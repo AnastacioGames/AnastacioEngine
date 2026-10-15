@@ -53,6 +53,10 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
   nos helpers de bake fora do `if(WIN32)` (`creator/CMakeLists.txt`). Conferir: build do editor e do player,
   export de vídeo, video texture, views do Color Management (Filmic etc.), menu ImGui no jogo (fonte e
   `imgui.ini` ao lado do executável) e bake de lightmap.
+  Soma-se, da preparação da release 0.5.1 (build e `ctest` só rodados no Linux): `bmesh_bevel.c`
+  (`adjust_offsets` recebe `bm` e usa `BM_ITER_MESH` em vez de `GHASH_ITER` na primeira passada, corrigindo
+  um `ctest bmesh_bevel` intermitente) e `selection_utils.py` (`bpy.utils.register_class` no lugar de
+  `register_module`, que não existe). Rodar `ctest` completo no Windows depois de compilar.
 - Migração Windows: editor `AnastacioEngine.exe` e player `AnastacioRuntime.exe` compilados.
   Cooking, standalone pelo editor e export nativo passaram em cena controlada; usuário
   confirmou que o jogo funciona após a migração. Pendente: console,
@@ -155,6 +159,14 @@ pacotes de teste 8201–8211 foram aceitos pelo usuário. Planos: [web-profile-v
 
 Aberto:
 
+- **Build Linux com Python wasm32 e primeiro carregamento completo:** os presets
+  `web-runtime-linux`/`web-runtime-release-linux` e o CPython 3.11 wasm32-emscripten local destravam o
+  configure e o build do `RangeRuntime` nesta máquina (detalhes em `web-python-poc-plan.md`). O alinhamento
+  de 8 bytes de `ImBuf` foi corrigido em 2026-10-13: `ppm[2]` é `double`, portanto `IMB_allocImBuf` usa
+  `MEM_mallocN_aligned(..., 8)` no wasm32. Reconfigure e rebuild release completos passaram; Chrome
+  headless carregou a cena, as texturas (90 ms) e os oito materiais sem `alignment fault`/aborto. Ainda falta
+  teste ponta a ponta jogável/visual antes de refazer o pacote Linux 0.5.1 com `web/` (o atual usa
+  `SKIP_WEB=1`).
 - **Patch do SDL2/Emscripten** (gate de timestamp do gamepad): versionado em `tools/web/patch-sdl2-gamepad.py`
   e aplicado no configure (`platform_web.cmake`). Gamepad físico conferido no navegador em 2026-09-20 (D-pad
   corrigido em `DEV_Joystick`, ver changelog). Controle sem mapeamento standard ("USB Joystick", D-pad como hat

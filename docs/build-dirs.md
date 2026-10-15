@@ -14,9 +14,9 @@ diga qual dos itens abaixo é. Assim um caminho não é confundido com outro.
 
 ## Expressões e o que significam
 
-- **Editor Windows:** o alvo `RangeEngine` produz `build/bin/AnastacioEngine.exe`; o player
-  é `build/bin/AnastacioRuntime.exe`, produzido pelo alvo `RangeRuntime`. No Linux,
-  editor/player continuam `RangeEngine`/`RangeRuntime`; artefatos Web mantêm `RangeRuntime.*`.
+- **Desktop Windows/Linux:** os alvos internos `RangeEngine` e `RangeRuntime` produzem,
+  respectivamente, `AnastacioEngine` e `AnastacioRuntime` (com `.exe` no Windows). Os
+  artefatos Web mantêm `RangeRuntime.*`.
 
 - **"Android"**, sem qualificação, = **Android Web (APK WebView)**. Erros em `build-android/` não bloqueiam o Android.
 - **"Ligar o Cycles no build principal"** = pôr `WITH_CYCLES=ON` no `build/`. Assim o editor e o player que vão para

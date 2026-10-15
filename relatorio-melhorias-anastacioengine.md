@@ -64,8 +64,8 @@ ferramenta correspondente.
 
 ## Demos de materiais de nós
 
-As [11 demos de nós revisadas](demos/revisados/README.md) ficam em `demos/revisados/`, com frames e
-notas por etapa, preservando os originais. A revisão inclui extremos exatos de dissolve e cobertura,
+As 11 demos de nós revisadas foram usadas na validação, com frames e
+notas por etapa, preservando os originais fora da árvore distribuída. A revisão inclui extremos exatos de dissolve e cobertura,
 nível de espuma em coordenadas do mundo, microrelevo triplanar, dimensões seguras de Interior Mapping
 e casco de contorno toon gravado na malha para o player.
 São mudanças de assets/Python, com execução das 11 cópias validada no player em 2026-10-07; a avaliação
@@ -222,7 +222,7 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 - Fragment shader customizado por emissor (Fase P): arquivo `.glsl` externo (`object.particles.fragmentShaderPath`
   em Python, campo "Fragment Shader File" na UI), com hot-reload automático (poll de mtime a cada ~0,5s) —
   edita-se o arquivo com o jogo rodando e o efeito atualiza sozinho. Exemplos prontos em
-  [`projects-teste/shaders/particles/`](projects-teste/shaders/particles/).
+  em exemplos locais de projeto (a pasta `projects-teste/` não é versionada).
 - **Animações de objetos de pool**: objetos reciclados que já chamaram `playAction()` uma vez ficavam permanentemente
   registrados em `KX_Scene::m_animatedlist`, gerando custo de dispatch de atualização de animação a cada frame mesmo
   quando suspensos no pool. Corrigido expondo `KX_GameObject::SuspendAnimations()`/`ResumeAnimations()` (wrappers

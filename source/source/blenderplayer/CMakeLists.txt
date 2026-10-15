@@ -73,6 +73,11 @@ elseif(APPLE)
 
 else()
 	add_executable(RangeRuntime bad_level_call_stubs/stubs.c)
+	if(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+		# Keep the target name stable while shipping the desktop Linux player
+		# under the same product name as Windows.
+		set_target_properties(RangeRuntime PROPERTIES OUTPUT_NAME "AnastacioRuntime")
+	endif()
 
 	if(NOT WITH_INSTALL_PORTABLE)
 		install(

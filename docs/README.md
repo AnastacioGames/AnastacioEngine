@@ -73,8 +73,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   com o pipeline de renderização.
 - [Materiais de nós](node-material-support.md): estado da compatibilidade e limitações do suporte a node materials.
 - [Nós de vertex, geometry e GLSL Script](shader-nodes.md): Vertex Offset, campo Geometry, nós novos e presets.
-- [Demos de nós revisadas](../demos/revisados/README.md): cópias das 11 receitas, frames explicativos,
-  correções de controles e procedimento de validação no player.
+- Demos de nós revisadas: as 11 receitas, frames explicativos e procedimento de validação no player
+  foram mantidos fora da árvore distribuída junto aos projetos de teste.
 - [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).
 - [Modernização dos Logic Bricks](logic-bricks-modernization.md), incluindo as notas de
   [eventos de cutscene](notes-cutscene-events.md) e a fase 4 (registrada no [changelog](changelog.md)).

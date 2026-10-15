@@ -4,7 +4,7 @@
 
 **Se voce baixou o release 0.4.1**: ele tem bugs de empacotamento (so um executavel na primeira
 versao; e o Python embutido no caminho errado, que da `No module named 'encodings'` fora da maquina
-de build). Use o release **0.5.0 ou mais recente**, que traz o editor e o `RangeRuntime`.
+de build). Use o release **0.5.0 ou mais recente**, que traz o editor e o `AnastacioRuntime`.
 
 **Se voce baixou o release 0.4.4 ou anterior** e aparece `libOpenImageIO.so.2.4: cannot open shared object file`
 (Ubuntu 26.04 e outras distros) ou erro de `GLIBC_2.38`: a 0.4.5 corrige os dois. Ela e compilada no Ubuntu 22.04
@@ -31,11 +31,11 @@ guarda o caminho do codigo antigo.
 Depois, um unico comando cobre dependencias (via apt), Python 3.11 isolado, configuracao e build:
 
 ```bash
-bash tools/linux/quickstart-editor.sh      # editor completo (RangeEngine)
-bash tools/linux/quickstart.sh             # so o player/runtime (RangeRuntime), pra rodar um .range
+bash tools/linux/quickstart-editor.sh      # editor completo (AnastacioEngine)
+bash tools/linux/quickstart.sh             # so o player/runtime (AnastacioRuntime), pra rodar um .range
 ```
 
-Executaveis ficam em `build-linux-editor/bin/RangeEngine` e `build-linux/bin/RangeRuntime`. **Nao e
+Executaveis ficam em `build-linux-editor/bin/AnastacioEngine` e `build-linux/bin/AnastacioRuntime`. **Nao e
 necessario** baixar `lib/linux_x64` via svn — isso e so para o build Windows (`lib/win64_vc15`); o preset
 Linux usa as bibliotecas da propria distro instaladas via apt.
 

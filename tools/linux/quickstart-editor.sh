@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roteiro automatico para compilar o RangeEngine (editor completo) no Linux.
+# Roteiro automatico para compilar o AnastacioEngine (editor completo) no Linux.
 # Uso:
 #   bash tools/linux/quickstart-editor.sh
 #
@@ -55,18 +55,18 @@ bash tools/linux/install-python311.sh
 step "4/5 - Checagem de ambiente (preflight)"
 PYTHON_VERSION="$PYTHON_VERSION" PYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" bash tools/linux/preflight.sh
 
-step "5/5 - Configurando e compilando (RangeEngine, preset linux-editor)"
+step "5/5 - Configurando e compilando (alvo RangeEngine, preset linux-editor)"
 cmake --preset linux-editor -S source
 cmake --build build-linux-editor --target RangeEngine -j"$(nproc)"
 cmake --install build-linux-editor
 
-if [ -x "build-linux-editor/bin/RangeEngine" ]; then
+if [ -x "build-linux-editor/bin/AnastacioEngine" ]; then
   echo
-  echo "Build concluido. Executavel pronto em: build-linux-editor/bin/RangeEngine"
+  echo "Build concluido. Executavel pronto em: build-linux-editor/bin/AnastacioEngine"
   echo "Se alguma dependencia (FFmpeg/OpenImageIO/OpenColorIO) nao foi encontrada,"
   echo "o CMake desliga a flag correspondente sozinho e mostra um aviso no log de"
   echo "configuracao acima -- releia-o se algum recurso do editor faltar em runtime."
 else
-  echo "Build terminou mas build-linux-editor/bin/RangeEngine nao foi encontrado." >&2
+  echo "Build terminou mas build-linux-editor/bin/AnastacioEngine nao foi encontrado." >&2
   exit 1
 fi

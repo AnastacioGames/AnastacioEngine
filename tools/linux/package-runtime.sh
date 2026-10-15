@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Empacota uma instalacao ja validada do RangeRuntime para Linux x86_64.
+# Empacota uma instalacao ja validada do AnastacioRuntime para Linux x86_64.
 
 set -euo pipefail
 
@@ -29,13 +29,13 @@ package_name="AnastacioEngine-${version}-linux-x86_64"
 staging_dir="$dist_dir/$package_name"
 archive="$dist_dir/$package_name.tar.xz"
 
-if [ ! -x "$runtime_dir/RangeRuntime" ] && [ ! -x "$runtime_dir/RangeEngine" ]; then
-  printf 'RangeRuntime/RangeEngine nao encontrado em %s. Execute cmake --install primeiro.\n' "$runtime_dir" >&2
+if [ ! -x "$runtime_dir/AnastacioRuntime" ] && [ ! -x "$runtime_dir/AnastacioEngine" ]; then
+	printf 'AnastacioRuntime/AnastacioEngine nao encontrado em %s. Execute cmake --install primeiro.\n' "$runtime_dir" >&2
   exit 1
 fi
 
-if [ -n "$extra_dir" ] && [ ! -x "$extra_dir/RangeRuntime" ] && [ ! -x "$extra_dir/RangeEngine" ]; then
-  printf 'EXTRA_BIN_DIR=%s nao tem RangeRuntime nem RangeEngine. Confira o cmake --install desse preset.\n' "$extra_dir" >&2
+if [ -n "$extra_dir" ] && [ ! -x "$extra_dir/AnastacioRuntime" ] && [ ! -x "$extra_dir/AnastacioEngine" ]; then
+	printf 'EXTRA_BIN_DIR=%s nao tem AnastacioRuntime nem AnastacioEngine. Confira o cmake --install desse preset.\n' "$extra_dir" >&2
   exit 1
 fi
 
@@ -52,10 +52,15 @@ if [ -n "$extra_dir" ]; then
   # sem sobrescrever nada que ja veio do runtime_dir principal.
   cp -an "$extra_dir/." "$staging_dir/"
 fi
+# cmake --install does not remove an old output after OUTPUT_NAME changes. Do
+# not let stale pre-rename binaries accidentally become part of a new release.
+rm -f "$staging_dir/RangeEngine" "$staging_dir/RangeRuntime"
 cp "$repo_root/source/COPYING" "$staging_dir/COPYING"
-# Icone e atalho do menu/dock (o executavel so define o icone da janela no X11).
-cp "$repo_root/source/release/linux/range-engine.png" "$repo_root/source/release/linux/RangeEngine.desktop" \
-  "$repo_root/source/release/linux/install-desktop.sh" "$staging_dir/"
+# Icone e atalho do menu/dock. O PNG e o mesmo cubo dourado que o recurso do
+# executavel Windows e o icone de janela X11; o executavel ELF nao o embute.
+cp "$repo_root/source/release/windows/icons/anastacio-engine-cube-splash-v2.png" \
+	"$repo_root/source/release/linux/install-desktop.sh" "$staging_dir/"
+cp "$repo_root/source/release/linux/RangeEngine.desktop" "$staging_dir/AnastacioEngine.desktop"
 # Ferramentas de build (geradores de codigo) e estado local do ImGui nao vao para o usuario.
 rm -f "$staging_dir/datatoc" "$staging_dir/datatoc_icon" "$staging_dir/makesdna" "$staging_dir/makesrna" \
   "$staging_dir/msgfmt" "$staging_dir/imgui.ini" "$staging_dir/\\imgui.ini"
@@ -63,15 +68,21 @@ rm -f "$staging_dir/datatoc" "$staging_dir/datatoc_icon" "$staging_dir/makesdna"
 rm -f "$staging_dir"/[0-9].[0-9]*/scripts/addons/Range_Components_Label.rar
 # web/ (runtime Web, empacotadores e template Android): sem ela Export Web e Build APK nao funcionam.
 # O runtime Web e o mesmo do Windows; WEB_RUNTIME_DIR aponta para a saida do preset web-runtime-release.
-python3 "$repo_root/tools/stage_release_web.py" "$staging_dir" \
-  --runtime-dir "${WEB_RUNTIME_DIR:-$repo_root/build-web-release/bin}"
+# SKIP_WEB=1 pula essa etapa (ex.: maquina sem o CPython wasm32 cross-compilado); o pacote sai sem web/.
+if [ "${SKIP_WEB:-0}" != "1" ]; then
+  python3 "$repo_root/tools/stage_release_web.py" "$staging_dir" \
+    --runtime-dir "${WEB_RUNTIME_DIR:-$repo_root/build-web-release/bin}"
+else
+  printf 'SKIP_WEB=1: pacote sem web/ (Export Web/Build APK ficam indisponiveis nesta copia).\n' >&2
+fi
 
 missing=""
-[ -x "$staging_dir/RangeRuntime" ] || missing="RangeRuntime"
-[ -x "$staging_dir/RangeEngine" ] || missing="${missing:+$missing e }RangeEngine"
+[ -x "$staging_dir/AnastacioRuntime" ] || missing="AnastacioRuntime"
+[ -x "$staging_dir/AnastacioEngine" ] || missing="${missing:+$missing e }AnastacioEngine"
+[ -f "$staging_dir/anastacio-engine-cube-splash-v2.png" ] || missing="${missing:+$missing e }icone AnastacioEngine"
 if [ -n "$missing" ]; then
   printf 'AVISO: pacote sem %s. Para publicar um release completo, compile os dois presets\n' "$missing" >&2
-  printf '(linux-runtime e linux-editor) e passe BIN_DIR + EXTRA_BIN_DIR apontando pra cada bin/.\n' >&2
+	printf '(linux-runtime e linux-editor) e passe BIN_DIR + EXTRA_BIN_DIR apontando pra cada bin/.\n' >&2
 fi
 
 # Torna o pacote portatil: embute o Python 3.11 isolado em <versao>/python e troca o RUNPATH absoluto
@@ -146,7 +157,7 @@ system_libs='^(ld-linux.*|lib(c|m|dl|pthread|rt|resolv|util|anl|nsl|mvec)|libstd
 ldd_targets=()
 while IFS= read -r -d '' f; do
   head -c4 "$f" | grep -q 'ELF' && ldd_targets+=("$f")
-done < <(find "$staging_dir" -type f \( -name 'Range*' -o -name '*.so' -o -name '*.so.*' \) -print0)
+done < <(find "$staging_dir" -type f \( -name 'Anastacio*' -o -name '*.so' -o -name '*.so.*' \) -print0)
 bundled=0
 while read -r soname path; do
   printf '%s\n' "$soname" | grep -Eq "$system_libs" && continue
@@ -154,11 +165,14 @@ while read -r soname path; do
   [ -e "$staging_dir/lib/$soname" ] && continue
   cp -L "$path" "$staging_dir/lib/$soname"
   bundled=$((bundled + 1))
-done < <(ldd "${ldd_targets[@]}" 2>/dev/null | awk '$2 == "=>" && $3 ~ /^\// {print $1, $3}' | sort -u -k1,1)
+done < <(LD_LIBRARY_PATH="$staging_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  ldd "${ldd_targets[@]}" 2>/dev/null | awk '$2 == "=>" && $3 ~ /^\// {print $1, $3}' | sort -u -k1,1)
 printf 'Bibliotecas da distro empacotadas em lib/: %s\n' "$bundled"
-if ldd "${ldd_targets[@]}" 2>/dev/null | grep -q 'not found'; then
+if LD_LIBRARY_PATH="$staging_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  ldd "${ldd_targets[@]}" 2>/dev/null | grep -q 'not found'; then
   printf 'Dependencia nao encontrada na maquina de build:\n' >&2
-  ldd "${ldd_targets[@]}" 2>/dev/null | grep 'not found' | sort -u >&2
+	LD_LIBRARY_PATH="$staging_dir/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    ldd "${ldd_targets[@]}" 2>/dev/null | grep 'not found' | sort -u >&2
   exit 1
 fi
 
@@ -167,7 +181,7 @@ fi
 python3 - "$staging_dir" <<'PY'
 import os, struct, sys
 root = sys.argv[1]
-for name in ("RangeEngine", "RangeRuntime"):
+for name in ("AnastacioEngine", "AnastacioRuntime"):
     path = os.path.join(root, name)
     if not os.path.isfile(path):
         continue

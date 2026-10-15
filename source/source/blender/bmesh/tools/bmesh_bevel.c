@@ -2189,17 +2189,26 @@ static void adjust_the_cycle_or_chain(BoundVert *vstart, bool iscycle)
  * It turns out that the dependent offsets either form chains or
  * cycles, and we can process each of those separatey.
  */
-static void adjust_offsets(BevelParams *bp)
+static void adjust_offsets(BevelParams *bp, BMesh *bm)
 {
+	BMIter iter;
+	BMVert *v_mesh;
 	BevVert *bv, *bvcur;
 	BoundVert *v, *vanchor, *vchainstart, *vnext;
 	EdgeHalf *enext;
-	GHashIterator giter;
 	bool iscycle;
 
-	/* find and process chains and cycles of unvisited BoundVerts that have eon set */
-	GHASH_ITER(giter, bp->vert_hash) {
-		bv = bvcur = BLI_ghashIterator_getValue(&giter);
+	/* Find and process chains and cycles of unvisited BoundVerts that have eon set.
+	 * Walk tagged mesh verts in their (deterministic) BMesh order rather than bp->vert_hash's
+	 * GHash order (keyed by BMVert pointer): which vert starts a cycle walk can change the
+	 * float rounding of adjust_the_cycle_or_chain's result, and the pointer-hash order is not
+	 * reproducible across runs (depends on allocation addresses). */
+	BM_ITER_MESH (v_mesh, &iter, bm, BM_VERTS_OF_MESH) {
+		if (!BM_elem_flag_test(v_mesh, BM_ELEM_TAG))
+			continue;
+		bv = bvcur = find_bevvert(bp, v_mesh);
+		if (!bv)
+			continue;
 		vanchor = bv->vmesh->boundstart;
 		do {
 			if (vanchor->visited || !vanchor->eon)
@@ -2252,9 +2261,12 @@ static void adjust_offsets(BevelParams *bp)
 	}
 
 	/* Rebuild boundaries with new width specs */
-	GHASH_ITER(giter, bp->vert_hash) {
-		bv = BLI_ghashIterator_getValue(&giter);
-		build_boundary(bp, bv, false);
+	{
+		GHashIterator giter;
+		GHASH_ITER(giter, bp->vert_hash) {
+			bv = BLI_ghashIterator_getValue(&giter);
+			build_boundary(bp, bv, false);
+		}
 	}
 }
 
@@ -5393,7 +5405,7 @@ void BM_mesh_bevel(
 
 		/* Perhaps do a pass to try to even out widths */
 		if (!bp.vertex_only && bp.offset_adjust && bp.offset_type != BEVEL_AMT_PERCENT) {
-			adjust_offsets(&bp);
+			adjust_offsets(&bp, bm);
 		}
 
 		/* Build the meshes around vertices, now that positions are final */

@@ -301,6 +301,10 @@ else()
 	if(WIN32)
 		# Preserve the internal target and Python-module output names.
 		set_target_properties(RangeEngine PROPERTIES OUTPUT_NAME "AnastacioEngine")
+	elseif(UNIX AND NOT APPLE AND NOT EMSCRIPTEN)
+		# Desktop Linux follows the Windows product name. Keep the CMake target
+		# itself as RangeEngine: scripts and dependent targets use that contract.
+		set_target_properties(RangeEngine PROPERTIES OUTPUT_NAME "AnastacioEngine")
 	endif()
 	WINDOWS_SIGN_TARGET(RangeEngine)
 endif()

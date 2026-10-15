@@ -1,4 +1,4 @@
-"""Copy the available RangeRuntime installations into a RangeArmor project.
+"""Copy the available AnastacioRuntime installations into a RangeArmor project.
 
 The Panel may run on Windows while a Linux runtime was built through WSL.
 Therefore platform selection is independent from the Panel host OS: the
@@ -21,7 +21,7 @@ data = _common.getProjectData()
 
 PLATFORMS = {
     "Windows64": "AnastacioRuntime.exe",
-    "Linux64": "RangeRuntime",
+    "Linux64": "AnastacioRuntime",
 }
 
 
@@ -42,7 +42,7 @@ def main():
         copied += 1
 
     if copied == 0:
-        raise RuntimeError("No RangeRuntime installation was found. Set RANGEARMOR_ENGINE_DIR_WINDOWS64 and/or RANGEARMOR_ENGINE_DIR_LINUX64.")
+        raise RuntimeError("No AnastacioRuntime installation was found. Set RANGEARMOR_ENGINE_DIR_WINDOWS64 and/or RANGEARMOR_ENGINE_DIR_LINUX64.")
 
 
 def requested_platforms():
