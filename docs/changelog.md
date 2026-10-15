@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-15 - Baked Lighting: interface em português
+
+- O painel agora usa `Iluminação Pré-calculada`, com os três modos, avisos, contagem de receptores,
+  cobertura do atlas, botões e dicas em português. Mensagens de progresso e de erro do bake também foram
+  traduzidas.
+- O antigo `Texture Bake (Legacy)` foi renomeado para `Bake de Textura (Legado)` e seu aviso direciona
+  para o painel moderno em português. Os scripts de fonte e da instalação `build/bin/` foram sincronizados.
+
 ## 2026-10-15 - OpenCL bake: aviso indevido de `kernel_lamp_emission`
 
 - Reproduzido em `projects-teste/baked_gpu.range`: o plano tem material de nós sem texture slot,
