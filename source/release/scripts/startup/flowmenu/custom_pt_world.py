@@ -519,76 +519,83 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         if weather.show_expanded_rain:
             col = main_box.column(align=True)
             col.active = weather.use_rain
-            row = col.row()
+            row = col.row(align=True)
+            row.prop(weather, "show_expanded_rain_droplets", text="Droplets", emboss=True)
             row.prop(weather, "use_rain_droplets", text="")
-            row.label(text="Droplets")
-            col.prop(weather, "rain_style")
-            col.prop(weather, "rain_intensity", slider=True)
-            col.prop(weather, "rain_speed", text="Fall Speed")
-            if weather.rain_style == 'CLASSIC':
-                col.prop(weather, "rain_density")
-                col.prop(weather, "rain_wind", text="Wind")
-                col.prop(weather, "rain_streak_width")
-            col.prop(weather, "rain_darken", slider=True)
-            col.prop(weather, "rain_color", text="Rain Color")
+            if weather.show_expanded_rain_droplets:
+                sub = col.column(align=True)
+                sub.active = weather.use_rain_droplets
+                sub.prop(weather, "rain_style")
+                sub.prop(weather, "rain_intensity", slider=True)
+                sub.prop(weather, "rain_speed", text="Fall Speed")
+                if weather.rain_style == 'CLASSIC':
+                    sub.prop(weather, "rain_density")
+                    sub.prop(weather, "rain_wind", text="Wind")
+                    sub.prop(weather, "rain_streak_width")
+                sub.prop(weather, "rain_darken", slider=True)
+                sub.prop(weather, "rain_color", text="Rain Color")
 
-            # Ripples e Splash: mesma lista, na mesma ordem.
-            for effect, label, prop_name in (("ripple", "Ripples", "ripples_effect"),
-                                             ("splash", "Splash", "splash_effect")):
-                row = col.row()
+            for effect, label, prop_name, expanded_prop in (("ripple", "Ripples", "ripples_effect", "show_expanded_rain_ripples"),
+                                                            ("splash", "Splash", "splash_effect", "show_expanded_rain_splash")):
+                row = col.row(align=True)
+                row.prop(weather, expanded_prop, text=label, emboss=True)
                 row.prop(weather, "use_rain_" + effect, text="")
-                row.label(text=label)
-                sub = col.column()
-                sub.active = getattr(weather, "use_rain_" + effect)
-                prefix = "rain_" + effect + "_"
-                sub.prop(weather, prefix + "intensity")
-                sub.prop(weather, "use_rain_" + effect + "_puddle_only")
-                sub.prop(weather, prefix + "size")
-                sub.prop(weather, prefix + "rate")
-                sub.prop(weather, prefix + "normal")
-                sub.prop(weather, prefix + "distance", text=label.rstrip("s") + " Distance")
-                sub.prop(weather, prefix + "min_up")
-                sub.label(text="Only objects with \"%s\" (all when none has it)" % prop_name, icon='INFO')
+                if getattr(weather, expanded_prop):
+                    sub = col.column(align=True)
+                    sub.active = getattr(weather, "use_rain_" + effect)
+                    puddle_only = sub.row(align=True)
+                    puddle_only.prop(weather, "use_rain_" + effect + "_puddle_only")
+                    prefix = "rain_" + effect + "_"
+                    sub.prop(weather, prefix + "intensity")
+                    sub.prop(weather, prefix + "size")
+                    sub.prop(weather, prefix + "rate")
+                    sub.prop(weather, prefix + "normal")
+                    sub.prop(weather, prefix + "distance", text=label.rstrip("s") + " Distance")
+                    sub.prop(weather, prefix + "min_up")
+                    sub.label(text="Only objects with \"%s\" (all when none has it)" % prop_name, icon='INFO')
 
-            row = col.row()
+            row = col.row(align=True)
+            row.prop(weather, "show_expanded_rain_puddles", text="Puddles", emboss=True)
             row.prop(weather, "use_rain_puddles", text="")
-            row.label(text="Puddles")
-            sub = col.column()
-            sub.active = weather.use_rain_puddles
-            sub.prop(weather, "rain_puddle_amount", text="Amount", slider=True)
-            sub.prop(weather, "rain_puddle_size", text="Size")
-            sub.prop(weather, "rain_puddle_darkness", text="Darkness", slider=True)
-            sub.prop(weather, "rain_puddle_reflection", text="Reflection", slider=True)
-            sub.prop(weather, "use_rain_puddle_ssr", text="Screen Space Reflection")
-            sub.prop(weather, "rain_puddle_distance", text="Puddle Distance")
-            sub.prop(weather, "rain_puddle_min_up", text="Upward Surface")
-            sub.label(text="Only objects with \"puddles_effect\" (all when none has it)", icon='INFO')
+            if weather.show_expanded_rain_puddles:
+                sub = col.column(align=True)
+                sub.active = weather.use_rain_puddles
+                sub.prop(weather, "rain_puddle_amount", text="Amount", slider=True)
+                sub.prop(weather, "rain_puddle_size", text="Size")
+                sub.prop(weather, "rain_puddle_darkness", text="Darkness", slider=True)
+                sub.prop(weather, "rain_puddle_reflection", text="Reflection", slider=True)
+                sub.prop(weather, "use_rain_puddle_ssr", text="Screen Space Reflection")
+                sub.prop(weather, "rain_puddle_distance", text="Puddle Distance")
+                sub.prop(weather, "rain_puddle_min_up", text="Upward Surface")
+                sub.label(text="Only objects with \"puddles_effect\" (all when none has it)", icon='INFO')
 
-            row = col.row()
+            row = col.row(align=True)
+            row.prop(weather, "show_expanded_rain_aura", text="Aura", emboss=True)
             row.prop(weather, "use_rain_aura", text="")
-            row.label(text="Aura")
-            sub = col.column()
-            sub.active = weather.use_rain_aura
-            sub.prop(weather, "rain_aura_property", text="Property")
-            info = sub.column(align=True)
-            info.label(text="Only objects with \"%s\" set to True" % (weather.rain_aura_property or "..."), icon='INFO')
-            info.label(text="(every nearby object when none has it)")
-            sub.prop(weather, "rain_aura_style", text="Style")
-            sub.prop(weather, "rain_aura_size")
-            sub.prop(weather, "rain_aura_rate")
-            sub.prop(weather, "rain_aura_intensity")
-            sub.prop(weather, "rain_aura_distance")
+            if weather.show_expanded_rain_aura:
+                sub = col.column(align=True)
+                sub.active = weather.use_rain_aura
+                sub.prop(weather, "rain_aura_property", text="Property")
+                info = sub.column(align=True)
+                info.label(text="Only objects with \"%s\" set to True" % (weather.rain_aura_property or "..."), icon='INFO')
+                info.label(text="(every nearby object when none has it)")
+                sub.prop(weather, "rain_aura_style", text="Style")
+                sub.prop(weather, "rain_aura_size")
+                sub.prop(weather, "rain_aura_rate")
+                sub.prop(weather, "rain_aura_intensity")
+                sub.prop(weather, "rain_aura_distance")
 
-            row = col.row()
+            row = col.row(align=True)
+            row.prop(weather, "show_expanded_rain_lightning", text="Lightning", emboss=True)
             row.prop(weather, "use_rain_lightning", text="")
-            row.label(text="Lightning")
-            sub = col.column()
-            sub.active = weather.use_rain_lightning
-            sub.prop(weather, "rain_lightning_rate", text="Per Minute")
-            sub.prop(weather, "rain_lightning_intensity", text="Intensity")
-            sub.prop(weather, "rain_lightning_distance", text="Distance")
-            sub.prop(weather, "rain_lightning_width", text="Width")
-            sub.prop(weather, "use_rain_lightning_side")
+            if weather.show_expanded_rain_lightning:
+                sub = col.column(align=True)
+                sub.active = weather.use_rain_lightning
+                sub.prop(weather, "rain_lightning_rate", text="Per Minute")
+                sub.prop(weather, "rain_lightning_intensity", text="Intensity")
+                sub.prop(weather, "rain_lightning_distance", text="Distance")
+                sub.prop(weather, "rain_lightning_width", text="Width")
+                sub.prop(weather, "use_rain_lightning_side")
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_clouds", text="Clouds - Procedural", emboss=True)

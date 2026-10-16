@@ -328,6 +328,10 @@ void BKE_world_init(World *wrld)
 
 	/* weather (rain/clouds/lens flare) */
 	wrld->weather_flag |= (WO_WEATHER_RAIN_DROPLETS | WO_WEATHER_RAIN_RIPPLE);
+	wrld->weather_expand_flag |= (WO_WEATHER_RAIN_DROPLETS | WO_WEATHER_RAIN_RIPPLE |
+	                             WO_WEATHER_RAIN_SPLASH |
+	                             WO_WEATHER_RAIN_PUDDLES | WO_WEATHER_RAIN_AURA |
+	                             WO_WEATHER_RAIN_LIGHTNING);
 	wrld->rain_intensity = 0.5f;
 	wrld->rain_density = 1.0f;
 	wrld->rain_speed = 1.0f;

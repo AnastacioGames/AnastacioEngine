@@ -1053,6 +1053,42 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
 	RNA_def_property_update(prop, 0, NULL);
 
+	prop = RNA_def_property(srna, "show_expanded_rain_droplets", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_RAIN_DROPLETS);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the Droplets rain settings");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded_rain_ripples", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_RAIN_RIPPLE);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the Ripples rain settings");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded_rain_splash", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_RAIN_SPLASH);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the Splash rain settings");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded_rain_puddles", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_RAIN_PUDDLES);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the Puddles rain settings");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded_rain_aura", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_RAIN_AURA);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the Aura rain settings");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "show_expanded_rain_lightning", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "weather_expand_flag", WO_WEATHER_RAIN_LIGHTNING);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the Lightning rain settings");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
 	prop = RNA_def_property(srna, "rain_style", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "rain_style");
 	RNA_def_property_enum_items(prop, rain_style_items);

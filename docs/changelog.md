@@ -6,6 +6,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-16 - Weather Rain: seções expansíveis
+
+- Droplets, Ripples, Splash, Puddles, Aura e Lightning agora têm cabeçalhos horizontais expansíveis, cada qual
+  com uma seta e seu próprio controle de ativação no lado direito. Ripples e Splash deixaram de dividir uma
+  mesma seção e de usar colunas, para manter esse padrão visual.
+- As seções vêm abertas em Worlds novos e são abertas uma vez ao carregar arquivos existentes, preservando a
+  apresentação anterior até o usuário escolher quais recolher.
+
+## 2026-10-16 - Weather Rain: Ripples e Splash lado a lado
+
+- O painel de chuva agora organiza todos os controles de Ripples em uma coluna e todos os controles de Splash
+  na coluna ao lado. Em cada cabeçalho, o checkbox do efeito e seu próprio `Only in Puddles` ficam na mesma
+  linha; os avisos das game properties foram quebrados em duas linhas para caberem na nova largura.
+
 ## 2026-10-16 - CSM com referência pela câmera ou pela luz Sun
 
 - A Lamp Sun com CSM ganhou a opção `Reference`: `Camera` mantém as três faixas de profundidade anteriores;

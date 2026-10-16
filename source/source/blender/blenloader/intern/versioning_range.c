@@ -482,6 +482,24 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 119)) {
+    /* Keep the new Rain sub-panels open for existing files, preserving the previous
+     * fully expanded presentation on their first load in this version. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->weather_expand_flag |= (WO_WEATHER_RAIN_DROPLETS | WO_WEATHER_RAIN_RIPPLE |
+                                  WO_WEATHER_RAIN_PUDDLES | WO_WEATHER_RAIN_AURA |
+                                  WO_WEATHER_RAIN_LIGHTNING);
+    }
+  }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 120)) {
+    /* Splash now has its own Rain sub-panel. Open it for existing files so the
+     * change does not hide its settings on first load. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->weather_expand_flag |= WO_WEATHER_RAIN_SPLASH;
+    }
+  }
+
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 109)) {
     /* Cutscene settings are new scene-owned data. Older files have no settings block,
      * so create an empty one instead of leaving later RNA/UI access to handle a NULL
