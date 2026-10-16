@@ -2064,11 +2064,6 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
         # and no VSM/CSM/filter variants (see gpu_lamp_create_point_shadow_buffer).
         is_point = lamp.type == 'POINT'
         is_sun = lamp.type == 'SUN'
-        is_simple = is_point or lamp.ge_shadow_buffer_type == "SIMPLE"
-        use_csm = is_sun and lamp.use_csm_shadow
-        # Auto Bias: CSM + Simple buffer only (VSM keeps its own bias meaning).
-        auto_bias = use_csm and is_simple and lamp.use_csm_auto_bias
-        two_cascades = lamp.csm_cascade_count == 2
 
         main_box = layout.box()
 
@@ -2102,115 +2097,148 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
         if is_sun:
             col.prop(lamp, "shadow_frustum_size", text="Frustum Size")
 
-        # --- Buffer & Quality ---
-        row = main_box.row(align=True)
-        row.prop(lamp, "show_expanded_lamp_shadow_buffer", text="Buffer & Quality",
-                 icon='TRIA_DOWN' if lamp.show_expanded_lamp_shadow_buffer else 'TRIA_RIGHT', emboss=True)
-        if lamp.show_expanded_lamp_shadow_buffer:
-            box = main_box.box()
 
-            if not is_point:
-                split = box.split(factor=0.3)
-                split.label("Type:")
-                split.row().prop(lamp, "ge_shadow_buffer_type", expand=True)
-                if is_simple:
-                    split = box.split(factor=0.3)
-                    split.label("Filter:")
-                    split.prop(lamp, "shadow_filter", text="")
+def _shadow_flags(lamp):
+    """Shared state of the Use Shadow panel and its sub-panels."""
+    is_point = lamp.type == 'POINT'
+    is_simple = is_point or lamp.ge_shadow_buffer_type == "SIMPLE"
+    use_csm = lamp.type == 'SUN' and lamp.use_csm_shadow
+    # Auto Bias: CSM + Simple buffer only (VSM keeps its own bias meaning).
+    auto_bias = use_csm and is_simple and lamp.use_csm_auto_bias
+    return is_point, is_simple, use_csm, auto_bias
 
-            pcf = lamp.shadow_filter in ("PCF", "PCF_BAIL", "PCF_JITTER", "PCF_PENUMBRA")
-            if use_csm:
-                # Cascades read one tap per pixel; per-cascade sizes live in the cascade table.
-                if is_simple and pcf:
-                    box.label("PCF filters are not used with cascades", icon='INFO')
+
+class DATA_PT_shadow_game_buffer(DataButtonsPanel, Panel):
+    bl_label = "Buffer & Quality"
+    bl_parent_id = "DATA_PT_shadow_game"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return DATA_PT_shadow_game.poll(context)
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon='IMAGE_DATA')
+
+    def draw(self, context):
+        lamp = context.lamp
+        layout = self.layout
+        layout.active = lamp.use_shadow
+        is_point, is_simple, use_csm, auto_bias = _shadow_flags(lamp)
+
+        if not is_point:
+            split = layout.split(factor=0.3)
+            split.label("Type:")
+            split.row().prop(lamp, "ge_shadow_buffer_type", expand=True)
+            if is_simple:
+                split = layout.split(factor=0.3)
+                split.label("Filter:")
+                split.prop(lamp, "shadow_filter", text="")
+
+        pcf = lamp.shadow_filter in ("PCF", "PCF_BAIL", "PCF_JITTER", "PCF_PENUMBRA")
+        if use_csm:
+            # Cascades read one tap per pixel; per-cascade sizes live in the cascade table.
+            if is_simple and pcf:
+                layout.label("PCF filters are not used with cascades", icon='INFO')
+        else:
+            col = layout.column(align=True)
+            col.prop(lamp, "shadow_buffer_size", text="Size")
+            if is_point:
+                # The atlas is Size*3 x Size*2 texels, so the engine caps Size at 2048.
+                col.label("Size above 2048 is clamped (cube atlas)", icon='INFO')
+            elif not is_simple:
+                col.prop(lamp, "shadow_buffer_sharp", text="Sharpness")
+            elif pcf:
+                col.prop(lamp, "shadow_buffer_samples", text="Samples")
+                col.prop(lamp, "shadow_buffer_soft", text="Soft")
+
+        layout.separator()
+        row = layout.row()
+        row.label("Bias:")
+        if use_csm and is_simple:
+            row.prop(lamp, "use_csm_auto_bias", text="Auto")
+        row = layout.row(align=True)
+        if auto_bias:
+            row.prop(lamp, "shadow_buffer_bias", text="Strength")
+            layout.label("Follows each cascade's texel size", icon='INFO')
+        elif use_csm:
+            # Per-cascade Bias is in the cascade table; Slope/Bleed bias is lamp-wide.
+            if is_simple:
+                row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")
             else:
-                col = box.column(align=True)
-                col.prop(lamp, "shadow_buffer_size", text="Size")
-                if is_point:
-                    # The atlas is Size*3 x Size*2 texels, so the engine caps Size at 2048.
-                    col.label("Size above 2048 is clamped (cube atlas)", icon='INFO')
-                elif not is_simple:
-                    col.prop(lamp, "shadow_buffer_sharp", text="Sharpness")
-                elif pcf:
-                    col.prop(lamp, "shadow_buffer_samples", text="Samples")
-                    col.prop(lamp, "shadow_buffer_soft", text="Soft")
-
-            box.separator()
-            row = box.row()
-            row.label("Bias:")
-            if use_csm and is_simple:
-                row.prop(lamp, "use_csm_auto_bias", text="Auto")
-            row = box.row(align=True)
-            if auto_bias:
-                row.prop(lamp, "shadow_buffer_bias", text="Strength")
-                box.label("Follows each cascade's texel size", icon='INFO')
-            elif use_csm:
-                # Per-cascade Bias is in the cascade table; Slope/Bleed bias is lamp-wide.
-                if is_simple:
-                    row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")
-                else:
-                    row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
+                row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
+        else:
+            row.prop(lamp, "shadow_buffer_bias", text="Bias")
+            if not is_simple:
+                row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
             else:
-                row.prop(lamp, "shadow_buffer_bias", text="Bias")
-                if not is_simple:
-                    row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
-                else:
-                    row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")
-
-        # --- Cascaded Shadow Mapping (Sun only) ---
-        if is_sun:
-            row = main_box.row(align=True)
-            row.prop(lamp, "show_expanded_lamp_shadow_csm", text="Cascaded Shadow Mapping",
-                     icon='TRIA_DOWN' if lamp.show_expanded_lamp_shadow_csm else 'TRIA_RIGHT', emboss=True)
-            row.prop(lamp, "use_csm_shadow", text="")
-            if lamp.show_expanded_lamp_shadow_csm:
-                box = main_box.box()
-                box.active = lamp.use_csm_shadow
-
-                split = box.split(factor=0.3)
-                split.label("Reference:")
-                split.row().prop(lamp, "csm_reference", expand=True)
-                split = box.split(factor=0.3)
-                split.label("Cascades:")
-                split.prop(lamp, "csm_cascade_count", text="")
-
-                light_ref = lamp.csm_reference == 'LIGHT'
-                col = box.column(align=True)
-                col.prop(lamp, "cascaded_proportion_two",
-                         text="Near Size" if light_ref else "Near Range", slider=True)
-                if not two_cascades:
-                    col.prop(lamp, "cascaded_proportion_three",
-                             text="Medium Expansion" if light_ref else "Medium Range", slider=True)
-                last = "Medium" if two_cascades else "Low"
-                box.label(("%s reaches Frustum Size" if light_ref else "%s reaches Clip End") % last,
-                          icon='INFO')
-
-                # One row per cascade: buffer size, plus its bias when Auto Bias is off.
-                rows = [("Near", "shadow_buffer_size", "shadow_buffer_bias"),
-                        ("Medium", "shadow_csm_two_buffer_size", "shadow_buffer_bias_two")]
-                if not two_cascades:
-                    rows.append(("Low", "shadow_csm_three_buffer_size", "shadow_buffer_bias_three"))
-                show_bias = is_simple and not auto_bias
-                col = box.column(align=True)
-                split = col.split(factor=0.3)
-                split.label("")
-                sub = split.row(align=True)
-                sub.label("Size")
-                if show_bias:
-                    sub.label("Bias")
-                for name, size_prop, bias_prop in rows:
-                    split = col.split(factor=0.3)
-                    split.label(name)
-                    sub = split.row(align=True)
-                    sub.prop(lamp, size_prop, text="")
-                    if show_bias:
-                        sub.prop(lamp, bias_prop, text="")
-
-                box.prop(lamp, "use_csm_debug", text="Show Cascades (Debug)")
+                row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")
 
 
-bpy.types.Lamp.show_expanded_lamp_shadow_buffer = bpy.props.BoolProperty(name="Expanded", default=False)
-bpy.types.Lamp.show_expanded_lamp_shadow_csm = bpy.props.BoolProperty(name="Expanded", default=False)
+class DATA_PT_shadow_game_csm(DataButtonsPanel, Panel):
+    bl_label = "Cascaded Shadow Mapping"
+    bl_parent_id = "DATA_PT_shadow_game"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return DATA_PT_shadow_game.poll(context) and context.lamp.type == 'SUN'
+
+    def draw_header(self, context):
+        row = self.layout.row(align=True)
+        row.prop(context.lamp, "use_csm_shadow", text="")
+        row.label(text="", icon='MOD_ARRAY')
+
+    def draw(self, context):
+        lamp = context.lamp
+        layout = self.layout
+        layout.active = lamp.use_shadow and lamp.use_csm_shadow
+        is_point, is_simple, use_csm, auto_bias = _shadow_flags(lamp)
+        two_cascades = lamp.csm_cascade_count == 2
+
+        split = layout.split(factor=0.3)
+        split.label("Reference:")
+        split.row().prop(lamp, "csm_reference", expand=True)
+        split = layout.split(factor=0.3)
+        split.label("Cascades:")
+        split.prop(lamp, "csm_cascade_count", text="")
+
+        light_ref = lamp.csm_reference == 'LIGHT'
+        col = layout.column(align=True)
+        col.prop(lamp, "cascaded_proportion_two",
+                 text="Near Size" if light_ref else "Near Range", slider=True)
+        if not two_cascades:
+            col.prop(lamp, "cascaded_proportion_three",
+                     text="Medium Expansion" if light_ref else "Medium Range", slider=True)
+        last = "Medium" if two_cascades else "Low"
+        layout.label(("%s reaches Frustum Size" if light_ref else "%s reaches Clip End") % last,
+                     icon='INFO')
+
+        # One row per cascade: buffer size, plus its bias when Auto Bias is off.
+        rows = [("Near", "shadow_buffer_size", "shadow_buffer_bias"),
+                ("Medium", "shadow_csm_two_buffer_size", "shadow_buffer_bias_two")]
+        if not two_cascades:
+            rows.append(("Low", "shadow_csm_three_buffer_size", "shadow_buffer_bias_three"))
+        show_bias = is_simple and not auto_bias
+        col = layout.column(align=True)
+        split = col.split(factor=0.3)
+        split.label("")
+        sub = split.row(align=True)
+        sub.label("Size")
+        if show_bias:
+            sub.label("Bias")
+        for name, size_prop, bias_prop in rows:
+            split = col.split(factor=0.3)
+            split.label(name)
+            sub = split.row(align=True)
+            sub.prop(lamp, size_prop, text="")
+            if show_bias:
+                sub.prop(lamp, bias_prop, text="")
+
+        layout.prop(lamp, "use_csm_debug", text="Show Cascades (Debug)")
+
 
 
 class DATA_PT_light_culling_game(DataButtonsPanel, Panel):
@@ -2925,6 +2953,8 @@ classes = (
     WORLD_PT_game_environment_lighting,
     WORLD_PT_game_mist,
     DATA_PT_shadow_game,
+    DATA_PT_shadow_game_buffer,
+    DATA_PT_shadow_game_csm,
     DATA_PT_light_culling_game,
     OBJECT_MT_lod_tools,
     OBJECT_OT_game_load_with_scene,
