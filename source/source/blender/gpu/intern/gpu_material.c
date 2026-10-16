@@ -2364,7 +2364,14 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 				}
 			}
 
-			if (lamp->type == LA_SUN && lamp->spotbl != 0.0) {
+			if (lamp->type == LA_SUN && lamp->spotbl != 0.0 && GPU_lamp_has_cascaded_shadow(lamp)) {
+				GPU_link(mat, "shadow_fade_csm", GPU_material_builtin(mat, GPU_VIEW_POSITION),
+					GPU_select_uniform(&lamp->spotbl, GPU_DYNAMIC_LAMP_SPOTBLEND, lamp->ob, ma),
+					GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+					GPU_dynamic_uniform((float *)lamp->cascade[1]->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+					GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL), shadfac, &shadfac);
+			}
+			else if (lamp->type == LA_SUN && lamp->spotbl != 0.0) {
 				GPU_link(mat, "shadow_fade", GPU_material_builtin(mat, GPU_VIEW_POSITION),
 					GPU_select_uniform(&lamp->spotbl, GPU_DYNAMIC_LAMP_SPOTBLEND, lamp->ob, ma),
 					GPU_dynamic_uniform((float*)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob), shadfac, &shadfac);

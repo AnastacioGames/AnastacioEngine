@@ -3968,6 +3968,15 @@ void shadow_fade(vec3 rco, float fadefac, mat4 shadowpersmat, float shadfac, out
 	result = mix(shadfac, 1.0, length(uv));
 }
 
+/* Shadow Fade for a Sun with cascades. Light-reference cascades are concentric, so the coverage
+ * edge is the outer (Low) map: fading against the Near map would whiten Medium/Low entirely.
+ * Camera-reference cascades keep the legacy Near-map fade. */
+void shadow_fade_csm(vec3 rco, float fadefac, mat4 nearpersmat, mat4 outerpersmat,
+                     float referenceLight, float shadfac, out float result)
+{
+	shadow_fade(rco, fadefac, (referenceLight < 0.5) ? nearpersmat : outerpersmat, shadfac, result);
+}
+
 /* Colored shadows. In a lamp's shadow color pass (pass = 1) a Colored Shadows caster outputs the
  * light it lets through: its color blended toward white as it gets more transparent, nothing where
  * it is almost opaque (lead lines of a stained glass). Alpha carries the depth, kept at its nearest
