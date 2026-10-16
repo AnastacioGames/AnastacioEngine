@@ -59,6 +59,23 @@ static void rna_Lamp_use_csm_shadow_set(PointerRNA *ptr, bool value)
 	la->shadow_cascade_count = value ? 3 : 0;
 }
 
+static int rna_Lamp_csm_cascade_count_get(PointerRNA *ptr)
+{
+	Lamp *la = (Lamp *)ptr->data;
+	return (la->csm_flag & LA_CSM_TWO_CASCADES) ? 2 : 3;
+}
+
+static void rna_Lamp_csm_cascade_count_set(PointerRNA *ptr, int value)
+{
+	Lamp *la = (Lamp *)ptr->data;
+	if (value == 2) {
+		la->csm_flag |= LA_CSM_TWO_CASCADES;
+	}
+	else {
+		la->csm_flag &= ~LA_CSM_TWO_CASCADES;
+	}
+}
+
 static int rna_Lamp_csm_reference_get(PointerRNA *ptr)
 {
 	Lamp *la = (Lamp *)ptr->data;
@@ -967,6 +984,20 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 	RNA_def_property_enum_funcs(prop, "rna_Lamp_csm_reference_get", "rna_Lamp_csm_reference_set", NULL);
 	RNA_def_property_ui_text(prop, "Reference",
 	                         "Choose whether cascade distances start from the active Camera or follow the Light direction");
+	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+
+	prop = RNA_def_property(srna, "csm_cascade_count", PROP_INT, PROP_NONE);
+	RNA_def_property_int_funcs(prop, "rna_Lamp_csm_cascade_count_get", "rna_Lamp_csm_cascade_count_set", NULL);
+	RNA_def_property_range(prop, 2, 3);
+	RNA_def_property_ui_text(prop, "Cascades",
+	                         "Number of shadow cascades: 2 (Near + Medium, cheaper) or 3 (Near + Medium + Low)");
+	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+
+	prop = RNA_def_property(srna, "use_csm_auto_bias", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "csm_flag", LA_CSM_AUTO_BIAS);
+	RNA_def_property_ui_text(prop, "Auto Bias",
+	                         "Derive each cascade's bias and slope bias from its shadow texel size "
+	                         "(Bias becomes a strength, 1 = default); Simple buffers only");
 	RNA_def_property_update(prop, 0, "rna_Lamp_update");
 
 	prop = RNA_def_property(srna, "use_csm_debug", PROP_BOOLEAN, PROP_NONE);

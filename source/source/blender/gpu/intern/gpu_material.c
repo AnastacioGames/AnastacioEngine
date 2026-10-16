@@ -2277,13 +2277,13 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 					         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
 					         GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 					         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-					         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
+					         GPU_dynamic_uniform(&lamp->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&lamp->slopebias, GPU_DYNAMIC_NONE, NULL),
 					         GPU_dynamic_texture(cascade0->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 					         GPU_dynamic_uniform((float *)cascade0->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-					         GPU_uniform(&cascade0->bias), GPU_uniform(&cascade0->slopebias),
+					         GPU_dynamic_uniform(&cascade0->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&cascade0->slopebias, GPU_DYNAMIC_NONE, NULL),
 					         GPU_dynamic_texture(cascade1->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 					         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-					         GPU_uniform(&cascade1->bias), GPU_uniform(&cascade1->slopebias),
+					         GPU_dynamic_uniform(&cascade1->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&cascade1->slopebias, GPU_DYNAMIC_NONE, NULL),
 					         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
 					         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
 					         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
@@ -2388,13 +2388,13 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 				         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
 				         GPU_dynamic_texture(lamp->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
 				         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-				         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
+				         GPU_dynamic_uniform(&lamp->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&lamp->slopebias, GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_texture(cascade0->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
 				         GPU_dynamic_uniform((float *)cascade0->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-				         GPU_uniform(&cascade0->bias), GPU_uniform(&cascade0->slopebias),
+				         GPU_dynamic_uniform(&cascade0->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&cascade0->slopebias, GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_texture(cascade1->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
 				         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-				         GPU_uniform(&cascade1->bias), GPU_uniform(&cascade1->slopebias),
+				         GPU_dynamic_uniform(&cascade1->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&cascade1->slopebias, GPU_DYNAMIC_NONE, NULL),
 					         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
 					         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
@@ -5097,6 +5097,12 @@ static GPULamp *gpu_lamp_create_cascade(GPULamp *parent, Lamp *la, int index)
 	 * fall back to the Near cascade's own size/bias, or a sane constant for soft. */
 	cascade->size = (la->csm_bufsize[index] > 0) ? la->csm_bufsize[index] : la->bufsize;
 
+	/* Two-cascade mode never draws or samples the Low map; keep a minimal buffer so the
+	 * material's three-cascade uniforms stay valid without spending its VRAM. */
+	if (index == 1 && (la->csm_flag & LA_CSM_TWO_CASCADES)) {
+		cascade->size = 16;
+	}
+
 	const float csmBias = (la->csm_bias[index] > 0.0f) ? la->csm_bias[index] : la->bias;
 
 	/* No per-cascade slopebias/bleedbias field in DNA (matches the reference UI, which only
@@ -5427,9 +5433,36 @@ void GPU_lamp_update_buffer_mats(GPULamp *lamp)
 	gpu_lamp_update_persmat(lamp);
 }
 
+/* CSM Auto Bias: shadow acne is one shadow texel of depth error, so derive the depth bias and
+ * the normal offset from this cascade's texel size instead of the fixed Bias value. winmat is
+ * the cascade's orthographic projection: width = 2 / m[0][0], depth range = 2 / m[2][2].
+ * la->bias (default 1) scales both. Cheap enough to run on every cascade bind. VSM keeps its
+ * own bias meaning and is left untouched. */
+static void gpu_lamp_csm_auto_bias(GPULamp *lamp)
+{
+	Lamp *la = lamp->la;
+	if (la->type != LA_SUN || la->shadow_cascade_count == 0 || !(la->csm_flag & LA_CSM_AUTO_BIAS) ||
+	    la->shadowmap_type == LA_SHADMAP_VARIANCE || lamp->size <= 0)
+	{
+		return;
+	}
+	const float sx = fabsf(lamp->winmat[0][0]);
+	const float sz = fabsf(lamp->winmat[2][2]);
+	if (sx < 1e-12f || sz < 1e-12f) {
+		return;
+	}
+	const float texel = (2.0f / sx) / (float)lamp->size;
+	const float depthRange = 2.0f / sz;
+	const float strength = max_ff(la->bias, 0.0f);
+	/* Half a texel of depth (the shader adds the slope term), plus a 1-texel normal offset. */
+	lamp->bias = max_ff(0.5f * strength * texel / depthRange, 1e-6f);
+	lamp->slopebias = strength * texel;
+}
+
 void GPU_lamp_shadow_buffer_bind(GPULamp *lamp, float viewmat[4][4], int *winsize, float winmat[4][4])
 {
 	GPU_lamp_update_buffer_mats(lamp);
+	gpu_lamp_csm_auto_bias(lamp);
 
 	/* opengl */
 	glDisable(GL_SCISSOR_TEST);
@@ -5458,6 +5491,7 @@ void GPU_lamp_shadow_buffer_bind_matrices(
 	copy_m4_m4(lamp->viewmat, viewmat);
 	copy_m4_m4(lamp->winmat, winmat);
 	gpu_lamp_update_persmat(lamp);
+	gpu_lamp_csm_auto_bias(lamp);
 	/* CSM cascade sub-lamps are not passed through GPU_lamp_update(), and their
 	 * view/win/persmat can change while the material camera and lamp transform stay
 	 * identical.  Those are the keys used by GPU_material_update_lamps()'s dynamic
@@ -5476,6 +5510,18 @@ void GPU_lamp_shadow_buffer_bind_matrices(
 	copy_m4_m4(out_viewmat, lamp->viewmat);
 	copy_m4_m4(out_winmat, lamp->winmat);
 	*winsize = lamp->size;
+}
+
+/* Sets a cascade's view/win matrices without binding or drawing it. Two-cascade mode mirrors
+ * the Medium matrices into the unused Low sub-lamp, whose persmat the shaders still read as the
+ * outer coverage (Light-reference Shadow Fade). */
+void GPU_lamp_shadow_set_matrices(GPULamp *lamp, float viewmat[4][4], float winmat[4][4])
+{
+	copy_m4_m4(lamp->viewmat, viewmat);
+	copy_m4_m4(lamp->winmat, winmat);
+	gpu_lamp_update_persmat(lamp);
+	gpu_lamp_csm_auto_bias(lamp);
+	lamp->dynupdate_valid = false;
 }
 
 void GPU_lamp_shadow_buffer_unbind(GPULamp *lamp)
@@ -6115,13 +6161,13 @@ GPUNodeLink *GPU_lamp_get_data(
 				         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
 				         GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 				         GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-				         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
+				         GPU_dynamic_uniform(&lamp->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&lamp->slopebias, GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_texture(cascade0->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 				         GPU_dynamic_uniform((float *)cascade0->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-				         GPU_uniform(&cascade0->bias), GPU_uniform(&cascade0->slopebias),
+				         GPU_dynamic_uniform(&cascade0->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&cascade0->slopebias, GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_texture(cascade1->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 				         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-				         GPU_uniform(&cascade1->bias), GPU_uniform(&cascade1->slopebias),
+				         GPU_dynamic_uniform(&cascade1->bias, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&cascade1->slopebias, GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
 				         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),

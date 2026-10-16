@@ -112,7 +112,7 @@ void KX_ShadowRenderer::ComputeCascadeFrustumBounds(
 }
 
 void KX_ShadowRenderer::ComputeCascadeLightBounds(
-        float halfSize, float clipStart, float clipEnd,
+	    float halfSize, float clipStart, float clipEnd,
         float& r_minX, float& r_maxX, float& r_minY, float& r_maxY, float& r_minZ, float& r_maxZ)
 {
 	r_minX = r_minY = -halfSize;
@@ -174,14 +174,54 @@ bool KX_ShadowRenderer::SelfTestCascadeShadowMath()
 	return ok;
 }
 
+void KX_ShadowRenderer::ComputeCasterLightBounds(KX_Scene *scene, const mt::mat3x4& lightWorldInv,
+                                                 std::vector<CasterLightBounds>& r_bounds)
+{
+	r_bounds.clear();
+	auto add = [&](KX_GameObject *obj) {
+		if (obj->GetMeshList().empty()) {
+			return;
+		}
+
+		const SG_BBox& box = obj->GetCullingNode().GetAabb();
+		const mt::vec3& boxMin = box.GetMin();
+		const mt::vec3& boxMax = box.GetMax();
+		/* Object -> light space once, then 8 corners through a single affine transform. */
+		const mt::mat3x4 toLight = lightWorldInv * obj->NodeGetWorldTransform();
+		CasterLightBounds b = {{FLT_MAX, FLT_MAX, FLT_MAX}, {-FLT_MAX, -FLT_MAX, -FLT_MAX}};
+
+		for (int corner = 0; corner < 8; ++corner) {
+			const mt::vec3 local((corner & 1) ? boxMax[0] : boxMin[0],
+			                     (corner & 2) ? boxMax[1] : boxMin[1],
+			                     (corner & 4) ? boxMax[2] : boxMin[2]);
+			const mt::vec3 lc = toLight * local;
+			for (int i = 0; i < 3; ++i) {
+				b.m_min[i] = std::min(b.m_min[i], lc[i]);
+				b.m_max[i] = std::max(b.m_max[i], lc[i]);
+			}
+		}
+		r_bounds.push_back(b);
+	};
+
+	for (KX_GameObject *obj : scene->GetStaticShadowCasterObjects()) {
+		add(obj);
+	}
+	for (KX_GameObject *obj : scene->GetDynamicShadowCasterObjects()) {
+		add(obj);
+	}
+}
+
 void KX_ShadowRenderer::ComputeCascadeShadowMatrices(
-        KX_Scene *scene, KX_Camera *viewcam, KX_LightObject *light, RAS_ILightObject *raslight, short cascadeIndex,
+        KX_Camera *viewcam, KX_LightObject *light, RAS_ILightObject *raslight, short cascadeIndex,
+        const std::vector<CasterLightBounds>& casterBounds,
         mt::mat4& r_viewmat, mt::mat4& r_winmat, float& r_splitFar)
 {
 	const float clipstart = raslight->m_shadowclipstart;
 	const float cliprange = raslight->m_shadowclipend - raslight->m_shadowclipstart;
 	const float propNear = raslight->m_cascadeproportionnear;
 	const float propMiddle = raslight->m_cascadeproportionmiddle;
+	/* Two-cascade mode: Medium is the last cascade and reaches the clip end / Frustum Size. */
+	const bool lastCascade = (cascadeIndex == 2) || (cascadeIndex == 1 && raslight->m_shadowcascadecount == 2);
 
 	float splitNear, splitFar;
 	switch (cascadeIndex) {
@@ -194,7 +234,7 @@ void KX_ShadowRenderer::ComputeCascadeShadowMatrices(
 		case 1: /* Medium */
 		{
 			splitNear = clipstart + propNear * cliprange;
-			splitFar = splitNear + propMiddle * cliprange;
+			splitFar = lastCascade ? raslight->m_shadowclipend : splitNear + propMiddle * cliprange;
 			break;
 		}
 		default: /* Low */
@@ -208,8 +248,8 @@ void KX_ShadowRenderer::ComputeCascadeShadowMatrices(
 
 	float minX, maxX, minY, maxY, minZ, maxZ;
 	if (raslight->m_cascadeReferenceLight) {
-		const float sizeFactor = (cascadeIndex == 0) ? propNear :
-		                         ((cascadeIndex == 1) ? std::min(propNear + propMiddle, 1.0f) : 1.0f);
+		const float sizeFactor = lastCascade ? 1.0f :
+		                         ((cascadeIndex == 0) ? propNear : std::min(propNear + propMiddle, 1.0f));
 		const float halfSize = std::max(raslight->m_shadowfrustumsize * sizeFactor, 0.001f);
 		/* In Light mode the split values sent to the shader are square half-sizes, not depths. */
 		r_splitFar = halfSize;
@@ -231,44 +271,17 @@ void KX_ShadowRenderer::ComputeCascadeShadowMatrices(
 	/* The camera slice bounds receivers, but its shadow map must also contain scene
 	 * geometry which overlaps the slice in light-space X/Y.  Fit Z to those caster
 	 * bounds instead of adding the entire shadow clip range: this prevents pitch-
-	 * dependent clipping without sacrificing depth precision and shadow bias quality. */
-	auto includeCasterDepth = [&](KX_GameObject *obj) {
-		if (obj->GetMeshList().empty()) {
-			return;
-		}
-
-		const SG_BBox& box = obj->GetCullingNode().GetAabb();
-		const mt::vec3& boxMin = box.GetMin();
-		const mt::vec3& boxMax = box.GetMax();
-		const mt::mat3x4 worldTransform = obj->NodeGetWorldTransform();
-		float objectMinX = FLT_MAX, objectMaxX = -FLT_MAX;
-		float objectMinY = FLT_MAX, objectMaxY = -FLT_MAX;
-		float objectMinZ = FLT_MAX, objectMaxZ = -FLT_MAX;
-
-		for (int corner = 0; corner < 8; ++corner) {
-			const mt::vec3 local((corner & 1) ? boxMax[0] : boxMin[0],
-			                     (corner & 2) ? boxMax[1] : boxMin[1],
-			                     (corner & 4) ? boxMax[2] : boxMin[2]);
-			const mt::vec3 lc = lightWorldInv * (worldTransform * local);
-			objectMinX = std::min(objectMinX, lc[0]); objectMaxX = std::max(objectMaxX, lc[0]);
-			objectMinY = std::min(objectMinY, lc[1]); objectMaxY = std::max(objectMaxY, lc[1]);
-			objectMinZ = std::min(objectMinZ, lc[2]); objectMaxZ = std::max(objectMaxZ, lc[2]);
-		}
-
-		if (objectMaxX >= minX && objectMinX <= maxX &&
-		    objectMaxY >= minY && objectMinY <= maxY) {
-			minZ = std::min(minZ, objectMinZ - 0.5f);
-			maxZ = std::max(maxZ, objectMaxZ + 0.5f);
-		}
-	};
-	/* Camera-reference slices need caster depth outside the receiver slice. Light-reference
+	 * dependent clipping without sacrificing depth precision and shadow bias quality.
+	 * Camera-reference slices need caster depth outside the receiver slice. Light-reference
 	 * boxes already span the full clip depth and differ only in their concentric X/Y size. */
 	if (!raslight->m_cascadeReferenceLight) {
-		for (KX_GameObject *obj : scene->GetStaticShadowCasterObjects()) {
-			includeCasterDepth(obj);
-		}
-		for (KX_GameObject *obj : scene->GetDynamicShadowCasterObjects()) {
-			includeCasterDepth(obj);
+		const float sliceMinX = minX, sliceMaxX = maxX, sliceMinY = minY, sliceMaxY = maxY;
+		for (const CasterLightBounds& b : casterBounds) {
+			if (b.m_max[0] >= sliceMinX && b.m_min[0] <= sliceMaxX &&
+			    b.m_max[1] >= sliceMinY && b.m_min[1] <= sliceMaxY) {
+				minZ = std::min(minZ, b.m_min[2] - 0.5f);
+				maxZ = std::max(maxZ, b.m_max[2] + 0.5f);
+			}
 		}
 	}
 
@@ -390,6 +403,18 @@ bool Mat3x4NearlyEqual(const mt::mat3x4& a, const mt::mat3x4& b, float epsilon =
 	return true;
 }
 
+bool Mat4Equal(const mt::mat4& a, const mt::mat4& b)
+{
+	for (int row = 0; row < 4; ++row) {
+		for (int col = 0; col < 4; ++col) {
+			if (a(row, col) != b(row, col)) {
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
 /* Loose threshold used only by the "Tolerant" (2) cache setting below, to decide whether a
  * small camera/light movement is still worth reusing last frame's cascade matrices for one
  * extra frame. Deliberately coarser than the exact-match epsilon above -- picked as "visibly
@@ -405,7 +430,11 @@ struct CascadeMatrixCache
 	mt::mat3x4 camWorldTrans = mt::mat3x4::Identity();
 	mt::mat3x4 lightWorldInv = mt::mat3x4::Identity();
 	bool referenceLight = false;
-	float config[5] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+	/// Light clip/proportions/frustum size/cascade count, then the view camera's p00/p11/perspective
+	/// (a lens, zoom or aspect change moves the Camera-reference slices without any transform change).
+	float config[9] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
+	/// True when the last computed matrices equal the ones of the frame before (camera at rest).
+	bool stable = false;
 	mt::mat4 viewmat[3];
 	mt::mat4 winmat[3];
 	float splitFar[3] = { 0.0f, 0.0f, 0.0f };
@@ -590,15 +619,21 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 			}
 			if (lightActive && needUpdate) {
 				const bool usePoint = raslight->HasPointShadow();
-				const short numPasses = useCascade ? 3 : (usePoint ? 6 : 1);
+				// Cascades drawn: 2 (Near + Medium) or 3 (Near + Medium + Low).
+				const short cascadeCount = (raslight->m_shadowcascadecount == 2) ? 2 : 3;
+				const short numPasses = useCascade ? cascadeCount : (usePoint ? 6 : 1);
 				++shadowUpdatedLights;
 				shadowPasses += numPasses;
 
-// Computed once per cascade here (not re-derived per pass below): each call walks
+				// Computed once per cascade here (not re-derived per pass below): each call walks
 				// every static/dynamic shadow caster to fit the Z bounds, so recomputing it a
 				// second time per pass would repeat that full scan for no new result.
 				mt::mat4 cascadeViews[3], cascadeWins[3];
 				float cascadeSplitFars[3];
+				// Camera-reference cascades move with the camera, so a stale static cache would be
+				// re-baked every moving frame (static pass + blit + dynamic pass, slower than one
+				// plain pass). Bake only once the matrices hold still; meanwhile draw a plain pass.
+				bool staticBakeAllowed = true;
 				if (useCascade) {
 					// Cascade-invalidation cache: reuse last frame's cascade matrices verbatim
 					// when the camera hasn't moved and the scene has no dynamic shadow casters
@@ -609,13 +644,17 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 					// recomputes below; Tolerant additionally allows one frame of small
 					// movement, which is the knob for camera-motion shadow "shimmer" reports.
 					const short cacheTolerance = viewcam->GetCSMCacheMaxStaleFrames();
-					const mt::mat3x4 camWorldTrans = viewcam->NodeGetWorldTransform();
+					// Same transform ComputeCascadeShadowMatrices fits against (includes VR head tracking).
+					const mt::mat3x4 camWorldTrans = viewcam->GetCameraToWorld();
 					const mt::mat3x4 lightWorldInv = light->NodeGetWorldTransform().Inverse();
 					const bool referenceLight = raslight->m_cascadeReferenceLight;
-					const float cascadeConfig[5] = {
+					const mt::mat4& camProj = viewcam->GetProjectionMatrix(RAS_Rasterizer::RAS_STEREO_LEFTEYE);
+					const float cascadeConfig[9] = {
 						raslight->m_shadowclipstart, raslight->m_shadowclipend,
 						raslight->m_cascadeproportionnear, raslight->m_cascadeproportionmiddle,
-						raslight->m_shadowfrustumsize};
+						raslight->m_shadowfrustumsize, (float)cascadeCount,
+						referenceLight ? 0.0f : camProj(0, 0), referenceLight ? 0.0f : camProj(1, 1),
+						(referenceLight || viewcam->GetCameraData()->m_perspective) ? 1.0f : 0.0f};
 					CascadeMatrixCache& cc = cascadeCache[light];
 					const bool cacheEligible = cacheTolerance >= 1 && cc.valid && !staticCasterListDirty &&
 					                            (referenceLight || scene->GetDynamicShadowCasterObjects().empty()) &&
@@ -641,11 +680,31 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 							cascadeWins[p] = cc.winmat[p];
 							cascadeSplitFars[p] = cc.splitFar[p];
 						}
+						cc.stable = true;
 					}
 					else {
-						for (short p = 0; p < 3; ++p) {
-							ComputeCascadeShadowMatrices(scene, viewcam, light, raslight, p, cascadeViews[p], cascadeWins[p], cascadeSplitFars[p]);
+						// Light-space caster boxes once per light (not once per cascade); Light
+						// reference doesn't fit Z to casters, so it skips the scan entirely.
+						static std::vector<CasterLightBounds> casterBounds;
+						if (referenceLight) {
+							casterBounds.clear();
 						}
+						else {
+							ComputeCasterLightBounds(scene, lightWorldInv, casterBounds);
+						}
+						bool sameAsBefore = cc.valid;
+						for (short p = 0; p < cascadeCount; ++p) {
+							ComputeCascadeShadowMatrices(viewcam, light, raslight, p, casterBounds, cascadeViews[p], cascadeWins[p], cascadeSplitFars[p]);
+							sameAsBefore = sameAsBefore && Mat4Equal(cascadeViews[p], cc.viewmat[p]) &&
+							               Mat4Equal(cascadeWins[p], cc.winmat[p]);
+						}
+						if (cascadeCount == 2) {
+							// The undrawn Low slot mirrors Medium (outer coverage for the shader's fade).
+							cascadeViews[2] = cascadeViews[1];
+							cascadeWins[2] = cascadeWins[1];
+							cascadeSplitFars[2] = cascadeSplitFars[1];
+						}
+						cc.stable = sameAsBefore;
 						cc.camWorldTrans = camWorldTrans;
 						cc.lightWorldInv = lightWorldInv;
 						cc.referenceLight = referenceLight;
@@ -658,7 +717,16 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 						cc.valid = true;
 						cc.staleFrames = 0;
 					}
-					raslight->SetCascadeSplits(cascadeSplitFars[0], cascadeSplitFars[1]);
+					staticBakeAllowed = referenceLight || cc.stable;
+					if (cascadeCount == 2) {
+						// The shader picks Low past split1: push it out of reach so Medium covers
+						// the rest, and give the undrawn Low map Medium's matrices.
+						raslight->SetCascadeSplits(cascadeSplitFars[0], 1.0e30f);
+						raslight->SetCascadeMatrices(2, cascadeViews[1], cascadeWins[1]);
+					}
+					else {
+						raslight->SetCascadeSplits(cascadeSplitFars[0], cascadeSplitFars[1]);
+					}
 				}
 
 				std::unordered_set<KX_GameObject *> dynamicCasterSet;
@@ -676,9 +744,11 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 
 					// (a) Static sub-pass: only re-rendered when the cache is stale (first frame,
 					// explicit dirty, or the cascade's view/win matrix drifted -- see
-					// NeedStaticShadowUpdate / GPU_lamp_shadow_static_matches).
-					if (useStaticSplit && m_engine->GetShadowCulling() &&
-					    raslight->NeedStaticShadowUpdate(pass, cascadeView, cascadeWin)) {
+					// NeedStaticShadowUpdate / GPU_lamp_shadow_static_matches). A stale cache
+					// while the cascade is still moving skips the split for this pass.
+					const bool staticStale = useStaticSplit && raslight->NeedStaticShadowUpdate(pass, cascadeView, cascadeWin);
+					const bool passSplit = useStaticSplit && (!staticStale || staticBakeAllowed);
+					if (passSplit && staticStale && m_engine->GetShadowCulling()) {
 						mt::mat3x4 staticCamtrans;
 						raslight->BindStaticShadowBuffer(canvas, pass, staticCam, staticCamtrans, cascadeView, cascadeWin);
 						KX_StaticShadowBufferGuard staticShadowBufferGuard(raslight, pass, cascadeView, cascadeWin);
@@ -717,7 +787,7 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 
 					// (b) Composite the cached static depth into the buffer we just bound, then
 					// only draw the dynamic casters on top -- the static geometry is already there.
-					if (useStaticSplit) {
+					if (passSplit) {
 						raslight->CompositeStaticShadow(pass);
 					}
 
@@ -728,11 +798,11 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 						m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_shadows);
 
 						/* render */
-						if (!useStaticSplit) {
+						if (!passSplit) {
 							rasty->Clear(RAS_Rasterizer::RAS_DEPTH_BUFFER_BIT | RAS_Rasterizer::RAS_COLOR_BUFFER_BIT);
 						}
 						// Send a nullptr off screen because the viewport is binding it's using its own private one.
-						if (useStaticSplit) {
+						if (passSplit) {
 							std::vector<KX_GameObject *> dynamicVisible;
 							dynamicVisible.reserve(objects.size());
 							for (KX_GameObject *obj : objects) {
@@ -766,7 +836,7 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 						m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_shadows);
 
 						/* render */
-						if (!useStaticSplit) {
+						if (!passSplit) {
 							rasty->Clear(RAS_Rasterizer::RAS_DEPTH_BUFFER_BIT | RAS_Rasterizer::RAS_COLOR_BUFFER_BIT);
 						}
 					}
@@ -798,10 +868,11 @@ void KX_ShadowRenderer::DrawDebugFrustum(KX_Scene *scene)
 					mt::vec4(0.15f, 1.0f, 0.15f, 1.0f),
 					mt::vec4(0.15f, 0.35f, 1.0f, 1.0f),
 				};
-				for (short drawIndex = 0; drawIndex < 3; ++drawIndex) {
+				const short cascadeCount = (raslight->m_shadowcascadecount == 2) ? 2 : 3;
+				for (short drawIndex = 0; drawIndex < cascadeCount; ++drawIndex) {
 					/* Concentric Light-reference frusta overlap. Queue outer-to-inner so their
 					 * translucent debug faces leave the red center readable. */
-					const short cascade = raslight->m_cascadeReferenceLight ? (2 - drawIndex) : drawIndex;
+					const short cascade = raslight->m_cascadeReferenceLight ? (cascadeCount - 1 - drawIndex) : drawIndex;
 					debugDraw.DrawCameraFrustum(
 					        raslight->GetCascadeWinMat(cascade) * raslight->GetCascadeViewMat(cascade),
 					        colors[cascade]);

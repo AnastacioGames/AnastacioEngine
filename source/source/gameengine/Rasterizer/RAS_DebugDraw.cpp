@@ -105,6 +105,14 @@ void RAS_DebugDraw::DrawCameraFrustum(const mt::mat4& persmat)
 	                        mt::vec4(0.8f, 0.5f, 0.0f, 1.0f));
 }
 
+void RAS_DebugDraw::DrawCameraFrustum(const mt::mat4& persmat, const mt::vec4& color)
+{
+	mt::vec4 inside(color.x, color.y, color.z, 0.18f);
+	mt::vec4 outside(0.0f, 0.0f, 0.0f, 0.25f);
+	mt::vec4 wire(color.x, color.y, color.z, 1.0f);
+	m_frustums.emplace_back(persmat.Inverse(), inside, outside, wire);
+}
+
 void RAS_DebugDraw::RenderBox2d(const mt::vec2& pos, const mt::vec2& size, const mt::vec4& color)
 {
 	m_boxes2d.emplace_back(pos, size, color);

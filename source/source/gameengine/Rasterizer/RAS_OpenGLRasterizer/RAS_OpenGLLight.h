@@ -81,6 +81,7 @@ public:
 	                             const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);
 	void UnbindCascadeShadowBuffer(short cascadeIndex);
 	void SetCascadeSplits(float split0, float split1);
+	void SetCascadeMatrices(short cascadeIndex, const mt::mat4& lightViewMat, const mt::mat4& lightWinMat);
 	bool GetFarShadow(int& bindCode, mt::mat4& worldToShadow);
 	int GetShadowColorBindCode();
 	bool HasPointShadow();

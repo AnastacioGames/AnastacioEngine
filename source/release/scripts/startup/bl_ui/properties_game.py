@@ -2114,12 +2114,22 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
 
             row = box.row()
             row.label("Bias:")
+            # Auto Bias: CSM + Simple buffer only (VSM keeps its own bias meaning).
+            can_auto_bias = (lamp.type == 'SUN' and lamp.use_csm_shadow and
+                             lamp.ge_shadow_buffer_type == "SIMPLE")
+            if can_auto_bias:
+                box.prop(lamp, "use_csm_auto_bias", text="Auto Bias")
+            auto_bias = can_auto_bias and lamp.use_csm_auto_bias
             row = box.row(align=True)
-            row.prop(lamp, "shadow_buffer_bias", text="Bias")
-            if not is_point and lamp.ge_shadow_buffer_type == "VARIANCE":
-                row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
+            if auto_bias:
+                row.prop(lamp, "shadow_buffer_bias", text="Strength")
+                box.label("Bias and Slope Bias follow each cascade's texel size", icon='INFO')
             else:
-                row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")
+                row.prop(lamp, "shadow_buffer_bias", text="Bias")
+                if not is_point and lamp.ge_shadow_buffer_type == "VARIANCE":
+                    row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
+                else:
+                    row.prop(lamp, "shadow_buffer_slope_bias", text="Slope Bias")
 
         # --- Cascaded Shadow Mapping (Sun only) ---
         if lamp.type == 'SUN':
@@ -2135,28 +2145,37 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
                 # Only the dependent debug and cascade settings should be inactive.
                 col.active = lamp.use_csm_shadow
                 col.prop(lamp, "csm_reference", text="Reference")
+                col.prop(lamp, "csm_cascade_count", text="Cascades")
                 col.prop(lamp, "use_csm_debug", text="Enable Debug")
 
+                two_cascades = lamp.csm_cascade_count == 2
                 row = col.row(align=True)
                 if lamp.csm_reference == 'LIGHT':
                     row.prop(lamp, "cascaded_proportion_two", text="Inner Size", slider=True)
-                    row.prop(lamp, "cascaded_proportion_three", text="Middle Expansion", slider=True)
-                    col.label("Blue outer size uses Frustum Size", icon='INFO')
+                    if not two_cascades:
+                        row.prop(lamp, "cascaded_proportion_three", text="Middle Expansion", slider=True)
+                    col.label("Green outer size uses Frustum Size" if two_cascades else
+                              "Blue outer size uses Frustum Size", icon='INFO')
                 else:
                     row.prop(lamp, "cascaded_proportion_two", text="Cascade Proportion Near", slider=True)
-                    row.prop(lamp, "cascaded_proportion_three", text="Cascade Proportion Middle", slider=True)
+                    if not two_cascades:
+                        row.prop(lamp, "cascaded_proportion_three", text="Cascade Proportion Middle", slider=True)
 
                 col.separator(factor=1)
 
                 col.prop(lamp, "shadow_csm_two_buffer_size", text="CSM Size Medium")
                 col.prop(lamp, "shadow_buffer_soft_two", text="CSM Shadow Soft Medium")
-                col.prop(lamp, "shadow_buffer_bias_two", text="CSM Bias Medium")
+                auto_bias = lamp.use_csm_auto_bias and lamp.ge_shadow_buffer_type == "SIMPLE"
+                if not auto_bias:
+                    col.prop(lamp, "shadow_buffer_bias_two", text="CSM Bias Medium")
 
-                col.separator(factor=1)
+                if not two_cascades:
+                    col.separator(factor=1)
 
-                col.prop(lamp, "shadow_csm_three_buffer_size", text="CSM Size Low")
-                col.prop(lamp, "shadow_buffer_soft_three", text="CSM Shadow Soft Low")
-                col.prop(lamp, "shadow_buffer_bias_three", text="CSM Bias Low")
+                    col.prop(lamp, "shadow_csm_three_buffer_size", text="CSM Size Low")
+                    col.prop(lamp, "shadow_buffer_soft_three", text="CSM Shadow Soft Low")
+                    if not auto_bias:
+                        col.prop(lamp, "shadow_buffer_bias_three", text="CSM Bias Low")
 
         # --- Clipping ---
         row = main_box.row()

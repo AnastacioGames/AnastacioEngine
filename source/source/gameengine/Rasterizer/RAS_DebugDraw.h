@@ -127,6 +127,7 @@ public:
 	 * \param projmat The camera perspective matrix.
 	 */
 	void DrawCameraFrustum(const mt::mat4& persmat);
+	void DrawCameraFrustum(const mt::mat4& persmat, const mt::vec4& color);
 
 	void RenderBox2d(const mt::vec2& pos, const mt::vec2& size, const mt::vec4& color);
 

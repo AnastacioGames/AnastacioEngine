@@ -238,5 +238,9 @@ typedef struct Lamp {
 /* csm_flag */
 #define LA_CSM_DEBUG	(1 << 0)
 #define LA_CSM_REFERENCE_LIGHT	(1 << 1)
+/* Only Near + Medium cascades (Medium reaches the clip end / Frustum Size). */
+#define LA_CSM_TWO_CASCADES	(1 << 2)
+/* Bias and normal offset follow each cascade's texel size; Bias becomes a strength (1 = default). */
+#define LA_CSM_AUTO_BIAS	(1 << 3)
 
 #endif /* __DNA_LAMP_TYPES_H__ */

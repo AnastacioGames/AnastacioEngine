@@ -472,7 +472,8 @@ bool RAS_OpenGLLight::GetFarShadow(int& bindCode, mt::mat4& worldToShadow)
 		return false;
 	}
 	if (GPU_lamp_has_cascaded_shadow(lamp)) {
-		lamp = GPU_lamp_get_cascade(lamp, 1);
+		/* The last drawn cascade: Medium in two-cascade mode, Low otherwise. */
+		lamp = GPU_lamp_get_cascade(lamp, (m_shadowcascadecount == 2) ? 0 : 1);
 	}
 	bindCode = GPU_lamp_shadow_bind_code(lamp);
 	worldToShadow = mt::mat4(GPU_lamp_get_persmat(lamp));
@@ -487,7 +488,7 @@ int RAS_OpenGLLight::GetShadowColorBindCode()
 	}
 	/* Same map as GetFarShadow(): the last cascade. */
 	if (GPU_lamp_has_cascaded_shadow(lamp)) {
-		lamp = GPU_lamp_get_cascade(lamp, 1);
+		lamp = GPU_lamp_get_cascade(lamp, (m_shadowcascadecount == 2) ? 0 : 1);
 	}
 	return GPU_lamp_shadow_color_bind_code(lamp);
 }
@@ -632,6 +633,20 @@ void RAS_OpenGLLight::InvalidateStaticShadow()
 			GPU_lamp_shadow_static_invalidate(cascadeLamp);
 		}
 	}
+}
+
+void RAS_OpenGLLight::SetCascadeMatrices(short cascadeIndex, const mt::mat4& lightViewMat, const mt::mat4& lightWinMat)
+{
+	GPULamp *lamp = GetGPULamp();
+	GPULamp *cascadeLamp = (cascadeIndex == 0) ? lamp : GPU_lamp_get_cascade(lamp, cascadeIndex - 1);
+	if (!cascadeLamp) {
+		return;
+	}
+
+	float viewmat[4][4], winmat[4][4];
+	lightViewMat.Pack(&viewmat[0][0]);
+	lightWinMat.Pack(&winmat[0][0]);
+	GPU_lamp_shadow_set_matrices(cascadeLamp, viewmat, winmat);
 }
 
 void RAS_OpenGLLight::SetCascadeSplits(float split0, float split1)

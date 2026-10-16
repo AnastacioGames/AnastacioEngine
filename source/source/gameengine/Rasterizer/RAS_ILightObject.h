@@ -68,7 +68,8 @@ public:
 	mt::vec3 m_shadowcolor;
 
 	/* Cascaded Shadow Mapping (Sun lamps only) -- proportions of [m_shadowclipstart, m_shadowclipend]
-	 * covered by the Near and Middle cascades (the remainder goes to Low/far). 0 means CSM disabled. */
+	 * covered by the Near and Middle cascades (the remainder goes to Low/far). 0 means CSM disabled,
+	 * otherwise 2 (Near + Medium, Medium reaching the clip end) or 3. */
 	short	m_shadowcascadecount;
 	float	m_cascadeproportionnear;
 	float	m_cascadeproportionmiddle;
@@ -150,6 +151,8 @@ public:
 	                                     const mt::mat4& lightViewMat, const mt::mat4& lightWinMat) = 0;
 	virtual void UnbindCascadeShadowBuffer(short cascadeIndex) = 0;
 	virtual void SetCascadeSplits(float split0, float split1) = 0;
+	/// Writes a cascade's matrices without drawing it (two-cascade mode mirrors Medium into Low).
+	virtual void SetCascadeMatrices(short cascadeIndex, const mt::mat4& lightViewMat, const mt::mat4& lightWinMat) = 0;
 	/// Sun shadow map reaching the farthest (last cascade, or the only map) for the Volumetric Fog
 	/// sun shafts: bind code and world -> shadow map matrix. False without a usable depth map.
 	virtual bool GetFarShadow(int& bindCode, mt::mat4& worldToShadow) = 0;

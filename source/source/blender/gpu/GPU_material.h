@@ -480,6 +480,7 @@ GPULamp *GPU_lamp_get_cascade(GPULamp *lamp, int index);
 void GPU_lamp_shadow_buffer_bind_matrices(
         GPULamp *lamp, float viewmat[4][4], float winmat[4][4], int *winsize,
         float out_viewmat[4][4], float out_winmat[4][4]);
+void GPU_lamp_shadow_set_matrices(GPULamp *lamp, float viewmat[4][4], float winmat[4][4]);
 void GPU_lamp_set_cascade_splits(GPULamp *lamp, float split0, float split1);
 
 /* Point lamp shadow (Shading Nodes only): the 6 cube faces live in one 3x2 depth atlas, each

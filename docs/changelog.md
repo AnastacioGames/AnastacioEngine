@@ -6,6 +6,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-16 - CSM: performance no modo Camera, 2 ou 3 cascatas e Auto Bias
+
+- Queda de FPS no modo Camera com Static Shadow: as cascatas seguem a câmera, então o cache estático era
+  re-renderizado todo frame em movimento (passada estática + blit + dinâmica, mais caro que sem cache). Agora,
+  enquanto a cascata se move, desenha-se uma passada simples; o cache só é refeito com a matriz parada.
+- O ajuste de Z às caixas dos casters (modo Camera) passou de 3 varreduras por frame (uma por cascata) para
+  uma por luz; o modo Light não faz essa varredura.
+- Cache de matrizes CSM: a chave agora inclui a projeção da câmera (lente/zoom/aspecto) e usa
+  `GetCameraToWorld()` como o cálculo (VR).
+- Nova propriedade `csm_cascade_count` (2 ou 3, bit `LA_CSM_TWO_CASCADES` em `csm_flag`): com 2 a Medium
+  vai até o Clip End/Frustum Size, só 2 passadas, e a Low fica com buffer de 16 px espelhando a Medium.
+- Novo `use_csm_auto_bias` (bit `LA_CSM_AUTO_BIAS`, Simple apenas): Bias = 0,5 texel de profundidade e
+  Slope Bias = 1 texel por cascata, calculados no bind das matrizes; o campo Bias vira `Strength`. Os bias
+  das cascatas no shader CSM passaram a uniform dinâmico. Fatores ainda sem validação visual.
+- `RAS_DebugDraw::DrawCameraFrustum(persmat, color)`, já usado pelo debug colorido do CSM, entra no repositório.
+
 ## 2026-10-16 - Weather Rain: seções expansíveis
 
 - Droplets, Ripples, Splash, Puddles, Aura e Lightning agora têm cabeçalhos horizontais expansíveis, cada qual

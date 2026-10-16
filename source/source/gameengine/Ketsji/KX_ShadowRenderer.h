@@ -26,6 +26,8 @@
 
 #include "mathfu.h"
 
+#include <vector>
+
 class KX_KetsjiEngine;
 class KX_Scene;
 class KX_Camera;
@@ -56,11 +58,24 @@ public:
 	/// Debug draw of each light's shadow frustum, if enabled (m_showShadowFrustum).
 	void DrawDebugFrustum(KX_Scene *scene);
 
+	/// Light-space AABB of one shadow caster, shared by the 3 cascades of a light.
+	struct CasterLightBounds
+	{
+		float m_min[3];
+		float m_max[3];
+	};
+
+	/// Fills r_bounds with the light-space AABB of every static/dynamic shadow caster with a mesh.
+	static void ComputeCasterLightBounds(KX_Scene *scene, const mt::mat3x4& lightWorldInv,
+	                                     std::vector<CasterLightBounds>& r_bounds);
+
 	/** Computes the orthographic view/projection pair for one CSM split. In Camera reference mode
-	 * it tightly fits a slice of the active camera frustum in light space. In Light reference mode
-	 * it builds concentric boxes around the Sun axis, all spanning the full shadow clip depth. */
+	 * it tightly fits a slice of the active camera frustum in light space, widening Z to the
+	 * casters in casterBounds (from ComputeCasterLightBounds). In Light reference mode it builds
+	 * concentric boxes around the Sun axis, all spanning the full shadow clip depth. */
 	static void ComputeCascadeShadowMatrices(
-	        KX_Scene *scene, KX_Camera *viewcam, KX_LightObject *light, RAS_ILightObject *raslight, short cascadeIndex,
+	        KX_Camera *viewcam, KX_LightObject *light, RAS_ILightObject *raslight, short cascadeIndex,
+	        const std::vector<CasterLightBounds>& casterBounds,
 	        mt::mat4& r_viewmat, mt::mat4& r_winmat, float& r_splitFar);
 
 	/** Pure math core of CSM frustum fitting: projects the 8 corners of the camera frustum

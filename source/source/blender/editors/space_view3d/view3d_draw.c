@@ -3134,17 +3134,21 @@ static void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3
 
 		if (viewer_rv3d != NULL && GPU_lamp_has_cascaded_shadow(shadow->lamp)) {
 			float split0, split1;
+			/* Two cascades: Medium reaches the clip end and the Low map is never drawn. */
+			const bool twoCascades = (shadow->la->csm_flag & LA_CSM_TWO_CASCADES) != 0;
+			const float propMiddle = twoCascades ? max_ff(1.0f - shadow->la->shadow_cascade_proportion_near, 0.01f) :
+			                                       shadow->la->shadow_cascade_proportion_middle;
 			float dummyView[4][4], dummyWin[4][4];
 
 			view3d_compute_cascade_shadow_matrix(
 			        viewer_rv3d, shadow->obmat, shadow->la->clipsta, shadow->la->clipend,
-			        shadow->la->shadow_cascade_proportion_near, shadow->la->shadow_cascade_proportion_middle,
+			        shadow->la->shadow_cascade_proportion_near, propMiddle,
 			        0, dummyView, dummyWin, &split0);
 			view3d_compute_cascade_shadow_matrix(
 			        viewer_rv3d, shadow->obmat, shadow->la->clipsta, shadow->la->clipend,
-			        shadow->la->shadow_cascade_proportion_near, shadow->la->shadow_cascade_proportion_middle,
+			        shadow->la->shadow_cascade_proportion_near, propMiddle,
 			        1, dummyView, dummyWin, &split1);
-			GPU_lamp_set_cascade_splits(shadow->lamp, split0, split1);
+			GPU_lamp_set_cascade_splits(shadow->lamp, split0, twoCascades ? 1.0e30f : split1);
 
 			/* Medium = game cascade index 1 -> GPU_lamp_get_cascade(.., 0).
 			 * Low    = game cascade index 2 -> GPU_lamp_get_cascade(.., 1). */
@@ -3160,8 +3164,14 @@ static void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3
 
 				view3d_compute_cascade_shadow_matrix(
 				        viewer_rv3d, shadow->obmat, shadow->la->clipsta, shadow->la->clipend,
-				        shadow->la->shadow_cascade_proportion_near, shadow->la->shadow_cascade_proportion_middle,
-				        gameCascadeIdx[c], cViewIn, cWinIn, &splitFarUnused);
+				        shadow->la->shadow_cascade_proportion_near, propMiddle,
+				        (twoCascades && c == 1) ? 1 : gameCascadeIdx[c], cViewIn, cWinIn, &splitFarUnused);
+
+				if (twoCascades && c == 1) {
+					/* Low mirrors Medium's matrices (outer coverage) without a draw. */
+					GPU_lamp_shadow_set_matrices(cascadeLamp, cViewIn, cWinIn);
+					continue;
+				}
 
 				bool cvsm = GPU_lamp_shadow_buffer_type(cascadeLamp) == LA_SHADMAP_VARIANCE;
 				if (cvsm) {

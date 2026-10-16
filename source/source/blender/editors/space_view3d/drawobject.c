@@ -1446,7 +1446,10 @@ static void draw_transp_sun_shadow_volume(Lamp *la, Object *lampob, Object *camo
 		 * in Camera mode, concentric Sun-local boxes in Light mode. */
 		const float cliprange = la->clipend - la->clipsta;
 		const float split0 = la->clipsta + la->shadow_cascade_proportion_near * cliprange;
-		const float split1 = split0 + la->shadow_cascade_proportion_middle * cliprange;
+		const int cascadeCount = (la->csm_flag & LA_CSM_TWO_CASCADES) ? 2 : 3;
+		/* Two cascades: Medium reaches the clip end / Frustum Size. */
+		const float split1 = (cascadeCount == 2) ? la->clipend :
+		                     split0 + la->shadow_cascade_proportion_middle * cliprange;
 		const float colors[3][3] = {
 			{1.0f, 0.15f, 0.15f},
 			{0.15f, 1.0f, 0.15f},
@@ -1458,14 +1461,15 @@ static void draw_transp_sun_shadow_volume(Lamp *la, Object *lampob, Object *camo
 		const float aspect = referenceLight ? 1.0f :
 		        ((float)scene->r.xsch * scene->r.xasp) / ((float)scene->r.ysch * scene->r.yasp);
 
-		for (int drawIndex = 0; drawIndex < 3; ++drawIndex) {
+		for (int drawIndex = 0; drawIndex < cascadeCount; ++drawIndex) {
 			/* The Light boxes overlap completely in depth. Draw outer blue first and inner
 			 * red last, otherwise the blue translucent faces wash out the two inner boxes. */
-			const int cascade = referenceLight ? (2 - drawIndex) : drawIndex;
+			const int cascade = referenceLight ? (cascadeCount - 1 - drawIndex) : drawIndex;
 			const float nearclip = ranges[cascade];
 			const float farclip = ranges[cascade + 1];
 			if (referenceLight) {
-				const float factor = (cascade == 0) ? la->shadow_cascade_proportion_near :
+				const float factor = (cascade == cascadeCount - 1) ? 1.0f :
+				        (cascade == 0) ? la->shadow_cascade_proportion_near :
 				        ((cascade == 1) ? min_ff(la->shadow_cascade_proportion_near +
 				                                  la->shadow_cascade_proportion_middle, 1.0f) : 1.0f);
 				draw_csm_light_slice(max_ff(la->shadow_frustum_size * factor, 0.001f),

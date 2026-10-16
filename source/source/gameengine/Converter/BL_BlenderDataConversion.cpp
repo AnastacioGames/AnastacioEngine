@@ -1989,7 +1989,8 @@ static KX_LightObject *BL_GameLightFromBlenderLamp(Lamp *la, unsigned int layerf
 	lightobj->m_shadowbleedbias = la->bleedbias;
 	lightobj->m_shadowmaptype = la->shadowmap_type;
 	lightobj->m_shadowfrustumsize = la->shadow_frustum_size;
-	lightobj->m_shadowcascadecount = la->shadow_cascade_count;
+	lightobj->m_shadowcascadecount = (la->shadow_cascade_count == 0) ? 0 :
+	                                 ((la->csm_flag & LA_CSM_TWO_CASCADES) ? 2 : 3);
 	lightobj->m_cascadeproportionnear = la->shadow_cascade_proportion_near;
 	lightobj->m_cascadeproportionmiddle = la->shadow_cascade_proportion_middle;
 	lightobj->m_cascadeReferenceLight = (la->csm_flag & LA_CSM_REFERENCE_LIGHT) != 0;
