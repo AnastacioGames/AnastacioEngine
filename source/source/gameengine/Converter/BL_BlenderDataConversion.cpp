@@ -1992,6 +1992,7 @@ static KX_LightObject *BL_GameLightFromBlenderLamp(Lamp *la, unsigned int layerf
 	lightobj->m_shadowcascadecount = la->shadow_cascade_count;
 	lightobj->m_cascadeproportionnear = la->shadow_cascade_proportion_near;
 	lightobj->m_cascadeproportionmiddle = la->shadow_cascade_proportion_middle;
+	lightobj->m_cascadeReferenceLight = (la->csm_flag & LA_CSM_REFERENCE_LIGHT) != 0;
 	lightobj->m_shadowcolor = mt::vec3(la->shdwr, la->shdwg, la->shdwb);
 	lightobj->m_layer = layerflag;
 	lightobj->m_spotblend = la->spotblend;
@@ -2031,7 +2032,9 @@ static KX_LightObject *BL_GameLightFromBlenderLamp(Lamp *la, unsigned int layerf
 
 	KX_LightObject *gamelight = new KX_LightObject(kxscene, KX_Scene::m_callbacks, rasterizer, lightobj);
 
-	gamelight->SetShowShadowFrustum((la->mode & LA_SHOW_SHADOW_BOX) && (la->mode & LA_SHAD_RAY));
+	gamelight->SetShowShadowFrustum(
+	        (((la->mode & LA_SHOW_SHADOW_BOX) != 0) && ((la->mode & LA_SHAD_RAY) != 0)) ||
+	        (la->shadow_cascade_count != 0 && (la->csm_flag & LA_CSM_DEBUG) != 0));
 
 	return gamelight;
 }

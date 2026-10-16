@@ -72,6 +72,8 @@ public:
 	short	m_shadowcascadecount;
 	float	m_cascadeproportionnear;
 	float	m_cascadeproportionmiddle;
+	/// False: camera-frustum slices (legacy/default). True: fixed boxes along the Sun local -Z axis.
+	bool	m_cascadeReferenceLight;
 
 	mt::vec3 m_color;
 
@@ -124,6 +126,8 @@ public:
 	virtual mt::mat4 GetShadowWorldMatrix() = 0;
 	virtual mt::mat4 GetViewMat() = 0;
 	virtual mt::mat4 GetWinMat() = 0;
+	virtual mt::mat4 GetCascadeViewMat(short cascadeIndex) = 0;
+	virtual mt::mat4 GetCascadeWinMat(short cascadeIndex) = 0;
 	virtual int GetShadowLayer() = 0;
 	virtual void BindShadowBuffer(RAS_ICanvas *canvas, KX_Camera *cam, mt::mat3x4& camtrans) = 0;
 	virtual void UnbindShadowBuffer() = 0;

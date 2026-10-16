@@ -810,7 +810,10 @@ class RenderButtonsPanel:
     @classmethod
     def poll(cls, context):
         rd = context.scene.render
-        return (rd.engine in cls.COMPAT_ENGINES)
+        category = getattr(cls, "ae_category", None)
+        return (rd.engine in cls.COMPAT_ENGINES and
+                (rd.engine != 'BLENDER_GAME' or category is None or
+                 context.window_manager.ae_render_panel_category == category))
 
 
 class RENDER_OT_set_game_resolution(Operator):
@@ -959,6 +962,7 @@ class RENDER_PT_game_cook(RenderButtonsPanel, Panel):
     # Second panel, right after the engine selector: loading speed matters for every game.
     bl_label = "Cook"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'SYSTEM'
 
     def draw(self, context):
         import os
@@ -984,6 +988,7 @@ class RENDER_PT_embedded(RenderButtonsPanel, Panel):
     # Embedded and Standalone players side by side, one column each.
     bl_label = "Player"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'SYSTEM'
 
     def draw(self, context):
         import sys
@@ -1037,6 +1042,7 @@ class RENDER_PT_embedded(RenderButtonsPanel, Panel):
 class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
     bl_label = "Shading"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'GRAPHICS'
 
     def draw(self, context):
         layout = self.layout
@@ -1073,6 +1079,7 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
 class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
     bl_label = "Native SSGI (Experimental)"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'GRAPHICS'
 
     @classmethod
     def poll(cls, context):
@@ -1137,10 +1144,11 @@ class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
 class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
     bl_label = "Iluminação Pré-calculada"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'GRAPHICS'
 
     @classmethod
     def poll(cls, context):
-        return (context.scene.render.engine in cls.COMPAT_ENGINES and
+        return (super().poll(context) and
                 hasattr(context.scene, "ae_lightmap_settings"))
 
     def draw(self, context):
@@ -1234,6 +1242,7 @@ class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
 class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
     bl_label = "Post Processing Shaders"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'GRAPHICS'
 
     def draw(self, context):
         layout = self.layout
@@ -1341,6 +1350,7 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
 class RENDER_PT_game_system(RenderButtonsPanel, Panel):
     bl_label = "System"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'SYSTEM'
 
     def draw(self, context):
         layout = self.layout
@@ -1416,6 +1426,7 @@ class RENDER_PT_game_attachments(RenderButtonsPanel, Panel):
     # Extra color outputs written by materials, read back by 2D filters as bgl_DataTextures[n].
     bl_label = "Attachments"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'GRAPHICS'
 
     def draw(self, context):
         layout = self.layout
@@ -1470,6 +1481,7 @@ class RENDER_PT_game_attachments(RenderButtonsPanel, Panel):
 class RENDER_PT_game_animations(RenderButtonsPanel, Panel):
     bl_label = "Animations"
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'SYSTEM'
 
     def draw(self, context):
         layout = self.layout
@@ -1501,6 +1513,7 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
     # Field names sit on their own label above the field, so fields show only the value.
     bl_label = "Display"
     COMPAT_ENGINES = {"BLENDER_GAME"}
+    ae_category = 'SYSTEM'
 
     def draw(self, context):
         layout = self.layout
@@ -1560,6 +1573,7 @@ class RENDER_PT_game_vr(RenderButtonsPanel, Panel):
     # head tracking, lens and comfort fields (used with Stereo = Stereo).
     bl_label = "VR"
     COMPAT_ENGINES = {"BLENDER_GAME"}
+    ae_category = 'SYSTEM'
 
     def draw(self, context):
         layout = self.layout
@@ -2120,11 +2134,17 @@ class DATA_PT_shadow_game(DataButtonsPanel, Panel):
                 # Keep the master toggle interactive even when CSM is currently disabled.
                 # Only the dependent debug and cascade settings should be inactive.
                 col.active = lamp.use_csm_shadow
+                col.prop(lamp, "csm_reference", text="Reference")
                 col.prop(lamp, "use_csm_debug", text="Enable Debug")
 
                 row = col.row(align=True)
-                row.prop(lamp, "cascaded_proportion_two", text="Cascade Proportion Near", slider=True)
-                row.prop(lamp, "cascaded_proportion_three", text="Cascade Proportion Middle", slider=True)
+                if lamp.csm_reference == 'LIGHT':
+                    row.prop(lamp, "cascaded_proportion_two", text="Inner Size", slider=True)
+                    row.prop(lamp, "cascaded_proportion_three", text="Middle Expansion", slider=True)
+                    col.label("Blue outer size uses Frustum Size", icon='INFO')
+                else:
+                    row.prop(lamp, "cascaded_proportion_two", text="Cascade Proportion Near", slider=True)
+                    row.prop(lamp, "cascaded_proportion_three", text="Cascade Proportion Middle", slider=True)
 
                 col.separator(factor=1)
 
@@ -2187,6 +2207,12 @@ class ObjectButtonsPanel:
     bl_region_type = 'WINDOW'
     bl_context = "object"
 
+    @classmethod
+    def poll(cls, context):
+        return (context.object is not None and
+                context.scene.render.engine == 'BLENDER_GAME' and
+                context.window_manager.ae_object_panel_category == 'GAME')
+
 
 class OBJECT_MT_lod_tools(Menu):
     bl_label = "Level Of Detail Tools"
@@ -2237,12 +2263,14 @@ class OBJECT_OT_game_load_with_scene(Operator):
 
 class OBJECT_PT_game_object_tasks(GameButtonsPanel, Panel):
     bl_label = "Load Object with Scene"
+    bl_context = "object"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return context.scene.render.engine in cls.COMPAT_ENGINES and ob and ob.type
+        return (context.scene.render.engine in cls.COMPAT_ENGINES and ob and ob.type and
+                context.window_manager.ae_object_panel_category == 'GAME')
 
     def draw(self, context):
         layout = self.layout
@@ -2304,7 +2332,7 @@ class OBJECT_MT_culling(ObjectButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return context.scene.render.engine in cls.COMPAT_ENGINES and ob.type not in {'CAMERA', 'EMPTY', 'LAMP'}
+        return (super().poll(context) and ob.type not in {'CAMERA', 'EMPTY', 'LAMP'})
 
     def draw(self, context):
         layout = self.layout
@@ -2315,6 +2343,7 @@ class OBJECT_MT_culling(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_game_network(GameButtonsPanel, Panel):
     bl_label = "Network"
+    bl_context = "object"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -2322,7 +2351,8 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
-                and ob.type not in {'CAMERA'})
+                and ob.type not in {'CAMERA'} and
+                context.window_manager.ae_object_panel_category == 'GAME')
 
     def draw(self, context):
         layout = self.layout
@@ -2346,13 +2376,15 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
 
 class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
     bl_label = "Activity Culling"
+    bl_context = "object"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return context.scene.render.engine in cls.COMPAT_ENGINES and ob.type not in {'CAMERA'}
+        return (context.scene.render.engine in cls.COMPAT_ENGINES and ob.type not in {'CAMERA'} and
+                context.window_manager.ae_object_panel_category == 'GAME')
 
     def draw(self, context):
         layout = self.layout
@@ -2675,7 +2707,7 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return context.scene.render.engine in cls.COMPAT_ENGINES and ob.type not in {'CAMERA', 'EMPTY', 'LAMP'}
+        return (super().poll(context) and ob.type not in {'CAMERA', 'EMPTY', 'LAMP'})
 
     def draw(self, context):
         layout = self.layout
@@ -2739,12 +2771,14 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         
 class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
     bl_label = "Animation Events"
+    bl_context = "object"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
-        return context.object is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+        return (context.object is not None and context.scene.render.engine in cls.COMPAT_ENGINES and
+                context.window_manager.ae_object_panel_category == 'GAME')
 
     def draw(self, context):
         layout = self.layout

@@ -270,7 +270,7 @@ void color_to_blender_normal_new_shading(vec3 color, out vec3 normal)
  * highlight de uma luz pontual/sol colapsa num pico sub-pixel (um ponto branco).
  * Limitamos a nitidez a esse piso para o highlight ficar sempre visivel, como o
  * "mais brilhante" classico do BGE. So afeta o specular, nunca o difuso. */
-#define RANGE_SPEC_MIN_ROUGHNESS 0.15
+#define RANGE_SPEC_MIN_ROUGHNESS 0.1
 
 /*********** SHADER NODES ***************/
 
@@ -3798,19 +3798,55 @@ void shadow_vsm(
 }
 
 /* Cascaded Shadow Mapping (Sun lamps only): 3 fixed cascades (Near/Medium/Low), selected per-fragment
- * by camera-space distance against 2 split boundaries. Uses the same single-tap sampling as
- * shadow_simple/shadow_vsm (not the PCF-jitter/early-bail variants) -- per-cascade bias/soft already
- * give quality control per distance band, so this keeps the codegen surface manageable.
+ * by camera-space depth or Sun-local square distance against 2 split boundaries. Uses the same
+ * single-tap sampling as shadow_simple/shadow_vsm (not the PCF-jitter/early-bail variants).
  *
  * Cascade boundaries are cross-faded over a band (10% of the split distance) instead of a hard cut,
  * so the harder-filtered far cascade doesn't pop visibly against the softer near one. The extra
  * cascade sample only happens inside that band -- outside it, this costs the same single tap as before. */
+float csm_reference_distance(vec3 rco, mat4 lightimat, float referenceLight)
+{
+	/* rco is in active-camera view space. dynimat maps it to the Sun local space. */
+	float cameraDistance = -rco.z;
+	vec2 lightPlane = abs((lightimat * vec4(rco, 1.0)).xy);
+	/* Chebyshev distance gives square cascade boundaries aligned to the Sun local axes. */
+	float lightDistance = max(lightPlane.x, lightPlane.y);
+	return mix(cameraDistance, lightDistance, step(0.5, referenceLight));
+}
+
+/* Camera cascades keep their independent projection matrices. Light cascades are concentric,
+ * share one view and the same Z clip range, and differ only by their square XY half-size. Build
+ * their XY coordinates directly in Sun-local space so rendering and sampling use the exact same
+ * square even when the two cascade sub-lamp matrix uniforms are stale in an existing material. */
+vec4 csm_shadow_proj_coord(vec3 rco, vec3 vn, mat4 shadowpersmat, mat4 basepersmat,
+                           mat4 lightimat, float referenceLight, float halfSize,
+                           float bias, float slopebias)
+{
+	if (referenceLight < 0.5) {
+		return shadow_proj_coord(rco, vn, shadowpersmat, bias, slopebias);
+	}
+	/* The cascade matrix is the authoritative world/view -> shadow-map transform.
+	 * Light-reference cascades are concentric, but each map still owns its complete
+	 * orthographic projection (including the matching XY scale and Z range). */
+	return shadow_proj_coord(rco, vn, shadowpersmat, bias, slopebias);
+}
+
+vec4 csm_shadow_proj_coord(vec3 rco, mat4 shadowpersmat, mat4 basepersmat,
+                           mat4 lightimat, float referenceLight, float halfSize)
+{
+	if (referenceLight < 0.5) {
+		return shadow_proj_coord(rco, shadowpersmat);
+	}
+	return shadow_proj_coord(rco, shadowpersmat);
+}
+
 void shadow_simple_csm(
         vec3 rco, vec3 vn,
         sampler2DShadow shadowmap0, mat4 shadowpersmat0, float bias0, float slopebias0,
         sampler2DShadow shadowmap1, mat4 shadowpersmat1, float bias1, float slopebias1,
         sampler2DShadow shadowmap2, mat4 shadowpersmat2, float bias2, float slopebias2,
-        float split0, float split1, float type, float twosided, float inp,
+        mat4 lightimat, float referenceLight, float split0, float split1, float outerSize,
+        float type, float twosided, float inp,
         out float result)
 {
 	if (inp <= 0.0) {
@@ -3818,36 +3854,39 @@ void shadow_simple_csm(
 		return;
 	}
 
-	float viewdist = -rco.z;
+	float viewdist = csm_reference_distance(rco, lightimat, referenceLight);
 	vec4 co;
 
-	float blend0 = split0 * 0.1;
-	float blend1 = split1 * 0.1;
+	/* Camera mode keeps the legacy cross-fade. Light mode uses concentric square
+	 * cascades; a hard boundary is intentional here so a failed outer-map sample
+	 * cannot be hidden as a white blend with the inner cascade. */
+	float blend0 = (referenceLight < 0.5) ? split0 * 0.1 : 0.0;
+	float blend1 = (referenceLight < 0.5) ? split1 * 0.1 : 0.0;
 
 	if (viewdist < split0 - blend0) {
-		co = shadow_proj_coord(rco, vn, shadowpersmat0, bias0, slopebias0);
+		co = csm_shadow_proj_coord(rco, vn, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0, bias0, slopebias0);
 		result = shadow_visibility(co) ? test_shadow_simple(shadowmap0, co, type) : 1.0;
 	}
 	else if (viewdist < split0 + blend0) {
-		co = shadow_proj_coord(rco, vn, shadowpersmat0, bias0, slopebias0);
+		co = csm_shadow_proj_coord(rco, vn, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0, bias0, slopebias0);
 		float shadow0 = shadow_visibility(co) ? test_shadow_simple(shadowmap0, co, type) : 1.0;
-		co = shadow_proj_coord(rco, vn, shadowpersmat1, bias1, slopebias1);
+		co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
 		float shadow1 = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
 		result = mix(shadow0, shadow1, smoothstep(split0 - blend0, split0 + blend0, viewdist));
 	}
 	else if (viewdist < split1 - blend1) {
-		co = shadow_proj_coord(rco, vn, shadowpersmat1, bias1, slopebias1);
+		co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
 		result = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
 	}
 	else if (viewdist < split1 + blend1) {
-		co = shadow_proj_coord(rco, vn, shadowpersmat1, bias1, slopebias1);
+		co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
 		float shadow1 = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
-		co = shadow_proj_coord(rco, vn, shadowpersmat2, bias2, slopebias2);
+		co = csm_shadow_proj_coord(rco, vn, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize, bias2, slopebias2);
 		float shadow2 = shadow_visibility(co) ? test_shadow_simple(shadowmap2, co, type) : 1.0;
 		result = mix(shadow1, shadow2, smoothstep(split1 - blend1, split1 + blend1, viewdist));
 	}
 	else {
-		co = shadow_proj_coord(rco, vn, shadowpersmat2, bias2, slopebias2);
+		co = csm_shadow_proj_coord(rco, vn, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize, bias2, slopebias2);
 		result = shadow_visibility(co) ? test_shadow_simple(shadowmap2, co, type) : 1.0;
 	}
 }
@@ -3857,7 +3896,7 @@ void shadow_vsm_csm(
         sampler2D shadowmap0, mat4 shadowpersmat0, float bias0, float bleedbias0,
         sampler2D shadowmap1, mat4 shadowpersmat1, float bias1, float bleedbias1,
         sampler2D shadowmap2, mat4 shadowpersmat2, float bias2, float bleedbias2,
-        float split0, float split1, float inp,
+        mat4 lightimat, float referenceLight, float split0, float split1, float outerSize, float inp,
         out float result)
 {
 	if (inp <= 0.0) {
@@ -3865,36 +3904,36 @@ void shadow_vsm_csm(
 		return;
 	}
 
-	float viewdist = -rco.z;
+	float viewdist = csm_reference_distance(rco, lightimat, referenceLight);
 	vec4 co;
 
-	float blend0 = split0 * 0.1;
-	float blend1 = split1 * 0.1;
+	float blend0 = (referenceLight < 0.5) ? split0 * 0.1 : 0.0;
+	float blend1 = (referenceLight < 0.5) ? split1 * 0.1 : 0.0;
 
 	if (viewdist < split0 - blend0) {
-		co = shadow_proj_coord(rco, shadowpersmat0);
+		co = csm_shadow_proj_coord(rco, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0);
 		result = shadow_visibility(co) ? test_shadow_vsm(shadowmap0, co, bias0, bleedbias0) : 1.0;
 	}
 	else if (viewdist < split0 + blend0) {
-		co = shadow_proj_coord(rco, shadowpersmat0);
+		co = csm_shadow_proj_coord(rco, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0);
 		float shadow0 = shadow_visibility(co) ? test_shadow_vsm(shadowmap0, co, bias0, bleedbias0) : 1.0;
-		co = shadow_proj_coord(rco, shadowpersmat1);
+		co = csm_shadow_proj_coord(rco, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1);
 		float shadow1 = shadow_visibility(co) ? test_shadow_vsm(shadowmap1, co, bias1, bleedbias1) : 1.0;
 		result = mix(shadow0, shadow1, smoothstep(split0 - blend0, split0 + blend0, viewdist));
 	}
 	else if (viewdist < split1 - blend1) {
-		co = shadow_proj_coord(rco, shadowpersmat1);
+		co = csm_shadow_proj_coord(rco, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1);
 		result = shadow_visibility(co) ? test_shadow_vsm(shadowmap1, co, bias1, bleedbias1) : 1.0;
 	}
 	else if (viewdist < split1 + blend1) {
-		co = shadow_proj_coord(rco, shadowpersmat1);
+		co = csm_shadow_proj_coord(rco, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1);
 		float shadow1 = shadow_visibility(co) ? test_shadow_vsm(shadowmap1, co, bias1, bleedbias1) : 1.0;
-		co = shadow_proj_coord(rco, shadowpersmat2);
+		co = csm_shadow_proj_coord(rco, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize);
 		float shadow2 = shadow_visibility(co) ? test_shadow_vsm(shadowmap2, co, bias2, bleedbias2) : 1.0;
 		result = mix(shadow1, shadow2, smoothstep(split1 - blend1, split1 + blend1, viewdist));
 	}
 	else {
-		co = shadow_proj_coord(rco, shadowpersmat2);
+		co = csm_shadow_proj_coord(rco, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize);
 		result = shadow_visibility(co) ? test_shadow_vsm(shadowmap2, co, bias2, bleedbias2) : 1.0;
 	}
 }
@@ -3947,9 +3986,8 @@ void shadow_color_output(vec4 surface, vec3 base, float alpha, float glow, float
 
 /* Light reaching a receiver through the Colored Shadows casters: the transmittance stored in the
  * lamp's color target where the receiver lies behind the nearest one, white elsewhere. */
-vec3 shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias)
+vec3 shadow_color_tint_coord(sampler2D colormap, vec4 co)
 {
-	vec4 co = shadow_proj_coord(rco, vn, shadowpersmat, bias, slopebias);
 	if (co.x < 0.0 || co.x > 1.0 || co.y < 0.0 || co.y > 1.0 || co.z > 1.0) {
 		return vec3(1.0);
 	}
@@ -3976,6 +4014,21 @@ vec3 shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat
 	return (co.z > depth + 0.0008) ? c.rgb : vec3(1.0);
 }
 
+vec3 shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias)
+{
+	return shadow_color_tint_coord(colormap, shadow_proj_coord(rco, vn, shadowpersmat, bias, slopebias));
+}
+
+vec3 csm_shadow_color_tint(vec3 rco, vec3 vn, sampler2D colormap,
+                           mat4 shadowpersmat, mat4 basepersmat, mat4 lightimat,
+                           float referenceLight, float halfSize, float bias, float slopebias)
+{
+	return shadow_color_tint_coord(
+	        colormap,
+	        csm_shadow_proj_coord(rco, vn, shadowpersmat, basepersmat,
+	                              lightimat, referenceLight, halfSize, bias, slopebias));
+}
+
 void shade_shadow_tint(vec3 lcol, vec3 rco, vec3 vn, sampler2D colormap, mat4 shadowpersmat, float bias, float slopebias,
                        out vec3 outcol)
 {
@@ -3988,30 +4041,38 @@ void shade_shadow_tint_csm(vec3 lcol, vec3 rco, vec3 vn,
                            sampler2D colormap0, mat4 shadowpersmat0, float bias0, float slopebias0,
                            sampler2D colormap1, mat4 shadowpersmat1, float bias1, float slopebias1,
                            sampler2D colormap2, mat4 shadowpersmat2, float bias2, float slopebias2,
-                           float split0, float split1, out vec3 outcol)
+                           mat4 lightimat, float referenceLight, float split0, float split1, float outerSize,
+                           out vec3 outcol)
 {
-	float viewdist = -rco.z;
-	float blend0 = split0 * 0.1;
-	float blend1 = split1 * 0.1;
+	float viewdist = csm_reference_distance(rco, lightimat, referenceLight);
+	float blend0 = (referenceLight < 0.5) ? split0 * 0.1 : 0.0;
+	float blend1 = (referenceLight < 0.5) ? split1 * 0.1 : 0.0;
 	vec3 tint;
 	if (viewdist < split0 - blend0) {
-		tint = shadow_color_tint(rco, vn, colormap0, shadowpersmat0, bias0, slopebias0);
+		tint = csm_shadow_color_tint(rco, vn, colormap0, shadowpersmat0, shadowpersmat0,
+		                             lightimat, referenceLight, split0, bias0, slopebias0);
 	}
 	else if (viewdist < split0 + blend0) {
-		tint = mix(shadow_color_tint(rco, vn, colormap0, shadowpersmat0, bias0, slopebias0),
-		           shadow_color_tint(rco, vn, colormap1, shadowpersmat1, bias1, slopebias1),
+		tint = mix(csm_shadow_color_tint(rco, vn, colormap0, shadowpersmat0, shadowpersmat0,
+		                                  lightimat, referenceLight, split0, bias0, slopebias0),
+		           csm_shadow_color_tint(rco, vn, colormap1, shadowpersmat1, shadowpersmat0,
+		                                  lightimat, referenceLight, split1, bias1, slopebias1),
 		           smoothstep(split0 - blend0, split0 + blend0, viewdist));
 	}
 	else if (viewdist < split1 - blend1) {
-		tint = shadow_color_tint(rco, vn, colormap1, shadowpersmat1, bias1, slopebias1);
+		tint = csm_shadow_color_tint(rco, vn, colormap1, shadowpersmat1, shadowpersmat0,
+		                             lightimat, referenceLight, split1, bias1, slopebias1);
 	}
 	else if (viewdist < split1 + blend1) {
-		tint = mix(shadow_color_tint(rco, vn, colormap1, shadowpersmat1, bias1, slopebias1),
-		           shadow_color_tint(rco, vn, colormap2, shadowpersmat2, bias2, slopebias2),
+		tint = mix(csm_shadow_color_tint(rco, vn, colormap1, shadowpersmat1, shadowpersmat0,
+		                                  lightimat, referenceLight, split1, bias1, slopebias1),
+		           csm_shadow_color_tint(rco, vn, colormap2, shadowpersmat2, shadowpersmat0,
+		                                  lightimat, referenceLight, outerSize, bias2, slopebias2),
 		           smoothstep(split1 - blend1, split1 + blend1, viewdist));
 	}
 	else {
-		tint = shadow_color_tint(rco, vn, colormap2, shadowpersmat2, bias2, slopebias2);
+		tint = csm_shadow_color_tint(rco, vn, colormap2, shadowpersmat2, shadowpersmat0,
+		                             lightimat, referenceLight, outerSize, bias2, slopebias2);
 	}
 	outcol = lcol * tint;
 }

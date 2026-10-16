@@ -111,6 +111,17 @@ void KX_ShadowRenderer::ComputeCascadeFrustumBounds(
 	r_minZ = minZ; r_maxZ = maxZ;
 }
 
+void KX_ShadowRenderer::ComputeCascadeLightBounds(
+        float halfSize, float clipStart, float clipEnd,
+        float& r_minX, float& r_maxX, float& r_minY, float& r_maxY, float& r_minZ, float& r_maxZ)
+{
+	r_minX = r_minY = -halfSize;
+	r_maxX = r_maxY = halfSize;
+	/* Blender lights point down local -Z. Distances are positive in the UI. */
+	r_minZ = -clipEnd;
+	r_maxZ = -clipStart;
+}
+
 bool KX_ShadowRenderer::SelfTestCascadeShadowMath()
 {
 	bool ok = true;
@@ -151,6 +162,12 @@ bool KX_ShadowRenderer::SelfTestCascadeShadowMath()
 	check(fabsf(minX + 1.0f) < 1e-4f, "ortho: minX esperado -1 (independente da distancia)");
 	check(fabsf(maxX - 1.0f) < 1e-4f, "ortho: maxX esperado +1");
 
+	ComputeCascadeLightBounds(3.0f, splitNear, splitFar, minX, maxX, minY, maxY, minZ, maxZ);
+	check(fabsf(minX + 3.0f) < 1e-4f && fabsf(maxX - 3.0f) < 1e-4f,
+	      "light: largura esperada pelo Frustum Size");
+	check(fabsf(minZ + splitFar) < 1e-4f && fabsf(maxZ + splitNear) < 1e-4f,
+	      "light: profundidade esperada pelo clip completo");
+
 	if (!ok) {
 		printf("[SelfTestCascadeShadowMath] RESULTADO: houve FAIL(s), ver mensagens acima\n");
 	}
@@ -187,18 +204,29 @@ void KX_ShadowRenderer::ComputeCascadeShadowMatrices(
 			break;
 		}
 	}
-	r_splitFar = splitFar;
-
-	const RAS_CameraData *camdata = viewcam->GetCameraData();
-	const mt::mat4& proj = viewcam->GetProjectionMatrix(RAS_Rasterizer::RAS_STEREO_LEFTEYE);
-	/* GetCameraToWorld() includes the head tracking orientation (VR), so the cascades follow the view. */
-	const mt::mat3x4 camWorldTrans = viewcam->GetCameraToWorld();
 	const mt::mat3x4 lightWorldInv = light->NodeGetWorldTransform().Inverse();
 
 	float minX, maxX, minY, maxY, minZ, maxZ;
-	ComputeCascadeFrustumBounds(proj, camdata->m_perspective, splitNear, splitFar,
-	                             camWorldTrans, lightWorldInv,
-	                             minX, maxX, minY, maxY, minZ, maxZ);
+	if (raslight->m_cascadeReferenceLight) {
+		const float sizeFactor = (cascadeIndex == 0) ? propNear :
+		                         ((cascadeIndex == 1) ? std::min(propNear + propMiddle, 1.0f) : 1.0f);
+		const float halfSize = std::max(raslight->m_shadowfrustumsize * sizeFactor, 0.001f);
+		/* In Light mode the split values sent to the shader are square half-sizes, not depths. */
+		r_splitFar = halfSize;
+		ComputeCascadeLightBounds(halfSize, clipstart, raslight->m_shadowclipend,
+		                          minX, maxX, minY, maxY, minZ, maxZ);
+	}
+	else {
+		r_splitFar = splitFar;
+		const RAS_CameraData *camdata = viewcam->GetCameraData();
+		const mt::mat4& proj = viewcam->GetProjectionMatrix(RAS_Rasterizer::RAS_STEREO_LEFTEYE);
+		/* GetCameraToWorld() includes the head tracking orientation (VR), so Camera-reference
+		 * cascades follow the actual view rather than only the camera object's transform. */
+		const mt::mat3x4 camWorldTrans = viewcam->GetCameraToWorld();
+		ComputeCascadeFrustumBounds(proj, camdata->m_perspective, splitNear, splitFar,
+		                             camWorldTrans, lightWorldInv,
+		                             minX, maxX, minY, maxY, minZ, maxZ);
+	}
 
 	/* The camera slice bounds receivers, but its shadow map must also contain scene
 	 * geometry which overlaps the slice in light-space X/Y.  Fit Z to those caster
@@ -233,11 +261,15 @@ void KX_ShadowRenderer::ComputeCascadeShadowMatrices(
 			maxZ = std::max(maxZ, objectMaxZ + 0.5f);
 		}
 	};
-	for (KX_GameObject *obj : scene->GetStaticShadowCasterObjects()) {
-		includeCasterDepth(obj);
-	}
-	for (KX_GameObject *obj : scene->GetDynamicShadowCasterObjects()) {
-		includeCasterDepth(obj);
+	/* Camera-reference slices need caster depth outside the receiver slice. Light-reference
+	 * boxes already span the full clip depth and differ only in their concentric X/Y size. */
+	if (!raslight->m_cascadeReferenceLight) {
+		for (KX_GameObject *obj : scene->GetStaticShadowCasterObjects()) {
+			includeCasterDepth(obj);
+		}
+		for (KX_GameObject *obj : scene->GetDynamicShadowCasterObjects()) {
+			includeCasterDepth(obj);
+		}
 	}
 
 	/* Light shines down its local -Z axis (Blender convention), so distance-from-light
@@ -372,6 +404,8 @@ struct CascadeMatrixCache
 	int staleFrames = 0;
 	mt::mat3x4 camWorldTrans = mt::mat3x4::Identity();
 	mt::mat3x4 lightWorldInv = mt::mat3x4::Identity();
+	bool referenceLight = false;
+	float config[5] = { 0.0f, 0.0f, 0.0f, 0.0f, 0.0f };
 	mt::mat4 viewmat[3];
 	mt::mat4 winmat[3];
 	float splitFar[3] = { 0.0f, 0.0f, 0.0f };
@@ -577,18 +611,25 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 					const short cacheTolerance = viewcam->GetCSMCacheMaxStaleFrames();
 					const mt::mat3x4 camWorldTrans = viewcam->NodeGetWorldTransform();
 					const mt::mat3x4 lightWorldInv = light->NodeGetWorldTransform().Inverse();
+					const bool referenceLight = raslight->m_cascadeReferenceLight;
+					const float cascadeConfig[5] = {
+						raslight->m_shadowclipstart, raslight->m_shadowclipend,
+						raslight->m_cascadeproportionnear, raslight->m_cascadeproportionmiddle,
+						raslight->m_shadowfrustumsize};
 					CascadeMatrixCache& cc = cascadeCache[light];
 					const bool cacheEligible = cacheTolerance >= 1 && cc.valid && !staticCasterListDirty &&
-					                            scene->GetDynamicShadowCasterObjects().empty();
+					                            (referenceLight || scene->GetDynamicShadowCasterObjects().empty()) &&
+					                            cc.referenceLight == referenceLight &&
+					                            memcmp(cc.config, cascadeConfig, sizeof(cascadeConfig)) == 0;
 					bool canReuse = false;
 					if (cacheEligible) {
-						if (Mat3x4NearlyEqual(camWorldTrans, cc.camWorldTrans) &&
+						if ((referenceLight || Mat3x4NearlyEqual(camWorldTrans, cc.camWorldTrans)) &&
 						    Mat3x4NearlyEqual(lightWorldInv, cc.lightWorldInv)) {
 							canReuse = true;
 							cc.staleFrames = 0;
 						}
 						else if (cacheTolerance >= 2 && cc.staleFrames < 1 &&
-						         Mat3x4NearlyEqual(camWorldTrans, cc.camWorldTrans, kCSMCacheToleranceEpsilon) &&
+						         (referenceLight || Mat3x4NearlyEqual(camWorldTrans, cc.camWorldTrans, kCSMCacheToleranceEpsilon)) &&
 						         Mat3x4NearlyEqual(lightWorldInv, cc.lightWorldInv, kCSMCacheToleranceEpsilon)) {
 							canReuse = true;
 							cc.staleFrames += 1;
@@ -607,6 +648,8 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 						}
 						cc.camWorldTrans = camWorldTrans;
 						cc.lightWorldInv = lightWorldInv;
+						cc.referenceLight = referenceLight;
+						memcpy(cc.config, cascadeConfig, sizeof(cascadeConfig));
 						for (short p = 0; p < 3; ++p) {
 							cc.viewmat[p] = cascadeViews[p];
 							cc.winmat[p] = cascadeWins[p];
@@ -682,7 +725,6 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 						m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_shadowculling);
 
 						const std::vector<KX_GameObject *> objects = scene->CalculateVisibleMeshes(cam, cam->GetFrustum(RAS_Rasterizer::RAS_STEREO_LEFTEYE), raslight->GetShadowLayer(), true);
-
 						m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_shadows);
 
 						/* render */
@@ -750,10 +792,24 @@ void KX_ShadowRenderer::DrawDebugFrustum(KX_Scene *scene)
 	for (KX_LightObject *light : scene->GetLightList()) {
 		RAS_ILightObject *raslight = light->GetLightData();
 		if (m_engine->GetShowShadowFrustum() == KX_DebugOption::FORCE || light->GetShowShadowFrustum()) {
-			const mt::mat4 projmat(raslight->GetWinMat());
-			const mt::mat4 viewmat(raslight->GetViewMat());
-
-			debugDraw.DrawCameraFrustum(projmat * viewmat);
+			if (raslight->HasCascadedShadow()) {
+				const mt::vec4 colors[3] = {
+					mt::vec4(1.0f, 0.15f, 0.15f, 1.0f),
+					mt::vec4(0.15f, 1.0f, 0.15f, 1.0f),
+					mt::vec4(0.15f, 0.35f, 1.0f, 1.0f),
+				};
+				for (short drawIndex = 0; drawIndex < 3; ++drawIndex) {
+					/* Concentric Light-reference frusta overlap. Queue outer-to-inner so their
+					 * translucent debug faces leave the red center readable. */
+					const short cascade = raslight->m_cascadeReferenceLight ? (2 - drawIndex) : drawIndex;
+					debugDraw.DrawCameraFrustum(
+					        raslight->GetCascadeWinMat(cascade) * raslight->GetCascadeViewMat(cascade),
+					        colors[cascade]);
+				}
+			}
+			else {
+				debugDraw.DrawCameraFrustum(raslight->GetWinMat() * raslight->GetViewMat());
+			}
 		}
 	}
 }

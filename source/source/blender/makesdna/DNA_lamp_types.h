@@ -237,5 +237,6 @@ typedef struct Lamp {
 
 /* csm_flag */
 #define LA_CSM_DEBUG	(1 << 0)
+#define LA_CSM_REFERENCE_LIGHT	(1 << 1)
 
 #endif /* __DNA_LAMP_TYPES_H__ */

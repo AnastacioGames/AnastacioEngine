@@ -720,8 +720,11 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   em 2026-10-15; o aviso OpenCL `kernel_lamp_emission` foi reproduzido em `baked_gpu.range` e corrigido:
   o caminho de bake tentava carregar um kernel split que não é compilado para bake. AO, Static e Indirect
   passaram sem o aviso no executável de teste e no executável principal instalado por cópia idêntica;
-  falta confirmar visualmente no jogo. O link normal do executável principal ainda falha com `LNK1104`
-  mesmo depois de fechar o editor; falta diagnosticar o bloqueio. Falhas reais reportadas pelo motor
+  falta confirmar visualmente no jogo. O `LNK1104` do executável principal era um bloqueio temporário
+  de arquivo no Windows: sem processo/handle, atributo ou permissão impeditiva, o link normal voltou a
+  concluir em 2026-10-15. Como o dono do handle não existia mais no momento da inspeção, a causa exata
+  permanece indeterminada; se reaparecer, capturar o processo pelo Restart Manager antes de repetir o link.
+  Falhas reais reportadas pelo motor
   impedem o salvamento de um bake supostamente válido.
   GTAO no lugar do SSAO legado no desktop. FPS e objeto móvel medidos (desktop e iGPU). Falta:
   validar no Linux e no build Web. UV da lightmap por xatlas. [SSGI nativo experimental](ssgi-native-plan.md)
@@ -748,10 +751,18 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (Filmic/exposure/gamma de Color Management aplicados na saída do material nodes, aproximado) feita em 2026-10-01. Fases 3 a 5
   validadas pelo usuário em 2026-10-02 (`tools/create_node_phases_test.py`). Tangent e Anisotropic BSDF de verdade em
   2026-10-02; Holdout, Translucent, Velvet e Subsurface (aproximados) em 2026-10-02. Wireframe no Game em 2026-10-02 (vértices sem compartilhamento + `gl_VertexID % 3`). Refração screen-space no Glass/Refraction e Transmission do Principled (Alpha Blend) em 2026-10-02. Hair BSDF e Principled Hair BSDF (R, TT, TRT e absorção do Cycles, aproximados) validados pelo usuário em 2026-10-02 (`tools/create_hair_bsdf_test.py`). IES Texture nas lâmpadas Point e Spot (`tools/create_ies_test.py`) e nós de volume (Absorption, Scatter, Principled; `tools/create_volume_test.py`) em 2026-10-02, validados pelo usuário em 2026-10-02 contra render do Cycles (o Principled não ilumina o entorno como no Cycles); atenuação da Spot no Game PBR igual à do Cycles em 2026-10-02; Point Density e Script ficam sem suporte. Fase 6 decidida em 2026-10-01: o BI fica como está (Game legado segue com os nós do BI, sem migração).
-- **Material rápido (receitas de nós, 2026-10-02)**: painel Quick Material com pacote de texturas, mistura por
-  máscara RGB e materiais prontos (ver changelog). Falta o usuário conferir no editor e no jogo
-  (`tools/create_material_recipes_test.py`, PBR e `legacy`). Normal e rugosidade por camada feitas (botão de pasta). Próximos: mistura pela
-  altura e Texture Array (só se 8+ camadas).
+- **Material rápido (receitas de nós, 2026-10-02)**: a aba Material usa filtros `Surface`, `Game` e `Setup`;
+  o painel Quick Material é separado em criação e materiais em camadas, com pacote de texturas, mistura por
+  máscara RGB e materiais prontos (ver changelog). `Convert Material` oferece PBR e Classic lado a lado; a
+  volta para Classic cobre Principled/Emission/Glass, texture slots e UV, preserva os três Shader Sources e
+  avisa sobre aproximações. Falta o usuário conferir no editor e no jogo
+  (`tools/create_material_recipes_test.py`, PBR e `legacy`). Normal e rugosidade por camada feitas (botão de pasta).
+  A conversão de material legado para PBR explicita o nó `UV Map`: preserva o mapa configurado ou usa a primeira
+  UV do mesh quando o campo está vazio. A aba Material também oferece o controle global `PBR Shading Nodes`
+  no grupo Setup. Os previews de Material e Texture ficam integrados aos respectivos painéis de slots no
+  Game e podem ser ocultados para devolver a largura à lista. As abas Object e Render também usam filtros
+  no topo (`Object`/`Game`/`Transform` e `System`/`Graphics`). Próximos: mistura pela altura e Texture Array
+  (só se 8+ camadas).
 - **Nós de material com estágios de vertex e geometry (2026-10-10, branch `claude/shader-nodes`)**: guia em
   [shader-nodes.md](shader-nodes.md). Feito: entrada Vertex Offset no Material Output, campo Geometry em Shader
   Sources, nós Vertex Offset/Wind/Wave/Fur Shells/Outline/Shell Layer/Camera Distance/GLSL Script, menu Add com
@@ -843,6 +854,8 @@ por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.
   (aceite de 2026-09-20). Em 2026-10-10 o timer de GPU deixou de contar o sono do limite de FPS (a escala só
   descia em jogo com folga); falta conferir no jogo que a escala volta a subir e fica parada quando sobra GPU.
 - **CSM**: blend entre cascatas e debug tint já implementados; falta medir o custo de GPU dessas duas features.
+  A referência `Light`, com caixas quadradas concêntricas orientadas pela Sun, passou em build e inspeção de
+  persistência em 2026-10-16; falta o usuário confirmar visualmente o debug e a propagação das sombras no jogo.
 - Avaliar antialiasing temporal somente com caso de uso e critérios de qualidade definidos.
 - Aceitos como no-op no core profile (reabrir só com demanda concreta): motion blur legado e texto de
   debug via `BLF_draw` (o clipping de espelho/água foi resolvido com projeção oblíqua em 2026-09-28).

@@ -6,6 +6,102 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-16 - CSM com referência pela câmera ou pela luz Sun
+
+- A Lamp Sun com CSM ganhou a opção `Reference`: `Camera` mantém as três faixas de profundidade anteriores;
+  `Light` cria três áreas quadradas concêntricas orientadas pela luz, com vermelho no centro, verde ao redor e
+  azul como área externa definida por `Frustum Size`. Nesse modo, os limites usados para escolher a cascata no
+  shader também são quadrados no espaço local da Sun, em vez de distância ao longo da câmera.
+- O desenho de debug do editor e o debug do runtime acompanham a referência escolhida. Em `Light`, as caixas
+  são desenhadas da maior para a menor para preservar a leitura das cores transparentes; em `Camera`, o desenho
+  em fatias do frustum permanece inalterado. O painel contextualiza os controles como `Inner Size` e
+  `Middle Expansion` no modo da luz.
+- `RangeEngine` e `RangeRuntime` foram recompilados com sucesso após reinicialização liberar o executável do
+  editor. As cenas controladas `csm-camera.range` e `csm-light.range` foram reabertas e inspecionadas com o
+  editor atualizado; referência, CSM, debug, clipping e tamanho externo persistiram. A confirmação visual das
+  caixas concêntricas e da propagação da sombra no jogo real permanece pendente.
+- No primeiro teste visual, somente a área vermelha projetava sombra; verde e azul selecionavam a cascata,
+  mas amostravam matrizes antigas ou ainda zeradas. As sub-lamps Medium/Low recebiam `viewmat`, `winmat` e
+  `persmat` novos durante o passe, porém o cache de uniforms dinâmicos não incluía essas matrizes em sua chave.
+  `GPU_lamp_shadow_buffer_bind_matrices()` agora invalida esse cache ao instalar cada matriz CSM. Editor e
+  runtime foram recompilados, mas o teste visual mostrou que essa primeira correção não bastava.
+- Instrumentação temporária na cena real `projects-teste/sombras_cascaded.range` confirmou dois casters nas
+  três cascatas e profundidade escrita nos três mapas (905.216/139.490/5.253 pixels); os depth maps brutos
+  mostraram a silhueta do cubo também em verde e azul. Bias efetivo (`0,005/0,0005/0,0005`), slope zero e as
+  três matrizes GPU distintas também foram conferidos. O degradê observado era o blend de 10% misturando a
+  sombra vermelha com uma amostra externa branca, não o parâmetro `Soft`.
+- No modo `Light`, o shader agora calcula o XY de amostragem diretamente no espaço local da Sun com o half-size
+  de cada quadrado (`split0`, `split1`, `Frustum Size`) e usa a matriz Near compartilhada somente para Z, já que
+  as caixas concêntricas têm a mesma orientação e clipping de profundidade. Isso evita depender da matriz das
+  sub-lamps para localizar a amostra; `Camera` mantém o caminho anterior. Referência, splits e tamanho externo
+  passaram a ser uniforms vivos. A instrumentação foi retirada, shaders/editor/runtime recompilados, e a
+  confirmação visual desta correção permanece pendente.
+
+## 2026-10-15 - Material: filtros de painéis e conversão PBR para Classic
+
+- As abas Object e Render do Game também receberam filtros no topo. Object usa
+  `Object | Game | Transform`: relações/organização/exibição; recursos específicos do jogo; e transformações;
+  do jogo. Render usa `System | Graphics`: System reúne cook/player/animações e runtime/display/VR;
+  Graphics reúne shading/iluminação/pós-processamento e o Bake de Textura legado. As faixas foram incorporadas aos primeiros painéis das
+  abas, evitando que a ordenação do Blender 2.79 as leve para o rodapé. Load Object with Scene, Network,
+  Activity Culling e Animation Events foram reunidos na própria aba Object com Culling e LOD. O seletor do
+  objeto usa somente o `Fake User` nativo (`F`), sem uma segunda caixa redundante. No Game ele é um painel
+  normal `Object`; no Blender Render o seletor histórico continua sem cabeçalho. Como o Blender 2.79 exibe
+  painéis reativados conforme o `sortorder` persistido na tela, a UI ganhou a opção genérica de painel
+  `PIN_TO_TOP`; o painel superior de Object a utiliza para permanecer acima de todos os grupos mesmo depois
+  de alternar os filtros.
+- Na aba Texture do Game, o preview deixou de ser um painel vertical separado e passou para dentro da caixa
+  `Texture`, ao lado da lista de slots. Um botão de visibilidade na coluna de ações mostra ou oculta o
+  preview; ele inicia oculto e a lista recupera a largura disponível. Os controles nativos
+  Texture/Material/Both, forma do material e alpha continuam disponíveis no preview integrado.
+- No Game, `Material Slot` e `Material Preview` compartilham uma única caixa no topo: lista de slots à
+  esquerda e preview sem título à direita. Os seletores do preview ficam em uma linha sob a imagem; os
+  botões de adicionar, remover, menu e ordenar slots formam uma coluna à direita do preview. Abaixo dessa
+  faixa, o seletor do material, o vínculo, os tipos de superfície e o nó ativo usam toda a largura da caixa.
+  Um botão de visibilidade abaixo do menu mostra ou oculta o preview; ele inicia oculto e a lista de slots
+  ocupa toda a largura disponível, preservando a coluna de ações à direita.
+  O painel vertical de preview é ocultado nesse modo para não duplicar o conteúdo; no Blender Render ele
+  permanece na organização histórica.
+- Uma faixa no rodapé de `Material Slot`, antes de todos os subpainéis, filtra a aba em três grupos, na ordem
+  `Surface`, `Game` e `Setup`: Surface reúne pipeline, Diffuse, Specular, Shading, Node Shader e Subsurface;
+  Game reúne Game Settings, Foliage, Options, Shadow e Transparency; Setup reúne PBR, Quick Material,
+  conversão, atlas e preview. No Blender Render a organização histórica
+  não muda. A faixa inicialmente registrada como painel sem cabeçalho foi movida para o próprio Material Slot
+  porque o Blender 2.79 ordena painéis sem cabeçalho no final da coluna.
+- O painel agora se chama `Convert Material` e mostra `PBR` e `Classic` lado a lado. O novo operador
+  `material.to_classic_nodes` converte Principled, Emission e Glass reconhecíveis para uma árvore Classic com
+  `Extended Material`; leva valores de cor/metallic/roughness/specular/alpha/emit e cria texture slots para
+  Base Color, Specular, Roughness (invertida para Hardness), Normal/Bump, Alpha e Emit, preservando o UV Map.
+- Texts anexados em Vertex/Geometry/Fragment permanecem no material. Múltiplos Principled/imagens e recursos
+  sem equivalente (Subsurface, Anisotropic, Sheen, Clearcoat, Transmission e Vertex Offset por nós) geram
+  aviso explícito de aproximação; a operação confirma antes, participa do Undo e alinha a cena para Classic.
+- `tools/test_material_classic_and_categories.py` validou cinco mapas, valores, alpha, emissão, os três Texts,
+  os três filtros e os dois botões. A cena salva abriu no `AnastacioRuntime`, executou cinco frames com os
+  shaders anexados e gravou `material_classic_runtime.ok`.
+
+## 2026-10-15 - Quick Material separado da conversão PBR
+
+- `Quick Material` voltou a ter título próprio e foi dividido nas caixas `Create Material` (texture set e
+  material pronto) e `Layered Materials` (mistura por máscara e superfícies molhadas/reflexivas). Todos os
+  cabeçalhos internos agora usam ícone; os ícones repetidos foram retirados dos botões PBR/Classic.
+- `Convert Material to PBR` virou um painel expansível independente, fechado por padrão, com somente o botão
+  de conversão dentro da caixa.
+
+## 2026-10-15 - PBR Shading Nodes também na aba Material
+
+- A aba Material do Game Engine ganhou, imediatamente abaixo de `Material Slot`, um painel expansível
+  `PBR Shading Nodes`, fechado por padrão. Dentro da caixa há somente o botão homônimo, ligado à mesma
+  propriedade global usada pela aba Render; os dois controles permanecem sincronizados.
+
+## 2026-10-15 - Conversão PBR explicita o UV Map padrão
+
+- Ao converter um material legado, slots com coordenadas `UV` agora sempre recebem um nó `UV Map`, em vez
+  de `Texture Coordinate`. O mapa indicado no slot continua tendo prioridade; quando o campo `Map` está
+  vazio, o conversor grava explicitamente a primeira camada UV do mesh ativo. Se o mesh não possui UV, o nó
+  ainda é criado, mas seu nome fica vazio.
+- `tools/test_material_to_pbr_uv.py` cobre mapa implícito, mapa explícito e mesh sem UV. Os três casos
+  passaram no `AnastacioEngine.exe` instalado em `build/bin/`.
+
 ## 2026-10-15 - Baked Lighting: interface em português
 
 - O painel agora usa `Iluminação Pré-calculada`, com os três modos, avisos, contagem de receptores,
@@ -73,6 +169,30 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   estáticos, exclusão de objeto dinâmico do atlas, RGBM com contraste, Light Volume 1x1x1 e persistência do
   modo; `AnastacioRuntime` encerrou com código 0 e sem erros GLSL. O usuário validou uma cena simples com
   cubo e plano Static; uma cena maior com materiais variados ainda não foi testada visualmente.
+
+## 2026-10-15 - Quick Material: conversão PBR visível no título
+
+- O título do painel agora é `Quick Material / Convert Material to PBR`; a conversão continua no mesmo
+  painel, evitando criar outro menu para um fluxo já relacionado.
+- Removido o controle duplicado `Specular Color` do Quick Material; o ajuste fica somente no painel
+  `Specular`.
+
+## 2026-10-15 - World: painéis recolhíveis Sky, Sun e Night
+
+- `Sky`, `Sun` e `Night` são painéis irmãos, cada qual com sua própria seta de expansão. `Sun` e `Night`
+  preservam seus campos dentro de uma caixa; propriedades e comportamento do runtime permanecem inalterados.
+
+## 2026-10-15 - Pacote Windows: incluir addon Anastacio Ragdoll
+
+- A instalação 0.5.1 usada nos testes estava sem `anastacio_ragdoll.py` e
+  `anastacio_ragdoll_runtime.py`, embora os arquivos existissem em `build/bin/`.
+  Os dois arquivos foram restaurados no pacote local e o empacotador agora valida
+  sua presença antes de gerar um novo ZIP.
+
+## 2026-10-15 - Links de apoio: Patreon da Anastacio Engine
+
+- Os links de suporte da splash e da tela About agora direcionam para
+  `https://www.patreon.com/cw/AnastacioEngine`, substituindo o Patreon da Range Engine.
 
 ## 2026-10-14 - Web/Android: alternar controles para acessar menus
 
@@ -206,6 +326,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   acorda corpos e contornos de culling/compound no [plano](ragdoll-modernization-plan.md).
 - Proposta: prévia no editor por Python, núcleo comum e modos livre/vinculado; C++ somente
   para lacunas verificadas. Nenhum código ou `.range` alterado, nenhum build ou teste físico.
+
+## 2026-10-14 - Correção do pacote Windows 0.5.1: operadores e splash
+
+O ZIP publicado excluía `bl_operators/logic_to_python.py`: o filtro genérico de logs no
+empacotador removia qualquer arquivo cujo nome começasse por `log`. Como o
+`bl_operators/__init__.py` ainda importa esse módulo, a inicialização Python abortava com
+`KeyError: 'logic_to_python'`, deixando a tela inicial incompleta e emitindo erros RNA.
+
+- `tools/stage_release_windows.py` agora exclui somente os nomes de logs, preserva
+  `logic_to_python.py`, não leva `__pycache__` e valida todos os módulos declarados pelo
+  `bl_operators/__init__.py` antes de compactar.
+- O `AnastacioEngine-0.5.1-windows-x64.zip` foi remontado de `build/bin/`, extraído e
+  aberto a partir da cópia extraída; a validação dos módulos de startup passou.
+
+## 2026-10-13 - Link da comunidade Discord da Anastacio Engine
+
+Os links Discord da tela inicial e do menu About do editor agora apontam para
+`https://discord.gg/AsbjKgh4E`.
 
 ## 2026-10-13 - Release 0.5.1: ORM Occlusion por canal e versão
 

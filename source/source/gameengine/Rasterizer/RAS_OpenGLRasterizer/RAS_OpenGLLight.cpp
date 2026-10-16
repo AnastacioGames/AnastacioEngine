@@ -290,6 +290,30 @@ mt::mat4 RAS_OpenGLLight::GetWinMat()
 	return mt::mat4::Identity();
 }
 
+mt::mat4 RAS_OpenGLLight::GetCascadeViewMat(short cascadeIndex)
+{
+	GPULamp *lamp = GetGPULamp();
+	if (lamp && cascadeIndex >= 0 && cascadeIndex < 3) {
+		GPULamp *cascadeLamp = (cascadeIndex == 0) ? lamp : GPU_lamp_get_cascade(lamp, cascadeIndex - 1);
+		if (cascadeLamp) {
+			return mt::mat4(GPU_lamp_get_viewmat(cascadeLamp));
+		}
+	}
+	return mt::mat4::Identity();
+}
+
+mt::mat4 RAS_OpenGLLight::GetCascadeWinMat(short cascadeIndex)
+{
+	GPULamp *lamp = GetGPULamp();
+	if (lamp && cascadeIndex >= 0 && cascadeIndex < 3) {
+		GPULamp *cascadeLamp = (cascadeIndex == 0) ? lamp : GPU_lamp_get_cascade(lamp, cascadeIndex - 1);
+		if (cascadeLamp) {
+			return mt::mat4(GPU_lamp_get_winmat(cascadeLamp));
+		}
+	}
+	return mt::mat4::Identity();
+}
+
 mt::mat4 RAS_OpenGLLight::GetShadowMatrix()
 {
 	GPULamp *lamp;

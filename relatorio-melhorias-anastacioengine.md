@@ -53,6 +53,16 @@ somente para leitura de projetos legados.
 A AnastacioEngine é um fork da Range Engine 1.6 Rev1, derivada da UPBGE 0.2.5b e do Blender 2.79. As
 frentes principais são performance, iluminação/renderização e ferramentas de runtime.
 
+O editor separa `Sky`, `Sun` e `Night` em painéis recolhíveis independentes na aba World, sem alterar as
+propriedades consumidas pelo runtime.
+Na aba Material do Game Engine, uma faixa `Surface`/`Game`/`Setup` filtra os painéis sem esconder o Material
+Slot. O conversor de materiais trabalha nos dois sentidos: Classic para PBR explicita o UV Map; PBR para
+Classic traduz o subconjunto compatível de Principled/Emission/Glass para Extended Material e texture slots,
+preserva os Texts Vertex/Geometry/Fragment e informa as aproximações sem equivalente.
+As abas Object e Render do Game usam filtros no topo: `Object`/`Game`/`Transform` e
+`System`/`Graphics`, respectivamente. As faixas ficam incorporadas ao primeiro painel para permanecer
+antes dos subpainéis no sistema de ordenação do Blender 2.79.
+
 A validação nativa em Linux x86_64 de 2026-09-15 também é uma evidência importante para os exports Web e
 Android: o runtime já roda fora do Windows/MSVC com toolchain Unix, Python 3.11 isolado, OpenAL, SDL/X11,
 RPATH e empacotamento próprio. Isso não substitui o trabalho específico de Emscripten/NDK, mas reduz o risco
@@ -240,8 +250,12 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   invalida; a varredura do snapshot por frame permanece. Build e regressao em Point passaram;
   benchmark sintetico estatico mediu 0,613 -> 0,194 ms em sombras e +28,3% na mediana de FPS.
   Ganho no jogo real e demais validacoes ficam na auditoria KX10.
-- CSM para luzes Sun usa três cascatas ajustadas ao frustum e considera os bounds dos casters no recorte Z.
-  O bug de sombra estática ausente no ângulo inicial foi corrigido e confirmado visualmente.
+- CSM para luzes Sun permite escolher a referência `Camera` ou `Light`. `Camera` usa as três faixas de
+  profundidade do frustum e considera os bounds dos casters no recorte Z. `Light` usa três áreas quadradas
+  concêntricas orientadas pela Sun: vermelho no centro, verde intermediário e azul externo pelo `Frustum Size`.
+  O debug do editor/runtime e a seleção da cascata no shader seguem a referência escolhida. O bug de sombra
+  estática ausente no ângulo inicial do modo Camera foi corrigido e confirmado visualmente; o novo modo Light
+  está compilado e inspecionado, ainda aguardando confirmação visual no jogo real.
 - Novas Lamps já nascem com o preset de sombras para Sun: mapa Simple com filtro PCF, 1024 px na cascata
   Near, com CSM e debug desativados, splits 0,40/0,35 e cascatas Medium/Low em 512/128 px. Os valores continuam
   editáveis por lamp e dados existentes não são alterados.

@@ -66,6 +66,8 @@ public:
 	int GetShadowBindCode();
 	mt::mat4 GetViewMat();
 	mt::mat4 GetWinMat();
+	mt::mat4 GetCascadeViewMat(short cascadeIndex);
+	mt::mat4 GetCascadeWinMat(short cascadeIndex);
 	mt::mat4 GetShadowMatrix();
 	mt::mat4 GetShadowWorldMatrix();
 	int GetShadowLayer();

@@ -1416,6 +1416,16 @@ static void draw_csm_camera_slice(const Object *lampob,
 	}
 }
 
+static void draw_csm_light_slice(const float halfsize, const float clipnear, const float clipfar, float box[8][3])
+{
+	box[0][0] = box[1][0] = box[2][0] = box[3][0] = -halfsize;
+	box[4][0] = box[5][0] = box[6][0] = box[7][0] = +halfsize;
+	box[0][1] = box[1][1] = box[4][1] = box[5][1] = -halfsize;
+	box[2][1] = box[3][1] = box[6][1] = box[7][1] = +halfsize;
+	box[0][2] = box[3][2] = box[4][2] = box[7][2] = -clipfar;
+	box[1][2] = box[2][2] = box[5][2] = box[6][2] = -clipnear;
+}
+
 static void draw_transp_sun_shadow_volume(Lamp *la, Object *lampob, Object *camob, Scene *scene)
 {
 	float box[8][3];
@@ -1429,29 +1439,41 @@ static void draw_transp_sun_shadow_volume(Lamp *la, Object *lampob, Object *camo
 	box[1][2] = box[2][2] = box[5][2] = box[6][2] = -la->clipsta;
 
 	if (la->shadow_cascade_count != 0 && (la->csm_flag & LA_CSM_DEBUG) &&
-	    camob && camob->type == OB_CAMERA && camob->data)
+	    ((la->csm_flag & LA_CSM_REFERENCE_LIGHT) ||
+	     (camob && camob->type == OB_CAMERA && camob->data)))
 	{
-		/* Cascade+Debug together always show the per-cascade camera-slice box,
-		 * independent of "Show Shadow Box". The runtime CSM is fit to slices of
-		 * the active camera frustum, not to a volume centered on the Sun.
-		 * Mirror that geometry in the editor. */
-		Camera *camera = camob->data;
+		/* Cascade+Debug mirrors the selected runtime reference: camera-frustum slices
+		 * in Camera mode, concentric Sun-local boxes in Light mode. */
 		const float cliprange = la->clipend - la->clipsta;
 		const float split0 = la->clipsta + la->shadow_cascade_proportion_near * cliprange;
 		const float split1 = split0 + la->shadow_cascade_proportion_middle * cliprange;
-		const float aspect = ((float)scene->r.xsch * scene->r.xasp) /
-		                     ((float)scene->r.ysch * scene->r.yasp);
 		const float colors[3][3] = {
 			{1.0f, 0.15f, 0.15f},
 			{0.15f, 1.0f, 0.15f},
 			{0.15f, 0.35f, 1.0f},
 		};
 		const float ranges[4] = {la->clipsta, split0, split1, la->clipend};
+		const bool referenceLight = (la->csm_flag & LA_CSM_REFERENCE_LIGHT) != 0;
+		Camera *camera = referenceLight ? NULL : camob->data;
+		const float aspect = referenceLight ? 1.0f :
+		        ((float)scene->r.xsch * scene->r.xasp) / ((float)scene->r.ysch * scene->r.yasp);
 
-		for (int cascade = 0; cascade < 3; ++cascade) {
+		for (int drawIndex = 0; drawIndex < 3; ++drawIndex) {
+			/* The Light boxes overlap completely in depth. Draw outer blue first and inner
+			 * red last, otherwise the blue translucent faces wash out the two inner boxes. */
+			const int cascade = referenceLight ? (2 - drawIndex) : drawIndex;
 			const float nearclip = ranges[cascade];
 			const float farclip = ranges[cascade + 1];
-			draw_csm_camera_slice(lampob, camob, camera, aspect, nearclip, farclip, box);
+			if (referenceLight) {
+				const float factor = (cascade == 0) ? la->shadow_cascade_proportion_near :
+				        ((cascade == 1) ? min_ff(la->shadow_cascade_proportion_near +
+				                                  la->shadow_cascade_proportion_middle, 1.0f) : 1.0f);
+				draw_csm_light_slice(max_ff(la->shadow_frustum_size * factor, 0.001f),
+				                     la->clipsta, la->clipend, box);
+			}
+			else {
+				draw_csm_camera_slice(lampob, camob, camera, aspect, nearclip, farclip, box);
+			}
 			draw_shadow_volume(box, colors[cascade]);
 		}
 	}

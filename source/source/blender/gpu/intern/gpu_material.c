@@ -339,6 +339,8 @@ struct GPULamp {
 	/* Camera-space distance where cascade 0->1 and 1->2 selection switches (Near/Medium/Low).
 	 * Set once per frame by the RAS layer alongside the cascade view/win matrices. */
 	float cascade_split[2];
+	/* 0 = active-camera depth, 1 = square distance in the Sun-local XY plane. */
+	float cascade_reference;
 
 	ListBase materials;
 };
@@ -2246,6 +2248,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 			if (GPU_lamp_has_cascaded_shadow(lamp)) {
 				GPULamp *cascade0 = lamp->cascade[0]; /* Medium */
 				GPULamp *cascade1 = lamp->cascade[1]; /* Low */
+				mat->dynproperty |= DYN_LAMP_IMAT;
 
 				if (lamp->la->shadowmap_type == LA_SHADMAP_VARIANCE) {
 					GPU_link(mat, "shadow_vsm_csm",
@@ -2259,7 +2262,11 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 					         GPU_dynamic_texture(cascade1->tex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 					         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
 					         GPU_uniform(&cascade1->bias), GPU_uniform(&lamp->la->bleedbias),
-					         GPU_uniform(&lamp->cascade_split[0]), GPU_uniform(&lamp->cascade_split[1]),
+					         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
+					         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
+					         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
+					         GPU_dynamic_uniform(&lamp->cascade_split[1], GPU_DYNAMIC_NONE, NULL),
+					         GPU_dynamic_uniform(&lamp->la->shadow_frustum_size, GPU_DYNAMIC_NONE, NULL),
 					         inp, &shadfac);
 				}
 				else {
@@ -2277,7 +2284,11 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 					         GPU_dynamic_texture(cascade1->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 					         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
 					         GPU_uniform(&cascade1->bias), GPU_uniform(&cascade1->slopebias),
-					         GPU_uniform(&lamp->cascade_split[0]), GPU_uniform(&lamp->cascade_split[1]),
+					         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
+					         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
+					         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
+					         GPU_dynamic_uniform(&lamp->cascade_split[1], GPU_DYNAMIC_NONE, NULL),
+					         GPU_dynamic_uniform(&lamp->la->shadow_frustum_size, GPU_DYNAMIC_NONE, NULL),
 					         GPU_uniform(&filtertype), GPU_uniform(&twoSidedShadows), inp, &shadfac);
 				}
 
@@ -2377,7 +2388,11 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 				         GPU_dynamic_texture(cascade1->colortex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
 				         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
 				         GPU_uniform(&cascade1->bias), GPU_uniform(&cascade1->slopebias),
-				         GPU_uniform(&lamp->cascade_split[0]), GPU_uniform(&lamp->cascade_split[1]), &lcol);
+					         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
+					         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->cascade_split[1], GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->la->shadow_frustum_size, GPU_DYNAMIC_NONE, NULL), &lcol);
 			}
 			else if (lamp->colortex && !GPU_lamp_has_cascaded_shadow(lamp)) {
 				GPU_link(mat, "shade_shadow_tint", lcol,
@@ -4726,6 +4741,7 @@ void GPU_lamp_update(GPULamp *lamp, int lay, int hide, float obmat[4][4])
 
 	lamp->lay = lay;
 	lamp->hide = hide;
+	lamp->cascade_reference = (lamp->la->csm_flag & LA_CSM_REFERENCE_LIGHT) ? 1.0f : 0.0f;
 
 	if (!lamp->update_obmat_valid || memcmp(lamp->update_obmat, obmat, sizeof(lamp->update_obmat)) != 0) {
 		normalize_m4_m4_ex(mat, obmat, obmat_scale);
@@ -5435,6 +5451,12 @@ void GPU_lamp_shadow_buffer_bind_matrices(
 	copy_m4_m4(lamp->viewmat, viewmat);
 	copy_m4_m4(lamp->winmat, winmat);
 	gpu_lamp_update_persmat(lamp);
+	/* CSM cascade sub-lamps are not passed through GPU_lamp_update(), and their
+	 * view/win/persmat can change while the material camera and lamp transform stay
+	 * identical.  Those are the keys used by GPU_material_update_lamps()'s dynamic
+	 * uniform cache, so explicitly invalidate it here; otherwise Medium/Low may keep
+	 * the zero or previous dynpersmat and sample an empty area while Near still works. */
+	lamp->dynupdate_valid = false;
 
 	glDisable(GL_SCISSOR_TEST);
 	if (lamp->la->shadowmap_type == LA_SHADMAP_VARIANCE) {
@@ -6058,6 +6080,7 @@ GPUNodeLink *GPU_lamp_get_data(
 		if (GPU_lamp_has_cascaded_shadow(lamp)) {
 			GPULamp *cascade0 = lamp->cascade[0]; /* Medium */
 			GPULamp *cascade1 = lamp->cascade[1]; /* Low */
+			mat->dynproperty |= DYN_LAMP_IMAT;
 
 			if (lamp->la->shadowmap_type == LA_SHADMAP_VARIANCE) {
 				GPU_link(mat, "shadow_vsm_csm",
@@ -6071,7 +6094,11 @@ GPUNodeLink *GPU_lamp_get_data(
 				         GPU_dynamic_texture(cascade1->tex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 				         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
 				         GPU_uniform(&cascade1->bias), GPU_uniform(&lamp->la->bleedbias),
-				         GPU_uniform(&lamp->cascade_split[0]), GPU_uniform(&lamp->cascade_split[1]),
+				         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
+				         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->cascade_split[1], GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->la->shadow_frustum_size, GPU_DYNAMIC_NONE, NULL),
 				         inp, &shadowfac);
 			}
 			else {
@@ -6088,7 +6115,11 @@ GPUNodeLink *GPU_lamp_get_data(
 				         GPU_dynamic_texture(cascade1->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
 				         GPU_dynamic_uniform((float *)cascade1->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
 				         GPU_uniform(&cascade1->bias), GPU_uniform(&cascade1->slopebias),
-				         GPU_uniform(&lamp->cascade_split[0]), GPU_uniform(&lamp->cascade_split[1]),
+				         GPU_dynamic_uniform((float *)lamp->dynimat, GPU_DYNAMIC_LAMP_DYNIMAT, lamp->ob),
+				         GPU_dynamic_uniform(&lamp->cascade_reference, GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->cascade_split[1], GPU_DYNAMIC_NONE, NULL),
+				         GPU_dynamic_uniform(&lamp->la->shadow_frustum_size, GPU_DYNAMIC_NONE, NULL),
 				         GPU_uniform(&filtertype), GPU_uniform(&twoSidedShadows), inp, &shadowfac);
 			}
 

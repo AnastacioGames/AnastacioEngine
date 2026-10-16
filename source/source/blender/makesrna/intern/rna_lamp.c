@@ -59,6 +59,23 @@ static void rna_Lamp_use_csm_shadow_set(PointerRNA *ptr, bool value)
 	la->shadow_cascade_count = value ? 3 : 0;
 }
 
+static int rna_Lamp_csm_reference_get(PointerRNA *ptr)
+{
+	Lamp *la = (Lamp *)ptr->data;
+	return (la->csm_flag & LA_CSM_REFERENCE_LIGHT) ? 1 : 0;
+}
+
+static void rna_Lamp_csm_reference_set(PointerRNA *ptr, int value)
+{
+	Lamp *la = (Lamp *)ptr->data;
+	if (value == 1) {
+		la->csm_flag |= LA_CSM_REFERENCE_LIGHT;
+	}
+	else {
+		la->csm_flag &= ~LA_CSM_REFERENCE_LIGHT;
+	}
+}
+
 static void rna_Lamp_buffer_size_set(PointerRNA *ptr, int value)
 {
 	Lamp *la = (Lamp *)ptr->data;
@@ -921,6 +938,11 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 {
 	StructRNA *srna;
 	PropertyRNA *prop;
+	static const EnumPropertyItem csm_reference_items[] = {
+		{0, "CAMERA", 0, "Camera", "Measure cascade ranges forward from the active camera view"},
+		{1, "LIGHT", 0, "Light", "Measure cascade ranges forward along the Sun light local direction"},
+		{0, NULL, 0, NULL, NULL},
+	};
 
 	srna = RNA_def_struct(brna, "SunLamp", "Lamp");
 	RNA_def_struct_sdna(srna, "Lamp");
@@ -940,6 +962,13 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 	                         "over long view distances");
 	RNA_def_property_update(prop, 0, "rna_Lamp_update");
 
+	prop = RNA_def_property(srna, "csm_reference", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, csm_reference_items);
+	RNA_def_property_enum_funcs(prop, "rna_Lamp_csm_reference_get", "rna_Lamp_csm_reference_set", NULL);
+	RNA_def_property_ui_text(prop, "Reference",
+	                         "Choose whether cascade distances start from the active Camera or follow the Light direction");
+	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+
 	prop = RNA_def_property(srna, "use_csm_debug", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "csm_flag", LA_CSM_DEBUG);
 	RNA_def_property_ui_text(prop, "Enable Debug", "Visualize the cascade splits in the 3D view/game");
@@ -949,15 +978,14 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "shadow_cascade_proportion_near");
 	RNA_def_property_range(prop, 0.01f, 0.98f);
 	RNA_def_property_ui_text(prop, "Cascade Proportion Near",
-	                         "Fraction of the shadow clip range covered by the near cascade");
+	                         "Camera: fraction of the shadow clip range; Light: fraction of Frustum Size used by the inner cascade");
 	RNA_def_property_update(prop, 0, "rna_Lamp_update");
 
 	prop = RNA_def_property(srna, "cascaded_proportion_three", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "shadow_cascade_proportion_middle");
 	RNA_def_property_range(prop, 0.01f, 0.98f);
 	RNA_def_property_ui_text(prop, "Cascade Proportion Middle",
-	                         "Fraction of the shadow clip range covered by the middle cascade "
-	                         "(the remainder after Near and Middle goes to the Low/far cascade)");
+	                         "Camera: fraction of the shadow clip range; Light: additional fraction of Frustum Size used by the middle cascade");
 	RNA_def_property_update(prop, 0, "rna_Lamp_update");
 
 	prop = RNA_def_property(srna, "shadow_csm_two_buffer_size", PROP_INT, PROP_NONE);

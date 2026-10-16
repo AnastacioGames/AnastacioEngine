@@ -56,11 +56,9 @@ public:
 	/// Debug draw of each light's shadow frustum, if enabled (m_showShadowFrustum).
 	void DrawDebugFrustum(KX_Scene *scene);
 
-	/** Computes a camera-frustum-fit orthographic view/projection matrix pair for one Cascaded
-	 * Shadow Mapping split, in the given light's local space. `cascadeIndex` is 0=Near, 1=Medium,
-	 * 2=Low; the near/far distances for that split come from the light's clip range and cascade
-	 * proportions. Assumes a perspective viewcam (orthographic viewcams fall back to a
-	 * depth-independent frustum size, a known simplification). */
+	/** Computes the orthographic view/projection pair for one CSM split. In Camera reference mode
+	 * it tightly fits a slice of the active camera frustum in light space. In Light reference mode
+	 * it builds concentric boxes around the Sun axis, all spanning the full shadow clip depth. */
 	static void ComputeCascadeShadowMatrices(
 	        KX_Scene *scene, KX_Camera *viewcam, KX_LightObject *light, RAS_ILightObject *raslight, short cascadeIndex,
 	        mt::mat4& r_viewmat, mt::mat4& r_winmat, float& r_splitFar);
@@ -76,6 +74,12 @@ public:
 	static void ComputeCascadeFrustumBounds(
 	        const mt::mat4& proj, bool perspective, float splitNear, float splitFar,
 	        const mt::mat3x4& camWorldTrans, const mt::mat3x4& lightWorldInv,
+	        float& r_minX, float& r_maxX, float& r_minY, float& r_maxY, float& r_minZ, float& r_maxZ);
+
+	/** Pure math bounds for a Light-reference cascade: a square of the requested half-size in
+	 * Sun-local X/Y, spanning the full shadow clip interval along local -Z. */
+	static void ComputeCascadeLightBounds(
+	        float halfSize, float clipStart, float clipEnd,
 	        float& r_minX, float& r_maxX, float& r_minY, float& r_maxY, float& r_minZ, float& r_maxZ);
 
 	/** Runs ComputeCascadeFrustumBounds with fixed, hand-computed inputs/expected outputs and
