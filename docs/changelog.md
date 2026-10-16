@@ -6,6 +6,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-16 - Painel Use Shadow reorganizado
+
+- Ordem nova: geral (com rótulo `Color:`), alcance (Clip Start/End e Frustum Size), Buffer & Quality e
+  Cascaded Shadow Mapping, com o liga/desliga do CSM no próprio cabeçalho.
+- Tamanho (e Bias, sem Auto Bias) de cada cascata numa tabela Near/Medium/Low; os sliders de proporção mudam
+  de nome conforme Camera/Light e um aviso diz qual cascata vai até o Clip End/Frustum Size.
+- Removidos da UI os controles sem efeito: `CSM Shadow Soft Medium/Low` (`csm_soft` não é lido pela engine) e
+  Samples/Soft com CSM ligado (o shader das cascatas lê uma amostra; filtros PCF mostram aviso).
+
 ## 2026-10-16 - CSM: performance no modo Camera, 2 ou 3 cascatas e Auto Bias
 
 - Queda de FPS no modo Camera com Static Shadow: as cascatas seguem a câmera, então o cache estático era
