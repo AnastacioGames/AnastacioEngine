@@ -27,25 +27,59 @@ class ObjectButtonsPanel:
     bl_region_type = 'WINDOW'
     bl_context = "object"
 
+    @classmethod
+    def poll(cls, context):
+        category = getattr(cls, "ae_category", None)
+        return (context.object is not None and
+                (context.scene.render.engine != 'BLENDER_GAME' or
+                 category is None or
+                 context.window_manager.ae_object_panel_category == category))
+
 
 class OBJECT_PT_context_object(ObjectButtonsPanel, Panel):
     bl_label = ""
     bl_options = {'HIDE_HEADER'}
 
+    @classmethod
+    def poll(cls, context):
+        return (context.object is not None and
+                context.scene.render.engine != 'BLENDER_GAME')
+
     def draw(self, context):
         layout = self.layout
         space = context.space_data
-        ob = context.object
 
         if space.use_pin_id:
             layout.template_ID(space, "pin_id")
         else:
-            row = layout.row()
-            row.template_ID(context.scene.objects, "active", filter='AVAILABLE')
-            row.prop(ob, "use_fake_user", text="Fake User")
+            layout.template_ID(context.scene.objects, "active", filter='AVAILABLE')
+
+
+class OBJECT_PT_game_context_object(ObjectButtonsPanel, Panel):
+    """Stable top panel; Blender 2.79 reorders headerless panels after headed ones."""
+    bl_label = "Object"
+    bl_options = {'PIN_TO_TOP'}
+
+    @classmethod
+    def poll(cls, context):
+        return (context.object is not None and
+                context.scene.render.engine == 'BLENDER_GAME')
+
+    def draw(self, context):
+        layout = self.layout.box()
+        space = context.space_data
+
+        if space.use_pin_id:
+            layout.template_ID(space, "pin_id")
+        else:
+            layout.template_ID(context.scene.objects, "active", filter='AVAILABLE')
+
+        row = layout.row(align=True)
+        row.prop(context.window_manager, "ae_object_panel_category", expand=True)
 
 class OBJECT_PT_transform(ObjectButtonsPanel, Panel):
     bl_label = "Transform"
+    ae_category = 'TRANSFORM'
 
     def draw(self, context):
         layout = self.layout
@@ -74,6 +108,7 @@ class OBJECT_PT_transform(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_delta_transform(ObjectButtonsPanel, Panel):
     bl_label = "Delta Transform"
+    ae_category = 'TRANSFORM'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -102,6 +137,7 @@ class OBJECT_PT_delta_transform(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_transform_locks(ObjectButtonsPanel, Panel):
     bl_label = "Transform Locks"
+    ae_category = 'TRANSFORM'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -134,6 +170,7 @@ class OBJECT_PT_transform_locks(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_relations(ObjectButtonsPanel, Panel):
     bl_label = "Relations"
+    ae_category = 'OBJECT'
 
     def draw(self, context):
         layout = self.layout
@@ -164,6 +201,7 @@ class OBJECT_PT_relations(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_relations_extras(ObjectButtonsPanel, Panel):
     bl_label = "Relations Extras"
+    ae_category = 'OBJECT'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -206,6 +244,7 @@ class GROUP_MT_specials(Menu):
 
 class OBJECT_PT_groups(ObjectButtonsPanel, Panel):
     bl_label = "Groups"
+    ae_category = 'OBJECT'
 
     def draw(self, context):
         layout = self.layout
@@ -246,6 +285,7 @@ class OBJECT_PT_groups(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_display(ObjectButtonsPanel, Panel):
     bl_label = "Viewport Display"
+    ae_category = 'OBJECT'
     bl_options = {'DEFAULT_CLOSED'}
 
     def draw(self, context):
@@ -305,6 +345,7 @@ class OBJECT_PT_display(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_duplication(ObjectButtonsPanel, Panel):
     bl_label = "Duplication"
+    ae_category = 'OBJECT'
 
     def draw(self, context):
         layout = self.layout
@@ -392,7 +433,6 @@ class OBJECT_PT_custom_props(ObjectButtonsPanel, PropertyPanel, Panel):
 
 
 classes = (
-    OBJECT_PT_context_object,
     OBJECT_PT_transform,
     OBJECT_PT_delta_transform,
     OBJECT_PT_transform_locks,
@@ -404,6 +444,20 @@ classes = (
     OBJECT_PT_duplication,
     OBJECT_PT_motion_paths,
     # OBJECT_PT_custom_props,  # disabled: Custom Properties panel unused
+    # Blender 2.79 draws this context in reverse registration order. Keep both
+    # variants last so the applicable one is always the first visible panel.
+    OBJECT_PT_context_object,
+    OBJECT_PT_game_context_object,
+)
+
+bpy.types.WindowManager.ae_object_panel_category = bpy.props.EnumProperty(
+    name="Object Panels",
+    items=(
+        ('OBJECT', "Object", "Relations, display, groups and duplication"),
+        ('GAME', "Game", "Game loading, culling, network, LOD and animation events"),
+        ('TRANSFORM', "Transform", "Transform, delta transform and locks"),
+    ),
+    default='OBJECT',
 )
 
 if __name__ == "__main__":  # only for live edit.

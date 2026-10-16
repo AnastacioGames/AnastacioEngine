@@ -44,6 +44,8 @@ _modules = [
     "properties_game",
     "properties_mask_common",
     "properties_material",
+    # Blender 2.79 draws these panels in reverse registration order. Object
+    # registers after Game so its final context panel stays above both groups.
     "properties_object",
     "properties_paint_common",
     "properties_grease_pencil_common",

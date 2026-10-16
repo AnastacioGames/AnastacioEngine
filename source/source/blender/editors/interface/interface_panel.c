@@ -867,6 +867,10 @@ static int find_leftmost_panel(const void *a1, const void *a2)
 static int find_highest_panel(const void *a1, const void *a2)
 {
 	const PanelSort *ps1 = a1, *ps2 = a2;
+	const bool first1 = (ps1->pa->type->flag & PNL_PIN_TO_TOP) != 0;
+	const bool first2 = (ps2->pa->type->flag & PNL_PIN_TO_TOP) != 0;
+
+	if (first1 != first2) return first1 ? -1 : 1;
 
 	/* stick uppermost header-less panels to the top of the region -
 	 * prevent them from being sorted (multiple header-less panels have to be sorted though) */
@@ -887,6 +891,12 @@ static int find_highest_panel(const void *a1, const void *a2)
 static int compare_panel(const void *a1, const void *a2)
 {
 	const PanelSort *ps1 = a1, *ps2 = a2;
+	const bool first1 = (ps1->pa->type->flag & PNL_PIN_TO_TOP) != 0;
+	const bool first2 = (ps2->pa->type->flag & PNL_PIN_TO_TOP) != 0;
+
+	/* Explicit top panels must not inherit stale sortorder when filtered
+	 * panels are activated or restored from an older screen layout. */
+	if (first1 != first2) return first1 ? -1 : 1;
 
 	if (ps1->pa->sortorder > ps2->pa->sortorder) return 1;
 	else if (ps1->pa->sortorder < ps2->pa->sortorder) return -1;

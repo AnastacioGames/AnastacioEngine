@@ -1090,6 +1090,8 @@ static void rna_def_panel(BlenderRNA *brna)
 		{PNL_NO_HEADER, "HIDE_HEADER", 0, "Hide Header",
 		                "If set to False, the panel shows a header, which contains a clickable "
 		                "arrow to collapse the panel and the label (see bl_label)"},
+		{PNL_PIN_TO_TOP, "PIN_TO_TOP", 0, "Pin to Top",
+		                 "Keep the panel above regular panels regardless of saved panel order"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
