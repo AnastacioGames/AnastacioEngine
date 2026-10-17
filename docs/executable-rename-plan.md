@@ -104,7 +104,7 @@ Nome aprovado em 2026-10-08: `AnastacioRuntime.exe`, somente Windows. Isso ampli
 
 Usar resolução que prefira o player novo e aceite o antigo durante a transição. Não sobrescrever caminhos personalizados em preferências ou `config.json`; conferir se o caminho legado existe antes de propor migração.
 
-**Web/Android:** não aplicar `OUTPUT_NAME` indiscriminadamente ao player. `RangeRuntime.js`, `.wasm`, `.data` e `RangeRuntime.manifest.json` são contratos do pacote Web. Há nomes fixos em `tools/web/package-web.py`, `source/release/scripts/modules/range_web/manifest.py` e comandos pós-build. Renomear esses artefatos exige auditar loader, manifesto, hashes, testes, caches e exportação Android WebView separadamente. O Android NDK permanece congelado.
+**Web/Android:** não aplicar `OUTPUT_NAME` indiscriminadamente ao player. `RangeRuntime.js`, `.wasm`, `.data` e `RangeRuntime.manifest.json` são contratos do pacote Web. Há nomes fixos em `tools/web/package-web.py`, `source/release/scripts/modules/range_web/manifest.py` e comandos pós-build. Renomear esses artefatos exige auditar loader, manifesto, hashes, testes, caches e exportação Android WebView separadamente. A rota Android nativa (NDK) foi abandonada.
 
 ## 6. Caso o nome novo alcance Linux/macOS
 
@@ -183,7 +183,7 @@ Validação em 2026-10-08, mantendo os nomes internos dos runtimes:
   `C:\Users\f_bro\AppData\Local\Temp\tmpk4jravny\android\jogo-0.2-debug.apk`.
   Instalação e execução em aparelho não realizadas; APK não publicado.
 - Android oficial continua sendo APK WebView sobre `build-web-release`. Não há
-  renomeação de `.exe` dentro dele. Android NDK continua congelado.
+  renomeação de `.exe` dentro dele. Rota Android nativa (NDK) abandonada.
 - RangeArmor mantém saídas desktop Windows/Linux; os exportadores Web/Android são
   próprios. Cooking desktop não foi declarado compatível com Web/Android por esses testes.
 

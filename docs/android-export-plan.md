@@ -7,7 +7,7 @@ Esta revisão confere documentação, código local e fontes oficiais; não impl
 
 **O melhor próximo passo é um APK experimental mínimo com WebView e o jogo real.** Reaproveitar o runtime Web é a rota de menor trabalho inicial identificada, mas sua adoção para distribuição depende do resultado em aparelho físico. Chrome Android serve de referência; o produto precisa passar no WebView dentro do APK.
 
-Recomenda-se Kotlin + AndroidX WebKit (`WebViewAssetLoader`), pacote Web local e APK para testes via `adb`. O backend NDK fica congelado com critérios de reabertura (seção 9). Não desenvolver as duas rotas ao mesmo tempo.
+Recomenda-se Kotlin + AndroidX WebKit (`WebViewAssetLoader`), pacote Web local e APK para testes via `adb`. Não desenvolver as duas rotas ao mesmo tempo.
 
 Primeiro escopo jogável: carregar offline desde a primeira abertura, render WebGL2, controle direcional e botões por toque simultâneo, áudio, save e retomada confiáveis. Sensores, entrada analógica completa, API Python mobile, AAB/Play e integração no editor entram depois da prova desse núcleo; antecipar inclinação somente se indispensável ao jogo escolhido.
 
@@ -181,7 +181,7 @@ Reutilizar `verify-persistence.cjs`, `verify-save.cjs` e verificações de capac
 | Pico de carga excessivo | Reduzir preload/cópias/conteúdo e reavaliar orçamento. |
 | Limite persistente de CPU/memória/áudio atribuível à rota Web, ou necessidade real de threads/extensões nativas | Reabrir prova NDK limitada com a mesma cena e critério de aceite. |
 
-NDK não garante ganho suficiente; exigir comparação reproduzível. Consultar `mobile-export-plan.md` e as fases Android de `android-web-export-roadmap.md` como levantamento histórico. Bloqueios registrados: Bionic/`malloc_stats`, `GL/glu.h` e backend de janela Android ausente. Reaproveitar primeiro SDL/infraestrutura existente antes de criar outro backend completo. Preservar presets, contrato de entrada e testes de persistência da trilha Web.
+A rota nativa (NDK) foi abandonada em 2026-10-17 e seus planos removidos; reabrir só com comparação reproduzível que mostre ganho.
 
 Kotlin mínimo é a recomendação para o escopo atual. Capacitor merece reavaliação se vários plugins nativos passarem a ser necessários. TWA é mais adequada se a estratégia virar uma PWA hospedada; pode operar offline com service worker, conforme o [guia do Chrome](https://developer.chrome.com/docs/android/trusted-web-activity/offline-first), mas muda o modelo de distribuição do pacote local.
 

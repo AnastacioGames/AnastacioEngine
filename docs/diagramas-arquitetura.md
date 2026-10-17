@@ -180,7 +180,6 @@ flowchart TB
     code -->|"presets web-runtime / web-runtime-release<br/>build-web-release/"| WB["Runtime Web<br/>WebAssembly + WebGL2"]
     WB -->|"range_web: Exportar Web"| PK["Pacote do jogo para o navegador"]
     PK -->|"range_web/android.py"| AN["Android<br/>APK/AAB com WebView"]
-    code -.->|"build-android/ (NDK)<br/>congelado"| X["Android nativo<br/>não usado"]
 ```
 
 **Legenda.** Windows e Linux compilam editor e player nativos. A Web compila só o runtime; o jogo é exportado

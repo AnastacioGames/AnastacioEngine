@@ -13,7 +13,6 @@ Gerado em 2026-10-07 por busca textual em arquivos rastreados, mais quatro scrip
 | `README.md` | 23, 25, 26, 53, 102, 111 |
 | `docs/android-manual-tests.md` | 131, 135 |
 | `docs/android-touch-controls-plan.md` | 146 |
-| `docs/android-web-export-roadmap.md` | 10, 41, 87, 112, 135, 226, 273 |
 | `docs/architecture.md` | 23, 24, 64 |
 | `docs/build-dirs.md` | 8, 23 |
 | `docs/build-notes.md` | 61, 62, 82 |
@@ -28,7 +27,6 @@ Gerado em 2026-10-07 por busca textual em arquivos rastreados, mais quatro scrip
 | `docs/linux-build.md` | 7, 34, 35, 38, 54, 69, 97, 98, 99, 100, 102, 113, 124, 146, 148, 150, 178, 189, 192, 214, 224, 226, 228, 245, 262, 263, 277, 283, 299, 303, 304, 313, 376, 385, 395, 396, 397, 401, 402, 414, 418, 419, 447, 448, 460, 484, 491, 546, 554 |
 | `docs/logic-bricks-modernization.md` | 65, 107 |
 | `docs/maintenance-guide.md` | 107, 108, 114, 133 |
-| `docs/mobile-export-plan.md` | 10, 20, 87, 152, 178, 290, 330 |
 | `docs/multiplayer-plan.md` | 7 |
 | `docs/performance-audit.md` | 214 |
 | `docs/relatorio-varredura-bugs-silenciosos.md` | 174, 186, 196, 214, 225, 282, 289, 301, 303, 309, 316, 318, 339 |

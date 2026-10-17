@@ -1,6 +1,6 @@
 # Instruções para agentes de código (Codex e outros) neste repo
 
-> **Nomes dos builds:** veja [docs/build-dirs.md](docs/build-dirs.md). "Android" = APK WebView sobre `build-web-release`. O `build-android/` é o experimento NDK **congelado**: falhas nele não indicam Android quebrado.
+> **Nomes dos builds:** veja [docs/build-dirs.md](docs/build-dirs.md). "Android" = APK WebView sobre `build-web-release`. O `build-android/` guarda só os APKs gerados por `tools/web/package-android.py`; a rota nativa (NDK) foi abandonada.
 
 ## Regra anti-loop: não repita a mesma tentativa que falhou
 

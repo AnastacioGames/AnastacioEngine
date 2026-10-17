@@ -39,8 +39,6 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   do build Emscripten; `tools/web/verify-package.cjs` verifica o carregamento por CDP.
 - [Plano Android (APK WebView sobre o Web)](android-export-plan.md): plano revisado; prova em APK/aparelho
   real antes do exportador, com critérios de input, persistência, desempenho e ciclo de vida.
-- [Roadmap Web/Android](android-web-export-roadmap.md): consolida o estado do runtime Web e usa a validação
-  Linux nativa como evidência de portabilidade para planejar o export Android.
 
 - [Roadmap](roadmap.md): somente trabalho aberto ou validação pendente.
 - [Relatório de melhorias](../relatorio-melhorias-anastacioengine.md): inventário conciso do que a engine já
@@ -78,7 +76,7 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Cutscenes nativas](cutscene-native-integration-plan.md): eventos, integração e [exemplo executável](cutscene-native-example.md).
 - [Modernização dos Logic Bricks](logic-bricks-modernization.md), incluindo as notas de
   [eventos de cutscene](notes-cutscene-events.md) e a fase 4 (registrada no [changelog](changelog.md)).
-- [Exportação mobile/VR](mobile-export-plan.md), [Android WebView](android-export-plan.md) e
+- [Android WebView](android-export-plan.md) e
   [controles de toque](android-touch-controls-plan.md).
 
 ## Referência e manutenção

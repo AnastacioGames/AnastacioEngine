@@ -155,7 +155,7 @@ Estado: o runtime Web roda no navegador com render (luz GLSL, normal map `.dds`,
 mouse, gamepad, save (IDBFS), áudio (WAV/MP3/OGG e módulo `aud`), transição de cenas e Python. O validador
 (marcos A–D), o pré-voo (marco E, automático depois do Exportar Web) e o empacotamento estão implementados; os
 pacotes de teste 8201–8211 foram aceitos pelo usuário. Planos: [web-profile-validation-plan.md](web-profile-validation-plan.md),
-[web-deploy.md](web-deploy.md), [android-web-export-roadmap.md](android-web-export-roadmap.md).
+[web-deploy.md](web-deploy.md).
 
 Aberto:
 
@@ -478,8 +478,8 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
 
 Android v1 concluído (2026-09-24): APK/AAB com WebView embutindo o pacote Web, validado em aparelho físico
 (carga, desempenho, toque, save, ciclo de vida) e exportado pelo editor. Publicação na Play Console adiada
-para o futuro por decisão do usuário. Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). NDK congelado, reaberto somente
-por limitação medida; bloqueios em [mobile-export-plan.md](mobile-export-plan.md). iOS fora do escopo.
+para o futuro por decisão do usuário. Marcos A0–A5 e critérios em [android-export-plan.md](android-export-plan.md). Rota nativa (NDK) abandonada.
+iOS fora do escopo.
 
 - **Release sem template Android (aberto, 2026-10-13)**: zip Windows da 0.5.0 sem `web/android-template` (Build APK
   falha) e tar Linux sem `web/` (Export Web e Android falham). Corrigido no código (`stage_release_web.py`,

@@ -981,9 +981,7 @@ endif()
 # - WIN32
 # - APPLE
 
-if(ANDROID)
-	include(platform_android)
-elseif(EMSCRIPTEN)
+if(EMSCRIPTEN)
 	include(platform_web)
 elseif(UNIX AND NOT APPLE)
 	include(platform_unix)

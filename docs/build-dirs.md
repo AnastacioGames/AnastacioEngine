@@ -9,7 +9,7 @@ diga qual dos itens abaixo é. Assim um caminho não é confundido com outro.
 | **Build Web (debug)** | `build-web/` | ativo | Runtime Emscripten de depuração (preset `web-runtime`). Pode ter SAFE_HEAP. |
 | **Build Web (release)** | `build-web-release/` | ativo | Runtime Emscripten release (preset `web-runtime-release`). É a base do Android Web. |
 | **Android Web (APK WebView)** | *(sem build C++ próprio)* | **ativo, é o Android oficial** | APK Kotlin com WebView carregando o pacote Web. Recompilar o C++ do Android = recompilar `build-web-release`. Ver [android-export-plan.md](android-export-plan.md) e [android-manual-tests.md](android-manual-tests.md). |
-| **Android Nativo (NDK), congelado** | `build-android/` | **congelado, não é o Android oficial** | Experimento antigo de compilar a engine com o NDK. Falha com centenas de dependências ausentes, e isso é esperado. Não use como sinal de "Android quebrado". Critérios para reabrir: [android-export-plan.md](android-export-plan.md), seção 9. |
+| **Saída dos APKs** | `build-android/` | **ativo (só saída)** | Pasta onde `tools/web/package-android.py` grava APK, `android-report.json` e `gradle.log`. Não é build C++: a rota nativa (NDK) foi abandonada e seu preset removido. |
 | **Sandbox do Cycles** | `build-cycles/` | obsoleto | Cópia antiga com `WITH_CYCLES=ON`, de antes de o Cycles entrar no `build/`. |
 
 ## Expressões e o que significam
@@ -18,7 +18,7 @@ diga qual dos itens abaixo é. Assim um caminho não é confundido com outro.
   respectivamente, `AnastacioEngine` e `AnastacioRuntime` (com `.exe` no Windows). Os
   artefatos Web mantêm `RangeRuntime.*`.
 
-- **"Android"**, sem qualificação, = **Android Web (APK WebView)**. Erros em `build-android/` não bloqueiam o Android.
+- **"Android"**, sem qualificação, = **Android Web (APK WebView)**. `build-android/` é só a saída dos APKs.
 - **"Ligar o Cycles no build principal"** = pôr `WITH_CYCLES=ON` no `build/`. Assim o editor e o player que vão para
   release passam a ter Cycles.
 - **"Sandbox do Cycles"** = só o `build-cycles/`, obsoleto: o `build/` já tem Cycles.

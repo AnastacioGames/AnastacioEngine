@@ -438,8 +438,8 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 - A rota recomendada para Android v1 (revisão de 2026-09-20) é um APK com WebView que embute o pacote Web,
   condicionada à prova com o jogo real em aparelho físico; ainda não há execução Android comprovada.
   Primeiro validar APK mínimo, toque simultâneo, memória/desempenho, save e pausa/retomada; depois CLI e editor.
-  Sensores podem usar adaptador Android pequeno quando necessário. NDK fica congelado até limitação medida
-  que justifique reabertura (bloqueios conhecidos: `malloc_stats` na Bionic, `GL/glu.h`, sem GHOST Android).
+  Sensores podem usar adaptador Android pequeno quando necessário. Rota nativa (NDK) abandonada em 2026-10-17;
+  preset, stub CMake e planos removidos.
   Plano em [`docs/android-export-plan.md`](docs/android-export-plan.md).
 - Export Android: a lógica fica em `range_web/android.py`; o painel "Android (Range)" e
   `tools/web/package-android.py` só a chamam. Ele consome o pacote do export Web (conferido por `SHA256SUMS.txt`),
