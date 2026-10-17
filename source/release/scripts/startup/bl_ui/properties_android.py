@@ -232,6 +232,11 @@ class SCENE_PT_range_android(SceneButtonsPanel, Panel):
     COMPAT_ENGINES = {'BLENDER_GAME'}
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        return (context.scene.render.engine in cls.COMPAT_ENGINES and
+                context.window_manager.ae_export_panel_category == 'ANDROID')
+
     def draw_header(self, context):
         self.layout.label(text="", icon='ANDROID')
 

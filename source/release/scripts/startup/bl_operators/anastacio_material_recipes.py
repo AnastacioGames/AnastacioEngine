@@ -949,7 +949,15 @@ def legacy_slots(mat):
     return out
 
 
-def build_pbr_from_legacy(mat):
+def first_uv_layer_name(ob):
+    """Nome da primeira UV do mesh ativo, ou vazio quando o material não tem mesh/UV associado."""
+    if ob is None or ob.type != 'MESH':
+        return ""
+    uv_textures = getattr(ob.data, "uv_textures", None)
+    return uv_textures[0].name if uv_textures and len(uv_textures) else ""
+
+
+def build_pbr_from_legacy(mat, ob=None):
     """Monta um grafo Principled a partir dos slots de textura do material.
 
     Devolve (trazidos, ignorados): nomes de textura que entraram no grafo e os que não
@@ -980,15 +988,21 @@ def build_pbr_from_legacy(mat):
     bsdf.inputs["Specular"].default_value = min(mat.specular_intensity, 1.0)
 
     coords = {}
+    default_uv_layer = first_uv_layer_name(ob)
 
     def coord_source(slot):
         """Fonte de coordenada do slot, reaproveitada entre slots que usam a mesma."""
-        key = (slot.texture_coords, slot.uv_layer)
+        # O BI usa a primeira UV do mesh quando o slot está em UV mas o campo Map ficou
+        # vazio. Torne esse fallback explícito no grafo PBR; além de documentar a intenção,
+        # evita que o nó Texture Coordinate escolha outra UV conforme muda a UV ativa.
+        uv_layer = (slot.uv_layer or default_uv_layer) if slot.texture_coords == 'UV' else ""
+        key = (slot.texture_coords, uv_layer)
         if key not in coords:
             y = 400 - 220 * len(coords)
-            if slot.texture_coords == 'UV' and slot.uv_layer:
-                n = b.add("ShaderNodeUVMap", -1500, y, label="UV: " + slot.uv_layer)
-                n.uv_map = slot.uv_layer
+            if slot.texture_coords == 'UV':
+                label = "UV: " + uv_layer if uv_layer else "UV Map"
+                n = b.add("ShaderNodeUVMap", -1500, y, label=label)
+                n.uv_map = uv_layer
                 coords[key] = n.outputs["UV"]
             elif slot.texture_coords in {'REFLECTION', 'NORMAL'}:
                 # Matcap e afins: o BI usa o vetor em espaço de câmera e remapeia de -1..1
@@ -1174,6 +1188,226 @@ def build_pbr_from_legacy(mat):
     return brought, skipped
 
 
+def _nodes_upstream(socket, seen=None):
+    """Nós ligados acima de um socket, na ordem mais próxima -> mais distante."""
+    if socket is None or not socket.is_linked:
+        return []
+    seen = set() if seen is None else seen
+    out = []
+    for link in socket.links:
+        node = link.from_node
+        key = node.as_pointer()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(node)
+        for node_input in node.inputs:
+            out.extend(_nodes_upstream(node_input, seen))
+    return out
+
+
+def _upstream_images(socket):
+    images = []
+    for node in _nodes_upstream(socket):
+        if node.bl_idname == "ShaderNodeTexImage" and node.image and node not in images:
+            images.append(node)
+    return images
+
+
+def _input_value(node, name, default):
+    socket = node.inputs.get(name) if node else None
+    if socket is None:
+        return default
+    value = socket.default_value
+    try:
+        return tuple(value)
+    except TypeError:
+        return value
+
+
+def _image_uv_layer(image_node, ob):
+    vector = image_node.inputs.get("Vector")
+    for node in _nodes_upstream(vector):
+        if node.bl_idname == "ShaderNodeUVMap":
+            return node.uv_map or first_uv_layer_name(ob)
+        if node.bl_idname == "ShaderNodeTexCoord":
+            return first_uv_layer_name(ob)
+    return first_uv_layer_name(ob)
+
+
+def _transparent_alpha(surface_socket):
+    """Retorna (socket do alpha, valor padrão, inverter) para um Mix com Transparent."""
+    for node in _nodes_upstream(surface_socket):
+        if node.bl_idname != "ShaderNodeMixShader":
+            continue
+        left = _nodes_upstream(node.inputs[1])
+        right = _nodes_upstream(node.inputs[2])
+        left_transparent = any(n.bl_idname == "ShaderNodeBsdfTransparent" for n in left)
+        right_transparent = any(n.bl_idname == "ShaderNodeBsdfTransparent" for n in right)
+        if left_transparent != right_transparent:
+            # Mix(Transparent, Surface, fac): fac já é a opacidade. Se o Transparent
+            # estiver do outro lado, a opacidade é 1-fac.
+            fac = node.inputs[0]
+            return fac, float(fac.default_value), right_transparent
+    return None, 1.0, False
+
+
+def _classic_texture_slot(base, image, uv_layer, role, invert=False,
+                          normal_factor=1.0, use_normal_map=False):
+    slot = base.texture_slots.add()
+    if slot is None:
+        return None
+    texture = bpy.data.textures.new(image.name + " " + role.title(), 'IMAGE')
+    texture.image = image
+    texture.use_alpha = True
+    slot.texture = texture
+    slot.texture_coords = 'UV'
+    slot.uv_layer = uv_layer
+    slot.invert = invert
+
+    for prop, unused_role in SLOT_ROLES:
+        setattr(slot, prop, unused_role == role)
+    if role == "normal":
+        texture.use_normal_map = use_normal_map
+        slot.normal_factor = normal_factor
+    return slot
+
+
+def build_classic_from_pbr(mat, ob=None):
+    """Converte o subconjunto compatível de um grafo PBR para nós/material Classic.
+
+    Os Texts de Vertex/Geometry/Fragment pertencem ao Material, não à árvore, então são
+    preservados. Retorna (itens convertidos, avisos de aproximação).
+    """
+    tree = mat.node_tree
+    if not mat.use_nodes or tree is None:
+        return [], ["the material has no PBR node tree"]
+
+    outputs = [n for n in tree.nodes if n.bl_idname == "ShaderNodeOutputMaterial"]
+    output = tree.nodes.active if tree.nodes.active in outputs else (outputs[0] if outputs else None)
+    surface_socket = output.inputs.get("Surface") if output else None
+    surface_nodes = _nodes_upstream(surface_socket)
+    principled = [n for n in surface_nodes if n.bl_idname == "ShaderNodeBsdfPrincipled"]
+    emissions = [n for n in surface_nodes if n.bl_idname == "ShaderNodeEmission"]
+    glasses = [n for n in surface_nodes if n.bl_idname == "ShaderNodeBsdfGlass"]
+    warnings = []
+    brought = []
+
+    if not principled and not emissions and not glasses:
+        return [], ["no Principled, Emission or Glass surface was found"]
+    if len(principled) > 1:
+        warnings.append("multiple Principled shaders: the first one was used")
+    if output and output.inputs.get("Vertex Offset") and output.inputs["Vertex Offset"].is_linked:
+        warnings.append("the node-based Vertex Offset was not converted")
+
+    shader = principled[0] if principled else None
+    if shader:
+        base_color = _input_value(shader, "Base Color", (0.8, 0.8, 0.8, 1.0))
+        metallic = float(_input_value(shader, "Metallic", 0.0))
+        roughness = float(_input_value(shader, "Roughness", 0.5))
+        specular = float(_input_value(shader, "Specular", 0.5))
+        normal_socket = shader.inputs.get("Normal")
+        normal_nodes = _nodes_upstream(normal_socket)
+        normal_strength = 1.0
+        for node in normal_nodes:
+            if node.bl_idname in {"ShaderNodeNormalMap", "ShaderNodeBump"}:
+                normal_strength = float(_input_value(node, "Strength", 1.0))
+                break
+        unsupported = (
+            ("Subsurface", 0.0), ("Anisotropic", 0.0), ("Sheen", 0.0),
+            ("Clearcoat", 0.0), ("Transmission", 0.0),
+        )
+        used = [name for name, zero in unsupported
+                if float(_input_value(shader, name, zero)) > zero]
+        if used:
+            warnings.append("no Classic equivalent for " + ", ".join(used))
+    elif glasses:
+        glass = glasses[0]
+        base_color = _input_value(glass, "Color", (1.0, 1.0, 1.0, 1.0))
+        metallic, roughness, specular = 0.0, float(_input_value(glass, "Roughness", 0.0)), 1.0
+        normal_socket, normal_strength = glass.inputs.get("Normal"), 1.0
+        warnings.append("Glass was approximated with a transparent Classic material")
+    else:
+        emission = emissions[0]
+        base_color = _input_value(emission, "Color", (1.0, 1.0, 1.0, 1.0))
+        metallic, roughness, specular = 0.0, 0.5, 0.0
+        normal_socket, normal_strength = None, 1.0
+
+    alpha_socket, alpha, invert_alpha = _transparent_alpha(surface_socket)
+    if glasses and not principled:
+        alpha = 0.15
+
+    emit = 0.0
+    emission_color_socket = None
+    if emissions:
+        emission = emissions[0]
+        emit = max(float(_input_value(emission, "Strength", 1.0)), 0.0)
+        emission_color_socket = emission.inputs.get("Color")
+        if shader and tuple(_input_value(emission, "Color", base_color))[:3] != tuple(base_color)[:3]:
+            warnings.append("Emission color was approximated with the base color")
+
+    role_sockets = []
+    if shader:
+        role_sockets.extend((
+            ("color", shader.inputs.get("Base Color"), False, 1.0, False),
+            ("specular", shader.inputs.get("Specular"), False, 1.0, False),
+            ("roughness", shader.inputs.get("Roughness"), True, 1.0, False),
+            ("normal", normal_socket, False, normal_strength,
+             any(n.bl_idname == "ShaderNodeNormalMap" for n in normal_nodes)),
+        ))
+    if emission_color_socket:
+        role_sockets.append(("emit", emission_color_socket, False, 1.0, False))
+    if alpha_socket:
+        role_sockets.append(("alpha", alpha_socket, invert_alpha, 1.0, False))
+
+    extracted = []
+    for role, socket, invert, factor, use_normal_map in role_sockets:
+        images = _upstream_images(socket)
+        if len(images) > 1:
+            warnings.append("%s uses multiple images: only the nearest one was converted" % role)
+        if images:
+            image_node = images[0]
+            extracted.append((role, image_node.image, _image_uv_layer(image_node, ob),
+                              invert, factor, use_normal_map))
+
+    # Só depois de extrair toda a informação apagamos a árvore PBR.
+    b = TreeBuilder(mat)
+    material_node = b.legacy_output(mat, 250, 0)
+    base = material_node.material
+    b.tree.nodes.active = material_node
+
+    base.diffuse_color = tuple(base_color[:3])
+    base.diffuse_intensity = 1.0
+    base.specular_color = (1.0, 1.0, 1.0)
+    base.specular_intensity = max(0.0, min(specular, 1.0))
+    base.specular_metallic_bsdf = max(0.0, min(metallic, 1.0))
+    base.specular_roughness_bsdf = max(0.02, min(roughness, 1.0))
+    try:
+        base.specular_shader = 'GGX'
+        base.diffuse_shader = 'LAMBERT_CUSTOM'
+    except TypeError:
+        pass
+    base.emit = emit
+    base.alpha = max(0.0, min(alpha, 1.0))
+    base.use_transparency = (base.alpha < 1.0 or
+                             any(item[0] == "alpha" for item in extracted))
+    mat.alpha = base.alpha
+    mat.use_transparency = base.use_transparency
+    if base.use_transparency:
+        mat.game_settings.alpha_blend = 'ALPHA'
+
+    for role, image, uv_layer, invert, factor, use_normal_map in extracted:
+        slot = _classic_texture_slot(base, image, uv_layer, role, invert, factor, use_normal_map)
+        if slot is None:
+            warnings.append("Classic texture-slot limit reached")
+            break
+        brought.append("%s -> %s" % (image.name, role))
+
+    if not brought:
+        brought.append("Principled values")
+    return brought, warnings
+
+
 class MATERIAL_OT_material_to_pbr(Operator):
     """Rebuild this material as PBR nodes, bringing its texture slots along as Image Texture nodes"""
     bl_idname = "material.to_pbr_nodes"
@@ -1199,7 +1433,7 @@ class MATERIAL_OT_material_to_pbr(Operator):
 
     def execute(self, context):
         mat = active_material(context)
-        brought, skipped = build_pbr_from_legacy(mat)
+        brought, skipped = build_pbr_from_legacy(mat, context.object)
         if not context.scene.game_settings.use_shading_nodes:
             context.scene.game_settings.use_shading_nodes = True
             self.report({'INFO'}, "PBR Shading Nodes was turned on so the new nodes render")
@@ -1218,6 +1452,38 @@ class MATERIAL_OT_material_to_pbr(Operator):
         return {'FINISHED'}
 
 
+class MATERIAL_OT_material_to_classic(Operator):
+    """Rebuild this PBR material as Classic nodes, preserving attached shader-source Texts"""
+    bl_idname = "material.to_classic_nodes"
+    bl_label = "Convert Material to Classic Nodes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        mat = active_material(context)
+        return (mat is not None and mat.use_nodes and mat.node_tree is not None and
+                any(node.bl_idname in {"ShaderNodeBsdfPrincipled", "ShaderNodeEmission",
+                                       "ShaderNodeBsdfGlass"}
+                    for node in mat.node_tree.nodes))
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        mat = active_material(context)
+        brought, warnings = build_classic_from_pbr(mat, context.object)
+        if not brought:
+            self.report({'ERROR'}, warnings[0] if warnings else "The material could not be converted")
+            return {'CANCELLED'}
+        if context.scene.game_settings.use_shading_nodes:
+            context.scene.game_settings.use_shading_nodes = False
+        if warnings:
+            self.report({'WARNING'}, "Converted with approximations: " + "; ".join(warnings))
+        else:
+            self.report({'INFO'}, "Converted %d item(s) to Classic nodes" % len(brought))
+        return {'FINISHED'}
+
+
 classes = (
     MATERIAL_OT_recipe_texture_set,
     MATERIAL_OT_recipe_mask_blend,
@@ -1228,4 +1494,5 @@ classes = (
     MATERIAL_OT_recipe_tiling,
     MATERIAL_OT_recipe_preset,
     MATERIAL_OT_material_to_pbr,
+    MATERIAL_OT_material_to_classic,
 )

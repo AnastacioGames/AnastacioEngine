@@ -173,8 +173,6 @@ class TEXTURE_PT_texture_slots(TextureButtonsPanel, Panel):
         return context_texture_poll(context) and (engine in cls.COMPAT_ENGINES)
 
     def draw(self, context):
-        layout = self.layout.box()
-
         slot = getattr(context, "texture_slot", None)
         node = getattr(context, "texture_node", None)
         space = context.space_data
@@ -190,6 +188,32 @@ class TEXTURE_PT_texture_slots(TextureButtonsPanel, Panel):
 
         if not space.use_pin_id:
             pin_id = None
+
+        game_preview = context.scene.render.engine == 'BLENDER_GAME'
+        if game_preview:
+            root = self.layout.box()
+            if context.window_manager.ae_texture_preview_visible:
+                split = root.split(factor=0.58)
+                layout = split.column()
+                preview_area = split.row()
+                preview = preview_area.column()
+                slot_actions = preview_area.column(align=True)
+                if tex:
+                    if idblock:
+                        preview.template_preview(tex, parent=idblock, slot=slot)
+                    else:
+                        preview.template_preview(tex, slot=slot)
+                    if space.texture_context == 'BRUSH':
+                        preview.prop(tex, "use_preview_alpha")
+                else:
+                    preview.label(text="No texture")
+            else:
+                split = root.split(factor=0.94)
+                layout = split.column()
+                slot_actions = split.column(align=True)
+        else:
+            layout = self.layout.box()
+            slot_actions = None
 
         if space.texture_context == 'OTHER':
             if not pin_id:
@@ -215,6 +239,12 @@ class TEXTURE_PT_texture_slots(TextureButtonsPanel, Panel):
                     else:
                         split.label(text="Type:")
                         split.prop(tex, "type", text="")
+            if slot_actions is not None:
+                preview_icon = ('RESTRICT_VIEW_OFF' if
+                                context.window_manager.ae_texture_preview_visible else
+                                'RESTRICT_VIEW_ON')
+                slot_actions.prop(context.window_manager, "ae_texture_preview_visible",
+                                  text="", icon=preview_icon, toggle=True)
             return
 
         tex_collection = (pin_id is None) and (node is None) and (not isinstance(idblock, Brush))
@@ -225,10 +255,17 @@ class TEXTURE_PT_texture_slots(TextureButtonsPanel, Panel):
             row.template_list("TEXTURE_UL_texslots", "", idblock, "texture_slots",
                               idblock, "active_texture_index", rows=2)
 
-            col = row.column(align=True)
+            col = slot_actions if slot_actions is not None else row.column(align=True)
             col.operator("texture.slot_move", text="", icon='TRIA_UP').type = 'UP'
             col.operator("texture.slot_move", text="", icon='TRIA_DOWN').type = 'DOWN'
             col.menu("TEXTURE_MT_specials", icon='DOWNARROW_HLT', text="")
+
+        if slot_actions is not None:
+            preview_icon = ('RESTRICT_VIEW_OFF' if
+                            context.window_manager.ae_texture_preview_visible else
+                            'RESTRICT_VIEW_ON')
+            slot_actions.prop(context.window_manager, "ae_texture_preview_visible",
+                              text="", icon=preview_icon, toggle=True)
 
         if tex_collection:
             layout.template_ID(idblock, "active_texture", new="texture.new")
@@ -254,6 +291,12 @@ class TEXTURE_PT_texture_slots(TextureButtonsPanel, Panel):
 class TEXTURE_PT_preview(TextureButtonsPanel, Panel):
     bl_label = "Preview"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        # No Game, o preview fica integrado ao painel Texture.
+        return (context.scene.render.engine != 'BLENDER_GAME' and
+                super().poll(context))
 
     def draw(self, context):
         layout = self.layout
@@ -1688,6 +1731,12 @@ classes = (
     TEXTURE_PT_game_influence,
     TEXTURE_PT_influence,
     # TEXTURE_PT_custom_props,  # disabled: Custom Properties panel unused
+)
+
+bpy.types.WindowManager.ae_texture_preview_visible = bpy.props.BoolProperty(
+    name="Texture Preview",
+    description="Show the texture preview beside the texture slots",
+    default=False,
 )
 
 if __name__ == "__main__":  # only for live edit.

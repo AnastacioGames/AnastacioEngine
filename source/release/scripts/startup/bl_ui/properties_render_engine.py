@@ -18,6 +18,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
+import bpy
 from bpy.types import Menu, Panel
 
 # Panels are drawn in registration order, so this module is listed before
@@ -48,6 +49,25 @@ class RENDER_MT_engine(Menu):
             props.value = engine
 
 
+class RENDER_PT_panel_category(Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "render"
+    bl_label = "Render Panels"
+    bl_options = {'HIDE_HEADER', 'PIN_TO_TOP'}
+    COMPAT_ENGINES = {"BLENDER_GAME"}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return scene and (scene.render.engine in cls.COMPAT_ENGINES)
+
+    def draw(self, context):
+        row = self.layout.row(align=True)
+        row.scale_y = 1.2
+        row.prop(context.window_manager, "ae_render_panel_category", expand=True)
+
+
 class RENDER_PT_render(Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -58,7 +78,12 @@ class RENDER_PT_render(Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return scene and (scene.render.engine in cls.COMPAT_ENGINES)
+        if not (scene and scene.render.engine in cls.COMPAT_ENGINES):
+            return False
+        # The Engine box only shows under the System tab; Graphics has its own panels.
+        if scene.render.engine == "BLENDER_GAME":
+            return context.window_manager.ae_render_panel_category == 'SYSTEM'
+        return True
 
     def draw(self, context):
         layout = self.layout
@@ -89,7 +114,17 @@ class RENDER_PT_render(Panel):
 
 classes = (
     RENDER_MT_engine,
+    RENDER_PT_panel_category,
     RENDER_PT_render,
+)
+
+bpy.types.WindowManager.ae_render_panel_category = bpy.props.EnumProperty(
+    name="Render Panels",
+    items=(
+        ('SYSTEM', "System", "Cook, players, animation timing, runtime, display and VR"),
+        ('GRAPHICS', "Graphics", "Shading, lighting and post-processing"),
+    ),
+    default='SYSTEM',
 )
 
 if __name__ == "__main__":  # only for live edit.

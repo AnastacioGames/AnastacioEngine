@@ -2489,7 +2489,7 @@ class WM_MT_splash(Menu):
         row = layout.row()
         row.emboss = 'NONE'
         row.operator("wm.url_open", text="Python API", icon='FILE_SCRIPT').url = "https://anastaciogames.github.io/anastacio-docs/"
-        row.operator("wm.url_open", text="Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
+        row.operator("wm.url_open", text="Discord", icon='DISCORD').url = "https://discord.gg/AsbjKgh4E"
         row.operator("wm.url_open", text="GitHub", icon='URL').url = "https://github.com/AnastacioGames"
         row.operator("wm.url_open", text="Patreon Anastacio", icon='PATREON').url = "https://www.patreon.com/cw/AnastacioEngine"
         row.operator("wm.url_open", text="Patreon Range", icon='PATREON').url = "https://www.patreon.com/rangeengine"
@@ -2586,8 +2586,8 @@ class WM_MT_splash_about(Menu):
         col.emboss = 'PULLDOWN_MENU'
         col.operator("wm.url_open", text="License", icon='URL').url = "https://www.blender.org/about/license/"
         col.operator("wm.url_open", text="Anastacio Engine - Python API", icon='FILE_SCRIPT').url = "https://anastaciogames.github.io/anastacio-docs/"
-        col.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
-        col.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/rangeengine"
+        col.operator("wm.url_open", text="Anastacio Engine - Discord", icon='DISCORD').url = "https://discord.gg/AsbjKgh4E"
+        col.operator("wm.url_open", text="Support the Development", icon='PATREON').url = "https://www.patreon.com/cw/AnastacioEngine"
 
 class WM_OT_create_project(Operator):
     """Create a RangeArmor-ready project folder and its initial files"""

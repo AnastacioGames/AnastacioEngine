@@ -183,8 +183,7 @@ class OBJECT_PT_relations(ObjectButtonsPanel, Panel):
 
         col = split.column()
         col.label(text="Layers:")
-        col.prop(ob, "layers")
-        col.separator(factor=1)
+        col.prop(ob, "layers", text="")
         col.prop(ob, "pass_index")
 
         col = split.column()

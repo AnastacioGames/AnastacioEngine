@@ -564,7 +564,7 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, Panel):
 
 class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
     # New id so files that saved the old panel position also show it last; add-ons that
-    # add physics panels re-register it after theirs (see easy_ragdoll_RangeEngine.py).
+    # add physics panels re-register it after theirs.
     bl_idname = "PHYSICS_PT_game_obstacle_create"
     bl_label = "Create Obstacle"
     COMPAT_ENGINES = {'BLENDER_GAME'}

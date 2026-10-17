@@ -52,7 +52,10 @@ class RenderButtonsPanel:
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return scene and (scene.render.engine in cls.COMPAT_ENGINES)
+        category = getattr(cls, "ae_category", None)
+        return (scene and scene.render.engine in cls.COMPAT_ENGINES and
+                (scene.render.engine != 'BLENDER_GAME' or category is None or
+                 context.window_manager.ae_render_panel_category == category))
 
 
 # RENDER_PT_render (engine selector) lives in properties_render_engine.py so it
@@ -479,6 +482,7 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
     bl_label = "Bake de Textura (Legado)"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+    ae_category = 'GRAPHICS'
 
     def draw(self, context):
         layout = self.layout

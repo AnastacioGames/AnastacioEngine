@@ -697,6 +697,12 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
+    @classmethod
+    def poll(cls, context):
+        rd = context.scene.render
+        return (context.scene and rd.engine in cls.COMPAT_ENGINES and
+                context.window_manager.ae_export_panel_category == 'RANGEARMOR')
+
     def draw_header(self, context):
         self.layout.label(text="", icon='DESKTOP')
 

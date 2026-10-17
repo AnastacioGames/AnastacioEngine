@@ -108,6 +108,12 @@ class MaterialButtonsPanel:
         return context.material and (context.scene.render.engine in cls.COMPAT_ENGINES)
 
 
+def material_category_visible(context, category):
+    """Filtros da aba Material valem só no Game; Blender Render mantém a UI histórica."""
+    return (context.scene.render.engine != 'BLENDER_GAME' or
+            context.window_manager.ae_material_panel_category == category)
+
+
 class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
     bl_label = "Material Slot"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
@@ -121,12 +127,33 @@ class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
         return (context.material or context.object) and (engine in cls.COMPAT_ENGINES)
 
     def draw(self, context):
-        layout = self.layout.box()
-
         mat = context.material
         ob = context.object
         slot = context.material_slot
         space = context.space_data
+
+        if context.scene.render.engine == 'BLENDER_GAME':
+            layout = self.layout.box()
+            if context.window_manager.ae_material_preview_visible:
+                split = layout.split(factor=0.58)
+                slot_layout = split.column()
+                preview_area = split.row()
+                preview = preview_area.column()
+                slot_actions = preview_area.column(align=True)
+                if mat:
+                    preview.template_preview(mat, show_buttons=False)
+                    row = preview.row(align=True)
+                    row.prop(mat, "preview_render_type", text="", expand=True)
+                else:
+                    preview.label(text="No material")
+            else:
+                split = layout.split(factor=0.94)
+                slot_layout = split.column()
+                slot_actions = split.column(align=True)
+        else:
+            layout = self.layout.box()
+            slot_layout = layout
+            slot_actions = None
 
         if ob:
             is_sortable = (len(ob.material_slots) > 1)
@@ -135,15 +162,20 @@ class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
             if is_sortable:
                 rows = 4
 
-            row = layout.row()
+            row = slot_layout.row()
 
             row.template_list("MATERIAL_UL_matslots", "", ob, "material_slots", ob, "active_material_index", rows=rows)
 
-            col = row.column(align=True)
+            col = slot_actions if slot_actions is not None else row.column(align=True)
             col.operator("object.material_slot_add", icon='ZOOMIN', text="")
             col.operator("object.material_slot_remove", icon='ZOOMOUT', text="")
 
             col.menu("MATERIAL_MT_specials", icon='DOWNARROW_HLT', text="")
+            preview_icon = ('RESTRICT_VIEW_OFF' if
+                            context.window_manager.ae_material_preview_visible else
+                            'RESTRICT_VIEW_ON')
+            col.prop(context.window_manager, "ae_material_preview_visible",
+                     text="", icon=preview_icon, toggle=True)
 
             if is_sortable:
                 col.separator(factor=1)
@@ -152,7 +184,7 @@ class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
                 col.operator("object.material_slot_move", icon='TRIA_DOWN', text="").direction = 'DOWN'
 
             if ob.mode == 'EDIT':
-                row = layout.row(align=True)
+                row = slot_layout.row(align=True)
                 row.operator("object.material_slot_assign", text="Assign")
                 row.operator("object.material_slot_select", text="Select")
                 row.operator("object.material_slot_deselect", text="Deselect")
@@ -183,6 +215,25 @@ class MATERIAL_PT_context_material(MaterialButtonsPanel, Panel):
                 else:
                     row.label(text="No material node selected")
 
+        if context.scene.render.engine == 'BLENDER_GAME':
+            row = self.layout.row(align=True)
+            row.prop(context.window_manager, "ae_material_panel_category", expand=True)
+
+
+class MATERIAL_PT_game_pbr_shading(MaterialButtonsPanel, Panel):
+    bl_label = "PBR Shading Nodes"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return super().poll(context) and material_category_visible(context, 'SETUP')
+
+    def draw(self, context):
+        box = self.layout.box()
+        box.prop(context.scene.game_settings, "use_shading_nodes",
+                 text="PBR Shading Nodes", icon="MATERIAL")
+
 
 class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
     bl_label = "Quick Material"
@@ -191,7 +242,9 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return ob and ob.type == 'MESH' and (context.scene.render.engine in cls.COMPAT_ENGINES)
+        return (ob and ob.type == 'MESH' and
+                context.scene.render.engine in cls.COMPAT_ENGINES and
+                material_category_visible(context, 'SETUP'))
 
     def draw(self, context):
         from bl_operators.anastacio_material_recipes import (
@@ -201,20 +254,23 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
         mat = context.material
 
         box = layout.box()
-        box.label(text="Quick Material:", icon="MATERIAL")
+        box.label(text="Create Material:", icon="MATERIAL")
         col = box.column(align=True)
         col.operator("material.recipe_texture_set", icon='IMAGE_DATA')
+        col.operator_menu_enum("material.recipe_preset", "preset",
+                               text="Ready-made Material", icon='MATERIAL')
+
+        box = layout.box()
+        box.label(text="Layered Materials:", icon="GROUP_VCOL")
+        col = box.column(align=True)
         col.operator("material.recipe_mask_blend", icon='GROUP_VCOL')
 
         # A receita existe nos dois caminhos de shading; cada botão monta um e deixa a cena
         # no modo correspondente, senão o material fica montado para um caminho que não desenha.
-        col.label(text="Wet/Reflective Patches:")
+        col.label(text="Wet/Reflective Patches:", icon='MOD_OCEAN')
         row = col.row(align=True)
-        row.operator("material.recipe_wet_patches", text="PBR", icon='MOD_OCEAN').shading = 'PBR'
-        row.operator("material.recipe_wet_patches", text="Classic", icon='MOD_OCEAN').shading = 'LEGACY'
-
-        col.operator_menu_enum("material.recipe_preset", "preset", text="Ready-made Material", icon='MATERIAL')
-        col.operator("material.to_pbr_nodes", icon='NODETREE')
+        row.operator("material.recipe_wet_patches", text="PBR").shading = 'PBR'
+        row.operator("material.recipe_wet_patches", text="Classic").shading = 'LEGACY'
 
         if not mat or RECIPE_KEY not in mat:
             return
@@ -269,9 +325,32 @@ class MATERIAL_PT_recipes(MaterialButtonsPanel, Panel):
                 box.label(text="The mask was painted: save it (Image > Save As) or pack it", icon='ERROR')
 
 
+class MATERIAL_PT_convert_pbr(MaterialButtonsPanel, Panel):
+    bl_label = "Convert Material"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return super().poll(context) and material_category_visible(context, 'SETUP')
+
+    def draw(self, context):
+        box = self.layout.box()
+        row = box.row(align=True)
+        row.operator("material.to_pbr_nodes", text="PBR", icon='NODETREE')
+        row.operator("material.to_classic_nodes", text="Classic", icon='MATERIAL')
+
+
 class MATERIAL_PT_preview(MaterialButtonsPanel, Panel):
     bl_label = "Material Preview"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        # No Game, o preview fica ao lado de Material Slot no painel superior.
+        return (context.scene.render.engine != 'BLENDER_GAME' and
+                super().poll(context) and
+                material_category_visible(context, 'SETUP'))
 
     def draw(self, context):
         self.layout.template_preview(context.material)
@@ -286,7 +365,9 @@ class MATERIAL_PT_pipeline(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return mat and (not simple_material(mat)) and (mat.type in {'SURFACE', 'WIRE', 'VOLUME'}) and (engine in cls.COMPAT_ENGINES)
+        return (mat and (not simple_material(mat)) and
+                mat.type in {'SURFACE', 'WIRE', 'VOLUME'} and
+                engine in cls.COMPAT_ENGINES and material_category_visible(context, 'SURFACE'))
 
     def draw(self, context):
         layout = self. layout
@@ -345,7 +426,8 @@ class MATERIAL_PT_diffuse(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (mat.type in {'SURFACE', 'WIRE', 'HALO'}) and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and mat.type in {'SURFACE', 'WIRE', 'HALO'} and
+                engine in cls.COMPAT_ENGINES and material_category_visible(context, 'SURFACE'))
 
     def draw(self, context):
         layout = self.layout
@@ -406,7 +488,8 @@ class MATERIAL_PT_specular(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (mat.type in {'SURFACE', 'WIRE', 'HALO'}) and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and mat.type in {'SURFACE', 'WIRE', 'HALO'} and
+                engine in cls.COMPAT_ENGINES and material_category_visible(context, 'SURFACE'))
 
     def draw(self, context):
         layout = self.layout
@@ -463,7 +546,8 @@ class MATERIAL_PT_shading(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (mat.type in {'SURFACE', 'WIRE', 'HALO'}) and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and mat.type in {'SURFACE', 'WIRE', 'HALO'} and
+                engine in cls.COMPAT_ENGINES and material_category_visible(context, 'SURFACE'))
 
     def draw(self, context):
         layout = self.layout
@@ -488,11 +572,16 @@ class MATERIAL_PT_shading(MaterialButtonsPanel, Panel):
             col = split.column()
             sub = col.column()
             sub.active = not mat.use_shadeless
-            sub.prop(mat, "use_tangent_shading")
-            sub.prop(mat, "use_energy_conservation", text="Energy Conservation")
+            # Tangent Shading, Energy Conservation e Slope nao tem efeito no game
+            # engine (so leitura no raytracer legado do Blender Internal, nunca no
+            # gpu_material.c). Escondidos aqui para o usuario nao mexer a toa.
+            if engine != 'BLENDER_GAME':
+                sub.prop(mat, "use_tangent_shading")
+                sub.prop(mat, "use_energy_conservation", text="Energy Conservation")
             sub.prop(mat, "emit")
             sub.prop(mat, "ambient")
-            sub.prop(mat, "specular_slope", text="Slope")
+            if engine != 'BLENDER_GAME':
+                sub.prop(mat, "specular_slope", text="Slope")
             col.prop(mat, "roughness", text="Turbidity")
 
             # One row per label/field pair keeps them aligned at any UI scale.
@@ -516,7 +605,8 @@ class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return (mat is not None) and mat.use_nodes and (engine in cls.COMPAT_ENGINES)
+        return (mat is not None and mat.use_nodes and engine in cls.COMPAT_ENGINES and
+                material_category_visible(context, 'SURFACE'))
 
     def draw(self, context):
         layout = self.layout
@@ -682,7 +772,8 @@ class MATERIAL_PT_sss(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (mat.type in {'SURFACE', 'WIRE', 'HALO'}) and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and mat.type in {'SURFACE', 'WIRE', 'HALO'} and
+                engine in cls.COMPAT_ENGINES and material_category_visible(context, 'SURFACE'))
 
     def draw(self, context):
         layout = self.layout
@@ -834,7 +925,8 @@ class MATERIAL_PT_game_settings(MaterialButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.material and (context.scene.render.engine in cls.COMPAT_ENGINES)
+        return (context.material and context.scene.render.engine in cls.COMPAT_ENGINES and
+                material_category_visible(context, 'GAME'))
 
     def draw(self, context):
         layout = self.layout
@@ -872,7 +964,8 @@ class MATERIAL_PT_game_foliage(MaterialButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.material and (context.scene.render.engine in cls.COMPAT_ENGINES)
+        return (context.material and context.scene.render.engine in cls.COMPAT_ENGINES and
+                material_category_visible(context, 'GAME'))
 
     def draw(self, context):
         layout = self.layout
@@ -1009,7 +1102,8 @@ class MATERIAL_PT_game_options(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (mat.type in {'SURFACE', 'WIRE', 'HALO'}) and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and mat.type in {'SURFACE', 'WIRE', 'HALO'} and
+                engine in cls.COMPAT_ENGINES and material_category_visible(context, 'GAME'))
 
     def draw(self, context):
         layout = self.layout
@@ -1118,7 +1212,8 @@ class MATERIAL_PT_game_shadow(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (mat.type in {'SURFACE', 'WIRE', 'HALO'}) and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and mat.type in {'SURFACE', 'WIRE', 'HALO'} and
+                engine in cls.COMPAT_ENGINES and material_category_visible(context, 'GAME'))
 
     def draw(self, context):
         layout = self.layout
@@ -1155,7 +1250,8 @@ class MATERIAL_PT_transp_game(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and engine in cls.COMPAT_ENGINES and
+                material_category_visible(context, 'GAME'))
 
     def draw(self, context):
         layout = self.layout
@@ -1350,7 +1446,8 @@ class MATERIAL_PT_volume_options(VolumeButtonsPanel, Panel):
     def poll(cls, context):
         mat = context.material
         engine = context.scene.render.engine
-        return check_material(mat) and (mat.type == 'VOLUME') and (engine in cls.COMPAT_ENGINES)
+        return (check_material(mat) and mat.type == 'VOLUME' and engine in cls.COMPAT_ENGINES and
+                material_category_visible(context, 'SURFACE'))
 
     def draw(self, context):
         layout = self.layout
@@ -1389,7 +1486,8 @@ class MATERIAL_PT_anastacio_atlas(MaterialButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         return (ob is not None and ob.type == 'MESH' and
-                context.material and context.scene.render.engine in cls.COMPAT_ENGINES)
+                context.material and context.scene.render.engine in cls.COMPAT_ENGINES and
+                material_category_visible(context, 'SETUP'))
 
     def draw(self, context):
         layout = self.layout
@@ -1432,7 +1530,9 @@ classes = (
     MATERIAL_MT_specials,
     MATERIAL_UL_matslots,
     MATERIAL_PT_context_material,
+    MATERIAL_PT_game_pbr_shading,
     MATERIAL_PT_recipes,
+    MATERIAL_PT_convert_pbr,
     MATERIAL_PT_anastacio_atlas,
     MATERIAL_PT_preview,
     MATERIAL_PT_pipeline,
@@ -1466,6 +1566,41 @@ bpy.types.WindowManager.ae_atlas_show_info = bpy.props.BoolProperty(
     name="Show Info",
     description="Show help text for Material Atlas",
     default=False,
+)
+
+bpy.types.WindowManager.ae_material_panel_category = bpy.props.EnumProperty(
+    name="Material Panels",
+    description="Choose which group of material panels is visible",
+    items=(
+        ('SURFACE', "Surface", "Surface appearance and shader controls"),
+        ('GAME', "Game", "Game rendering, foliage, shadows and transparency"),
+        ('SETUP', "Setup", "Create, convert, preview and organize materials"),
+    ),
+    default='SETUP',
+)
+
+bpy.types.WindowManager.ae_material_preview_visible = bpy.props.BoolProperty(
+    name="Material Preview",
+    description="Show the material preview beside the material slots",
+    default=False,
+)
+
+
+def _update_specular_tint(self, context):
+    mat = self
+    if mat.ae_use_specular_tint:
+        if tuple(mat.specular_color) == (1.0, 1.0, 1.0):
+            mat.specular_color = mat.diffuse_color[:3]
+    else:
+        mat.specular_color = (1.0, 1.0, 1.0)
+
+
+bpy.types.Material.ae_use_specular_tint = bpy.props.BoolProperty(
+    name="Tint Specular",
+    description="Tinge o brilho especular do runtime com uma cor, em vez de branco puro "
+                 "(util sem textura, onde nao ha influencia de Specular Color)",
+    default=False,
+    update=_update_specular_tint,
 )
 
 if __name__ == "__main__":  # only for live edit.

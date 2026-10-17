@@ -220,6 +220,11 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
     COMPAT_ENGINES = {'BLENDER_GAME'}
     bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        return (context.scene.render.engine in cls.COMPAT_ENGINES and
+                context.window_manager.ae_export_panel_category == 'WEB')
+
     def draw_header(self, context):
         self.layout.label(text="", icon='WEB')
 
