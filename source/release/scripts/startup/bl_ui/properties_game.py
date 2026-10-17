@@ -1197,6 +1197,7 @@ class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
         right.prop(scene, "ae_ssgi_steps")
         left.prop(scene, "ae_ssgi_divisor")
         right.prop(scene, "ae_ssgi_thickness")
+        advanced_box.prop(scene, "ae_ssgi_denoise")
 
 
 class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):

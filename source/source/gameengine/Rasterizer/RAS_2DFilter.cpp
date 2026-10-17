@@ -731,7 +731,7 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
         float params[8] = {m_buildInFilters.ssgi_radius, m_buildInFilters.ssgi_strength,
             m_buildInFilters.ssgi_thickness, (float)m_buildInFilters.ssgi_rays,
             (float)m_buildInFilters.ssgi_steps, (float)(m_buildInFilters.ssgi_slot - 1),
-            (float)m_buildInFilters.ssgi_divisor, 0.0f};
+            (float)m_buildInFilters.ssgi_divisor, (float)m_buildInFilters.ssgi_denoise};
         SetUniformfv(m_predefinedUniforms[GE_SSGI_PARAMETERS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(params), 2);
     }
     if (m_predefinedUniforms[GE_SSGI_DISPLAY_UNIFORM] != -1) {

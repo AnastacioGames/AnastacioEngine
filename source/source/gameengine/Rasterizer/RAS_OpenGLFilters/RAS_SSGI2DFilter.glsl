@@ -13,7 +13,19 @@ uniform mat4 unfprojmat;
 uniform mat4 unfinvprojmat;
 uniform float bgl_RenderedTextureWidth;
 uniform float bgl_RenderedTextureHeight;
-uniform vec4 ge_SSGIParams[2]; // radius, strength, thickness, rays; steps, slot, divisor, reserved
+uniform vec4 ge_SSGIParams[2]; // radius, strength, thickness, rays; steps, slot, divisor, denoise
+
+/* 4x4 Bayer index in [0, 1): interleaved sampling (Keller & Heidrich 2001). Every 4x4 block
+ * holds all 16 ray rotations, so the composite filter (>= 5x5) averages them into a smooth result. */
+float bayer2(vec2 a)
+{
+    a = floor(a);
+    return fract(a.x * 0.5 + a.y * a.y * 0.75);
+}
+float bayer4(vec2 a)
+{
+    return bayer2(0.5 * a) * 0.25 + bayer2(a);
+}
 
 vec3 position_at(vec2 uv, float depth)
 {
@@ -45,20 +57,22 @@ void main()
     float thickness = ge_SSGIParams[0].z;
     int rays = int(ge_SSGIParams[0].w);
     int steps = int(ge_SSGIParams[1].x);
-    /* Static interleaved rotation: avoids temporal flicker without a history buffer. */
-    float noise = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+    /* Static pattern: no temporal flicker without a history buffer. */
+    float noise = bayer4(gl_FragCoord.xy) + 0.03125;
+    float bias = max(0.002, thickness * 0.1) + 0.002 * abs(p.z);
     vec3 sum = vec3(0.0);
     for (int r = 0; r < 16; ++r) {
         if (r >= rays) break;
         float u = (float(r) + 0.5) / float(rays);
         float angle = 6.28318530718 * fract(float(r) * 0.61803398875 + noise);
         vec3 dir = tangent * (sqrt(u) * cos(angle)) + bitangent * (sqrt(u) * sin(angle)) + n * sqrt(1.0 - u);
-        float bias = max(0.002, thickness * 0.1);
+        /* Per-ray step jitter turns the banding of fixed march distances into fine noise. */
+        float jitter = fract(noise + float(r) * 0.75487766625);
         vec3 origin = p + n * bias;
         float previous_t = 0.0;
         for (int j = 0; j < 32; ++j) {
             if (j >= steps) break;
-            float fraction = (float(j) + 1.0) / float(steps);
+            float fraction = (float(j) + jitter) / float(steps);
             float t = radius * fraction * fraction;
             vec3 q = origin + dir * t;
             vec4 clip = unfprojmat * vec4(q, 1.0);
@@ -75,13 +89,19 @@ void main()
                  * The thickness cap prevents reaching unrelated geometry behind silhouettes. */
                 if (gap >= 0.0) {
                     float tolerance = thickness + (t - previous_t) * abs(dir.z);
-                    if (gap <= tolerance && length(hit - p) > bias * 2.0 && length(hit - p) <= radius) {
+                    float dist = length(hit - p);
+                    if (gap <= tolerance && dist > bias * 2.0 && dist <= radius) {
                         vec4 hit_n = texture2D(bgl_DataTextures[SSGI_SLOT], sample_uv);
                         vec3 hit_normal = hit_n.xyz * 2.0 - 1.0;
                         if (hit_n.a >= 0.99 && dot(hit_normal, -dir) > 0.0) {
-                            vec3 radiance = texture2D(bgl_DataTextures[SSGI_SLOT + 2], sample_uv).rgb;
+                            vec3 radiance = max(texture2D(bgl_DataTextures[SSGI_SLOT + 2], sample_uv).rgb, vec3(0.0));
+                            /* Firefly clamp: one bright texel must not dominate a few-ray estimate. */
+                            float lum = dot(radiance, vec3(0.2126, 0.7152, 0.0722));
+                            radiance *= min(1.0, 16.0 / max(lum, 1e-6));
                             float edge = min(min(sample_uv.x, sample_uv.y), min(1.0 - sample_uv.x, 1.0 - sample_uv.y));
-                            sum += max(radiance, vec3(0.0)) * smoothstep(0.0, 0.05, edge);
+                            /* Smooth range fade instead of a hard cut at the radius. */
+                            float fade = 1.0 - smoothstep(0.7, 1.0, dist / radius);
+                            sum += radiance * smoothstep(0.0, 0.05, edge) * fade;
                         }
                     }
                     break;

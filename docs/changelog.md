@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-17 - Qualidade do SSGI nativo
+
+- Traçado: amostragem intercalada Bayer 4x4 (Keller & Heidrich) no lugar do ruído estático, jitter de passo
+  por raio, fade suave no raio máximo, clamp de fireflies e bias proporcional à profundidade.
+- Composição: joint bilateral upsampling (Kopf 2007) com posição sub-texel; filtro guiado por normal e plano.
+- Nova opção `ae_ssgi_denoise` (Off 3x3 / Normal 5x5 / High 7x7) em `ge_SSGIParams[1].w`; presets Low/Medium
+  usam High, High/Ultra usam Normal. Teste: `criar_cena_ssgi.py -- out.range modo denoise`; prints com `SSGI_SHOT`.
+
 ## 2026-10-17 - SSGI nativo mais fácil de usar (branch local `feat/ssgi-facilidade`)
 
 - Painel: as 8 regras genéricas viraram só problemas que bloqueiam o efeito, cada um com correção (botão

@@ -1,5 +1,5 @@
 """Native SSGI integration scene. Usage: editor -b --factory-startup --python this.py -- out.range [mode].
-mode: standard (default), filmic, baked, disabled, emissive. Runtime logs go to SSGI_TEST_LOG.
+mode: standard (default), filmic, baked, disabled, emissive, graphs, graphs_strict; optional denoise 0/1/2. Runtime logs go to SSGI_TEST_LOG.
 No screenshots: numerical buffer checks and shader errors only; appearance needs real-game validation.
 """
 import bpy
@@ -10,6 +10,7 @@ from mathutils import Vector
 args = sys.argv[sys.argv.index('--') + 1:]
 destination = os.path.abspath(args[0])
 mode = args[1] if len(args) > 1 else 'standard'
+denoise = int(args[2]) if len(args) > 2 else 1  # 0 off, 1 normal, 2 high
 scene = bpy.context.scene
 for ob in list(scene.objects):
     bpy.data.objects.remove(ob, do_unlink=True)
@@ -26,6 +27,7 @@ scene['ae_ssgi_radius'] = 3.0 if mode == 'emissive' else 5.0
 scene['ae_ssgi_divisor'] = 2
 scene['ae_ssgi_thickness'] = 0.15
 scene['ae_ssgi_strength'] = 1.0
+scene['ae_ssgi_denoise'] = denoise
 scene['ssgi_test_mode'] = mode
 view_names = scene.view_settings.bl_rna.properties['view_transform'].enum_items.keys()
 scene.view_settings.view_transform = 'Filmic' if mode == 'filmic' else ('Standard' if 'Standard' in view_names else 'Default')

@@ -125,13 +125,23 @@ def _compile_core_fragments():
 
 def tick(cont):
     # Abrir a cena manualmente não deve alternar efeitos, câmera ou resolução.
-    if not os.environ.get('SSGI_TEST_LOG') and not os.environ.get('SSGI_BENCH'):
+    shot = os.environ.get('SSGI_SHOT')
+    if not os.environ.get('SSGI_TEST_LOG') and not os.environ.get('SSGI_BENCH') and not shot:
         return
     frame = _state.get('frame', 0) + 1
     _state['frame'] = frame
     try:
         scene = Range.logic.getCurrentScene()
         manager = scene.filterManager
+        if shot:
+            # SSGI_SHOT=<path.png>, SSGI_SHOT_OFF=1 disables SSGI; Scene settings stay as saved.
+            if frame == 1 and os.environ.get('SSGI_SHOT_OFF'):
+                manager.changeSSGIValues(False)
+            if frame == 45:
+                Range.render.makeScreenshot(shot)
+            if frame == 70:
+                Range.logic.endGame()
+            return
         benchmark = os.environ.get('SSGI_BENCH')
         if benchmark:
             if frame == 1:

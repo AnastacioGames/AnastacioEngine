@@ -1,4 +1,7 @@
-/* Edge-aware spatial reconstruction and linear-light composition. */
+/* Joint bilateral upsampling (Kopf et al. 2007) plus an edge-aware spatial denoise guided by
+ * normal and plane distance, then linear-light composition.
+ * Denoise (ge_SSGIParams[1].w): 0 = 3x3 upsample only, 1 = 5x5, 2 = 7x7. 5x5 and wider cover the
+ * trace pass's 4x4 interleaved ray pattern, so it averages out instead of showing as grain. */
 #ifdef USE_CORE_PROFILE
 #define texture2D texture
 in vec2 texCoordVarying;
@@ -52,20 +55,30 @@ void main()
     vec3 n = normalize(geom.xyz * 2.0 - 1.0);
     vec2 size = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);
     vec2 low_size = max(floor(size / ge_SSGIParams[1].z), vec2(1.0));
-    vec2 center = floor(uv * low_size);
+    int denoise = int(ge_SSGIParams[1].w + 0.5);
+    int reach = denoise + 1;
+    float sigma = denoise == 0 ? 0.75 : (denoise == 1 ? 1.6 : 2.6);
+    /* Continuous low-res position: weights follow the real sub-texel offset, so divisor 2/4
+     * blends smoothly instead of showing blocks. */
+    vec2 low_pos = uv * low_size - 0.5;
+    vec2 center = floor(low_pos + 0.5);
+    float plane_tolerance = max(ge_SSGIParams[0].z, 0.004 * abs(p.z));
     vec3 sum = vec3(0.0);
     float total = 0.0;
-    for (int y = -1; y <= 1; ++y) for (int x = -1; x <= 1; ++x) {
-        vec2 tap = (center + vec2(float(x), float(y)) + 0.5) / low_size;
+    for (int y = -3; y <= 3; ++y) for (int x = -3; x <= 3; ++x) {
+        if (abs(x) > reach || abs(y) > reach) continue;
+        vec2 cell = center + vec2(float(x), float(y));
+        vec2 offset = cell - low_pos;
+        vec2 tap = (cell + 0.5) / low_size;
         if (any(lessThan(tap, vec2(0.0))) || any(greaterThan(tap, vec2(1.0)))) continue;
         vec4 gi = texture2D(ge_SSGIBuffer, tap);
         vec2 full_tap = (floor(tap * size) + 0.5) / size;
         vec4 tap_n = texture2D(bgl_DataTextures[SSGI_SLOT], full_tap);
         if (gi.a < 0.99 || tap_n.a < 0.99) continue;
         vec3 delta = position_at(full_tap) - p;
-        float normal_weight = pow(max(dot(n, normalize(tap_n.xyz * 2.0 - 1.0)), 0.0), 32.0);
-        float plane_weight = exp(-abs(dot(delta, n)) / max(ge_SSGIParams[0].z, 0.002));
-        float spatial_weight = exp(-0.5 * float(x * x + y * y));
+        float normal_weight = pow(max(dot(n, normalize(tap_n.xyz * 2.0 - 1.0)), 0.0), 16.0);
+        float plane_weight = exp(-abs(dot(delta, n)) / plane_tolerance);
+        float spatial_weight = exp(-dot(offset, offset) / (2.0 * sigma * sigma));
         float weight = normal_weight * plane_weight * spatial_weight;
         sum += gi.rgb * weight;
         total += weight;

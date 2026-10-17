@@ -7,24 +7,24 @@ QUALITY_PRESETS = {
     'LOW': {
         'label': "Low",
         'radius': 3.0, 'strength': 1.0, 'rays': 4, 'steps': 8,
-        'divisor': 4, 'thickness': 0.1,
+        'divisor': 4, 'thickness': 0.1, 'denoise': 'HIGH',
     },
     'MEDIUM': {
         'label': "Medium",
         'radius': 3.0, 'strength': 1.0, 'rays': 6, 'steps': 12,
-        'divisor': 2, 'thickness': 0.1,
+        'divisor': 2, 'thickness': 0.1, 'denoise': 'HIGH',
     },
     'HIGH': {
         'label': "High",
         'radius': 3.0, 'strength': 1.0, 'rays': 8, 'steps': 16,
-        'divisor': 1, 'thickness': 0.1,
+        'divisor': 1, 'thickness': 0.1, 'denoise': 'NORMAL',
     },
     # The trace shader accepts up to 16 rays and 32 steps. Keep the most
     # expensive preset opt-in, for still or slow desktop scenes.
     'ULTRA': {
         'label': "Ultra",
         'radius': 3.0, 'strength': 1.0, 'rays': 12, 'steps': 24,
-        'divisor': 1, 'thickness': 0.1,
+        'divisor': 1, 'thickness': 0.1, 'denoise': 'NORMAL',
     },
 }
 
@@ -61,6 +61,7 @@ class SCENE_OT_anastacio_ssgi_quality(bpy.types.Operator):
             scene.ae_ssgi_steps = preset['steps']
             scene.ae_ssgi_divisor = preset['divisor']
             scene.ae_ssgi_thickness = preset['thickness']
+            scene.ae_ssgi_denoise = preset['denoise']
             scene.ae_ssgi_quality = self.quality
         finally:
             _applying_preset = False
@@ -198,8 +199,14 @@ def register_props():
         description="1 = full resolution, 2 = half width and height, 4 = quarter", update=_mark_custom)
     bpy.types.Scene.ae_ssgi_thickness = FloatProperty(name="Thickness", default=0.1, min=0.001, max=10.0,
         description="Depth intersection tolerance; high values can leak light", update=_mark_custom)
+    # Enum numbers are read by KX_Scene.cpp from the IDProperty: keep 0/1/2.
+    bpy.types.Scene.ae_ssgi_denoise = EnumProperty(name="Denoise", default='NORMAL', items=(
+        ('OFF', "Off", "Edge-aware upsampling only; sharpest, noisiest", 0),
+        ('NORMAL', "Normal", "5x5 edge-aware filter", 1),
+        ('HIGH', "High", "7x7 edge-aware filter; smoothest, for few rays or low resolution", 2),
+    ), description="Smooths SSGI noise while keeping edges; enable before Play", update=_mark_custom)
 
 
 def unregister_props():
-    for name in ('use', 'approximate', 'show_help', 'quality', 'radius', 'strength', 'rays', 'steps', 'divisor', 'thickness'):
+    for name in ('use', 'approximate', 'show_help', 'quality', 'radius', 'strength', 'rays', 'steps', 'divisor', 'thickness', 'denoise'):
         delattr(bpy.types.Scene, 'ae_ssgi_' + name)

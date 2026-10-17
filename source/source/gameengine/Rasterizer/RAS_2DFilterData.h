@@ -66,6 +66,7 @@ typedef struct BuildInFilters {
     int ssgi_rays;
     int ssgi_steps;
     int ssgi_divisor;
+    int ssgi_denoise; /* 0 off, 1 normal, 2 high: composite reconstruction radius */
     float ssgi_radius;
     float ssgi_strength;
     float ssgi_thickness;

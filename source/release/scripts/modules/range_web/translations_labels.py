@@ -1408,6 +1408,7 @@ SSGI_PANELS = (
     ("Steps", "Passos", "Pasos", "Шаги"),
     ("Resolution Divisor", "Divisor de resolução", "Divisor de resolución", "Делитель разрешения"),
     ("Thickness", "Espessura", "Grosor", "Толщина"),
+    ("Denoise", "Redução de ruído", "Reducción de ruido", "Шумоподавление"),
 )
 
 # Mensagens e dicas dos operadores da Range (flowmenu, veiculo, particulas) que estavam escritas em portugues no

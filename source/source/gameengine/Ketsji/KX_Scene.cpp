@@ -440,6 +440,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
         filters.ssgi_rays = (int)CLAMPIS(setting("ae_ssgi_rays", 4), 1, 16);
         filters.ssgi_steps = (int)CLAMPIS(setting("ae_ssgi_steps", 8), 2, 32);
         filters.ssgi_divisor = (int)CLAMPIS(setting("ae_ssgi_divisor", 2), 1, 4);
+        filters.ssgi_denoise = (int)CLAMPIS(setting("ae_ssgi_denoise", 1), 0, 2);
         filters.ssgi_radius = CLAMPIS(setting("ae_ssgi_radius", 3), 0.01f, 100.0f);
         filters.ssgi_strength = CLAMPIS(setting("ae_ssgi_strength", 1), 0.0f, 4.0f);
         filters.ssgi_thickness = CLAMPIS(setting("ae_ssgi_thickness", 0.1f), 0.001f, 10.0f);
