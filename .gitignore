@@ -77,3 +77,5 @@ demos/
 
 # projetos de teste ficam fora do repo e da publicacao
 projects-teste/
+build-wasm-net/
+debug-logs/
