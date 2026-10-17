@@ -1776,6 +1776,11 @@ static int game_property_new_exec(bContext *C, wmOperator *op)
 
 	BLI_uniquename(&ob->prop, prop, DATA_("Property"), '.', offsetof(bProperty, name), sizeof(prop->name));
 
+	/* KX_FontObject resolution: 0 divides by zero, start at the engine default. */
+	if (prop->type == GPROP_FLOAT && STREQ(prop->name, "Text-Res")) {
+		*(float *)(&prop->data) = 1.0f;
+	}
+
 	WM_event_add_notifier(C, NC_LOGIC, NULL);
 	return OPERATOR_FINISHED;
 }

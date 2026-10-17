@@ -32,6 +32,8 @@
 #include "DNA_mesh_types.h"
 #include "DNA_meta_types.h"
 #include "DNA_object_types.h"
+#include "DNA_packedFile_types.h"
+#include "DNA_property_types.h"
 #include "DNA_rigidbody_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_smoke_types.h"
@@ -40,6 +42,7 @@
 
 #include "BLI_listbase.h"
 #include "BLI_link_utils.h"
+#include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "PIL_time.h"
 #include "BLI_math.h"
@@ -69,6 +72,7 @@
 #include "BKE_paint.h"
 #include "BKE_particle.h"
 #include "BKE_pointcache.h"
+#include "BKE_property.h"
 #include "BKE_scene.h"
 #include "BKE_subsurf.h"
 #include "BKE_unit.h"
@@ -5321,6 +5325,178 @@ static bool drawDispList_nobackface(Scene *scene, View3D *v3d, RegionView3D *rv3
 
 	return false;
 }
+/* Same font KX_FontObject's GetFontId() loads; looked up by name every draw so the
+ * game player loading/unloading the same font never leaves a stale id here. */
+static int draw_game_text_font_id(Main *bmain, VFont *vfont)
+{
+	char path[FILE_MAX];
+	int fontid;
+
+	if (vfont == NULL || BKE_vfont_is_builtin(vfont)) {
+		return BLF_find("default");
+	}
+
+	if (vfont->packedfile) {
+		fontid = BLF_find(vfont->name);
+		if (fontid == -1) {
+			fontid = BLF_load_mem(vfont->name, (unsigned char *)vfont->packedfile->data, vfont->packedfile->size);
+		}
+		return (fontid != -1) ? fontid : BLF_find("default");
+	}
+
+	BLI_strncpy(path, vfont->name, sizeof(path));
+	BLI_path_abs(path, ID_BLEND_PATH(bmain, &vfont->id));
+	fontid = BLF_find(path);
+	if (fontid == -1) {
+		fontid = BLF_load(path);
+	}
+	return (fontid != -1) ? fontid : BLF_find("default");
+}
+
+/**
+ * "Preview Game Text": draw a font object with BLF the same way KX_FontObject +
+ * RAS_OpenGLRasterizer::RenderText3D do in game, so the viewport matches Play.
+ * Expects the object matrix already on the modelview stack.
+ * \return false when the regular curve drawing should be used instead.
+ */
+static bool draw_game_text_preview(Main *bmain, Scene *scene, Base *base,
+                                   const short dflag, const unsigned char ob_wire_col[4])
+{
+	Object *ob = base->object;
+	Curve *cu = ob->data;
+	bProperty *prop;
+	const char *str = cu->str;
+	float resolution = 1.0f;
+	float color[4];
+	int fontid;
+
+	if ((cu->flag & CU_GAME_TEXT_PREVIEW) == 0 || (dflag & (DRAW_PICKING | DRAW_CONSTCOLOR))) {
+		return false;
+	}
+
+	fontid = draw_game_text_font_id(bmain, cu->vfont);
+	if (fontid == -1) {
+		return false;
+	}
+
+	/* KX_FontObject::UpdateTextFromProperty */
+	prop = BKE_bproperty_object_get(ob, "Text");
+	if (prop && prop->type == GPROP_STRING) {
+		str = prop->poin;
+	}
+	prop = BKE_bproperty_object_get(ob, "Text-Res");
+	if (prop && prop->type == GPROP_FLOAT) {
+		resolution = *(float *)&prop->data;
+	}
+	else if (prop && prop->type == GPROP_INT) {
+		resolution = (float)prop->data;
+	}
+	CLAMP(resolution, 0.1f, 18.0f);
+
+	if (str == NULL || str[0] == '\0' || cu->fsize == 0.0f) {
+		return true;
+	}
+
+	/* BGE_FONT_RES */
+	const float size = fabsf(cu->fsize * 100.0f * resolution);
+	const float aspect = cu->fsize / size;
+	const int isize = (int)size;
+	float offset[2] = {cu->xof, cu->yof};
+
+	/* split on line breaks, like split_string() in KX_FontObject.cpp */
+	const char *lines[256];
+	size_t lens[256];
+	int totline = 0;
+	for (const char *p = str; totline < 256; ) {
+		const char *end = strchr(p, '\n');
+		lines[totline] = p;
+		lens[totline] = end ? (size_t)(end - p) : strlen(p);
+		totline++;
+		if (end == NULL) {
+			break;
+		}
+		p = end + 1;
+	}
+
+	/* KX_FontObject::GetTextAabb + ApplyTextAlignment */
+	if (cu->spacemode != CU_ALIGN_X_LEFT || cu->align_y != CU_ALIGN_Y_TOP_BASELINE) {
+		const float line_spacing = cu->linedist / aspect;
+		float min[2] = {FLT_MAX, FLT_MAX}, max[2] = {-FLT_MAX, -FLT_MAX};
+
+		BLF_size(fontid, isize, 72);
+		for (int i = 0; i < totline; i++) {
+			rctf box;
+			BLF_boundbox(fontid, lines[i], lens[i], &box);
+			min[0] = min_ff(min[0], box.xmin);
+			min[1] = min_ff(min[1], box.ymin - line_spacing * i);
+			max[0] = max_ff(max[0], box.xmax);
+			max[1] = max_ff(max[1], box.ymax - line_spacing * i);
+		}
+		for (int j = 0; j < 2; j++) {
+			min[j] = (min[j] + offset[j] * size) * aspect;
+			max[j] = (max[j] + offset[j] * size) * aspect;
+		}
+
+		switch (cu->spacemode) {
+			case CU_ALIGN_X_MIDDLE: offset[0] -= ((min[0] + max[0]) - cu->xof) / 2.0f; break;
+			case CU_ALIGN_X_RIGHT:  offset[0] -= max[0] - cu->xof; break;
+			default: break;
+		}
+		switch (cu->align_y) {
+			case CU_ALIGN_Y_TOP:    offset[1] -= max[1] - cu->yof; break;
+			case CU_ALIGN_Y_CENTER: offset[1] -= ((min[1] + max[1]) / 2.0f) - cu->yof; break;
+			case CU_ALIGN_Y_BOTTOM: offset[1] -= min[1] - cu->yof; break;
+			default: break;
+		}
+	}
+
+	/* KX_FontObject::UpdateBuckets: object color, no material */
+	if (BKE_scene_check_color_management_enabled(scene)) {
+		linearrgb_to_srgb_v4(color, ob->col);
+	}
+	else {
+		copy_v4_v4(color, ob->col);
+	}
+
+	/* RAS_OpenGLRasterizer::RenderText3D */
+	int flags = BLF_MATRIX | BLF_ASPECT;
+	if (cu->use_shadows) {
+		flags |= BLF_SHADOW;
+		BLF_shadow(fontid, 1, cu->shadow_col);
+		BLF_shadow_offset(fontid, cu->shadow_offx, cu->shadow_offy);
+	}
+
+	glDisable(GL_LIGHTING);
+	glDisable(GL_CULL_FACE);
+	glDepthMask(GL_FALSE);
+	glColor4fv(color);
+
+	BLF_enable(fontid, flags);
+	for (int i = 0; i < totline; i++) {
+		float mat[4][4];
+		unit_m4(mat);
+		mat[3][0] = offset[0];
+		mat[3][1] = offset[1] - cu->fsize * cu->linedist * i;
+
+		BLF_matrix(fontid, (float *)mat);
+		BLF_aspect(fontid, aspect, aspect, aspect);
+		BLF_size(fontid, isize, 72);
+		BLF_position(fontid, 0.0f, 0.0f, 0.0f);
+		BLF_draw(fontid, lines[i], lens[i]);
+	}
+	BLF_disable(fontid, flags);
+
+	glDepthMask(GL_TRUE);
+
+	/* the glyphs have no outline: show selection with the bounds instead */
+	if (base->flag & SELECT) {
+		glColor3ubv(ob_wire_col);
+		draw_bounding_volume(ob, OB_BOUND_BOX);
+	}
+
+	return true;
+}
+
 static bool drawDispList(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *rv3d, Base *base,
                          const char dt, const short dflag, const unsigned char ob_wire_col[4])
 {
@@ -8421,7 +8597,9 @@ static void draw_object_impl(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d
 					}
 				}
 				else if (ED_view3d_boundbox_clip(rv3d, ob->bb)) {
-					empty_object = drawDispList(bmain, scene, v3d, rv3d, base, dt, dflag, ob_wire_col);
+					if (!draw_game_text_preview(bmain, scene, base, dflag, ob_wire_col)) {
+						empty_object = drawDispList(bmain, scene, v3d, rv3d, base, dt, dflag, ob_wire_col);
+					}
 				}
 
 				break;

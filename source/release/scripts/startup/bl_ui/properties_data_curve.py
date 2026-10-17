@@ -24,6 +24,21 @@ from rna_prop_ui import PropertyPanel
 from bpy.types import Curve, SurfaceCurve, TextCurve
 
 
+def _game_text_tab(context):
+    """Active tab of a text object under the Range Engine, None otherwise.
+
+    KX_FontObject only draws the regular font with size, alignment, line spacing,
+    offset and shadow; everything else only affects the curve geometry."""
+    if type(context.curve) is not TextCurve or context.scene.render.engine != "BLENDER_GAME":
+        return None
+    return context.window_manager.ae_text_panel_category
+
+
+def _show_in_geometry_tab(context):
+    tab = _game_text_tab(context)
+    return tab is None or tab == 'GEOMETRY'
+
+
 class CurveButtonsPanel:
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
@@ -31,7 +46,7 @@ class CurveButtonsPanel:
 
     @classmethod
     def poll(cls, context):
-        return (context.curve is not None)
+        return (context.curve is not None) and _show_in_geometry_tab(context)
 
 
 class CurveButtonsPanelCurve(CurveButtonsPanel):
@@ -49,7 +64,7 @@ class CurveButtonsPanelSurface(CurveButtonsPanel):
 class CurveButtonsPanelText(CurveButtonsPanel):
     @classmethod
     def poll(cls, context):
-        return (type(context.curve) is TextCurve)
+        return (type(context.curve) is TextCurve) and _show_in_geometry_tab(context)
 
 
 class CurveButtonsPanelActive(CurveButtonsPanel):
@@ -64,6 +79,10 @@ class CurveButtonsPanelActive(CurveButtonsPanel):
 class DATA_PT_context_curve(CurveButtonsPanel, Panel):
     bl_label = ""
     bl_options = {'HIDE_HEADER'}
+
+    @classmethod
+    def poll(cls, context):
+        return (context.curve is not None)
 
     def draw(self, context):
         layout = self.layout
@@ -164,7 +183,7 @@ class DATA_PT_geometry_curve(CurveButtonsPanelCurve, Panel):
 
     @classmethod
     def poll(cls, context):
-        return (type(context.curve) in {Curve, TextCurve})
+        return (type(context.curve) in {Curve, TextCurve}) and _show_in_geometry_tab(context)
 
     def draw(self, context):
         layout = self.layout
@@ -324,13 +343,18 @@ class DATA_PT_font(CurveButtonsPanelText, Panel):
 
         text = context.curve
         char = context.curve.edit_format
+        game = _game_text_tab(context) is not None
 
         box = layout.box()
         box.label(text="Font:", icon="FONT_DATA")
 
-        row = box.split(factor=0.25)
-        row.label(text="Regular")
-        row.template_ID(text, "font", open="font.open", unlink="font.unlink")
+        if game:
+            # Regular font and size live in the Game Text tab, which is what Play draws.
+            box.label(text="Only for the 3D curve (Convert to Mesh / render):", icon='INFO')
+        else:
+            row = box.split(factor=0.25)
+            row.label(text="Regular")
+            row.template_ID(text, "font", open="font.open", unlink="font.unlink")
         row = box.split(factor=0.25)
         row.label(text="Bold")
         row.template_ID(text, "font_bold", open="font.open", unlink="font.unlink")
@@ -346,7 +370,8 @@ class DATA_PT_font(CurveButtonsPanelText, Panel):
         split = box.split()
 
         col = split.column()
-        col.prop(text, "size", text="Size")
+        if not game:
+            col.prop(text, "size", text="Size")
         col = split.column()
         col.prop(text, "shear")
 
@@ -380,17 +405,6 @@ class DATA_PT_font(CurveButtonsPanelText, Panel):
         row.prop(text, "small_caps_scale", text="Small Caps")
         row.prop(char, "use_small_caps")
 
-        rd = context.scene.render
-        if rd.engine == "BLENDER_GAME":
-            box = layout.box()
-            box.label(text="Game Engine Options:", icon="GAME")
-            col = box.column()
-            col.prop(text, "use_shadows")
-            row = col.row()
-            row.prop(text, "shadow_offset_x")
-            row.prop(text, "shadow_offset_y")
-            row = col.row()
-            row.prop(text, "shadow_col", text="")
 
 class DATA_PT_paragraph(CurveButtonsPanelText, Panel):
     bl_label = "Paragraph"
@@ -399,6 +413,19 @@ class DATA_PT_paragraph(CurveButtonsPanelText, Panel):
         layout = self.layout
 
         text = context.curve
+
+        if _game_text_tab(context) is not None:
+            # Alignment, line spacing and offset are in the Game Text tab.
+            box = layout.box()
+            box.label(text="Spacing:", icon="ARROW_LEFTRIGHT")
+            col = box.column(align=True)
+            col.prop(text, "space_character", text="Letter")
+            col.prop(text, "space_word", text="Word")
+            box.label(text="Justify / Flush alignment:")
+            row = box.row()
+            row.prop_enum(text, "align_x", 'JUSTIFY')
+            row.prop_enum(text, "align_x", 'FLUSH')
+            return
 
         box = layout.box()
         box.label(text="Alignment:", icon="ALIGN")
@@ -422,6 +449,115 @@ class DATA_PT_paragraph(CurveButtonsPanelText, Panel):
         col.label(text="Offset:")
         col.prop(text, "offset_x", text="X")
         col.prop(text, "offset_y", text="Y")
+
+
+class DATA_PT_text_panel_category(Panel):
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "data"
+    bl_label = "Text Panels"
+    bl_options = {'HIDE_HEADER', 'PIN_TO_TOP'}
+
+    @classmethod
+    def poll(cls, context):
+        return _game_text_tab(context) is not None
+
+    def draw(self, context):
+        row = self.layout.row(align=True)
+        row.scale_y = 1.2
+        row.prop(context.window_manager, "ae_text_panel_category", expand=True)
+
+
+class GameTextPanel(CurveButtonsPanel):
+    """Game Text tab: only what KX_FontObject uses when the game runs."""
+
+    @classmethod
+    def poll(cls, context):
+        return _game_text_tab(context) == 'GAME'
+
+
+class DATA_PT_game_text_font(GameTextPanel, Panel):
+    bl_label = "Font"
+
+    def draw(self, context):
+        text = context.curve
+
+        box = self.layout.box()
+        box.label(text="Font:", icon="FONT_DATA")
+        box.template_ID(text, "font", open="font.open", unlink="font.unlink")
+        box.prop(text, "size", text="Size")
+
+
+class DATA_PT_game_text_alignment(GameTextPanel, Panel):
+    bl_label = "Alignment"
+
+    def draw(self, context):
+        text = context.curve
+
+        box = self.layout.box()
+        box.label(text="Alignment:", icon="ALIGN")
+        box.label(text="Horizontal Alignment:")
+        row = box.row(align=True)
+        row.prop_enum(text, "align_x", 'LEFT')
+        row.prop_enum(text, "align_x", 'CENTER')
+        row.prop_enum(text, "align_x", 'RIGHT')
+        box.label(text="Vertical Alignment:")
+        box.row(align=True).prop(text, "align_y", expand=True)
+
+
+class DATA_PT_game_text_spacing(GameTextPanel, Panel):
+    bl_label = "Spacing & Offset"
+
+    def draw(self, context):
+        text = context.curve
+
+        box = self.layout.box()
+        box.label(text="Spacing & Offset:", icon="ARROW_LEFTRIGHT")
+        split = box.split()
+        col = split.column(align=True)
+        col.label(text="Spacing:")
+        col.prop(text, "space_line", text="Line")
+        col = split.column(align=True)
+        col.label(text="Offset:")
+        col.prop(text, "offset_x", text="X")
+        col.prop(text, "offset_y", text="Y")
+
+
+class DATA_PT_game_text_shadow(GameTextPanel, Panel):
+    bl_label = "Shadow"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw_header(self, context):
+        self.layout.prop(context.curve, "use_shadows", text="")
+
+    def draw(self, context):
+        text = context.curve
+
+        box = self.layout.box()
+        box.label(text="Shadow:", icon="GAME")
+        col = box.column()
+        col.active = text.use_shadows
+        col.label(text="Offset:")
+        row = col.row(align=True)
+        row.prop(text, "shadow_offset_x", text="X")
+        row.prop(text, "shadow_offset_y", text="Y")
+        col.label(text="Color:")
+        col.prop(text, "shadow_col", text="")
+
+
+class DATA_PT_game_text_viewport(GameTextPanel, Panel):
+    bl_label = "Viewport"
+
+    def draw(self, context):
+        text = context.curve
+
+        box = self.layout.box()
+        box.label(text="Viewport:", icon="RESTRICT_VIEW_OFF")
+        box.prop(text, "use_game_text_preview")
+        if context.object:
+            # KX_FontObject uses the object color, not the material.
+            box.label(text="Text Color:")
+            box.prop(context.object, "color", text="")
 
 
 class DATA_PT_text_boxes(CurveButtonsPanelText, Panel):
@@ -470,6 +606,12 @@ class DATA_PT_custom_props_curve(CurveButtonsPanel, PropertyPanel, Panel):
 
 classes = (
     DATA_PT_context_curve,
+    DATA_PT_text_panel_category,
+    DATA_PT_game_text_font,
+    DATA_PT_game_text_alignment,
+    DATA_PT_game_text_spacing,
+    DATA_PT_game_text_shadow,
+    DATA_PT_game_text_viewport,
     DATA_PT_shape_curve,
     DATA_PT_curve_texture_space,
     DATA_PT_geometry_curve,
@@ -479,6 +621,16 @@ classes = (
     DATA_PT_paragraph,
     DATA_PT_text_boxes,
     # DATA_PT_custom_props_curve,  # disabled: Custom Properties panel unused
+)
+
+bpy.types.WindowManager.ae_text_panel_category = bpy.props.EnumProperty(
+    name="Text Panels",
+    items=(
+        ('GAME', "Game Text", "What the game draws: font, size, alignment, spacing, shadow and viewport preview"),
+        ('GEOMETRY', "3D Geometry", "Curve-only settings: extrude, bevel, bold/italic, underline, text boxes; "
+                                    "used after Convert to Mesh or when rendering"),
+    ),
+    default='GAME',
 )
 
 if __name__ == "__main__":  # only for live edit.

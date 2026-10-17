@@ -299,6 +299,8 @@ enum {
 	CU_FILL_CAPS          = 1 << 14,
 	/** map taper object to beveled area */
 	CU_MAP_TAPER          = 1 << 15,
+	/** Font: draw in the 3D view the way KX_FontObject draws it in game (BLF glyphs) */
+	CU_GAME_TEXT_PREVIEW  = 1 << 16,
 };
 
 /* Curve.twist_mode */

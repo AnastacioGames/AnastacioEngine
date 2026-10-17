@@ -1072,6 +1072,13 @@ static void rna_def_font(BlenderRNA *UNUSED(brna), StructRNA *srna)
 	RNA_def_property_ui_text(prop, "Shadow Color", "Shadow color for text");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
+	prop = RNA_def_property(srna, "use_game_text_preview", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_GAME_TEXT_PREVIEW);
+	RNA_def_property_ui_text(prop, "Preview Game Text",
+	                         "Draw the text in the 3D View the way the game draws it (font glyphs at the "
+	                         "Text-Res resolution, object color, Text property); edit mode still shows the curve");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
 	/* strings */
 	prop = RNA_def_property(srna, "family", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_maxlength(prop, MAX_ID_NAME - 2);

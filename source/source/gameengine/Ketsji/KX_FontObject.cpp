@@ -268,7 +268,9 @@ void KX_FontObject::UpdateTextFromProperty()
 		const std::string resolutionText = propR->GetText();
 		if (resolutionText != m_res) {
 			try {
-				m_resolution = std::stof(resolutionText);
+				float resolution = std::stof(resolutionText);
+				CLAMP(resolution, 0.1f, 18.0f);
+				m_resolution = resolution;
 			}
 			catch (const std::exception &) {
 				// Ignore non-numeric logic brick value, keep previous resolution.

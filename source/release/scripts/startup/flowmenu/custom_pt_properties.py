@@ -269,7 +269,7 @@ class CUSTOM_PT_game_properties(Panel):
         prop = game.properties[prop_index_res]
         sub.prop(prop, "name", text="", icon='FONT_DATA')
         row.prop(prop, "value", text="Resolution")
-        row.label(text="Text Resolution(0-50)")
+        row.label(text="Text Resolution(0.1-18)")
 
     def draw(self, context):
         layout = self.layout
@@ -278,6 +278,7 @@ class CUSTOM_PT_game_properties(Panel):
         is_font = (ob.type == 'FONT')
 
         if is_font:
+            layout.prop(ob.data, "use_game_text_preview")
             self._draw_text_props(layout, game)
 
         row = layout.row(align=True)

@@ -173,7 +173,7 @@ class GAME_PT_game_properties(GameButtonsPanel, Panel):
                     prop = game.properties[prop_indexR]
                     sub.prop(prop, "name", text="", icon="FONT_DATA")
                     row.prop(prop, "value", text="Resolution")
-                    row.label("Text Resolution(0 - 18)")
+                    row.label("Text Resolution(0.1 - 18)")
                 else:
                     sub = row.row(align=True)
                     propsR = sub.operator("object.game_property_new", text="", icon='ZOOMIN',)

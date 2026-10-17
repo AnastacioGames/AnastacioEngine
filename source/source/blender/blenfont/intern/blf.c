@@ -208,6 +208,11 @@ int BLF_load(const char *name)
 	return i;
 }
 
+int BLF_find(const char *name)
+{
+	return blf_search(name);
+}
+
 int BLF_load_unique(const char *name)
 {
 	FontBLF *font;

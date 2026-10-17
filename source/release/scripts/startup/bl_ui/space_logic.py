@@ -37,6 +37,7 @@ class LOGIC_PT_properties(Panel):
         is_font = (ob.type == 'FONT')
 
         if is_font:
+            layout.prop(ob.data, "use_game_text_preview")
             prop_index, prop_indexR = game.properties.find("Text"), game.properties.find("Text-Res")
 
             if prop_index != -1:
@@ -58,7 +59,7 @@ class LOGIC_PT_properties(Panel):
                     prop = game.properties[prop_indexR]
                     sub.prop(prop, "name", text="", icon="FONT_DATA")
                     row.prop(prop, "value", text="Resolution")
-                    row.label("Text Resolution(0-50)")
+                    row.label("Text Resolution(0.1-18)")
                 else:
                     sub = row.row(align=True)
                     propsR = sub.operator("object.game_property_new", text="", icon='ZOOMIN',)

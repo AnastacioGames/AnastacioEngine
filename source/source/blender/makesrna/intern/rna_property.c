@@ -27,6 +27,7 @@
 
 #include "BLI_path_util.h"
 #include "BLI_string_utils.h"
+#include "BLI_utildefines.h"
 
 #include "BLT_translation.h"
 
@@ -82,8 +83,35 @@ static float rna_GameFloatProperty_value_get(PointerRNA *ptr)
 static void rna_GameFloatProperty_value_set(PointerRNA *ptr, float value)
 {
 	bProperty *prop = (bProperty *)(ptr->data);
-	CLAMP(value, -FLT_MAX, FLT_MAX);
+	/* "Text-Res" drives KX_FontObject glyph resolution; an extreme value typed or
+	 * dragged into the field can hang the engine generating the font atlas, so it
+	 * is hard-clamped here instead of relying on a UI redraw to catch it later. */
+	if (STREQ(prop->name, "Text-Res")) {
+		CLAMP(value, 0.1f, 18.0f);
+	}
+	else {
+		CLAMP(value, -FLT_MAX, FLT_MAX);
+	}
 	*(float *)(&prop->data) = value;
+}
+
+/* Keeps the drag/slider range for "Text-Res" within the clamp applied by
+ * rna_GameFloatProperty_value_set, so the field itself cannot be dragged
+ * past the limit instead of snapping back after the fact. */
+static void rna_GameFloatProperty_value_range(PointerRNA *ptr, float *min, float *max, float *softmin, float *softmax)
+{
+	bProperty *prop = (bProperty *)(ptr->data);
+
+	if (STREQ(prop->name, "Text-Res")) {
+		*min = *softmin = 0.1f;
+		*max = *softmax = 18.0f;
+	}
+	else {
+		*min = -FLT_MAX;
+		*max = FLT_MAX;
+		*softmin = -FLT_MAX;
+		*softmax = FLT_MAX;
+	}
 }
 
 static void rna_GameProperty_type_set(PointerRNA *ptr, int value)
@@ -175,7 +203,8 @@ void RNA_def_gameproperty(BlenderRNA *brna)
 	/* RNA_def_property_float_sdna(prop, NULL, "data"); */
 	RNA_def_property_ui_text(prop, "Value", "Property value");
 	RNA_def_property_range(prop, -FLT_MAX, FLT_MAX);
-	RNA_def_property_float_funcs(prop, "rna_GameFloatProperty_value_get", "rna_GameFloatProperty_value_set", NULL);
+	RNA_def_property_float_funcs(prop, "rna_GameFloatProperty_value_get", "rna_GameFloatProperty_value_set",
+	                              "rna_GameFloatProperty_value_range");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "net_bits", PROP_INT, PROP_NONE);
