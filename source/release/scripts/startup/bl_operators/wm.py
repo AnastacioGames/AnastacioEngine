@@ -2491,7 +2491,8 @@ class WM_MT_splash(Menu):
         row.operator("wm.url_open", text="Python API", icon='FILE_SCRIPT').url = "https://anastaciogames.github.io/anastacio-docs/"
         row.operator("wm.url_open", text="Discord", icon='DISCORD').url = "https://discord.gg/wC76whPX2"
         row.operator("wm.url_open", text="GitHub", icon='URL').url = "https://github.com/AnastacioGames"
-        row.operator("wm.url_open", text="Support", icon='PATREON').url = "https://www.patreon.com/rangeengine"
+        row.operator("wm.url_open", text="Patreon Anastacio", icon='PATREON').url = "https://www.patreon.com/cw/AnastacioEngine"
+        row.operator("wm.url_open", text="Patreon Range", icon='PATREON').url = "https://www.patreon.com/rangeengine"
         layout.separator(factor=1.5)
 
 
