@@ -660,12 +660,14 @@ iOS fora do escopo.
   com a referência legada foi fechada em 2026-10-08: ver [batching estático e culling](batching-estatico-e-culling.md)
   (Static Batch `377a0026`, ciclo do grupo `ae1370bc`, culling `98f54d7f`; validados no jogo do usuário).
 - **Trabalho repetido por frame (aberto, 2026-10-08):** generalizar a lição do `98f54d7f` (marca
-  "modificado" sempre ligada). Feito: contadores + detector em execução (`61d35afc`). Falta:
-  regra no `AGENTS.md`, verificador estático (`tools/`) e rodar o detector nos jogos reais
-  (parado e em movimento). Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
+  "modificado" sempre ligada). Feito: contadores + detector em execução (`61d35afc`); regra no
+  `AGENTS.md` e verificador estático `tools/check_trabalho_repetido.py` (`--selftest` acha o bug de
+  `98f54d7f` na versão antiga) em 2026-10-17. Falta: rodar o detector nos jogos reais parado e em
+  movimento com o usuário jogando (`tools/debug/abrir_auditoria_trabalho_repetido.bat`); em background
+  só a cena de abertura do RolimaRacer foi medida (1 objeto, contadores 0). Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
   Varredura do engine inteiro concluída: ~100 suspeitos classificados por gravidade em
   [auditoria-suspeitos.md](auditoria-suspeitos.md) (só leitura, nada medido). Bugs do nível 0 (8/8)
-  corrigidos em 2026-10-08, só compilados (falta conferir em jogo). Grupos CV/KX/RA/PH/GL/GP fechados em 2026-10-09 (corrigidos ou descartados; só CV3 aberto); ganho por item não demonstrado em A/B. Abertos: PY, LP, SP.
+  corrigidos em 2026-10-08, só compilados (falta conferir em jogo). Grupos CV/KX/RA/PH/GL/GP fechados em 2026-10-09; CV3 corrigido em 2026-10-11 (decisão: pular com watchdog); PY, LP e SP com todos os itens decididos (corrigidos, adiados com motivo ou descartados) em [auditoria-suspeitos.md](auditoria-suspeitos.md). Ganho por item não demonstrado em A/B.
 - **Travadas do RolimaRacer (aberto, 2026-10-10):** corrigidos o pico de 39 ms (imagem de nó Material subindo no
   1º desenho) e a resolução dinâmica descendo sem parar; `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo.
   Abertos: picos longos no swap, inicialmente observados ao voltar do ragdoll; a rodada

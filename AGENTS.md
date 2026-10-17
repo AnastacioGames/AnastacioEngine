@@ -126,6 +126,11 @@ estiver desatualizado.
 - **Busque antes de construir**: antes de gastar esforço numa ferramenta externa ou infraestrutura nova para
   resolver um problema (ex: profiling de GPU), procure primeiro no próprio código por algo que já faça isso
   (classes de query, flags de feature, migrações parecidas já registradas no changelog).
+- **Trabalho repetido por frame**: toda marca de mudança (`m_modified`, `m_dirty`, `NotifyUpdate`...) só liga
+  dentro do ramo que detectou a mudança; laço por frame sobre todos os objetos precisa de uma lista só dos que
+  mudam ou de uma checagem barata antes. Depois de mexer em atualização/culling/transform, rodar
+  `python tools/check_trabalho_repetido.py` (e `--selftest`) e o detector numa cena parada
+  ([docs/auditoria-trabalho-repetido.md](docs/auditoria-trabalho-repetido.md)): parado, os contadores devem ficar ~0.
 - **Teste visual no jogo real, não em screenshot automatizado**: para bugs de renderização/visuais, captura
   automatizada de tela via câmera scriptada (`RangeRuntime.exe` headless + `--background` + `PrintWindow`) é
   pouco confiável aqui e já produziu resultados enganosos. Prefira pedir para o usuário testar no jogo real

@@ -65,7 +65,12 @@ primeiro segundo (carregamento). Recolocando temporariamente o bug de `98f54d7f`
 - `BL_Shader::setAttrib`: ignora valor repetido. OK.
 - Demais `NotifyUpdate` estão em caminhos de edição explícita (Python, deformers, destruição).
 
-## Plano aberto (para a próxima sessão)
+## Plano (camadas 1 e 2 feitas em 2026-10-17)
+
+Estado: regra no `AGENTS.md` e `tools/check_trabalho_repetido.py` feitos (`--selftest` acha o bug de
+`98f54d7f` na versão anterior do arquivo e não acha na atual). Varredura atual: 4 suspeitos, todos
+esperados (laços de culling sobre `m_renderlist` e `RAS_StorageVbo::UpdateSize`). Falta a camada 3 nos
+jogos reais com o usuário jogando: `tools/debug/abrir_auditoria_trabalho_repetido.bat`.
 
 Objetivo: o padrão não pode voltar. Três camadas, nesta ordem:
 
