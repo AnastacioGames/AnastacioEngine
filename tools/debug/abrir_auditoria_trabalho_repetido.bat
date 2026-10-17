@@ -14,6 +14,8 @@ for %%f in ("%GAME%") do set COPY=%%~dpf_audit_copy%%~xf
 "%ROOT%\build\bin\AnastacioEngine.exe" -b "%GAME%" --python "%ROOT%\tools\debug\auditar_trabalho_repetido.py" -- "%COPY%" "%OUT%\contadores.txt"
 for %%f in ("%GAME%") do cd /d "%%~dpf"
 set AUDIT_SECONDS=0
+rem Syncs de transform e raizes atualizadas por objeto, a cada segundo (CM_WorkCounters.h).
+set RANGE_AUDIT_TRANSFORMS=%OUT%\objetos.txt
 "%ROOT%\build\bin\AnastacioRuntime.exe" "%COPY%"
 del "%COPY%" "%COPY%1" 2>nul
 echo Log em %OUT%\contadores.txt

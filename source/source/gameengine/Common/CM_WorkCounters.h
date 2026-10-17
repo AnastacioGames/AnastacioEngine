@@ -31,6 +31,11 @@
 #define __CM_WORK_COUNTERS_H__
 
 #include <atomic>
+#include <cstdio>
+#include <cstdlib>
+#include <map>
+#include <mutex>
+#include <string>
 
 enum CM_WorkCounter {
 	CM_WORK_SCENE_NODE_UPDATES = 0,
@@ -77,6 +82,75 @@ inline void CM_WorkCountersSwap()
 inline int CM_WorkCountLast(CM_WorkCounter counter)
 {
 	return CM_WorkCountersLast()[counter];
+}
+
+/* Opt-in per-object audit (RANGE_AUDIT_TRANSFORMS=<file>): counts transform syncs and updated
+ * scene-graph roots by object name and appends one line per object every second. Off by default;
+ * then each call costs one branch. */
+struct CM_WorkAudit {
+	std::mutex mutex;
+	std::map<std::string, int> syncs;
+	std::map<std::string, int> roots;
+	FILE *file = nullptr;
+	int frames = 0;
+	int seconds = 0;
+	double last = -1.0;
+};
+
+inline CM_WorkAudit *CM_WorkAuditGet()
+{
+	static CM_WorkAudit *audit = []() -> CM_WorkAudit * {
+		const char *path = getenv("RANGE_AUDIT_TRANSFORMS");
+		if (!path || !path[0]) {
+			return nullptr;
+		}
+		CM_WorkAudit *a = new CM_WorkAudit();
+		a->file = fopen(path, "w");
+		if (a->file) {
+			fprintf(a->file, "# segundo tipo objeto media_por_frame\n");
+		}
+		return a;
+	}();
+	return audit;
+}
+
+inline void CM_WorkAuditCount(bool root, const std::string& name)
+{
+	CM_WorkAudit *a = CM_WorkAuditGet();
+	if (!a) {
+		return;
+	}
+	std::lock_guard<std::mutex> lock(a->mutex);
+	++(root ? a->roots : a->syncs)[name];
+}
+
+/// Called once per frame with the engine clock in seconds.
+inline void CM_WorkAuditFrame(double time)
+{
+	CM_WorkAudit *a = CM_WorkAuditGet();
+	if (!a || !a->file) {
+		return;
+	}
+	std::lock_guard<std::mutex> lock(a->mutex);
+	++a->frames;
+	if (a->last < 0.0) {
+		a->last = time;
+	}
+	if (time - a->last < 1.0) {
+		return;
+	}
+	++a->seconds;
+	for (const auto& kv : a->roots) {
+		fprintf(a->file, "%d raiz %s %.1f\n", a->seconds, kv.first.c_str(), (double)kv.second / a->frames);
+	}
+	for (const auto& kv : a->syncs) {
+		fprintf(a->file, "%d sync %s %.1f\n", a->seconds, kv.first.c_str(), (double)kv.second / a->frames);
+	}
+	fflush(a->file);
+	a->roots.clear();
+	a->syncs.clear();
+	a->frames = 0;
+	a->last = time;
 }
 
 #endif  // __CM_WORK_COUNTERS_H__

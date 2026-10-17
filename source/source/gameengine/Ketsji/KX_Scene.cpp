@@ -2750,6 +2750,9 @@ void KX_Scene::UpdateParents()
 
 	int updatedNodes = 0;
 	while ((node = SG_Node::GetNextScheduled(m_sghead))) {
+		if (CM_WorkAuditGet()) {
+			CM_WorkAuditCount(true, static_cast<KX_GameObject *>(node->GetClientObject())->GetName());
+		}
 		node->UpdateWorldData();
 		++updatedNodes;
 	}

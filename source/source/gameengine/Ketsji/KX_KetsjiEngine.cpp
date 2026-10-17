@@ -453,6 +453,7 @@ void KX_KetsjiEngine::StartEngine()
 void KX_KetsjiEngine::BeginFrame()
 {
 	CM_WorkCountersSwap();
+	CM_WorkAuditFrame(GetClockTime());
 
 	if (m_flags & SHOW_RENDER_QUERIES) {
 		m_logger.StartLog(tc_overhead);

@@ -1722,6 +1722,9 @@ void KX_GameObject::UpdateActivity(float distance)
 void KX_GameObject::UpdateTransform()
 {
 	CM_WorkCount(CM_WORK_TRANSFORM_SYNCS);
+	if (CM_WorkAuditGet()) {
+		CM_WorkAuditCount(false, GetName());
+	}
 	// HACK: saves function call for dynamic object, they are handled differently
 	if (m_physicsController && !m_physicsController->IsDynamic()) {
 		m_physicsController->SetTransform();
