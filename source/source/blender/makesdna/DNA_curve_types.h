@@ -301,6 +301,8 @@ enum {
 	CU_MAP_TAPER          = 1 << 15,
 	/** Font: draw in the 3D view the way KX_FontObject draws it in game (BLF glyphs) */
 	CU_GAME_TEXT_PREVIEW  = 1 << 16,
+	/** Font: with the game text preview on, also hide the regular curve text */
+	CU_GAME_TEXT_HIDE_CURVE = 1 << 17,
 };
 
 /* Curve.twist_mode */

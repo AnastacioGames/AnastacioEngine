@@ -5466,9 +5466,13 @@ static bool draw_game_text_preview(Main *bmain, Scene *scene, Base *base,
 		BLF_shadow_offset(fontid, cu->shadow_offx, cu->shadow_offy);
 	}
 
+	/* Write depth for the glyph pixels only (alpha test), so meshes drawn later in
+	 * the same pass don't paint over the text; the transparent quad parts are discarded. */
 	glDisable(GL_LIGHTING);
 	glDisable(GL_CULL_FACE);
-	glDepthMask(GL_FALSE);
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, 0.1f);
+	glDepthMask(GL_TRUE);
 	glColor4fv(color);
 
 	BLF_enable(fontid, flags);
@@ -5486,7 +5490,8 @@ static bool draw_game_text_preview(Main *bmain, Scene *scene, Base *base,
 	}
 	BLF_disable(fontid, flags);
 
-	glDepthMask(GL_TRUE);
+	glAlphaFunc(GL_ALWAYS, 0.0f);
+	glDisable(GL_ALPHA_TEST);
 
 	/* the glyphs have no outline: show selection with the bounds instead */
 	if (base->flag & SELECT) {
@@ -8082,7 +8087,13 @@ static void draw_object_selected_outline(
 
 	glDepthMask(0);
 
-	if (ELEM(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
+	if (ob->type == OB_FONT &&
+	    (((Curve *)ob->data)->flag & (CU_GAME_TEXT_PREVIEW | CU_GAME_TEXT_HIDE_CURVE)) ==
+	    (CU_GAME_TEXT_PREVIEW | CU_GAME_TEXT_HIDE_CURVE))
+	{
+		/* curve text hidden by the game text preview: no curve outline either */
+	}
+	else if (ELEM(ob->type, OB_FONT, OB_CURVE, OB_SURF)) {
 		bool has_faces = false;
 
 #ifdef SEQUENCER_DAG_WORKAROUND
@@ -8597,7 +8608,8 @@ static void draw_object_impl(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d
 					}
 				}
 				else if (ED_view3d_boundbox_clip(rv3d, ob->bb)) {
-					if (!draw_game_text_preview(bmain, scene, base, dflag, ob_wire_col)) {
+					const bool game_text = draw_game_text_preview(bmain, scene, base, dflag, ob_wire_col);
+					if (!game_text || (cu->flag & CU_GAME_TEXT_HIDE_CURVE) == 0) {
 						empty_object = drawDispList(bmain, scene, v3d, rv3d, base, dt, dflag, ob_wire_col);
 					}
 				}

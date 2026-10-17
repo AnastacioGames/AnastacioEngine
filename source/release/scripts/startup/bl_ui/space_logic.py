@@ -38,6 +38,8 @@ class LOGIC_PT_properties(Panel):
 
         if is_font:
             layout.prop(ob.data, "use_game_text_preview")
+            if ob.data.use_game_text_preview:
+                layout.prop(ob.data, "use_game_text_hide_curve")
             prop_index, prop_indexR = game.properties.find("Text"), game.properties.find("Text-Res")
 
             if prop_index != -1:

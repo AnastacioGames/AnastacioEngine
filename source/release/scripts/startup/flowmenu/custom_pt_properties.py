@@ -279,6 +279,8 @@ class CUSTOM_PT_game_properties(Panel):
 
         if is_font:
             layout.prop(ob.data, "use_game_text_preview")
+            if ob.data.use_game_text_preview:
+                layout.prop(ob.data, "use_game_text_hide_curve")
             self._draw_text_props(layout, game)
 
         row = layout.row(align=True)

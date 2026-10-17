@@ -553,7 +553,11 @@ class DATA_PT_game_text_viewport(GameTextPanel, Panel):
 
         box = self.layout.box()
         box.label(text="Viewport:", icon="RESTRICT_VIEW_OFF")
-        box.prop(text, "use_game_text_preview")
+        row = box.row()
+        row.prop(text, "use_game_text_preview")
+        sub = row.row()
+        sub.active = text.use_game_text_preview
+        sub.prop(text, "use_game_text_hide_curve")
         if context.object:
             # KX_FontObject uses the object color, not the material.
             box.label(text="Text Color:")

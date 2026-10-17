@@ -1078,6 +1078,13 @@ static void rna_def_font(BlenderRNA *UNUSED(brna), StructRNA *srna)
 	                         "Draw the text in the 3D View the way the game draws it (font glyphs at the "
 	                         "Text-Res resolution, object color, Text property); edit mode still shows the curve");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+	prop = RNA_def_property(srna, "use_game_text_hide_curve", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_GAME_TEXT_HIDE_CURVE);
+	RNA_def_property_ui_text(prop, "Hide Original Text",
+	                         "With Preview Game Text on, hide the regular 3D curve text (and its selection "
+	                         "outline) so only the game text is drawn");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
 
 	/* strings */
 	prop = RNA_def_property(srna, "family", PROP_STRING, PROP_NONE);
