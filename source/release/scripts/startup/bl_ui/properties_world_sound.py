@@ -76,6 +76,35 @@ def _module(context, index):
     return None
 
 
+def _engine_datafiles_dir():
+    """Pasta datafiles instalada com a engine (sons de exemplo ficam em datafiles/sounds)."""
+    base = bpy.utils.resource_path('LOCAL')
+    return os.path.normpath(os.path.join(base, "datafiles", "sounds"))
+
+
+def _localize_engine_sound(path):
+    """Se o arquivo escolhido vem de dentro da engine (datafiles/sounds), copia para a pasta
+    do projeto: o jogo exportado so leva o que esta em data/ do projeto, nao o instalador da
+    engine. Devolve o caminho a usar (copiado, ou o original se nao for da engine)."""
+    abs_path = os.path.abspath(path)
+    engine_dir = _engine_datafiles_dir()
+    try:
+        inside_engine = os.path.commonpath([abs_path, engine_dir]) == engine_dir
+    except ValueError:  # outra unidade no Windows
+        inside_engine = False
+    if not inside_engine or not bpy.data.is_saved:
+        return path
+
+    import shutil
+    project_dir = os.path.dirname(bpy.data.filepath)
+    dest_dir = os.path.join(project_dir, "sounds")
+    os.makedirs(dest_dir, exist_ok=True)
+    dest_path = os.path.join(dest_dir, os.path.basename(abs_path))
+    if not os.path.exists(dest_path):
+        shutil.copy2(abs_path, dest_path)
+    return dest_path
+
+
 class WORLD_OT_sound_module_add(Operator):
     """Add a sound module to the World"""
     bl_idname = "world.sound_module_add"
@@ -164,6 +193,7 @@ class WORLD_OT_sound_entry_add(Operator):
             if not item.name:
                 continue
             path = os.path.join(self.directory, item.name)
+            path = _localize_engine_sound(path)
             if self.relative_path and bpy.data.is_saved:
                 try:
                     path = bpy.path.relpath(path)
@@ -303,7 +333,6 @@ def _draw_module(layout, module, index):
 
     col = box.column()
     col.active = not module.mute
-    col.prop(module, "type")
     row = col.row(align=True)
     row.prop(module, "volume", slider=True)
     if module.type == 'EFFECTS':
