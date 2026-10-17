@@ -1104,7 +1104,11 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
         box = layout.box()
         box.label(text="Shader Compilation:", icon="SCRIPT")
         box.prop(gs, "use_fast_shader_loading")
-        if gs.use_fast_shader_loading:
+        show = getattr(context.scene, "ae_fast_shader_show_help", True)
+        if gs.use_fast_shader_loading and hasattr(context.scene, "ae_fast_shader_show_help"):
+            box.prop(context.scene, "ae_fast_shader_show_help", text="Gain & Loss",
+                     icon='TRIA_DOWN' if show else 'TRIA_RIGHT', emboss=False)
+        if gs.use_fast_shader_loading and show:
             col = box.column(align=True)
             col.label(text="Gain: materials differing only in colors/values share one shader,", icon="TIME")
             col.label(text="      so the game loads much faster (800 materials: 64 s to 5 s).")
@@ -1132,25 +1136,31 @@ class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
 
         settings_box = layout.box()
         settings_box.prop(scene, "ae_ssgi_use", text="Use in Game")
-        settings_box.label(text="Desktop only; restart Play after changes", icon='INFO')
-        if not scene.game_settings.use_shading_nodes:
-            settings_box.label(text="Enable PBR Shading Nodes in Shading", icon='ERROR')
-        slots = list(scene.game_settings.attachment_slots)
-        if any(slot is not None for slot in slots[3:]):
-            settings_box.label(text="Needs the last four attachment slots free", icon='ERROR')
 
-        help_box = layout.box()
-        row = help_box.row(align=True)
-        row.prop(scene, "ae_ssgi_show_help", text="Requirements & Limits",
-                 icon='TRIA_DOWN' if scene.ae_ssgi_show_help else 'TRIA_RIGHT', emboss=True)
+        # Everything informative stays behind one flat disclosure row.
+        settings_box.separator()
+        settings_box.prop(scene, "ae_ssgi_show_help", text="Requirements & Limits",
+                          icon='TRIA_DOWN' if scene.ae_ssgi_show_help else 'TRIA_RIGHT',
+                          emboss=False)
         if scene.ae_ssgi_show_help:
-            help_box.label(text="Requires: desktop, PBR Shading Nodes and opaque supported materials.", icon='INFO')
-            help_box.label(text="Material: Principled/Diffuse directly to Output, or a simple material.")
-            help_box.label(text="World/Sky is optional; Environment Lighting fills fully dark areas.")
-            help_box.label(text="Direct visible lights bounce; Sky/World itself is not an SSGI source.")
-            help_box.label(text="Screen-space: hidden or offscreen surfaces cannot contribute.", icon='ERROR')
-            help_box.label(text="Baked Lightmaps/Volumes stay active; baked receivers are excluded.")
-            help_box.label(text="No transparency, emission, or complex/custom material graphs.")
+            if not scene.game_settings.use_shading_nodes:
+                settings_box.label(text="Enable PBR Shading Nodes in Shading", icon='ERROR')
+            slots = list(scene.game_settings.attachment_slots)
+            if any(slot is not None for slot in slots[3:]):
+                settings_box.label(text="Needs the last four attachment slots free", icon='ERROR')
+            col = settings_box.column(align=True)
+            col.scale_y = 0.8
+            for line in (
+                "Requires desktop and opaque materials",
+                "Restart Play after changing these settings",
+                "Material: Principled/Diffuse to Output, or a simple material",
+                "No transparency, emission or complex/custom node graphs",
+                "Direct visible lights bounce; Sky/World is not a source",
+                "World/Sky optional; Environment Lighting fills dark areas",
+                "Baked Lightmaps/Volumes stay; baked receivers are excluded",
+                "Screen-space: hidden/offscreen surfaces can't contribute",
+            ):
+                col.label(text="•  " + line)
 
         quality_box = layout.box()
         quality_box.label(text="Quality:", icon='PREFERENCES')

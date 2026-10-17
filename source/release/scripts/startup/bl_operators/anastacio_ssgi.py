@@ -76,6 +76,8 @@ def register_props():
         description="Screen-space indirect light for opaque Principled materials (desktop); enable before Play")
     bpy.types.Scene.ae_ssgi_show_help = BoolProperty(name="Requirements & Limits", default=False,
         description="Show Native SSGI requirements and limitations")
+    bpy.types.Scene.ae_fast_shader_show_help = BoolProperty(name="Gain & Loss", default=True,
+        description="Show what Fast Shader Loading gains and loses")
     bpy.types.Scene.ae_ssgi_quality = EnumProperty(name="Quality", default='CUSTOM', items=(
         ('LOW', "Low", "4 rays, 8 steps, quarter resolution"),
         ('MEDIUM', "Medium", "6 rays, 12 steps, half resolution"),
