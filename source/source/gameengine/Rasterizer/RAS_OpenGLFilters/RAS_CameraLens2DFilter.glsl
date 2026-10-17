@@ -5,7 +5,7 @@ out vec4 fragColor;
   #define gl_FragColor fragColor
 #endif
 
-// Camera FX, pass B: speed blur (radial, centered on the focus), directional blur (camera turn),
+// Camera FX, pass B: speed blur (radial, centered on the focus), camera motion blur (reprojection),
 // chromatic aberration and vignette / fisheye, in a single pass. Values from KX_Camera::UpdateGameFX.
 uniform sampler2D bgl_RenderedTexture;
 uniform sampler2D bgl_DepthTexture;
@@ -15,10 +15,11 @@ uniform float bgl_RenderedTextureHeight;
 // [0] focus distance, focus range, near, far
 // [1] max blur (px), rings, cat eye strength, perspective
 // [2] speed blur, focus x, focus y (bottom-up), protect
-// [3] turn x, turn y (screen fraction), unused, unused
+// [3] motion blur scale (x one frame of motion), max trail (screen fraction), unused, unused
 // [4] chromatic, vignette, vignette radius, fisheye
 // [5] blades, grain strength, grain seed, unused
-uniform vec4 ge_CameraFX[6];
+// [6..9] reprojection matrix columns: this frame's clip space -> last frame's clip space
+uniform vec4 ge_CameraFX[10];
 
 float linearDepth(vec2 uv)
 {
@@ -64,8 +65,8 @@ void main()
 	vec2 chromaShift = v * length(v) * chroma * 0.02;
 
 	float speed = ge_CameraFX[2].x;
-	vec2 turn = ge_CameraFX[3].xy;
-	bool blur = speed > 0.0 || dot(turn, turn) > 1e-8;
+	float motionScale = ge_CameraFX[3].x;
+	bool blur = speed > 0.0 || motionScale > 0.0;
 
 	// Keep the focus band sharp so the target (car) is not smeared with the scenery.
 	float blurMask = 1.0;
@@ -80,12 +81,27 @@ void main()
 		vec2 focus = ge_CameraFX[2].yz;
 		// Radial streaks grow away from the focus point.
 		vec2 radial = (uv - focus) * speed * 0.12;
-		vec2 dir = turn;
+		// Screen motion of this pixel since the last frame, from its depth: one-sided trail toward
+		// where it was, so turns and travel smear without the two-sided "ghost" copies.
+		vec2 motion = vec2(0.0);
+		if (motionScale > 0.0) {
+			float d = texture(bgl_DepthTexture, uv).r;
+			mat4 reproject = mat4(ge_CameraFX[6], ge_CameraFX[7], ge_CameraFX[8], ge_CameraFX[9]);
+			vec4 prev = reproject * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+			if (prev.w > 1e-5) {
+				motion = (uv - (prev.xy / prev.w * 0.5 + 0.5)) * motionScale;
+				float len = length(motion);
+				float maxLen = ge_CameraFX[3].y;
+				if (len > maxLen) {
+					motion *= maxLen / len;
+				}
+			}
+		}
 		// Sample count follows the streak length in pixels, so consecutive samples stay ~2 px apart.
 		// With a fixed count a long streak shows up as discrete ghost copies of the scene, visible
 		// as horizontal bands at the top and bottom of the screen.
 		vec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);
-		vec2 streak = (abs(radial) + abs(dir) * 0.5) * blurMask * res;
+		vec2 streak = (abs(radial) + abs(motion)) * blurMask * res;
 		const int MAX_SAMPLES = 32;
 		int samples = int(clamp(length(streak) * 0.5, 4.0, float(MAX_SAMPLES)));
 		// Per-pixel jitter of the sample positions (interleaved gradient noise) hides what is left.
@@ -98,7 +114,7 @@ void main()
 				break;
 			}
 			float t = (float(i) + jitter) / float(samples);
-			vec2 offset = (-radial * t + dir * (t - 0.5)) * blurMask;
+			vec2 offset = -(radial + motion) * t * blurMask;
 			float w = 1.0 - t * 0.5;
 			sum += fetchColor(uv + offset, chromaShift) * w;
 			weight += w;

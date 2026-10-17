@@ -919,7 +919,7 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 
 	if (m_predefinedUniforms[GE_CAMERAFX_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_CAMERAFX_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.camera_fx,
-		             sizeof(float) * 24, 6);
+		             sizeof(float) * 40, 10);
 	}
 
 	/* GameObject Uniforms */

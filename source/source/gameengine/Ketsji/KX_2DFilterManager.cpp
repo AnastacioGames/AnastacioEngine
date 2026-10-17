@@ -25,6 +25,8 @@
  */
 
 #include "KX_2DFilterManager.h"
+
+#include <cmath>
 #include "RAS_ICanvas.h"
 
 #include "CM_Message.h"
@@ -529,11 +531,11 @@ void KX_2DFilterManager::PrepareCameraFX(KX_Scene *scene)
 	}
 }
 
-void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
+void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera, double time)
 {
 	bool useDof = false;
 	bool useLens = false;
-	float fx[24] = {0.0f};
+	float fx[40] = {0.0f};
 
 	const bool grain = m_useGrain && m_grainStrength > 0.0f;
 	if (grain) {
@@ -550,14 +552,37 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		const float speed = camera->GetCameraSpeed();
 		const float speedFactor = std::min(speed / std::max(gfx.speedBlurMaxSpeed, 0.1f), 1.0f);
 		const mt::vec2& screen = camera->GetFocusScreenPosition();
-		const mt::vec2& turn = camera->GetCameraTurn();
+
+		/* Camera motion blur: reprojection from this frame's view-projection to the last one, so the
+		 * shader gets each pixel's real screen motion from its depth (turn and travel alike, one-sided
+		 * trail). A new camera or the first frame has no history and draws no blur. */
+		const RAS_Rasterizer::StereoEye eye = RAS_Rasterizer::RAS_STEREO_LEFTEYE;
+		const mt::mat4 viewProj = camera->GetProjectionMatrix(eye) * camera->GetModelviewMatrix(eye);
+		const bool history = (m_prevFXCamera == camera);
+		bool moved = false;
+		if (history) {
+			for (int c = 0; c < 4 && !moved; ++c) {
+				for (int r = 0; r < 4; ++r) {
+					if (std::abs(viewProj(r, c) - m_prevViewProj(r, c)) > 1e-6f) {
+						moved = true;
+						break;
+					}
+				}
+			}
+		}
+		const mt::mat4 reproject = history ? m_prevViewProj * viewProj.Inverse() : mt::mat4::Identity();
+		// One frame's motion scaled to a 60 fps frame, so the trail length does not follow the frame rate.
+		const double frameDelta = time - m_prevFXTime;
+		const float fpsScale = (history && frameDelta > 0.0) ?
+			std::min(std::max((float)((1.0 / 60.0) / frameDelta), 0.25f), 2.0f) : 1.0f;
+		m_prevViewProj = viewProj;
+		m_prevFXCamera = camera;
+		m_prevFXTime = time;
 
 		useDof = (gfx.flag & CAM_GFX_DOF) && gfx.dofBlur > 0.0f;
 		const bool speedBlur = (gfx.flag & CAM_GFX_SPEEDBLUR) && gfx.speedBlurStrength > 0.0f;
-		/* Only while the camera turns: with turn 0 the shader just copies the screen, a full screen pass
-		 * every frame for nothing (same threshold as the shader's blur test). */
-		const bool dirBlur = (gfx.flag & CAM_GFX_DIRBLUR) && gfx.dirBlurStrength > 0.0f &&
-		                     (turn.x * turn.x + turn.y * turn.y) * gfx.dirBlurStrength * gfx.dirBlurStrength * 16.0f > 1e-8f;
+		// Only while the camera moves: a still camera would run a full screen pass that just copies the screen.
+		const bool dirBlur = (gfx.flag & CAM_GFX_DIRBLUR) && gfx.dirBlurStrength > 0.0f && moved;
 		const bool chroma = (gfx.flag & CAM_GFX_CHROMA) && gfx.chromaStrength > 0.0f;
 		const bool vignette = (gfx.flag & CAM_GFX_VIGNETTE) &&
 		                      (gfx.vignetteStrength > 0.0f || gfx.fisheyeStrength != 0.0f);
@@ -579,13 +604,14 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 		fx[10] = 1.0f - screen.y;
 		fx[11] = (gfx.flag & CAM_GFX_BLUR_PROTECT) ? 1.0f : 0.0f;
 		if (dirBlur) {
-			mt::vec2 dir = turn * gfx.dirBlurStrength * 4.0f;
-			const float len = dir.Length();
-			if (len > gfx.dirBlurMax && len > 0.0f) {
-				dir *= gfx.dirBlurMax / len;
+			// Trail length as a multiple of one frame's motion, capped as a screen fraction.
+			fx[12] = gfx.dirBlurStrength * 2.0f * fpsScale;
+			fx[13] = gfx.dirBlurMax;
+			for (int c = 0; c < 4; ++c) {
+				for (int r = 0; r < 4; ++r) {
+					fx[24 + c * 4 + r] = reproject(r, c);
+				}
 			}
-			fx[12] = dir.x;
-			fx[13] = dir.y;
 		}
 		float chromaAmount = chroma ? gfx.chromaStrength : 0.0f;
 		if (chroma && (gfx.flag & CAM_GFX_CHROMA_SPEED)) {
@@ -622,7 +648,7 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 
 	for (RAS_2DFilter *filter : {dof, lens}) {
 		if (filter && filter->GetEnabled()) {
-			std::copy(fx, fx + 24, filter->GetBuildInFilters()->camera_fx);
+			std::copy(fx, fx + 40, filter->GetBuildInFilters()->camera_fx);
 		}
 	}
 }

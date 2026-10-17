@@ -946,7 +946,7 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 	KX_2DFilterManager *filterManager = scene->Get2DFilterManager();
 	if (filterManager) {
 		// Camera FX (focus DOF, speed/directional blur, cat eye lens) of the active camera.
-		filterManager->UpdateCameraFX(scene->GetActiveCamera());
+		filterManager->UpdateCameraFX(scene->GetActiveCamera(), m_engine->GetClockTime());
 	}
 	RAS_2DFilter *flareFilter = filterManager ? filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_LENSFLARE, true) : nullptr;
 

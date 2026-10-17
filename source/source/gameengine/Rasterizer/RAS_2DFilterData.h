@@ -183,8 +183,8 @@ typedef struct BuildInFilters {
 	float flare_sun_x;
 	float flare_sun_y;
 
-	/* Camera FX (active camera game_fx): 6 vec4 of ge_CameraFX, see RAS_CameraDof2DFilter.glsl */
-	float camera_fx[24];
+	/* Camera FX (active camera game_fx): 10 vec4 of ge_CameraFX, see RAS_CameraLens2DFilter.glsl */
+	float camera_fx[40];
 
 } BuildInFilters;
 

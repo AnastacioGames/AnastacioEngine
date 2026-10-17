@@ -31,6 +31,7 @@
 #include "KX_2DFilter.h"
 #include "KX_2DFilterOffScreen.h"
 #include "EXP_PyObjectPlus.h"
+#include "mathfu.h"
 
 class KX_Camera;
 class KX_Scene;
@@ -69,7 +70,7 @@ public:
 
 	/** Camera FX of the active camera: adds/removes the DOF and Lens passes when the set of enabled
 	 * effects changes (so everything off costs no pass) and uploads this frame's values. */
-	void UpdateCameraFX(KX_Camera *camera);
+	void UpdateCameraFX(KX_Camera *camera, double time);
 	/** Scene load, inside a shader prefetch pass: sends the programs of the Camera FX passes the scene's cameras
 	 * use to the driver, compiled together with the materials. */
 	void PrefetchCameraFX(KX_Scene *scene);
@@ -94,6 +95,10 @@ private:
 	/** Film Grain, a scene post-process drawn in the camera lens pass. */
 	bool m_useGrain;
 	float m_grainStrength;
+	/// View-projection of the last Camera FX frame, for the camera motion blur reprojection.
+	mt::mat4 m_prevViewProj;
+	KX_Camera *m_prevFXCamera = nullptr;
+	double m_prevFXTime = 0.0;
 	/** Scene FXAA settings, for an FXAA pass built later from Python. */
 	BuildInFilters m_sceneFilters;
 	/** The FXAA pass, built (disabled) when missing. Its parameters hold the scene values. */

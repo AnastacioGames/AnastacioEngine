@@ -17,7 +17,7 @@ uniform float bgl_RenderedTextureHeight;
 // [3] turn x, turn y, directional blur on, unused
 // [4] chromatic, vignette, vignette radius, fisheye
 // [5] blades, unused, unused, unused
-uniform vec4 ge_CameraFX[6];
+uniform vec4 ge_CameraFX[10];
 
 float linearDepth(vec2 uv)
 {
