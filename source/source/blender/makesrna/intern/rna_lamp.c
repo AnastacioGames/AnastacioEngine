@@ -996,8 +996,9 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_csm_auto_bias", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "csm_flag", LA_CSM_AUTO_BIAS);
 	RNA_def_property_ui_text(prop, "Auto Bias",
-	                         "Derive each cascade's bias and slope bias from its shadow texel size "
-	                         "(Bias becomes a strength, 1 = default); Simple buffers only");
+	                         "Derive each cascade's bias from its shadow texel size "
+	                         "(Bias becomes a strength, 1 = default); Simple buffers also get a "
+	                         "slope-based normal offset, Variance buffers get a variance floor");
 	RNA_def_property_update(prop, 0, "rna_Lamp_update");
 
 	prop = RNA_def_property(srna, "use_csm_debug", PROP_BOOLEAN, PROP_NONE);

@@ -173,7 +173,7 @@ class GAME_PT_game_properties(GameButtonsPanel, Panel):
                     prop = game.properties[prop_indexR]
                     sub.prop(prop, "name", text="", icon="FONT_DATA")
                     row.prop(prop, "value", text="Resolution")
-                    row.label("Text Resolution(0 - 50)")
+                    row.label("Text Resolution(0 - 18)")
                 else:
                     sub = row.row(align=True)
                     propsR = sub.operator("object.game_property_new", text="", icon='ZOOMIN',)
@@ -1781,6 +1781,35 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
             box.label(text="Speaker objects only; frames skipped between updates, 0 = every frame", icon='INFO')
 
 
+# Abas Network / RangeArmor / Web / Android no topo da aba Export Game: so estado da tela (WindowManager), nao vai para o .range.
+bpy.types.WindowManager.ae_export_panel_category = EnumProperty(
+    name="Export Panels",
+    items=(
+        ('NETWORK', "Network", "Room, ports and server for multiplayer", 'NETWORK', 0),
+        ('RANGEARMOR', "Export", "Desktop builds with RangeArmor", 'DESKTOP', 1),
+        ('WEB', "Web", "Package and touch controls for the Web runtime", 'WEB', 2),
+        ('ANDROID', "Android", "App settings for the Android (Web) runtime", 'ANDROID', 3),
+    ),
+    default='NETWORK',
+)
+
+
+def export_category_is(context, category):
+    return context.window_manager.ae_export_panel_category == category
+
+
+class SCENE_PT_export_category(SceneButtonsPanel, Panel):
+    bl_label = "Export Panels"
+    bl_context = "export"
+    bl_options = {'HIDE_HEADER', 'PIN_TO_TOP'}
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    def draw(self, context):
+        row = self.layout.row(align=True)
+        row.scale_y = 1.2
+        row.prop(context.window_manager, "ae_export_panel_category", expand=True)
+
+
 class SCENE_PT_game_network(SceneButtonsPanel, Panel):
     bl_label = "Network"
     # Export Game tab: the room settings (ports, server, game id) belong with how the game is shipped.
@@ -1790,7 +1819,8 @@ class SCENE_PT_game_network(SceneButtonsPanel, Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.scene.render.engine in cls.COMPAT_ENGINES
+        return (context.scene.render.engine in cls.COMPAT_ENGINES and
+                export_category_is(context, 'NETWORK'))
 
     def draw_header(self, context):
         self.layout.label(text="", icon='NETWORK')
@@ -2175,8 +2205,8 @@ def _shadow_flags(lamp):
     is_point = lamp.type == 'POINT'
     is_simple = is_point or lamp.ge_shadow_buffer_type == "SIMPLE"
     use_csm = lamp.type == 'SUN' and lamp.use_csm_shadow
-    # Auto Bias: CSM + Simple buffer only (VSM keeps its own bias meaning).
-    auto_bias = use_csm and is_simple and lamp.use_csm_auto_bias
+    # Auto Bias: CSM only; works for both Simple (depth+slope) and Variance (variance floor).
+    auto_bias = use_csm and lamp.use_csm_auto_bias
     return is_point, is_simple, use_csm, auto_bias
 
 
@@ -2212,12 +2242,15 @@ def _draw_shadow_buffer(layout, lamp):
     layout.separator()
     row = layout.row()
     row.label("Bias:")
-    if use_csm and is_simple:
+    if use_csm:
         row.prop(lamp, "use_csm_auto_bias", text="Auto")
     row = layout.row(align=True)
     if auto_bias:
         row.prop(lamp, "shadow_buffer_bias", text="Strength")
         layout.label("Follows each cascade's texel size", icon='INFO')
+        if not is_simple:
+            row = layout.row(align=True)
+            row.prop(lamp, "shadow_buffer_bleed_bias", text="Bleed Bias")
     elif use_csm:
         # Per-cascade Bias is in the cascade table; Slope/Bleed bias is lamp-wide.
         if is_simple:
@@ -2260,7 +2293,7 @@ def _draw_shadow_csm(layout, lamp):
             ("Medium", "shadow_csm_two_buffer_size", "shadow_buffer_bias_two")]
     if not two_cascades:
         rows.append(("Low", "shadow_csm_three_buffer_size", "shadow_buffer_bias_three"))
-    show_bias = is_simple and not auto_bias
+    show_bias = not auto_bias
     col = layout.column(align=True)
     split = col.split(factor=0.3)
     split.label("")
@@ -2452,16 +2485,15 @@ class OBJECT_MT_culling(ObjectButtonsPanel, Panel):
 
 class OBJECT_PT_game_network(GameButtonsPanel, Panel):
     bl_label = "Network"
-    bl_context = "object"
     bl_options = {'DEFAULT_CLOSED'}
+    bl_order = -20
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
         ob = context.object
         return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
-                and ob.type not in {'CAMERA'} and
-                context.window_manager.ae_object_panel_category == 'GAME')
+                and ob.type not in {'CAMERA'})
 
     def draw(self, context):
         layout = self.layout
@@ -2485,15 +2517,14 @@ class OBJECT_PT_game_network(GameButtonsPanel, Panel):
 
 class OBJECT_PT_activity_culling(GameButtonsPanel, Panel):
     bl_label = "Activity Culling"
-    bl_context = "object"
     bl_options = {'DEFAULT_CLOSED'}
+    bl_order = -19
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
     def poll(cls, context):
         ob = context.object
-        return (context.scene.render.engine in cls.COMPAT_ENGINES and ob.type not in {'CAMERA'} and
-                context.window_manager.ae_object_panel_category == 'GAME')
+        return (context.scene.render.engine in cls.COMPAT_ENGINES and ob.type not in {'CAMERA'})
 
     def draw(self, context):
         layout = self.layout
@@ -2810,7 +2841,7 @@ bpy.types.Scene.lod_impostor_bake_angles = EnumProperty(
 
 
 class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
-    bl_label = "Levels of Detail"
+    bl_label = "Levels of Detail - LOD"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     @classmethod
@@ -2989,6 +3020,7 @@ classes = (
     RENDER_PT_game_animations,
 	RENDER_UL_attachments,
     SCENE_PT_game_physics,
+    SCENE_PT_export_category,
     SCENE_PT_game_network,
     SCENE_PT_game_navmesh,
     WORLD_PT_game_context_world,
@@ -3000,13 +3032,13 @@ classes = (
     DATA_PT_light_culling_game,
     OBJECT_MT_lod_tools,
     OBJECT_OT_game_load_with_scene,
+    OBJECT_OT_bake_lod_impostor,
+    OBJECT_PT_levels_of_detail,
     OBJECT_PT_game_object_tasks,
     OBJECT_MT_culling,
     OBJECT_PT_game_network,
     OBJECT_PT_activity_culling,
-    OBJECT_OT_bake_lod_impostor,
-    OBJECT_PT_levels_of_detail,
-    OBJECT_PT_animation_events, 
+    OBJECT_PT_animation_events,
 )
 
 bpy.types.Scene.show_expanded_game_cursor = bpy.props.BoolProperty(name="Expanded", default=False)

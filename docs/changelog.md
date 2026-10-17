@@ -6,6 +6,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-17 - CSM Auto Bias também para Variance (VSM)
+
+- `gpu_lamp_csm_auto_bias()` deixou de excluir VSM: a mesma análise de "um texel de profundidade por
+  cascata" agora alimenta o parâmetro que o shader VSM já usava (`test_shadow_vsm()` lê `bias` como
+  10x o piso de variância). Para Simple o cálculo continua igual (bias de profundidade + slope bias
+  em espaço de mundo); para Variance, o piso de variância vira `10 * texelDepth²`, onde `texelDepth`
+  é o mesmo erro de profundidade de 1 texel usado no slope bias do Simple. Slope bias continua sem
+  efeito no VSM (shader não recebe esse parâmetro).
+- UI (`properties_game.py`): `Auto` no painel Bias agora aparece com CSM ligado em qualquer tipo de
+  buffer (antes só Simple); com Auto ativo em VSM, `Bleed Bias` continua editável ao lado de
+  `Strength`. A tabela de cascatas também passou a mostrar o Bias manual por cascata quando Auto está
+  desligado, mesmo em VSM (antes a coluna ficava sempre oculta para VSM, mas o shader já lia esse
+  valor por cascata).
+- Fatores ainda sem validação visual (igual ao Auto Bias do Simple, 2026-10-16).
+
 ## 2026-10-17 - Splash: apoio à Anastacio Engine e à Range Engine
 
 - A barra inferior da splash agora exibe dois botões Patreon identificados separadamente: `Patreon Anastacio`

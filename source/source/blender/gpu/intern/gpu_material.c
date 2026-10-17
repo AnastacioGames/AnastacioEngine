@@ -5433,16 +5433,25 @@ void GPU_lamp_update_buffer_mats(GPULamp *lamp)
 	gpu_lamp_update_persmat(lamp);
 }
 
-/* CSM Auto Bias: shadow acne is one shadow texel of depth error, so derive the depth bias and
- * the normal offset from this cascade's texel size instead of the fixed Bias value. winmat is
- * the cascade's orthographic projection: width = 2 / m[0][0], depth range = 2 / m[2][2].
- * la->bias (default 1) scales both. Cheap enough to run on every cascade bind. VSM keeps its
- * own bias meaning and is left untouched. */
+/* CSM Auto Bias: shadow acne is one shadow texel of depth error, so derive the depth bias (and,
+ * for Simple buffers, the normal offset) from this cascade's texel size instead of the fixed
+ * Bias value. winmat is the cascade's orthographic projection: width = 2 / m[0][0], depth range
+ * = 2 / m[2][2]. la->bias (default 1) scales the result. Cheap enough to run on every cascade
+ * bind.
+ *
+ * Simple buffers compare a single depth sample, so the bias is a depth offset (lamp->bias) plus
+ * a world-space normal offset (lamp->slopebias) that follows the surface slope.
+ *
+ * Variance buffers instead clamp Chebyshev's variance term (test_shadow_vsm() in
+ * gpu_shader_material.glsl reads lamp->bias as 10x the variance floor) to suppress acne on flat
+ * surfaces; there is no separate sample position to offset, so slopebias is unused. One texel of
+ * depth error in the same normalized Z this shader compares against (texelDepth, matching the
+ * un-halved quantity used for Simple's slopebias) gives a depth-squared floor of texelDepth^2. */
 static void gpu_lamp_csm_auto_bias(GPULamp *lamp)
 {
 	Lamp *la = lamp->la;
 	if (la->type != LA_SUN || la->shadow_cascade_count == 0 || !(la->csm_flag & LA_CSM_AUTO_BIAS) ||
-	    la->shadowmap_type == LA_SHADMAP_VARIANCE || lamp->size <= 0)
+	    lamp->size <= 0)
 	{
 		return;
 	}
@@ -5454,8 +5463,15 @@ static void gpu_lamp_csm_auto_bias(GPULamp *lamp)
 	const float texel = (2.0f / sx) / (float)lamp->size;
 	const float depthRange = 2.0f / sz;
 	const float strength = max_ff(la->bias, 0.0f);
+	const float texelDepth = strength * texel / depthRange;
+
+	if (la->shadowmap_type == LA_SHADMAP_VARIANCE) {
+		lamp->bias = max_ff(10.0f * texelDepth * texelDepth, 1e-6f);
+		return;
+	}
+
 	/* Half a texel of depth (the shader adds the slope term), plus a 1-texel normal offset. */
-	lamp->bias = max_ff(0.5f * strength * texel / depthRange, 1e-6f);
+	lamp->bias = max_ff(0.5f * texelDepth, 1e-6f);
 	lamp->slopebias = strength * texel;
 }
 
