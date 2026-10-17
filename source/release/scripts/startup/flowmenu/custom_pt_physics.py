@@ -869,6 +869,11 @@ class CustomPhysicsButtonsPanel:
     bl_context = "physics"
 
 
+def _physics_tab_selected(context):
+    # Botao Physics do topo da aba (bl_ui/properties_game.py); no Damage so ficam Destruction/Explosive/Deformation.
+    return getattr(context.window_manager, "ae_physics_panel_category", 'PHYSICS') == 'PHYSICS'
+
+
 # ==============================================================================
 # PAINEL PRINCIPAL DE FÍSICA
 # ==============================================================================
@@ -881,7 +886,7 @@ class CUSTOM_PT_game_physics(CustomPhysicsButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.active_object
         rd = context.scene.render
-        return ob and ob.game and (rd.engine in cls.COMPAT_ENGINES)
+        return ob and ob.game and (rd.engine in cls.COMPAT_ENGINES) and _physics_tab_selected(context)
 
     def draw(self, context):
         layout = self.layout
@@ -1165,7 +1170,8 @@ class CUSTOM_PT_game_collision_bounds(CustomPhysicsButtonsPanel, Panel):
     def poll(cls, context):
         game = context.object.game
         rd = context.scene.render
-        return (rd.engine in cls.COMPAT_ENGINES) and (game.physics_type in {'SENSOR', 'STATIC', 'DYNAMIC', 'RIGID_BODY', 'CHARACTER', 'SOFT_BODY'})
+        return (rd.engine in cls.COMPAT_ENGINES) and _physics_tab_selected(context) \
+            and (game.physics_type in {'SENSOR', 'STATIC', 'DYNAMIC', 'RIGID_BODY', 'CHARACTER', 'SOFT_BODY'})
 
     def draw(self, context):
         layout = self.layout

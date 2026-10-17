@@ -613,6 +613,8 @@ class ANASTACIO_PT_ragdoll(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
+        if getattr(context.window_manager, 'ae_physics_panel_category', 'PHYSICS') != 'PHYSICS':
+            return False
         return context_rig(context) is not None
 
     def draw(self, context):

@@ -219,6 +219,38 @@ class PhysicsButtonsPanel:
     bl_region_type = 'WINDOW'
     bl_context = "physics"
 
+
+# Abas Physics / Damage no topo da aba Physics: so estado da tela (WindowManager), nao vai para o .range.
+bpy.types.WindowManager.ae_physics_panel_category = EnumProperty(
+    name="Physics Panels",
+    items=(
+        ('PHYSICS', "Physics", "Physics type, collision bounds and obstacles", 'PHYSICS', 0),
+        ('DAMAGE', "Damage", "Destruction, explosives and deformation", 'MOD_EXPLODE', 1),
+    ),
+    default='PHYSICS',
+)
+
+
+def physics_category_is(context, category):
+    return context.window_manager.ae_physics_panel_category == category
+
+
+class PHYSICS_PT_game_category(PhysicsButtonsPanel, Panel):
+    bl_label = "Physics Panels"
+    bl_options = {'HIDE_HEADER', 'PIN_TO_TOP'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob and ob.game and context.scene.render.engine in cls.COMPAT_ENGINES
+
+    def draw(self, context):
+        row = self.layout.row(align=True)
+        row.scale_y = 1.2
+        row.prop(context.window_manager, "ae_physics_panel_category", expand=True)
+
+
 class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
     bl_label = "Physics"
     COMPAT_ENGINES = {'BLENDER_GAME'}
@@ -227,7 +259,7 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.active_object
         rd = context.scene.render
-        return ob and ob.game and (rd.engine in cls.COMPAT_ENGINES)
+        return ob and ob.game and (rd.engine in cls.COMPAT_ENGINES) and physics_category_is(context, 'PHYSICS')
 
     def draw(self, context):
         layout = self.layout
@@ -496,6 +528,7 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, Panel):
         game = context.object.game
         rd = context.scene.render
         return (rd.engine in cls.COMPAT_ENGINES) \
+            and physics_category_is(context, 'PHYSICS') \
             and (game.physics_type in {'SENSOR', 'STATIC', 'DYNAMIC', 'RIGID_BODY', 'CHARACTER', 'SOFT_BODY'})
 
     def draw(self, context):
@@ -541,6 +574,7 @@ class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
         game = context.object.game
         rd = context.scene.render
         return (rd.engine in cls.COMPAT_ENGINES) \
+            and physics_category_is(context, 'PHYSICS') \
             and (game.physics_type in {'SENSOR', 'STATIC', 'DYNAMIC', 'RIGID_BODY', 'SOFT_BODY', 'CHARACTER', 'NO_COLLISION'})
 
     def draw(self, context):
@@ -627,6 +661,7 @@ class PHYSICS_PT_game_destruction(PhysicsButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+                and physics_category_is(context, 'DAMAGE')
                 and ob.game.physics_type in {'STATIC', 'DYNAMIC', 'RIGID_BODY'})
 
     def draw(self, context):
@@ -687,6 +722,7 @@ class PHYSICS_PT_game_explosive(PhysicsButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+                and physics_category_is(context, 'DAMAGE')
                 and ob.game.physics_type in {'STATIC', 'DYNAMIC', 'RIGID_BODY', 'NO_COLLISION'})
 
     def draw(self, context):
@@ -731,6 +767,7 @@ class PHYSICS_PT_game_deform(PhysicsButtonsPanel, Panel):
     def poll(cls, context):
         ob = context.object
         return (ob is not None and ob.type == 'MESH' and context.scene.render.engine in cls.COMPAT_ENGINES
+                and physics_category_is(context, 'DAMAGE')
                 and ob.game.physics_type in {'STATIC', 'DYNAMIC', 'RIGID_BODY'})
 
     def draw(self, context):
@@ -2924,6 +2961,7 @@ class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
 classes = (
     GAME_PT_game_components,
     GAME_PT_game_properties,
+    PHYSICS_PT_game_category,
     PHYSICS_PT_game_physics,
     PHYSICS_PT_game_collision_bounds,
     PHYSICS_PT_game_obstacles,

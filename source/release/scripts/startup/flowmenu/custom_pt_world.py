@@ -19,12 +19,28 @@ class CustomWorldButtonsPanel:
     bl_context = "world"
 
 
+# Abas Sky / Atmosphere / Properties no topo da aba World: so estado da tela (WindowManager), nao vai para o .range.
+bpy.types.WindowManager.ae_world_panel_category = EnumProperty(
+    name="World Panels",
+    items=(
+        ('SKY', "Sky", "Sky, Sun and Night", 'WORLD', 0),
+        ('ATMOSPHERE', "Atmosphere", "Environment lighting and weather", 'MOD_SMOKE', 1),
+        ('PROPERTIES', "Properties", "World properties", 'SETTINGS', 2),
+    ),
+    default='SKY',
+)
+
+
+def _world_tab_is(context, category):
+    return context.window_manager.ae_world_panel_category == category
+
+
 # ==============================================================================
 # SELETOR DE MUNDO (TOPO DA ABA)
 # ==============================================================================
 class CUSTOM_PT_game_context_world(CustomWorldButtonsPanel, Panel):
     bl_label = ""
-    bl_options = {'HIDE_HEADER'}
+    bl_options = {'HIDE_HEADER', 'PIN_TO_TOP'}
     bl_idname = "WORLD_PT_game_context_world_custom"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
@@ -39,11 +55,17 @@ class CUSTOM_PT_game_context_world(CustomWorldButtonsPanel, Panel):
         world = context.world
         space = context.space_data
 
-        split = layout.split(factor=0.65)
+        box = layout.box()
+        split = box.split(factor=0.65)
         if scene:
             split.template_ID(scene, "world", new="world.new")
         elif world:
             split.template_ID(space, "pin_id")
+
+        if scene.world:
+            row = box.row(align=True)
+            row.scale_y = 1.2
+            row.prop(context.window_manager, "ae_world_panel_category", expand=True)
 
 
 # ==============================================================================
@@ -259,7 +281,7 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
+        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES and _world_tab_is(context, 'SKY'))
 
     def draw(self, context):
         layout = self.layout
@@ -295,56 +317,92 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
             row.prop(world, "sky_turbidity", text="Turbidity")
             row.prop(world, "ground_color", text="Ground")
         else:
-            row = box.row()
-            row.label(text="Atmosphere:", icon='WORLD')
+            row = box.row(align=True)
             row.operator("world.atmosphere_reset", text="Earth", icon='FILE_REFRESH')
-            col = box.column(align=True)
-            col.prop(world, "atmosphere_intensity")
-            col.prop(world, "atmosphere_altitude")
-            col = box.column(align=True)
-            col.prop(world, "atmosphere_rayleigh_color")
+            row.prop(world, "atmosphere_intensity")
+            row.prop(world, "atmosphere_altitude")
+            split = box.split()
+            col = split.column(align=True)
+            col.label(text="Air Color:")
+            col.row(align=True).prop(world, "atmosphere_rayleigh_color", text="")
             col.prop(world, "atmosphere_rayleigh_density")
-            col = box.column(align=True)
+            col = split.column(align=True)
+            col.label(text="")
             col.prop(world, "atmosphere_mie_density")
             col.prop(world, "atmosphere_mie_direction", slider=True)
 
-        if sky in {'PROCEDURAL', 'ATMOSPHERIC'}:
-            # The assignment belongs to Scene (the runtime reads Scene.world_sun),
-            # but it is presented with the World sky controls deliberately.
-            box = layout.box()
-            box.label(text="Sun:", icon='LAMP_SUN')
-            col = box.column(align=True)
-            # The sun object is picked/created when the scene is converted: next Play only.
-            not_live_layout(col).prop(scene, "world_sun_set", text="Object")
-            not_live_layout(col).prop(scene, "use_auto_world_sun", text="Automatic")
-            row = box.row(align=True)
-            sub = row.row(align=True)
-            sub.active = scene.use_auto_world_sun
-            sub.prop(scene, "auto_world_sun_hour", text="Hour")
-            row.prop(world, "sun_size", text="Disc Size")
-            row = box.row(align=True)
-            row.active = scene.use_auto_world_sun
-            row.prop(scene, "auto_world_sun_direction", text="Direction")
-            if not scene.world_sun_set:
-                box.label(text="Without a Sun object the sky stays at noon and has no sun disc", icon='ERROR')
 
-            box = layout.box()
-            box.label(text="Night:", icon='SOLO_ON')
-            row = box.row()
-            row.prop(world, "use_sky_stars", text="Stars")
-            row.prop(world, "use_sky_moon", text="Moon")
-            row = box.row()
-            row.active = world.use_sky_stars
-            row.prop(world, "star_style", text="Style")
-            row = box.row(align=True)
-            row.prop(world, "use_sky_aurora", text="Aurora")
-            sub = row.row()
-            sub.active = world.use_sky_aurora
-            sub.prop(world, "aurora_colors", text="")
-            row = box.row(align=True)
-            row.active = world.use_sky_moon
-            row.prop(world, "moon_size", text="Size")
-            row.prop(world, "moon_brightness", text="Brightness")
+
+class CUSTOM_PT_game_world_sun(CustomWorldButtonsPanel, Panel):
+    """Top-level Sun panel alongside Sky."""
+    bl_label = "Sun"
+    bl_idname = "WORLD_PT_game_world_sun_custom"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.world and not _world_nodes_active(context) and
+                scene.render.engine in cls.COMPAT_ENGINES and
+                _world_tab_is(context, 'SKY') and
+                scene.world.sky_type in {'PROCEDURAL', 'ATMOSPHERIC'})
+
+    def draw(self, context):
+        scene = context.scene
+        world = context.world
+        box = self.layout.box()
+
+        # The assignment belongs to Scene (the runtime reads Scene.world_sun),
+        # but it is presented with the World sky controls deliberately.
+        col = box.column(align=True)
+        # The sun object is picked/created when the scene is converted: next Play only.
+        not_live_layout(col).prop(scene, "world_sun_set", text="Object")
+        not_live_layout(col).prop(scene, "use_auto_world_sun", text="Auto Sun Position")
+        row = box.row(align=True)
+        sub = row.row(align=True)
+        sub.active = scene.use_auto_world_sun
+        sub.prop(scene, "auto_world_sun_hour", text="Hour")
+        row.prop(world, "sun_size", text="Disc Size")
+        row = box.row(align=True)
+        row.active = scene.use_auto_world_sun
+        row.prop(scene, "auto_world_sun_direction", text="Direction")
+        if not scene.world_sun_set:
+            box.label(text="Without a Sun object the sky stays at noon and has no sun disc", icon='ERROR')
+
+
+class CUSTOM_PT_game_world_night(CustomWorldButtonsPanel, Panel):
+    """Top-level Night panel alongside Sky."""
+    bl_label = "Night"
+    bl_idname = "WORLD_PT_game_world_night_custom"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        scene = context.scene
+        return (scene.world and not _world_nodes_active(context) and
+                scene.render.engine in cls.COMPAT_ENGINES and
+                _world_tab_is(context, 'SKY') and
+                scene.world.sky_type in {'PROCEDURAL', 'ATMOSPHERIC'})
+
+    def draw(self, context):
+        world = context.world
+        box = self.layout.box()
+
+        row = box.row()
+        row.prop(world, "use_sky_stars", text="Stars")
+        row.prop(world, "use_sky_moon", text="Moon")
+        row = box.row()
+        row.active = world.use_sky_stars
+        row.prop(world, "star_style", text="Style")
+        row = box.row(align=True)
+        row.prop(world, "use_sky_aurora", text="Aurora")
+        sub = row.row()
+        sub.active = world.use_sky_aurora
+        sub.prop(world, "aurora_colors", text="")
+        row = box.row(align=True)
+        row.active = world.use_sky_moon
+        row.prop(world, "moon_size", text="Size")
+        row.prop(world, "moon_brightness", text="Brightness")
 
 
 # ==============================================================================
@@ -358,7 +416,7 @@ class CUSTOM_PT_game_environment_lighting(CustomWorldButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
+        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES and _world_tab_is(context, 'ATMOSPHERE'))
 
     def draw(self, context):
         layout = self.layout
@@ -367,14 +425,18 @@ class CUSTOM_PT_game_environment_lighting(CustomWorldButtonsPanel, Panel):
 
         box = layout.box()
         box.label(text="Ambient:", icon='COLOR')
-        box.prop(world, "ambient_color", text="Color")
+        split = box.split(factor=0.55)
+        col = split.column()
+        col.label(text="Color:")
+        col.prop(world, "ambient_color", text="")
+        col = split.column()
+        col.label(text="")
+        col.prop(light, "use_environment_light", text="Environment Light")
 
-        row = box.row(align=True)
-        row.prop(light, "use_environment_light", text="")
-        sub = row.row(align=True)
-        sub.active = light.use_environment_light
-        sub.prop(light, "environment_energy", text="Environment Light")
-        sub.prop(light, "environment_color", text="")
+        col = box.column(align=True)
+        col.active = light.use_environment_light
+        col.prop(light, "environment_energy", text="Energy")
+        col.row(align=True).prop(light, "environment_color", expand=True)
 
         box = layout.box()
         box.label(text="Exposure:", icon='CAMERA_DATA')
@@ -425,7 +487,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
+        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES and _world_tab_is(context, 'ATMOSPHERE'))
 
     def draw(self, context):
         layout = self.layout
@@ -791,7 +853,7 @@ class CUSTOM_PT_game_global_properties(CustomWorldButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES)
+        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES and _world_tab_is(context, 'PROPERTIES'))
 
     def _draw_prop_row(self, parent, prop, index, builtin):
         row = parent.box().row()
