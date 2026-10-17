@@ -494,6 +494,18 @@ void KX_AudioManager::Update()
 	const float dt = (m_lastUpdate > 0.0) ? (float)std::min(std::max(now - m_lastUpdate, 0.0), 0.1) : 0.0f;
 	m_lastUpdate = now;
 
+	// Events waiting for their time (thunder after the flash).
+	for (unsigned int i = 0; i < m_delayedEvents.size();) {
+		if (m_delayedEvents[i].time <= now) {
+			const DelayedEvent delayed = m_delayedEvents[i];
+			m_delayedEvents.erase(m_delayedEvents.begin() + i);
+			PlayEvent(delayed.event, delayed.gain);
+		}
+		else {
+			++i;
+		}
+	}
+
 	if (m_pendingValid) {
 		m_reverbActive = (m_pendingSource != nullptr);
 		if (m_reverbActive) {
@@ -857,6 +869,15 @@ bool KX_AudioManager::PlayEvent(int event, float gain)
 	return StartOneShot(*candidates[pick].first, candidates[pick].second, gain, false, 0.0f);
 }
 
+void KX_AudioManager::PlayEventDelayed(int event, float gain, float delay)
+{
+	if (delay <= 0.0f) {
+		PlayEvent(event, gain);
+		return;
+	}
+	m_delayedEvents.push_back({PIL_check_seconds_timer() + delay, event, gain});
+}
+
 void KX_AudioManager::ReportRain()
 {
 	m_rainTime = PIL_check_seconds_timer();
@@ -886,6 +907,7 @@ void KX_AudioManager::StopAll()
 		module->paused = false;
 	}
 	m_rainPlaying = false;
+	m_delayedEvents.clear();
 }
 
 #ifdef WITH_PYTHON

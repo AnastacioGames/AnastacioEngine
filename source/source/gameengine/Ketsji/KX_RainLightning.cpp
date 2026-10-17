@@ -140,12 +140,21 @@ void KX_RainLightning::Manual::Take(double time, unsigned int salt)
 	big = pendingBig;
 }
 
-void KX_RainLightning::PlayThunder(float gain)
+// Thunder by distance: full up to THUNDER_NEAR, then inverse distance down to a far rumble.
+static const float THUNDER_NEAR = 30.0f;
+static const float THUNDER_MIN_GAIN = 0.08f;
+static const float SOUND_SPEED = 343.0f;
+static const float THUNDER_MAX_DELAY = 4.0f;
+
+void KX_RainLightning::PlayThunder(float gain, float distance)
 {
 	KX_AudioManager *audio = KX_GetActiveEngine() ? KX_GetActiveEngine()->GetAudioManager() : nullptr;
-	if (audio) {
-		audio->PlayEvent(WO_SOUND_EVENT_THUNDER, gain);
+	if (!audio) {
+		return;
 	}
+	const float falloff = (distance > THUNDER_NEAR) ? THUNDER_NEAR / distance : 1.0f;
+	const float delay = std::min(distance / SOUND_SPEED, THUNDER_MAX_DELAY);
+	audio->PlayEventDelayed(WO_SOUND_EVENT_THUNDER, gain * std::max(falloff, THUNDER_MIN_GAIN), delay);
 }
 
 void KX_RainLightning::Strike(bool bolt)
@@ -253,7 +262,10 @@ void KX_RainLightning::Update(KX_Scene *scene, KX_Camera *camera, const World *w
 		strike.seed = seed;
 		strike.big = big;
 		strike.hasBolt = false;
-		PlayThunder(big ? 1.0f : 0.6f);
+		if (!big) {
+			// A flash inside the far clouds: a soft rumble.
+			PlayThunder(0.6f, world->rain_lightning_distance);
+		}
 		if (big) {
 			// Keep the whole bolt inside the camera range: a closer bolt is also smaller,
 			// so it looks the same.
@@ -265,6 +277,7 @@ void KX_RainLightning::Update(KX_Scene *scene, KX_Camera *camera, const World *w
 			                        (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING_SIDE) != 0, &strike.bolt);
 			strike.center = mt::vec3(strike.bolt.center);
 			strike.hasBolt = true;
+			PlayThunder(1.0f, (strike.center - m_camPos).Length());
 		}
 	}
 
@@ -375,8 +388,7 @@ void KX_RainLightning::UpdateEmitter(KX_Scene *scene, Emitter& emitter, double t
 	const float flash = BKE_rain_lightning_flash(strike.seed, strike.big, (float)(time - strike.start), &over);
 	const float fade = BKE_rain_lightning_distance_fade((strike.center - m_camPos).Length(), settings.flash_distance);
 	if (thunder) {
-		// A far strike still rumbles, softer.
-		PlayThunder((strike.big ? 1.0f : 0.6f) * std::max(fade, 0.3f));
+		PlayThunder(strike.big ? 1.0f : 0.6f, (strike.center - m_camPos).Length());
 	}
 	strike.flash = flash * settings.intensity * fade;
 	strike.boltBright = strike.hasBolt ? std::min(flash * 1.6f, 1.0f) * settings.intensity : 0.0f;

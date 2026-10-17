@@ -93,6 +93,8 @@ public:
 	 * \return false when no sound has this event or it cannot play.
 	 */
 	bool PlayEvent(int event, float gain = 1.0f);
+	/// PlayEvent after  delay seconds (e.g. the thunder after the flash, sound travels slower).
+	void PlayEventDelayed(int event, float gain, float delay);
 	/// A scene with World > Rain on, every frame: the Rain sounds loop while some scene reports.
 	void ReportRain();
 
@@ -140,6 +142,13 @@ private:
 	std::vector<std::pair<const Module *, int> > m_lastEvent;
 	double m_rainTime;
 	bool m_rainPlaying;
+
+	struct DelayedEvent {
+		double time;
+		int event;
+		float gain;
+	};
+	std::vector<DelayedEvent> m_delayedEvents;
 };
 
 #ifdef WITH_PYTHON

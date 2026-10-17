@@ -71,7 +71,8 @@ public:
 
 private:
 	/// World Sound > Effects: a Thunder sound (variations at random).
-	static void PlayThunder(float gain);
+	/// \param distance From the camera to the strike: softer and later (sound at ~343 m/s) when far.
+	static void PlayThunder(float gain, float distance = 0.0f);
 
 	/// One lit strike: the World one or the latest of an emitter.
 	struct StrikeState {

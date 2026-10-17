@@ -52,6 +52,25 @@ EFFECT_SLOTS = (
     ("Thunder 2", 'THUNDER'),
     ("Thunder 3", 'THUNDER'),
 )
+# Som que vem com a engine (datafiles/sounds/effects) para cada slot do Effects.
+ENGINE_EFFECT_FILES = {
+    "Explosion Tiny": "explosao_tiny.wav",
+    "Explosion Small": "explosao_small.wav",
+    "Explosion Medium": "explosao_medium.wav",
+    "Explosion Large": "explosao_large.wav",
+    "Explosion Huge": "explosao_huge.wav",
+    "Destruction Tiny": "quebra_tiny.wav",
+    "Destruction Small": "quebra_small.wav",
+    "Destruction Medium": "quebra_medium.wav",
+    "Destruction Large": "quebra_large.wav",
+    "Destruction Huge": "quebra_huge.wav",
+    "Rain": "chuva.wav",
+    "Thunder 1": "trovao1.wav",
+    "Thunder 2": "trovao2.wav",
+    "Thunder 3": "trovao3.wav",
+}
+# Event pelo nome do arquivo no Add Sounds (chuva.wav -> Rain), para nao ficar mudo.
+ENGINE_EFFECT_EVENTS = {os.path.splitext(f)[0]: dict(EFFECT_SLOTS)[slot] for slot, f in ENGINE_EFFECT_FILES.items()}
 MODULE_ICONS = {item[0]: item[3] for item in MODULE_TYPES}
 MODULE_NAMES = {item[0]: item[1] for item in MODULE_TYPES}
 
@@ -105,6 +124,30 @@ def _localize_engine_sound(path):
     return dest_path
 
 
+def _fill_engine_effects(module):
+    """Slots do Effects sem arquivo recebem o som que vem com a engine. Devolve quantos."""
+    effects_dir = os.path.join(_engine_datafiles_dir(), "effects")
+    filled = 0
+    for sound in module.sounds:
+        if sound.filepath:
+            continue
+        filename = ENGINE_EFFECT_FILES.get(sound.name)
+        if not filename:
+            continue
+        path = os.path.join(effects_dir, filename)
+        if not os.path.isfile(path):
+            continue
+        path = _localize_engine_sound(path)
+        if bpy.data.is_saved:
+            try:
+                path = bpy.path.relpath(path)
+            except ValueError:
+                pass
+        sound.filepath = path
+        filled += 1
+    return filled
+
+
 class WORLD_OT_sound_module_add(Operator):
     """Add a sound module to the World"""
     bl_idname = "world.sound_module_add"
@@ -122,6 +165,7 @@ class WORLD_OT_sound_module_add(Operator):
         if self.type == 'EFFECTS':
             for name, event in EFFECT_SLOTS:
                 module.sounds.new(name, filepath="").event = event
+            _fill_engine_effects(module)
         context.window_manager.world_sound_filter = self.type
         return {'FINISHED'}
 
@@ -199,7 +243,11 @@ class WORLD_OT_sound_entry_add(Operator):
                     path = bpy.path.relpath(path)
                 except ValueError:  # another drive on Windows: keep it absolute
                     pass
-            module.sounds.new(os.path.splitext(item.name)[0], filepath=path)
+            sound = module.sounds.new(os.path.splitext(item.name)[0], filepath=path)
+            if module.type == 'EFFECTS':
+                event = ENGINE_EFFECT_EVENTS.get(os.path.splitext(item.name)[0].lower())
+                if event:
+                    sound.event = event
             added += 1
 
         if not added:
@@ -207,6 +255,27 @@ class WORLD_OT_sound_entry_add(Operator):
             return {'CANCELLED'}
         if self.relative_path and not bpy.data.is_saved:
             self.report({'INFO'}, "Paths kept absolute: save the .range to store them relative")
+        return {'FINISHED'}
+
+
+class WORLD_OT_sound_engine_fill(Operator):
+    """Give every empty slot (Rain, Thunder, Explosion...) the sound that comes with the engine"""
+    bl_idname = "world.sound_engine_fill"
+    bl_label = "Use Engine Sounds"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    module: IntProperty(options={'HIDDEN'})
+
+    def execute(self, context):
+        module = _module(context, self.module)
+        if module is None:
+            return {'CANCELLED'}
+        filled = _fill_engine_effects(module)
+        if not filled:
+            self.report({'INFO'}, "No empty slot with an engine sound")
+            return {'CANCELLED'}
+        if not bpy.data.is_saved:
+            self.report({'INFO'}, "Save the .range to copy the sounds into the project folder")
         return {'FINISHED'}
 
 
@@ -339,6 +408,8 @@ def _draw_module(layout, module, index):
         col.label(text="Every play is a new voice: a sound never cuts the one before", icon='INFO')
         col.label(text="Same Event on several sounds = variations picked at random", icon='INFO')
         col.prop(module, "use_reverb_areas")
+        if any(not s.filepath and s.name in ENGINE_EFFECT_FILES for s in module.sounds):
+            col.operator("world.sound_engine_fill", icon='FILE_SOUND').module = index
         col.separator()
         _draw_sounds(col, module, index)
         return
@@ -397,6 +468,7 @@ classes = (
     WORLD_OT_sound_module_remove,
     WORLD_OT_sound_module_move,
     WORLD_OT_sound_entry_add,
+    WORLD_OT_sound_engine_fill,
     WORLD_OT_sound_entry_remove,
     WORLD_OT_sound_entry_variation,
     WORLD_OT_sound_entry_move,
