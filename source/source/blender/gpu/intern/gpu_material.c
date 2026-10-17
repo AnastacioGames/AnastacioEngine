@@ -1270,6 +1270,27 @@ int GPU_material_ssgi_slot(Scene *scene)
 #endif
 }
 
+const char *GPU_material_ssgi_disabled_reason(Scene *scene)
+{
+    IDProperty *enabled = scene && scene->id.properties ?
+        IDP_GetPropertyFromGroup(scene->id.properties, "ae_ssgi_use") : NULL;
+    if (!enabled || enabled->type != IDP_INT || !IDP_Int(enabled) || GPU_material_ssgi_slot(scene)) return NULL;
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    return "desktop only";
+#else
+    if (!BKE_scene_use_new_shading_nodes(scene)) return "enable PBR Shading Nodes in Render > Shading";
+    return "free the attachment slots after the third one";
+#endif
+}
+
+bool GPU_material_ssgi_approximate(Scene *scene)
+{
+    IDProperty *prop = scene && scene->id.properties ?
+        IDP_GetPropertyFromGroup(scene->id.properties, "ae_ssgi_approximate") : NULL;
+    /* Unset (older files, never touched) means the default: on. */
+    return !prop || prop->type != IDP_INT || IDP_Int(prop);
+}
+
 static float GPU_shadow_color_pass; /* defined with GPU_lamp_shadow_color_begin() */
 
 void GPU_material_shadow_color_link(GPUMaterial *material, GPUNodeLink *base, GPUNodeLink *alpha)
@@ -1308,22 +1329,87 @@ static void gpu_material_link_shadow_color(GPUMaterial *mat, Material *ma)
 	         GPU_dynamic_uniform(&GPU_shadow_color_pass, GPU_DYNAMIC_SHADOW_COLOR_PASS, NULL), &mat->outlinks[0]);
 }
 
+/* Re-feed an existing node input (a Mix Shader factor) into another node: a linked socket, a
+ * dynamic uniform (Fast Shader Loading) or a constant. */
+static GPUNodeLink *gpu_ssgi_input_link(GPUInput *input)
+{
+    if (input->link) return input->link;
+    if (input->dynamicvec) return GPU_dynamic_uniform(input->dynamicvec, input->dynamictype, input->dynamicdata);
+    return GPU_uniform(input->vec);
+}
+
+/* Normal, albedo and direct radiance of one closure (the scene color is the Surface itself).
+ * Supported BSDFs expose them as extra outputs; Mix/Add Shader combine their branches; Transparent,
+ * Holdout or an empty socket contribute nothing. Other closures only get the geometric normal,
+ * an approximate albedo (Approximate Unsupported) and never emit bounce light. */
+static bool gpu_ssgi_closure(GPUMaterial *mat, GPUNodeLink *closure, bool approximate, GPUNodeLink *out[3])
+{
+    if (!closure || !closure->output) {
+        GPU_link(mat, "set_rgba_zero", &out[0]);
+        out[1] = out[2] = out[0];
+        return true;
+    }
+    GPUNode *node = closure->output->node;
+    if (STREQ(node->name, "node_bsdf_principled") ||
+        STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi") ||
+        STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi_node") ||
+        STREQ(node->name, "node_emission_ssgi"))
+    {
+        GPUOutput *extra = ((GPUOutput *)node->outputs.first)->next;
+        for (int i = 0; i < 3 && extra; ++i, extra = extra->next) out[i] = extra->link;
+        return true;
+    }
+    if (STREQ(node->name, "node_bsdf_transparent") || STREQ(node->name, "node_holdout")) {
+        return gpu_ssgi_closure(mat, NULL, approximate, out);
+    }
+    const bool mix = STREQ(node->name, "node_mix_shader");
+    if (mix || STREQ(node->name, "node_add_shader")) {
+        GPUInput *input = node->inputs.first;
+        GPUNodeLink *fac = NULL;
+        if (mix) {
+            fac = gpu_ssgi_input_link(input);
+            input = input->next;
+        }
+        GPUNodeLink *a[3], *b[3];
+        if (!input || !input->next ||
+            !gpu_ssgi_closure(mat, input->link, approximate, a) ||
+            !gpu_ssgi_closure(mat, input->next->link, approximate, b))
+        {
+            return false;
+        }
+        if (mix) {
+            GPU_link(mat, "ssgi_mix_closure", fac, a[0], a[1], a[2], b[0], b[1], b[2], &out[0], &out[1], &out[2]);
+        }
+        else {
+            GPU_link(mat, "ssgi_add_closure", a[0], a[1], a[2], b[0], b[1], b[2], &out[0], &out[1], &out[2]);
+        }
+        return true;
+    }
+    if (!approximate) return false;
+    /* Specular closures must not receive diffuse bounce: normal only, so they still occlude rays. */
+    const bool specular = STREQ(node->name, "node_bsdf_glossy") || STREQ(node->name, "node_bsdf_glass") ||
+                          STREQ(node->name, "node_bsdf_refraction") || STREQ(node->name, "node_bsdf_anisotropic");
+    /* The diffuse-like BSDFs take Color first; anything else falls back to the material color. */
+    GPUInput *color = node->inputs.first;
+    GPUNodeLink *albedo = (!specular && color && color->type == GPU_VEC4) ? gpu_ssgi_input_link(color) :
+                                                                              GPU_uniform(&mat->ma->r);
+    static float receives[2] = {0.0f, 1.0f};
+    GPU_link(mat, "ssgi_approximate_closure", albedo, GPU_uniform(&receives[!specular]),
+             GPU_material_builtin(mat, GPU_VIEW_NORMAL), &out[0], &out[1], &out[2]);
+    return true;
+}
+
 void GPU_material_ssgi_outputs(GPUMaterial *material, GPUNodeLink *surface)
 {
     const int slot = GPU_material_ssgi_slot(material->scene);
     if (!slot || !surface || !surface->output || !material->ma ||
-        material->ma->game.alpha_blend != GEMAT_SOLID || material->ma->fragcode ||
-        !GPU_material_use_new_shading_nodes(material)) return;
-    GPUNode *node = surface->output->node;
-    /* A mixed closure needs its own composition contract; only the actual Surface root is accepted. */
-    if (!STREQ(node->name, "node_bsdf_principled") &&
-        !STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi") &&
-        !STREQ(node->name, "node_bsdf_diffuse_ambient_ssgi_node") &&
-        !STREQ(node->name, "node_emission_ssgi")) return;
-    GPUOutput *extra = ((GPUOutput *)node->outputs.first)->next;
-    for (int i = 0; i < 4 && extra; ++i, extra = extra->next) {
-        material->outlinks[slot + i] = extra->link;
-    }
+        (material->ma->game.alpha_blend != GEMAT_SOLID && material->ma->game.alpha_blend != GEMAT_CLIP) ||
+        material->ma->fragcode || !GPU_material_use_new_shading_nodes(material)) return;
+    GPUNodeLink *out[3];
+    if (!gpu_ssgi_closure(material, surface, GPU_material_ssgi_approximate(material->scene), out)) return;
+    for (int i = 0; i < 3; ++i) material->outlinks[slot + i] = out[i];
+    /* Pre-display scene color: exactly what the material renders, whatever the graph. */
+    material->outlinks[slot + 3] = surface;
 }
 
 void GPU_material_enable_alpha(GPUMaterial *material)
@@ -4533,7 +4619,7 @@ GPUMaterial *GPU_material_from_blender(Scene *scene, Material *ma, bool use_open
 			 * node (scene lights with shadow maps, World color as ambient) */
 			static float roughness = 0.0f;
 			const int ssgi_slot = GPU_material_ssgi_slot(scene);
-			if (ssgi_slot && ma->game.alpha_blend == GEMAT_SOLID && !ma->fragcode) {
+			if (ssgi_slot && (ma->game.alpha_blend == GEMAT_SOLID || ma->game.alpha_blend == GEMAT_CLIP) && !ma->fragcode) {
 				GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
 				GPU_link(mat, "node_bsdf_diffuse_ambient_ssgi",
 				         GPU_uniform(&ma->r), GPU_uniform(&ma->emit), GPU_uniform(&roughness), GPU_material_builtin(mat, GPU_VIEW_NORMAL),

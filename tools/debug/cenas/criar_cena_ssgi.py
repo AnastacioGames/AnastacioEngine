@@ -85,6 +85,44 @@ red = material('RedWall', (0.8, 0.02, 0.02, 1))
 white = diffuse_material('WhiteWallDiffuse', (0.7, 0.7, 0.7, 1))
 metal = material('Metal', (0.7, 0.7, 0.7, 1), 1.0)
 legacy = legacy_material('LegacyOrange', (0.8, 0.25, 0.03, 1))
+def graph_material(name, build):
+    mat = bpy.data.materials.new(name)
+    mat.use_nodes = True
+    tree = mat.node_tree
+    tree.nodes.clear()
+    output = tree.nodes.new('ShaderNodeOutputMaterial')
+    tree.links.new(build(tree), output.inputs['Surface'])
+    return mat
+
+
+def bsdf(tree, kind, rgba):
+    node = tree.nodes.new(kind)
+    node.inputs[0].default_value = rgba
+    return node.outputs[0]
+
+
+def mix(tree, fac, a, b, kind='ShaderNodeMixShader'):
+    node = tree.nodes.new(kind)
+    shaders = [s for s in node.inputs if s.type == 'SHADER']
+    if kind == 'ShaderNodeMixShader':
+        node.inputs['Fac'].default_value = fac
+    tree.links.new(a, shaders[0])
+    tree.links.new(b, shaders[1])
+    return node.outputs[0]
+
+
+if mode.startswith('graphs'):
+    # Mix/Add Shader, Transparent branch, approximated (Toon) and specular (Glossy) closures, Alpha Clip.
+    scene['ae_ssgi_approximate'] = mode != 'graphs_strict'
+    red = graph_material('RedWallMix', lambda t: mix(t, 0.5,
+        bsdf(t, 'ShaderNodeBsdfPrincipled', (0.8, 0.02, 0.02, 1)), bsdf(t, 'ShaderNodeBsdfDiffuse', (0.8, 0.02, 0.02, 1))))
+    white = graph_material('WhiteWallMixTransparent', lambda t: mix(t, 0.2,
+        bsdf(t, 'ShaderNodeBsdfDiffuse', (0.7, 0.7, 0.7, 1)), bsdf(t, 'ShaderNodeBsdfTransparent', (1, 1, 1, 1))))
+    green = graph_material('GreenGroundAdd', lambda t: mix(t, 0, bsdf(t, 'ShaderNodeBsdfPrincipled', (0.05, 0.7, 0.05, 1)),
+        bsdf(t, 'ShaderNodeEmission', (0, 0, 0, 1)), 'ShaderNodeAddShader'))
+    metal = graph_material('GlossyCube', lambda t: bsdf(t, 'ShaderNodeBsdfGlossy', (0.7, 0.7, 0.7, 1)))
+    legacy = graph_material('ToonCube', lambda t: bsdf(t, 'ShaderNodeBsdfToon', (0.8, 0.25, 0.03, 1)))
+    legacy.game_settings.alpha_blend = 'CLIP'
 cube('Ground', (0, 0, -0.1), (4, 4, 0.1), green)
 cube('RedWall', (-1.5, 0, 1.5), (0.1, 2.5, 1.5), red)
 cube('WhiteWall', (0, 2.6, 1.5), (3, 0.1, 1.5), white)

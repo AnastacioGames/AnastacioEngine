@@ -279,6 +279,9 @@ void LA_Launcher::InitEngine()
 	RAS_OffScreen::AttachmentList attachments;
 	attachments.push_back({4, hdrTable[gm.hdr]});
 	const int ssgiSlot = GPU_material_ssgi_slot(m_startScene);
+	if (const char *reason = GPU_material_ssgi_disabled_reason(m_startScene)) {
+		CM_Warning("Native SSGI is on but disabled: " << reason);
+	}
 	for (unsigned short i = 0; i < 7; ++i) {
 		RenderAttachment *attach = gm.attachments[i];
 		if (attach) {

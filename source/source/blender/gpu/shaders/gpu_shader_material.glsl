@@ -5554,6 +5554,44 @@ void node_mix_shader(float fac, vec4 shader1, vec4 shader2, out vec4 shader)
 	shader = vec4((a > 1e-6) ? rgb / a : mix(shader1.rgb, shader2.rgb, fac), a);
 }
 
+/* Native SSGI data of Mix/Add Shader: normals blend by weight (alpha marks a written normal),
+ * albedo and direct radiance by the same weights as the closures themselves. */
+void ssgi_blend_closures(float w1, float w2, vec4 n1, vec4 a1, vec4 d1, vec4 n2, vec4 a2, vec4 d2,
+                         out vec4 n, out vec4 a, out vec4 d)
+{
+	vec3 v1 = (n1.xyz * 2.0 - 1.0) * n1.a;
+	vec3 v2 = (n2.xyz * 2.0 - 1.0) * n2.a;
+	vec3 v = v1 * w1 + v2 * w2;
+	if (dot(v, v) < 1e-8) {
+		v = (n1.a > n2.a) ? v1 : v2;
+	}
+	n = (max(n1.a, n2.a) > 0.5 && dot(v, v) > 1e-8) ? vec4(normalize(v) * 0.5 + 0.5, 1.0) : vec4(0.0);
+	a = vec4(clamp(a1.rgb * w1 + a2.rgb * w2, 0.0, 1.0), max(a1.a, a2.a));
+	d = vec4(max(d1.rgb * w1 + d2.rgb * w2, vec3(0.0)), max(d1.a, d2.a));
+}
+
+void ssgi_mix_closure(float fac, vec4 n1, vec4 a1, vec4 d1, vec4 n2, vec4 a2, vec4 d2,
+                      out vec4 n, out vec4 a, out vec4 d)
+{
+	fac = clamp(fac, 0.0, 1.0);
+	ssgi_blend_closures(1.0 - fac, fac, n1, a1, d1, n2, a2, d2, n, a, d);
+}
+
+void ssgi_add_closure(vec4 n1, vec4 a1, vec4 d1, vec4 n2, vec4 a2, vec4 d2,
+                      out vec4 n, out vec4 a, out vec4 d)
+{
+	ssgi_blend_closures(1.0, 1.0, n1, a1, d1, n2, a2, d2, n, a, d);
+}
+
+/* Closures without SSGI outputs: geometric normal (so rays stop on them), optional approximate
+ * albedo to receive bounce, never a bounce source since their direct light cannot be separated. */
+void ssgi_approximate_closure(vec4 color, float receives, vec3 N, out vec4 n, out vec4 a, out vec4 d)
+{
+	n = vec4(normalize(N) * 0.5 + 0.5, 1.0);
+	a = vec4(clamp(color.rgb, 0.0, 1.0) * receives, receives);
+	d = vec4(0.0, 0.0, 0.0, 1.0);
+}
+
 void node_add_shader(vec4 shader1, vec4 shader2, out vec4 shader)
 {
 	shader = shader1 + shader2;

@@ -359,6 +359,9 @@ void GPU_material_set_foliage_reference_position(GPUMaterial *material, const fl
 struct Scene *GPU_material_scene(GPUMaterial *material);
 /* First native SSGI color slot, or 0 when disabled/unavailable. Four consecutive slots follow. */
 int GPU_material_ssgi_slot(struct Scene *scene);
+/* Why Native SSGI was requested but cannot run, or NULL. */
+const char *GPU_material_ssgi_disabled_reason(struct Scene *scene);
+bool GPU_material_ssgi_approximate(struct Scene *scene);
 void GPU_material_ssgi_outputs(GPUMaterial *material, struct GPUNodeLink *surface);
 /* Colored shadows: the color and alpha the material casts with (alpha NULL: the surface alpha).
  * Ignored unless the material has Colored Shadows. The links must be node outputs. */
