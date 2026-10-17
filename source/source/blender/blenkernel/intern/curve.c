@@ -131,6 +131,7 @@ void BKE_curve_free(Curve *cu)
 	MEM_SAFE_FREE(cu->strinfo);
 	MEM_SAFE_FREE(cu->bb);
 	MEM_SAFE_FREE(cu->tb);
+	MEM_SAFE_FREE(cu->atlas_glyphs);
 }
 
 void BKE_curve_init(Curve *cu)
@@ -202,6 +203,7 @@ void BKE_curve_copy_data(Main *bmain, Curve *cu_dst, const Curve *cu_src, const 
 	cu_dst->str = MEM_dupallocN(cu_src->str);
 	cu_dst->strinfo = MEM_dupallocN(cu_src->strinfo);
 	cu_dst->tb = MEM_dupallocN(cu_src->tb);
+	cu_dst->atlas_glyphs = MEM_dupallocN(cu_src->atlas_glyphs);
 	cu_dst->bb = MEM_dupallocN(cu_src->bb);
 
 	if (cu_src->key) {

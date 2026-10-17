@@ -564,6 +564,37 @@ class DATA_PT_game_text_viewport(GameTextPanel, Panel):
             box.prop(context.object, "color", text="")
 
 
+class DATA_PT_game_text_atlas(GameTextPanel, Panel):
+    bl_label = "Bitmap Atlas"
+
+    def draw_header(self, context):
+        self.layout.prop(context.curve, "use_bitmap_atlas", text="")
+
+    def draw(self, context):
+        text = context.curve
+
+        box = self.layout.box()
+        box.label(text="Bitmap Atlas:", icon="IMAGE_DATA")
+        col = box.column()
+        col.active = text.use_bitmap_atlas
+        col.operator("font.text_atlas_generate", text="Generate from Font", icon='FILE_FONT')
+        col.prop(text, "atlas_image")
+        image = text.atlas_image
+        if image:
+            row = col.row(align=True)
+            row.operator("font.text_atlas_edit_external", icon='IMAGE_COL')
+            row.operator("font.text_atlas_reload", text="Reload", icon='FILE_REFRESH')
+            if not image.packed_file:
+                row.operator("font.text_atlas_pack", text="", icon='UGLYPACKAGE')
+        col.prop(text, "use_atlas_hard_edge")
+        if text.atlas_glyph_count:
+            col.label(text="%d glyphs, cell %d px, font %d px" % (
+                text.atlas_glyph_count, text.atlas_cell, text.atlas_size))
+        else:
+            col.label(text="Press Generate from Font, then edit the image and Reload", icon='INFO')
+        col.operator("font.text_atlas_import", text="Load atlas.json (tools/text_atlas.py)", icon='FILE_FOLDER')
+
+
 class DATA_PT_text_boxes(CurveButtonsPanelText, Panel):
     bl_label = "Text Boxes"
 
@@ -616,6 +647,7 @@ classes = (
     DATA_PT_game_text_spacing,
     DATA_PT_game_text_shadow,
     DATA_PT_game_text_viewport,
+    DATA_PT_game_text_atlas,
     DATA_PT_shape_curve,
     DATA_PT_curve_texture_space,
     DATA_PT_geometry_curve,

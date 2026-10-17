@@ -2104,6 +2104,9 @@ static void write_curve(WriteData *wd, Curve *cu)
 			writedata(wd, DATA, cu->len + 1, cu->str);
 			writestruct(wd, DATA, CharInfo, cu->len_wchar + 1, cu->strinfo);
 			writestruct(wd, DATA, TextBox, cu->totbox, cu->tb);
+			if (cu->atlas_glyphs && cu->atlas_count > 0) {
+				writestruct(wd, DATA, TextAtlasGlyph, cu->atlas_count, cu->atlas_glyphs);
+			}
 		}
 		else {
 			/* is also the order of reading */

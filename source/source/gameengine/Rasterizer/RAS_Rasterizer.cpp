@@ -690,6 +690,15 @@ void RAS_Rasterizer::IndexPrimitivesText(RAS_MeshSlot *ms)
 	mat[13] += offset[1];
 	mat[14] += offset[2];
 
+#ifndef __EMSCRIPTEN__
+	/* Bitmap atlas: quads already hold the line breaks, in text space. */
+	if (textUser->GetAtlasTexture() && textUser->GetAtlasQuads()) {
+		m_impl->RenderTextAtlas3D(textUser->GetAtlasTexture(), *textUser->GetAtlasQuads(),
+		                          textUser->GetColor().Data(), mat, textUser->GetAtlasHardEdge());
+		return;
+	}
+#endif
+
 	for (unsigned short int i = 0, size = textUser->GetTexts().size(); i < size; ++i) {
 		if (i != 0) {
 			mat[12] -= spacing[0];

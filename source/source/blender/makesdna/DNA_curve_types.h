@@ -177,6 +177,13 @@ typedef struct EditNurb {
 	char pad[4];
 } EditNurb;
 
+/* Bitmap atlas glyph: whole fixed cell in the atlas image (UV origin bottom-left). */
+typedef struct TextAtlasGlyph {
+	int code;          /* unicode code point */
+	float u0, v0, u1, v1;
+	float advance;     /* pen advance in atlas pixels */
+} TextAtlasGlyph;
+
 typedef struct Curve {
 	ID id;
 	struct AnimData *adt;		/* animation data (must be immediately after id for utilities to use it) */
@@ -259,6 +266,13 @@ typedef struct Curve {
 
 	char pad2[2];
 
+	/* bitmap atlas for game text (CU_BITMAP_ATLAS), metrics in atlas pixels */
+	int atlas_count;
+	float atlas_size;  /* font em size the atlas was rendered at; Size of the text maps to it */
+	float atlas_cell, atlas_baseline, atlas_line_height;
+	int atlas_pad;
+	struct Image *atlas_image;
+	struct TextAtlasGlyph *atlas_glyphs;
 } Curve;
 
 #define CURVE_VFONT_ANY(cu) \
@@ -303,6 +317,10 @@ enum {
 	CU_GAME_TEXT_PREVIEW  = 1 << 16,
 	/** Font: with the game text preview on, also hide the regular curve text */
 	CU_GAME_TEXT_HIDE_CURVE = 1 << 17,
+	/** Font: in game, draw with the bitmap atlas image instead of font glyphs */
+	CU_BITMAP_ATLAS       = 1 << 18,
+	/** Font: bitmap atlas with hard edge (alpha test at 0.5), crisp when magnified */
+	CU_ATLAS_HARD_EDGE    = 1 << 19,
 };
 
 /* Curve.twist_mode */

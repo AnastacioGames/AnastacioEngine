@@ -693,6 +693,7 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 				CALLBACK_INVOKE(curve->vfontb, IDWALK_CB_USER);
 				CALLBACK_INVOKE(curve->vfonti, IDWALK_CB_USER);
 				CALLBACK_INVOKE(curve->vfontbi, IDWALK_CB_USER);
+				CALLBACK_INVOKE(curve->atlas_image, IDWALK_CB_USER);
 				break;
 			}
 

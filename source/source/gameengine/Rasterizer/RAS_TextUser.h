@@ -32,6 +32,9 @@
 #include "RAS_MeshUser.h"
 
 #include <string>
+#include <vector>
+
+struct GPUTexture;
 
 class RAS_TextUser : public RAS_MeshUser
 {
@@ -46,6 +49,10 @@ private:
 	bool m_use_shadows;
 	mt::vec2 m_shadow_offset;
 	mt::vec4 m_shadow_col;
+	/// Bitmap atlas: texture and quads (x, y, u, v per vertex, 4 vertices per glyph) in text space.
+	GPUTexture *m_atlasTexture;
+	const std::vector<float> *m_atlasQuads;
+	bool m_atlasHardEdge = false;
 
 public:
 	RAS_TextUser(void *clientobj, RAS_BoundingBox *boundingBox);
@@ -72,6 +79,25 @@ public:
 	void SetUseShadows(bool enable);
 	void SetShadowOffset(mt::vec2 shadow_offset);
 	void SetShadowColor(mt::vec4 shadow_col);
+
+	GPUTexture *GetAtlasTexture() const
+	{
+		return m_atlasTexture;
+	}
+	const std::vector<float> *GetAtlasQuads() const
+	{
+		return m_atlasQuads;
+	}
+	bool GetAtlasHardEdge() const
+	{
+		return m_atlasHardEdge;
+	}
+	void SetAtlas(GPUTexture *texture, const std::vector<float> *quads, bool hardEdge = false)
+	{
+		m_atlasTexture = texture;
+		m_atlasQuads = quads;
+		m_atlasHardEdge = hardEdge;
+	}
 };
 
 #endif  // __RAS_TEXT_USER_H__

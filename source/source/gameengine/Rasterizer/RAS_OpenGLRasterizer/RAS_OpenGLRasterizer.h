@@ -38,6 +38,10 @@
 
 #include "RAS_Rasterizer.h"
 
+#include <vector>
+
+struct GPUTexture;
+
 /**
  * 3D rendering device context.
  */
@@ -124,6 +128,8 @@ public:
 	void DisableForText();
 	void RenderText3D(int fontid, const std::string& text, int size, int dpi,
 	                  const float color[4], const float mat[16], float aspect, bool useShadow, const float shadowOffset[2], const float shadow_color[4]);
+	/// Draw bitmap atlas glyph quads (x, y, u, v per vertex) with the atlas texture tinted by color.
+	void RenderTextAtlas3D(GPUTexture *texture, const std::vector<float>& quads, const float color[4], const float mat[16], bool hardEdge);
 
 	void PushMatrix();
 	void PopMatrix();

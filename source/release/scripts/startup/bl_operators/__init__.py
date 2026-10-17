@@ -38,6 +38,7 @@ _modules = [
     "anastacio_explosive",
     "anastacio_lightmap",
     "anastacio_ssgi",
+    "anastacio_text_atlas",
     "anastacio_material_recipes",
     "logic_to_python",
     "mask",

@@ -129,6 +129,12 @@ void BKE_vfont_builtin_register(void *mem, int size)
 	builtin_font_size = size;
 }
 
+const void *BKE_vfont_builtin_data(int *r_size)
+{
+	*r_size = builtin_font_size;
+	return builtin_font_data;
+}
+
 static PackedFile *get_builtin_packedfile(void)
 {
 	if (!builtin_font_data) {

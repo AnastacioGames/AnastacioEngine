@@ -34,7 +34,12 @@
 
 #include "KX_GameObject.h"
 
+#include <unordered_map>
+#include <vector>
+
 class RAS_BoundingBox;
+struct Curve;
+struct GPUTexture;
 
 class KX_FontObject : public KX_GameObject
 {
@@ -115,6 +120,21 @@ protected:
 
 	bool m_do_color_management;
 
+	/// Bitmap atlas (CU_BITMAP_ATLAS): code point -> index in Curve::atlas_glyphs.
+	Curve *m_curve;
+	std::unordered_map<unsigned int, int> m_atlasLookup;
+	/// Glyph quads in text space (x, y, u, v per vertex), rebuilt by SetText.
+	std::vector<float> m_atlasQuads;
+	mt::vec2 m_atlasMin;
+	mt::vec2 m_atlasMax;
+	GPUTexture *m_atlasTexture;
+	bool m_atlasTextureTried;
+
+	bool UseAtlas() const
+	{
+		return !m_atlasLookup.empty();
+	}
+	void BuildAtlasQuads();
 	void GetTextAabb(mt::vec2& min, mt::vec2& max);
 
 #ifdef WITH_PYTHON

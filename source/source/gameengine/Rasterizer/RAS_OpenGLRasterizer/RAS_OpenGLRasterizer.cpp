@@ -40,6 +40,8 @@
 #include "GPU_extensions.h"
 #include "GPU_material.h"
 #include "GPU_shader.h"
+#include "GPU_basic_shader.h"
+#include "GPU_texture.h"
 #include "GPU_vertex_array.h"
 
 extern "C" {
@@ -526,6 +528,48 @@ void RAS_OpenGLRasterizer::RenderText3D(int fontid, const std::string& text, int
 	BLF_disable(fontid, flags);
 
 	m_rasterizer->SetAlphaBlend(GPU_BLEND_SOLID);
+}
+
+void RAS_OpenGLRasterizer::RenderTextAtlas3D(GPUTexture *texture, const std::vector<float>& quads,
+                                             const float color[4], const float mat[16], bool hardEdge)
+{
+#ifdef WITH_GL_PROFILE_COMPAT
+	m_rasterizer->DisableForText();
+	SetFrontFace(true);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	GPU_basic_shader_bind(GPU_SHADER_TEXTURE_2D | GPU_SHADER_USE_COLOR);
+	GPU_texture_bind(texture, 0);
+	if (hardEdge) {
+		/* Linear filtering + cut at 0.5 keeps the contour crisp when magnified. */
+		glEnable(GL_ALPHA_TEST);
+		glAlphaFunc(GL_GREATER, 0.5f);
+	}
+
+	glMatrixMode(GL_MODELVIEW);
+	glPushMatrix();
+	glMultMatrixf(mat);
+
+	/* RGBA glyphs painted by the user, the object color tints them. */
+	glColor4fv(color);
+	glBegin(GL_QUADS);
+	for (size_t i = 0; i + 3 < quads.size(); i += 4) {
+		glTexCoord2f(quads[i + 2], quads[i + 3]);
+		glVertex2f(quads[i], quads[i + 1]);
+	}
+	glEnd();
+
+	glPopMatrix();
+	if (hardEdge) {
+		glDisable(GL_ALPHA_TEST);
+	}
+	GPU_texture_unbind(texture);
+	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+	m_rasterizer->SetAlphaBlend(GPU_BLEND_SOLID);
+#else
+	UNUSED_VARS(texture, quads, color, mat, hardEdge);
+#endif
 }
 
 /* NOTE: the legacy fixed-function matrix stack (PushMatrix/PopMatrix/SetMatrixMode/

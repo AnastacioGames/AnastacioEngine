@@ -38,7 +38,9 @@ RAS_TextUser::RAS_TextUser(void *clientobj, RAS_BoundingBox *boundingBox)
 	m_offset(mt::zero3),
 	m_spacing(mt::zero3),
 	m_use_shadows(false),
-	m_shadow_col(mt::zero4)
+	m_shadow_col(mt::zero4),
+	m_atlasTexture(nullptr),
+	m_atlasQuads(nullptr)
 {
 }
 

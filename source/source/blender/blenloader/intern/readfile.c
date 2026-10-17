@@ -3990,6 +3990,7 @@ static void lib_link_curve(FileData *fd, Main *main)
 			cu->vfontb = newlibadr_us(fd, cu->id.lib, cu->vfontb);
 			cu->vfonti = newlibadr_us(fd, cu->id.lib, cu->vfonti);
 			cu->vfontbi = newlibadr_us(fd, cu->id.lib, cu->vfontbi);
+			cu->atlas_image = newlibadr_us(fd, cu->id.lib, cu->atlas_image);
 
 			cu->ipo = newlibadr_us(fd, cu->id.lib, cu->ipo); // XXX deprecated - old animation system
 			cu->key = newlibadr_us(fd, cu->id.lib, cu->key);
@@ -4026,6 +4027,10 @@ static void direct_link_curve(FileData *fd, Curve *cu)
 	cu->str = newdataadr(fd, cu->str);
 	cu->strinfo = newdataadr(fd, cu->strinfo);
 	cu->tb = newdataadr(fd, cu->tb);
+	cu->atlas_glyphs = newdataadr(fd, cu->atlas_glyphs);
+	if (cu->atlas_glyphs == NULL) {
+		cu->atlas_count = 0;
+	}
 
 	if (cu->vfont == NULL) {
 		link_list(fd, &(cu->nurb));
@@ -9740,6 +9745,7 @@ static void expand_curve(FileData *fd, Main *mainvar, Curve *cu)
 	expand_doit(fd, mainvar, cu->vfontb);
 	expand_doit(fd, mainvar, cu->vfonti);
 	expand_doit(fd, mainvar, cu->vfontbi);
+	expand_doit(fd, mainvar, cu->atlas_image);
 	expand_doit(fd, mainvar, cu->key);
 	expand_doit(fd, mainvar, cu->ipo); // XXX deprecated - old animation system
 	expand_doit(fd, mainvar, cu->bevobj);

@@ -117,6 +117,7 @@ float BLF_default_width_max(void) ATTR_WARN_UNUSED_RESULT;
 
 float BLF_descender(int fontid) ATTR_WARN_UNUSED_RESULT;
 float BLF_ascender(int fontid) ATTR_WARN_UNUSED_RESULT;
+bool BLF_has_glyph(int fontid, unsigned int unicode) ATTR_WARN_UNUSED_RESULT;
 
 /* The following function return the width and height of the string, but
  * just in one call, so avoid extra freetype2 stuff.

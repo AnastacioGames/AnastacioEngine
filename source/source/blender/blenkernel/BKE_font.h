@@ -66,6 +66,7 @@ typedef struct EditFont {
 
 bool BKE_vfont_is_builtin(struct VFont *vfont);
 void BKE_vfont_builtin_register(void *mem, int size);
+const void *BKE_vfont_builtin_data(int *r_size);
 
 void BKE_vfont_free_data(struct VFont *vfont);
 void BKE_vfont_free(struct VFont *sc);

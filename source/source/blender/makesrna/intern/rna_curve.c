@@ -1085,6 +1085,58 @@ static void rna_def_font(BlenderRNA *UNUSED(brna), StructRNA *srna)
 	                         "outline) so only the game text is drawn");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
+	prop = RNA_def_property(srna, "use_bitmap_atlas", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_BITMAP_ATLAS);
+	RNA_def_property_ui_text(prop, "Bitmap Atlas",
+	                         "In game, draw the text with the glyphs painted in the atlas image instead of "
+	                         "the font (missing glyphs fall back to the font)");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
+	prop = RNA_def_property(srna, "use_atlas_hard_edge", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_ATLAS_HARD_EDGE);
+	RNA_def_property_ui_text(prop, "Hard Edge",
+	                         "Cut the atlas glyphs at 50% alpha: crisp outline when the text is enlarged "
+	                         "(soft shadows/glows become solid or vanish)");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
+	prop = RNA_def_property(srna, "atlas_image", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "atlas_image");
+	RNA_def_property_struct_type(prop, "Image");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Atlas Image", "Image holding the glyph cells of the bitmap atlas");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
+	prop = RNA_def_property(srna, "atlas_size", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 65536.0f);
+	RNA_def_property_ui_text(prop, "Atlas Font Size", "Font em size in pixels the atlas was rendered at");
+
+	prop = RNA_def_property(srna, "atlas_padding", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "atlas_pad");
+	RNA_def_property_range(prop, 0, 1024);
+	RNA_def_property_ui_text(prop, "Atlas Padding", "Pixels between the cell edge and the glyph origin");
+
+	prop = RNA_def_property(srna, "atlas_cell", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 65536.0f);
+	RNA_def_property_ui_text(prop, "Atlas Cell", "Glyph cell size in atlas pixels");
+
+	prop = RNA_def_property(srna, "atlas_baseline", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 65536.0f);
+	RNA_def_property_ui_text(prop, "Atlas Baseline", "Baseline offset from the top of a cell, in atlas pixels");
+
+	prop = RNA_def_property(srna, "atlas_line_height", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 65536.0f);
+	RNA_def_property_ui_text(prop, "Atlas Line Height", "Line height in atlas pixels");
+
+	prop = RNA_def_property(srna, "atlas_glyph_count", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "atlas_count");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Atlas Glyphs", "Number of glyphs in the bitmap atlas metrics");
+
+	prop = RNA_def_property(srna, "atlas_glyphs", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "atlas_glyphs", "atlas_count");
+	RNA_def_property_struct_type(prop, "TextAtlasGlyph");
+	RNA_def_property_ui_text(prop, "Atlas Glyphs", "Glyph cells of the bitmap atlas (resize with atlas_glyphs_resize)");
+
 
 	/* strings */
 	prop = RNA_def_property(srna, "family", PROP_STRING, PROP_NONE);
@@ -1149,6 +1201,32 @@ static void rna_def_font(BlenderRNA *UNUSED(brna), StructRNA *srna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_FAST);
 	RNA_def_property_ui_text(prop, "Fast Editing", "Don't fill polygons while editing");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+}
+
+static void rna_def_text_atlas_glyph(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "TextAtlasGlyph", NULL);
+	RNA_def_struct_ui_text(srna, "Text Atlas Glyph", "One glyph cell of a bitmap text atlas");
+
+	prop = RNA_def_property(srna, "code", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 0, 0x10FFFF);
+	RNA_def_property_ui_text(prop, "Code", "Unicode code point");
+
+	prop = RNA_def_property(srna, "uv_min", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "u0");
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_ui_text(prop, "UV Min", "Bottom-left corner of the cell in the atlas");
+
+	prop = RNA_def_property(srna, "uv_max", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "u1");
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_ui_text(prop, "UV Max", "Top-right corner of the cell in the atlas");
+
+	prop = RNA_def_property(srna, "advance", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Advance", "Pen advance in atlas pixels");
 }
 
 static void rna_def_textbox(BlenderRNA *brna)
@@ -1798,6 +1876,7 @@ void RNA_def_curve(BlenderRNA *brna)
 	rna_def_surface(brna);
 	rna_def_text(brna);
 	rna_def_textbox(brna);
+	rna_def_text_atlas_glyph(brna);
 	rna_def_charinfo(brna);
 	rna_def_bpoint(brna);
 	rna_def_beztriple(brna);

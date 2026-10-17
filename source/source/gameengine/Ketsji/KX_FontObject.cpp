@@ -33,6 +33,7 @@
 #include <exception>
 #include "DNA_curve_types.h"
 #include "DNA_vfont_types.h"
+#include "DNA_image_types.h"
 #include "KX_Scene.h"
 #include "KX_Globals.h"
 #include "KX_PythonInit.h"
@@ -47,6 +48,9 @@
 
 /* paths needed for font load */
 #include "BLI_blenlib.h"
+#include "BLI_string_utf8.h"
+#include "GPU_glew.h"
+#include "GPU_texture.h"
 #include "BKE_global.h"
 #include "BKE_font.h"
 #include "BKE_main.h"
@@ -93,9 +97,20 @@ KX_FontObject::KX_FontObject(void *sgReplicationInfo,
 	m_dpi(72),
 	m_resolution(1.0f),
 	m_rasterizer(rasterizer),
-	m_do_color_management(do_color_management)
+	m_do_color_management(do_color_management),
+	m_curve(static_cast<Curve *>(ob->data)),
+	m_atlasTexture(nullptr),
+	m_atlasTextureTried(false)
 {
 	Curve *text = static_cast<Curve *> (ob->data);
+
+	if ((text->flag & CU_BITMAP_ATLAS) && text->atlas_image && text->atlas_glyphs &&
+	    text->atlas_count > 0 && text->atlas_size > 0.0f && text->atlas_cell > 0.0f)
+	{
+		for (int i = 0; i < text->atlas_count; ++i) {
+			m_atlasLookup[(unsigned int)text->atlas_glyphs[i].code] = i;
+		}
+	}
 	m_fsize = text->fsize;
 	m_line_spacing = text->linedist;
 	m_offset = mt::vec3(text->xof, text->yof, 0.0f);
@@ -202,13 +217,75 @@ void KX_FontObject::UpdateBuckets()
 	textUser->SetUseShadows(m_use_shadow);
 	textUser->SetShadowOffset(m_shadow_offset);
 	textUser->SetShadowColor(m_shadow_color);
+
+	if (UseAtlas() && !m_atlasTextureTried) {
+		// GL context needed, so fetched here and not at conversion (cached on the Image).
+		ImageUser iuser = {nullptr};
+		iuser.ok = 1;
+		iuser.frames = 1;
+		iuser.sfra = 1;
+		m_atlasTexture = GPU_texture_from_blender(m_curve->atlas_image, &iuser, GL_TEXTURE_2D, false, 0.0, true);
+		m_atlasTextureTried = true;
+	}
+	textUser->SetAtlas(m_atlasTexture, m_atlasTexture ? &m_atlasQuads : nullptr,
+	                  (m_curve->flag & CU_ATLAS_HARD_EDGE) != 0);
 	textUser->ActivateMeshSlots();
+}
+
+void KX_FontObject::BuildAtlasQuads()
+{
+	const Curve *cu = m_curve;
+	// Atlas pixels to text space: the font em (atlas_size) maps to the Size of the text.
+	const float s = m_fsize / cu->atlas_size;
+	const float cell = cu->atlas_cell * s;
+	const float pad = cu->atlas_pad * s;
+	const float baseline = cu->atlas_baseline * s;
+	const float lineSpacing = m_fsize * m_line_spacing;
+
+	m_atlasQuads.clear();
+	m_atlasMin = mt::vec2(FLT_MAX);
+	m_atlasMax = mt::vec2(-FLT_MAX);
+
+	for (unsigned short i = 0, count = m_texts.size(); i < count; ++i) {
+		const std::string& line = m_texts[i];
+		const float top = baseline - lineSpacing * i;
+		float pen = 0.0f;
+		size_t index = 0;
+		while (index < line.size()) {
+			const unsigned int code = BLI_str_utf8_as_unicode_step(line.c_str(), &index);
+			const auto it = m_atlasLookup.find(code);
+			if (it == m_atlasLookup.end()) {
+				// Not in the atlas: leave a gap so the rest of the line keeps its place.
+				pen += cell * 0.5f;
+				continue;
+			}
+			const TextAtlasGlyph& g = cu->atlas_glyphs[it->second];
+			const float x0 = pen - pad;
+			const float x1 = x0 + cell;
+			const float y0 = top - cell;
+			const float quad[16] = {
+				x0, y0, g.u0, g.v0,
+				x1, y0, g.u1, g.v0,
+				x1, top, g.u1, g.v1,
+				x0, top, g.u0, g.v1,
+			};
+			m_atlasQuads.insert(m_atlasQuads.end(), quad, quad + 16);
+			pen += g.advance * s;
+		}
+		m_atlasMin.x = std::min(m_atlasMin.x, 0.0f);
+		m_atlasMax.x = std::max(m_atlasMax.x, pen);
+		m_atlasMin.y = std::min(m_atlasMin.y, top - cell);
+		m_atlasMax.y = std::max(m_atlasMax.y, top);
+	}
 }
 
 void KX_FontObject::SetText(const std::string& text)
 {
 	m_text = text;
 	m_texts = split_string(text);
+	if (UseAtlas()) {
+		BuildAtlasQuads();
+	}
 
 	if (m_spacemode != TEXT_ALIGN_X_LEFT || m_spacemode_y != TEXT_ALIGN_Y_TOP_BASELINE) {
 		m_text_offset = m_offset;
@@ -296,6 +373,15 @@ const mt::vec2 KX_FontObject::GetTextDimensions()
 
 void KX_FontObject::GetTextAabb(mt::vec2& min, mt::vec2& max)
 {
+	if (UseAtlas()) {
+		if (m_atlasQuads.empty() && !m_texts.empty()) {
+			BuildAtlasQuads();
+		}
+		min = m_atlasMin + mt::vec2(m_text_offset.x, m_text_offset.y);
+		max = m_atlasMax + mt::vec2(m_text_offset.x, m_text_offset.y);
+		return;
+	}
+
 	const float RES = BGE_FONT_RES * m_resolution;
 
 	const float size = m_fsize * RES;
