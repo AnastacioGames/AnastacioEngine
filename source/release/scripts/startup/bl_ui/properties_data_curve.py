@@ -107,6 +107,8 @@ class DATA_PT_shape_curve(CurveButtonsPanel, Panel):
         is_surf = type(curve) is SurfaceCurve
         is_curve = type(curve) is Curve
         is_text = type(curve) is TextCurve
+        # Render resolution only applies to offline render; Play and Convert to Mesh use Preview.
+        game = context.scene.render.engine == "BLENDER_GAME"
 
         box = layout.box()
         box.label(text="Shape:", icon="CURVE_DATA")
@@ -121,7 +123,8 @@ class DATA_PT_shape_curve(CurveButtonsPanel, Panel):
         col.label(text="Resolution:")
         sub = col.column(align=True)
         sub.prop(curve, "resolution_u", text="Preview U")
-        sub.prop(curve, "render_resolution_u", text="Render U")
+        if not game:
+            sub.prop(curve, "render_resolution_u", text="Render U")
         if is_curve:
             col.label(text="Twisting:")
             col.prop(curve, "twist_mode", text="")
@@ -137,7 +140,8 @@ class DATA_PT_shape_curve(CurveButtonsPanel, Panel):
             sub.label(text="")
             sub = col.column(align=True)
             sub.prop(curve, "resolution_v", text="Preview V")
-            sub.prop(curve, "render_resolution_v", text="Render V")
+            if not game:
+                sub.prop(curve, "render_resolution_v", text="Render V")
 
         if is_curve or is_text:
             col.label(text="Fill:")
@@ -637,6 +641,13 @@ class DATA_PT_custom_props_curve(CurveButtonsPanel, PropertyPanel, Panel):
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
     _context_path = "object.data"
     _property_type = bpy.types.Curve
+
+    @classmethod
+    def poll(cls, context):
+        # The game runtime never reads ID properties of curve/text data.
+        if context.scene.render.engine == "BLENDER_GAME":
+            return False
+        return PropertyPanel.poll.__func__(cls, context)
 
 
 classes = (
