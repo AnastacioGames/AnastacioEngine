@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Starts a server and a client RangeRuntime (xvfb; a --server one without any display) and checks that a replicated object moves
+# Starts a server and a client AnastacioRuntime (xvfb; a --server one without any display) and checks that a replicated object moves
 # on the client. Usage: tools/net_engine_test/run_net_test.sh [spawner|car|scene|server|scene-server|predict|predict-cube|rpc|relevance|scene-change] [build dir] [net-sim "lat,jit,loss"]
 #   spawner, car  the script registers the objects (net.replicate) and calls host()/join()
 #   server        spawner with the server started as a headless server (RangeRuntime --server): no render, no
@@ -42,13 +42,13 @@ case "$SCENARIO" in
     SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   spawner) SCENE_SERVER="$ROOT/projects-teste/halfanim_crash/halfanim_crash.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   predict-cube) export NET_PREDICT_DYN=1; SCENARIO=car; SIM="${SIM:-40,5,1}"; SECONDS_RUN="${NET_SECONDS:-12}"
-    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/RangeEngine}"
+    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/AnastacioEngine}"
     ( cd "$(dirname "$EDITOR_BIN")" && BLENDER_SYSTEM_SCRIPTS="$ROOT/source/release/scripts" BLENDER_SYSTEM_DATAFILES="$ROOT/source/release/datafiles" xvfb-run -a "$EDITOR_BIN" -b --python "$HERE/make_dyn_scene.py" -- "$OUT/cube.range" ) \
       > "$OUT/make.log" 2>&1
     grep -q "NETDYN SAVED" "$OUT/make.log" || { echo "NET ENGINE TEST (predict-cube): FAIL (editor step, logs in $OUT)"; exit 1; }
     SCENE_SERVER="$OUT/cube.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   scene-change)
-    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/RangeEngine}"
+    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/AnastacioEngine}"
     ( cd "$(dirname "$EDITOR_BIN")" && BLENDER_SYSTEM_SCRIPTS="$ROOT/source/release/scripts" BLENDER_SYSTEM_DATAFILES="$ROOT/source/release/datafiles" xvfb-run -a "$EDITOR_BIN" -b --python "$HERE/make_scene_change.py" -- "$OUT/change.range" ) \
       > "$OUT/make.log" 2>&1
     grep -q "NETCHANGE SAVED" "$OUT/make.log" || { echo "NET ENGINE TEST (scene-change): FAIL (editor step, logs in $OUT)"; exit 1; }
@@ -56,7 +56,7 @@ case "$SCENARIO" in
   car) SCENE_SERVER="$ROOT/projects-teste/car_framerate/car_com_fr0.range"; SCENE_CLIENT="$SCENE_SERVER" ;;
   scene|scene-server)
     if [ "$SCENARIO" = scene-server ]; then SERVER_ARGS="--server"; export NET_HEADLESS=1; fi
-    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/RangeEngine}"
+    EDITOR_BIN="${EDITOR_BIN:-$ROOT/build-linux-editor/bin/AnastacioEngine}"
     ( cd "$(dirname "$EDITOR_BIN")" && BLENDER_SYSTEM_SCRIPTS="$ROOT/source/release/scripts" BLENDER_SYSTEM_DATAFILES="$ROOT/source/release/datafiles" xvfb-run -a "$EDITOR_BIN" -b --python "$HERE/make_net_scenes.py" -- "$PORT" "$OUT" ) \
       > "$OUT/make.log" 2>&1
     grep -h "NETSCENE" "$OUT/make.log"
@@ -82,7 +82,7 @@ run() { # role scene [extra player args: the server's go first, -w after them wo
   case " $* " in *" --server "*) xvfb="env -u DISPLAY -u WAYLAND_DISPLAY" ;; esac
   # /usr/bin/time -f: user+system CPU seconds of the player (xvfb-run is outside the measured command).
   ( cd "$BUILD/bin" && NET_ROLE="$role" timeout 120 $xvfb /usr/bin/time -f "NETCPU $role %U %S" \
-      ./RangeRuntime "$@" $window -p "${TEST_PY:-$HERE/net_engine_test.py}" "$scene" > "$OUT/$role.log" 2>&1 ) &
+      ./AnastacioRuntime "$@" $window -p "${TEST_PY:-$HERE/net_engine_test.py}" "$scene" > "$OUT/$role.log" 2>&1 ) &
 }
 run server "$SCENE_SERVER" $SERVER_ARGS
 sleep 1

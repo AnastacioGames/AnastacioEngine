@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Roteiro automatico para compilar e testar o RangeRuntime (player) no Linux.
+# Roteiro automatico para compilar e testar o AnastacioRuntime (player) no Linux.
 # Uso:
 #   bash tools/linux/quickstart.sh                 -> instala deps, compila e instala
 #   bash tools/linux/quickstart.sh /caminho/jogo.range  -> alem disso, roda o jogo no final
@@ -49,16 +49,16 @@ bash tools/linux/install-python311.sh
 step "4/6 - Checagem de ambiente (preflight)"
 PYTHON_VERSION="$PYTHON_VERSION" PYTHON_EXECUTABLE="$PYTHON_EXECUTABLE" bash tools/linux/preflight.sh
 
-step "5/6 - Configurando e compilando (RangeRuntime, preset linux-runtime)"
+step "5/6 - Configurando e compilando (alvo RangeRuntime, preset linux-runtime)"
 cmake --preset linux-runtime -S source
 cmake --build build-linux --target RangeRuntime -j"$(nproc)"
 cmake --install build-linux
 
-if [ -x "build-linux/bin/RangeRuntime" ]; then
+if [ -x "build-linux/bin/AnastacioRuntime" ]; then
   step "6/6 - Build concluido"
-  echo "Executavel pronto em: build-linux/bin/RangeRuntime"
+  echo "Executavel pronto em: build-linux/bin/AnastacioRuntime"
 else
-  echo "Build terminou mas build-linux/bin/RangeRuntime nao foi encontrado." >&2
+  echo "Build terminou mas build-linux/bin/AnastacioRuntime nao foi encontrado." >&2
   exit 1
 fi
 
@@ -75,7 +75,7 @@ fi
 if [ -n "$GAME_RANGE" ]; then
   if [ -f "$GAME_RANGE" ]; then
     step "Rodando jogo: $GAME_RANGE"
-    (cd build-linux/bin && "${NVIDIA_OFFLOAD_ENV[@]}" ./RangeRuntime "$GAME_RANGE")
+    (cd build-linux/bin && "${NVIDIA_OFFLOAD_ENV[@]}" ./AnastacioRuntime "$GAME_RANGE")
   else
     echo "Arquivo .range nao encontrado: $GAME_RANGE" >&2
     exit 1
@@ -86,7 +86,7 @@ else
 
 Para rodar um jogo depois (notebook com GPU NVIDIA hibrida detectada, use o offload):
   cd build-linux/bin
-  __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./RangeRuntime /caminho/para/seu_jogo.range
+  __NV_PRIME_RENDER_OFFLOAD=1 __GLX_VENDOR_LIBRARY_NAME=nvidia ./AnastacioRuntime /caminho/para/seu_jogo.range
 
 Ou rode este script de novo passando o caminho do .range como argumento.
 EOF
@@ -95,7 +95,7 @@ EOF
 
 Para rodar um jogo depois:
   cd build-linux/bin
-  ./RangeRuntime /caminho/para/seu_jogo.range
+  ./AnastacioRuntime /caminho/para/seu_jogo.range
 
 Ou rode este script de novo passando o caminho do .range como argumento.
 EOF

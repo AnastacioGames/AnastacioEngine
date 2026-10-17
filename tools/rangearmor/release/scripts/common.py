@@ -3,12 +3,16 @@ from json import loads as _loads
 
 
 def resolve_runtime(path):
-    """Accept either standard Windows runtime name without changing custom paths."""
+    """Accept either standard desktop runtime name without changing custom paths."""
     path = _Path(path)
     if path.is_file():
         return path
-    alternate = {'RangeRuntime.exe': 'AnastacioRuntime.exe',
-                 'AnastacioRuntime.exe': 'RangeRuntime.exe'}.get(path.name)
+    alternate = {
+        'RangeRuntime.exe': 'AnastacioRuntime.exe',
+        'AnastacioRuntime.exe': 'RangeRuntime.exe',
+        'RangeRuntime': 'AnastacioRuntime',
+        'AnastacioRuntime': 'RangeRuntime',
+    }.get(path.name)
     if alternate and path.with_name(alternate).is_file():
         return path.with_name(alternate)
     return path

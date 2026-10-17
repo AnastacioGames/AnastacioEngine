@@ -32,6 +32,8 @@ class ReleaseSafety(unittest.TestCase):
         self.destination = self.root / 'release/Game-1-Windows64'
         self.destination.mkdir()
         (self.destination / 'previous.txt').write_text('known good')
+        self.cook_runtime = self.root / 'AnastacioRuntime'
+        self.cook_runtime.write_bytes(b'test runtime')
 
     def test_failed_cook_preserves_previous_delivery(self):
         with mock.patch.object(release.prepare_cooked, 'prepare', side_effect=RuntimeError('cook failed')):
@@ -66,6 +68,17 @@ class ReleaseSafety(unittest.TestCase):
         self.assertEqual(release.common.resolve_runtime(configured), configured)
         self.assertEqual(release.common.resolve_runtime(runtime), runtime)
 
+    def test_linux_runtime_name_migrates_with_legacy_fallback(self):
+        engine = self.root / 'engine/Linux64'
+        engine.mkdir(parents=True)
+        legacy = engine / 'RangeRuntime'
+        new = engine / 'AnastacioRuntime'
+        legacy.write_bytes(b'legacy runtime')
+        self.assertEqual(release.common.resolve_runtime(new), legacy)
+        new.write_bytes(b'new runtime')
+        self.assertEqual(release.common.resolve_runtime(new), new)
+        self.assertEqual(release.common.resolve_runtime(engine / 'CustomRuntime'), engine / 'CustomRuntime')
+
     def test_success_packages_companion_and_preserves_previous(self):
         with mock.patch.object(release.prepare_cooked, 'prepare'):
             release.build(self.data, {'--target': 'All', '--compress': True})
@@ -83,21 +96,24 @@ class ReleaseSafety(unittest.TestCase):
         self.assertTrue((self.destination / 'previous.txt').exists())
 
     def test_failed_runtime_preserves_previous_cache(self):
-        with mock.patch.object(release.prepare_cooked.subprocess, 'run') as run:
+        with mock.patch.dict('os.environ', {'RANGEARMOR_COOK_RUNTIME': str(self.cook_runtime)}), \
+             mock.patch.object(release.prepare_cooked.subprocess, 'run') as run:
             run.return_value = mock.Mock(returncode=5, stdout='failed', stderr='')
             with self.assertRaises(RuntimeError):
                 release.prepare_cooked.prepare(self.data)
         self.assertEqual((self.root / 'data/Game.cooked').read_bytes(), b'test fixture')
 
     def test_timeout_preserves_previous_cache(self):
-        with mock.patch.object(release.prepare_cooked.subprocess, 'run',
+        with mock.patch.dict('os.environ', {'RANGEARMOR_COOK_RUNTIME': str(self.cook_runtime)}), \
+             mock.patch.object(release.prepare_cooked.subprocess, 'run',
                                side_effect=subprocess.TimeoutExpired('runtime', 600)):
             with self.assertRaises(subprocess.TimeoutExpired):
                 release.prepare_cooked.prepare(self.data)
         self.assertEqual((self.root / 'data/Game.cooked').read_bytes(), b'test fixture')
 
     def test_successful_empty_cook_removes_previous_cache(self):
-        with mock.patch.object(release.prepare_cooked.subprocess, 'run') as run:
+        with mock.patch.dict('os.environ', {'RANGEARMOR_COOK_RUNTIME': str(self.cook_runtime)}), \
+             mock.patch.object(release.prepare_cooked.subprocess, 'run') as run:
             run.return_value = mock.Mock(returncode=0)
             release.prepare_cooked.prepare(self.data)
         self.assertFalse((self.root / 'data/Game.cooked').exists())

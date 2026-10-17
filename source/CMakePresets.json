@@ -242,6 +242,30 @@
         "CMAKE_CXX_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -Wno-sign-conversion",
         "CMAKE_EXE_LINKER_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=5MB"
       }
+    },
+    {
+      "name": "web-runtime-linux",
+      "displayName": "AnastacioEngine Runtime (Web/Emscripten wasm32, Linux host)",
+      "description": "Igual ao web-runtime, com os caminhos fixos do Windows (ninja.exe, node.exe, PYTHON_ROOT_DIR em D:/) troc\u00e1veis por vari\u00e1veis de ambiente para compilar num host Linux com o emsdk (fonte emsdk_env.sh antes de configurar). PYTHON_ROOT_DIR ainda precisa de um CPython 3.11 cross-compilado para wasm32-emscripten (ver docs/web-python-poc-plan.md); sem isso o configure/build falha mais na frente, mas j\u00e1 n\u00e3o nos caminhos do Windows.",
+      "inherits": "web-runtime",
+      "binaryDir": "${sourceDir}/../build-web",
+      "cacheVariables": {
+        "CMAKE_MAKE_PROGRAM": "ninja",
+        "PYTHON_ROOT_DIR": "$env{PYTHON_WASM_ROOT_DIR}",
+        "CMAKE_CROSSCOMPILING_EMULATOR": "$env{EMSDK_NODE}"
+      }
+    },
+    {
+      "name": "web-runtime-release-linux",
+      "displayName": "AnastacioEngine Runtime (Web/Emscripten wasm32, release, Linux host)",
+      "description": "web-runtime-release com os mesmos caminhos de web-runtime-linux. Use para gerar pacotes com tools/web/package-web.py --runtime-dir build-web-release/bin.",
+      "inherits": ["web-runtime-linux", "web-runtime-release"],
+      "binaryDir": "${sourceDir}/../build-web-release",
+      "cacheVariables": {
+        "CMAKE_C_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -Wno-sign-conversion",
+        "CMAKE_CXX_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -Wno-sign-conversion",
+        "CMAKE_EXE_LINKER_FLAGS": "-sUSE_SDL=2 -sUSE_ZLIB=1 -sUSE_BZIP2=1 -sUSE_SQLITE3=1 -sUSE_FREETYPE=1 -sUSE_LIBJPEG=1 -sUSE_LIBPNG=1 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2 -sLEGACY_GL_EMULATION=1 -sGL_UNSAFE_OPTS=0 -sALLOW_MEMORY_GROWTH=1 -sSTACK_SIZE=5MB"
+      }
     }
   ],
   "buildPresets": [
@@ -272,6 +296,16 @@
     {
       "name": "web-runtime-release",
       "configurePreset": "web-runtime-release",
+      "targets": ["RangeRuntime"]
+    },
+    {
+      "name": "web-runtime-linux",
+      "configurePreset": "web-runtime-linux",
+      "targets": ["RangeRuntime"]
+    },
+    {
+      "name": "web-runtime-release-linux",
+      "configurePreset": "web-runtime-release-linux",
       "targets": ["RangeRuntime"]
     }
   ]

@@ -16,7 +16,7 @@ def prepare(data):
     if data_dir not in main.parents or not main.is_file():
         raise RuntimeError('MainFile must exist inside data/: ' + str(main))
     host = 'Windows64' if platform.system() == 'Windows' else 'Linux64'
-    name = 'AnastacioRuntime.exe' if host == 'Windows64' else 'RangeRuntime'
+    name = 'AnastacioRuntime.exe' if host == 'Windows64' else 'AnastacioRuntime'
     configured = os.environ.get('RANGEARMOR_COOK_RUNTIME')
     candidates = [Path(configured)] if configured else []
     candidates += [Path(__file__).resolve().parents[3] / name,
