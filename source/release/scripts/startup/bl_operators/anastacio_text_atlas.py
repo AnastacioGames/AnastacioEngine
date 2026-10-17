@@ -356,6 +356,24 @@ def _write_atlas_file(image):
     return os.path.normpath(path)
 
 
+def _open_system_editor(path):
+    import subprocess
+    import sys
+    try:
+        if sys.platform == "win32":
+            try:
+                os.startfile(path, "edit")
+            except OSError:
+                os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+        return True
+    except Exception:
+        return False
+
+
 class FONT_OT_text_atlas_edit_external(Operator):
     """Save the atlas image as a PNG and open it in your image editor (or give the file to an AI tool). """ \
         """Keep each letter inside its cell, save, then press Reload"""
@@ -369,11 +387,16 @@ class FONT_OT_text_atlas_edit_external(Operator):
 
     def execute(self, context):
         path = _write_atlas_file(_text_curve(context).atlas_image)
+        editor = bpy.path.abspath(context.user_preferences.filepaths.image_editor)
         try:
+            if not editor or not os.path.isfile(editor):
+                raise RuntimeError("no image editor in User Preferences")
             bpy.ops.image.external_edit(filepath=path)
-        except RuntimeError as ex:
-            self.report({'WARNING'}, "Saved %s (could not open an editor: %s)" % (path, ex))
-            return {'FINISHED'}
+        except RuntimeError:
+            # No image editor set in User Preferences: use the system one.
+            if not _open_system_editor(path):
+                self.report({'WARNING'}, "Saved %s - open it in any image editor, then press Reload" % path)
+                return {'FINISHED'}
         self.report({'INFO'}, "Editing %s - save it there, then press Reload" % path)
         return {'FINISHED'}
 

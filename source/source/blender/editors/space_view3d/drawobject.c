@@ -60,6 +60,7 @@
 #include "BKE_font.h"
 #include "BKE_global.h"
 #include "BKE_image.h"
+#include "BLI_string_utf8.h"
 #include "BKE_key.h"
 #include "BKE_lattice.h"
 #include "BKE_main.h"
@@ -90,6 +91,7 @@
 #include "GPU_select.h"
 #include "GPU_basic_shader.h"
 #include "GPU_shader.h"
+#include "GPU_texture.h"
 
 #include "ED_datafiles.h"
 #include "ED_mesh.h"
@@ -5354,6 +5356,123 @@ static int draw_game_text_font_id(Main *bmain, VFont *vfont)
 }
 
 /**
+ * "Preview Game Text" with a Bitmap Atlas: same layout as KX_FontObject::BuildAtlasQuads,
+ * ApplyTextAlignment and RAS_OpenGLRasterizer::RenderTextAtlas3D.
+ * eturn false when the atlas can't be used (falls back to the BLF preview).
+ */
+static bool draw_game_text_atlas(Curve *cu, const char **lines, const size_t *lens, int totline,
+                                 const float color[4])
+{
+	if ((cu->flag & CU_BITMAP_ATLAS) == 0 || cu->atlas_image == NULL || cu->atlas_glyphs == NULL ||
+	    cu->atlas_count <= 0 || cu->atlas_size <= 0.0f || cu->atlas_cell <= 0.0f)
+	{
+		return false;
+	}
+
+	ImageUser iuser = {NULL};
+	iuser.ok = 1;
+	iuser.frames = 1;
+	iuser.sfra = 1;
+	GPUTexture *tex = GPU_texture_from_blender(cu->atlas_image, &iuser, GL_TEXTURE_2D, false, 0.0, true);
+	if (tex == NULL) {
+		return false;
+	}
+
+	const float s = cu->fsize / cu->atlas_size;
+	const float cell = cu->atlas_cell * s;
+	const float pad = cu->atlas_pad * s;
+	const float baseline = cu->atlas_baseline * s;
+	const float line_spacing = cu->fsize * cu->linedist;
+	float min[2] = {FLT_MAX, FLT_MAX}, max[2] = {-FLT_MAX, -FLT_MAX};
+
+	/* first pass: bounds, for the alignment */
+	for (int i = 0; i < totline; i++) {
+		const float top = baseline - line_spacing * i;
+		float pen = 0.0f;
+		size_t index = 0;
+		while (index < lens[i]) {
+			const unsigned int code = BLI_str_utf8_as_unicode_step(lines[i], &index);
+			const TextAtlasGlyph *g = NULL;
+			for (int k = 0; k < cu->atlas_count; k++) {
+				if ((unsigned int)cu->atlas_glyphs[k].code == code) {
+					g = &cu->atlas_glyphs[k];
+					break;
+				}
+			}
+			pen += g ? g->advance * s : cell * 0.5f;
+		}
+		min[0] = min_ff(min[0], 0.0f);
+		max[0] = max_ff(max[0], pen);
+		min[1] = min_ff(min[1], top - cell);
+		max[1] = max_ff(max[1], top);
+	}
+
+	float offset[2] = {cu->xof, cu->yof};
+	if (cu->spacemode != CU_ALIGN_X_LEFT || cu->align_y != CU_ALIGN_Y_TOP_BASELINE) {
+		const float bmin[2] = {min[0] + cu->xof, min[1] + cu->yof};
+		const float bmax[2] = {max[0] + cu->xof, max[1] + cu->yof};
+		switch (cu->spacemode) {
+			case CU_ALIGN_X_MIDDLE: offset[0] -= ((bmin[0] + bmax[0]) - cu->xof) / 2.0f; break;
+			case CU_ALIGN_X_RIGHT:  offset[0] -= bmax[0] - cu->xof; break;
+			default: break;
+		}
+		switch (cu->align_y) {
+			case CU_ALIGN_Y_TOP:    offset[1] -= bmax[1] - cu->yof; break;
+			case CU_ALIGN_Y_CENTER: offset[1] -= ((bmin[1] + bmax[1]) / 2.0f) - cu->yof; break;
+			case CU_ALIGN_Y_BOTTOM: offset[1] -= bmin[1] - cu->yof; break;
+			default: break;
+		}
+	}
+
+	glDisable(GL_LIGHTING);
+	glDisable(GL_CULL_FACE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	/* depth only where there is ink, like the BLF preview */
+	glEnable(GL_ALPHA_TEST);
+	glAlphaFunc(GL_GREATER, (cu->flag & CU_ATLAS_HARD_EDGE) ? 0.5f : 0.1f);
+	glDepthMask(GL_TRUE);
+	GPU_basic_shader_bind(GPU_SHADER_TEXTURE_2D | GPU_SHADER_USE_COLOR);
+	GPU_texture_bind(tex, 0);
+	glColor4fv(color);
+
+	glBegin(GL_QUADS);
+	for (int i = 0; i < totline; i++) {
+		const float top = baseline - line_spacing * i + offset[1];
+		float pen = offset[0];
+		size_t index = 0;
+		while (index < lens[i]) {
+			const unsigned int code = BLI_str_utf8_as_unicode_step(lines[i], &index);
+			const TextAtlasGlyph *g = NULL;
+			for (int k = 0; k < cu->atlas_count; k++) {
+				if ((unsigned int)cu->atlas_glyphs[k].code == code) {
+					g = &cu->atlas_glyphs[k];
+					break;
+				}
+			}
+			if (g == NULL) {
+				pen += cell * 0.5f;
+				continue;
+			}
+			const float x0 = pen - pad, x1 = x0 + cell, y0 = top - cell;
+			glTexCoord2f(g->u0, g->v0); glVertex2f(x0, y0);
+			glTexCoord2f(g->u1, g->v0); glVertex2f(x1, y0);
+			glTexCoord2f(g->u1, g->v1); glVertex2f(x1, top);
+			glTexCoord2f(g->u0, g->v1); glVertex2f(x0, top);
+			pen += g->advance * s;
+		}
+	}
+	glEnd();
+
+	GPU_texture_unbind(tex);
+	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+	glAlphaFunc(GL_ALWAYS, 0.0f);
+	glDisable(GL_ALPHA_TEST);
+	glDisable(GL_BLEND);
+	return true;
+}
+
+/**
  * "Preview Game Text": draw a font object with BLF the same way KX_FontObject +
  * RAS_OpenGLRasterizer::RenderText3D do in game, so the viewport matches Play.
  * Expects the object matrix already on the modelview stack.
@@ -5456,6 +5575,14 @@ static bool draw_game_text_preview(Main *bmain, Scene *scene, Base *base,
 	}
 	else {
 		copy_v4_v4(color, ob->col);
+	}
+
+	if (draw_game_text_atlas(cu, lines, lens, totline, color)) {
+		if (base->flag & SELECT) {
+			glColor3ubv(ob_wire_col);
+			draw_bounding_volume(ob, OB_BOUND_BOX);
+		}
+		return true;
 	}
 
 	/* RAS_OpenGLRasterizer::RenderText3D */
