@@ -294,14 +294,18 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
                  icon='TRIA_DOWN' if ob.show_expanded_gpu_emitter else 'TRIA_RIGHT', emboss=True)
 
         if ob.show_expanded_gpu_emitter:
-            split = main_box.split()
-            col = split.column()
-            box = col.box()
-            box.label(text="Debug:", icon="SETTINGS")
-            box.prop(gp, "use_debug_ui", text="Live Debug UI (in-game)")
-            box.operator("particle.import_gpu_debug_values", icon="IMPORT")
-            col = split.column()
-            box = col.box()
+            # Debug column (Live Debug UI + Import Debug Values) is hidden: the
+            # padlock in the UI now unlocks the interface during Play, making
+            # this standalone debug toggle redundant. Kept here, commented, in
+            # case the debug workflow needs to come back.
+            # split = main_box.split()
+            # col = split.column()
+            # box = col.box()
+            # box.label(text="Debug:", icon="SETTINGS")
+            # box.prop(gp, "use_debug_ui", text="Live Debug UI (in-game)")
+            # box.operator("particle.import_gpu_debug_values", icon="IMPORT")
+            # col = split.column()
+            box = main_box.box()
             box.label(text="Emission:", icon="PLAY")
             box.prop(gp, "enabled", text="Emit at Game Start")
             box.prop(gp, "emission_mode", text="")
@@ -326,12 +330,17 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             box.prop(gp, "emit_from", text="")
             sub = box.column()
             sub.enabled = gp.emit_from == 'VOLUME'
-            sub.prop(gp, "emitter_position")
+            sub.label(text="Emitter Position:")
+            row = sub.row(align=True)
+            row.prop(gp, "emitter_position", text="")
             sub.prop(gp, "emitter_radius")
             col = split.column()
             box = col.box()
             box.label(text="Emission Cone:", icon="MESH_CONE")
-            box.prop(gp, "emission_direction")
+            box.label(text="")
+            box.label(text="Emission Direction:")
+            row = box.row(align=True)
+            row.prop(gp, "emission_direction", text="")
             box.prop(gp, "emission_angle")
 
             split = main_box.split()
@@ -370,10 +379,12 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             split = box.split()
             col = split.column()
             col.label(text="Gravity:")
-            col.prop(gp, "gravity", text="")
+            row = col.row(align=True)
+            row.prop(gp, "gravity", text="")
             col = split.column()
             col.label(text="Velocity:")
-            col.prop(gp, "velocity", text="")
+            row = col.row(align=True)
+            row.prop(gp, "velocity", text="")
             box.prop(gp, "velocity_randomness")
             box.prop(gp, "drag")
 
