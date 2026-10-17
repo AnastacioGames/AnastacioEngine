@@ -79,54 +79,91 @@ class SCENE_OT_anastacio_ssgi_enable_nodes(bpy.types.Operator):
         return {'FINISHED'}
 
 
-# Mirrors GPU_material_ssgi_outputs() in gpu_material.c: keep both in sync.
+# Mirrors gpu_ssgi_closure() in gpu_material.c: keep both in sync.
 _SSGI_ROOTS = {'BSDF_PRINCIPLED', 'BSDF_DIFFUSE', 'EMISSION'}
-_SSGI_BLEND = {'OPAQUE'}
+_SSGI_EMPTY = {'BSDF_TRANSPARENT', 'HOLDOUT'}
+_SSGI_SPECULAR = {'BSDF_GLOSSY', 'BSDF_GLASS', 'BSDF_REFRACTION', 'BSDF_ANISOTROPIC'}
+_SSGI_BLEND = {'OPAQUE', 'CLIP'}
 
-# Last "Check Scene" result shown by the panel: (participating, [(material, reason)]).
+# Last "Check Scene" result shown by the panel:
+# (full, approximated, excluded, [(material, reason, is_excluded)]).
 check_result = None
 
 
-def _surface_node(tree):
-    output = next((n for n in tree.nodes if n.type == 'OUTPUT_MATERIAL' and n.is_active_output), None)
-    if output is None:
-        output = next((n for n in tree.nodes if n.type == 'OUTPUT_MATERIAL'), None)
-    if output is None or not output.inputs['Surface'].is_linked:
-        return None
-    node = output.inputs['Surface'].links[0].from_node
-    while node.type == 'REROUTE' and node.inputs[0].is_linked:
-        node = node.inputs[0].links[0].from_node
-    return node
-
-
-def ssgi_material_issue(ma):
-    """None when the material writes SSGI data, else a short reason."""
-    blend = ma.game_settings.alpha_blend
-    if blend not in _SSGI_BLEND:
-        return "transparency (%s)" % blend.replace('_', ' ').title()
-    if not ma.use_nodes or not ma.node_tree:
-        return None
-    node = _surface_node(ma.node_tree)
-    if node is None:
-        return "nothing linked to Material Output"
-    if node.type not in _SSGI_ROOTS:
-        return "%s node on Output" % node.bl_label
+def _linked_node(socket):
+    """Node feeding a socket, through reroutes and into node groups, like the GPU graph."""
+    while socket.is_linked:
+        node = socket.links[0].from_node
+        if node.type == 'REROUTE':
+            socket = node.inputs[0]
+        elif node.type == 'GROUP' and node.node_tree:
+            out = next((n for n in node.node_tree.nodes if n.type == 'GROUP_OUTPUT'), None)
+            name = socket.links[0].from_socket.name
+            if out is None or name not in out.inputs:
+                return None
+            socket = out.inputs[name]
+        elif node.type == 'GROUP_INPUT':
+            return None
+        else:
+            return node
     return None
 
 
+def _closure_state(node, approximate):
+    """'full', 'partial' (approximated closure) or None (excluded), plus the node that decided it."""
+    if node is None or node.type in _SSGI_ROOTS or node.type in _SSGI_EMPTY:
+        return 'full', None
+    if node.type in {'MIX_SHADER', 'ADD_SHADER'}:
+        shaders = [sock for sock in node.inputs if sock.type == 'SHADER']
+        states = [_closure_state(_linked_node(sock), approximate) for sock in shaders]
+        for state in ('excluded', 'partial'):
+            hit = next((st for st in states if (st[0] or 'excluded') == state), None)
+            if hit:
+                return hit
+        return 'full', None
+    return ('partial' if approximate else None), node
+
+
+def ssgi_material_issue(ma, approximate=True):
+    """None when the material fully writes SSGI data, else (excluded, short reason)."""
+    blend = ma.game_settings.alpha_blend
+    if blend not in _SSGI_BLEND:
+        return True, "transparency (%s)" % blend.replace('_', ' ').title()
+    if not ma.use_nodes or not ma.node_tree:
+        return None
+    tree = ma.node_tree
+    output = next((n for n in tree.nodes if n.type == 'OUTPUT_MATERIAL' and n.is_active_output), None)
+    output = output or next((n for n in tree.nodes if n.type == 'OUTPUT_MATERIAL'), None)
+    if output is None:
+        return True, "no Material Output"
+    state, node = _closure_state(_linked_node(output.inputs['Surface']), approximate)
+    if state == 'full':
+        return None
+    if state == 'partial':
+        what = "blocks rays only" if node.type in _SSGI_SPECULAR else "approximate color"
+        return False, "%s: %s" % (node.bl_label, what)
+    return True, "%s node (Approximate Unsupported is off)" % node.bl_label
+
+
 class SCENE_OT_anastacio_ssgi_check(bpy.types.Operator):
-    """List the materials in this Scene that Native SSGI cannot use, and why"""
+    """List the materials in this Scene that Native SSGI approximates or cannot use, and why"""
     bl_idname = "scene.anastacio_ssgi_check"
     bl_label = "Check Scene"
 
     def execute(self, context):
         global check_result
-        materials = {slot.material for ob in context.scene.objects if ob.type == 'MESH'
+        scene = context.scene
+        materials = {slot.material for ob in scene.objects if ob.type == 'MESH'
                      for slot in ob.material_slots if slot.material}
-        issues = sorted((ma.name, reason) for ma in materials
-                        for reason in (ssgi_material_issue(ma),) if reason)
-        check_result = (len(materials) - len(issues), issues)
-        self.report({'INFO'}, "Native SSGI: %d of %d materials participate" % (check_result[0], len(materials)))
+        issues = sorted((excluded, ma.name, reason) for ma in materials
+                        for issue in (ssgi_material_issue(ma, scene.ae_ssgi_approximate),) if issue
+                        for excluded, reason in (issue,))
+        partial = sum(1 for issue in issues if not issue[0])
+        excluded = len(issues) - partial
+        check_result = (len(materials) - len(issues), partial, excluded,
+                        [(name, reason, ex) for ex, name, reason in sorted(issues, key=lambda i: (not i[0], i[1]))])
+        self.report({'INFO'}, "Native SSGI: %d full, %d approximate, %d excluded"
+                    % (check_result[0], partial, excluded))
         return {'FINISHED'}
 
 
@@ -136,9 +173,12 @@ classes = (SCENE_OT_anastacio_ssgi_quality, SCENE_OT_anastacio_ssgi_enable_nodes
 
 def register_props():
     bpy.types.Scene.ae_ssgi_use = BoolProperty(name="Native SSGI", default=False,
-        description="Screen-space indirect light for opaque Principled materials (desktop); enable before Play")
-    bpy.types.Scene.ae_ssgi_show_help = BoolProperty(name="Requirements & Limits", default=False,
-        description="Show Native SSGI requirements and limitations")
+        description="Screen-space indirect light for opaque and Alpha Clip materials (desktop); enable before Play")
+    bpy.types.Scene.ae_ssgi_approximate = BoolProperty(name="Approximate Unsupported", default=True,
+        description="Node graphs without SSGI data still receive bounce light using their color "
+                    "(specular ones only block rays); enable before Play")
+    bpy.types.Scene.ae_ssgi_show_help = BoolProperty(name="Limits", default=False,
+        description="Show Native SSGI limitations")
     bpy.types.Scene.ae_fast_shader_show_help = BoolProperty(name="Gain & Loss", default=True,
         description="Show what Fast Shader Loading gains and loses")
     bpy.types.Scene.ae_ssgi_quality = EnumProperty(name="Quality", default='CUSTOM', items=(
@@ -161,5 +201,5 @@ def register_props():
 
 
 def unregister_props():
-    for name in ('use', 'show_help', 'quality', 'radius', 'strength', 'rays', 'steps', 'divisor', 'thickness'):
+    for name in ('use', 'approximate', 'show_help', 'quality', 'radius', 'strength', 'rays', 'steps', 'divisor', 'thickness'):
         delattr(bpy.types.Scene, 'ae_ssgi_' + name)

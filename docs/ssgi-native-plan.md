@@ -38,9 +38,16 @@ rays, steps, thickness, divisor=0)`, onde divisor `0` preserva a resolução e `
 O painel oferece presets Low (4/8/divisor 4), Medium (6/12/divisor 2), High (8/16/divisor 1) e Ultra
 (12/24/divisor 1); Ultra é opt-in para cenas desktop lentas/estáticas e custa mais GPU. Alterar um
 controle avançado marca a Scene como Custom.
-Em `Requirements & Limits`, expansível no próprio painel, estão os requisitos de material e attachments,
-o comportamento de World/Sky, bake e as limitações de espaço de tela. Os textos do painel e da ajuda têm
-traduções inglês, português, espanhol e russo.
+O painel só mostra o que bloqueia o efeito, com a correção ao lado (botão para ligar PBR Shading Nodes,
+quais attachment slots liberar) e `Check Scene`, que lista por material o que é aproximado ou excluído e
+por quê (classificador Python espelha `gpu_ssgi_closure()`). `Limits` recolhido guarda só espaço de tela e
+desktop. Se o SSGI está ligado mas não pode rodar, o runtime registra o motivo (`range_runtime.log.txt`).
+Grafos: Mix/Add Shader combinam normal, albedo e radiância direta dos ramos com o mesmo peso; Transparent,
+Holdout e socket vazio contribuem zero. `Approximate Unsupported` (`ae_ssgi_approximate`, padrão ligado):
+closures sem dados de SSGI recebem GI com a normal geométrica e o input Color (ou a cor do material);
+Glossy/Glass/Refraction/Anisotropic só bloqueiam raios; nenhum vira fonte. A cor linear é sempre a saída
+Surface. Alpha Clip participa; Alpha Blend e shader customizado continuam fora. Textos com traduções
+inglês, português, espanhol e russo.
 Desligar por API mantém os buffers; para não alocá-los, desligue na Scene antes
 de carregar o jogo. Não é possível criá-los por essa API depois de carregar com a opção desligada.
 
@@ -61,8 +68,8 @@ de carregar o jogo. Não é possível criá-los por essa API depois de carregar 
   24 bytes/pixel por framebuffer antes de MSAA (era 32, redução de 25%); os framebuffers compartilhados
   duplicam esses attachments. VRAM total não foi medida.
 - Não há histórico temporal nem Hi-Z nesta etapa: pode haver ruído espacial e instabilidade de enquadramento.
-  Só fontes difusas diretas opacas Principled/Diffuse BSDF ou material simples; emissivos, grafos mistos,
-  transparência e material legado com texturas/shader customizado não suportados.
+  Fontes de rebatimento: Principled/Diffuse/Emission (também dentro de Mix/Add) e material simples;
+  Alpha Blend e shader customizado não suportados.
   Receptores cobertos por lightmap/light volume ficam excluídos. Não substitui o bake nem ilumina fora da tela.
 
 Próxima etapa: usuário conferir no jogo real; depois otimizar alocação e avaliar temporal/Hi-Z separadamente.

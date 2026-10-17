@@ -1395,6 +1395,7 @@ SSGI_PANELS = (
     ("PBR Shading Nodes is off", "Nós de sombreamento PBR desligados", "Nodos de sombreado PBR desactivados", "Узлы PBR-шейдинга выключены"),
     ("Enable", "Ativar", "Activar", "Включить"),
     ("Check Scene", "Verificar cena", "Verificar escena", "Проверить сцену"),
+    ("Approximate Unsupported", "Aproximar não suportados", "Aproximar no compatibles", "Приближать неподдерживаемые"),
     ("Limits", "Limites", "Límites", "Ограничения"),
     ("•  Screen-space: only what is on screen bounces light", "•  Espaço de tela: só o que está na tela rebate luz", "•  Espacio de pantalla: solo lo que está en pantalla rebota luz", "•  Экранное пространство: свет отражает только то, что на экране"),
     ("•  Desktop only; Web/Android keep baked lighting", "•  Somente desktop; Web/Android usam a luz baked", "•  Solo escritorio; Web/Android usan la luz horneada", "•  Только ПК; Web/Android используют запечённый свет"),

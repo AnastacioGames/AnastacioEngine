@@ -6,6 +6,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-17 - SSGI nativo mais fácil de usar (branch local `feat/ssgi-facilidade`)
+
+- Painel: as 8 regras genéricas viraram só problemas que bloqueiam o efeito, cada um com correção (botão
+  para PBR Shading Nodes, slots a liberar), mais `Check Scene` com contagem total/aproximado/excluído e
+  motivo por material. `Limits` ficou com espaço de tela e desktop.
+- `gpu_material.c`: `gpu_ssgi_closure()` desce por Mix/Add Shader (`ssgi_mix_closure`/`ssgi_add_closure`
+  em GLSL; o fac reaproveita link, uniform dinâmico do Fast Shader Loading ou constante). Transparent/
+  Holdout contam zero. Nova opção `ae_ssgi_approximate` (padrão ligada): closures sem saída de SSGI
+  recebem GI pela cor (`ssgi_approximate_closure`), especulares só bloqueiam raios. Alpha Clip aceito
+  (nós e material simples). O slot de cor linear passou a ser sempre a saída Surface.
+- `LA_Launcher.cpp`: `GPU_material_ssgi_disabled_reason()` registra por que o SSGI ligado não roda.
+- Validação: `criar_cena_ssgi.py` ganhou modos `graphs`/`graphs_strict`. RX 6800M, 640x480: `standard`
+  1488 pixels válidos/1435 elegíveis; `graphs` (Mix, Mix+Transparent, Add, Toon com Alpha Clip, Glossy)
+  1488/1344, GI nas paredes Mix (deltas vermelho/branco > 0), sem erro GL; `graphs_strict` 1348/1297
+  (Toon/Glossy excluídos). `Check Scene` bate com o runtime. Aviso conferido com PBR desligado.
+  Falta aceite visual.
+
 ## 2026-10-17 - CSM Auto Bias também para Variance (VSM)
 
 - `gpu_lamp_csm_auto_bias()` deixou de excluir VSM: a mesma análise de "um texel de profundidade por

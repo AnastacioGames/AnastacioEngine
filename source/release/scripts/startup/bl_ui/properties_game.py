@@ -1149,17 +1149,18 @@ class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
                 settings_box.label(text="Free attachment slot(s) %s in Attachments" % ", ".join(busy),
                                    icon='ERROR')
 
+            settings_box.prop(scene, "ae_ssgi_approximate")
             from bl_operators import anastacio_ssgi
             row = settings_box.row()
             row.operator("scene.anastacio_ssgi_check", icon='VIEWZOOM')
             result = anastacio_ssgi.check_result
             if result is not None:
-                ok, issues = result
-                row.label(text="%d participate, %d excluded" % (ok, len(issues)))
+                full, partial, excluded, issues = result
+                row.label(text="%d full · %d approx. · %d excluded" % (full, partial, excluded))
                 col = settings_box.column(align=True)
                 col.scale_y = 0.8
-                for name, reason in issues[:12]:
-                    col.label(text="%s: %s" % (name, reason), icon='DOT')
+                for name, reason, is_excluded in issues[:12]:
+                    col.label(text="%s: %s" % (name, reason), icon='ERROR' if is_excluded else 'DOT')
                 if len(issues) > 12:
                     col.label(text="... %d more" % (len(issues) - 12))
 
