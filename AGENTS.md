@@ -69,6 +69,10 @@ seguido de rebuild completo do(s) alvo(s). Um clean rebuild completo de `RangeEn
 `ninja install` atualiza). Uma pasta `install/` na raiz do repo pode ser uma cópia manual antiga — não confiar
 nela, sempre testar a partir de `build/bin/`.
 
+Para alterações nos scripts Python da UI em `source/release/scripts/`, sincronizar também os arquivos
+correspondentes em `build/bin/2.79/scripts/` antes de testar o editor. O executável em uso carrega os scripts
+dessa instalação; atualizar somente o código-fonte não altera a UI já instalada.
+
 ## Workflow do projeto
 
 Este é um fork em C++ da Range Engine 1.6 Rev1 (derivado de UPBGE 0.2.5b / Blender 2.79), com duas frentes de
