@@ -554,7 +554,10 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera)
 
 		useDof = (gfx.flag & CAM_GFX_DOF) && gfx.dofBlur > 0.0f;
 		const bool speedBlur = (gfx.flag & CAM_GFX_SPEEDBLUR) && gfx.speedBlurStrength > 0.0f;
-		const bool dirBlur = (gfx.flag & CAM_GFX_DIRBLUR) && gfx.dirBlurStrength > 0.0f;
+		/* Only while the camera turns: with turn 0 the shader just copies the screen, a full screen pass
+		 * every frame for nothing (same threshold as the shader's blur test). */
+		const bool dirBlur = (gfx.flag & CAM_GFX_DIRBLUR) && gfx.dirBlurStrength > 0.0f &&
+		                     (turn.x * turn.x + turn.y * turn.y) * gfx.dirBlurStrength * gfx.dirBlurStrength * 16.0f > 1e-8f;
 		const bool chroma = (gfx.flag & CAM_GFX_CHROMA) && gfx.chromaStrength > 0.0f;
 		const bool vignette = (gfx.flag & CAM_GFX_VIGNETTE) &&
 		                      (gfx.vignetteStrength > 0.0f || gfx.fisheyeStrength != 0.0f);
