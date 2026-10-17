@@ -1137,30 +1137,40 @@ class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
         settings_box = layout.box()
         settings_box.prop(scene, "ae_ssgi_use", text="Use in Game")
 
-        # Everything informative stays behind one flat disclosure row.
-        settings_box.separator()
-        settings_box.prop(scene, "ae_ssgi_show_help", text="Requirements & Limits",
+        # Only problems that actually block the effect are shown, each with its fix.
+        if scene.ae_ssgi_use:
+            if not scene.game_settings.use_shading_nodes:
+                row = settings_box.row()
+                row.label(text="PBR Shading Nodes is off", icon='ERROR')
+                row.operator("scene.anastacio_ssgi_enable_nodes", text="Enable")
+            slots = list(scene.game_settings.attachment_slots)
+            busy = [str(i + 1) for i, slot in enumerate(slots) if slot is not None and i >= 3]
+            if busy:
+                settings_box.label(text="Free attachment slot(s) %s in Attachments" % ", ".join(busy),
+                                   icon='ERROR')
+
+            from bl_operators import anastacio_ssgi
+            row = settings_box.row()
+            row.operator("scene.anastacio_ssgi_check", icon='VIEWZOOM')
+            result = anastacio_ssgi.check_result
+            if result is not None:
+                ok, issues = result
+                row.label(text="%d participate, %d excluded" % (ok, len(issues)))
+                col = settings_box.column(align=True)
+                col.scale_y = 0.8
+                for name, reason in issues[:12]:
+                    col.label(text="%s: %s" % (name, reason), icon='DOT')
+                if len(issues) > 12:
+                    col.label(text="... %d more" % (len(issues) - 12))
+
+        settings_box.prop(scene, "ae_ssgi_show_help", text="Limits",
                           icon='TRIA_DOWN' if scene.ae_ssgi_show_help else 'TRIA_RIGHT',
                           emboss=False)
         if scene.ae_ssgi_show_help:
-            if not scene.game_settings.use_shading_nodes:
-                settings_box.label(text="Enable PBR Shading Nodes in Shading", icon='ERROR')
-            slots = list(scene.game_settings.attachment_slots)
-            if any(slot is not None for slot in slots[3:]):
-                settings_box.label(text="Needs the last four attachment slots free", icon='ERROR')
             col = settings_box.column(align=True)
             col.scale_y = 0.8
-            for line in (
-                "Requires desktop and opaque materials",
-                "Restart Play after changing these settings",
-                "Material: Principled/Diffuse to Output, or a simple material",
-                "No transparency, emission or complex/custom node graphs",
-                "Direct visible lights bounce; Sky/World is not a source",
-                "World/Sky optional; Environment Lighting fills dark areas",
-                "Baked Lightmaps/Volumes stay; baked receivers are excluded",
-                "Screen-space: hidden/offscreen surfaces can't contribute",
-            ):
-                col.label(text="•  " + line)
+            col.label(text="•  Screen-space: only what is on screen bounces light")
+            col.label(text="•  Desktop only; Web/Android keep baked lighting")
 
         quality_box = layout.box()
         quality_box.label(text="Quality:", icon='PREFERENCES')

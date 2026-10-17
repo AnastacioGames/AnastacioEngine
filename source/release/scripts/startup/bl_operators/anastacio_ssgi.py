@@ -68,7 +68,70 @@ class SCENE_OT_anastacio_ssgi_quality(bpy.types.Operator):
         return {'FINISHED'}
 
 
-classes = (SCENE_OT_anastacio_ssgi_quality,)
+class SCENE_OT_anastacio_ssgi_enable_nodes(bpy.types.Operator):
+    """Enable PBR Shading Nodes, required by Native SSGI (changes how every material is shaded)"""
+    bl_idname = "scene.anastacio_ssgi_enable_nodes"
+    bl_label = "Enable PBR Shading Nodes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        context.scene.game_settings.use_shading_nodes = True
+        return {'FINISHED'}
+
+
+# Mirrors GPU_material_ssgi_outputs() in gpu_material.c: keep both in sync.
+_SSGI_ROOTS = {'BSDF_PRINCIPLED', 'BSDF_DIFFUSE', 'EMISSION'}
+_SSGI_BLEND = {'OPAQUE'}
+
+# Last "Check Scene" result shown by the panel: (participating, [(material, reason)]).
+check_result = None
+
+
+def _surface_node(tree):
+    output = next((n for n in tree.nodes if n.type == 'OUTPUT_MATERIAL' and n.is_active_output), None)
+    if output is None:
+        output = next((n for n in tree.nodes if n.type == 'OUTPUT_MATERIAL'), None)
+    if output is None or not output.inputs['Surface'].is_linked:
+        return None
+    node = output.inputs['Surface'].links[0].from_node
+    while node.type == 'REROUTE' and node.inputs[0].is_linked:
+        node = node.inputs[0].links[0].from_node
+    return node
+
+
+def ssgi_material_issue(ma):
+    """None when the material writes SSGI data, else a short reason."""
+    blend = ma.game_settings.alpha_blend
+    if blend not in _SSGI_BLEND:
+        return "transparency (%s)" % blend.replace('_', ' ').title()
+    if not ma.use_nodes or not ma.node_tree:
+        return None
+    node = _surface_node(ma.node_tree)
+    if node is None:
+        return "nothing linked to Material Output"
+    if node.type not in _SSGI_ROOTS:
+        return "%s node on Output" % node.bl_label
+    return None
+
+
+class SCENE_OT_anastacio_ssgi_check(bpy.types.Operator):
+    """List the materials in this Scene that Native SSGI cannot use, and why"""
+    bl_idname = "scene.anastacio_ssgi_check"
+    bl_label = "Check Scene"
+
+    def execute(self, context):
+        global check_result
+        materials = {slot.material for ob in context.scene.objects if ob.type == 'MESH'
+                     for slot in ob.material_slots if slot.material}
+        issues = sorted((ma.name, reason) for ma in materials
+                        for reason in (ssgi_material_issue(ma),) if reason)
+        check_result = (len(materials) - len(issues), issues)
+        self.report({'INFO'}, "Native SSGI: %d of %d materials participate" % (check_result[0], len(materials)))
+        return {'FINISHED'}
+
+
+classes = (SCENE_OT_anastacio_ssgi_quality, SCENE_OT_anastacio_ssgi_enable_nodes,
+           SCENE_OT_anastacio_ssgi_check)
 
 
 def register_props():
