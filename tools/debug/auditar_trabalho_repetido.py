@@ -56,6 +56,9 @@ text.clear()
 text.write(MEDIDOR)
 
 # Pendura o medidor na camera ativa de cada cena, com sensor Always em modo pulso.
+# Guarda cena da tela, selecao e objeto ativo para a copia abrir igual ao original.
+orig_scene = bpy.context.screen.scene
+orig_state = {sc.name: (sc.objects.active, [ob for ob in sc.objects if ob.select]) for sc in bpy.data.scenes}
 for scene in bpy.data.scenes:
     cam = scene.camera
     if cam is None:
@@ -77,6 +80,13 @@ for scene in bpy.data.scenes:
     ctrl.states = (initial.index(True) + 1) if True in initial else 1
     sensor.link(ctrl)
     print('AUDIT medidor na camera', cam.name, 'cena', scene.name)
+
+for scene in bpy.data.scenes:
+    active, selected = orig_state[scene.name]
+    for ob in scene.objects:
+        ob.select = ob in selected
+    scene.objects.active = active
+bpy.context.screen.scene = orig_scene
 
 if out_blend == '-':
     print('AUDIT medidor so na memoria, log', log_path)
