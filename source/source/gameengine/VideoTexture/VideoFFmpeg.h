@@ -188,6 +188,12 @@ private:
 
 	std::atomic<bool> m_stopThread;
 	bool m_cacheStarted;
+	// seamless repeat: the cache thread seeks back to the range start by itself, frames of loop
+	// N are queued with position + N * loopSpan(); m_cacheLoop is the loop the thread decodes,
+	// m_playLoop the one being shown. Both reset when the cache stops.
+	std::atomic<int> m_cacheLoop;
+	std::atomic<int> m_playLoop;
+	long loopSpan(void) { return long(m_range[1] * m_baseFrameRate) + 2; }
 	ListBase m_thread;
 	ListBase m_frameCacheBase;	// list of frames that are ready
 	ListBase m_frameCacheFree;	// list of frames that are unused

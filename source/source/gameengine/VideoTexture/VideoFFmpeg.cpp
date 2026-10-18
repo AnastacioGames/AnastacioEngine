@@ -117,7 +117,8 @@ VideoFFmpeg::VideoFFmpeg(HRESULT *hRslt) :VideoBase(),
 	m_deinterlace(false), m_preseek(0), m_videoStream(-1), m_baseFrameRate(25.0),
 	m_lastFrame(-1),  m_eof(false), m_externTime(false), m_curPosition(-1), m_startTime(0),
 	m_captWidth(0), m_captHeight(0), m_captRate(0.f), m_isImage(false),
-	m_isThreaded(false), m_isStreaming(false), m_stopThread(false), m_cacheStarted(false)
+	m_isThreaded(false), m_isStreaming(false), m_stopThread(false), m_cacheStarted(false),
+	m_cacheLoop(0), m_playLoop(0)
 {
 	// set video format
 	m_format = RGB24;
@@ -411,6 +412,13 @@ void *VideoFFmpeg::cacheThread(void *data)
 		startTs = 0;
 	}
 
+	bool rangeEnded = false;
+	// the main thread will play the range again once more (m_repeat counts the plays left,
+	// < 0 is forever): this thread may decode ahead into the next loop
+	auto canLoop = [&]() -> bool {
+		return video->m_isFile &&
+		       (video->m_repeat < 0 || video->m_repeat - (video->m_cacheLoop - video->m_playLoop) > 1);
+	};
 	// convert the frame just decoded into currentFrame and queue it
 	auto deliverFrame = [&](int64_t pktDts) -> bool {
 		AVFrame *input = video->m_frame;
@@ -430,6 +438,16 @@ void *VideoFFmpeg::cacheThread(void *data)
 				input = video->m_frameDeinterlaced;
 			}
 		}
+		const long pos = (long)((video_frame_ts(video->m_frame, pktDts) - startTs) * (video->m_baseFrameRate * timeBase) + 0.5);
+		if (video->m_cacheLoop > 0 && pos < long(video->m_range[0] * video->m_baseFrameRate)) {
+			// decoded from the keyframe before the range start after looping back
+			return false;
+		}
+		if (pos >= video->m_range[1] * video->m_baseFrameRate && canLoop()) {
+			// past the play range: loop back now instead of decoding the rest of the file
+			rangeEnded = true;
+			return false;
+		}
 		sws_scale(video->m_imgConvertCtx,
 		          input->data,
 		          input->linesize,
@@ -437,8 +455,8 @@ void *VideoFFmpeg::cacheThread(void *data)
 		          video->m_codecCtx->height,
 		          currentFrame->frame->data,
 		          currentFrame->frame->linesize);
-		video->m_curPosition = (long)((video_frame_ts(video->m_frame, pktDts) - startTs) * (video->m_baseFrameRate * timeBase) + 0.5);
-		currentFrame->framePosition = video->m_curPosition;
+		video->m_curPosition = pos;
+		currentFrame->framePosition = pos + video->m_cacheLoop * video->loopSpan();
 		pthread_mutex_lock(&video->m_cacheMutex);
 		BLI_addtail(&video->m_frameCacheBase, currentFrame);
 		pthread_mutex_unlock(&video->m_cacheMutex);
@@ -507,8 +525,14 @@ void *VideoFFmpeg::cacheThread(void *data)
 				avcodec_decode_video2(video->m_codecCtx,
 				                      video->m_frame, &frameFinished,
 				                      &cachePacket->packet);
-				if (frameFinished && deliverFrame(cachePacket->packet.dts)) {
-					currentFrame = nullptr;
+				if (frameFinished) {
+					if (deliverFrame(cachePacket->packet.dts)) {
+						currentFrame = nullptr;
+					}
+					else if (!rangeEnded) {
+						// frame skipped (before the range start, bad data): keep decoding
+						frameFinished = 0;
+					}
 				}
 				av_free_packet(&cachePacket->packet);
 				BLI_addtail(&video->m_packetCacheFree, cachePacket);
@@ -527,7 +551,31 @@ void *VideoFFmpeg::cacheThread(void *data)
 				}
 				drained = true;
 			}
-			if (currentFrame && endOfFile) {
+			if (currentFrame && ((endOfFile && drained) || rangeEnded) && canLoop()) {
+				// repeat: seek back to the range start from here, the main thread keeps
+				// showing frames and the loop has no hitch
+				long startPos = long(video->m_range[0] * video->m_baseFrameRate) - video->m_preseek;
+				if (startPos < 0) {
+					startPos = 0;
+				}
+				const int64_t seekTs = (int64_t)(startPos / (video->m_baseFrameRate * timeBase)) + startTs;
+				if (av_seek_frame(video->m_formatCtx, video->m_videoStream, seekTs, AVSEEK_FLAG_BACKWARD) >= 0) {
+					avcodec_flush_buffers(video->m_codecCtx);
+					while ((cachePacket = (CachePacket *)video->m_packetCacheBase.first) != nullptr) {
+						BLI_remlink(&video->m_packetCacheBase, cachePacket);
+						av_free_packet(&cachePacket->packet);
+						BLI_addtail(&video->m_packetCacheFree, cachePacket);
+					}
+					endOfFile = false;
+					drained = false;
+					rangeEnded = false;
+					++video->m_cacheLoop;
+					continue;
+				}
+				// could not seek: end here, the main thread restarts the old way
+				endOfFile = true;
+			}
+			if (currentFrame && (endOfFile || rangeEnded)) {
 				// no more packet and end of file => put a special frame that indicates that
 				currentFrame->framePosition = -1;
 				pthread_mutex_lock(&video->m_cacheMutex);
@@ -589,6 +637,8 @@ void VideoFFmpeg::stopCache()
 		// the queued packets are dropped below and the decoder may have been drained at the
 		// end of file: reset it so direct reading starts clean
 		avcodec_flush_buffers(m_codecCtx);
+		m_cacheLoop = 0;
+		m_playLoop = 0;
 		// now delete the cache
 		CacheFrame *frame;
 		CachePacket *packet;
@@ -895,8 +945,13 @@ void VideoFFmpeg::calcImage(unsigned int texId, double ts, bool mipmap, unsigned
 		}
 		// if video has ended
 		if (m_isFile && actTime * m_frameRate >= m_range[1]) {
-			// in any case, this resets the cache
-			stopCache();
+			// the cache thread already decodes the next loop: keep it, no seek here
+			const bool seamless = m_cacheStarted && (m_repeat < 0 || m_repeat > 1) &&
+			                      m_cacheLoop > m_playLoop;
+			// otherwise this resets the cache
+			if (!seamless) {
+				stopCache();
+			}
 			// if repeats are set, decrease them
 			if (m_repeat > 0) {
 				--m_repeat;
@@ -906,6 +961,9 @@ void VideoFFmpeg::calcImage(unsigned int texId, double ts, bool mipmap, unsigned
 				// reset its position
 				actTime -= (m_range[1] - m_range[0]) / m_frameRate;
 				m_startTime += (m_range[1] - m_range[0]) / m_frameRate;
+				if (seamless) {
+					++m_playLoop;
+				}
 			}
 			// if video has to be stopped, stop it
 			else {
@@ -984,6 +1042,8 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 	int64_t dts = 0;
 
 	if (m_cacheStarted) {
+		// cached frames of later loops are numbered after the earlier ones
+		const long cachePosition = position + m_playLoop * loopSpan();
 		// when cache is active, we must not read the file directly
 		do {
 			pthread_mutex_lock(&m_cacheMutex);
@@ -1007,12 +1067,12 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 			}
 			// for streaming, always return the next frame,
 			// that's what grabFrame does in non cache mode anyway.
-			if (m_isStreaming || frame->framePosition == position) {
+			if (m_isStreaming || frame->framePosition == cachePosition) {
 				return frame->frame;
 			}
 			// for cam, skip old frames to keep image realtime.
 			// There should be no risk of clock drift since it all happens on the same CPU
-			if (frame->framePosition > position) {
+			if (frame->framePosition > cachePosition) {
 				// this can happen after rewind if the seek didn't find the first frame
 				// the frame in the buffer is ahead of time, just leave it there
 				return nullptr;
@@ -1023,7 +1083,7 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 			pthread_mutex_lock(&m_cacheMutex);
 			CacheFrame *next = (CacheFrame *)frame->link.next;
 			pthread_mutex_unlock(&m_cacheMutex);
-			if (next == nullptr || next->framePosition == -1 || next->framePosition > position) {
+			if (next == nullptr || next->framePosition == -1 || next->framePosition > cachePosition) {
 				return frame->frame;
 			}
 			// this frame is not useful, release it
