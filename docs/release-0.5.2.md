@@ -123,3 +123,16 @@ extrair numa pasta limpa e conferir:
 - Web: feixe do Spot na Volumetric Fog não aparece no navegador.
 - Sombra colorida: cor no Sun com CSM ainda pendente.
 - OIDN no Linux (bake usa box blur).
+
+## Publicação (rascunho criado no Linux, 2026-10-18)
+
+Release **v0.5.2 em rascunho** no GitHub com `AnastacioEngine-0.5.2-linux-x86_64.tar.xz` e um
+`SHA256SUMS.txt` com as linhas do Linux e do Windows. README já aponta para os links da 0.5.2.
+No PC com Windows, para terminar:
+
+1. Refazer o zip da RangeArmor 0.5.2 e calcular o SHA-256.
+2. Acrescentar a linha da RangeArmor ao `SHA256SUMS.txt` (baixe o do rascunho com
+   `gh release download v0.5.2 -p SHA256SUMS.txt`).
+3. `gh release upload v0.5.2 AnastacioEngine-0.5.2-windows-x64.zip RangeArmor-0.5.2-windows-x64.zip SHA256SUMS.txt --clobber`
+4. Conferir os 4 arquivos no rascunho e publicar: `gh release edit v0.5.2 --draft=false --latest`
+   (cria a tag `v0.5.2` no `main`).
