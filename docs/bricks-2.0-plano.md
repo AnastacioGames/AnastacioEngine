@@ -276,3 +276,12 @@ Implementada, com o teste de runtime pendente (precisa abrir o jogo).
 - Cena de teste: casos W1 (0,5 s, 1 conclusão), W0 (zero), W2 (cancelado pelo estado), W3 (Restart com pulso
   contínuo, nunca conclui), W4 (sem Restart, várias conclusões), A1 (Action sem action, falha) — imprime
   `BRICKS2 result ... PASS/FAIL`.
+
+### F2b — Steering
+
+- Contrato: com **Self Terminated** ligado, Concluído quando chega ao alvo (Seek e Path Following: dentro da
+  distância ou no fim do caminho; Flee: longe o bastante). Pulso negativo = cancelado; sem alvo = falha. Sem Self
+  Terminated ele nunca conclui, e o botão "Então" e o aviso do sensor tratam esse caso.
+- Teste no jogo: PASS em 2026-10-18. Seek de x=0 até o alvo em x=10, com distância 1 e velocidade 5: concluiu uma
+  vez em 1,874 s, em x=9,00. Sem alvo: nenhuma conclusão. Sem Self Terminated: nenhuma conclusão.
+- Próximos candidatos: ShapeAction (mesmo contrato da Action), depois avaliar Camera e Scene.

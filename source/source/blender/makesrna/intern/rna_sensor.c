@@ -778,7 +778,7 @@ static void rna_def_actuator_sensor(BlenderRNA *brna)
 		{SENS_ACTUATOR_ACTIVE, "ACTIVE", 0, "Active", "Positive while the actuator is active"},
 		{SENS_ACTUATOR_FINISHED, "FINISHED", 0, "Finished",
 		 "One tick pulse after the actuator finished its job (Action in Play, Ping Pong or Flipper, "
-		 "Sound in Play End, Wait); stopping, failing or leaving the state does not count"},
+		 "Sound in Play End, Wait, Steering with Self Terminated reaching the target); stopping, failing or leaving the state does not count"},
 		{0, NULL, 0, NULL, NULL}
 	};
 

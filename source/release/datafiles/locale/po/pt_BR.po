@@ -97867,8 +97867,8 @@ msgstr "Um pulso positivo durante a espera reinicia a contagem (senão é ignora
 msgid "Positive while the actuator is active"
 msgstr "Positivo enquanto o atuador está ativo"
 
-msgid "One tick pulse after the actuator finished its job (Action in Play, Ping Pong or Flipper, Sound in Play End, Wait); stopping, failing or leaving the state does not count"
-msgstr "Pulso de um tick depois que o atuador concluiu (Action em Play, Ping Pong ou Flipper, Sound em Play End, Esperar); parar, falhar ou sair do estado não conta"
+msgid "One tick pulse after the actuator finished its job (Action in Play, Ping Pong or Flipper, Sound in Play End, Wait, Steering with Self Terminated reaching the target); stopping, failing or leaving the state does not count"
+msgstr "Pulso de um tick depois que o atuador concluiu (Action em Play, Ping Pong ou Flipper, Sound em Play End, Esperar, Steering com Self Terminated chegando ao alvo); parar, falhar ou sair do estado não conta"
 
 msgid "When the sensor is positive"
 msgstr "Quando o sensor fica positivo"
@@ -97882,5 +97882,5 @@ msgstr "Então"
 msgid "Add an Actuator sensor in Finished mode for this actuator, linked to a new And controller: link the controller to the actuators that run when this one finishes"
 msgstr "Adiciona um sensor Actuator no modo Concluído para este actuator, ligado a um controller And novo: ligue o controller aos actuators que rodam quando este terminar"
 
-msgid "This actuator never finishes (use Wait, Action or Sound)"
-msgstr "Este actuator nunca conclui (use Esperar, Action ou Sound)"
+msgid "This actuator never finishes (use Wait, Action, Sound or Steering with Self Terminated)"
+msgstr "Este atuador nunca conclui (use Esperar, Action, Sound ou Steering com Self Terminated)"

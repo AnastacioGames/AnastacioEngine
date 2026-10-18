@@ -1029,7 +1029,7 @@ static void draw_sensor_actuator(uiLayout *layout, PointerRNA *ptr)
 
 		/* the sensor never fires for actuators that do not report when they finish */
 		if (act && !ED_logic_actuator_reports_finish(act)) {
-			uiItemL(layout, IFACE_("This actuator never finishes (use Wait, Action or Sound)"), ICON_ERROR);
+			uiItemL(layout, IFACE_("This actuator never finishes (use Wait, Action, Sound or Steering with Self Terminated)"), ICON_ERROR);
 		}
 	}
 }

@@ -1090,6 +1090,10 @@ static void LOGIC_OT_python_component_move_down(wmOperatorType* ot)
 /* actuators that report a completion (SCA_IActuator::SetEndReason) */
 bool ED_logic_actuator_reports_finish(const bActuator *act)
 {
+	if (act->type == ACT_STEERING) {
+		/* without Self Terminated it steers until a negative pulse */
+		return act->data && (((bSteeringActuator *)act->data)->flag & ACT_STEERING_SELFTERMINATED);
+	}
 	return ELEM(act->type, ACT_WAIT, ACT_ACTION, ACT_SOUND);
 }
 

@@ -181,6 +181,7 @@ bool KX_SteeringActuator::Update(double curtime)
 
 	if (bNegativeEvent || !m_target) {
 		// Do nothing on negative events.
+		SetEndReason(bNegativeEvent ? END_CANCELLED : END_FAILED);
 		return false;
 	}
 
@@ -304,6 +305,8 @@ bool KX_SteeringActuator::Update(double curtime)
 	}
 
 	if (terminate && m_isSelfTerminated) {
+		// reached the target (Seek, Path Following) or got far enough (Flee)
+		SetEndReason(END_FINISHED);
 		return false;
 	}
 
