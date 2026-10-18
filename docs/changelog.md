@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-18 - .cooked de outro compilador quebrava a colisão
+
+- O BVH de malha estática no `.cooked` é o `btOptimizedBvh` gravado com `serializeInPlace` (layout de memória
+  do compilador). Cache do MSVC lido no GCC (ou o contrário) era aceito e os objetos atravessavam o chão
+  (tutorial Logic Bricks 2.0 no Linux com o `.cooked` commitado do Windows). `CcdPhysicsController.cpp`:
+  versão do BVH = compilador + `sizeof(btOptimizedBvh)`, BVH estranho é recusado e refeito;
+  `CcdCookedData::AddBvh` substitui a entrada recusada para o `.cooked` ser regravado.
+- Teste: cache do Windows no runtime Linux, 1ª execução `bvh 1 loaded, 1 used, 1 new` e Player em z=0,5;
+  2ª execução reaproveita (`0 new`). `docs/logic-bricks-2-tutorial.cooked`/`.blend1` fora do git, `*.cooked` no `.gitignore`.
+
 ## 2026-10-18 - 0.5.2 no Linux: sons de efeito fora do pacote
 
 - `creator/CMakeLists.txt` não instalava `release/datafiles/sounds/`: chuva, trovão, explosão e destruição

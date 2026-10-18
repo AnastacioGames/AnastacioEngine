@@ -176,7 +176,7 @@ No PC com Windows, para terminar:
   Windows o Player cai até z=-18; com cache gerado no Linux para em z=0,5.
 - Também vale ao contrário (cache do Linux no Windows) e para jogo exportado **do Windows para Linux**
   com `.cooked` pronto.
-- Correção (próximo commit, em validação no container): `CcdPhysicsController.cpp` grava a versão do BVH
+- Correção (commitada e validada no container Linux): `CcdPhysicsController.cpp` grava a versão do BVH
   com compilador + `sizeof(btOptimizedBvh)` e recusa BVH de outro compilador (reconstrói);
   `CcdCookedData::AddBvh` substitui a entrada recusada para o `.cooked` ser regravado certo.
   `docs/logic-bricks-2-tutorial.cooked` e `.blend1` saíram do git; `*.cooked` no `.gitignore`.
@@ -184,3 +184,7 @@ No PC com Windows, para terminar:
   (só `.cpp` mudou), refazer o zip da engine e o da RangeArmor, atualizar o `SHA256SUMS.txt` e só então
   publicar. Conferir: um `.cooked` velho do Windows deve mostrar `bvh 1 loaded, … 1 new` no primeiro Play
   (recusado e refeito) e física normal.
+
+- Validado: cache do Windows → 1ª execução recusa e refaz o BVH (`1 new`), Player/Enemy param em z=0,5;
+  2ª execução usa o cache regravado. Pacote Linux refeito com a correção e trocado no rascunho:
+  `73a960e4a0b43225017a863bd541c40944447f125d8e5c7fe37b5563cce833fa  AnastacioEngine-0.5.2-linux-x86_64.tar.xz` (o `SHA256SUMS.txt` do rascunho já tem esta linha).

@@ -79,3 +79,7 @@ demos/
 projects-teste/
 build-wasm-net/
 debug-logs/
+
+# Cache de carregamento e backups gerados pela engine
+*.cooked
+docs/*.blend1

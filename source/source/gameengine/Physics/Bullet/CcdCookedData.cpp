@@ -428,7 +428,16 @@ const std::vector<char> *FindBvh(unsigned long long key)
 void AddBvh(unsigned long long key, const std::vector<char>& data)
 {
 	std::lock_guard<std::mutex> lock(mutex);
-	if (record && !data.empty() && bvhs.emplace(key, data).second) {
+	if (!record || data.empty()) {
+		return;
+	}
+	const auto it = bvhs.emplace(key, data);
+	if (it.second) {
+		++numBvhsAdded;
+	}
+	else if (it.first->second != data) {
+		/* A loaded BVH was rejected (other compiler/version) and rebuilt: replace it. */
+		it.first->second = data;
 		++numBvhsAdded;
 	}
 }

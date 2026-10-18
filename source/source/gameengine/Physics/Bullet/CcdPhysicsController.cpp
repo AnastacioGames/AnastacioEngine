@@ -139,6 +139,15 @@ struct CookedBvhHeader
 	uint32_t size;
 };
 
+/* serializeInPlace() stores the in-memory btOptimizedBvh, whose layout differs between compilers:
+ * a BVH cooked by MSVC is garbage for GCC (objects fall through the floor). Reject foreign ones. */
+#ifdef _MSC_VER
+static const uint32_t cooked_bvh_compiler = 1;
+#else
+static const uint32_t cooked_bvh_compiler = 2;
+#endif
+static const uint32_t cooked_bvh_version = 2u | ((uint32_t)sizeof(btOptimizedBvh) << 8) | (cooked_bvh_compiler << 24);
+
 uint64_t cooked_bvh_key(const SharedBvhKey& key)
 {
 	return key.hash[0] ^ (key.hash[1] * 0x9E3779B97F4A7C15ULL) ^ ((uint64_t)key.numVerts << 32) ^ (uint64_t)key.numTris;
@@ -154,7 +163,7 @@ btOptimizedBvh *load_cooked_bvh(const SharedBvhKey& key)
 	}
 	memcpy(&head, data->data(), sizeof(head));
 	if (head.hash[0] != key.hash[0] || head.hash[1] != key.hash[1] || head.numVerts != key.numVerts ||
-	    head.numTris != key.numTris || head.version != 1 || head.size != data->size() - sizeof(head))
+	    head.numTris != key.numTris || head.version != cooked_bvh_version || head.size != data->size() - sizeof(head))
 	{
 		return nullptr;
 	}
@@ -173,7 +182,7 @@ void save_cooked_bvh(const SharedBvhKey& key, const btOptimizedBvh *bvh)
 	if (!CcdCookedData::IsRecording()) {
 		return;
 	}
-	CookedBvhHeader head = {{key.hash[0], key.hash[1]}, key.numVerts, key.numTris, 1, bvh->calculateSerializeBufferSize()};
+	CookedBvhHeader head = {{key.hash[0], key.hash[1]}, key.numVerts, key.numTris, cooked_bvh_version, bvh->calculateSerializeBufferSize()};
 	void *mem = btAlignedAlloc(head.size, 16);
 	if (bvh->serializeInPlace(mem, head.size, false)) {
 		std::vector<char> data(sizeof(head) + head.size);
