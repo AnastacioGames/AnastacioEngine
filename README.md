@@ -40,6 +40,10 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
 - **SSGI e CSM:** SSGI com Check Scene, Denoise e resultado mais suave; CSM com 2 ou 3 cascatas,
   referência pela luz Sun e Auto Bias.
 - **Som:** chuva, trovão, explosão e destruição já vêm na engine e tocam sozinhos; liga/desliga por efeito.
+- **Controles de toque na Web e no Android:** botão **Controles: ligados/desligados** no canto da tela para
+  esconder os controles virtuais e tocar nos menus do jogo (Start, opções) sem que o stick pegue o toque.
+  Ao religar, volta o mesmo tipo de controle que o jogador escolheu (stick, setas ou inclinar o celular no
+  layout de corrida), e essa escolha fica guardada para a próxima vez que ele abrir o jogo.
 - **Interface:** aba Object em Object/Game/Transform, painéis de sombra e clima reorganizados, Game Layers
   fixadas, Ragdoll com presets.
 - **Correções:** vídeos não caem mais para ~1 FPS nem engasgam no loop, CSM sem cascatas clareadas, ícone

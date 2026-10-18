@@ -57,6 +57,17 @@ e um SSGI e um CSM mais fáceis de usar, além de várias correções de vídeo,
 - Liga/desliga o som de cada efeito (chuva, raio, Empty Lightning, Explosive/Destruction).
 - Trovões, explosões e quebras saem com tom e volume levemente variados a cada vez.
 
+### Controles de toque na Web e no Android
+
+- Botão **Controles: ligados/desligados** no canto superior direito (respeita a área segura do celular).
+  Desligado, os controles virtuais somem e os toques vão direto para o jogo, então dá para usar os menus
+  (Start, opções) sem o stick invisível capturar o toque. Ao desligar, eixos, botões e o giro da câmera são
+  soltos, para o personagem não ficar andando ou girando sozinho.
+- Ao religar, volta o mesmo tipo de controle que o jogador escolheu pelo botão de troca do layout (no
+  layout de corrida: stick, setas ou inclinar o celular), e essa escolha fica guardada para a próxima visita.
+- O botão só aparece quando há controles de toque (não aparece no desktop, com `?touch=0` nem no layout `none`).
+- Vale para jogos exportados de novo; pacotes Web/APK antigos precisam ser exportados outra vez.
+
 ### Interface
 
 - Aba Object dividida em **Object / Game / Transform**; novas abas **Physics/Damage** e
@@ -104,7 +115,7 @@ e um SSGI e um CSM mais fáceis de usar, além de várias correções de vídeo,
 
 ### Web e Android
 
-- Botão para alternar os controles de toque e chegar aos menus do jogo.
+- Os controles de toque não impedem mais de tocar no Start e nos menus do jogo (ver o botão Controles acima).
 - Texturas PNG carregam no runtime Web (wasm32).
 
 ### Ferramentas
