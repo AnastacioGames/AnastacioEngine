@@ -43,9 +43,6 @@ class OUTLINER_HT_header(Header):
 
         layout.prop(space, "display_mode", text="")
 
-        filepath = bpy.data.filepath
-        layout.label(text=bpy.path.basename(filepath) if filepath else "<unsaved>")
-
         layout.prop(space, "filter_text", icon='VIEWZOOM', text="")
 
         layout.separator(factor=1)
