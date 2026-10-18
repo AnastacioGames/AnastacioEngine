@@ -176,6 +176,8 @@ _DIR_AXES = {'DIRPX': (0, False), 'DIRPY': (1, False), 'DIRPZ': (2, False),
              'DIRNX': (0, True), 'DIRNY': (1, True), 'DIRNZ': (2, True)}
 _DYNAMIC = {'DYNAMIC', 'RIGID_BODY', 'SOFT_BODY'}
 _ACT_STATE = [None]  # expressao "actuator ativo" do tradutor atual (None = padrao)
+_ACT_DONE = [None]  # expressao "actuator terminou neste frame" (sensor Actuator no modo Concluido)
+_LIVE = "%LIVE%"  # trocado por "controller no estado ativo" (sair do estado cancela Wait/Video)
 _FIRE = "%FIRE%"  # trocado pela variavel de pulso do controller na saida
 _ON = "%ON%"  # trocado pela variavel do controller (actuator que roda todo frame)
 _ACT_ALWAYS = [False]  # actuator roda todo frame, fora do "if controller" (usa _ON)
@@ -375,9 +377,14 @@ def _sensor_expr(ob, sens, key=None):
         if not sens.actuator:
             raise Unsupported("sensor actuator sem actuator")
         if getattr(sens, "mode", 'ACTIVE') == 'FINISHED':
-            # Modo Concluido (Bricks 2.0): depende do motivo de encerramento do actuator na engine.
-            raise Unsupported("sensor actuator no modo Concluido")
-        expr = "self._act_on.get(%r, False)" % sens.actuator
+            # Modo Concluido (Bricks 2.0): pulso de um tic depois que o actuator terminou o trabalho.
+            target = next((a for a in ob.game.actuators if a.name == sens.actuator), None)
+            if target is None or not _finishes(target):
+                raise Unsupported("sensor actuator no modo Concluido lendo %s" %
+                                  (target.type if target else "actuator inexistente"))
+            expr = "self._act_done.get(%r, False)" % sens.actuator
+        else:
+            expr = "self._act_on.get(%r, False)" % sens.actuator
     elif t == 'ANIMATIONEVENT':
         trigger = -1 if sens.trigger_all else sens.trigger_index - 1
         expr = "self._anim_event(%r, %d, %d, own=ob)" % (key, sens.event_index - 1, trigger)
@@ -596,7 +603,7 @@ def _world_property_code(act):
 # Helpers do componente que agem sobre o objeto passado em own= (atuador de outro objeto).
 # Estado (self._ticks) e chaves por 'dono/atuador'; o resto de self.* continua sendo brick.
 _OWN_CALLS = (r"self\._(follow|mouse_look|cst\w*|steer|track_parent|track_tgt|snd_play|snd_stop|ramp|servo|char_move|vibrate|"
-              r"filter2d|arm_con|action|rt_set)\(|self\._ticks\.pop\(")
+              r"filter2d|arm_con|action|rt_set|wait|video)\(|self\._ticks\.pop\(")
 
 
 def _actuator_code(ob, act):
@@ -791,11 +798,44 @@ def _actuator_code(ob, act):
         return _armature_code(act)
     if t == 'FILTER_2D':
         return _filter2d_code(act), False
+    if t == 'WAIT':
+        return _wait_code(act)
+    if t == 'VIDEO':
+        return _video_code(act)
     if t == 'VIBRATION':
         return ["self._vibrate(%s, %s, %s, %s, %s)" % (
             _act_arg("Joystick", act.joy_index), act.mode == 'PLAY', _act_arg("Strength Left", act.joy_strength_left),
             _act_arg("Strength Right", act.joy_strength_right), _act_arg("Duration", act.joy_duration))], False
     raise Unsupported("actuator %s" % t)
+
+
+def _finishes(act):
+    """Actuators cujo termino o conversor sabe reproduzir (sensor Actuator no modo Concluido)."""
+    return act.type in {'WAIT', 'VIDEO'}
+
+
+def _wait_code(act):
+    # SCA_WaitActuator: conta o tempo de logica a partir do pulso positivo e termina.
+    key = "wt:" + _ACT_LABEL[0]
+    _ACT_ALWAYS[0] = True
+    _ACT_STATE[0] = "%r in self._ticks" % key
+    _ACT_DONE[0] = "self._ticks.pop(%r, False)" % ("done:" + key)
+    return ["self._wait(%r, %s, %s, %s, %s)" % (key, _FIRE, _LIVE, _act_arg("Duration", act.duration),
+                                                _act_arg("Restart", act.use_restart))], False
+
+
+_VIDEO_MODES = {'PLAY': 0, 'PAUSE': 1, 'TOGGLE': 2, 'STOP': 3, 'RESTART': 4, 'SEEK': 5}
+
+
+def _video_code(act):
+    # KX_VideoActuator: comanda o componente anastacio_video; Play/Restart terminam no fim do video.
+    key = "vid:" + _ACT_LABEL[0]
+    _ACT_ALWAYS[0] = True
+    _ACT_STATE[0] = "%r in self._ticks" % key
+    _ACT_DONE[0] = "self._ticks.pop(%r, False)" % ("done:" + key)
+    return ["self._video(%r, %s, %s, %s, %d, %s, %s, own=ob)" % (
+        key, _FIRE, _LIVE, _act_arg("Object", act.object.name if act.object else ""), _VIDEO_MODES[act.mode],
+        _act_arg("Seconds", act.seconds), _act_arg("Relative", act.use_relative))], False
 
 
 def _runtime_property_code(act):
@@ -1265,6 +1305,7 @@ class %(classname)s(%(base)s):
         self._ticks = {}
         self._hits = []
         self._act_on = {}
+        self._act_done = {}
 %(start_extra)s%(first_update)s%(extra)s
     def _rise(self, key, value):
         """Pulso positivo: True so no frame em que value passa a True."""
@@ -1928,6 +1969,77 @@ _EXTRA["_track_tgt"] = '''
         cache[key] = tgt
         return tgt
 '''
+_EXTRA["_wait"] = '''
+    def _wait(self, key, fire, live, duration, restart):
+        """Wait actuator (SCA_WaitActuator): conta o tempo desde o pulso positivo e termina."""
+        now = logic.getFrameTime()
+        start = self._ticks.get(key)
+        if start is not None and not live:
+            # Saiu do estado: cancela (nao conta como concluido).
+            del self._ticks[key]
+            return
+        if start is None:
+            if not fire:
+                return
+            start = now
+        elif fire and restart:
+            start = now
+        if now - start >= duration - 1e-6:
+            self._ticks.pop(key, None)
+            self._ticks["done:" + key] = True
+        else:
+            self._ticks[key] = start
+'''
+_EXTRA["_video"] = '''
+    def _video(self, key, fire, live, target, mode, seconds, relative, own=None):
+        """Video actuator (KX_VideoActuator): 0 play, 1 pause, 2 play/pause, 3 stop, 4 restart, 5 seek."""
+        st = self._ticks.get(key)
+        if st is not None and not live:
+            # Saiu do estado: o video continua, o actuator para de acompanhar.
+            del self._ticks[key]
+            return
+        if fire:
+            st = "pend"
+        if st is None:
+            return
+        ob = own or self.object
+        o = ob.scene.objects.get(target) if target else ob
+        player = next((c for c in o.components if getattr(c, "anastacio_video", False)), None) if o else None
+        if player is None:
+            print("Video actuator: %s has no Video Player" % (target or ob.name))
+            self._ticks.pop(key, None)
+            return
+        if st == "pend":
+            if not hasattr(player, "finished"):
+                # O start() do componente ainda nao rodou: o comando espera um tic.
+                self._ticks[key] = st
+                return
+            watch = mode in (0, 4) or (mode == 2 and not player.playing)
+            if mode == 1 or (mode == 2 and player.playing):
+                player.pause()
+            elif mode == 3:
+                player.stop()
+            elif mode == 4:
+                player.seek(0.0)
+                player.play()
+            elif mode == 5:
+                t = seconds + (player.time if relative else 0.0)
+                player.seek(max(0.0, min(t, player.duration) if player.duration > 0.0 else t))
+            else:
+                player.play()
+            if not watch:
+                self._ticks.pop(key, None)
+                self._ticks["done:" + key] = True
+                return
+        if player.finished:
+            self._ticks.pop(key, None)
+            self._ticks["done:" + key] = True
+        elif not player.playing:
+            # Pausado ou parado por outro, ou o video nao abriu: cancelado.
+            self._ticks.pop(key, None)
+        else:
+            self._ticks[key] = "watch"
+'''
 _EXTRA["_snd_play"] = '''
     def _snd_play(self, key, path, volume, pitch, loop, pingpong, d3, own=None):
         """Sound actuator: toca se nao estava tocando (KX_SoundActuator::play); d3 = ajustes 3D ou None."""
@@ -2564,6 +2676,8 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     converted = []
     act_refs = {}  # controller -> actuators lidos por sensores Actuator
     watched = {s.actuator for s in ob.game.sensors if s.type == 'ACTUATOR'}
+    watched_done = {s.actuator for s in ob.game.sensors
+                    if s.type == 'ACTUATOR' and getattr(s, "mode", 'ACTIVE') == 'FINISHED'}
     todos = []
     sensor_exprs = {}  # nome da variavel -> (expressao, nome original); cada sensor avaliado uma vez
     sensor_masks = {}
@@ -2692,8 +2806,9 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
                     _GROUP_ICON[_GROUP[0]] = 'FILE_TEXT'
                 _ACT_STATE[0] = None
                 _ACT_ALWAYS[0] = False
+                _ACT_DONE[0] = None
                 code = _actuator_code(owner, a)
-                code = code + ((),) * (3 - len(code)) + (_ACT_STATE[0], _ACT_ALWAYS[0])
+                code = code + ((),) * (3 - len(code)) + (_ACT_STATE[0], _ACT_ALWAYS[0], _ACT_DONE[0])
                 if owner != ob:
                     if any(re.search(r"self\.(?!_a\[)", re.sub(_OWN_CALLS, "", line))
                            for part in code[:1] + code[2:3] for line in part):
@@ -2787,6 +2902,8 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
     out.append("\n        # Actuators")
     if watched:
         out.append("        self._act_on = {}")
+    if watched_done:
+        out.append("        self._act_done = {}")
     # A engine roda os actuators de um objeto na ordem da pilha de actuators dele, nao na dos controllers.
     stack = {a.name: i for i, a in enumerate(ob.game.actuators)}
     flat = [(cont, act, owner, code) for cont, _expr, _pulse, actuators in plans for act, owner, code in actuators]
@@ -2804,7 +2921,9 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             if owner != ob:
                 out.append("        if %s is not None:" % foreign[owner.name])
                 pad += "    "
-            out += [pad + line.replace(_ON, cname).replace(_FIRE, cname + "_fire") for line in lines]
+            live = "bool(state & %d)" % (1 << (cont.states - 1))
+            out += [pad + line.replace(_ON, cname).replace(_FIRE, cname + "_fire").replace(_LIVE, live)
+                    for line in lines]
         else:
             out.append("        if %s:  # actuator '%s' <- controller '%s'" % (cond, act.name, cont.name))
             out += ["            " + line.replace(_FIRE, cname + "_fire") for line in lines]
@@ -2818,6 +2937,10 @@ def convert_object(ob, classname, component=True, _skip=frozenset()):
             # Estado lido pelos sensores Actuator no proximo frame.
             out.append("        if %s:" % (code[3] or cond))
             out.append("            self._act_on[%r] = True" % act.name)
+        if owner == ob and act.name in watched_done and code[5]:
+            # Pulso de concluido lido pelos sensores Actuator (modo Concluido) no proximo frame.
+            out.append("        if %s:" % code[5])
+            out.append("            self._act_done[%r] = True" % act.name)
 
     if _SND3D[0] and any("self._snd_play(" in line for line in out):
         out.append("        self._snd_update()")
