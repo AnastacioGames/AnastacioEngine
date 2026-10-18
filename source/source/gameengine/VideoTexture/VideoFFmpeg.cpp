@@ -1087,12 +1087,9 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 			pthread_mutex_unlock(&m_cacheMutex);
 			// no need to remove the frame from the queue: the cache thread does not touch the head, only the tail
 			if (frame == nullptr) {
-				// no frame in cache, in case of file it is an abnormal situation
-				if (m_isFile) {
-					// go back to no threaded reading
-					stopCache();
-					break;
-				}
+				// the cache thread has not decoded this frame yet: wait for it. Stopping the
+				// cache here re-seeked to the keyframe on every frame, seconds per frame on
+				// videos with far apart keyframes (screen recordings), and never caught up.
 				return nullptr;
 			}
 			if (frame->framePosition == -1) {

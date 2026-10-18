@@ -378,6 +378,8 @@ class VideoPlayer(Range.types.KX_PythonComponent):
                 self._handle = None
 
     def dispose(self):
+        if not hasattr(self, "_handle"):  # the game ended before start()
+            return
         if self._handle:
             self._handle.stop()
         self._restore_scene()
