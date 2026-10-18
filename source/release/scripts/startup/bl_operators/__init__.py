@@ -41,6 +41,7 @@ _modules = [
     "anastacio_text_atlas",
     "anastacio_material_recipes",
     "logic_to_python",
+    "logic_presets",
     "mask",
     "mesh",
     "node",

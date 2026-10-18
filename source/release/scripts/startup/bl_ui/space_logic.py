@@ -139,6 +139,9 @@ class LOGIC_MT_logicbricks_add(Menu):
         layout.operator_menu_enum("logic.controller_add", "type", text="Controller")
         layout.operator_menu_enum("logic.actuator_add", "type", text="Actuator")
 
+        layout.separator()
+        layout.operator_menu_enum("logic.preset_add", "type", text="Preset")
+
 
 class LOGIC_HT_header(Header):
     bl_space_type = 'LOGIC_EDITOR'

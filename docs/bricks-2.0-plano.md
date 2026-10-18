@@ -286,3 +286,20 @@ Implementada, com o teste de runtime pendente (precisa abrir o jogo).
   vez em 1,874 s, em x=9,00. Sem alvo: nenhuma conclusão. Sem Self Terminated: nenhuma conclusão.
 - ShapeAction não tem conversão no runtime (o Action cobre shape keys), então não entra. Os outros actuators
   (Motion, Camera, Scene, Property, Message...) não têm um fim natural e ficam de fora até alguém pedir um caso.
+
+## F3 — Presets (feito)
+
+Menu **Add › Preset** da Logic Editor (`logic.preset_add`, em `bl_operators/logic_presets.py`). Cada preset cria os
+bricks já ligados num grupo com o nome do preset, traduzido:
+
+| Preset | Bricks |
+|---|---|
+| Andar (WASD) | W/S movem ±0,1 em Y local; A/D giram ±0,05 rad |
+| Saltar | Espaço + Ray −Z (1,1) → velocidade Z 6 (precisa de física Dynamic) |
+| Câmera Seguindo | na câmera da cena: Always → Camera atrás do objeto ativo (−Y, altura 3, 5–8) |
+| Coletar Item | Collision com prop `player` → End Object + Message `collected` |
+| Porta com Tecla | E + Near `player` (3) → alterna `open`; `open` = True → Action em Flipper (o usuário escolhe a Action) |
+| Vida e Dano | prop `health` = 100; Collision `damage` → −10; `health` < 1 → End Object |
+
+As propriedades só são criadas quando ainda não existem. Aplicar o mesmo preset duas vezes gera nomes com `.001`.
+Teste em background: os 6 presets criam os bricks, ligações e grupos esperados, e tudo sobrevive a salvar/reabrir.

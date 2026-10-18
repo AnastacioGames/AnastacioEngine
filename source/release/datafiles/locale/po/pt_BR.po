@@ -97884,3 +97884,50 @@ msgstr "Adiciona um sensor Actuator no modo Concluído para este actuator, ligad
 
 msgid "This actuator never finishes (use Wait, Action, Sound or Steering with Self Terminated)"
 msgstr "Este atuador nunca conclui (use Esperar, Action, Sound ou Steering com Self Terminated)"
+
+msgctxt "Operator"
+msgid "Add Logic Preset"
+msgstr "Adicionar Preset de Lógica"
+
+msgid "Add a group of logic bricks already linked"
+msgstr "Adiciona um grupo de logic bricks já ligados"
+
+msgid "Walk (WASD)"
+msgstr "Andar (WASD)"
+
+msgid "W and S move forward and back, A and D turn"
+msgstr "W e S andam para frente e para trás, A e D giram"
+
+msgid "Space jumps while a ray below touches the ground (needs Dynamic physics)"
+msgstr "Espaço pula enquanto um raio para baixo toca o chão (precisa de física Dynamic)"
+
+msgid "Follow Camera"
+msgstr "Câmera Seguindo"
+
+msgid "The scene camera follows the active object from behind"
+msgstr "A câmera da cena segue o objeto ativo por trás"
+
+msgid "Collect Item"
+msgstr "Coletar Item"
+
+msgid "The item disappears and sends the message \"collected\" when an object with the property \"player\" touches it"
+msgstr "O item some e envia a mensagem \"collected\" quando um objeto com a propriedade \"player\" encosta nele"
+
+msgid "Door with Key"
+msgstr "Porta com Tecla"
+
+msgid "E near an object with the property \"player\" toggles the property \"open\", which plays the door Action (choose it) forward or back"
+msgstr "E perto de um objeto com a propriedade \"player\" alterna a propriedade \"open\", que toca a Action da porta (escolha qual) para frente ou para trás"
+
+msgid "Health and Damage"
+msgstr "Vida e Dano"
+
+msgid "Property \"health\" loses 10 when touching an object with the property \"damage\", the object ends at zero"
+msgstr "A propriedade \"health\" perde 10 ao tocar um objeto com a propriedade \"damage\"; o objeto termina ao chegar a zero"
+
+msgid "Select the object the scene camera should follow"
+msgstr "Selecione o objeto que a câmera da cena deve seguir"
+
+msgid "Bricks added to the camera \"%s\""
+msgstr "Bricks adicionados à câmera \"%s\""
+
