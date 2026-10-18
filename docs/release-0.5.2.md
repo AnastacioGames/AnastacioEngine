@@ -98,17 +98,17 @@ depois montar os pacotes. Regras gerais em [AGENTS.md](../AGENTS.md); empacotame
 Gerar o pacote no container (ver [release-0.5.0-linux.md](release-0.5.0-linux.md), o padrão agora é 0.5.2),
 extrair numa pasta limpa e conferir:
 
-- [ ] About mostra 0.5.2.
-- [ ] `ctest` no build Linux passa (inclui `script_load_modules` e `bmesh_bevel`).
-- [ ] `2.79/datafiles/sounds/effects/` está no tar; chuva e trovão tocam sozinhos numa cena com Weather Rain.
-- [ ] Video Player: vídeo toca em loop, fade e legenda `.srt` aparecem; o actuator Video controla.
-- [ ] Logic Bricks 2.0: abrir `docs/logic-bricks-2-tutorial.blend`, rodar, ver Highlight Active e a janela
+- [x] About mostra 0.5.2.
+- [x] `ctest` no build Linux passa (inclui `script_load_modules` e `bmesh_bevel`).
+- [x] `2.79/datafiles/sounds/effects/` está no tar; chuva e trovão tocam sozinhos numa cena com Weather Rain.
+- [x] Video Player: vídeo toca em loop, fade e legenda `.srt` aparecem; o actuator Video controla.
+- [x] Logic Bricks 2.0: abrir `docs/logic-bricks-2-tutorial.blend`, rodar, ver Highlight Active e a janela
       no Debug Mode (F4).
-- [ ] Text do jogo com atlas bitmap; "Edit Externally" abre o editor do sistema (no Linux usa o fallback).
-- [ ] SSGI, CSM com 2/3 cascatas e Directional Blur sem erro de shader no terminal.
-- [ ] Baked Lighting (AO e estática) e Material Atlas no editor do pacote.
-- [ ] Ragdoll e Game Layers fixadas funcionam.
-- [ ] Rodar os `tools/test_*.py` em background com o editor do pacote (mesmos comandos do Windows).
+- [x] Text do jogo com atlas bitmap; "Edit Externally" abre o editor do sistema (no Linux usa o fallback).
+- [x] SSGI, CSM com 2/3 cascatas e Directional Blur sem erro de shader no terminal.
+- [x] Baked Lighting (AO e estática) e Material Atlas no editor do pacote.
+- [x] Ragdoll e Game Layers fixadas funcionam.
+- [x] Rodar os `tools/test_*.py` em background com o editor do pacote (mesmos comandos do Windows).
 
 ## Depois do teste: lançar
 
@@ -202,3 +202,12 @@ No PC com Windows, para terminar:
 - Pacote Linux refeito com as duas correções (física do `.cooked` e Standalone) e trocado no rascunho:
   `1a4f7f00ab82466658aac096528200748d9e5833312ccc4b048ed29b5fa3c0e7  AnastacioEngine-0.5.2-linux-x86_64.tar.xz` (linha já no `SHA256SUMS.txt` do rascunho;
   falta trocar a do zip Windows e acrescentar a da RangeArmor).
+
+### Linux: checklist visual aprovado (2026-10-18)
+
+- Usuário testou o pacote final (`1a4f7f00…`) extraído: visual OK (Play e Standalone, tutorial Logic Bricks 2.0,
+  som, vídeo, render). Log do terminal sem erro de shader, traceback ou crash. **Linux liberado.**
+- **Falta só o Windows:** `git pull`, recompilar + `ninja install`, refazer zip da engine e da RangeArmor
+  (com o `Launcher-linux` do rascunho), corrigir o `SHA256SUMS.txt` (linha Windows nova + RangeArmor),
+  `gh release upload v0.5.2 ... --clobber`, apagar o asset `Launcher-linux` do rascunho e publicar com
+  `gh release edit v0.5.2 --draft=false --latest`.
