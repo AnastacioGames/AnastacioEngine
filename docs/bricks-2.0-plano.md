@@ -190,3 +190,35 @@ levantamento.
 3. Esperar ignora novos positivos por padrão e cancela ao sair do estado? (proposta: sim)
 4. Nomes: "Concluído"/"Então"/"Esperar" em pt-BR, "Finished"/"Then"/"Wait" em inglês?
 5. Começar por F0 + F1a (estados com nome)?
+
+## 8. Resultado da F0 (2026-10-18)
+
+**Decisão: modo "Ao concluir" no sensor Actuator, não um sensor novo.**
+
+- `bActuatorSensor` (`DNA_sensor_types.h`) já tem `int type`, que nenhum código lê ou grava. Ele vira o modo:
+  `0` = comportamento atual (ativo/inativo), `1` = Concluído. Não muda o DNA, e arquivos antigos e da Range
+  original chegam com `0`, ou seja, idênticos ao de hoje.
+- Cópia (`copy_sensor`: `MEM_dupallocN` de `data`), escrita (`writefile.c`), leitura, undo e append já tratam o
+  struct inteiro. O alvo é por nome, como hoje: renomear o actuator (`rna_Actuator_name_set`) não atualiza o
+  sensor, e excluir o alvo deixa `m_actuator` nulo (`Evaluate` devolve falso). Esse comportamento já existe e é
+  seguro; atualizar o nome ao renomear fica como melhoria opcional.
+- `.cooked` guarda só hull e shaders; a lógica vem do `.range`. Sem impacto.
+- Conversão: `BL_ConvertSensors.cpp` (case `SENS_ACTUATOR`) passa a ler `type` e repassa ao `SCA_ActuatorSensor`.
+- RNA: nova enum `mode` em `rna_def_actuator_sensor`. UI: `draw_sensor_actuator` em `logic_window.c`.
+
+**Motivo de encerramento** (`SCA_IActuator`: `FINISHED`/`CANCELLED`/`FAILED`, gravado quando `Update()` devolve
+falso e o `SCA_LogicManager` tira o actuator da lista ativa):
+
+| Actuator | FINISHED | CANCELLED | FAILED |
+|---|---|---|---|
+| Action (`BL_ActionActuator::Update`) | ramo "Handle a finished animation" (`ACT_FLAG_PLAY_END` + `IsActionDone`): Play, Ping Pong, Flipper | sobreposto por outra action na camada; pulso negativo em Loop Stop | `m_actionName` vazio; Property sem a propriedade |
+| Sound (`KX_SoundActuator::Update`) | `isplaying` cai sem pulso negativo | pulso negativo com modo *Stop* | `m_sound` nulo |
+| Esperar (novo) | tempo esgotado | saída do estado, objeto removido | — |
+
+Loops sem fim (Loop Stop segurado, Sound em loop) nunca disparam o Concluído, como esperado. Desativação por
+troca de estado passa por `SCA_LogicManager` linha ~150 (`Deactivate()` + `SetActive(false)`) e deve gravar
+`CANCELLED`.
+
+**Detecção no sensor:** o modo Concluído dá pulso positivo de um tick quando o actuator sai da lista ativa com
+`FINISHED`; um contador de conclusões no actuator evita perder conclusões que ocorrem no mesmo tick do
+reinício.
