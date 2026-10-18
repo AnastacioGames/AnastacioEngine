@@ -85,6 +85,10 @@ public:
 	virtual bool stop (void);
 	/// set play range
 	virtual void setRange (double start, double stop);
+	/// jump to a time of the file in seconds, playing or paused
+	void seek (double seconds);
+	/// time of the frame shown, in seconds of the file (-1 before the first frame)
+	double getTime (void) { return (m_lastFrame < 0) ? -1.0 : double(m_lastFrame) / m_baseFrameRate; }
 	/// set frame rate
 	virtual void setFrameRate (float rate);
 	// some specific getters and setters

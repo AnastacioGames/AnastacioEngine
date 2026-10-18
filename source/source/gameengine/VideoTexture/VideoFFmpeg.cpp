@@ -897,6 +897,25 @@ bool VideoFFmpeg::stop(void)
 }
 
 
+void VideoFFmpeg::seek(double seconds)
+{
+	if (!m_isFile) {
+		return;
+	}
+	if (seconds < m_range[0]) {
+		seconds = m_range[0];
+	}
+	if (seconds > m_range[1]) {
+		seconds = m_range[1];
+	}
+	// drop the frames read ahead, grabFrame seeks the file from the new clock
+	stopCache();
+	m_eof = false;
+	// play() continues after m_lastFrame; the frame before the target makes the target show
+	m_lastFrame = long(seconds * m_baseFrameRate) - 1;
+	m_startTime = PIL_check_seconds_timer() - seconds / m_frameRate;
+}
+
 // set video range
 void VideoFFmpeg::setRange(double start, double stop)
 {
@@ -1178,8 +1197,24 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 
 	// find the correct frame, in case of streaming and no cache, it means just
 	// return the next frame. This is not quite correct, may need more work
-	while (av_read_frame(m_formatCtx, &packet) >= 0)
+	bool flushing = false;
+	while (true)
 	{
+		if (!flushing && av_read_frame(m_formatCtx, &packet) < 0) {
+			// end of file: threaded decoders still hold the last frames, empty packets
+			// get them out (a seek near the end would find nothing otherwise)
+			if (!m_isFile) {
+				break;
+			}
+			flushing = true;
+		}
+		if (flushing) {
+			av_init_packet(&packet);
+			packet.data = nullptr;
+			packet.size = 0;
+			packet.stream_index = m_videoStream;
+			packet.dts = AV_NOPTS_VALUE;
+		}
 		if (packet.stream_index == m_videoStream) {
 			AVFrame *input = m_frame;
 			short counter = 0;
@@ -1233,6 +1268,10 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 			}
 		}
 		av_free_packet(&packet);
+		if (flushing && !frameFinished) {
+			// decoder empty
+			break;
+		}
 	}
 	m_eof = m_isFile && !frameLoaded;
 	if (frameLoaded) {
@@ -1348,6 +1387,21 @@ static int VideoFFmpeg_setDeinterlace(PyImage *self, PyObject *value, void *clos
 	return 0;
 }
 
+static PyObject *VideoFFmpeg_seek(PyImage *self, PyObject *args)
+{
+	double seconds;
+	if (!PyArg_ParseTuple(args, "d:seek", &seconds)) {
+		return nullptr;
+	}
+	getFFmpeg(self)->seek(seconds);
+	Py_RETURN_NONE;
+}
+
+static PyObject *VideoFFmpeg_getTime(PyImage *self, void *closure)
+{
+	return PyFloat_FromDouble(getFFmpeg(self)->getTime());
+}
+
 // methods structure
 static PyMethodDef videoMethods[] =
 { // methods from VideoBase class
@@ -1355,11 +1409,14 @@ static PyMethodDef videoMethods[] =
 	{"pause", (PyCFunction)Video_pause, METH_NOARGS, "pause video"},
 	{"stop", (PyCFunction)Video_stop, METH_NOARGS, "stop video (play will replay it from start)"},
 	{"refresh", (PyCFunction)Video_refresh, METH_VARARGS, "Refresh video - get its status"},
+	{"seek", (PyCFunction)VideoFFmpeg_seek, METH_VARARGS, "seek(seconds): jump to a time of the file, playing or paused"},
 	{nullptr}
 };
 // attributes structure
 static PyGetSetDef videoGetSets[] =
-{ // methods from VideoBase class
+{
+	{(char *)"time", (getter)VideoFFmpeg_getTime, nullptr, (char *)"time of the frame shown in seconds, -1 before the first one", nullptr},
+	// methods from VideoBase class
 	{(char *)"status", (getter)Video_getStatus, nullptr, (char *)"video status", nullptr},
 	{(char *)"range", (getter)Video_getRange, (setter)Video_setRange, (char *)"replay range", nullptr},
 	{(char *)"repeat", (getter)Video_getRepeat, (setter)Video_setRepeat, (char *)"repeat count, -1 for infinite repeat", nullptr},
