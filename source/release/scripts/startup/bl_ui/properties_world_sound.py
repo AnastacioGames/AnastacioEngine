@@ -124,13 +124,21 @@ def _localize_engine_sound(path):
     return dest_path
 
 
+def _slot_path(sound):
+    """Caminho do slot; o caminho de pasta que salvar um slot vazio gravava antes vira vazio."""
+    path = sound.filepath
+    if path.endswith(("\\", "/")):
+        sound.filepath = path = ""
+    return path
+
+
 def _fill_engine_effects(module, events=None):
     """Slots do Effects sem arquivo recebem o som que vem com a engine (so os dos events
     pedidos, quando dados). Devolve quantos."""
     effects_dir = os.path.join(_engine_datafiles_dir(), "effects")
     filled = 0
     for sound in module.sounds:
-        if sound.filepath or (events is not None and sound.event not in events):
+        if _slot_path(sound) or (events is not None and sound.event not in events):
             continue
         filename = ENGINE_EFFECT_FILES.get(sound.name)
         if not filename:
@@ -181,9 +189,11 @@ def ensure_weather_sounds(scene):
     effects = [m for m in world.sound_modules if m.type == 'EFFECTS']
     for module in effects:
         for sound in module.sounds:
-            if sound.filepath and os.path.isabs(sound.filepath) and bpy.data.is_saved:
-                path = _localize_engine_sound(sound.filepath)
-                if path != sound.filepath:
+            # Na mesma unidade o save ja deixou o caminho da engine relativo ("//..\engine\...").
+            if _slot_path(sound) and bpy.data.is_saved:
+                abs_path = bpy.path.abspath(sound.filepath)
+                path = _localize_engine_sound(abs_path)
+                if path != abs_path:
                     try:
                         path = bpy.path.relpath(path)
                     except ValueError:
@@ -192,7 +202,7 @@ def ensure_weather_sounds(scene):
                     changed += 1
 
     for event in _needed_weather_events(scene, world):
-        if any(s.event == event and s.filepath for m in effects for s in m.sounds):
+        if any(s.event == event and _slot_path(s) for m in effects for s in m.sounds):
             continue
         if not effects:
             effects.append(_new_effects_module(world))

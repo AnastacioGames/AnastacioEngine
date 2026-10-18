@@ -6,6 +6,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-18 - Sons automáticos com projeto na mesma unidade da engine
+
+- Projeto na mesma unidade da engine: o save deixava o caminho do som da engine relativo e
+  `ensure_weather_sounds` só copiava caminhos absolutos, então chuva/trovão ficavam apontando para dentro da
+  engine (sumiriam no jogo exportado). Agora resolve o caminho antes de copiar para `sounds/`.
+- `bpath.c`: slots vazios do World Sound não são mais remapeados (viravam `//..\..\` e pareciam
+  preenchidos); `_slot_path` limpa esse caminho em arquivos já salvos.
+- Pacote Windows sem o `AnastacioEngine_BakeTest.exe`. Teste: `tools/test_weather_sounds_auto.py` em C: e D:.
+
 ## 2026-10-18 - Preparação da 0.5.2
 
 - Versão 0.5.2 em `ANASTACIO_VERSION_STRING`, About (`wm.py`), `stage_release_windows.py` e

@@ -1,6 +1,7 @@
 # Chuva/raio ligados sem som no Effects: ao salvar (save_pre) e ao rodar o jogo (game_pre) a engine cria o
 # modulo Effects, poe chuva.wav/trovao*.wav e copia os arquivos para <projeto>/sounds.
 # Uso: AnastacioEngine.exe -b --factory-startup --python tools/test_weather_sounds_auto.py -- <pasta temporaria>
+# Rode com a pasta na mesma unidade da engine tambem: ali o save deixa o caminho da engine relativo.
 import os
 import sys
 
@@ -65,6 +66,8 @@ assert len(by_event.get('RAIN', [])) == 1, by_event
 for fp in by_event['THUNDER'] + by_event['RAIN']:
     assert fp.startswith("//"), fp
     assert os.path.isfile(bpy.path.abspath(fp)), fp
+# Slots sem som continuam vazios depois de salvar (o save gravava "//..\..\\" neles).
+assert not any(s.filepath for s in effects[0].sounds if s.event not in ('THUNDER', 'RAIN')),     [s.filepath for s in effects[0].sounds]
 for name in ("trovao1.wav", "trovao2.wav", "trovao3.wav", "chuva.wav"):
     assert os.path.isfile(os.path.join(out_dir, "sounds", name)), name
 

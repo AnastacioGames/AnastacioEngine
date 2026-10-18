@@ -532,7 +532,10 @@ void BKE_bpath_traverse_id(Main *bmain, ID *id, BPathVisitor visit_cb, const int
 			World *wrld = (World *)id;
 			for (WorldSoundModule *module = wrld->sound_modules.first; module; module = module->next) {
 				for (WorldSoundEntry *entry = module->sounds.first; entry; entry = entry->next) {
-					rewrite_path_fixed(entry->filepath, visit_cb, absbase, bpath_user_data);
+					/* Empty slots stay empty; remapping "" gives a "//..\..\" path that looks filled. */
+					if (entry->filepath[0]) {
+						rewrite_path_fixed(entry->filepath, visit_cb, absbase, bpath_user_data);
+					}
 				}
 			}
 			break;
