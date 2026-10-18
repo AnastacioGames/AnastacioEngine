@@ -148,7 +148,7 @@ No PC com Windows, para terminar:
   `RangeRuntime` (o da 0.5.1 não acha o runtime do pacote 0.5.2):
 
   ```bash
-  cd tools/rangearmor/source/launcher
+  cd tools/rangearmor/source/launcher   # Cargo.lock versão 3: serve o cargo 1.75 do apt; se reclamar de versão, use o rustup
   cargo test --locked && cargo build --release --locked --target-dir /tmp/ra-launcher
   strip /tmp/ra-launcher/release/rangearmor   # opcional; upx -5 se tiver
   sha256sum /tmp/ra-launcher/release/rangearmor
