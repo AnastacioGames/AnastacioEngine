@@ -199,3 +199,6 @@ No PC com Windows, para terminar:
 - Validado: `wm.blenderplayer_start` com o editor do pacote abre o runtime e a cena roda (Player em z=0,5).
 - **Windows:** não muda nada no comportamento (lá já era `AnastacioRuntime.exe`); só entra no `git pull`.
   O pacote Linux será refeito com isso e trocado no rascunho junto com o `SHA256SUMS.txt`.
+- Pacote Linux refeito com as duas correções (física do `.cooked` e Standalone) e trocado no rascunho:
+  `1a4f7f00ab82466658aac096528200748d9e5833312ccc4b048ed29b5fa3c0e7  AnastacioEngine-0.5.2-linux-x86_64.tar.xz` (linha já no `SHA256SUMS.txt` do rascunho;
+  falta trocar a do zip Windows e acrescentar a da RangeArmor).
