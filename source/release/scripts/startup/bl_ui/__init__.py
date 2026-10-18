@@ -84,6 +84,7 @@ _modules = [
     "space_properties",
     "space_sequencer",
     "space_text",
+    "space_text_srt",
     "space_time",
     "space_userpref",
     "space_view3d",

@@ -22,6 +22,105 @@ from bpy.types import Header, Menu, Panel
 from bpy.app.translations import pgettext_iface as iface_
 
 
+def _close_text(context, text):
+    """Remove the text from the file; the editor shows the next tab."""
+    texts = list(bpy.data.texts)
+    st = context.space_data
+    if st and st.type == 'TEXT_EDITOR' and st.text == text:
+        index = texts.index(text)
+        others = texts[:index] + texts[index + 1:]
+        st.text = others[min(index, len(others) - 1)] if others else None
+    bpy.data.texts.remove(text)
+
+
+def _loses_work(text):
+    # a text only in the .range, or with changes not saved to its file, is lost when closed
+    return not text.filepath or text.is_dirty
+
+
+class TEXT_OT_tab_close(bpy.types.Operator):
+    bl_idname = "text.tab_close"
+    bl_label = "Close"
+    bl_description = "Close this text (the file on disk is kept)"
+    bl_options = {'INTERNAL', 'UNDO'}
+
+    text_name = bpy.props.StringProperty()
+    others = bpy.props.BoolProperty(options={'HIDDEN'})
+
+    def targets(self):
+        if self.others:
+            return [t for t in bpy.data.texts if t.name != self.text_name]
+        text = bpy.data.texts.get(self.text_name)
+        return [text] if text else []
+
+    def invoke(self, context, event):
+        if any(_loses_work(t) for t in self.targets()):
+            return context.window_manager.invoke_confirm(self, event)
+        return self.execute(context)
+
+    def execute(self, context):
+        targets = self.targets()
+        for text in targets:
+            _close_text(context, text)
+        st = context.space_data
+        if self.others and self.text_name in bpy.data.texts and st and st.type == 'TEXT_EDITOR':
+            st.text = bpy.data.texts[self.text_name]
+        return {'FINISHED'} if targets else {'CANCELLED'}
+
+
+class TEXT_OT_tab_delete_file(bpy.types.Operator):
+    bl_idname = "text.tab_delete_file"
+    bl_label = "Delete File"
+    bl_description = "Close this text and delete its file from the disk (cannot be undone)"
+    bl_options = {'INTERNAL'}
+
+    text_name = bpy.props.StringProperty()
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        import os
+        text = bpy.data.texts.get(self.text_name)
+        if text is None or not text.filepath:
+            return {'CANCELLED'}
+        path = bpy.path.abspath(text.filepath)
+        try:
+            if os.path.isfile(path):
+                os.remove(path)
+        except OSError as exc:
+            self.report({'ERROR'}, "Could not delete %s: %s" % (path, exc))
+            return {'CANCELLED'}
+        _close_text(context, text)
+        self.report({'INFO'}, "Deleted %s" % path)
+        return {'FINISHED'}
+
+
+class WM_MT_button_context(Menu):
+    """Extra items of the right click menu of a button (here: the Text Editor tabs)"""
+    bl_label = ""
+
+    def draw(self, context):
+        op = getattr(context, "button_operator", None)
+        if op is None or op.rna_type.identifier != "TEXT_OT_switch":
+            return
+        name = op.text_name
+        text = bpy.data.texts.get(name)
+        if text is None:
+            return
+        layout = self.layout
+        layout.separator()
+        layout.operator("text.tab_close", text="Close", icon='X').text_name = name
+        sub = layout.row()
+        sub.enabled = len(bpy.data.texts) > 1
+        props = sub.operator("text.tab_close", text="Close Others", icon='PANEL_CLOSE')
+        props.text_name = name
+        props.others = True
+        sub = layout.row()
+        sub.enabled = bool(text.filepath)
+        sub.operator("text.tab_delete_file", text="Delete File...", icon='CANCEL').text_name = name
+
+
 class TEXT_OT_switch(bpy.types.Operator):
     bl_idname = "text.switch"
     bl_label = "Switch Text"
@@ -145,42 +244,16 @@ class TEXT_PT_view(Panel):
     bl_label = "View"
 
     def draw(self, context):
-        layout = self.layout
-
         st = context.space_data
 
-        # These properties carry an RNA icon, so they are drawn as compact
-        # icon toggles in one row instead of full-width buttons.
-        row = layout.row(align=True)
-        row.prop(st, "show_line_numbers", text="")
-        row.prop(st, "show_word_wrap", text="")
-        row.prop(st, "show_syntax_highlight", text="")
-
-        layout.prop(st, "show_line_highlight")
-
-
-class TEXT_PT_view_margin(Panel):
-    bl_space_type = 'TEXT_EDITOR'
-    bl_region_type = 'UI'
-    bl_category = "Text"
-    bl_label = "Margin"
-    bl_parent_id = "TEXT_PT_view"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    def draw_header(self, context):
-        st = context.space_data
-        self.layout.prop(st, "show_margin", text="")
-
-    def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
-        st = context.space_data
-
-        col = layout.column()
-        col.active = st.show_margin
-        col.prop(st, "margin_column", text="Column")
+        # line numbers, word wrap and syntax colors are always on (space_text.c), no toggles
+        box = self.layout.box()
+        box.prop(st, "show_line_highlight")
+        row = box.row()
+        row.prop(st, "show_margin", text="Margin")
+        sub = row.row()
+        sub.active = st.show_margin
+        sub.prop(st, "margin_column", text="Column")
 
 
 class TEXT_PT_properties(Panel):
@@ -190,20 +263,14 @@ class TEXT_PT_properties(Panel):
     bl_label = "Editor"
 
     def draw(self, context):
-        layout = self.layout
-        layout.use_property_split = True
-        layout.use_property_decorate = False
-
         st = context.space_data
         text = st.text
 
-        col = layout.column(align=True)
+        box = self.layout.box()
+        col = box.column(align=True)
         col.prop(st, "font_size")
         col.prop(st, "tab_width")
-
-        # Checkboxes read better without the split label column.
-        col = layout.column()
-        col.use_property_split = False
+        col = box.column()
         if text:
             col.prop(text, "use_tabs_as_spaces")
         col.prop(st, "use_live_edit")
@@ -216,30 +283,22 @@ class TEXT_PT_find(Panel):
     bl_label = "Find & Replace"
 
     def draw(self, context):
-        layout = self.layout
-
         st = context.space_data
 
-        # find
-        col = layout.column(align=True)
+        box = self.layout.box()
+        col = box.column(align=True)
         row = col.row(align=True)
         row.prop(st, "find_text", text="", icon='VIEWZOOM')
         row.operator("text.find_set_selected", text="", icon='EYEDROPPER')
         col.operator("text.find")
 
-        layout.separator()
-
-        # replace
-        col = layout.column(align=True)
+        col = box.column(align=True)
         row = col.row(align=True)
         row.prop(st, "replace_text", text="", icon='ARROW_LEFTRIGHT')
         row.operator("text.replace_set_selected", text="", icon='EYEDROPPER')
         col.operator("text.replace")
 
-        layout.separator()
-
-        # settings
-        row = layout.row(align=True)
+        row = box.row(align=True)
         row.prop(st, "use_match_case", text="Case", toggle=True)
         row.prop(st, "use_find_wrap", text="Wrap", toggle=True)
         row.prop(st, "use_find_all", text="All", toggle=True)
@@ -433,12 +492,14 @@ class TEXT_MT_toolbox(Menu):
 
 
 classes = (
+    TEXT_OT_tab_close,
+    TEXT_OT_tab_delete_file,
+    WM_MT_button_context,
     TEXT_OT_switch,
     TEXT_HT_header,
     TEXT_MT_edit,
     TEXT_MT_editor_menus,
     TEXT_PT_view,
-    TEXT_PT_view_margin,
     TEXT_PT_properties,
     TEXT_PT_find,
     TEXT_MT_view,

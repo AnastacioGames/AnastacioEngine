@@ -70,6 +70,7 @@ void main()
 
 
 SRT_TIME = re.compile(r"(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)")
+SRT_COLOR = re.compile(r'<font\s+color\s*=\s*"?#?([0-9a-fA-F]{6})"?', re.I)
 SRT_TAG = re.compile(r"<[^>]*>|\{\\[^}]*\}")
 
 
@@ -99,10 +100,18 @@ def load_srt(path):
                 g = [int(v) for v in match.groups()]
                 start = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000.0
                 end = g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000.0
-                body = [SRT_TAG.sub("", l).strip() for l in lines[i + 1:]]
-                body = [l for l in body if l]
-                if body:
-                    cues.append((start, end, body))
+                raw = [l for l in lines[i + 1:] if l.strip()]
+                body = [SRT_TAG.sub("", l).strip() for l in raw]
+                # <font color="#RRGGBB"> paints the line, {n8} puts the subtitle at the top
+                colors = []
+                for l in raw:
+                    c = SRT_COLOR.search(l)
+                    colors.append(tuple(int(c.group(1)[k:k + 2], 16) / 255.0 for k in (0, 2, 4)) if c
+                                  else (1.0, 1.0, 1.0))
+                top = any("{\\an8}" in l for l in raw)
+                keep = [k for k, l in enumerate(body) if l]
+                if keep:
+                    cues.append((start, end, [body[k] for k in keep], [colors[k] for k in keep], top))
                 break
     cues.sort(key=lambda cue: cue[0])
     return cues
@@ -465,22 +474,27 @@ class VideoPlayer(Range.types.KX_PythonComponent):
     @property
     def subtitle(self):
         """Lines of the subtitle shown now, [] when none."""
+        cue = self._cue_now()
+        return cue[2] if cue else []
+
+    def _cue_now(self):
         t = self.time
-        for start, end, lines in self._cues:
-            if start > t:
+        for cue in self._cues:
+            if cue[0] > t:
                 break
-            if t < end:
-                return lines
-        return []
+            if t < cue[1]:
+                return cue
+        return None
 
     def _draw_subtitles(self, *args):
         if not (self._playing or self._seeked or (self.fullscreen and self._alpha > 0.0)):
             return
         if self.fullscreen and self._alpha <= 0.0:
             return
-        lines = self.subtitle
-        if not lines:
+        cue = self._cue_now()
+        if cue is None:
             return
+        lines, colors, top = cue[2], cue[3], cue[4]
         import bgl
         import blf
         width = Range.render.getWindowWidth()
@@ -499,17 +513,18 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         font = 0
         blf.size(font, size, 72)
         shadow = max(1, size // 14)
-        y = height * 0.06
-        for line in reversed(lines):
+        step = size * 1.25
+        y = height * 0.94 - size - step * (len(lines) - 1) if top else height * 0.06
+        for line, color in zip(reversed(lines), reversed(colors)):
             x = (width - blf.dimensions(font, line)[0]) / 2
             bgl.glColor4f(0.0, 0.0, 0.0, 0.85 * alpha)
             for dx, dy in ((shadow, -shadow), (-shadow, -shadow), (shadow, shadow), (-shadow, shadow)):
                 blf.position(font, x + dx, y + dy, 0)
                 blf.draw(font, line)
-            bgl.glColor4f(1.0, 1.0, 1.0, alpha)
+            bgl.glColor4f(color[0], color[1], color[2], alpha)
             blf.position(font, x, y, 0)
             blf.draw(font, line)
-            y += size * 1.25
+            y += step
         bgl.glEnable(bgl.GL_DEPTH_TEST)
         bgl.glMatrixMode(bgl.GL_PROJECTION)
         bgl.glPopMatrix()
