@@ -98,6 +98,16 @@ const double defFrameRate = 25.0;
 #define CATCH_EXCP catch (Exception & exp) \
 	{ exp.report(); m_status = SourceError; }
 
+// Presentation timestamp of a decoded frame. The packet dts is in decode order and,
+// with B-frames or frame threading, belongs to another frame.
+static int64_t video_frame_ts(const AVFrame *frame, int64_t pktDts)
+{
+	if (frame->best_effort_timestamp != AV_NOPTS_VALUE) {
+		return frame->best_effort_timestamp;
+	}
+	return (frame->pkt_dts != AV_NOPTS_VALUE) ? frame->pkt_dts : pktDts;
+}
+
 // class RenderVideo
 
 // constructor
@@ -261,6 +271,9 @@ int VideoFFmpeg::openStream(const char *filename, FFMPEG_CONST AVInputFormat *in
 		return -1;
 	}
 	codecCtx->workaround_bugs = 1;
+	// decode on all cores (0 = auto); frames come out late, timestamps handle the order
+	codecCtx->thread_count = 0;
+	codecCtx->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
 	if (avcodec_open2(codecCtx, codec, nullptr) < 0) {
 		ffmpeg_stream_context_close(&codecCtx);
 		avformat_close_input(&formatCtx);
@@ -274,6 +287,14 @@ int VideoFFmpeg::openStream(const char *filename, FFMPEG_CONST AVInputFormat *in
 	m_baseFrameRate = (double)codecCtx->frame_rate / (double)codecCtx->frame_rate_base;
 #else
 	m_baseFrameRate = av_q2d(av_get_r_frame_rate_compat(formatCtx, formatCtx->streams[videoStream]));
+	{
+		// variable frame rate files (phones, some AVI muxers) report the timebase as the
+		// real rate (600, 1000...): the average rate is the one the frames are paced at
+		const double avgRate = av_q2d(formatCtx->streams[videoStream]->avg_frame_rate);
+		if (avgRate > 0.0 && (m_baseFrameRate <= 0.0 || m_baseFrameRate > avgRate * 1.5)) {
+			m_baseFrameRate = avgRate;
+		}
+	}
 #endif
 	if (m_baseFrameRate <= 0.0) {
 		m_baseFrameRate = defFrameRate;
@@ -387,6 +408,41 @@ void *VideoFFmpeg::cacheThread(void *data)
 		startTs = 0;
 	}
 
+	// convert the frame just decoded into currentFrame and queue it
+	auto deliverFrame = [&](int64_t pktDts) -> bool {
+		AVFrame *input = video->m_frame;
+
+		/* This means the data wasnt read properly, this check stops crashing */
+		if (input->data[0] == 0 && input->data[1] == 0
+		    && input->data[2] == 0 && input->data[3] == 0) {
+			return false;
+		}
+		if (video->m_deinterlace) {
+			if (avpicture_deinterlace(
+					(AVPicture *)video->m_frameDeinterlaced,
+					(const AVPicture *)video->m_frame,
+					video->m_codecCtx->pix_fmt,
+					video->m_codecCtx->width,
+					video->m_codecCtx->height) >= 0) {
+				input = video->m_frameDeinterlaced;
+			}
+		}
+		sws_scale(video->m_imgConvertCtx,
+		          input->data,
+		          input->linesize,
+		          0,
+		          video->m_codecCtx->height,
+		          currentFrame->frame->data,
+		          currentFrame->frame->linesize);
+		video->m_curPosition = (long)((video_frame_ts(video->m_frame, pktDts) - startTs) * (video->m_baseFrameRate * timeBase) + 0.5);
+		currentFrame->framePosition = video->m_curPosition;
+		pthread_mutex_lock(&video->m_cacheMutex);
+		BLI_addtail(&video->m_frameCacheBase, currentFrame);
+		pthread_mutex_unlock(&video->m_cacheMutex);
+		return true;
+	};
+	bool drained = false;
+
 	while (!video->m_stopThread)
 	{
 		// packet cache is used solely by this thread, no need to lock
@@ -395,19 +451,24 @@ void *VideoFFmpeg::cacheThread(void *data)
 		frameFinished = 0;
 		while (!endOfFile
 		       && (cachePacket = (CachePacket *)video->m_packetCacheFree.first) != nullptr
-		       && frameFinished < 25)
+		       && frameFinished < 1000)
 		{
 			// free packet => packet cache is not full yet, just read more
 			if (av_read_frame(video->m_formatCtx, &cachePacket->packet) >= 0) {
-				if (cachePacket->packet.stream_index == video->m_videoStream) {
-					// make sure fresh memory is allocated for the packet and move it to queue
+				if (cachePacket->packet.stream_index == video->m_videoStream &&
+				    cachePacket->packet.size > 0)
+				{
+					// make sure fresh memory is allocated for the packet and move it to queue.
+					// Fill the whole packet cache: reading one packet per loop capped the
+					// stream at 100 packets/s (fine-timebase AVI writes ~24 per frame).
 					av_dup_packet(&cachePacket->packet);
 					BLI_remlink(&video->m_packetCacheFree, cachePacket);
 					BLI_addtail(&video->m_packetCacheBase, cachePacket);
-					break;
+					continue;
 				}
 				else {
-					// this is not a good packet for us, just leave it on free queue
+					// not a good packet for us (other stream, or an empty "dropped frame"
+					// chunk), just leave it on free queue
 					// Note: here we could handle sound packet
 					av_free_packet(&cachePacket->packet);
 					frameFinished++;
@@ -443,41 +504,25 @@ void *VideoFFmpeg::cacheThread(void *data)
 				avcodec_decode_video2(video->m_codecCtx,
 				                      video->m_frame, &frameFinished,
 				                      &cachePacket->packet);
-				if (frameFinished) {
-					AVFrame *input = video->m_frame;
-
-					/* This means the data wasnt read properly, this check stops crashing */
-					if (input->data[0] != 0 || input->data[1] != 0
-					    || input->data[2] != 0 || input->data[3] != 0) {
-						if (video->m_deinterlace) {
-							if (avpicture_deinterlace(
-									(AVPicture *)video->m_frameDeinterlaced,
-									(const AVPicture *)video->m_frame,
-									video->m_codecCtx->pix_fmt,
-									video->m_codecCtx->width,
-									video->m_codecCtx->height) >= 0) {
-								input = video->m_frameDeinterlaced;
-							}
-						}
-						// convert to RGB24
-						sws_scale(video->m_imgConvertCtx,
-						          input->data,
-						          input->linesize,
-						          0,
-						          video->m_codecCtx->height,
-						          currentFrame->frame->data,
-						          currentFrame->frame->linesize);
-						// move frame to queue, this frame is necessarily the next one
-						video->m_curPosition = (long)((cachePacket->packet.dts - startTs) * (video->m_baseFrameRate * timeBase) + 0.5);
-						currentFrame->framePosition = video->m_curPosition;
-						pthread_mutex_lock(&video->m_cacheMutex);
-						BLI_addtail(&video->m_frameCacheBase, currentFrame);
-						pthread_mutex_unlock(&video->m_cacheMutex);
-						currentFrame = nullptr;
-					}
+				if (frameFinished && deliverFrame(cachePacket->packet.dts)) {
+					currentFrame = nullptr;
 				}
 				av_free_packet(&cachePacket->packet);
 				BLI_addtail(&video->m_packetCacheFree, cachePacket);
+			}
+			if (currentFrame && endOfFile && !drained && video->m_packetCacheBase.first == nullptr) {
+				// threaded decoders hold the last frames back: flush them out
+				AVPacket flush;
+				av_init_packet(&flush);
+				flush.data = nullptr;
+				flush.size = 0;
+				frameFinished = 0;
+				avcodec_decode_video2(video->m_codecCtx, video->m_frame, &frameFinished, &flush);
+				if (frameFinished && deliverFrame(AV_NOPTS_VALUE)) {
+					currentFrame = nullptr;
+					continue;
+				}
+				drained = true;
 			}
 			if (currentFrame && endOfFile) {
 				// no more packet and end of file => put a special frame that indicates that
@@ -960,6 +1005,15 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 				// the frame in the buffer is ahead of time, just leave it there
 				return nullptr;
 			}
+			// the frame is older than asked: show it unless a newer one is also due.
+			// Frames don't land on every position when the timebase is finer than the
+			// frame rate (variable frame rate, AVI at 1/600), an exact match never comes.
+			pthread_mutex_lock(&m_cacheMutex);
+			CacheFrame *next = (CacheFrame *)frame->link.next;
+			pthread_mutex_unlock(&m_cacheMutex);
+			if (next == nullptr || next->framePosition == -1 || next->framePosition > position) {
+				return frame->frame;
+			}
 			// this frame is not useful, release it
 			pthread_mutex_lock(&m_cacheMutex);
 			BLI_remlink(&m_frameCacheBase, frame);
@@ -989,7 +1043,7 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 						m_frame, &frameFinished,
 						&packet);
 					if (frameFinished) {
-						m_curPosition = (long)((packet.dts - startTs) * (m_baseFrameRate * timeBase) + 0.5);
+						m_curPosition = (long)((video_frame_ts(m_frame, packet.dts) - startTs) * (m_baseFrameRate * timeBase) + 0.5);
 					}
 				}
 				av_free_packet(&packet);
@@ -1065,7 +1119,7 @@ AVFrame *VideoFFmpeg::grabFrame(long position)
 			} while ((input->data[0] == 0 && input->data[1] == 0 && input->data[2] == 0 && input->data[3] == 0) && counter < 10 && m_isImage);
 
 			// remember dts to compute exact frame number
-			dts = packet.dts;
+			dts = frameFinished ? video_frame_ts(m_frame, packet.dts) : packet.dts;
 			if (frameFinished && !posFound) {
 				if (dts >= targetTs) {
 					posFound = 1;
