@@ -34,6 +34,51 @@ def video_component(ob):
     return next((c for c in ob.game.components if c.module == MODULE and c.name == COMPONENT), None)
 
 
+def copy_videos(game_dir, report=None):
+    """Copia para game_dir/videos os videos dos Video Players que ficariam fora do jogo exportado.
+
+    game_dir e a pasta que o jogo enxerga como "//" (data/ no RangeArmor, a pasta do executavel no
+    Save As Runtime). Video que ja esta dentro dela vai junto e nao e copiado. O runtime procura em
+    //videos/ pelo nome do arquivo quando o caminho escrito nao existe. Devolve quantos copiou."""
+    import os
+    import shutil
+
+    game_dir = os.path.normcase(os.path.abspath(game_dir))
+    dest_dir = os.path.join(game_dir, "videos")
+    copied = {}
+    for ob in bpy.data.objects:
+        component = video_component(ob)
+        if component is None or "File" not in component.properties:
+            continue
+        value = component.properties["File"].value
+        if not value:
+            continue
+        src = os.path.normcase(os.path.abspath(bpy.path.abspath(value, library=ob.library)))
+        if not os.path.isfile(src):
+            if report:
+                report({'WARNING'}, "Video Player of %s: file not found: %s" % (ob.name, value))
+            continue
+        try:
+            inside = os.path.commonpath([src, game_dir]) == game_dir
+        except ValueError:  # outra unidade no Windows
+            inside = False
+        if inside:
+            continue
+        name = os.path.basename(src)
+        if copied.get(name.lower(), src) != src:
+            if report:
+                report({'WARNING'}, "Two different videos are named %s; only one goes in the game" % name)
+            continue
+        dest = os.path.join(dest_dir, name)
+        if name.lower() not in copied:
+            os.makedirs(dest_dir, exist_ok=True)
+            if (not os.path.isfile(dest) or os.path.getsize(dest) != os.path.getsize(src) or
+                    os.path.getmtime(dest) < os.path.getmtime(src)):
+                shutil.copy2(src, dest)
+            copied[name.lower()] = src
+    return len(copied)
+
+
 def _override(context, ob):
     override = context.copy()
     override.update(object=ob, active_object=ob)

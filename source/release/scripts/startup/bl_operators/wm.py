@@ -2710,6 +2710,14 @@ def _rangearmor_write_export_preset(context):
     if os.path.basename(data_dir) != "data":
         return False
 
+    # Videos dos Video Players que estao fora de data/ vao para data/videos, que e empacotada.
+    from bl_ui.properties_video_player import copy_videos
+    try:
+        copy_videos(data_dir, report=lambda kind, msg: print("Export:", msg))
+    except OSError as e:
+        print("Export: could not copy the videos:", e)
+        return False
+
     project_dir = os.path.dirname(data_dir)
     config_path = os.path.join(project_dir, "launcher", "config.json")
     if not os.path.isfile(config_path):
