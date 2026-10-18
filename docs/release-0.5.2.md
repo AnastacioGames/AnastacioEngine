@@ -136,3 +136,25 @@ No PC com Windows, para terminar:
 3. `gh release upload v0.5.2 AnastacioEngine-0.5.2-windows-x64.zip RangeArmor-0.5.2-windows-x64.zip SHA256SUMS.txt --clobber`
 4. Conferir os 4 arquivos no rascunho e publicar: `gh release edit v0.5.2 --draft=false --latest`
    (cria a tag `v0.5.2` no `main`).
+
+## RangeArmor 0.5.2 (Windows, 2026-10-18)
+
+- Pasta `build/release-staging/RangeArmor-0.5.2-windows-x64/` montada a partir do zip da 0.5.1, com os
+  scripts atuais (`common.py`, `get_rangeengine_currentplatform.py`, `prepare_cooked.py`: nome
+  `AnastacioRuntime` também no Linux) e `Launcher.exe` recompilado (`cargo +1.95.0 test` 4/4).
+- `legacy-template-sha256.json` ganhou `Linux64` com o hash do `Launcher` Linux da 0.5.0/0.5.1
+  (`c4f0f3e4…`): projetos antigos passam a usar o launcher novo ao exportar.
+- **Falta (PC Linux):** compilar o `Launcher` Linux, que procura `AnastacioRuntime` com fallback para
+  `RangeRuntime` (o da 0.5.1 não acha o runtime do pacote 0.5.2):
+
+  ```bash
+  cd tools/rangearmor/source/launcher
+  cargo test --locked && cargo build --release --locked --target-dir /tmp/ra-launcher
+  strip /tmp/ra-launcher/release/rangearmor   # opcional; upx -5 se tiver
+  sha256sum /tmp/ra-launcher/release/rangearmor
+  gh release upload v0.5.2 /tmp/ra-launcher/release/rangearmor#Launcher-linux --clobber
+  ```
+
+  O hash novo não pode ser `c4f0f3e4…`. Depois o Windows baixa esse asset para
+  `release/launcher/Launcher`, apaga o asset temporário do rascunho, gera o zip da RangeArmor, sobe com
+  o zip do Windows e o `SHA256SUMS.txt`, e publica.
