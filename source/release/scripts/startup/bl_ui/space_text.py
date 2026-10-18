@@ -96,6 +96,77 @@ class TEXT_OT_tab_delete_file(bpy.types.Operator):
         return {'FINISHED'}
 
 
+def _text_open(context):
+    st = context.space_data
+    return st is not None and st.type == 'TEXT_EDITOR' and st.text is not None
+
+
+class TEXT_MT_floating_bar(Menu):
+    """Fixed floating buttons at the bottom right of the Text Editor (drawn by space_text.c)"""
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return _text_open(context)
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("ed.undo", text="", icon='LOOP_BACK')
+        layout.operator("ed.redo", text="", icon='LOOP_FORWARDS')
+        layout.separator()
+        layout.operator("text.cut", text="", icon='CUT')
+        layout.operator("text.copy", text="", icon='COPYDOWN')
+        layout.operator("text.paste", text="", icon='PASTEDOWN')
+        layout.separator()
+        layout.operator("text.start_find", text="", icon='VIEWZOOM')
+        layout.separator()
+        props = layout.operator("wm.context_cycle_int", text="", icon='ZOOMOUT')
+        props.data_path = "space_data.font_size"
+        props.reverse = True
+        props = layout.operator("wm.context_cycle_int", text="", icon='ZOOMIN')
+        props.data_path = "space_data.font_size"
+        props.reverse = False
+        layout.separator()
+        layout.operator("text.save", text="Save", icon='FILE_TICK')
+
+
+class TEXT_MT_floating_bar_context(Menu):
+    """Floating buttons for the kind of text open, above the fixed ones"""
+    bl_label = ""
+
+    @classmethod
+    def poll(cls, context):
+        return _text_open(context)
+
+    def draw(self, context):
+        layout = self.layout
+        name = context.space_data.text.name.lower()
+        if name.endswith(".srt"):
+            layout.label(text="Subtitle")
+            layout.operator("text.srt_add", text="Add", icon='ZOOMIN')
+            layout.operator("text.srt_split", text="", icon='ALIGN')
+            layout.operator("text.srt_merge", text="", icon='AUTOMERGE_ON')
+            layout.separator()
+            for delta, label in ((-0.1, "-0.1 s"), (0.1, "+0.1 s")):
+                props = layout.operator("text.srt_time", text=label)
+                props.edge = 'BOTH'
+                props.delta = delta
+            layout.separator()
+            layout.operator("text.srt_style", text="", icon='COLOR').style = 'COLOR'
+            layout.operator("text.srt_style", text="", icon='TRIA_UP_BAR').style = 'TOP'
+            layout.separator()
+            layout.operator("text.srt_check", text="Check", icon='VIEWZOOM')
+        else:
+            layout.label(text="Code")
+            layout.operator("text.comment", text="", icon='SYNTAX_OFF')
+            layout.operator("text.uncomment", text="", icon='SYNTAX_ON')
+            layout.operator("text.unindent", text="", icon='BACK')
+            layout.operator("text.indent", text="", icon='FORWARD')
+            if name.endswith(".py"):
+                layout.separator()
+                layout.operator("text.run_script", text="Run", icon='PLAY')
+
+
 class WM_MT_button_context(Menu):
     """Extra items of the right click menu of a button (here: the Text Editor tabs)"""
     bl_label = ""
@@ -495,6 +566,8 @@ classes = (
     TEXT_OT_tab_close,
     TEXT_OT_tab_delete_file,
     WM_MT_button_context,
+    TEXT_MT_floating_bar,
+    TEXT_MT_floating_bar_context,
     TEXT_OT_switch,
     TEXT_HT_header,
     TEXT_MT_edit,

@@ -463,6 +463,7 @@ set(ICON_NAMES
 	rangearmor
 	discord
 	patreon
+	cut
 	sortalpha
 	sortbyext
 	sorttime

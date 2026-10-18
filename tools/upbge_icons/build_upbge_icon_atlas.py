@@ -181,7 +181,8 @@ def main():
                 if size == 32:
                     mapped.append(name)
                 continue
-            own = range_atlas.crop(cell_box(i, size, range_atlas.height))
+            extra = os.path.join(os.path.dirname(os.path.abspath(__file__)), "extra", "%s_%d.png" % (name.lower(), size))
+            own = Image.open(extra).convert("RGBA") if os.path.isfile(extra) else range_atlas.crop(cell_box(i, size, range_atlas.height))
             if own.getbbox() is not None:
                 out.paste(own, dst[:2])
                 if size == 32:

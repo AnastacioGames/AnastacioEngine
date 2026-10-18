@@ -25,10 +25,12 @@
 #include <string.h>
 
 #include "DNA_text_types.h"
+#include "DNA_userdef_types.h"
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_math.h"
 
 #include "BKE_context.h"
 #include "BKE_global.h"
@@ -443,6 +445,55 @@ static void text_main_region_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_dropbox_handler(&ar->handlers, lb);
 }
 
+/* Floating button bars centered at the top of the text, like the one of the 3D View. Their
+ * buttons come from Python menus, so they change without rebuilding: TEXT_MT_floating_bar is the
+ * fixed one on top, TEXT_MT_floating_bar_context (buttons for the kind of text) goes below it.
+ * top is the upper edge of the bar; returns its lower edge, or top when the menu draws nothing. */
+static int text_draw_floating_menu(const bContext *C, ARegion *ar, const char *idname, int top)
+{
+	MenuType *mt = WM_menutype_find(idname, true);
+	if (mt == NULL || (mt->poll && !mt->poll(C, mt))) {
+		return top;
+	}
+
+	uiBlock *block = UI_block_begin(C, ar, idname, UI_EMBOSS);
+	uiLayout *layout = UI_block_layout(
+	        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, 0, 0, UI_UNIT_Y, 1, 0, UI_style_get());
+	uiLayout *row = uiLayoutRow(layout, true);
+	UI_menutype_draw((bContext *)C, mt, row);
+	int width = 0, height = 0;
+	UI_block_layout_resolve(block, &width, &height);
+	UI_block_end(C, block);
+	if (width <= 0) {
+		return top;
+	}
+
+	const int x = max_ii(UI_UNIT_X / 2, (ar->winx - width) / 2);
+	const int bottom = top - UI_UNIT_Y;
+	UI_block_translate(block, x, top);
+
+	/* opaque backdrop so the text lines do not show through */
+	unsigned char col[4];
+	UI_GetThemeColor4ubv(TH_HEADER, col);
+	col[3] = 235;
+	glEnable(GL_BLEND);
+	glColor4ubv(col);
+	UI_draw_roundbox_corner_set(UI_CNR_ALL);
+	UI_draw_roundbox_gl_mode(GL_POLYGON, (float)(x - 4), (float)(bottom - 4),
+	                         (float)(x + width + 4), (float)(top + 4), 0.25f * U.widget_unit);
+	glDisable(GL_BLEND);
+	UI_block_draw(C, block);
+	return bottom - 4;
+}
+
+static void text_draw_floating_bar(const bContext *C, ARegion *ar)
+{
+	const int gap = UI_UNIT_Y / 4;
+	int top = ar->winy - UI_UNIT_Y / 2;
+	top = text_draw_floating_menu(C, ar, "TEXT_MT_floating_bar", top);
+	text_draw_floating_menu(C, ar, "TEXT_MT_floating_bar_context", top - gap);
+}
+
 static void text_main_region_draw(const bContext *C, ARegion *ar)
 {
 	/* draw entirely, view changes should be handled here */
@@ -457,6 +508,7 @@ static void text_main_region_draw(const bContext *C, ARegion *ar)
 
 	/* data... */
 	draw_text_main(st, ar);
+	text_draw_floating_bar(C, ar);
 
 	/* reset view matrix */
 	// UI_view2d_view_restore(C);
@@ -613,6 +665,7 @@ void ED_spacetype_text(void)
 	/* regions: main window */
 	art = MEM_callocN(sizeof(ARegionType), "spacetype text region");
 	art->regionid = RGN_TYPE_WINDOW;
+	art->keymapflag = ED_KEYMAP_UI;  /* the floating bar's buttons */
 	art->init = text_main_region_init;
 	art->draw = text_main_region_draw;
 	art->cursor = text_cursor;
