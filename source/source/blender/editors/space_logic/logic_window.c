@@ -1565,6 +1565,13 @@ static void draw_actuator_header(uiLayout *layout, PointerRNA *ptr, PointerRNA *
 	                          RNA_boolean_get(ptr, "active")));
 	uiItemR(sub, ptr, "pin", UI_ITEM_R_NO_BG, "", ICON_NONE);
 
+	if (ED_logic_actuator_reports_finish(act)) {
+		/* "Then": sensor Finished + And controller, to chain the next actuators */
+		sub = uiLayoutRow(row, false);
+		uiLayoutSetActive(sub, RNA_boolean_get(ptr, "active"));
+		uiItemO(sub, IFACE_("Then"), ICON_FORWARD, "LOGIC_OT_actuator_then");
+	}
+
 	sub = uiLayoutRow(row, true);
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "active"));
 	uiItemEnumO(sub, "LOGIC_OT_actuator_move", "", ICON_TRIA_UP, "direction", 1); // up

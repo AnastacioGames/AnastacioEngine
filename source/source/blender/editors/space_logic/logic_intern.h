@@ -39,6 +39,8 @@ struct ARegion *logic_has_buttons_region(struct ScrArea *sa);
 /* logic_buttons.c */
 void LOGIC_OT_properties(struct wmOperatorType *ot);
 void LOGIC_OT_links_cut(struct wmOperatorType *ot);
+struct bActuator;
+bool ED_logic_actuator_reports_finish(const struct bActuator *act);
 
 /* logic_window.c */
 void logic_buttons(struct bContext *C, struct ARegion *ar);

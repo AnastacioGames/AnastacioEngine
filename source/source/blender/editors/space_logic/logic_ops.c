@@ -1085,6 +1085,93 @@ static void LOGIC_OT_python_component_move_down(wmOperatorType* ot)
 	RNA_def_int(ot->srna, "index", 0, 0, INT_MAX, "Index", "Component index to move", 0, INT_MAX);
 }
 
+/* ************* "Then" Operator ************* */
+
+/* actuators that report a completion (SCA_IActuator::SetEndReason) */
+bool ED_logic_actuator_reports_finish(const bActuator *act)
+{
+	return ELEM(act->type, ACT_WAIT, ACT_ACTION, ACT_SOUND);
+}
+
+static int actuator_then_exec(bContext *C, wmOperator *op)
+{
+	Object *ob = NULL;
+	bActuator *act = edit_actuator_property_get(C, op, &ob);
+	bSensor *sens;
+	bActuatorSensor *as;
+	bController *cont;
+	int state_mask = 0;
+	int bit;
+
+	if (!act || !ED_logic_actuator_reports_finish(act)) {
+		return OPERATOR_CANCELLED;
+	}
+
+	/* the new controller runs in the state of the controller that drives the actuator */
+	for (cont = ob->controllers.first; cont && !state_mask; cont = cont->next) {
+		for (int i = 0; i < cont->totlinks; i++) {
+			if (cont->links[i] == act) {
+				state_mask = cont->state_mask;
+				break;
+			}
+		}
+	}
+	if (!state_mask) {
+		for (bit = 0; bit < OB_MAX_STATES; bit++) {
+			if (ob->state & (1 << bit)) {
+				break;
+			}
+		}
+		state_mask = (bit < OB_MAX_STATES) ? (1 << bit) : 1;
+	}
+
+	sens = new_sensor(SENS_ACTUATOR);
+	as = sens->data;
+	BLI_strncpy(as->name, act->name, sizeof(as->name));
+	as->type = SENS_ACTUATOR_FINISHED;
+	BLI_snprintf(sens->name, sizeof(sens->name), "%s %s", DATA_("Then"), act->name);
+	BLI_addtail(&ob->sensors, sens);
+	BLI_uniquename(&ob->sensors, sens, DATA_("Sensor"), '.', offsetof(bSensor, name), sizeof(sens->name));
+
+	cont = new_controller(CONT_LOGIC_AND);
+	BLI_strncpy(cont->name, sens->name, sizeof(cont->name));
+	cont->state_mask = state_mask;
+	BLI_addtail(&ob->controllers, cont);
+	BLI_uniquename(&ob->controllers, cont, DATA_("Controller"), '.', offsetof(bController, name), sizeof(cont->name));
+
+	link_logicbricks((void **)&cont, (void ***)&(sens->links), &sens->totlinks, sizeof(bController *));
+
+	ob->scaflag |= OB_SHOWSENS | OB_SHOWCONT;
+
+	WM_event_add_notifier(C, NC_LOGIC, NULL);
+
+	return OPERATOR_FINISHED;
+}
+
+static int actuator_then_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	if (edit_actuator_invoke_properties(C, op)) {
+		return actuator_then_exec(C, op);
+	}
+	return OPERATOR_CANCELLED;
+}
+
+static void LOGIC_OT_actuator_then(wmOperatorType *ot)
+{
+	ot->name = "Then";
+	ot->description = "Add an Actuator sensor in Finished mode for this actuator, linked to a new And controller: "
+	                  "link the controller to the actuators that run when this one finishes";
+	ot->idname = "LOGIC_OT_actuator_then";
+
+	ot->invoke = actuator_then_invoke;
+	ot->exec = actuator_then_exec;
+	ot->poll = edit_actuator_poll;
+
+	/* flags */
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+	edit_actuator_properties(ot);
+}
+
 /* ************************* */
 
 void ED_operatortypes_logic(void)
@@ -1098,6 +1185,7 @@ void ED_operatortypes_logic(void)
 	WM_operatortype_append(LOGIC_OT_actuator_remove);
 	WM_operatortype_append(LOGIC_OT_actuator_add);
 	WM_operatortype_append(LOGIC_OT_actuator_move);
+	WM_operatortype_append(LOGIC_OT_actuator_then);
 
 	WM_operatortype_append(LOGIC_OT_python_component_register);
 	WM_operatortype_append(LOGIC_OT_python_component_create);
