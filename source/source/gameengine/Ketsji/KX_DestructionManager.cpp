@@ -1339,7 +1339,7 @@ void KX_DestructionManager::SpawnBlastEffects(KX_GameObject *gameobj, const Rang
 	static const int sizeOffset[5] = {1, 2, 3, 4, 0};
 	const int size = std::max(0, std::min<int>(settings.particle_size, 4));
 	KX_AudioManager *audio = KX_GetActiveEngine() ? KX_GetActiveEngine()->GetAudioManager() : nullptr;
-	if (audio) {
+	if (audio && !(settings.flags & EXPLOSIVE_NO_SOUND)) {
 		audio->PlayEvent((explosion ? WO_SOUND_EVENT_EXPLOSION_TINY : WO_SOUND_EVENT_DESTRUCTION_TINY) + sizeOffset[size]);
 	}
 

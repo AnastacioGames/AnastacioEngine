@@ -633,6 +633,9 @@ def draw_blast_effect(layout, context, es, enabled, destruction):
         row.prop(es, "smoke_duration", text=names[1] + " Duration")
         row.prop(es, "blast_speed")
 
+    col = layout.box()
+    col.prop(es, "use_sound", icon='SPEAKER')
+
     # Ground Mark: the Impact Decal projection, on the static surface under the blast.
     col = layout.box()
     col.prop(es, "use_ground_mark")

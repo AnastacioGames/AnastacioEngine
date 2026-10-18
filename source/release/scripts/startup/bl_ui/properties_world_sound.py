@@ -124,12 +124,13 @@ def _localize_engine_sound(path):
     return dest_path
 
 
-def _fill_engine_effects(module):
-    """Slots do Effects sem arquivo recebem o som que vem com a engine. Devolve quantos."""
+def _fill_engine_effects(module, events=None):
+    """Slots do Effects sem arquivo recebem o som que vem com a engine (so os dos events
+    pedidos, quando dados). Devolve quantos."""
     effects_dir = os.path.join(_engine_datafiles_dir(), "effects")
     filled = 0
     for sound in module.sounds:
-        if sound.filepath:
+        if sound.filepath or (events is not None and sound.event not in events):
             continue
         filename = ENGINE_EFFECT_FILES.get(sound.name)
         if not filename:
@@ -148,6 +149,69 @@ def _fill_engine_effects(module):
     return filled
 
 
+def _new_effects_module(world):
+    module = world.sound_modules.new(MODULE_NAMES['EFFECTS'], type='EFFECTS')
+    for name, event in EFFECT_SLOTS:
+        module.sounds.new(name, filepath="").event = event
+    return module
+
+
+def _needed_weather_events(scene, world):
+    """Events que a cena toca sozinha pelo clima: chuva e trovao (raio do World ou Empty Lightning)."""
+    weather = world.weather_settings
+    events = set()
+    if weather.use_rain:
+        if weather.use_rain_sound:
+            events.add('RAIN')
+        if weather.use_rain_lightning and weather.use_rain_lightning_sound:
+            events.add('THUNDER')
+    if any(getattr(ob, "use_lightning", False) and ob.lightning.use_sound for ob in scene.objects):
+        events.add('THUNDER')
+    return events
+
+
+def ensure_weather_sounds(scene):
+    """Chuva/raio ligados sem som no Effects: cria o modulo ou os slots e poe o som da engine.
+    Sons da engine com caminho absoluto (arquivo ainda nao salvo) vao para a pasta do projeto.
+    Devolve quantos slots mudaram."""
+    world = scene.world
+    if world is None:
+        return 0
+    changed = 0
+    effects = [m for m in world.sound_modules if m.type == 'EFFECTS']
+    for module in effects:
+        for sound in module.sounds:
+            if sound.filepath and os.path.isabs(sound.filepath) and bpy.data.is_saved:
+                path = _localize_engine_sound(sound.filepath)
+                if path != sound.filepath:
+                    try:
+                        path = bpy.path.relpath(path)
+                    except ValueError:
+                        pass
+                    sound.filepath = path
+                    changed += 1
+
+    for event in _needed_weather_events(scene, world):
+        if any(s.event == event and s.filepath for m in effects for s in m.sounds):
+            continue
+        if not effects:
+            effects.append(_new_effects_module(world))
+        module = effects[0]
+        names = {s.name for s in module.sounds}
+        for name, slot_event in EFFECT_SLOTS:
+            if slot_event == event and name not in names:
+                module.sounds.new(name, filepath="").event = event
+        changed += _fill_engine_effects(module, {event})
+    return changed
+
+
+@bpy.app.handlers.persistent
+def weather_sounds_handler(_dummy=None):
+    for scene in bpy.data.scenes:
+        if scene.render.engine == 'BLENDER_GAME':
+            ensure_weather_sounds(scene)
+
+
 class WORLD_OT_sound_module_add(Operator):
     """Add a sound module to the World"""
     bl_idname = "world.sound_module_add"
@@ -161,11 +225,10 @@ class WORLD_OT_sound_module_add(Operator):
         return _world(context) is not None
 
     def execute(self, context):
-        module = _world(context).sound_modules.new(MODULE_NAMES[self.type], type=self.type)
         if self.type == 'EFFECTS':
-            for name, event in EFFECT_SLOTS:
-                module.sounds.new(name, filepath="").event = event
-            _fill_engine_effects(module)
+            _fill_engine_effects(_new_effects_module(_world(context)))
+        else:
+            _world(context).sound_modules.new(MODULE_NAMES[self.type], type=self.type)
         context.window_manager.world_sound_filter = self.type
         return {'FINISHED'}
 

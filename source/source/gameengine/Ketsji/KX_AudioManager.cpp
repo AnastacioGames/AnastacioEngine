@@ -768,7 +768,7 @@ bool KX_AudioManager::HasModule(const std::string& moduleName) const
 	return FindModule(moduleName) != nullptr;
 }
 
-bool KX_AudioManager::StartOneShot(Module& module, int soundIndex, float gain, bool loop, float fade)
+bool KX_AudioManager::StartOneShot(Module& module, int soundIndex, float gain, bool loop, float fade, float pitchScale)
 {
 #ifdef WITH_AUDASPACE
 	Sound& sound = module.sounds[soundIndex];
@@ -803,7 +803,7 @@ bool KX_AudioManager::StartOneShot(Module& module, int soundIndex, float gain, b
 	if (loop) {
 		AUD_Handle_setLoopCount(handle, -1);
 	}
-	AUD_Handle_setPitch(handle, sound.pitch);
+	AUD_Handle_setPitch(handle, sound.pitch * pitchScale);
 
 	Voice voice;
 	voice.sound = soundIndex;
@@ -829,6 +829,7 @@ bool KX_AudioManager::StartOneShot(Module& module, int soundIndex, float gain, b
 	(void)gain;
 	(void)loop;
 	(void)fade;
+	(void)pitchScale;
 	return false;
 #endif
 }
@@ -866,7 +867,10 @@ bool KX_AudioManager::PlayEvent(int event, float gain)
 	}
 	last = candidates[pick];
 
-	return StartOneShot(*candidates[pick].first, candidates[pick].second, gain, false, 0.0f);
+	// Each one sounds a little different: pitch +-12% and up to 15% quieter.
+	const float pitch = 0.88f + 0.24f * (float)rand() / (float)RAND_MAX;
+	const float level = 0.85f + 0.15f * (float)rand() / (float)RAND_MAX;
+	return StartOneShot(*candidates[pick].first, candidates[pick].second, gain * level, false, 0.0f, pitch);
 }
 
 void KX_AudioManager::PlayEventDelayed(int event, float gain, float delay)

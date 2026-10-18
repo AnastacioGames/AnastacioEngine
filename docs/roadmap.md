@@ -876,18 +876,14 @@ iOS fora do escopo.
 
 ## Validações manuais pendentes
 
-- Tesla Rhythm: avaliar overlay, enquadramento e latência percebida no jogo real;
-  [modo de cinco pistas via Python Component](tesla-rhythm.md) passou sonda no runtime.
-
-- Decimate High Quality: avaliar no editor a forma, a triangulação e a textura de objetos reais com a opção
-  ligada e desligada (medição automática passou; ver changelog de 2026-10-12).
+- Nenhuma no momento.
 
 Aceitas pelo usuário em 2026-09-20 e removidas daqui: sombras no jogo real (Planos 1A e 5, múltiplas luzes),
 migração de `maxphystep`, Sol/Lens Flare, splash e About, Outliner, barra da 3D View, aba Particles, gamepad no
 menu ImGui e Runtime Property Sensors/Actuators. Aceitas em 2026-10-02: os itens de 2026-09-25 (Game Settings,
 FXAA, LOD, Foliage no Web, Shader Sources, painéis Transparency, Options e Subsurface, Asset Browser) e as
 categorias `CollisionDepth`/`TextureRenderers` do Profiler em linhas próprias. O stress de captura de vídeo e
-OpenAL foi cancelado por decisão do usuário.
+OpenAL foi cancelado por decisão do usuário; a validação no jogo real do Tesla Rhythm, em 2026-10-18. Decimate High Quality aceito em 2026-10-18.
 
 ## Fora do escopo atual
 

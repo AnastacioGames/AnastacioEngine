@@ -379,6 +379,7 @@ enum {
 	EXPLOSIVE_PARTICLE_COLORS = 1 << 4, /* fire/smoke/spark_color initialized */
 	EXPLOSIVE_GROUND_MARK    = 1 << 5,  /* project the mark object on the ground */
 	EXPLOSIVE_MARK_NEARBY    = 1 << 6,  /* Ground Mark also on the objects around the blast */
+	EXPLOSIVE_NO_SOUND       = 1 << 7,  /* no World Sound > Effects sound (Explosion/Destruction); 0 = with sound */
 };
 
 /* RangeExplosiveSettings.particle_size */
@@ -462,6 +463,7 @@ typedef struct RangeLightningSettings {
 enum {
 	LIGHTNING_HIT_GROUND = 1 << 0,  /* in game, the bolt ends on the first static surface below */
 	LIGHTNING_PREVIEW    = 1 << 1,  /* strikes also shown in the 3D View */
+	LIGHTNING_NO_SOUND   = 1 << 2,  /* no thunder (World Sound > Effects); 0 = with sound */
 };
 
 /* RangeLightningSettings.mode */

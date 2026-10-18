@@ -2794,6 +2794,10 @@ static void rna_def_object_lightning(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", LIGHTNING_HIT_GROUND);
 	RNA_def_property_ui_text(prop, "Hit Ground", "In game, the bolt ends on the first surface below the cloud (else at the Empty's height)");
 
+	prop = RNA_def_property(srna, "use_sound", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flags", LIGHTNING_NO_SOUND);
+	RNA_def_property_ui_text(prop, "Sound", "Play a Thunder sound of World Sound > Effects after each strike");
+
 	prop = RNA_def_property(srna, "use_preview", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", LIGHTNING_PREVIEW);
 	RNA_def_property_ui_text(prop, "Preview", "Show the automatic strikes in the 3D View");
@@ -3204,6 +3208,11 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "blast_speed", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.2f, 4.0f);
 	RNA_def_property_ui_text(prop, "Blast Speed", "How hard fire, smoke and sparks are thrown out, relative to the size preset");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_sound", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flags", EXPLOSIVE_NO_SOUND);
+	RNA_def_property_ui_text(prop, "Sound", "Play the Explosion or Destruction sound of World Sound > Effects for this size");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	prop = RNA_def_property(srna, "use_ground_mark", PROP_BOOLEAN, PROP_NONE);

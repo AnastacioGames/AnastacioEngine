@@ -264,7 +264,9 @@ void KX_RainLightning::Update(KX_Scene *scene, KX_Camera *camera, const World *w
 		strike.hasBolt = false;
 		if (!big) {
 			// A flash inside the far clouds: a soft rumble.
-			PlayThunder(0.6f, world->rain_lightning_distance);
+			if (!(world->weather_sound_mute & WO_WEATHER_RAIN_LIGHTNING)) {
+				PlayThunder(0.6f, world->rain_lightning_distance);
+			}
 		}
 		if (big) {
 			// Keep the whole bolt inside the camera range: a closer bolt is also smaller,
@@ -277,7 +279,9 @@ void KX_RainLightning::Update(KX_Scene *scene, KX_Camera *camera, const World *w
 			                        (world->weather_flag & WO_WEATHER_RAIN_LIGHTNING_SIDE) != 0, &strike.bolt);
 			strike.center = mt::vec3(strike.bolt.center);
 			strike.hasBolt = true;
-			PlayThunder(1.0f, (strike.center - m_camPos).Length());
+			if (!(world->weather_sound_mute & WO_WEATHER_RAIN_LIGHTNING)) {
+				PlayThunder(1.0f, (strike.center - m_camPos).Length());
+			}
 		}
 	}
 
@@ -387,7 +391,7 @@ void KX_RainLightning::UpdateEmitter(KX_Scene *scene, Emitter& emitter, double t
 	bool over;
 	const float flash = BKE_rain_lightning_flash(strike.seed, strike.big, (float)(time - strike.start), &over);
 	const float fade = BKE_rain_lightning_distance_fade((strike.center - m_camPos).Length(), settings.flash_distance);
-	if (thunder) {
+	if (thunder && !(settings.flags & LIGHTNING_NO_SOUND)) {
 		PlayThunder(strike.big ? 1.0f : 0.6f, (strike.center - m_camPos).Length());
 	}
 	strike.flash = flash * settings.intensity * fade;

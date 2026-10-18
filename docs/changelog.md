@@ -6,6 +6,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-18 - Liga/desliga o som de cada efeito e variação dos one-shots
+
+- Checkbox de som em todo efeito que toca som da engine, ligado por padrão (arquivos antigos seguem com som):
+  World Rain e Lightning (ícone de alto-falante no cabeçalho, `use_rain_sound`/`use_rain_lightning_sound`,
+  bits em `World.weather_sound_mute`, ex-`rain_aura_pad`), Empty Lightning (`lightning.use_sound`,
+  `LIGHTNING_NO_SOUND`) e Explosive/Destruction (`use_sound` no `RangeExplosiveSettings`, `EXPLOSIVE_NO_SOUND`).
+  O preenchimento automático respeita esses checks e agora só preenche os slots do evento que falta.
+- `KX_AudioManager::PlayEvent`: cada one-shot (trovão, explosão, destruição) sai com pitch ±12% e até 15% mais baixo.
+- Teste: `tools/test_weather_sounds_auto.py`.
+
+## 2026-10-18 - Som de chuva e trovão automático
+
+- Chuva ou raio ligados (World Weather ou Empty Lightning) sem som no Effects ficavam mudos: o som só
+  entrava pelo Add Sound Module > Effects ou Use Engine Sounds. Agora `save_pre`, `save_post` e
+  `game_pre` chamam `ensure_weather_sounds()` (`properties_world_sound.py`): cria o módulo Effects ou os
+  slots que faltam, põe `chuva.wav`/`trovao1-3.wav` da engine e copia para `<projeto>/sounds`; num
+  arquivo novo o caminho relativo é gravado a partir do segundo salvamento. Slots já preenchidos não mudam.
+- Teste: `tools/test_weather_sounds_auto.py`. Teste das categorias da aba Object
+  (`tools/test_object_render_categories.py`) confere Network e Activity Culling na aba Game.
+
 ## 2026-10-18 - Highlight Active: realce ao vivo dos logic bricks
 
 - Com o jogo embutido rodando, o Logic Editor acende os bricks que disparam (moldura laranja) e os fios

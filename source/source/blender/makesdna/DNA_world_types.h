@@ -172,7 +172,7 @@ typedef struct World {
 	char  rain_aura_prop[64]; /* propriedade de jogo que marca os objetos com aura */
 	float rain_lightning_intensity, rain_lightning_distance, rain_lightning_width;
 	short rain_aura_style; /* WO_RAIN_AURA_STATIC/ANIMATED; ocupa o antigo pad, 0 = Static */
-	short rain_aura_pad;
+	short weather_sound_mute; /* bits WO_WEATHER_RAIN (loop da chuva) e WO_WEATHER_RAIN_LIGHTNING (trovao) sem som; era rain_aura_pad, 0 = com som */
 	/* Ripples e Splash com a mesma lista de ajustes (tamanho/taxa/normal/superficie de cima) */
 	float rain_ripple_size, rain_ripple_rate;
 	float rain_splash_normal, rain_splash_min_up;

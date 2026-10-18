@@ -131,6 +131,7 @@ class DATA_PT_lightning(DataButtonsPanel, Panel):
         col.prop(ls, "color")
         col.prop(ls, "flash_distance")
         col.prop(ls, "use_preview")
+        col.prop(ls, "use_sound", text="Thunder Sound")
         layout.label(text="The screen flash needs World > Rain on", icon='INFO')
 
 

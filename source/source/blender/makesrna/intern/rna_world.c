@@ -1323,6 +1323,14 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Lightning", "Branching lightning bolts far in front of the camera with a flickering flash");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "use_rain_sound", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_sound_mute", WO_WEATHER_RAIN);
+	RNA_def_property_ui_text(prop, "Rain Sound", "Loop the Rain sound of World Sound > Effects while it rains");
+
+	prop = RNA_def_property(srna, "use_rain_lightning_sound", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "weather_sound_mute", WO_WEATHER_RAIN_LIGHTNING);
+	RNA_def_property_ui_text(prop, "Thunder Sound", "Play a Thunder sound of World Sound > Effects after each strike");
+
 	prop = RNA_def_property(srna, "use_rain_lightning_side", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_LIGHTNING_SIDE);
 	RNA_def_property_ui_text(prop, "Sideways Bolts", "Some bolts run sideways from cloud to cloud instead of only down to the ground");

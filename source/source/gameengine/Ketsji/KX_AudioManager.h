@@ -112,7 +112,7 @@ private:
 	void UpdateVoiceReverb(const Module& module, Voice& voice);
 	void StopVoice(Voice& voice);
 	/// Effects module: a new voice of the sound, whatever else plays.
-	bool StartOneShot(Module& module, int soundIndex, float gain, bool loop, float fade);
+	bool StartOneShot(Module& module, int soundIndex, float gain, bool loop, float fade, float pitchScale = 1.0f);
 	/// \param wrap Go around the ends even without Loop (the player asked for next/previous).
 	int NextTrack(const Module& module, int step, bool wrap) const;
 

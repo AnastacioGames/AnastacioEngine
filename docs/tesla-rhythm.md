@@ -36,4 +36,4 @@ Núcleo passou limites de janela, prevenção de duplicatas, perdas, acordes e m
 [Sonda runtime](../tools/tesla_rhythm/validate_runtime.py) cria cena separada:
 áudio, desenho do HUD, julgamento, orientação da câmera, pausa, resultado, reinício
 e remoção do callback passaram. Resultado em `rhythm_probe_result.txt` na pasta da demo.
-Aparência, enquadramento e latência percebida aguardam teste no jogo real.
+Teste de aparência, enquadramento e latência no jogo real tirado do escopo (2026-10-18).

@@ -277,6 +277,13 @@ def register():
     if properties_input.input_sync_handler not in bpy.app.handlers.scene_update_post:
         bpy.app.handlers.scene_update_post.append(properties_input.input_sync_handler)
 
+    # Chuva/raio ligados ganham o som da engine no Effects ao salvar e ao rodar o jogo; no save_post de um
+    # arquivo novo os sons vao para a pasta do projeto (o proximo salvamento grava o caminho relativo).
+    from . import properties_world_sound
+    for handlers in (bpy.app.handlers.save_pre, bpy.app.handlers.save_post, bpy.app.handlers.game_pre):
+        if properties_world_sound.weather_sounds_handler not in handlers:
+            handlers.append(properties_world_sound.weather_sounds_handler)
+
     # Senha da chave do release: no WindowManager para nunca ir para o .blend.
     WindowManager.range_android_password = StringProperty(
         name="Key password",
@@ -305,6 +312,10 @@ def unregister():
     from . import properties_input
     if properties_input.input_sync_handler in bpy.app.handlers.scene_update_post:
         bpy.app.handlers.scene_update_post.remove(properties_input.input_sync_handler)
+    from . import properties_world_sound
+    for handlers in (bpy.app.handlers.save_pre, bpy.app.handlers.save_post, bpy.app.handlers.game_pre):
+        if properties_world_sound.weather_sounds_handler in handlers:
+            handlers.remove(properties_world_sound.weather_sounds_handler)
 
 
     from bpy.utils import unregister_class
