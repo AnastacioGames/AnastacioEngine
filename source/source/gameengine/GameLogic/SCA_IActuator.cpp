@@ -40,7 +40,10 @@ SCA_IActuator::SCA_IActuator(SCA_IObject *gameobj, KX_ACTUATOR_TYPE type) :
 	m_type(type),
 	m_links(0),
 	m_posevent(false),
-	m_negevent(false)
+	m_negevent(false),
+	m_endReason(END_NONE),
+	m_finishCount(0),
+	m_startCount(0)
 {
 }
 
@@ -70,6 +73,7 @@ void SCA_IActuator::AddEvent(bool event)
 {
 	if (event) {
 		m_posevent = true;
+		++m_startCount;
 	}
 	else {
 		m_negevent = true;
@@ -112,6 +116,9 @@ void SCA_IActuator::ProcessReplica()
 	SCA_ILogicBrick::ProcessReplica();
 	RemoveAllEvents();
 	m_linkedcontrollers.clear();
+	m_endReason = END_NONE;
+	m_finishCount = 0;
+	m_startCount = 0;
 }
 
 SCA_IActuator::~SCA_IActuator()
@@ -144,6 +151,24 @@ bool SCA_IActuator::IsNoLink() const
 bool SCA_IActuator::IsType(KX_ACTUATOR_TYPE type)
 {
 	return m_type == type;
+}
+
+void SCA_IActuator::SetEndReason(KX_ACTUATOR_END reason)
+{
+	m_endReason = reason;
+	if (reason == END_FINISHED) {
+		++m_finishCount;
+	}
+}
+
+int SCA_IActuator::GetEndReason() const
+{
+	return m_endReason;
+}
+
+unsigned int SCA_IActuator::GetFinishCount() const
+{
+	return m_finishCount;
 }
 
 void SCA_IActuator::LinkToController(SCA_IController *controller)

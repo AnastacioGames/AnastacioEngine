@@ -56,6 +56,8 @@ class KX_SoundActuator : public SCA_IActuator
 {
 	Py_Header
 	bool					m_isplaying;
+	/// The actuator started the sound and did not stop it: reaching the end counts as finished.
+	bool					m_playPending;
 #ifdef WITH_AUDASPACE
 	AUD_Sound*				m_sound;
 	AUD_Handle*				m_handle;

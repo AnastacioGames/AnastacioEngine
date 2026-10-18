@@ -42,9 +42,12 @@
 
 SCA_ActuatorSensor::SCA_ActuatorSensor(SCA_EventManager *eventmgr,
                                        SCA_IObject *gameobj,
-                                       const std::string& actname)
+                                       const std::string& actname,
+                                       int mode)
 	:SCA_ISensor(gameobj, eventmgr),
-	m_checkactname(actname)
+	m_checkactname(actname),
+	m_mode(mode),
+	m_lastFinishCount(0)
 {
 	m_actuator = GetParent()->FindActuator(m_checkactname);
 	Init();
@@ -55,6 +58,13 @@ void SCA_ActuatorSensor::Init()
 	m_lastresult = m_invert ? true : false;
 	m_midresult = false;
 	m_reset = true;
+	/* completions that happened while the sensor was out of the active state are dropped */
+	SyncFinishCount();
+}
+
+void SCA_ActuatorSensor::SyncFinishCount()
+{
+	m_lastFinishCount = m_actuator ? m_actuator->GetFinishCount() : 0;
 }
 
 EXP_Value *SCA_ActuatorSensor::GetReplica()
@@ -70,6 +80,7 @@ EXP_Value *SCA_ActuatorSensor::GetReplica()
 void SCA_ActuatorSensor::ReParent(SCA_IObject *parent)
 {
 	m_actuator = parent->FindActuator(m_checkactname);
+	SyncFinishCount();
 	SCA_ISensor::ReParent(parent);
 }
 
@@ -93,6 +104,26 @@ SCA_ActuatorSensor::~SCA_ActuatorSensor()
 
 bool SCA_ActuatorSensor::Evaluate()
 {
+	if (m_actuator && m_mode == MODE_FINISHED) {
+		/* The actuators run after the sensors, so a completion is seen in the next logic tick.
+		 * Several completions between two evaluations give a single pulse. */
+		const unsigned int count = m_actuator->GetFinishCount();
+		const bool finished = (count != m_lastFinishCount);
+		bool reset = m_reset && m_level;
+
+		m_lastFinishCount = count;
+		m_reset = false;
+		if (finished) {
+			/* a completion in consecutive ticks triggers the controllers again */
+			m_lastresult = true;
+			return true;
+		}
+		if (m_lastresult) {
+			m_lastresult = false;
+			return true;
+		}
+		return (reset) ? true : false;
+	}
 	if (m_actuator) {
 		/* m_midresult keeps the activation seen by Update() in the previous frame: one-shot
 		 * actuators (Property, Message, Add Object...) are already inactive here and the
@@ -112,7 +143,7 @@ bool SCA_ActuatorSensor::Evaluate()
 
 void SCA_ActuatorSensor::Update()
 {
-	if (m_actuator) {
+	if (m_actuator && m_mode == MODE_ACTIVE) {
 		m_midresult = m_actuator->IsActive() && !m_actuator->IsNegativeEvent();
 	}
 }
@@ -152,6 +183,7 @@ PyMethodDef SCA_ActuatorSensor::Methods[] = {
 
 PyAttributeDef SCA_ActuatorSensor::Attributes[] = {
 	EXP_PYATTRIBUTE_STRING_RW_CHECK("actuator", 0, MAX_PROP_NAME, false, SCA_ActuatorSensor, m_checkactname, CheckActuator),
+	EXP_PYATTRIBUTE_INT_RW("mode", MODE_ACTIVE, MODE_FINISHED, true, SCA_ActuatorSensor, m_mode),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
 
@@ -161,6 +193,7 @@ int SCA_ActuatorSensor::CheckActuator(EXP_PyObjectPlus *self, const PyAttributeD
 	SCA_IActuator *act = sensor->GetParent()->FindActuator(sensor->m_checkactname);
 	if (act) {
 		sensor->m_actuator = act;
+		sensor->SyncFinishCount();
 		return 0;
 	}
 	PyErr_SetString(PyExc_AttributeError, "string does not correspond to an actuator");

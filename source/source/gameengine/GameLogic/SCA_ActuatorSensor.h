@@ -41,12 +41,26 @@ class SCA_ActuatorSensor : public SCA_ISensor
 	std::string		m_checkactname;
 	bool			m_lastresult;
 	bool			m_midresult;
+	/// MODE_ACTIVE or MODE_FINISHED.
+	int				m_mode;
+	/// Finish count of the actuator seen by the last evaluation (MODE_FINISHED).
+	unsigned int	m_lastFinishCount;
  protected:
 	SCA_IActuator*	m_actuator;
+
+	void SyncFinishCount();
 public:
+	enum {
+		/// Positive while the actuator is active (original behavior).
+		MODE_ACTIVE = 0,
+		/// One tick positive pulse after the actuator finished its job.
+		MODE_FINISHED = 1
+	};
+
 	SCA_ActuatorSensor(class SCA_EventManager* eventmgr,
 					  SCA_IObject* gameobj,
-					  const std::string& actname);
+					  const std::string& actname,
+					  int mode = MODE_ACTIVE);
 	
 	virtual ~SCA_ActuatorSensor();
 	virtual EXP_Value* GetReplica();

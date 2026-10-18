@@ -62,6 +62,8 @@ static const EnumPropertyItem actuator_type_items[] = {
 	{ACT_STEERING, "STEERING", 0, "Steering", ""},
 	{ACT_VIBRATION, "VIBRATION", 0, "Vibration", ""},
 	{ACT_VISIBILITY, "VISIBILITY", 0, "Visibility", ""},
+	{ACT_VIDEO, "VIDEO", 0, "Video", ""},
+	{ACT_WAIT, "WAIT", 0, "Wait", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -100,6 +102,10 @@ static StructRNA *rna_Actuator_refine(struct PointerRNA *ptr)
 			return &RNA_VibrationActuator;
 		case ACT_VISIBILITY:
 			return &RNA_VisibilityActuator;
+		case ACT_WAIT:
+			return &RNA_WaitActuator;
+		case ACT_VIDEO:
+			return &RNA_VideoActuator;
 		case ACT_2DFILTER:
 			return &RNA_Filter2DActuator;
 		case ACT_PARENT:
@@ -520,7 +526,9 @@ const EnumPropertyItem *rna_Actuator_type_itemf(bContext *C, PointerRNA *ptr, Pr
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_SOUND);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_STATE);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VIBRATION);
+	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VIDEO);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VISIBILITY);
+	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_WAIT);
 
 	RNA_enum_item_end(&item, &totitem);
 	*r_free = true;
@@ -598,6 +606,16 @@ static void rna_def_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Name", "");
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_Actuator_name_set");
 	RNA_def_struct_name_property(srna, prop);
+
+	prop = RNA_def_property(srna, "group", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "group");
+	RNA_def_property_ui_text(prop, "Group", "Brick group shown as a collapsible header in the Logic Editor (empty = no group)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "show_group", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_SHOW_GROUP);
+	RNA_def_property_ui_text(prop, "Show Group", "Show the group field of the brick");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
@@ -2228,6 +2246,76 @@ static void rna_def_visibility_actuator(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
+static void rna_def_wait_actuator(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "WaitActuator", "Actuator");
+	RNA_def_struct_ui_text(srna, "Wait Actuator",
+	                       "Actuator that counts a time and finishes, to chain bricks with an Actuator sensor in "
+	                       "Finished mode");
+	RNA_def_struct_sdna_from(srna, "bWaitActuator", "data");
+
+	prop = RNA_def_property(srna, "duration", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 3600.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Duration",
+	                         "Seconds of simulation time to wait (the time scale affects it), "
+	                         "zero finishes in the same tick");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_restart", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_WAIT_RESTART);
+	RNA_def_property_ui_text(prop, "Restart",
+	                         "A positive pulse while waiting starts the count again (otherwise it is ignored)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+}
+
+static void rna_def_video_actuator(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem prop_mode_items[] = {
+		{ACT_VIDEO_PLAY, "PLAY", 0, "Play", "Play the video; the actuator finishes when it ends (not when looping)"},
+		{ACT_VIDEO_PAUSE, "PAUSE", 0, "Pause", "Pause where it is"},
+		{ACT_VIDEO_TOGGLE, "TOGGLE", 0, "Play/Pause", "Pause a playing video, play a paused one"},
+		{ACT_VIDEO_STOP, "STOP", 0, "Stop", "Stop and go back to the start (a fullscreen video is hidden)"},
+		{ACT_VIDEO_RESTART, "RESTART", 0, "Restart", "Play from the start; finishes when the video ends"},
+		{ACT_VIDEO_SEEK, "SEEK", 0, "Seek", "Jump to a time of the video"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "VideoActuator", "Actuator");
+	RNA_def_struct_ui_text(srna, "Video Actuator",
+	                       "Controls the Video Player of an object (added in the Video Player panel)");
+	RNA_def_struct_sdna_from(srna, "bVideoActuator", "data");
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, prop_mode_items);
+	RNA_def_property_ui_text(prop, "Mode", "");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_pointer_sdna(prop, NULL, "ob");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Object", "Object with the Video Player (empty: this object)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "seconds", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, -100000.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, -3600.0f, 3600.0f, 100, 2);
+	RNA_def_property_ui_text(prop, "Seconds", "Time to jump to (with Relative, seconds to move)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_relative", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_VIDEO_RELATIVE);
+	RNA_def_property_ui_text(prop, "Relative", "Move from the current time (negative goes back)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+}
+
 static void rna_def_twodfilter_actuator(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2690,6 +2778,8 @@ void RNA_def_actuator(BlenderRNA *brna)
 	rna_def_game_actuator(brna);
 	rna_def_vibration_actuator(brna);
 	rna_def_visibility_actuator(brna);
+	rna_def_wait_actuator(brna);
+	rna_def_video_actuator(brna);
 	rna_def_twodfilter_actuator(brna);
 	rna_def_parent_actuator(brna);
 	rna_def_state_actuator(brna);

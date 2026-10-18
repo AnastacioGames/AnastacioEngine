@@ -97845,3 +97845,197 @@ msgstr "Velocidade com que as camadas de nuvem se movem"
 
 msgid "Color tint of the cloud layers"
 msgstr "Tom de cor das camadas de nuvem"
+
+msgid "Wait"
+msgstr "Esperar"
+
+msgid "Finished"
+msgstr "Concluído"
+
+msgid "Wait Actuator"
+msgstr "Atuador Esperar"
+
+msgid "Actuator that counts a time and finishes, to chain bricks with an Actuator sensor in Finished mode"
+msgstr "Atuador que conta um tempo e conclui, para encadear bricks com um sensor Actuator no modo Concluído"
+
+msgid "Seconds of simulation time to wait (the time scale affects it), zero finishes in the same tick"
+msgstr "Segundos de tempo de simulação a esperar (a escala de tempo afeta), zero conclui no mesmo tick"
+
+msgid "A positive pulse while waiting starts the count again (otherwise it is ignored)"
+msgstr "Um pulso positivo durante a espera reinicia a contagem (senão é ignorado)"
+
+msgid "Positive while the actuator is active"
+msgstr "Positivo enquanto o atuador está ativo"
+
+msgid "One tick pulse after the actuator finished its job (Action in Play, Ping Pong or Flipper, Sound in Play End, Wait, Steering with Self Terminated reaching the target); stopping, failing or leaving the state does not count"
+msgstr "Pulso de um tick depois que o atuador concluiu (Action em Play, Ping Pong ou Flipper, Sound em Play End, Esperar, Steering com Self Terminated chegando ao alvo); parar, falhar ou sair do estado não conta"
+
+msgid "When the sensor is positive"
+msgstr "Quando o sensor fica positivo"
+msgid "Then"
+msgstr "Então"
+
+msgctxt "Operator"
+msgid "Then"
+msgstr "Então"
+
+msgid "Add an Actuator sensor in Finished mode for this actuator, linked to a new And controller: link the controller to the actuators that run when this one finishes"
+msgstr "Adiciona um sensor Actuator no modo Concluído para este actuator, ligado a um controller And novo: ligue o controller aos actuators que rodam quando este terminar"
+
+msgid "This actuator never finishes (use Wait, Action, Sound or Steering with Self Terminated)"
+msgstr "Este atuador nunca conclui (use Esperar, Action, Sound ou Steering com Self Terminated)"
+
+msgctxt "Operator"
+msgid "Add Logic Preset"
+msgstr "Adicionar Preset de Lógica"
+
+msgid "Add a group of logic bricks already linked"
+msgstr "Adiciona um grupo de logic bricks já ligados"
+
+msgid "Walk (WASD)"
+msgstr "Andar (WASD)"
+
+msgid "W and S move forward and back, A and D turn"
+msgstr "W e S andam para frente e para trás, A e D giram"
+
+msgid "Space jumps while a ray below touches the ground (needs Dynamic physics)"
+msgstr "Espaço pula enquanto um raio para baixo toca o chão (precisa de física Dynamic)"
+
+msgid "Follow Camera"
+msgstr "Câmera Seguindo"
+
+msgid "The scene camera follows the active object from behind"
+msgstr "A câmera da cena segue o objeto ativo por trás"
+
+msgid "Collect Item"
+msgstr "Coletar Item"
+
+msgid "The item disappears and sends the message \"collected\" when an object with the property \"player\" touches it"
+msgstr "O item some e envia a mensagem \"collected\" quando um objeto com a propriedade \"player\" encosta nele"
+
+msgid "Door with Key"
+msgstr "Porta com Tecla"
+
+msgid "E near an object with the property \"player\" toggles the property \"open\", which plays the door Action (choose it) forward or back"
+msgstr "E perto de um objeto com a propriedade \"player\" alterna a propriedade \"open\", que toca a Action da porta (escolha qual) para frente ou para trás"
+
+msgid "Health and Damage"
+msgstr "Vida e Dano"
+
+msgid "Property \"health\" loses 10 when touching an object with the property \"damage\", the object ends at zero"
+msgstr "A propriedade \"health\" perde 10 ao tocar um objeto com a propriedade \"damage\"; o objeto termina ao chegar a zero"
+
+msgid "Select the object the scene camera should follow"
+msgstr "Selecione o objeto que a câmera da cena deve seguir"
+
+msgid "Bricks added to the camera \"%s\""
+msgstr "Bricks adicionados à câmera \"%s\""
+
+msgid "Chase Enemy"
+msgstr "Inimigo que Persegue"
+
+msgid "Follows the object with the property \"player\" when it comes closer than 10 units (Steering, Seek)"
+msgstr "Segue o objeto com a propriedade \"player\" quando ele chega a menos de 10 unidades (Steering, Seek)"
+
+msgid "Checkpoint and Respawn"
+msgstr "Checkpoint e Renascer"
+
+msgid "Touching an object with the property \"checkpoint\" saves the place, touching one with \"kill\" returns there (or to the start)"
+msgstr "Tocar um objeto com a propriedade \"checkpoint\" salva o lugar; tocar um com \"kill\" volta para lá (ou para o início)"
+
+msgid "Menu Button"
+msgstr "Botão de Menu"
+
+msgid "Clicking the object opens a scene (choose it in Go To Scene), the mouse cursor is shown"
+msgstr "Clicar no objeto abre uma cena (escolha em Go To Scene); o cursor do mouse fica visível"
+
+msgid "Moving Platform"
+msgstr "Plataforma que Vai e Volta"
+
+msgid "Goes forth for 2 seconds and comes back, with two states and the Wait actuator"
+msgstr "Vai por 2 segundos e volta, com dois estados e o actuator Wait"
+
+msgid "No object has the property \"player\" to chase"
+msgstr "Nenhum objeto tem a propriedade \"player\" para perseguir"
+
+
+msgid "Video"
+msgstr "Vídeo"
+
+msgid "Video Actuator"
+msgstr "Atuador Vídeo"
+
+msgid "Controls the Video Player of an object (added in the Video Player panel)"
+msgstr "Controla o Video Player de um objeto (adicionado no painel Video Player)"
+
+msgid "Play/Pause"
+msgstr "Tocar/Pausar"
+
+msgid "Play the video; the actuator finishes when it ends (not when looping)"
+msgstr "Toca o vídeo; o atuador termina quando ele acaba (não em loop)"
+
+msgid "Pause where it is"
+msgstr "Pausa onde está"
+
+msgid "Pause a playing video, play a paused one"
+msgstr "Pausa um vídeo tocando, toca um pausado"
+
+msgid "Stop and go back to the start (a fullscreen video is hidden)"
+msgstr "Para e volta ao começo (um vídeo em tela cheia é escondido)"
+
+msgid "Play from the start; finishes when the video ends"
+msgstr "Toca do começo; termina quando o vídeo acaba"
+
+msgid "Jump to a time of the video"
+msgstr "Pula para um tempo do vídeo"
+
+msgid "Object with the Video Player (empty: this object)"
+msgstr "Objeto com o Video Player (vazio: este objeto)"
+
+msgid "Time to jump to (with Relative, seconds to move)"
+msgstr "Tempo para onde pular (com Relativo, segundos a mover)"
+
+msgid "Move from the current time (negative goes back)"
+msgstr "Move a partir do tempo atual (negativo volta)"
+
+msgid "Brick Groups"
+msgstr "Grupos de Bricks"
+
+msgid "Show Group"
+msgstr "Mostrar Grupo"
+
+msgid "Show the group field of the brick"
+msgstr "Mostra o campo de grupo do brick"
+
+msgid "New Brick Group"
+msgstr "Novo Grupo de Bricks"
+
+msgid "Put the brick in a new group (a typed name that is not in the list is added to it)"
+msgstr "Põe o brick num grupo novo (um nome digitado que não está na lista é adicionado a ela)"
+
+msgid "Take the brick out of its group"
+msgstr "Tira o brick do grupo"
+
+msgid "Add Brick Group"
+msgstr "Adicionar Grupo de Bricks"
+
+msgid "Add a brick group to the list of the active object"
+msgstr "Adiciona um grupo de bricks à lista do objeto ativo"
+
+msgid "Remove Brick Group"
+msgstr "Remover Grupo de Bricks"
+
+msgid "Remove the selected brick group; its bricks stay, without a group"
+msgstr "Remove o grupo selecionado; os bricks dele ficam, sem grupo"
+
+msgid "From Bricks"
+msgstr "Dos Bricks"
+
+msgid "Add Groups Used by Bricks"
+msgstr "Adicionar Grupos Usados pelos Bricks"
+
+msgid "Double click renames the group of its bricks too"
+msgstr "Duplo clique renomeia também o grupo dos bricks"
+
+msgid "Groups offered by the group field of the logic bricks"
+msgstr "Grupos oferecidos pelo campo de grupo dos logic bricks"

@@ -89,6 +89,9 @@ protected:
 
 	/// Current sensor state.
 	bool m_state;
+	/// Number of times the sensor became positive, read by the Debug Mode logic view.
+	unsigned int m_riseCount;
+	bool m_riseOn;
 
 	/// Previous state (for tap option).
 	bool m_prev_state;
@@ -162,6 +165,10 @@ public:
 
 	/// Get the state of the sensor: positive or negative.
 	bool GetState();
+	unsigned int GetRiseCount() const
+	{
+		return m_riseCount;
+	}
 
 	/// Get the previous state of the sensor: positive or negative.
 	bool GetPrevState();

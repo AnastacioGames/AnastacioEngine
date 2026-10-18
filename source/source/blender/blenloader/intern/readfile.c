@@ -5175,6 +5175,12 @@ static void lib_link_object(FileData *fd, Main *main)
 						parenta->ob = newlibadr(fd, ob->id.lib, parenta->ob);
 						break;
 					}
+					case ACT_VIDEO:
+					{
+						bVideoActuator *videoa = act->data;
+						videoa->ob = newlibadr(fd, ob->id.lib, videoa->ob);
+						break;
+					}
 					case ACT_STATE:
 						/* bStateActuator *statea = act->data; */
 						break;
@@ -5809,6 +5815,7 @@ static void direct_link_object(FileData *fd, Object *ob)
 	link_list(fd, &ob->particlesystem);
 	direct_link_particlesystems(fd, &ob->particlesystem);
 
+	link_list(fd, &ob->brick_groups);
 	link_list(fd, &ob->prop);
 	for (prop = ob->prop.first; prop; prop = prop->next) {
 		prop->poin = newdataadr(fd, prop->poin);
@@ -10017,6 +10024,10 @@ static void expand_object(FileData *fd, Main *mainvar, Object *ob)
 		else if (act->type == ACT_PARENT) {
 			bParentActuator *pa = act->data;
 			expand_doit(fd, mainvar, pa->ob);
+		}
+		else if (act->type == ACT_VIDEO) {
+			bVideoActuator *va = act->data;
+			expand_doit(fd, mainvar, va->ob);
 		}
 		else if (act->type == ACT_ARMATURE) {
 			bArmatureActuator *arma = act->data;

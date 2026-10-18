@@ -505,7 +505,10 @@ void BL_ConvertSensors(struct Object *blenderobject,
 					    = logicmgr->FindEventManager(SCA_EventManager::ACTUATOR_EVENTMGR);
 					if (eventmgr) {
 						std::string propname = blenderactsensor->name;
-						gamesensor = new SCA_ActuatorSensor(eventmgr, gameobj, propname);
+						/* type is 0 in old files and in files of the original Range: active mode */
+						const int mode = (blenderactsensor->type == SENS_ACTUATOR_FINISHED) ?
+						                 SCA_ActuatorSensor::MODE_FINISHED : SCA_ActuatorSensor::MODE_ACTIVE;
+						gamesensor = new SCA_ActuatorSensor(eventmgr, gameobj, propname, mode);
 					}
 					break;
 				}

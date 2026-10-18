@@ -374,6 +374,9 @@ def _sensor_expr(ob, sens, key=None):
         # Actuator ativo no frame anterior (actuators rodam depois dos sensores).
         if not sens.actuator:
             raise Unsupported("sensor actuator sem actuator")
+        if getattr(sens, "mode", 'ACTIVE') == 'FINISHED':
+            # Modo Concluido (Bricks 2.0): depende do motivo de encerramento do actuator na engine.
+            raise Unsupported("sensor actuator no modo Concluido")
         expr = "self._act_on.get(%r, False)" % sens.actuator
     elif t == 'ANIMATIONEVENT':
         trigger = -1 if sens.trigger_all else sens.trigger_index - 1

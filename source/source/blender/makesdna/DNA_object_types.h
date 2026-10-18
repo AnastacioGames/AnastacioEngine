@@ -818,9 +818,18 @@ typedef struct Object {
 	/* User names for the 30 logic states (empty = unnamed). */
 	char state_names[30][32];
 
+	/* Brick groups of the Logic Editor (bLogicBrickGroup), offered by the group field of the bricks. */
+	ListBase brick_groups;
+	int actbrickgroup, pad_brickgroup;	/* active row of the Brick Groups list */
+
 	/* Multiplayer replication, opt-in via net.flags & NET_OBJ_REPLICATE. */
 	struct RangeNetObjectSettings net;
 } Object;
+
+typedef struct bLogicBrickGroup {
+	struct bLogicBrickGroup *next, *prev;
+	char name[32];	/* same size as the group of the bricks */
+} bLogicBrickGroup;
 
 /* Warning, this is not used anymore because hooks are now modifiers */
 typedef struct ObHook {

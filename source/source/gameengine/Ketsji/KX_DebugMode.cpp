@@ -44,6 +44,11 @@
 #include "RAS_Rasterizer.h"
 
 #include "SCA_LogicManager.h"
+#include "SCA_ISensor.h"
+#include "SCA_IController.h"
+#include "SCA_IActuator.h"
+
+#include "DNA_object_types.h"
 
 #include "EXP_ListValue.h"
 
@@ -82,6 +87,7 @@ KX_DebugMode::KX_DebugMode()
       m_graphShowSleeping(true),
       m_pickSceneObject(false),
       m_showOnlyFrameRate(false),
+      m_logicObject(nullptr),
 	  imgui_showDebugMenuTop(true),
       imgui_showDebugPhys(false),
       imgui_showArmatures(false),
@@ -178,6 +184,7 @@ void KX_DebugMode::RenderImguiDebugMode() {
 			RenderGameObjectPanel();
 		}
 		ImGui::End();
+		RenderGameObjectLogic(imgui_KXObSelected);
 	}
 	if (ImGui::Begin("Profiling")) {
 		RenderProfiling();
@@ -1252,6 +1259,274 @@ void KX_DebugMode::RenderGameObjectPanel() {
 	}
 
 	ImGui::EndChild();
+}
+
+void KX_DebugMode::LogicEventAdd(const void *brick, int kind, const std::string &text)
+{
+	const double time = KX_GetActiveEngine()->GetLogicTime();
+	LogicEvent ev = {brick, kind, text, time, 1};
+	for (auto it = m_logicHistory.begin(); it != m_logicHistory.end(); ++it) {
+		if (it->brick == brick && it->kind == kind && it->text == text) {
+			ev.count = it->count + 1;
+			m_logicHistory.erase(it);
+			break;
+		}
+	}
+	m_logicHistory.insert(m_logicHistory.begin(), ev);
+	if (m_logicHistory.size() > 50) {
+		m_logicHistory.pop_back();
+	}
+
+	if (m_logicBreak.count(brick) && !imgui_suspendedScene) {
+		for (KX_Scene *scene : KX_GetActiveEngine()->GetScenes()) {
+			scene->Suspend();
+		}
+		imgui_suspendedScene = true;
+	}
+}
+
+/* Read only view of the logic bricks of the selected object: what is on now and what fired
+ * recently (the highlight fades in one second). */
+void KX_DebugMode::RenderGameObjectLogic(KX_GameObject *gameObj)
+{
+	if (gameObj->GetSensors().empty() && gameObj->GetControllers().empty() && gameObj->GetActuators().empty()) {
+		return;
+	}
+	ImGui::SetNextWindowSize(ImVec2(360.0f, 420.0f), ImGuiCond_FirstUseEver);
+	const bool open = ImGui::Begin("Logic Bricks");
+	if (!open) {
+		ImGui::End();
+		return;
+	}
+	ImGui::Text("%s", gameObj->GetName().c_str() + (gameObj->GetName().compare(0, 2, "OB") == 0 ? 2 : 0));
+
+	if (m_logicObject != gameObj) {
+		m_logicObject = gameObj;
+		m_logicLastFire.clear();
+		m_logicLastOn.clear();
+		m_logicHistory.clear();
+		m_logicLastEnd.clear();
+		m_logicLastRise.clear();
+		m_logicBreak.clear();
+		// the actuators that already finished before the selection are not news
+		for (SCA_IActuator *act : gameObj->GetActuators()) {
+			m_logicLastEnd[act] = {act->GetFinishCount(), act->GetEndReason()};
+		}
+	}
+	const double now = ImGui::GetTime();
+	const ImVec4 colOn(0.35f, 0.9f, 0.35f, 1.0f);
+	const ImVec4 colOff(0.55f, 0.55f, 0.55f, 1.0f);
+	const ImVec4 colFire(1.0f, 0.85f, 0.2f, 1.0f);
+
+	// rising edge -> fire time; returns the color of the row
+	// rises: how many times the brick started (sensors and actuators count it themselves, so one
+	// tick pulses between two frames are not lost), ~0u when only the current state is known
+	auto rowColor = [&](const void *key, bool on, bool inState, const char *what, unsigned int rises) -> ImVec4 {
+		bool &last = m_logicLastOn[key];
+		bool fired = on && !last;
+		if (rises != ~0u) {
+			const auto seen = m_logicLastRise.find(key);
+			fired = seen != m_logicLastRise.end() && seen->second != rises;
+			m_logicLastRise[key] = rises;
+		}
+		if (fired) {
+			m_logicLastFire[key] = now;
+			LogicEventAdd(key, 0, what);
+		}
+		last = on;
+		const auto it = m_logicLastFire.find(key);
+		const float fade = (it == m_logicLastFire.end()) ? 0.0f : 1.0f - (float)(now - it->second);
+		ImVec4 base = on ? colOn : colOff;
+		if (!inState) {
+			base.w = 0.45f;
+		}
+		if (fade > 0.0f) {
+			base.x += (colFire.x - base.x) * fade;
+			base.y += (colFire.y - base.y) * fade;
+			base.z += (colFire.z - base.z) * fade;
+			base.w = 1.0f;
+		}
+		return base;
+	};
+
+	/* States: 30 boxes, the active ones lit. */
+	const unsigned int state = gameObj->GetState();
+	// the names given in the editor travel in the object data
+	const Object *blenderObj = gameObj->GetBlenderObject();
+	auto stateName = [&](int i) -> const char * {
+		return (blenderObj && blenderObj->state_names[i][0]) ? blenderObj->state_names[i] : nullptr;
+	};
+	ImGui::TextUnformatted("State");
+	for (int i = 0; i < 30; ++i) {
+		if (i % 15 != 0) {
+			ImGui::SameLine(0.0f, 2.0f);
+		}
+		else if (i != 0) {
+			ImGui::Dummy(ImVec2(37.0f, 0.0f));
+			ImGui::SameLine(0.0f, 2.0f);
+		}
+		else {
+			ImGui::SameLine();
+		}
+		const bool lit = (state & (1u << i)) != 0;
+		ImGui::PushID(i);
+		ImGui::PushStyleColor(ImGuiCol_Button, lit ? ImVec4(0.25f, 0.6f, 0.25f, 1.0f) : ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+		ImGui::Button(lit ? "#" : " ", ImVec2(14.0f, 14.0f));
+		if (ImGui::IsItemHovered()) {
+			const char *sname = stateName(i);
+			ImGui::SetTooltip("State %d%s%s%s", i + 1, sname ? ": " : "", sname ? sname : "", lit ? " (active)" : "");
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopID();
+	}
+	// the active states in words
+	std::string active;
+	for (int i = 0; i < 30; ++i) {
+		if (state & (1u << i)) {
+			const char *sname = stateName(i);
+			active += (active.empty() ? "" : ", ") + (sname ? std::string(sname) : std::to_string(i + 1));
+		}
+	}
+	ImGui::TextColored(ImVec4(0.35f, 0.9f, 0.35f, 1.0f), "Active: %s", active.empty() ? "none" : active.c_str());
+
+	// the brick name: a click marks it to pause the game when it fires
+	auto brickName = [&](const void *key, const ImVec4 &col, const std::string &name) {
+		const bool marked = m_logicBreak.count(key) != 0;
+		ImGui::PushStyleColor(ImGuiCol_Text, marked ? ImVec4(1.0f, 0.35f, 0.3f, 1.0f) : col);
+		ImGui::PushID(key);
+		if (ImGui::Selectable(((marked ? "* " : "") + name).c_str(), false, ImGuiSelectableFlags_None)) {
+			if (marked) {
+				m_logicBreak.erase(key);
+			}
+			else {
+				m_logicBreak.insert(key);
+			}
+		}
+		ImGui::PopID();
+		ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip(marked ? "Click: stop pausing when it fires" : "Click: pause the game when it fires");
+		}
+	};
+
+	const ImGuiTableFlags tableFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
+
+	/* Sensors: positive now. */
+	if (!gameObj->GetSensors().empty() && ImGui::BeginTable("LogicSensors", 2, tableFlags)) {
+		ImGui::TableSetupColumn("Sensor");
+		ImGui::TableSetupColumn("Positive");
+		ImGui::TableHeadersRow();
+		for (SCA_ISensor *sens : gameObj->GetSensors()) {
+			const bool on = sens->GetState();
+			const ImVec4 col = rowColor(sens, on, !sens->IsNoLink(), ("sensor " + sens->GetName() + " positive").c_str(),
+			                             sens->GetRiseCount());
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			brickName(sens, col, sens->GetName());
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", on ? "yes" : "-");
+		}
+		ImGui::EndTable();
+	}
+
+	/* Controllers: in the active state or not, the highlight follows the linked sensors. */
+	if (!gameObj->GetControllers().empty() && ImGui::BeginTable("LogicControllers", 2, tableFlags)) {
+		ImGui::TableSetupColumn("Controller");
+		ImGui::TableSetupColumn("State");
+		ImGui::TableHeadersRow();
+		for (SCA_IController *cont : gameObj->GetControllers()) {
+			const bool inState = (cont->GetStateMask() & state) != 0;
+			bool on = false;
+			for (SCA_ISensor *sens : cont->GetLinkedSensors()) {
+				on |= sens->GetState();
+			}
+			const ImVec4 col = rowColor(cont, inState && on, inState, ("controller " + cont->GetName()).c_str(), ~0u);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			brickName(cont, col, cont->GetName());
+			ImGui::TableNextColumn();
+			int first = 0;
+			while (first < 30 && !(cont->GetStateMask() & (1u << first))) {
+				++first;
+			}
+			const char *sname = (first < 30) ? stateName(first) : nullptr;
+			if (first == 30) {
+				ImGui::TextColored(col, "off");
+			}
+			else if (sname) {
+				ImGui::TextColored(col, "%s (%s)", inState ? "active" : "off", sname);
+			}
+			else {
+				ImGui::TextColored(col, "%s (%d)", inState ? "active" : "off", first + 1);
+			}
+		}
+		ImGui::EndTable();
+	}
+
+	/* Actuators: running now, how many times it finished and why it stopped last. */
+	if (!gameObj->GetActuators().empty() && ImGui::BeginTable("LogicActuators", 4, tableFlags)) {
+		ImGui::TableSetupColumn("Actuator");
+		ImGui::TableSetupColumn("Running");
+		ImGui::TableSetupColumn("Finished");
+		ImGui::TableSetupColumn("Last end");
+		ImGui::TableHeadersRow();
+		static const char *endNames[] = {"-", "finished", "cancelled", "failed"};
+		for (SCA_IActuator *act : gameObj->GetActuators()) {
+			const bool on = !act->QEmpty();
+			const ImVec4 col = rowColor(act, on, true, ("actuator " + act->GetName() + " started").c_str(),
+			                             act->GetStartCount());
+			const int reason = act->GetEndReason();
+			std::pair<unsigned int, int> &lastEnd = m_logicLastEnd[act];
+			if (lastEnd.first != act->GetFinishCount() || lastEnd.second != reason) {
+				if (reason > 0 && reason < 4) {
+					LogicEventAdd(act, 1, "actuator " + act->GetName() + " " + endNames[reason]);
+				}
+				lastEnd = {act->GetFinishCount(), reason};
+			}
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			brickName(act, col, act->GetName());
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", on ? "yes" : "-");
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%u", act->GetFinishCount());
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", (reason >= 0 && reason < 4) ? endNames[reason] : "-");
+		}
+		ImGui::EndTable();
+	}
+
+	/* History: the last 50 different events, newest first. */
+	if (ImGui::CollapsingHeader("History", ImGuiTreeNodeFlags_DefaultOpen)) {
+		if (ImGui::SmallButton("Clear")) {
+			m_logicHistory.clear();
+		}
+		ImGui::SameLine();
+		ImGui::TextDisabled("click a brick name to pause when it fires");
+		if (ImGui::BeginTable("LogicHistory", 3, tableFlags | ImGuiTableFlags_ScrollY, ImVec2(0.0f, 180.0f))) {
+			ImGui::TableSetupColumn("Time", ImGuiTableColumnFlags_WidthFixed, 52.0f);
+			ImGui::TableSetupColumn("Event");
+			ImGui::TableSetupColumn("x", ImGuiTableColumnFlags_WidthFixed, 34.0f);
+			ImGui::TableSetupScrollFreeze(0, 1);
+			ImGui::TableHeadersRow();
+			for (const LogicEvent &ev : m_logicHistory) {
+				ImGui::TableNextRow();
+				ImGui::TableNextColumn();
+				ImGui::Text("%.2f", ev.time);
+				ImGui::TableNextColumn();
+				if (m_logicBreak.count(ev.brick)) {
+					ImGui::TextColored(ImVec4(1.0f, 0.35f, 0.3f, 1.0f), "%s", ev.text.c_str());
+				}
+				else {
+					ImGui::TextUnformatted(ev.text.c_str());
+				}
+				ImGui::TableNextColumn();
+				ImGui::Text("%u", ev.count);
+			}
+			ImGui::EndTable();
+		}
+	}
+	ImGui::End();
 }
 
 void KX_DebugMode::RenderObjectProfiling() {

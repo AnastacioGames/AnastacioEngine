@@ -1606,6 +1606,12 @@ static void write_actuators(WriteData *wd, ListBase *lb)
 			case ACT_MOUSE:
 				writestruct(wd, DATA, bMouseActuator, 1, act->data);
 				break;
+			case ACT_WAIT:
+				writestruct(wd, DATA, bWaitActuator, 1, act->data);
+				break;
+			case ACT_VIDEO:
+				writestruct(wd, DATA, bVideoActuator, 1, act->data);
+				break;
 			default:
 				; /* error: don't know how to write this file */
 		}
@@ -1953,6 +1959,7 @@ static void write_object(WriteData *wd, Object *ob)
 		writedata(wd, DATA, sizeof(char) * ob->totcol, ob->matbits);
 		/* write_effects(wd, &ob->effect); */ /* not used anymore */
 		write_properties(wd, &ob->prop);
+		writelist(wd, DATA, bLogicBrickGroup, &ob->brick_groups);
 		write_sensors(wd, &ob->sensors);
 		write_controllers(wd, &ob->controllers);
 		write_actuators(wd, &ob->actuators);

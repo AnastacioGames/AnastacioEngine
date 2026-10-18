@@ -31,6 +31,9 @@
 #  define KX_DEBUGMODE_H
 
 #include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 #include "KX_ConsoleWindow.h"
 #include "KX_Imgui.h"
 #include "KX_VehicleDebugUI.h"
@@ -162,6 +165,29 @@ class KX_DebugMode
   // Options
   bool m_showOnlyFrameRate;
 
+  // Logic view: ImGui time of the last positive pulse / activation of each brick of the selected
+  // object, only used as a key (never dereferenced), cleared when the selection changes.
+  std::unordered_map<const void *, double> m_logicLastFire;
+  std::unordered_map<const void *, bool> m_logicLastOn;
+  KX_GameObject *m_logicObject;
+  // Last 50 different events of the selected object, newest first: a repeated event moves to the
+  // top and counts again.
+  struct LogicEvent {
+    const void *brick;
+    int kind;
+    std::string text;
+    double time;
+    unsigned int count;
+  };
+  std::vector<LogicEvent> m_logicHistory;
+  // finish count and end reason seen last for each actuator
+  std::unordered_map<const void *, std::pair<unsigned int, int>> m_logicLastEnd;
+  // bricks that pause the game when they fire (clicked by the user)
+  std::unordered_set<const void *> m_logicBreak;
+  // rise count seen last for each sensor and actuator
+  std::unordered_map<const void *, unsigned int> m_logicLastRise;
+  void LogicEventAdd(const void *brick, int kind, const std::string &text);
+
  public:
   /// Variables, No save.
 
@@ -230,6 +256,7 @@ class KX_DebugMode
   /// Sub-Panels (Called on Panels)
   void RenderCameraControllPanel();
   void RenderGameObjectPanel();
+  void RenderGameObjectLogic(KX_GameObject *gameObj);
   void RenderObjectProfiling();
 
   /// Menus

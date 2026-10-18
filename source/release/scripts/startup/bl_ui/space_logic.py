@@ -95,6 +95,35 @@ class LOGIC_PT_properties(Panel):
             row.operator("object.game_property_remove", text="", icon='X', emboss=False).index = i
 
 
+class LOGIC_PT_brick_groups(Panel):
+    bl_space_type = 'LOGIC_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "Brick Groups"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob and ob.game
+
+    def draw(self, context):
+        layout = self.layout
+        game = context.active_object.game
+
+        row = layout.row()
+        row.template_list("UI_UL_list", "logic_brick_groups", game, "brick_groups",
+                          game, "active_brick_group_index", rows=3)
+        col = row.column(align=True)
+        col.operator("logic.brick_group_add", icon='ZOOMIN', text="")
+        col.operator("logic.brick_group_remove", icon='ZOOMOUT', text="")
+
+        g = game
+        missing = any(b.group and b.group not in g.brick_groups
+                      for b in list(g.sensors) + list(g.controllers) + list(g.actuators))
+        if missing:
+            layout.operator("logic.brick_group_add", text="Add Groups Used by Bricks", icon='GROUP').collect = True
+        layout.label(text="Double click renames the group of its bricks too", icon='INFO')
+
+
 class LOGIC_PT_states(Panel):
     bl_space_type = 'LOGIC_EDITOR'
     bl_region_type = 'UI'
@@ -138,6 +167,9 @@ class LOGIC_MT_logicbricks_add(Menu):
         layout.operator_menu_enum("logic.sensor_add", "type", text="Sensor")
         layout.operator_menu_enum("logic.controller_add", "type", text="Controller")
         layout.operator_menu_enum("logic.actuator_add", "type", text="Actuator")
+
+        layout.separator()
+        layout.operator_menu_enum("logic.preset_add", "type", text="Preset")
 
 
 class LOGIC_HT_header(Header):
@@ -189,6 +221,7 @@ class LOGIC_MT_view(Menu):
 
 classes = (
     LOGIC_PT_properties,
+    LOGIC_PT_brick_groups,
     LOGIC_PT_states,
     LOGIC_MT_logicbricks_add,
     LOGIC_HT_header,

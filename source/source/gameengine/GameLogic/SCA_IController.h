@@ -65,6 +65,7 @@ public:
 	void UnlinkActuator(SCA_IActuator *actua);
 	void UnlinkSensor(SCA_ISensor *sensor);
 	void SetState(unsigned int state);
+	unsigned int GetStateMask() const { return m_statemask; }
 	void ApplyState(unsigned int state);
 	void Deactivate();
 	bool IsJustActivated();

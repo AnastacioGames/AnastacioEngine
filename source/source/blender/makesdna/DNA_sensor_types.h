@@ -101,7 +101,7 @@ typedef struct bAnimationEventSensor {
 } bAnimationEventSensor;
 
 typedef struct bActuatorSensor {
-	int type;
+	int type;	/* SENS_ACTUATOR_ACTIVE or SENS_ACTUATOR_FINISHED */
 	int pad;
 	char name[64];	/* MAX_NAME */
 } bActuatorSensor;
@@ -200,6 +200,7 @@ typedef struct bSensor {
 
 	char description[64]; /* user description */
 	char color[3]; /* sensor color */
+	char group[32]; /* brick group name, empty = no group */
 } bSensor;
 
 typedef struct bJoystickSensor {
@@ -335,6 +336,8 @@ typedef struct bVRHeadSensor {
 #define SENS_DEACTIVATE	64
 #define SENS_DELTATIME	128
 #define SENS_SHOW_DESCR 256 /* Show Sensor Description */
+#define SENS_GROUP_HIDE 512 /* the brick group is collapsed in the editor */
+#define SENS_SHOW_GROUP 1024 /* the group field is shown in the brick */
 
 /* sensor->pulse */
 #define SENS_PULSE_CONT 	0
@@ -431,6 +434,10 @@ typedef struct bVRHeadSensor {
 
 #define SENS_DELAY_REPEAT		1
 #define SENS_DELAY_USEDELTA		2
+
+/* actuatorsensor->type */
+#define SENS_ACTUATOR_ACTIVE	0	/* positive while the actuator is active (also old files) */
+#define SENS_ACTUATOR_FINISHED	1	/* one tick pulse after the actuator finished its job */
 // should match JOYINDEX_MAX in SCA_JoystickDefines.h */
 #define SENS_JOY_MAXINDEX		8
 

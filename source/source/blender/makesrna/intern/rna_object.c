@@ -24,6 +24,8 @@
 #include "DNA_action_types.h"
 #include "DNA_customdata_types.h"
 #include "DNA_controller_types.h"
+#include "DNA_sensor_types.h"
+#include "DNA_actuator_types.h"
 #include "DNA_group_types.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
@@ -1822,6 +1824,66 @@ static void rna_GameStateName_name_set(PointerRNA *ptr, const char *value)
 	BLI_strncpy_utf8((char *)ptr->data, value, 32);
 }
 
+/* gives every brick of the object that uses group 'from' the group 'to' ("" takes them out of the group) */
+static void rna_object_brick_group_rename(Object *ob, const char *from, const char *to)
+{
+	bSensor *sens;
+	bController *cont;
+	bActuator *act;
+
+	for (sens = ob->sensors.first; sens; sens = sens->next) {
+		if (STREQ(sens->group, from)) BLI_strncpy(sens->group, to, sizeof(sens->group));
+	}
+	for (cont = ob->controllers.first; cont; cont = cont->next) {
+		if (STREQ(cont->group, from)) BLI_strncpy(cont->group, to, sizeof(cont->group));
+	}
+	for (act = ob->actuators.first; act; act = act->next) {
+		if (STREQ(act->group, from)) BLI_strncpy(act->group, to, sizeof(act->group));
+	}
+}
+
+static void rna_LogicBrickGroup_name_set(PointerRNA *ptr, const char *value)
+{
+	Object *ob = (Object *)ptr->id.data;
+	bLogicBrickGroup *group = (bLogicBrickGroup *)ptr->data;
+	char old[sizeof(group->name)];
+
+	BLI_strncpy(old, group->name, sizeof(old));
+	BLI_strncpy_utf8(group->name, value, sizeof(group->name));
+	BLI_uniquename(&ob->brick_groups, group, "Group", '.', offsetof(bLogicBrickGroup, name),
+	               sizeof(group->name));
+	if (old[0]) {
+		rna_object_brick_group_rename(ob, old, group->name);
+	}
+}
+
+static bLogicBrickGroup *rna_LogicBrickGroups_new(Object *ob, const char *name)
+{
+	bLogicBrickGroup *group = MEM_callocN(sizeof(bLogicBrickGroup), "bLogicBrickGroup");
+
+	BLI_strncpy_utf8(group->name, name[0] ? name : "Group", sizeof(group->name));
+	BLI_addtail(&ob->brick_groups, group);
+	BLI_uniquename(&ob->brick_groups, group, "Group", '.', offsetof(bLogicBrickGroup, name),
+	               sizeof(group->name));
+	WM_main_add_notifier(NC_LOGIC, NULL);
+	return group;
+}
+
+static void rna_LogicBrickGroups_remove(Object *ob, ReportList *reports, PointerRNA *group_ptr)
+{
+	bLogicBrickGroup *group = group_ptr->data;
+
+	if (BLI_findindex(&ob->brick_groups, group) == -1) {
+		BKE_reportf(reports, RPT_ERROR, "Brick group '%s' not found in object '%s'", group->name, ob->id.name + 2);
+		return;
+	}
+	/* the bricks stay, out of the group */
+	rna_object_brick_group_rename(ob, group->name, "");
+	BLI_freelinkN(&ob->brick_groups, group);
+	RNA_POINTER_INVALIDATE(group_ptr);
+	WM_main_add_notifier(NC_LOGIC, NULL);
+}
+
 static void rna_GameObjectSettings_used_state_get(PointerRNA *ptr, bool *values)
 {
 	Object *ob = (Object *)ptr->data;
@@ -3363,6 +3425,42 @@ static void rna_def_game_state_name(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
+static void rna_def_logic_brick_group(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	srna = RNA_def_struct(brna, "LogicBrickGroup", NULL);
+	RNA_def_struct_sdna(srna, "bLogicBrickGroup");
+	RNA_def_struct_ui_text(srna, "Logic Brick Group", "Group offered by the group field of the logic bricks");
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_LogicBrickGroup_name_set");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Name", "Group name (renaming it renames the group of its bricks)");
+	RNA_def_struct_name_property(srna, prop);
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	srna = RNA_def_struct(brna, "LogicBrickGroups", NULL);
+	RNA_def_struct_sdna(srna, "Object");
+	RNA_def_struct_ui_text(srna, "Logic Brick Groups", "Brick groups of the object");
+
+	func = RNA_def_function(srna, "new", "rna_LogicBrickGroups_new");
+	RNA_def_function_ui_description(func, "Add a brick group (the name is made unique)");
+	parm = RNA_def_string(func, "name", "Group", 32, "", "Group name");
+	parm = RNA_def_pointer(func, "group", "LogicBrickGroup", "", "New group");
+	RNA_def_function_return(func, parm);
+
+	func = RNA_def_function(srna, "remove", "rna_LogicBrickGroups_remove");
+	RNA_def_function_ui_description(func, "Remove a brick group; its bricks stay, without a group");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	parm = RNA_def_pointer(func, "group", "LogicBrickGroup", "", "Group to remove");
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+	RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+}
+
 static void rna_def_object_game_settings(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -3775,6 +3873,16 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_collection_funcs(prop, "rna_GameObjectSettings_state_names_begin", "rna_iterator_array_next",
 	                                  "rna_iterator_array_end", "rna_iterator_array_get", NULL, NULL, NULL, NULL);
 	RNA_def_property_ui_text(prop, "State Names", "User names of the 30 logic states");
+
+	prop = RNA_def_property(srna, "brick_groups", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "brick_groups", NULL);
+	RNA_def_property_struct_type(prop, "LogicBrickGroup");
+	RNA_def_property_srna(prop, "LogicBrickGroups");
+	RNA_def_property_ui_text(prop, "Brick Groups", "Groups offered by the group field of the logic bricks");
+
+	prop = RNA_def_property(srna, "active_brick_group_index", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_int_sdna(prop, NULL, "actbrickgroup");
+	RNA_def_property_ui_text(prop, "Active Brick Group", "Brick group selected in the list");
 
 	prop = RNA_def_property(srna, "used_states", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_array(prop, OB_MAX_STATES);
@@ -5230,6 +5338,7 @@ void RNA_def_object(BlenderRNA *brna)
 
 	RNA_define_animate_sdna(false);
 	rna_def_game_state_name(brna);
+	rna_def_logic_brick_group(brna);
 	rna_def_object_game_settings(brna);
 	rna_def_object_base(brna);
 	rna_def_vertex_group(brna);

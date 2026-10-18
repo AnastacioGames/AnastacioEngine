@@ -49,6 +49,12 @@ protected:
 	int m_links;
 	bool m_posevent;
 	bool m_negevent;
+	/// Why the actuator stopped the last time (see KX_ACTUATOR_END).
+	int m_endReason;
+	/// Number of times the actuator stopped with END_FINISHED, read by the Actuator sensor in "Finished" mode.
+	unsigned int m_finishCount;
+	/// Number of positive pulses received, read by the Debug Mode logic view.
+	unsigned int m_startCount;
 
 	std::vector<SCA_IController *> m_linkedcontrollers;
 
@@ -87,6 +93,17 @@ public:
 		KX_ACT_STEERING,
 		KX_ACT_MOUSE,
 		KX_ACT_LIGHTNING,
+		KX_ACT_WAIT,
+		KX_ACT_VIDEO,
+	};
+
+	/** Why an actuator stopped. Only the actuators that support the "Finished" sensor fill it,
+	 * the others stay END_NONE. */
+	enum KX_ACTUATOR_END {
+		END_NONE = 0,
+		END_FINISHED,
+		END_CANCELLED,
+		END_FAILED
 	};
 
 	SCA_IActuator(SCA_IObject *gameobj, KX_ACTUATOR_TYPE type);
@@ -148,6 +165,15 @@ public:
 	virtual void DecLink();
 	bool IsNoLink() const;
 	bool IsType(KX_ACTUATOR_TYPE type);
+
+	/// Records why the actuator stopped, END_FINISHED also counts a completion.
+	void SetEndReason(KX_ACTUATOR_END reason);
+	int GetEndReason() const;
+	unsigned int GetFinishCount() const;
+	unsigned int GetStartCount() const
+	{
+		return m_startCount;
+	}
 };
 
 #endif  // __SCA_IACTUATOR_H__
