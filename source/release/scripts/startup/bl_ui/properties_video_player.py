@@ -143,11 +143,6 @@ class OBJECT_OT_video_player_add(Operator):
     bl_label = "Add Video Player"
     bl_options = {'REGISTER', 'UNDO'}
 
-    create_material = bpy.props.BoolProperty(
-        name="Create Material and Texture",
-        description="Give the object a new material with an image texture for the video to play on",
-        default=True)
-
     @classmethod
     def poll(cls, context):
         return context.object is not None and video_component(context.object) is None
@@ -161,10 +156,7 @@ class OBJECT_OT_video_player_add(Operator):
             return {'CANCELLED'}
         # Objeto com material comeca na tela dele; sem material, como cutscene em tela cheia.
         props = video_component(ob).properties
-        if self.create_material and ob.type == 'MESH':
-            create_video_material(ob)
         if ob.active_material:
-            ensure_video_texture(ob.active_material)
             props["Material"].value = ob.active_material.name
         else:
             props["Fullscreen"].value = True
@@ -185,6 +177,101 @@ class OBJECT_OT_video_player_remove(Operator):
         ob = context.object
         index = list(ob.game.components).index(video_component(ob))
         bpy.ops.logic.python_component_remove(_override(context, ob), index=index)
+        return {'FINISHED'}
+
+
+class OBJECT_OT_video_player_mode(Operator):
+    """Where the video plays"""
+    bl_idname = "object.video_player_mode"
+    bl_label = "Video Player Mode"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    mode = bpy.props.EnumProperty(items=(
+        ('FULLSCREEN', "Fullscreen Cutscene", "Draw the video over the whole screen, no material or camera needed"),
+        ('MATERIAL', "On Material", "Play the video on a material of this object; creates one with an image "
+                                   "texture when the object has none ready"),
+    ))
+
+    @classmethod
+    def poll(cls, context):
+        return video_component(context.object) is not None
+
+    def execute(self, context):
+        ob = context.object
+        props = video_component(ob).properties
+        if self.mode == 'FULLSCREEN':
+            props["Fullscreen"].value = True
+            return {'FINISHED'}
+        props["Fullscreen"].value = False
+        if ob.type != 'MESH':
+            return {'FINISHED'}
+        name = props["Material"].value
+        mat = bpy.data.materials.get(name) if name else ob.active_material
+        if mat is None or mat.name not in ob.data.materials:
+            mat = create_video_material(ob)
+            self.report({'INFO'}, "Created material %s for the video" % mat.name)
+        props["Material"].value = mat.name
+        return {'FINISHED'}
+
+
+SRT_EXAMPLE = """1
+00:00:00,500 --> 00:00:03,000
+First subtitle: from 0.5 s to 3 s
+
+2
+00:00:03,500 --> 00:00:06,000
+Two lines in one subtitle:
+the second line goes below
+
+3
+00:00:06,500 --> 00:00:09,000
+<i>Tags like italics are ignored</i>
+"""
+
+
+class OBJECT_OT_video_player_subtitles_example(Operator):
+    """Create a .srt next to the video with example subtitles and open it in the Text Editor"""
+    bl_idname = "object.video_player_subtitles_example"
+    bl_label = "Create Example"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        component = video_component(context.object)
+        return component is not None and bool(component.properties["File"].value)
+
+    def execute(self, context):
+        import os
+        ob = context.object
+        props = video_component(ob).properties
+        video = bpy.path.abspath(props["File"].value)
+        path = os.path.splitext(video)[0] + ".srt"
+        if os.path.isfile(path):
+            self.report({'INFO'}, "%s already exists, opened it" % os.path.basename(path))
+        else:
+            try:
+                with open(path, "w", encoding="utf-8") as handle:
+                    handle.write(SRT_EXAMPLE)
+            except OSError as exc:
+                self.report({'ERROR'}, "Could not write %s: %s" % (path, exc))
+                return {'CANCELLED'}
+            self.report({'INFO'}, "Created %s" % os.path.basename(path))
+        stored = path
+        if bpy.data.is_saved:
+            try:
+                stored = bpy.path.relpath(path)
+            except ValueError:  # outra unidade no Windows
+                pass
+        props["Subtitles"].value = stored
+        # abre no Text Editor; Alt+S la salva de volta no .srt
+        text = next((t for t in bpy.data.texts if t.filepath and
+                     os.path.normcase(bpy.path.abspath(t.filepath)) == os.path.normcase(path)), None)
+        if text is None:
+            text = bpy.data.texts.load(path)
+        for area in context.screen.areas:
+            if area.type == 'TEXT_EDITOR':
+                area.spaces.active.text = text
+                break
         return {'FINISHED'}
 
 
@@ -256,14 +343,9 @@ class OBJECT_PT_video_player(Panel):
     def draw(self, context):
         layout = self.layout
         ob = context.object
-        wm = context.window_manager
         component = video_component(ob)
         if component is None:
-            box = layout.box()
-            if ob.type == 'MESH':
-                box.prop(wm, "video_player_create_material")
-            op = box.operator("object.video_player_add", icon='FILE_MOVIE')
-            op.create_material = ob.type == 'MESH' and wm.video_player_create_material
+            layout.operator("object.video_player_add", icon='FILE_MOVIE')
             return
 
         props = component.properties
@@ -284,7 +366,13 @@ class OBJECT_PT_video_player(Panel):
         row = box.row(align=True)
         row.prop(props["File"], "value", text="File")
         row.operator("object.video_player_file", text="", icon='FILESEL')
-        box.prop(props["Fullscreen"], "value", text="Fullscreen Cutscene")
+        row = box.row(align=True)
+        row.operator("object.video_player_mode", text="Fullscreen Cutscene", icon='FULLSCREEN_ENTER',
+                     depress=fullscreen).mode = 'FULLSCREEN'
+        sub = row.row(align=True)
+        sub.enabled = ob.type == 'MESH'
+        sub.operator("object.video_player_mode", text="On Material", icon='MATERIAL',
+                     depress=not fullscreen).mode = 'MATERIAL'
         if not fullscreen:
             if ob.type == 'MESH':
                 box.prop_search(props["Material"], "value", ob.data, "materials", text="Material")
@@ -338,21 +426,20 @@ class OBJECT_PT_video_player(Panel):
             row.prop(props["Subtitles"], "value", text="File")
             op = row.operator("object.video_player_file", text="", icon='FILESEL')
             op.field = "Subtitles"
-            field(box, "Subtitle Size", text="Size")
+            row = box.row()
+            field(row, "Subtitle Size", text="Size")
+            row.operator("object.video_player_subtitles_example", icon='TEXT')
             if not props["Subtitles"].value:
                 box.label(text="Empty: uses a .srt with the video's name, if there is one", icon='INFO')
 
         layout.operator("object.video_player_remove", icon='X')
 
 
-bpy.types.WindowManager.video_player_create_material = bpy.props.BoolProperty(
-    name="Create Material and Texture for Player",
-    description="Give the object a new material with an image texture for the video to play on",
-    default=True)
-
 classes = (
     OBJECT_OT_video_player_add,
     OBJECT_OT_video_player_remove,
+    OBJECT_OT_video_player_mode,
+    OBJECT_OT_video_player_subtitles_example,
     OBJECT_OT_video_player_texture,
     OBJECT_OT_video_player_file,
     OBJECT_PT_video_player,
