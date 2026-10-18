@@ -3164,7 +3164,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 	Object *ob= CTX_data_active_object(C);
 	ID **idar;
 	PointerRNA logic_ptr, settings_ptr, object_ptr;
-	uiLayout *layout, *row, *box;
+	uiLayout *layout, *row, *box, *split;
 	uiBlock *block;
 	char uiblockstr[32];
 	short a, count;
@@ -3224,7 +3224,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 	/* ****************** Controllers ****************** */
 
-	xco= 21 * U.widget_unit; yco= - U.widget_unit / 2; width= 15 * U.widget_unit;
+	xco= 23 * U.widget_unit; yco= - U.widget_unit / 2; width= 18 * U.widget_unit;
 	layout= UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, xco, yco, width, 20, 0, UI_style_get());
 	row = uiLayoutRow(layout, true);
 
@@ -3235,7 +3235,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 	uiItemR(row, &logic_ptr, "show_controllers_linked_controller", 0, IFACE_("Link"), ICON_NONE);
 	
 	for (a = 0; a < count; a++) {
-		uiLayout *split, *subsplit, *col;
+		uiLayout *subsplit, *col;
 
 
 		ob= (Object *)idar[a];
@@ -3252,12 +3252,15 @@ void logic_buttons(bContext *C, ARegion *ar)
 		split = uiLayoutSplit(layout, 0.05f, false);
 		uiItemR(split, &settings_ptr, "show_state_panel", UI_ITEM_R_NO_BG, "", ICON_RIGHTARROW);
 		
-		row = uiLayoutRow(split, true);
+		/* same columns as the bricks: the header ends where the bricks end */
+		subsplit = uiLayoutSplit(split, 0.95f, false);
+		row = uiLayoutRow(subsplit, true);
 		uiDefButBitS(block, UI_BTYPE_TOGGLE, OB_SHOWCONT, B_REDR, ob->id.name + 2, (short)(xco - U.widget_unit / 2), yco, (short)(width - 1.5f * U.widget_unit), UI_UNIT_Y, &ob->scaflag, 0, 31, 0, 0, TIP_("Object name, click to show/hide controllers"));
 
 		RNA_pointer_create((ID *)ob, &RNA_Object, ob, &object_ptr);
 		uiLayoutSetContextPointer(row, "object", &object_ptr);
 		uiItemMenuEnumO(row, C, "LOGIC_OT_controller_add", "type", IFACE_("Add Controller"), ICON_CONSTRAINT);
+		uiItemL(subsplit, "", ICON_NONE);
 
 		if (RNA_boolean_get(&settings_ptr, "show_state_panel")) {
 
@@ -3295,7 +3298,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 	/* ****************** Sensors ****************** */
 
-	xco= U.widget_unit / 2; yco= -U.widget_unit / 2; width= 17 * U.widget_unit;
+	xco= U.widget_unit / 2; yco= -U.widget_unit / 2; width= 19 * U.widget_unit;
 	layout= UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, xco, yco, width, 20, 0, UI_style_get());
 	row = uiLayoutRow(layout, true);
 
@@ -3313,12 +3316,15 @@ void logic_buttons(bContext *C, ARegion *ar)
 		/* only draw the sensor common header if "use_visible" */
 		if ((ob->scavisflag & OB_VIS_SENS) == 0) continue;
 
-		row = uiLayoutRow(layout, true);
+		/* same columns as the bricks: the header ends where the bricks end */
+		split = uiLayoutSplit(layout, 0.95f, false);
+		row = uiLayoutRow(split, true);
 		uiDefButBitS(block, UI_BTYPE_TOGGLE, OB_SHOWSENS, B_REDR, ob->id.name + 2, (short)(xco - U.widget_unit / 2), yco, (short)(width - 1.5f * U.widget_unit), UI_UNIT_Y, &ob->scaflag, 0, 31, 0, 0, TIP_("Object name, click to show/hide sensors"));
 
 		RNA_pointer_create((ID *)ob, &RNA_Object, ob, &object_ptr);
 		uiLayoutSetContextPointer(row, "object", &object_ptr);
 		uiItemMenuEnumO(row, C, "LOGIC_OT_sensor_add", "type", IFACE_("Add Sensor"), ICON_OOPS);
+		uiItemL(split, "", ICON_NONE);
 
 		if ((ob->scaflag & OB_SHOWSENS) == 0) continue;
 
@@ -3331,7 +3337,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 	/* ****************** Actuators ****************** */
 
-	xco= 40 * U.widget_unit; yco= -U.widget_unit / 2; width= 17 * U.widget_unit;
+	xco= 45 * U.widget_unit; yco= -U.widget_unit / 2; width= 19 * U.widget_unit;
 	layout= UI_block_layout(block, UI_LAYOUT_VERTICAL, UI_LAYOUT_PANEL, xco, yco, width, 20, 0, UI_style_get());
 	row = uiLayoutRow(layout, true);
 
@@ -3351,7 +3357,10 @@ void logic_buttons(bContext *C, ARegion *ar)
 			continue;
 		}
 
-		row = uiLayoutRow(layout, true);
+		/* same columns as the bricks: the header starts where the bricks start */
+		split = uiLayoutSplit(layout, 0.05f, false);
+		uiItemL(split, "", ICON_NONE);
+		row = uiLayoutRow(split, true);
 		uiDefButBitS(block, UI_BTYPE_TOGGLE, OB_SHOWACT, B_REDR, ob->id.name + 2, (short)(xco - U.widget_unit / 2), yco, (short)(width - 1.5f * U.widget_unit), UI_UNIT_Y, &ob->scaflag, 0, 31, 0, 0, TIP_("Object name, click to show/hide actuators"));
 
 		RNA_pointer_create((ID *)ob, &RNA_Object, ob, &object_ptr);
@@ -3367,7 +3376,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 	UI_block_layout_resolve(block, NULL, &yco);	/* stores final height in yco */
 	height = MIN2(height, yco);
 
-	UI_view2d_totRect_set(&ar->v2d, 57.5f * U.widget_unit, height - U.widget_unit);
+	UI_view2d_totRect_set(&ar->v2d, 64.5f * U.widget_unit, height - U.widget_unit);
 
 	/* set the view */
 	UI_view2d_view_ortho(&ar->v2d);
