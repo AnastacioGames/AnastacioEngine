@@ -43,6 +43,7 @@ BLACKLIST = {
     # AnastacioEngine: game-only modules, they import the `Range` runtime module.
     os.path.join("Range_Particle_Emitter", "Range_Emitter"),
     os.path.join("anastacio_network", "component"),
+    "anastacio_ragdoll_runtime",
     # Not an importable package name (space and hyphen).
     "BGE Post-Process",
     # Helper modules imported by add-ons through `sys.path`, not add-ons themselves.
