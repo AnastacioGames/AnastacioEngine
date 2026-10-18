@@ -37,6 +37,8 @@
 
 #include "VideoBase.h"
 
+#include <string.h>
+
 #include "FilterSource.h"
 
 // VideoBase implementation
@@ -68,6 +70,17 @@ void VideoBase::process(BYTE *sample)
 		switch (m_format) {
 			case RGBA32:
 			{
+				// fast path: no Python filter and no scaling, copy whole rows instead of
+				// one virtual call per pixel (matters at 1080p and above)
+				if (m_pyfilter == nullptr && m_orgSize[0] == m_size[0] && m_orgSize[1] == m_size[1]) {
+					const size_t rowBytes = size_t(m_size[0]) * 4;
+					for (short y = 0; y < m_size[1]; ++y) {
+						const short srcY = m_flip ? m_size[1] - 1 - y : y;
+						memcpy(m_image + size_t(y) * m_size[0], sample + size_t(srcY) * rowBytes, rowBytes);
+					}
+					m_avail = true;
+					break;
+				}
 				FilterRGBA32 filtRGBA;
 				// use filter object for format to convert image
 				filterImage(filtRGBA, sample, m_orgSize);

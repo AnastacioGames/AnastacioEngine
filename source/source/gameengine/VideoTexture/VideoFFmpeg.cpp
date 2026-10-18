@@ -49,6 +49,47 @@
 #include "VideoFFmpeg.h"
 #include "Exception.h"
 
+// High quality colour conversion: bicubic and full chroma resolution (no SWS_ACCURATE_RND:
+// it disables the SIMD paths, 0.25 -> 48 ms per 720p frame and the cache falls behind),
+// so edges and gradients do not get the blocky/banded look of the fast path.
+#define VIDEO_SWS_FLAGS (SWS_BICUBIC | SWS_FULL_CHR_H_INT | SWS_FULL_CHR_H_INP)
+
+// Tell swscale the YUV matrix tagged in the stream (BT.709, BT.2020...) and its range, otherwise
+// it assumes BT.601 limited range and tagged HD or full range videos get wrong colours.
+static void video_set_colorspace(SwsContext *ctx, const AVCodecContext *codecCtx)
+{
+	if (ctx == nullptr) {
+		return;
+	}
+	int space = SWS_CS_DEFAULT;
+	switch (codecCtx->colorspace) {
+		case AVCOL_SPC_BT709: space = SWS_CS_ITU709; break;
+		case AVCOL_SPC_BT2020_NCL:
+		case AVCOL_SPC_BT2020_CL: space = SWS_CS_BT2020; break;
+		case AVCOL_SPC_SMPTE170M:
+		case AVCOL_SPC_BT470BG: space = SWS_CS_ITU601; break;
+		case AVCOL_SPC_UNSPECIFIED:
+		default:
+			// Untagged: BT.601, like the editor movie reader (anim_movie.c) and our own
+			// encoder, so a video looks the same in the game as in the editor.
+			space = SWS_CS_ITU601;
+			break;
+	}
+	const bool fullRange = codecCtx->color_range == AVCOL_RANGE_JPEG ||
+	                       codecCtx->pix_fmt == AV_PIX_FMT_YUVJ420P ||
+	                       codecCtx->pix_fmt == AV_PIX_FMT_YUVJ422P ||
+	                       codecCtx->pix_fmt == AV_PIX_FMT_YUVJ444P;
+	int *invTable, *table, srcRange, dstRange, brightness, contrast, saturation;
+	if (sws_getColorspaceDetails(ctx, &invTable, &srcRange, &table, &dstRange,
+	                             &brightness, &contrast, &saturation) < 0)
+	{
+		return;
+	}
+	const int *coefs = sws_getCoefficients(space);
+	sws_setColorspaceDetails(ctx, coefs, fullRange ? 1 : 0, coefs, 1, brightness, contrast, saturation);
+}
+
+
 
 // default framerate
 const double defFrameRate = 25.0;
@@ -279,12 +320,13 @@ int VideoFFmpeg::openStream(const char *filename, FFMPEG_CONST AVInputFormat *in
 			m_codecCtx->width,
 			m_codecCtx->height,
 			AV_PIX_FMT_RGBA,
-			SWS_FAST_BILINEAR,
+			VIDEO_SWS_FLAGS,
 			nullptr, nullptr, nullptr);
 	}
 	else {
 		// allocate buffer to store final decoded frame
-		m_format = RGB24;
+		// RGBA too (opaque alpha), so frames are copied straight to the texture buffer
+		m_format = RGBA32;
 		// allocate sws context
 		m_imgConvertCtx = sws_getContext(
 			m_codecCtx->width,
@@ -292,10 +334,11 @@ int VideoFFmpeg::openStream(const char *filename, FFMPEG_CONST AVInputFormat *in
 			m_codecCtx->pix_fmt,
 			m_codecCtx->width,
 			m_codecCtx->height,
-			AV_PIX_FMT_RGB24,
-			SWS_FAST_BILINEAR,
+			AV_PIX_FMT_RGBA,
+			VIDEO_SWS_FLAGS,
 			nullptr, nullptr, nullptr);
 	}
+	video_set_colorspace(m_imgConvertCtx, m_codecCtx);
 	m_frameRGB = allocFrameRGB();
 
 	if (!m_imgConvertCtx || !m_frameRGB) {

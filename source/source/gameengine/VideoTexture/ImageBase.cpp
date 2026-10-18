@@ -244,8 +244,9 @@ void ImageBase::swapImageBR()
 // initialize image data
 void ImageBase::init(short width, short height)
 {
-	// if image has to be scaled
-	if (m_scale) {
+	// if image has to be scaled: only needed on GPUs without non power of two textures,
+	// otherwise shrinking a 1920x1080 video to 1024x1024 just throws resolution away
+	if (m_scale && !GLEW_ARB_texture_non_power_of_two) {
 		// recalc sizes of image
 		width = calcSize(width);
 		height = calcSize(height);

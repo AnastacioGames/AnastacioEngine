@@ -57,6 +57,7 @@
 
 #include <memory.h>
 #include "GPU_glew.h"
+#include "GPU_draw.h"
 
 #include "CM_Message.h"
 
@@ -167,13 +168,41 @@ void Texture::SetSource(PyImage *source)
 	m_lastImage = nullptr;
 }
 
+// Upload the base level, reusing the storage when the size and format did not change:
+// re-creating a 1080p texture every frame costs a reallocation in the driver.
+static void uploadVideoLevel0(unsigned int *texture, short *size, unsigned int internalFormat)
+{
+	GLint curW = 0, curH = 0, curFormat = 0;
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &curW);
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_HEIGHT, &curH);
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &curFormat);
+	if (curW == size[0] && curH == size[1] && (unsigned int)curFormat == internalFormat) {
+		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, size[0], size[1], GL_RGBA, GL_UNSIGNED_BYTE, texture);
+	}
+	else {
+		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, size[0], size[1], 0, GL_RGBA, GL_UNSIGNED_BYTE, texture);
+	}
+}
+
 // load texture
 void loadTexture(unsigned int texId, unsigned int *texture, short *size,
                  bool mipmap, unsigned int internalFormat)
 {
 	// load texture for rendering
 	glBindTexture(GL_TEXTURE_2D, texId);
-	if (mipmap) {
+	if (mipmap && GLEW_VERSION_3_0) {
+		// Let the GPU build the mip chain: much faster than on the CPU each frame and
+		// filtered properly, so the video stays sharp at a distance.
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		uploadVideoLevel0(texture, size, internalFormat);
+		if (GLEW_EXT_texture_filter_anisotropic && GPU_get_anisotropic() > 1.0f) {
+			// keep the video sharp when seen at a grazing angle, like other textures
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
+		}
+		glGenerateMipmap(GL_TEXTURE_2D);
+	}
+	else if (mipmap) {
 		int i;
 		ImBuf *ibuf;
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
@@ -193,7 +222,7 @@ void loadTexture(unsigned int texId, unsigned int *texture, short *size,
 	else {
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexImage2D(GL_TEXTURE_2D, 0, internalFormat, size[0], size[1], 0, GL_RGBA, GL_UNSIGNED_BYTE, texture);
+		uploadVideoLevel0(texture, size, internalFormat);
 	}
 	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
 }
