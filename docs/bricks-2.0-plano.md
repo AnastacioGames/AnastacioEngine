@@ -284,4 +284,5 @@ Implementada, com o teste de runtime pendente (precisa abrir o jogo).
   Terminated ele nunca conclui, e o botão "Então" e o aviso do sensor tratam esse caso.
 - Teste no jogo: PASS em 2026-10-18. Seek de x=0 até o alvo em x=10, com distância 1 e velocidade 5: concluiu uma
   vez em 1,874 s, em x=9,00. Sem alvo: nenhuma conclusão. Sem Self Terminated: nenhuma conclusão.
-- Próximos candidatos: ShapeAction (mesmo contrato da Action), depois avaliar Camera e Scene.
+- ShapeAction não tem conversão no runtime (o Action cobre shape keys), então não entra. Os outros actuators
+  (Motion, Camera, Scene, Property, Message...) não têm um fim natural e ficam de fora até alguém pedir um caso.
