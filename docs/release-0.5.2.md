@@ -158,3 +158,29 @@ No PC com Windows, para terminar:
   O hash novo não pode ser `c4f0f3e4…`. Depois o Windows baixa esse asset para
   `release/launcher/Launcher`, apaga o asset temporário do rascunho, gera o zip da RangeArmor, sobe com
   o zip do Windows e o `SHA256SUMS.txt`, e publica.
+
+## Retorno do PC Linux (2026-10-18, 15:40)
+
+### Launcher Linux da RangeArmor: feito
+
+- Compilado em container `rust:1.95-bullseye` (glibc máx. 2.30; no host 24.04 ficava exigindo 2.39),
+  `cargo test --locked` 4/4, `strip`. SHA-256 `3cb1ade91d3440c300328adfcb13a7aaf166b77f84f8f262d30293ec25dcb678`
+  (diferente do legado `c4f0f3e4…`). Já está no rascunho como asset **`Launcher-linux`**.
+
+### BLOQUEIA A PUBLICAÇÃO: `.cooked` de outro compilador quebra a colisão
+
+- Sintoma (teste visual no Linux): no `docs/logic-bricks-2-tutorial.blend`, Player e Enemy atravessam o chão
+  ao dar Play. Causa: o `.cooked` commitado (gerado no Windows) foi carregado. O BVH de malha estática é
+  gravado com `btOptimizedBvh::serializeInPlace` (layout de memória do compilador): BVH do MSVC é lixo no
+  GCC e vice-versa, e o cabeçalho só conferia hash/vértices/`version == 1`. Reproduzido: com o cache do
+  Windows o Player cai até z=-18; com cache gerado no Linux para em z=0,5.
+- Também vale ao contrário (cache do Linux no Windows) e para jogo exportado **do Windows para Linux**
+  com `.cooked` pronto.
+- Correção (próximo commit, em validação no container): `CcdPhysicsController.cpp` grava a versão do BVH
+  com compilador + `sizeof(btOptimizedBvh)` e recusa BVH de outro compilador (reconstrói);
+  `CcdCookedData::AddBvh` substitui a entrada recusada para o `.cooked` ser regravado certo.
+  `docs/logic-bricks-2-tutorial.cooked` e `.blend1` saíram do git; `*.cooked` no `.gitignore`.
+- **Windows, depois desse commit:** `git pull`, recompilar `RangeEngine RangeRuntime` + `ninja install`
+  (só `.cpp` mudou), refazer o zip da engine e o da RangeArmor, atualizar o `SHA256SUMS.txt` e só então
+  publicar. Conferir: um `.cooked` velho do Windows deve mostrar `bvh 1 loaded, … 1 new` no primeiro Play
+  (recusado e refeito) e física normal.
