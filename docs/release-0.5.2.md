@@ -152,7 +152,7 @@ No PC com Windows, para terminar:
   cargo test --locked && cargo build --release --locked --target-dir /tmp/ra-launcher
   strip /tmp/ra-launcher/release/rangearmor   # opcional; upx -5 se tiver
   sha256sum /tmp/ra-launcher/release/rangearmor
-  gh release upload v0.5.2 /tmp/ra-launcher/release/rangearmor#Launcher-linux --clobber
+  cp /tmp/ra-launcher/release/rangearmor /tmp/Launcher-linux && gh release upload v0.5.2 /tmp/Launcher-linux --clobber
   ```
 
   O hash novo não pode ser `c4f0f3e4…`. Depois o Windows baixa esse asset para
