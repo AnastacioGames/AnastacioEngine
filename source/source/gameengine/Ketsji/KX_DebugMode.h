@@ -31,6 +31,7 @@
 #  define KX_DEBUGMODE_H
 
 #include <string>
+#include <unordered_map>
 #include "KX_ConsoleWindow.h"
 #include "KX_Imgui.h"
 #include "KX_VehicleDebugUI.h"
@@ -162,6 +163,12 @@ class KX_DebugMode
   // Options
   bool m_showOnlyFrameRate;
 
+  // Logic view: ImGui time of the last positive pulse / activation of each brick of the selected
+  // object, only used as a key (never dereferenced), cleared when the selection changes.
+  std::unordered_map<const void *, double> m_logicLastFire;
+  std::unordered_map<const void *, bool> m_logicLastOn;
+  KX_GameObject *m_logicObject;
+
  public:
   /// Variables, No save.
 
@@ -230,6 +237,7 @@ class KX_DebugMode
   /// Sub-Panels (Called on Panels)
   void RenderCameraControllPanel();
   void RenderGameObjectPanel();
+  void RenderGameObjectLogic(KX_GameObject *gameObj);
   void RenderObjectProfiling();
 
   /// Menus

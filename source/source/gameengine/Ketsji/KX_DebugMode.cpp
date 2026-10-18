@@ -44,6 +44,9 @@
 #include "RAS_Rasterizer.h"
 
 #include "SCA_LogicManager.h"
+#include "SCA_ISensor.h"
+#include "SCA_IController.h"
+#include "SCA_IActuator.h"
 
 #include "EXP_ListValue.h"
 
@@ -82,6 +85,7 @@ KX_DebugMode::KX_DebugMode()
       m_graphShowSleeping(true),
       m_pickSceneObject(false),
       m_showOnlyFrameRate(false),
+      m_logicObject(nullptr),
 	  imgui_showDebugMenuTop(true),
       imgui_showDebugPhys(false),
       imgui_showArmatures(false),
@@ -178,6 +182,7 @@ void KX_DebugMode::RenderImguiDebugMode() {
 			RenderGameObjectPanel();
 		}
 		ImGui::End();
+		RenderGameObjectLogic(imgui_KXObSelected);
 	}
 	if (ImGui::Begin("Profiling")) {
 		RenderProfiling();
@@ -1252,6 +1257,145 @@ void KX_DebugMode::RenderGameObjectPanel() {
 	}
 
 	ImGui::EndChild();
+}
+
+/* Read only view of the logic bricks of the selected object: what is on now and what fired
+ * recently (the highlight fades in one second). */
+void KX_DebugMode::RenderGameObjectLogic(KX_GameObject *gameObj)
+{
+	if (gameObj->GetSensors().empty() && gameObj->GetControllers().empty() && gameObj->GetActuators().empty()) {
+		return;
+	}
+	ImGui::SetNextWindowSize(ImVec2(360.0f, 420.0f), ImGuiCond_FirstUseEver);
+	const bool open = ImGui::Begin("Logic Bricks");
+	if (!open) {
+		ImGui::End();
+		return;
+	}
+	ImGui::Text("%s", gameObj->GetName().c_str() + (gameObj->GetName().compare(0, 2, "OB") == 0 ? 2 : 0));
+
+	if (m_logicObject != gameObj) {
+		m_logicObject = gameObj;
+		m_logicLastFire.clear();
+		m_logicLastOn.clear();
+	}
+	const double now = ImGui::GetTime();
+	const ImVec4 colOn(0.35f, 0.9f, 0.35f, 1.0f);
+	const ImVec4 colOff(0.55f, 0.55f, 0.55f, 1.0f);
+	const ImVec4 colFire(1.0f, 0.85f, 0.2f, 1.0f);
+
+	// rising edge -> fire time; returns the color of the row
+	auto rowColor = [&](const void *key, bool on, bool inState) -> ImVec4 {
+		bool &last = m_logicLastOn[key];
+		if (on && !last) {
+			m_logicLastFire[key] = now;
+		}
+		last = on;
+		const auto it = m_logicLastFire.find(key);
+		const float fade = (it == m_logicLastFire.end()) ? 0.0f : 1.0f - (float)(now - it->second);
+		ImVec4 base = on ? colOn : colOff;
+		if (!inState) {
+			base.w = 0.45f;
+		}
+		if (fade > 0.0f) {
+			base.x += (colFire.x - base.x) * fade;
+			base.y += (colFire.y - base.y) * fade;
+			base.z += (colFire.z - base.z) * fade;
+			base.w = 1.0f;
+		}
+		return base;
+	};
+
+	/* States: 30 boxes, the active ones lit. */
+	const unsigned int state = gameObj->GetState();
+	ImGui::TextUnformatted("State");
+	for (int i = 0; i < 30; ++i) {
+		if (i % 15 != 0) {
+			ImGui::SameLine(0.0f, 2.0f);
+		}
+		else if (i != 0) {
+			ImGui::Dummy(ImVec2(37.0f, 0.0f));
+			ImGui::SameLine(0.0f, 2.0f);
+		}
+		else {
+			ImGui::SameLine();
+		}
+		const bool lit = (state & (1u << i)) != 0;
+		ImGui::PushID(i);
+		ImGui::PushStyleColor(ImGuiCol_Button, lit ? ImVec4(0.25f, 0.6f, 0.25f, 1.0f) : ImVec4(0.2f, 0.2f, 0.2f, 1.0f));
+		ImGui::Button(lit ? "#" : " ", ImVec2(14.0f, 14.0f));
+		if (ImGui::IsItemHovered()) {
+			ImGui::SetTooltip("State %d%s", i + 1, lit ? " (active)" : "");
+		}
+		ImGui::PopStyleColor();
+		ImGui::PopID();
+	}
+
+	const ImGuiTableFlags tableFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_SizingStretchProp;
+
+	/* Sensors: positive now. */
+	if (!gameObj->GetSensors().empty() && ImGui::BeginTable("LogicSensors", 2, tableFlags)) {
+		ImGui::TableSetupColumn("Sensor");
+		ImGui::TableSetupColumn("Positive");
+		ImGui::TableHeadersRow();
+		for (SCA_ISensor *sens : gameObj->GetSensors()) {
+			const bool on = sens->GetState();
+			const ImVec4 col = rowColor(sens, on, !sens->IsNoLink());
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", sens->GetName().c_str());
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", on ? "yes" : "-");
+		}
+		ImGui::EndTable();
+	}
+
+	/* Controllers: in the active state or not, the highlight follows the linked sensors. */
+	if (!gameObj->GetControllers().empty() && ImGui::BeginTable("LogicControllers", 2, tableFlags)) {
+		ImGui::TableSetupColumn("Controller");
+		ImGui::TableSetupColumn("State");
+		ImGui::TableHeadersRow();
+		for (SCA_IController *cont : gameObj->GetControllers()) {
+			const bool inState = (cont->GetStateMask() & state) != 0;
+			bool on = false;
+			for (SCA_ISensor *sens : cont->GetLinkedSensors()) {
+				on |= sens->GetState();
+			}
+			const ImVec4 col = rowColor(cont, inState && on, inState);
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", cont->GetName().c_str());
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", inState ? "active" : "off");
+		}
+		ImGui::EndTable();
+	}
+
+	/* Actuators: running now, how many times it finished and why it stopped last. */
+	if (!gameObj->GetActuators().empty() && ImGui::BeginTable("LogicActuators", 4, tableFlags)) {
+		ImGui::TableSetupColumn("Actuator");
+		ImGui::TableSetupColumn("Running");
+		ImGui::TableSetupColumn("Finished");
+		ImGui::TableSetupColumn("Last end");
+		ImGui::TableHeadersRow();
+		static const char *endNames[] = {"-", "finished", "cancelled", "failed"};
+		for (SCA_IActuator *act : gameObj->GetActuators()) {
+			const bool on = !act->QEmpty();
+			const ImVec4 col = rowColor(act, on, true);
+			const int reason = act->GetEndReason();
+			ImGui::TableNextRow();
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", act->GetName().c_str());
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", on ? "yes" : "-");
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%u", act->GetFinishCount());
+			ImGui::TableNextColumn();
+			ImGui::TextColored(col, "%s", (reason >= 0 && reason < 4) ? endNames[reason] : "-");
+		}
+		ImGui::EndTable();
+	}
+	ImGui::End();
 }
 
 void KX_DebugMode::RenderObjectProfiling() {

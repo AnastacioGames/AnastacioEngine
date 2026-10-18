@@ -303,3 +303,15 @@ bricks já ligados num grupo com o nome do preset, traduzido:
 
 As propriedades só são criadas quando ainda não existem. Aplicar o mesmo preset duas vezes gera nomes com `.001`.
 Teste em background: os 6 presets criam os bricks, ligações e grupos esperados, e tudo sobrevive a salvar/reabrir.
+
+## F4 — Ver a lógica rodando (feito)
+
+Janela **Logic Bricks** no Debug Mode (`-g show_debug_mode = 1` ou opção da cena), aberta ao selecionar um objeto. Só leitura:
+
+- estados 1-30, ativos acesos;
+- sensores: positivo agora (apagado quando sem ligação no estado ativo);
+- controllers: no estado ativo ou não;
+- actuators: rodando, quantas vezes concluíram e o último encerramento (finished/cancelled/failed);
+- a linha que acabou de ligar pisca em amarelo e some em 1 s.
+
+Nomes de estado e grupos ficam só no editor (não chegam ao jogo).
