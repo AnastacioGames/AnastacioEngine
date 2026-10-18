@@ -94,6 +94,8 @@ e um SSGI e um CSM mais fáceis de usar, além de várias correções de vídeo,
   20 ícones inválidos corrigidos em add-ons e no flowmenu.
 - Add Sounds e o preenchimento automático copiam os sons da engine para o projeto (também com o projeto no
   mesmo disco da engine), então eles não somem no jogo exportado.
+- Os sons de efeito da engine (chuva, trovão, explosão, destruição) agora vão no pacote instalado; antes
+  ficavam de fora e os efeitos tocavam mudos.
 - Curvas não mostram mais Render U/V e propriedades que não valem na game engine.
 - Requisitos do SSGI e notas do Fast Shader Loading em blocos recolhíveis.
 - Outliner sem o rótulo `<unsaved>` no cabeçalho.

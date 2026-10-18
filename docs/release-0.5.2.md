@@ -26,6 +26,11 @@ depois montar os pacotes. Regras gerais em [AGENTS.md](../AGENTS.md); empacotame
   sons de efeito (chuva, trovão, explosão, destruição) ficavam fora do pacote e
   `test_weather_sounds_auto.py` falhava. Corrigido; `container-build-22.04.sh` agora confere
   `sounds/effects/trovao1.wav` no tar.
+- Reteste depois da correção (com `c1d0c692` do Windows incluído): `test_weather_sounds_auto.py` OK,
+  logic F7/bricks2 OK, Material Atlas modal ok/error/cancel/cancel-late OK (com janela, Xvfb), undo/redo OK.
+  Falta só o checklist visual abaixo (usuário).
+- SHA-256 do pacote Linux:
+  `53ba78349b30cf0f55c9136307a1562d4a4bc4b7bb998dc9eaaa3468d663e0a4  AnastacioEngine-0.5.2-linux-x86_64.tar.xz`
 - Como rodar certo: `test_logic_convert_f7/bricks2_codegen.py` precisam de `GEN_OUT=<prefixo>`;
   `test_material_atlas_modal.py` e `test_material_atlas_integration.py -- --undo` precisam de janela
   (sem `-b`; no Linux headless use Xvfb). Com `-b` o atlas roda síncrono (`G.background`) e o modal falha.
