@@ -3918,9 +3918,7 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 	uiFontStyle *fstyle = &style->widget;
 	uiWidgetType *wt = NULL;
 
-#ifdef USE_UI_POPOVER_ONCE
 	const rcti rect_orig = *rect;
-#endif
 
 	/* handle menus separately */
 	if (but->dt == UI_EMBOSS_PULLDOWN) {
@@ -4215,6 +4213,24 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 		wt->text(fstyle, &wt->wcol, but, rect);
 		if (disabled)
 			glDisable(GL_BLEND);
+
+		/* Pinned game layer: orange stripe on the outer edge of the layer grid button. */
+		if (but->drawflag & (UI_BUT_PIN_STRIPE_TOP | UI_BUT_PIN_STRIPE_BOTTOM)) {
+			const int stripe = max_ii(2, (int)(2.0f * U.pixelsize));
+			const int inset = max_ii(1, BLI_rcti_size_x(&rect_orig) / 6);
+			int ymin, ymax;
+			if (but->drawflag & UI_BUT_PIN_STRIPE_TOP) {
+				ymax = rect_orig.ymax;
+				ymin = ymax - stripe;
+			}
+			else {
+				ymin = rect_orig.ymin;
+				ymax = ymin + stripe;
+			}
+			/* Same orange as a pressed toggle, so it follows the theme. */
+			glColor4ubv((unsigned char *)tui->wcol_toggle.inner_sel);
+			glRecti(rect_orig.xmin + inset, ymin, rect_orig.xmax - inset, ymax);
+		}
 
 //		if (state & (UI_BUT_DISABLED | UI_BUT_INACTIVE))
 //			if (but->dt != UI_EMBOSS_PULLDOWN)

@@ -3712,7 +3712,37 @@ class VIEW3D_PT_layer(Panel):
         layout = self.layout
         layout.label("Layers")
         layout.template_layer_layout_object(2, 2)
-        
+
+
+class VIEW3D_PT_game_layers(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Pinned Game Layers"
+    bl_ui_units_x = 10
+
+    def draw(self, context):
+        layout = self.layout
+        gs = context.scene.game_settings
+        row = layout.row()
+        row.label("Pinned Game Layers", icon='PINNED')
+        if any(gs.start_layers):
+            row.operator("view3d.game_layers_unpin", text="", icon='X', emboss=False)
+        layout.template_layer_layout_game(2, 2)
+        if not any(gs.start_layers):
+            layout.label("None pinned: Play uses the visible layers")
+
+
+class VIEW3D_OT_game_layers_unpin(bpy.types.Operator):
+    """Unpin all game layers (Play uses the visible layers again)"""
+    bl_idname = "view3d.game_layers_unpin"
+    bl_label = "Unpin Game Layers"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        context.scene.game_settings.start_layers = [False] * 20
+        return {'FINISHED'}
+
+
 class VIEW3D_PT_shading(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
@@ -4087,6 +4117,7 @@ class VIEW3D_PT_layer_names(Panel):
         scene = context.scene
         space = context.space_data
         view = scene if space.lock_camera_and_layers else space
+        game = scene.game_settings
 
         counts = [0] * 20
         for ob in scene.objects:
@@ -4109,6 +4140,9 @@ class VIEW3D_PT_layer_names(Panel):
             sub.ui_units_x = 1.5
             sub.alignment = 'RIGHT'
             sub.label(text="%d" % counts[i] if counts[i] else "-")
+            pinned = game.start_layers[i]
+            row.prop(game, "start_layers", index=i, text="", toggle=True, emboss=pinned,
+                     icon='PINNED' if pinned else 'UNPINNED')
 
 
 class VIEW3D_PT_quad_view(Panel):
@@ -4368,6 +4402,8 @@ classes = (
     VIEW3D_PT_view3d_stereo,
     VIEW3D_PT_background_image,
     VIEW3D_PT_layer,
+    VIEW3D_PT_game_layers,
+    VIEW3D_OT_game_layers_unpin,
     VIEW3D_PT_shading,
     VIEW3D_PT_overlay,
     VIEW3D_PT_pivot_point,

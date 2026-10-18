@@ -356,7 +356,12 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 		unsigned int ob_lay = ob ? ob->lay : 0;
 
 		/* Layers */
-		uiTemplateLayers(layout, v3d->scenelock ? &sceneptr : &v3dptr, "layers", &v3dptr, "layers_used", ob_lay);
+		uiTemplateLayers_ex(layout, v3d->scenelock ? &sceneptr : &v3dptr, "layers", &v3dptr, "layers_used", ob_lay,
+		                    (unsigned int)scene->gm.start_lay);
+
+		/* Pinned game layers: popover with a second grid choosing the layers Play starts with. */
+		uiItemPopoverPanel(layout, C, "VIEW3D_PT_game_layers", "",
+		                   scene->gm.start_lay ? ICON_PINNED : ICON_UNPINNED);
 
 		/* Scene lock button removed from the header; it already lives in the
 		 * floating 3D View controls next to the layers popover. */

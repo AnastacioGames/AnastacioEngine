@@ -2904,7 +2904,8 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	}
 	kxscene->SetObstacleSimulation(obstacleSimulation);
 
-	int activeLayerBitInfo = blenderscene->lay;
+	/* Pinned game layers win over the layers left visible in the editor. */
+	int activeLayerBitInfo = blenderscene->gm.start_lay ? blenderscene->gm.start_lay : blenderscene->lay;
 	/* Outliner collections marked "not in game" keep their objects on this layer,
 	 * they start inactive even when the layer is shown in the editor. */
 	if (BKE_scene_collections_game_exclude_any(blenderscene)) {

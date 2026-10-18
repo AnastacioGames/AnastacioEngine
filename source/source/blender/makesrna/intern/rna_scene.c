@@ -5240,6 +5240,15 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "(keep it low for Web and Android)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "start_layers", PROP_BOOLEAN, PROP_LAYER_MEMBER);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_boolean_sdna(prop, NULL, "start_lay", 1);
+	RNA_def_property_array(prop, 20);
+	RNA_def_property_ui_text(prop, "Pinned Game Layers",
+	                         "Layers the game starts with, whatever layers are visible in the editor "
+	                         "(none pinned: the visible layers are used) - Shift-Click to pin several");
+	RNA_def_property_update(prop, NC_SCENE | ND_LAYER, NULL);
+
 	prop = RNA_def_property(srna, "network", PROP_POINTER, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_NEVER_NULL);
 	RNA_def_property_pointer_sdna(prop, NULL, "network");

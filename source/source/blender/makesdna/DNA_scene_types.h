@@ -1078,6 +1078,10 @@ typedef struct GameData {
 	char cursorimage_path[1024]; /* FILE_MAX */
 	int cursor_size;
 	int cursor_offset_x, cursor_offset_y;
+	/* Pinned game layers: bitmask of the layers the game starts with; 0 (old files) uses the visible
+	 * scene layers. Lets the editor show other layers without changing what Play loads. */
+	int start_lay;
+	int pad_start_lay;
 
 	/* Multiplayer */
 	struct RangeNetworkSettings network;

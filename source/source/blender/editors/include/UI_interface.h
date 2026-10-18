@@ -248,6 +248,9 @@ enum {
 	UI_BUT_ICON_REVERSE      = (1 << 24), /* Reverse order of consecutive off/on icons */
 
 	UI_BUT_ANIMATED_CHANGED  = (1 << 25), /* Value is animated, but the current value differs from the animated one. */
+
+	UI_BUT_PIN_STRIPE_TOP    = (1 << 26), /* Pinned game layer: orange stripe on the top edge. */
+	UI_BUT_PIN_STRIPE_BOTTOM = (1 << 27), /* Pinned game layer: orange stripe on the bottom edge. */
 };
 
 /* scale fixed button widths by this to account for DPI */
@@ -1088,6 +1091,9 @@ void uiTemplateCryptoPicker(uiLayout *layout, struct PointerRNA *ptr, const char
 void uiTemplateLayers(
         uiLayout *layout, struct PointerRNA *ptr, const char *propname,
         PointerRNA *used_ptr, const char *used_propname, int active_layer);
+void uiTemplateLayers_ex(
+        uiLayout *layout, struct PointerRNA *ptr, const char *propname,
+        PointerRNA *used_ptr, const char *used_propname, int active_layer, unsigned int pinned_layers);
 
 /*
  * LATE :
@@ -1103,6 +1109,11 @@ void uiTemplateLayerLayout(
                            const int group,
                            const int column);
 void uiTemplateLayerLayoutObject(
+                           uiLayout *layout,
+                           struct bContext *C,
+                           const int group,
+                           const int column);
+void uiTemplateLayerLayoutGame(
                            uiLayout *layout,
                            struct bContext *C,
                            const int group,

@@ -1441,6 +1441,13 @@ void uiTemplateLayerLayoutObject(
                            const int group,
                            const int column) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (uiTemplateLayerLayoutGame) */
+void uiTemplateLayerLayoutGame(
+                           struct uiLayout *layout,
+                           struct bContext *C,
+                           const int group,
+                           const int column) RET_NONE
+#endif
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (uiTemplateLayerLayoutBone) */
 void uiTemplateLayerLayoutBone(
                            struct uiLayout *layout,

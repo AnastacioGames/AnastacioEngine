@@ -2704,6 +2704,14 @@ void uiTemplateLayers(
         uiLayout *layout, PointerRNA *ptr, const char *propname,
         PointerRNA *used_ptr, const char *used_propname, int active_layer)
 {
+	uiTemplateLayers_ex(layout, ptr, propname, used_ptr, used_propname, active_layer, 0);
+}
+
+/* pinned_layers: layers drawn with an orange stripe on the outer edge (pinned game layers). */
+void uiTemplateLayers_ex(
+        uiLayout *layout, PointerRNA *ptr, const char *propname,
+        PointerRNA *used_ptr, const char *used_propname, int active_layer, unsigned int pinned_layers)
+{
 	uiLayout *uRow, *uCol;
 	PropertyRNA *prop, *used_prop = NULL;
 	int groups, cols, layers;
@@ -2764,6 +2772,9 @@ void uiTemplateLayers(
 				UI_but_func_set(but, handle_layer_buttons, but, POINTER_FROM_INT(layer));
 				but->type = UI_BTYPE_TOGGLE;
 				ui_layer_name_tooltip_set(but, ptr, layer);
+				if (pinned_layers & (unsigned int)butlay) {
+					but->drawflag |= (row == 0) ? UI_BUT_PIN_STRIPE_TOP : UI_BUT_PIN_STRIPE_BOTTOM;
+				}
 			}
 		}
 	}
@@ -2906,6 +2917,26 @@ void uiTemplateLayerLayoutObject(uiLayout *layout,
 	const uint layers_active = object ? object->lay : 0;
 
 	ui_template_layer_layout_ex(layout, v3d->scenelock ? &sceneptr : &v3dptr, "layers", layers_used, layers_active, column, group);
+}
+
+/* Pinned game layers (scene.game_settings.start_layers): the layers Play starts with. */
+void uiTemplateLayerLayoutGame(uiLayout *layout,
+                               bContext *C,
+                               const int group,
+                               const int column)
+{
+	Scene *scene = CTX_data_scene(C);
+	ScrArea *sa = CTX_wm_area(C);
+	View3D *v3d = (sa && sa->spacetype == SPACE_VIEW3D) ? sa->spacedata.first : NULL;
+	Object *object = OBACT;
+
+	PointerRNA gameptr;
+	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);
+
+	const uint layers_used = v3d ? v3d->lay_used : 0;
+	const uint layers_active = object ? object->lay : 0;
+
+	ui_template_layer_layout_ex(layout, &gameptr, "start_layers", layers_used, layers_active, column, group);
 }
 
 /*

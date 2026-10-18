@@ -907,6 +907,11 @@ void RNA_api_ui_layout(StructRNA *srna)
 	parm = RNA_def_int(func, "group", 1, 1, INT_MAX, "Group Per Column", "How many group the column would be divided to", 1, INT_MAX);
 	parm = RNA_def_int(func, "column", 1, 1, INT_MAX, "Column", "How many column the layer would be drawn on", 1, INT_MAX);
 
+	func = RNA_def_function(srna, "template_layer_layout_game", "uiTemplateLayerLayoutGame");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+	parm = RNA_def_int(func, "group", 1, 1, INT_MAX, "Group Per Column", "How many group the column would be divided to", 1, INT_MAX);
+	parm = RNA_def_int(func, "column", 1, 1, INT_MAX, "Column", "How many column the layer would be drawn on", 1, INT_MAX);
+
 	func = RNA_def_function(srna, "template_layer_layout_bone", "uiTemplateLayerLayoutBone");
 	api_ui_item_rna_common(func);
 	parm = RNA_def_int(func, "group", 1, 1, INT_MAX, "Group Per Column", "How many group the column would be divided to", 1, INT_MAX);
