@@ -29,6 +29,24 @@ No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
 
+## Novidades da 0.5.2 (em teste, ainda não lançada)
+
+- **Logic Bricks 2.0:** grupos recolhíveis, actuator Wait e modo Finished para encadear ações, botão Then,
+  actuator Video, presets, histórico, janela de lógica no Debug Mode e **Highlight Active** (os bricks
+  acendem quando disparam). O conversor para Python entende os bricks novos.
+- **Video Player:** componente nativo com fade para cutscenes, legendas `.srt` e controle por Logic Bricks;
+  o export copia os vídeos.
+- **Texto do jogo:** atlas bitmap gerado da fonte (cirílico e kana), preview na viewport.
+- **SSGI e CSM:** SSGI com Check Scene, Denoise e resultado mais suave; CSM com 2 ou 3 cascatas,
+  referência pela luz Sun e Auto Bias.
+- **Som:** chuva, trovão, explosão e destruição já vêm na engine e tocam sozinhos; liga/desliga por efeito.
+- **Interface:** aba Object em Object/Game/Transform, painéis de sombra e clima reorganizados, Game Layers
+  fixadas, Ragdoll com presets.
+- **Correções:** vídeos não caem mais para ~1 FPS nem engasgam no loop, CSM sem cascatas clareadas, ícone
+  inválido não some com o painel, sons da engine vão junto no jogo exportado, PNG no runtime Web.
+
+Lista completa em [docs/release-notes-0.5.2.md](docs/release-notes-0.5.2.md).
+
 ## Novidades da 0.5.1
 
 Versão de correções sobre a 0.5.0, com foco em estabilidade no Linux, export Web/Android e no shading PBR.

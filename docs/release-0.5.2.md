@@ -79,7 +79,7 @@ extrair numa pasta limpa e conferir:
 2. Windows: `python tools/stage_release_windows.py 0.5.2` + `python tools/stage_release_web.py <pasta>`;
    validar extraindo o zip (pasta `blender.crt/`).
 3. Linux: tar.xz do container + `sha256sum`; juntar no `SHA256SUMS.txt` com Windows e RangeArmor.
-4. Atualizar o README (downloads e "Novidades da 0.5.2"), criar a tag `v0.5.2` e a release no GitHub.
+4. README: trocar os links de download para 0.5.2 e tirar o "(em teste...)" da seção Novidades; corpo da release = `docs/release-notes-0.5.2.md`. Atualizar o README (downloads), criar a tag `v0.5.2` e a release no GitHub.
 
 ## Pendências conhecidas (não bloqueiam)
 
