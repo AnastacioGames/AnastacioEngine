@@ -69,6 +69,7 @@ _modules = [
     "properties_texture",
     "properties_world",
     "properties_world_sound",
+    "properties_video_player",
     "space_clip",
     "space_console",
     "space_dopesheet",
