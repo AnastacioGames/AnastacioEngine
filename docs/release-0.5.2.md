@@ -211,3 +211,25 @@ No PC com Windows, para terminar:
   (com o `Launcher-linux` do rascunho), corrigir o `SHA256SUMS.txt` (linha Windows nova + RangeArmor),
   `gh release upload v0.5.2 ... --clobber`, apagar o asset `Launcher-linux` do rascunho e publicar com
   `gh release edit v0.5.2 --draft=false --latest`.
+
+## Pacotes finais (Windows, 2026-10-18, depois de f4f1181b)
+
+- Windows recompilado com as correções do Linux (física do `.cooked`, Standalone): ctest 15/15,
+  `tools/test_*.py` sem erro, zip extraído conferido (About 0.5.2, `blender.crt/`, sons, `web/`).
+- RangeArmor 0.5.2: scripts novos, `Launcher.exe` recompilado, `Launcher` Linux do rascunho
+  (`3cb1ade9…`, bate com o registrado), raiz `RangeArmor-0.5.2-windows-x64/`.
+- `SHA256SUMS.txt` final (em `build/release-staging/SHA256SUMS.txt`):
+
+  ```
+  1a4f7f00ab82466658aac096528200748d9e5833312ccc4b048ed29b5fa3c0e7  AnastacioEngine-0.5.2-linux-x86_64.tar.xz
+  5a6d7756ae99bfec4582cae6bb6b91f08224afce53c36f83a199f25f8d24b3c0  AnastacioEngine-0.5.2-windows-x64.zip
+  4e04cf1518ad321a7678221d5a3fb310e6fe5a6b26011d23707ba98750a97a8d  RangeArmor-0.5.2-windows-x64.zip
+  ```
+
+- Falta: subir para o rascunho e publicar (precisa da autorização do usuário):
+
+  ```bash
+  gh release upload v0.5.2 build/dist/AnastacioEngine-0.5.2-windows-x64.zip build/dist/RangeArmor-0.5.2-windows-x64.zip build/release-staging/SHA256SUMS.txt --clobber
+  gh release delete-asset v0.5.2 Launcher-linux -y
+  gh release edit v0.5.2 --draft=false --latest
+  ```
