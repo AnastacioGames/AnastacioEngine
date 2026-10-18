@@ -2895,7 +2895,7 @@ static void draw_actuator_brick(bContext *C, uiBlock *block, uiLayout *layout, O
 
 /* ****************** Brick groups ****************** */
 
-/* Bricks with a group name are drawn under a collapsible header, after the bricks without a group.
+/* Bricks with a group name are drawn under a collapsible header, at the place of the first brick of the group.
  * This only changes the drawing: the execution order is still the order of the lists.
  * Wires that go to (or come from) a brick inside a collapsed group end at the group header. */
 
@@ -2968,6 +2968,99 @@ static void do_actuator_group_toggle(bContext *C, void *ob_v, void *group_v)
 	WM_event_add_notifier(C, NC_LOGIC, NULL);
 }
 
+/* Moves a whole group one position up or down in the column. The column shows the list in order, with
+ * each group drawn at the place of its first brick, so the items of the column are the ungrouped bricks
+ * and the groups. Moving up puts the bricks of the group just before the item above it; moving down puts
+ * the item below (one brick or all the bricks of a group) just before the group. */
+static void logic_group_move(ListBase *lb, size_t group_ofs, const char *group_v, int dir)
+{
+#define LINK_GROUP(l) ((const char *)(l) + group_ofs)
+	char name[32];
+	Link *link, *next, *first_cur = NULL, *anchor = NULL, *single = NULL;
+
+	BLI_strncpy(name, group_v, sizeof(name));
+
+	for (link = lb->first; link; link = link->next) {
+		const char *g = LINK_GROUP(link);
+		bool starts_item = true;
+
+		if (g[0] != '\0') {
+			Link *l2;
+			for (l2 = lb->first; l2 != link; l2 = l2->next) {
+				if (STREQ(LINK_GROUP(l2), g)) { starts_item = false; break; }
+			}
+		}
+		if (!starts_item) continue;
+
+		if (first_cur == NULL) {
+			if (STREQ(g, name)) {
+				first_cur = link;
+				if (dir < 0) break;
+			}
+			else {
+				anchor = link;  /* last item above the group */
+			}
+		}
+		else {
+			/* first item below the group */
+			if (g[0] == '\0') single = link;
+			else BLI_strncpy(name, g, sizeof(name));
+			anchor = first_cur;
+			break;
+		}
+	}
+	if (first_cur == NULL || anchor == NULL || (dir > 0 && anchor != first_cur)) return;
+
+	if (single) {
+		BLI_remlink(lb, single);
+		BLI_insertlinkbefore(lb, anchor, single);
+	}
+	else {
+		/* every brick of 'name' after 'anchor' goes just before it, keeping their order */
+		for (link = anchor->next; link; link = next) {
+			next = link->next;
+			if (STREQ(LINK_GROUP(link), name)) {
+				BLI_remlink(lb, link);
+				BLI_insertlinkbefore(lb, anchor, link);
+			}
+		}
+	}
+#undef LINK_GROUP
+}
+
+#define GROUP_MOVE_FUNC(fname, list, type, dir) \
+	static void fname(bContext *C, void *ob_v, void *group_v) \
+	{ \
+		Object *ob = ob_v; \
+		logic_group_move(&ob->list, offsetof(type, group), group_v, dir); \
+		WM_event_add_notifier(C, NC_LOGIC, NULL); \
+		ED_undo_push(C, "Move Brick Group"); \
+	}
+
+GROUP_MOVE_FUNC(do_sensor_group_up, sensors, bSensor, -1)
+GROUP_MOVE_FUNC(do_sensor_group_down, sensors, bSensor, 1)
+GROUP_MOVE_FUNC(do_controller_group_up, controllers, bController, -1)
+GROUP_MOVE_FUNC(do_controller_group_down, controllers, bController, 1)
+GROUP_MOVE_FUNC(do_actuator_group_up, actuators, bActuator, -1)
+GROUP_MOVE_FUNC(do_actuator_group_down, actuators, bActuator, 1)
+
+#undef GROUP_MOVE_FUNC
+
+/* up/down arrows that change the position of the group in the column, joined to the header button */
+static void draw_group_move_buttons(uiBlock *block, uiLayout *layout, char *group, Object *ob,
+                                    uiButHandleFunc up, uiButHandleFunc down)
+{
+	uiBut *but;
+
+	UI_block_layout_set_current(block, layout);
+	but = uiDefIconBut(block, UI_BTYPE_BUT, 0, ICON_TRIA_UP, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0,
+	                   TIP_("Move this group up"));
+	UI_but_func_set(but, up, ob, group);
+	but = uiDefIconBut(block, UI_BTYPE_BUT, 0, ICON_TRIA_DOWN, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0,
+	                   TIP_("Move this group down"));
+	UI_but_func_set(but, down, ob, group);
+}
+
 /* draws the header button in the current layout of the block */
 static void draw_group_header_button(uiBlock *block, char *group, bool hidden, int count,
                                      uiButHandleFunc func, Object *ob)
@@ -2992,16 +3085,15 @@ static void draw_sensor_column(bContext *C, SpaceLogic *slogic, uiBlock *block, 
 	bool seen;
 
 	for (sens = ob->sensors.first; sens; sens = sens->next) {
-		if (sens->group[0] == '\0' && sensor_is_shown(slogic, block, ob, sens))
-			draw_sensor_brick(C, block, layout, ob, sens, logic_ptr);
-	}
-
-	for (sens = ob->sensors.first; sens; sens = sens->next) {
 		uiLayout *split, *head, *outrow;
 		bool hidden = (sens->flag & SENS_GROUP_HIDE) != 0;
 		int count = 0;
 
-		if (sens->group[0] == '\0') continue;
+		if (sens->group[0] == '\0') {
+			if (sensor_is_shown(slogic, block, ob, sens))
+				draw_sensor_brick(C, block, layout, ob, sens, logic_ptr);
+			continue;
+		}
 		GROUP_SEEN_BEFORE(bSensor, ob->sensors.first, sens, seen);
 		if (seen) continue;
 
@@ -3011,11 +3103,12 @@ static void draw_sensor_column(bContext *C, SpaceLogic *slogic, uiBlock *block, 
 		if (count == 0) continue;
 
 		split = uiLayoutSplit(layout, 0.95f, false);
-		head = uiLayoutRow(split, false);
+		head = uiLayoutRow(split, true);
 		outrow = uiLayoutRow(split, true);
 
 		UI_block_layout_set_current(block, head);
 		draw_group_header_button(block, sens->group, hidden, count, do_sensor_group_toggle, ob);
+		draw_group_move_buttons(block, head, sens->group, ob, do_sensor_group_up, do_sensor_group_down);
 
 		UI_block_layout_set_current(block, outrow);
 		if (hidden) {
@@ -3048,16 +3141,15 @@ static void draw_controller_column(uiBlock *block, uiLayout *layout, Object *ob,
 	bool seen;
 
 	for (cont = ob->controllers.first; cont; cont = cont->next) {
-		if (cont->group[0] == '\0' && controller_is_shown(ob, cont))
-			draw_controller_brick(block, layout, ob, cont, xco, width, yco);
-	}
-
-	for (cont = ob->controllers.first; cont; cont = cont->next) {
 		uiLayout *split, *subsplit, *inrow, *head, *outrow;
 		bool hidden = (cont->flag & CONT_GROUP_HIDE) != 0;
 		int count = 0;
 
-		if (cont->group[0] == '\0') continue;
+		if (cont->group[0] == '\0') {
+			if (controller_is_shown(ob, cont))
+				draw_controller_brick(block, layout, ob, cont, xco, width, yco);
+			continue;
+		}
 		GROUP_SEEN_BEFORE(bController, ob->controllers.first, cont, seen);
 		if (seen) continue;
 
@@ -3069,11 +3161,12 @@ static void draw_controller_column(uiBlock *block, uiLayout *layout, Object *ob,
 		split = uiLayoutSplit(layout, 0.05f, false);
 		inrow = uiLayoutRow(split, true);
 		subsplit = uiLayoutSplit(split, 0.95f, false);
-		head = uiLayoutRow(subsplit, false);
+		head = uiLayoutRow(subsplit, true);
 		outrow = uiLayoutRow(subsplit, true);
 
 		UI_block_layout_set_current(block, head);
 		draw_group_header_button(block, cont->group, hidden, count, do_controller_group_toggle, ob);
+		draw_group_move_buttons(block, head, cont->group, ob, do_controller_group_up, do_controller_group_down);
 
 		if (hidden) {
 			/* the wires of the hidden controllers arrive at and leave from the group header */
@@ -3111,16 +3204,15 @@ static void draw_actuator_column(bContext *C, SpaceLogic *slogic, uiBlock *block
 	bool seen;
 
 	for (act = ob->actuators.first; act; act = act->next) {
-		if (act->group[0] == '\0' && actuator_is_shown(slogic, ob, act))
-			draw_actuator_brick(C, block, layout, ob, act, logic_ptr);
-	}
-
-	for (act = ob->actuators.first; act; act = act->next) {
 		uiLayout *split, *inrow, *head;
 		bool hidden = (act->flag & ACT_GROUP_HIDE) != 0;
 		int count = 0;
 
-		if (act->group[0] == '\0') continue;
+		if (act->group[0] == '\0') {
+			if (actuator_is_shown(slogic, ob, act))
+				draw_actuator_brick(C, block, layout, ob, act, logic_ptr);
+			continue;
+		}
 		GROUP_SEEN_BEFORE(bActuator, ob->actuators.first, act, seen);
 		if (seen) continue;
 
@@ -3131,10 +3223,11 @@ static void draw_actuator_column(bContext *C, SpaceLogic *slogic, uiBlock *block
 
 		split = uiLayoutSplit(layout, 0.05f, false);
 		inrow = uiLayoutRow(split, true);
-		head = uiLayoutRow(split, false);
+		head = uiLayoutRow(split, true);
 
 		UI_block_layout_set_current(block, head);
 		draw_group_header_button(block, act->group, hidden, count, do_actuator_group_toggle, ob);
+		draw_group_move_buttons(block, head, act->group, ob, do_actuator_group_up, do_actuator_group_down);
 
 		if (hidden) {
 			/* the wires of the hidden actuators arrive at the group header */
