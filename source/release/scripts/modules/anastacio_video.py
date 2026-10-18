@@ -14,9 +14,13 @@ From Logic Bricks, with a Message actuator (To empty = every Video Player, or th
     video_seek  body "5" jumps to 5 s, "+2" / "-2" moves from the current time
 
 A video that ends (not looping) sends video_finished, with the object's name as body.
+
+Subtitles: a .srt file (the Subtitles field, or one with the video's name next to it) is drawn
+at the bottom of the screen in sync with the video.
 """
 from collections import OrderedDict
 import os
+import re
 
 import Range
 from Range import logic, texture
@@ -65,6 +69,45 @@ void main()
 """
 
 
+SRT_TIME = re.compile(r"(\d+):(\d+):(\d+)[,.](\d+)\s*-->\s*(\d+):(\d+):(\d+)[,.](\d+)")
+SRT_TAG = re.compile(r"<[^>]*>|\{\\[^}]*\}")
+
+
+def subtitle_path(video_path, subtitles=""):
+    """The .srt of a video: the given file, else one with the video's name next to it."""
+    if subtitles:
+        return resolve_path(subtitles)
+    path = os.path.splitext(video_path)[0] + ".srt"
+    return path if os.path.isfile(path) else ""
+
+
+def load_srt(path):
+    """[(start, end, [lines])] of a .srt file, in seconds."""
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            with open(path, encoding=encoding) as handle:
+                text = handle.read()
+            break
+        except UnicodeDecodeError:
+            continue
+    cues = []
+    for block in re.split(r"\n\s*\n", text.replace("\r", "")):
+        lines = block.strip().split("\n")
+        for i, line in enumerate(lines):
+            match = SRT_TIME.search(line)
+            if match:
+                g = [int(v) for v in match.groups()]
+                start = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000.0
+                end = g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000.0
+                body = [SRT_TAG.sub("", l).strip() for l in lines[i + 1:]]
+                body = [l for l in body if l]
+                if body:
+                    cues.append((start, end, body))
+                break
+    cues.sort(key=lambda cue: cue[0])
+    return cues
+
+
 def resolve_path(path):
     """Absolute path of a video: as written, else in the videos folder the export fills."""
     full = logic.expandPath(path) if path else ""
@@ -91,6 +134,9 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         ("Skip Key", "ESCKEY"),
         ("Pause Scene", False),
         ("Fill Screen", False),
+        ("Fade", 0.5),
+        ("Subtitles", ""),
+        ("Subtitle Size", 1.0),
     ])
     anastacio_video = True
     runtime_version = RUNTIME_VERSION
@@ -110,6 +156,11 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         self._playing = False
         self._time_scale = None
         self._seeked = False
+        self._alpha = 0.0
+        self._fade_dir = 0
+        self._fade_clock = None
+        self._cues = []
+        self._draw_registered = False
 
         self.fullscreen = bool(args.get("Fullscreen", False))
         self.loop = bool(args.get("Loop", False))
@@ -119,6 +170,7 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         self.skippable = bool(args.get("Skippable", True))
         self.pause_scene = bool(args.get("Pause Scene", False))
         self.fill_screen = bool(args.get("Fill Screen", False))
+        self.fade = max(0.0, float(args.get("Fade", 0.5)))
         self.skip_key = getattr(Range.events, str(args.get("Skip Key", "ESCKEY")).upper(), Range.events.ESCKEY)
         self.path = resolve_path(args.get("File", ""))
         try:
@@ -137,6 +189,15 @@ class VideoPlayer(Range.types.KX_PythonComponent):
             self._update_image()
             if self.fullscreen:
                 self._ensure_filter()
+            subs = subtitle_path(self.path, args.get("Subtitles", ""))
+            if subs:
+                if not os.path.isfile(subs):
+                    print("Video Player: subtitles not found: %r" % args.get("Subtitles", ""))
+                else:
+                    self._cues = load_srt(subs)
+                    self.subtitle_size = max(0.1, float(args.get("Subtitle Size", 1.0)))
+                    self.object.scene.post_draw.append(self._draw_subtitles)
+                    self._draw_registered = True
             if args.get("Autoplay", True):
                 self._start_playing()
             else:
@@ -240,7 +301,7 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         self.finished = False
         if self.fullscreen:
             self._ensure_filter()
-            self._filter.setUniform("video_alpha", 1.0)
+            self._set_fade(1)
             if self.pause_scene and self._time_scale is None:
                 self._time_scale = logic.getTimeScale()
                 logic.setTimeScale(0.0)
@@ -253,7 +314,29 @@ class VideoPlayer(Range.types.KX_PythonComponent):
 
     def _hide(self):
         if self._filter is not None:
-            self._filter.setUniform("video_alpha", 0.0)
+            self._set_fade(-1)
+
+    def _set_fade(self, direction):
+        """Fade the fullscreen video in (1) or out (-1); without Fade it switches at once."""
+        if self.fade <= 0.0:
+            self._alpha = 1.0 if direction > 0 else 0.0
+            self._fade_dir = 0
+            self._filter.setUniform("video_alpha", self._alpha)
+            return
+        self._fade_dir = direction
+        self._fade_clock = None
+
+    def _step_fade(self):
+        # real time: Pause Scene stops the game clock while the cutscene plays
+        import time
+        now = time.perf_counter()
+        last, self._fade_clock = self._fade_clock, now
+        if last is None:
+            return
+        self._alpha = min(1.0, max(0.0, self._alpha + self._fade_dir * (now - last) / self.fade))
+        self._filter.setUniform("video_alpha", self._alpha)
+        if self._alpha in (0.0, 1.0):
+            self._fade_dir = 0
 
     def _ensure_filter(self):
         if self._filter is not None:
@@ -347,6 +430,8 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         if self._video is None:
             return
         self._read_messages()
+        if self._fade_dir and self._filter is not None:
+            self._step_fade()
         if not self._playing:
             if self._seeked:
                 self._seeked = False
@@ -377,9 +462,68 @@ class VideoPlayer(Range.types.KX_PythonComponent):
             except aud.error:
                 self._handle = None
 
+    @property
+    def subtitle(self):
+        """Lines of the subtitle shown now, [] when none."""
+        t = self.time
+        for start, end, lines in self._cues:
+            if start > t:
+                break
+            if t < end:
+                return lines
+        return []
+
+    def _draw_subtitles(self, *args):
+        if not (self._playing or self._seeked or (self.fullscreen and self._alpha > 0.0)):
+            return
+        if self.fullscreen and self._alpha <= 0.0:
+            return
+        lines = self.subtitle
+        if not lines:
+            return
+        import bgl
+        import blf
+        width = Range.render.getWindowWidth()
+        height = Range.render.getWindowHeight()
+        size = max(8, int(height * 0.045 * self.subtitle_size))
+        alpha = self._alpha if self.fullscreen else 1.0
+        bgl.glMatrixMode(bgl.GL_PROJECTION)
+        bgl.glPushMatrix()
+        bgl.glLoadIdentity()
+        bgl.glOrtho(0, width, 0, height, -1, 1)
+        bgl.glMatrixMode(bgl.GL_MODELVIEW)
+        bgl.glPushMatrix()
+        bgl.glLoadIdentity()
+        bgl.glDisable(bgl.GL_DEPTH_TEST)
+        bgl.glEnable(bgl.GL_BLEND)
+        font = 0
+        blf.size(font, size, 72)
+        shadow = max(1, size // 14)
+        y = height * 0.06
+        for line in reversed(lines):
+            x = (width - blf.dimensions(font, line)[0]) / 2
+            bgl.glColor4f(0.0, 0.0, 0.0, 0.85 * alpha)
+            for dx, dy in ((shadow, -shadow), (-shadow, -shadow), (shadow, shadow), (-shadow, shadow)):
+                blf.position(font, x + dx, y + dy, 0)
+                blf.draw(font, line)
+            bgl.glColor4f(1.0, 1.0, 1.0, alpha)
+            blf.position(font, x, y, 0)
+            blf.draw(font, line)
+            y += size * 1.25
+        bgl.glEnable(bgl.GL_DEPTH_TEST)
+        bgl.glMatrixMode(bgl.GL_PROJECTION)
+        bgl.glPopMatrix()
+        bgl.glMatrixMode(bgl.GL_MODELVIEW)
+        bgl.glPopMatrix()
+
     def dispose(self):
         if not hasattr(self, "_handle"):  # the game ended before start()
             return
+        if self._draw_registered:
+            try:
+                self.object.scene.post_draw.remove(self._draw_subtitles)
+            except (ValueError, SystemError):
+                pass
         if self._handle:
             self._handle.stop()
         self._restore_scene()

@@ -58,25 +58,43 @@ def copy_videos(game_dir, report=None):
             if report:
                 report({'WARNING'}, "Video Player of %s: file not found: %s" % (ob.name, value))
             continue
-        try:
-            inside = os.path.commonpath([src, game_dir]) == game_dir
-        except ValueError:  # outra unidade no Windows
-            inside = False
-        if inside:
-            continue
-        name = os.path.basename(src)
-        if copied.get(name.lower(), src) != src:
-            if report:
-                report({'WARNING'}, "Two different videos are named %s; only one goes in the game" % name)
-            continue
-        dest = os.path.join(dest_dir, name)
-        if name.lower() not in copied:
-            os.makedirs(dest_dir, exist_ok=True)
-            if (not os.path.isfile(dest) or os.path.getsize(dest) != os.path.getsize(src) or
-                    os.path.getmtime(dest) < os.path.getmtime(src)):
-                shutil.copy2(src, dest)
-            copied[name.lower()] = src
+        files = [src]
+        subs = component.properties["Subtitles"].value if "Subtitles" in component.properties else ""
+        if subs:
+            subs = os.path.normcase(os.path.abspath(bpy.path.abspath(subs, library=ob.library)))
+            if os.path.isfile(subs):
+                files.append(subs)
+            elif report:
+                report({'WARNING'}, "Video Player of %s: subtitles not found: %s" % (ob.name, subs))
+        elif os.path.isfile(os.path.splitext(src)[0] + ".srt"):
+            files.append(os.path.splitext(src)[0] + ".srt")
+        for src in files:
+            _copy_into(src, game_dir, dest_dir, copied, report)
     return len(copied)
+
+
+def _copy_into(src, game_dir, dest_dir, copied, report):
+    """Copia src para dest_dir, a nao ser que ja esteja dentro de game_dir."""
+    import os
+    import shutil
+    try:
+        inside = os.path.commonpath([src, game_dir]) == game_dir
+    except ValueError:  # outra unidade no Windows
+        inside = False
+    if inside:
+        return
+    name = os.path.basename(src)
+    if copied.get(name.lower(), src) != src:
+        if report:
+            report({'WARNING'}, "Two different files are named %s; only one goes in the game" % name)
+        return
+    dest = os.path.join(dest_dir, name)
+    if name.lower() not in copied:
+        os.makedirs(dest_dir, exist_ok=True)
+        if (not os.path.isfile(dest) or os.path.getsize(dest) != os.path.getsize(src) or
+                os.path.getmtime(dest) < os.path.getmtime(src)):
+            shutil.copy2(src, dest)
+        copied[name.lower()] = src
 
 
 def video_texture_slot(mat):
@@ -193,6 +211,8 @@ class OBJECT_OT_video_player_file(Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     filepath: bpy.props.StringProperty(subtype='FILE_PATH')
+    field: bpy.props.StringProperty(default="File", options={'HIDDEN'})
+    filter_glob: bpy.props.StringProperty(default="", options={'HIDDEN'})
     filter_movie: bpy.props.BoolProperty(default=True, options={'HIDDEN'})
     filter_folder: bpy.props.BoolProperty(default=True, options={'HIDDEN'})
     relative_path: bpy.props.BoolProperty(name="Relative Path", default=True,
@@ -203,6 +223,9 @@ class OBJECT_OT_video_player_file(Operator):
         return video_component(context.object) is not None
 
     def invoke(self, context, event):
+        if self.field == "Subtitles":
+            self.filter_movie = False
+            self.filter_glob = "*.srt"
         context.window_manager.fileselect_add(self)
         return {'RUNNING_MODAL'}
 
@@ -213,7 +236,7 @@ class OBJECT_OT_video_player_file(Operator):
                 path = bpy.path.relpath(path)
             except ValueError:  # outra unidade no Windows
                 pass
-        video_component(context.object).properties["File"].value = path
+        video_component(context.object).properties[self.field].value = path
         return {'FINISHED'}
 
 
@@ -300,12 +323,24 @@ class OBJECT_PT_video_player(Panel):
             col.label(text="Cutscene:", icon='CAMERA_DATA')
             field(col, "Pause Scene")
             field(col, "Fill Screen")
+            field(col, "Fade")
             col = split.column()
             col.label(text="Skip:", icon='FF')
             field(col, "Skippable")
             sub = col.column()
             sub.active = "Skippable" in props and props["Skippable"].value
             field(sub, "Skip Key", text="Key")
+
+        if "Subtitles" in props:
+            box = layout.box()
+            box.label(text="Subtitles:", icon='FONT_DATA')
+            row = box.row(align=True)
+            row.prop(props["Subtitles"], "value", text="File")
+            op = row.operator("object.video_player_file", text="", icon='FILESEL')
+            op.field = "Subtitles"
+            field(box, "Subtitle Size", text="Size")
+            if not props["Subtitles"].value:
+                box.label(text="Empty: uses a .srt with the video's name, if there is one", icon='INFO')
 
         layout.operator("object.video_player_remove", icon='X')
 

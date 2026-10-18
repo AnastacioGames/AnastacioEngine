@@ -1,0 +1,8 @@
+1
+00:00:00,300 --> 00:00:01,900
+Legenda de teste: <i>Olá</i>!
+Segunda linha com acentuação
+
+2
+00:00:02,100 --> 00:00:03,800
+{\an8}Cubo girando — fim do vídeo
