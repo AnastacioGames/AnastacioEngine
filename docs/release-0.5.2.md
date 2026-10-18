@@ -40,6 +40,15 @@ depois montar os pacotes. Regras gerais em [AGENTS.md](../AGENTS.md); empacotame
    (junto com `blender.crt/`, ver [distribution-0.1.md](distribution-0.1.md)).
 4. Rodar de novo `test_weather_sounds_auto.py` com o editor do zip extraído.
 
+## Windows refeito com o install novo (2026-10-18)
+
+- `git pull` (21d7c503), `ninja RangeEngine RangeRuntime install`: 14 sons em `build/bin/2.79/datafiles/sounds/effects/`.
+- Zip `AnastacioEngine-0.5.2-windows-x64.zip` (SHA256 `fa01903f6d9abfb1a8822742b23d5899a625f79ce5549e827e81a6e5e64a665b`)
+  extraído e conferido: `blender.crt/`, `ucrtbase.dll`, `web/` com android-template, 14 sons, sem
+  `AnastacioEngine_BakeTest.exe`, nenhum caminho com `\`; About 0.5.2; `test_weather_sounds_auto.py` com
+  o editor do zip OK (copia `chuva.wav` e `trovao1-3.wav` para `sounds/` do projeto).
+- Falta: refazer o zip da RangeArmor (launcher mudou desde a 0.5.1) e montar o `SHA256SUMS.txt` final.
+
 ## Novidades desde a 0.5.1
 
 ### Logic Bricks 2.0
