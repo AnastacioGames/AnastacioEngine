@@ -7,6 +7,13 @@ Configured by the Video Player panel (Object tab). From a script:
     vp.play(); vp.pause(); vp.stop(); vp.seek(5.0)
     vp.playing, vp.time, vp.duration, vp.finished
     vp.on_finished = callback   # called with the component when a non looping video ends
+
+From Logic Bricks, with a Message actuator (To empty = every Video Player, or the object's name):
+
+    video_play, video_pause, video_toggle, video_stop, video_restart
+    video_seek  body "5" jumps to 5 s, "+2" / "-2" moves from the current time
+
+A video that ends (not looping) sends video_finished, with the object's name as body.
 """
 from collections import OrderedDict
 import os
@@ -19,6 +26,9 @@ RUNTIME_VERSION = (0, 1, 0)
 EXPORT_FOLDER = "videos"
 # Filter pass of the fullscreen video: after the user's own passes.
 FULLSCREEN_PASS = 120
+# Subjects the player answers to (Message actuator) and the one it sends at the end.
+MESSAGE_PREFIX = "video_"
+FINISHED_SUBJECT = "video_finished"
 # Audio is moved back onto the video clock when they drift further apart than this (seconds).
 AUDIO_DRIFT = 0.08
 
@@ -99,6 +109,7 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         self._handle = None
         self._playing = False
         self._time_scale = None
+        self._seeked = False
 
         self.fullscreen = bool(args.get("Fullscreen", False))
         self.loop = bool(args.get("Loop", False))
@@ -178,6 +189,8 @@ class VideoPlayer(Range.types.KX_PythonComponent):
             return
         self.finished = False
         self._video.seek(float(seconds))
+        # paused: VideoFFmpeg decoded the target, update() uploads it once
+        self._seeked = not self._playing
         if self._handle:
             self._handle.position = float(seconds)
 
@@ -299,11 +312,45 @@ class VideoPlayer(Range.types.KX_PythonComponent):
         self._restore_scene()
         if self.fullscreen:
             self._hide()
+        logic.sendMessage(FINISHED_SUBJECT, self.object.name, "", self.object)
         if self.on_finished:
             self.on_finished(self)
 
+    def _read_messages(self):
+        for subject, body in logic.getMessages(self.object.name):
+            if not subject.startswith(MESSAGE_PREFIX) or subject == FINISHED_SUBJECT:
+                continue
+            command = subject[len(MESSAGE_PREFIX):]
+            if command == "play":
+                self.play()
+            elif command == "pause":
+                self.pause()
+            elif command == "toggle":
+                self.pause() if self._playing else self.play()
+            elif command == "stop":
+                self.stop()
+            elif command == "restart":
+                self.seek(0.0)
+                self.play()
+            elif command == "seek":
+                text = body.strip()
+                try:
+                    value = float(text)
+                except ValueError:
+                    print("Video Player: video_seek needs seconds in the body, got %r" % body)
+                    continue
+                if text[:1] in "+-":
+                    value += self.time
+                self.seek(min(max(0.0, value), self.duration or value))
+
     def update(self):
-        if self._video is None or not self._playing:
+        if self._video is None:
+            return
+        self._read_messages()
+        if not self._playing:
+            if self._seeked:
+                self._seeked = False
+                self._update_image()
             return
         if self.fullscreen and self.skippable and logic.keyboard.inputs[self.skip_key].activated:
             self._video.pause()

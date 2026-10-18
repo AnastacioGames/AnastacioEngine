@@ -914,6 +914,23 @@ void VideoFFmpeg::seek(double seconds)
 	// play() continues after m_lastFrame; the frame before the target makes the target show
 	m_lastFrame = long(seconds * m_baseFrameRate) - 1;
 	m_startTime = PIL_check_seconds_timer() - seconds / m_frameRate;
+	// calcImage only decodes while playing: paused or stopped, decode the target now so the
+	// jump shows at once (no cache thread here, play() starts it from this frame)
+	if (m_status != SourcePlaying && m_codecCtx != nullptr) {
+		const long target = m_lastFrame + 1;
+		const bool threaded = m_isThreaded;
+		m_isThreaded = false;
+		AVFrame *frame = grabFrame(target);
+		m_isThreaded = threaded;
+		if (frame != nullptr) {
+			m_lastFrame = target;
+			init(short(m_codecCtx->width), short(m_codecCtx->height));
+			// a frame already shown would block process(): this one replaces it
+			m_avail = false;
+			process((BYTE *)(frame->data[0]));
+			releaseFrame(frame);
+		}
+	}
 }
 
 // set video range

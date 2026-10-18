@@ -79,6 +79,40 @@ def copy_videos(game_dir, report=None):
     return len(copied)
 
 
+def video_texture_slot(mat):
+    """Slot de textura de imagem que o video substitui no jogo (o primeiro do material)."""
+    if mat is None:
+        return None
+    return next((ts for ts in mat.texture_slots if ts and ts.texture and ts.texture.type == 'IMAGE'), None)
+
+
+def ensure_video_texture(mat):
+    """Garante uma textura de imagem no material, que e onde o video aparece no jogo."""
+    if video_texture_slot(mat) is not None:
+        return
+    img = bpy.data.images.get("Video Placeholder") or bpy.data.images.new("Video Placeholder", 16, 16)
+    tex = bpy.data.textures.new("Video", 'IMAGE')
+    tex.image = img
+    slot = mat.texture_slots.add()
+    slot.texture = tex
+    slot.texture_coords = 'UV'
+
+
+def create_video_material(ob):
+    """Material novo, sem sombra e com a textura do video, aplicado no objeto."""
+    mat = bpy.data.materials.new("Video " + ob.name)
+    mat.use_shadeless = True
+    ensure_video_texture(mat)
+    if ob.type == 'MESH':
+        if not ob.data.uv_textures:
+            ob.data.uv_textures.new()
+        if ob.data.materials:
+            ob.data.materials[ob.active_material_index] = mat
+        else:
+            ob.data.materials.append(mat)
+    return mat
+
+
 def _override(context, ob):
     override = context.copy()
     override.update(object=ob, active_object=ob)
@@ -90,6 +124,11 @@ class OBJECT_OT_video_player_add(Operator):
     bl_idname = "object.video_player_add"
     bl_label = "Add Video Player"
     bl_options = {'REGISTER', 'UNDO'}
+
+    create_material = bpy.props.BoolProperty(
+        name="Create Material and Texture",
+        description="Give the object a new material with an image texture for the video to play on",
+        default=True)
 
     @classmethod
     def poll(cls, context):
@@ -104,7 +143,10 @@ class OBJECT_OT_video_player_add(Operator):
             return {'CANCELLED'}
         # Objeto com material comeca na tela dele; sem material, como cutscene em tela cheia.
         props = video_component(ob).properties
+        if self.create_material and ob.type == 'MESH':
+            create_video_material(ob)
         if ob.active_material:
+            ensure_video_texture(ob.active_material)
             props["Material"].value = ob.active_material.name
         else:
             props["Fullscreen"].value = True
@@ -125,6 +167,22 @@ class OBJECT_OT_video_player_remove(Operator):
         ob = context.object
         index = list(ob.game.components).index(video_component(ob))
         bpy.ops.logic.python_component_remove(_override(context, ob), index=index)
+        return {'FINISHED'}
+
+
+class OBJECT_OT_video_player_texture(Operator):
+    """Add an image texture to the material so the video has where to play"""
+    bl_idname = "object.video_player_texture"
+    bl_label = "Add Video Texture"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    material = bpy.props.StringProperty()
+
+    def execute(self, context):
+        mat = bpy.data.materials.get(self.material)
+        if mat is None:
+            return {'CANCELLED'}
+        ensure_video_texture(mat)
         return {'FINISHED'}
 
 
@@ -175,9 +233,14 @@ class OBJECT_PT_video_player(Panel):
     def draw(self, context):
         layout = self.layout
         ob = context.object
+        wm = context.window_manager
         component = video_component(ob)
         if component is None:
-            layout.operator("object.video_player_add", icon='FILE_MOVIE')
+            box = layout.box()
+            if ob.type == 'MESH':
+                box.prop(wm, "video_player_create_material")
+            op = box.operator("object.video_player_add", icon='FILE_MOVIE')
+            op.create_material = ob.type == 'MESH' and wm.video_player_create_material
             return
 
         props = component.properties
@@ -191,28 +254,38 @@ class OBJECT_PT_video_player(Panel):
             if name in props:
                 col.prop(props[name], "value", text=text if text is not None else name)
 
-        row = layout.row(align=True)
-        row.prop(props["File"], "value", text="File")
-        row.operator("object.video_player_file", text="", icon='FILEBROWSER')
-
         fullscreen = props["Fullscreen"].value
-        row = layout.row()
-        row.prop(props["Fullscreen"], "value", text="Fullscreen Cutscene")
+
+        box = layout.box()
+        box.label(text="Video:", icon='FILE_MOVIE')
+        row = box.row(align=True)
+        row.prop(props["File"], "value", text="File")
+        row.operator("object.video_player_file", text="", icon='FILESEL')
+        box.prop(props["Fullscreen"], "value", text="Fullscreen Cutscene")
         if not fullscreen:
             if ob.type == 'MESH':
-                layout.prop_search(props["Material"], "value", ob.data, "materials", text="Material")
+                box.prop_search(props["Material"], "value", ob.data, "materials", text="Material")
+                name = props["Material"].value
+                mat = bpy.data.materials.get(name) if name else ob.active_material
+                if mat is None:
+                    box.label(text="The object needs a material to show the video", icon='ERROR')
+                elif video_texture_slot(mat) is None:
+                    row = box.row()
+                    row.label(text="Material has no image texture", icon='ERROR')
+                    row.operator("object.video_player_texture", icon='TEXTURE').material = mat.name
             else:
-                field(layout, "Material")
+                field(box, "Material")
 
-        split = layout.split()
+        box = layout.box()
+        split = box.split()
         col = split.column()
-        col.label(text="Playback:")
+        col.label(text="Playback:", icon='PLAY')
         field(col, "Autoplay")
         field(col, "Loop")
         field(col, "Speed")
 
         col = split.column()
-        col.label(text="Sound:")
+        col.label(text="Sound:", icon='SOUND')
         field(col, "Play Sound")
         sub = col.column()
         sub.active = "Play Sound" in props and props["Play Sound"].value
@@ -221,26 +294,31 @@ class OBJECT_PT_video_player(Panel):
             field(sub, "3D Sound")
 
         if fullscreen:
-            layout.separator()
-            split = layout.split()
+            box = layout.box()
+            split = box.split()
             col = split.column()
-            col.label(text="Cutscene:")
+            col.label(text="Cutscene:", icon='CAMERA_DATA')
             field(col, "Pause Scene")
             field(col, "Fill Screen")
             col = split.column()
-            col.label(text="Skip:")
+            col.label(text="Skip:", icon='FF')
             field(col, "Skippable")
             sub = col.column()
             sub.active = "Skippable" in props and props["Skippable"].value
             field(sub, "Skip Key", text="Key")
 
-        layout.separator()
         layout.operator("object.video_player_remove", icon='X')
 
+
+bpy.types.WindowManager.video_player_create_material = bpy.props.BoolProperty(
+    name="Create Material and Texture for Player",
+    description="Give the object a new material with an image texture for the video to play on",
+    default=True)
 
 classes = (
     OBJECT_OT_video_player_add,
     OBJECT_OT_video_player_remove,
+    OBJECT_OT_video_player_texture,
     OBJECT_OT_video_player_file,
     OBJECT_PT_video_player,
 )
