@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-18 - 0.5.2 no Linux: sons de efeito fora do pacote
+
+- `creator/CMakeLists.txt` não instalava `release/datafiles/sounds/`: chuva, trovão, explosão e destruição
+  ficavam fora do pacote (Linux e, sem cópia manual no `build/bin`, também o zip Windows). Regra de
+  `install` adicionada; `container-build-22.04.sh` confere `sounds/effects/trovao1.wav` no tar.
+- Pacote Linux 0.5.2: `ctest` 10/10 e testes Python do pacote extraído; detalhes e avisos para o Windows
+  em `docs/release-0.5.2.md`.
+
 ## 2026-10-18 - Sons automáticos com projeto na mesma unidade da engine
 
 - Projeto na mesma unidade da engine: o save deixava o caminho do som da engine relativo e

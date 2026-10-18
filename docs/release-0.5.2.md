@@ -17,6 +17,29 @@ depois montar os pacotes. Regras gerais em [AGENTS.md](../AGENTS.md); empacotame
 - `check_trabalho_repetido.py --selftest` OK; os 4 suspeitos do modo normal já existiam na 0.5.1.
 - `check_docs.py`: 0 erros. `check_ui_icons.py`: 0 ícones inválidos.
 
+## Linux (2026-10-18, container Ubuntu 22.04)
+
+- Pacote `AnastacioEngine-0.5.2-linux-x86_64.tar.xz` gerado; `ctest` 10/10.
+- `tools/test_*.py` com o editor do pacote extraído: baked AO/static, logic F5/F6, Material Atlas
+  (normal, integração, undo, restore), Material Classic, PBR UV, categorias do Object, preview de textura OK.
+- **Bug achado:** `datafiles/sounds/` não tinha regra de `install` no `creator/CMakeLists.txt`, então os
+  sons de efeito (chuva, trovão, explosão, destruição) ficavam fora do pacote e
+  `test_weather_sounds_auto.py` falhava. Corrigido; `container-build-22.04.sh` agora confere
+  `sounds/effects/trovao1.wav` no tar.
+- Como rodar certo: `test_logic_convert_f7/bricks2_codegen.py` precisam de `GEN_OUT=<prefixo>`;
+  `test_material_atlas_modal.py` e `test_material_atlas_integration.py -- --undo` precisam de janela
+  (sem `-b`; no Linux headless use Xvfb). Com `-b` o atlas roda síncrono (`G.background`) e o modal falha.
+
+## Avisos para o Windows (antes de gerar o zip)
+
+1. `git pull` e recompilar `RangeEngine RangeRuntime` + `ninja install` (a regra nova copia os sons).
+2. Conferir que existe `build/bin/2.79/datafiles/sounds/effects/` com `chuva.wav`, `trovao1-3.wav`,
+   `explosao_*.wav`, `quebra_*.wav`. O teste de sons passou no Windows provavelmente porque o
+   `build/bin` local já tinha os arquivos copiados à mão; um zip feito sem o `install` sairia sem som.
+3. `python tools/stage_release_windows.py 0.5.2` e conferir a mesma pasta no zip extraído
+   (junto com `blender.crt/`, ver [distribution-0.1.md](distribution-0.1.md)).
+4. Rodar de novo `test_weather_sounds_auto.py` com o editor do zip extraído.
+
 ## Novidades desde a 0.5.1
 
 ### Logic Bricks 2.0

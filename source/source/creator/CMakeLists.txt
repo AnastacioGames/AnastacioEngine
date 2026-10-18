@@ -525,6 +525,12 @@ install(
 	DESTINATION ${TARGETDIR_VER}/datafiles
 )
 
+# Effect sounds bundled with the engine (World Weather, Lightning, Explosive/Destruction)
+install(
+	DIRECTORY ${CMAKE_SOURCE_DIR}/release/datafiles/sounds
+	DESTINATION ${TARGETDIR_VER}/datafiles
+)
+
 # game controller data base
 if(WITH_GAMEENGINE AND WITH_SDL)
 	install(
