@@ -272,8 +272,11 @@ int VideoFFmpeg::openStream(const char *filename, FFMPEG_CONST AVInputFormat *in
 	}
 	codecCtx->workaround_bugs = 1;
 	// decode on all cores (0 = auto); frames come out late, timestamps handle the order
+	// Only for video files: frame threading holds frames back, a single image would never come
+	// out and a camera would lag; those keep slice threading.
 	codecCtx->thread_count = 0;
-	codecCtx->thread_type = FF_THREAD_FRAME | FF_THREAD_SLICE;
+	codecCtx->thread_type = (m_isImage || inputFormat != nullptr) ? FF_THREAD_SLICE :
+	                        FF_THREAD_FRAME | FF_THREAD_SLICE;
 	if (avcodec_open2(codecCtx, codec, nullptr) < 0) {
 		ffmpeg_stream_context_close(&codecCtx);
 		avformat_close_input(&formatCtx);
@@ -535,8 +538,14 @@ void *VideoFFmpeg::cacheThread(void *data)
 				break;
 			}
 		}
-		// small sleep to avoid unnecessary looping
-		PIL_sleep_ms(10);
+		// small sleep to avoid unnecessary looping, unless frames are still free to fill:
+		// sleeping after every frame capped decoding at 100 fps, no room to catch up
+		pthread_mutex_lock(&video->m_cacheMutex);
+		const bool cacheFull = (video->m_frameCacheFree.first == nullptr);
+		pthread_mutex_unlock(&video->m_cacheMutex);
+		if (currentFrame != nullptr || cacheFull || video->m_packetCacheBase.first == nullptr) {
+			PIL_sleep_ms(currentFrame != nullptr || cacheFull ? 10 : 1);
+		}
 	}
 	// before quitting, put back the current frame to queue to allow freeing
 	if (currentFrame) {
@@ -577,6 +586,9 @@ void VideoFFmpeg::stopCache()
 	if (m_cacheStarted) {
 		m_stopThread = true;
 		BLI_threadpool_end(&m_thread);
+		// the queued packets are dropped below and the decoder may have been drained at the
+		// end of file: reset it so direct reading starts clean
+		avcodec_flush_buffers(m_codecCtx);
 		// now delete the cache
 		CacheFrame *frame;
 		CachePacket *packet;
