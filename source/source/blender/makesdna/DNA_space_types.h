@@ -1300,6 +1300,12 @@ typedef struct SpaceLogic {
 	struct bGPdata *gpd;        /* grease-pencil data */
 } SpaceLogic;
 
+/* SpaceLogic.flag */
+enum {
+	/* Realce dos bricks ativos durante o jogo desligado (bit negado: ligado por padrão). */
+	SLOGIC_HIGHLIGHT_ACTIVE_OFF = (1 << 0),
+};
+
 /** \} */
 
 /* -------------------------------------------------------------------- */

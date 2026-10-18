@@ -1396,6 +1396,7 @@ void BL_ConvertActuators(const char *maggiename,
 			uniquename += uniqueval->GetText();
 			uniqueval->Release();
 			baseact->SetName(bact->name);
+			baseact->SetBlenderBrick(bact);
 			baseact->SetLogicManager(logicmgr);
 			//gameobj->SetProperty(uniquename,baseact);
 			gameobj->AddActuator(baseact);

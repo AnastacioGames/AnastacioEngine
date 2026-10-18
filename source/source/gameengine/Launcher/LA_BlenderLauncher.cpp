@@ -32,6 +32,7 @@
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
 #include "KX_GameObject.h"
+#include "SCA_LogicManager.h"
 #include "DEV_EventConsumer.h"
 #include "PHY_IPhysicsEnvironment.h"
 #include "PHY_IVehicle.h"
@@ -187,6 +188,8 @@ void LA_BlenderLauncher::ExitEngine()
 		m_liveSnapshots.clear();
 		m_liveWorlds.clear();
 	}
+
+	WM_logic_debug_clear();
 
 	LA_Launcher::ExitEngine();
 
@@ -617,5 +620,24 @@ KX_ExitInfo LA_BlenderLauncher::EngineNextFrame()
 		WM_game_locked_ui_draw(m_context, m_ar);
 	}
 
-	return LA_Launcher::EngineNextFrame();
+	const KX_ExitInfo exitInfo = LA_Launcher::EngineNextFrame();
+	LogicDebugCollect();
+	return exitInfo;
+}
+
+void LA_BlenderLauncher::LogicDebugCollect()
+{
+	// Realce no Logic Editor: só coleta os bricks disparados se houver um aberto.
+	const bool wanted = WM_logic_debug_wanted();
+	for (KX_Scene *scene : *m_ketsjiEngine->CurrentScenes()) {
+		SCA_LogicManager *logicmgr = scene->GetLogicManager();
+		logicmgr->SetDebugBricks(wanted);
+		std::vector<void *>& pulses = logicmgr->GetDebugPulses();
+		if (!pulses.empty()) {
+			WM_logic_debug_pulses(pulses.data(), (int)pulses.size());
+			pulses.clear();
+		}
+	}
+	// Mantém o apagar suave mesmo sem pulsos novos.
+	WM_logic_debug_pulses(nullptr, 0);
 }

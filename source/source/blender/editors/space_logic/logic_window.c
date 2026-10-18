@@ -55,6 +55,10 @@
 
 #include "BLT_translation.h"
 
+#include "PIL_time.h"
+
+#include "BIF_gl.h"
+
 #include "UI_interface.h"
 #include "WM_api.h"
 #include "WM_types.h"
@@ -3251,6 +3255,163 @@ static void draw_actuator_column(bContext *C, SpaceLogic *slogic, uiBlock *block
 	}
 }
 
+/* ******************** Realce dos bricks ativos ******************** */
+
+/* Com o jogo embutido rodando, os bricks que dispararam acendem (caixa e fios, com um pulso
+ * correndo pelo fio) e apagam em seguida, como o realce de execução dos Blueprints. */
+
+#define LOGIC_DEBUG_MAX_BRICKS 256
+#define LOGIC_DEBUG_RESOL 24
+
+typedef struct LogicDebugBrick {
+	const void *brick;
+	float intensity;
+	rctf rect;
+} LogicDebugBrick;
+
+static const float logic_debug_color[3] = {1.0f, 0.72f, 0.18f};
+
+static const void *logic_debug_link_owner(const uiLink *link)
+{
+	if (link->ppoin == NULL) {
+		return NULL;
+	}
+	if (link->fromcode == LINK_SENSOR) {
+		return (const char *)link->ppoin - offsetof(bSensor, links);
+	}
+	if (link->fromcode == LINK_CONTROLLER) {
+		return (const char *)link->ppoin - offsetof(bController, links);
+	}
+	return NULL;
+}
+
+static void logic_debug_draw_wire(const uiLinkLine *line, float intensity, float phase)
+{
+	float coords[LOGIC_DEBUG_RESOL + 1][2];
+	rcti rect;
+
+	rect.xmin = BLI_rctf_cent_x(&line->from->rect);
+	rect.ymin = BLI_rctf_cent_y(&line->from->rect);
+	rect.xmax = BLI_rctf_cent_x(&line->to->rect);
+	rect.ymax = BLI_rctf_cent_y(&line->to->rect);
+	if (!ui_link_bezier_points(&rect, coords, LOGIC_DEBUG_RESOL)) {
+		return;
+	}
+
+	glEnableClientState(GL_VERTEX_ARRAY);
+	glVertexPointer(2, GL_FLOAT, 0, coords);
+
+	glLineWidth(7.0f * U.pixelsize);
+	glColor4f(UNPACK3(logic_debug_color), 0.25f * intensity);
+	glDrawArrays(GL_LINE_STRIP, 0, LOGIC_DEBUG_RESOL + 1);
+
+	glLineWidth(2.5f * U.pixelsize);
+	glColor4f(UNPACK3(logic_debug_color), intensity);
+	glDrawArrays(GL_LINE_STRIP, 0, LOGIC_DEBUG_RESOL + 1);
+
+	glDisableClientState(GL_VERTEX_ARRAY);
+
+	/* Pulso correndo do sensor para o atuador. */
+	const float pos = phase * LOGIC_DEBUG_RESOL;
+	const int i = min_ii((int)pos, LOGIC_DEBUG_RESOL - 1);
+	const float f = pos - i;
+	float dot[2];
+	interp_v2_v2v2(dot, coords[i], coords[i + 1], f);
+
+	glPointSize(8.0f * U.pixelsize);
+	glColor4f(1.0f, 0.95f, 0.75f, intensity);
+	glBegin(GL_POINTS);
+	glVertex2fv(dot);
+	glEnd();
+	glPointSize(1.0f);
+}
+
+static void logic_debug_draw(uiBlock *block)
+{
+	LogicDebugBrick bricks[LOGIC_DEBUG_MAX_BRICKS];
+	int totbrick = 0;
+	uiBut *but;
+
+	/* Área de cada brick aceso = união dos botões que editam aquele brick. */
+	for (but = block->buttons.first; but; but = but->next) {
+		const void *brick = but->rnapoin.data;
+		if (ELEM(but->type, UI_BTYPE_INLINK)) {
+			brick = but->poin;
+		}
+		else if (but->type == UI_BTYPE_LINK && but->link) {
+			brick = logic_debug_link_owner(but->link);
+		}
+		if (brick == NULL || (but->flag & (UI_HIDDEN | UI_SCROLLED))) {
+			continue;
+		}
+		const float intensity = WM_logic_debug_intensity(brick);
+		if (intensity <= 0.0f) {
+			continue;
+		}
+		int i;
+		for (i = 0; i < totbrick; i++) {
+			if (bricks[i].brick == brick) {
+				BLI_rctf_union(&bricks[i].rect, &but->rect);
+				break;
+			}
+		}
+		if (i == totbrick && totbrick < LOGIC_DEBUG_MAX_BRICKS) {
+			bricks[totbrick].brick = brick;
+			bricks[totbrick].intensity = intensity;
+			bricks[totbrick].rect = but->rect;
+			totbrick++;
+		}
+	}
+
+	if (totbrick == 0) {
+		return;
+	}
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_LINE_SMOOTH);
+
+	const float pad = 0.15f * U.widget_unit;
+	const float rad = 0.25f * U.widget_unit;
+	UI_draw_roundbox_corner_set(UI_CNR_ALL);
+	for (int i = 0; i < totbrick; i++) {
+		const LogicDebugBrick *b = &bricks[i];
+		const rctf *r = &b->rect;
+
+		glColor4f(UNPACK3(logic_debug_color), 0.12f * b->intensity);
+		UI_draw_roundbox_gl_mode(GL_POLYGON, r->xmin - pad, r->ymin - pad, r->xmax + pad, r->ymax + pad, rad);
+
+		glLineWidth(2.0f * U.pixelsize);
+		glColor4f(UNPACK3(logic_debug_color), b->intensity);
+		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, r->xmin - pad, r->ymin - pad, r->xmax + pad, r->ymax + pad, rad);
+	}
+
+	/* Fios acesos quando as duas pontas estão acesas. */
+	const float phase = (float)fmod(PIL_check_seconds_timer() * 1.5, 1.0);
+	for (but = block->buttons.first; but; but = but->next) {
+		if (but->type != UI_BTYPE_LINK || but->link == NULL) {
+			continue;
+		}
+		const float from = WM_logic_debug_intensity(logic_debug_link_owner(but->link));
+		if (from <= 0.0f) {
+			continue;
+		}
+		for (uiLinkLine *line = but->link->lines.first; line; line = line->next) {
+			if (line->from == NULL || line->to == NULL) {
+				continue;
+			}
+			const float intensity = min_ff(from, WM_logic_debug_intensity(line->to->poin));
+			if (intensity > 0.0f) {
+				logic_debug_draw_wire(line, intensity, phase);
+			}
+		}
+	}
+
+	glLineWidth(1.0f);
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+}
+
 void logic_buttons(bContext *C, ARegion *ar)
 {
 	SpaceLogic *slogic= CTX_wm_space_logic(C);
@@ -3478,6 +3639,9 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 	UI_block_end(C, block);
 	UI_block_draw(C, block);
+	if (!(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF)) {
+		logic_debug_draw(block);
+	}
 
 	/* restore view matrix */
 	UI_view2d_view_restore(C);

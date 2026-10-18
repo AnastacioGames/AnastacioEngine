@@ -30,6 +30,7 @@
 
 #include "DNA_listBase.h"
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_windowmanager_types.h"
 #include "DNA_userdef_types.h"
@@ -42,6 +43,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_dynstr.h"
+#include "BLI_ghash.h"
 #include "BLI_utildefines.h"
 #include "BLI_math.h"
 
@@ -600,6 +602,114 @@ void WM_game_locked_ui_draw(bContext *C, ARegion *game_ar)
 	CTX_wm_window_set(C, win);
 	CTX_wm_area_set(C, sa);
 	CTX_wm_region_set(C, ar);
+}
+
+/* -------------------------------------------------------------------- */
+/* Realce dos logic bricks ativos (jogo embutido)
+ *
+ * O jogo informa a cada quadro os bricks do Blender (bSensor/bController/bActuator) que
+ * dispararam; o Logic Editor acende esses bricks e os fios e apaga em LOGIC_DEBUG_FADE.
+ * Os ponteiros só servem de chave e nunca são lidos aqui. */
+
+#define LOGIC_DEBUG_FADE 0.4
+#define LOGIC_DEBUG_REDRAW_STEP (1.0 / 30.0)
+
+static GHash *g_logic_debug_pulses = NULL;
+static double g_logic_debug_last_redraw = 0.0;
+
+static bool logic_debug_tag_areas(bool tag)
+{
+	wmWindowManager *wm = G_MAIN ? G_MAIN->wm.first : NULL;
+	bool found = false;
+	if (wm == NULL) {
+		return false;
+	}
+	for (wmWindow *win = wm->windows.first; win; win = win->next) {
+		if (win->screen == NULL) {
+			continue;
+		}
+		for (ScrArea *sa = win->screen->areabase.first; sa; sa = sa->next) {
+			const SpaceLogic *slogic = sa->spacedata.first;
+			if (sa->spacetype == SPACE_LOGIC && !(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF)) {
+				found = true;
+				if (tag) {
+					ED_area_tag_redraw(sa);
+				}
+			}
+		}
+	}
+	return found;
+}
+
+bool WM_logic_debug_wanted(void)
+{
+	return logic_debug_tag_areas(false);
+}
+
+void WM_logic_debug_pulses(void *const *bricks, int count)
+{
+	const double now = PIL_check_seconds_timer();
+
+	if (count > 0 && g_logic_debug_pulses == NULL) {
+		g_logic_debug_pulses = BLI_ghash_ptr_new(__func__);
+	}
+	for (int i = 0; i < count; i++) {
+		void **val;
+		if (!BLI_ghash_ensure_p(g_logic_debug_pulses, bricks[i], &val)) {
+			*val = MEM_mallocN(sizeof(double), __func__);
+		}
+		*(double *)*val = now;
+	}
+
+	if (g_logic_debug_pulses == NULL || BLI_ghash_len(g_logic_debug_pulses) == 0) {
+		return;
+	}
+	if (now - g_logic_debug_last_redraw < LOGIC_DEBUG_REDRAW_STEP) {
+		return;
+	}
+	g_logic_debug_last_redraw = now;
+
+	/* Tira os já apagados; um quadro a mais desenhado sem eles limpa o editor. */
+	const void **stale = MEM_mallocN(sizeof(void *) * BLI_ghash_len(g_logic_debug_pulses), __func__);
+	int stale_len = 0;
+	GHashIterator gh_iter;
+	GHASH_ITER (gh_iter, g_logic_debug_pulses) {
+		if (now - *(double *)BLI_ghashIterator_getValue(&gh_iter) > LOGIC_DEBUG_FADE) {
+			stale[stale_len++] = BLI_ghashIterator_getKey(&gh_iter);
+		}
+	}
+	for (int i = 0; i < stale_len; i++) {
+		BLI_ghash_remove(g_logic_debug_pulses, stale[i], NULL, MEM_freeN);
+	}
+	MEM_freeN((void *)stale);
+	logic_debug_tag_areas(true);
+}
+
+float WM_logic_debug_intensity(const void *brick)
+{
+	if (g_logic_debug_pulses == NULL || brick == NULL) {
+		return 0.0f;
+	}
+	double *time = BLI_ghash_lookup(g_logic_debug_pulses, brick);
+	if (time == NULL) {
+		return 0.0f;
+	}
+	const double age = PIL_check_seconds_timer() - *time;
+	if (age >= LOGIC_DEBUG_FADE) {
+		return 0.0f;
+	}
+	/* Fica aceso no começo e apaga suave no fim. */
+	const float t = (float)(age / LOGIC_DEBUG_FADE);
+	return 1.0f - t * t;
+}
+
+void WM_logic_debug_clear(void)
+{
+	if (g_logic_debug_pulses) {
+		BLI_ghash_free(g_logic_debug_pulses, NULL, MEM_freeN);
+		g_logic_debug_pulses = NULL;
+		logic_debug_tag_areas(true);
+	}
 }
 
 bool WM_game_live_ui_active(void)

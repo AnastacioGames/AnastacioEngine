@@ -42,7 +42,8 @@
 
 SCA_LogicManager::SCA_LogicManager()
 	:m_lastControllersTriggered(0),
-	m_lastActuatorsUpdated(0)
+	m_lastActuatorsUpdated(0),
+	m_debugBricks(false)
 {
 }
 
@@ -186,6 +187,16 @@ void SCA_LogicManager::BeginFrame(double curtime, double fixedtime)
 		     contr = (SCA_IController *)obj->QRemove())
 		{
 			contr->Trigger(this);
+			if (m_debugBricks) {
+				// Só realça o controlador quando algum sensor ligado está positivo: o disparo
+				// pelo pulso negativo (tecla solta) não é "execução" para quem olha o editor.
+				for (SCA_ISensor *sensor : contr->GetLinkedSensors()) {
+					if (sensor->GetState()) {
+						DebugPulse(contr->GetBlenderBrick());
+						break;
+					}
+				}
+			}
 			contr->ClrJustActivated();
 			++m_lastControllersTriggered;
 		}
@@ -215,6 +226,9 @@ void SCA_LogicManager::UpdateFrame(double curtime)
 			// increment first to allow removal of inactive actuators.
 			++ia;
 			++m_lastActuatorsUpdated;
+			if (m_debugBricks && !actua->IsNegativeEvent()) {
+				DebugPulse(actua->GetBlenderBrick());
+			}
 			if (!actua->Update(curtime)) {
 				// this actuator is not active anymore, remove
 				actua->QDelink();

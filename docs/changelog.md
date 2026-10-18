@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-18 - Highlight Active: realce ao vivo dos logic bricks
+
+- Com o jogo embutido rodando, o Logic Editor acende os bricks que disparam (moldura laranja) e os fios
+  entre bricks acesos, com um pulso correndo do sensor ao atuador; apaga em 0,4 s. Funciona com o
+  cadeado aberto ou fechado (travado, só o Logic Editor redesenha e não é escurecido; até 30 Hz).
+- Regras: sensor aceso enquanto positivo; controlador quando disparado por sensor positivo ou enquanto
+  um sensor seu segue positivo e um atuador dele roda; atuador enquanto roda sem evento negativo.
+- `SCA_ILogicBrick::m_blenderBrick` liga o brick do jogo ao do Blender (conversores); o
+  `SCA_LogicManager` junta os pulsos e `LA_BlenderLauncher::LogicDebugCollect()` entrega a
+  `WM_logic_debug_pulses()`. Só coleta com um Logic Editor aberto e o toggle ligado.
+- Toggle `Highlight Active` no header (`SpaceLogic.show_highlight_active`, bit negado
+  `SLOGIC_HIGHLIGHT_ACTIVE_OFF`, ligado por padrão). Cena: `tools/debug/cenas/criar_cena_logic_realce.py`.
+
 ## 2026-10-17 - Qualidade do SSGI nativo
 
 - Traçado: amostragem intercalada Bayer 4x4 (Keller & Heidrich) no lugar do ruído estático, jitter de passo

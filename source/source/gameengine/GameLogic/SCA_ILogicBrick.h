@@ -52,6 +52,8 @@ protected:
 	bool				m_bActive;
 	EXP_Value*				m_eventval;
 	std::string			m_name;
+	/// Brick do Blender (bSensor/bController/bActuator) de origem, para o realce no Logic Editor.
+	void				*m_blenderBrick;
 	//unsigned long		m_drawcolor;
 	void RemoveEvent();
 
@@ -63,6 +65,9 @@ public:
 	void SetUeberExecutePriority(int execute_Priority);
 
 	SCA_IObject*	GetParent() { return m_gameobj; }
+
+	void			SetBlenderBrick(void *brick) { m_blenderBrick = brick; }
+	void			*GetBlenderBrick() const { return m_blenderBrick; }
 
 	virtual void	ReParent(SCA_IObject* parent);
 	virtual void	Relink(std::map<SCA_IObject *, SCA_IObject *>& obj_map);

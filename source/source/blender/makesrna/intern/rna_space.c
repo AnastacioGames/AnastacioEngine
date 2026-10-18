@@ -4705,6 +4705,11 @@ static void rna_def_space_logic(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Show Active States", "Show only actuators connected to active states");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "show_highlight_active", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SLOGIC_HIGHLIGHT_ACTIVE_OFF);
+	RNA_def_property_ui_text(prop, "Highlight Active",
+	                         "While the game runs, light up the logic bricks and links that are firing");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
 static void rna_def_space_clip(BlenderRNA *brna)

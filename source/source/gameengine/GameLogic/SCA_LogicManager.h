@@ -93,6 +93,11 @@ class SCA_LogicManager
 	 */
 	int		m_lastControllersTriggered;
 	int		m_lastActuatorsUpdated;
+
+	/// Realce dos bricks ativos no Logic Editor (só no jogo embutido): bricks do Blender
+	/// que dispararam desde a última coleta.
+	bool				m_debugBricks;
+	std::vector<void *>	m_debugPulses;
 public:
 	SCA_LogicManager();
 	virtual ~SCA_LogicManager();
@@ -154,6 +159,16 @@ public:
 	int		GetLastControllersTriggered() const { return m_lastControllersTriggered; }
 	int		GetLastActuatorsUpdated() const { return m_lastActuatorsUpdated; }
 	int		GetTotalRegisteredSensors() const;
+
+	void	SetDebugBricks(bool enable) { m_debugBricks = enable; }
+	bool	GetDebugBricks() const { return m_debugBricks; }
+	void	DebugPulse(void *blenderBrick)
+	{
+		if (m_debugBricks && blenderBrick) {
+			m_debugPulses.push_back(blenderBrick);
+		}
+	}
+	std::vector<void *>& GetDebugPulses() { return m_debugPulses; }
 };
 
 #endif  /* __SCA_LOGICMANAGER_H__ */

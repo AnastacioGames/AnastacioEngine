@@ -204,6 +204,7 @@ void BL_ConvertControllers(struct Object *blenderobject,
 			//at some point it should either be implemented globally (and saved as a separate var) or removed.
 			//gamecontroller->SetName(uniquename);
 			gamecontroller->SetName(bcontr->name);
+			gamecontroller->SetBlenderBrick(bcontr);
 			gamecontroller->SetLogicManager(logicmgr);
 			gameobj->AddController(gamecontroller);
 

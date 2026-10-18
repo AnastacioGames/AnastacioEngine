@@ -745,6 +745,7 @@ void BL_ConvertSensors(struct Object *blenderobject,
 				gamesensor->SetDeltaTime(use_dt);
 				gamesensor->SetTap(tap);
 				gamesensor->SetName(sens->name);
+				gamesensor->SetBlenderBrick(sens);
 				gamesensor->SetLogicManager(logicmgr);
 
 				gameobj->AddSensor(gamesensor);

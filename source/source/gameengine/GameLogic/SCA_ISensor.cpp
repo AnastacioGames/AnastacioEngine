@@ -283,6 +283,24 @@ void SCA_ISensor::Activate(class SCA_LogicManager *logicmgr)
 		// store the state for the rest of the logic system
 		m_prev_state = m_state;
 		m_state = this->IsPositiveTrigger();
+		if (m_state) {
+			logicmgr->DebugPulse(m_blenderBrick);
+			if (logicmgr->GetDebugBricks()) {
+				// O controlador só é disparado na mudança do sensor; enquanto o sensor segue
+				// positivo e um atuador dele roda, o fluxo continua e ele fica aceso.
+				for (SCA_IController *controller : m_linkedcontrollers) {
+					if (!controller->IsActive()) {
+						continue;
+					}
+					for (SCA_IActuator *actuator : controller->GetLinkedActuators()) {
+						if (actuator->IsActive()) {
+							logicmgr->DebugPulse(controller->GetBlenderBrick());
+							break;
+						}
+					}
+				}
+			}
+		}
 		if (result) {
 			// the sensor triggered this frame
 			if (m_state || !m_tap) {

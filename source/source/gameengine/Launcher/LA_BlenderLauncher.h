@@ -100,6 +100,8 @@ protected:
 
 	void LiveWorldsTake();
 	void LiveSyncWorlds();
+	/// Envia ao Logic Editor os bricks que dispararam neste quadro (realce ao vivo).
+	void LogicDebugCollect();
 
 	static void LiveSnapshotTake(Object *ob, LiveObjectSnapshot &snap);
 	void LiveSyncFromBlender();

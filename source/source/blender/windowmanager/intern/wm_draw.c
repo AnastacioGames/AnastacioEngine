@@ -28,6 +28,7 @@
 
 #include "DNA_listBase.h"
 #include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 #include "DNA_windowmanager_types.h"
 #include "DNA_userdef_types.h"
 #include "DNA_view3d_types.h"
@@ -1106,14 +1107,44 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar, bool
 
 	if (dim) {
 		/* Cadeado fechado: UI travada; sÃ³ recompÃµe a imagem guardada, escurecida. */
+		/* O Logic Editor é a exceção: redesenha quando marcado (realce dos bricks ativos)
+		 * e não é escurecido. */
 		wmDrawData *drawdata = win->drawdata.first;
 		if (drawdata->triple) {
-			wmSubWindowSet(win, win->screen->mainwin);
+			bScreen *screen = win->screen;
+			wmSubWindowSet(win, screen->mainwin);
 			wm_triple_draw_textures(win, drawdata->triple, 1.0f, false);
+
+			bool copytex = false;
+			for (ScrArea *sa = screen->areabase.first; sa; sa = sa->next) {
+				if (sa->spacetype != SPACE_LOGIC) {
+					continue;
+				}
+				CTX_wm_area_set(C, sa);
+				for (ARegion *ar = sa->regionbase.first; ar; ar = ar->next) {
+					if (ar->swinid && ar->do_draw && ar->overlap == false) {
+						CTX_wm_region_set(C, ar);
+						ED_region_do_draw(C, ar);
+						ar->do_draw = false;
+						CTX_wm_region_set(C, NULL);
+						copytex = true;
+					}
+				}
+				CTX_wm_area_set(C, NULL);
+			}
+			wmSubWindowSet(win, screen->mainwin);
+			if (copytex) {
+				wm_triple_copy_textures(win, drawdata->triple);
+			}
+
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 			glColor4f(0.0f, 0.0f, 0.0f, 0.45f);
-			glRecti(0, 0, WM_window_pixels_x(win), WM_window_pixels_y(win));
+			for (ScrArea *sa = screen->areabase.first; sa; sa = sa->next) {
+				if (sa->spacetype != SPACE_LOGIC) {
+					glRecti(sa->totrct.xmin, sa->totrct.ymin, sa->totrct.xmax + 1, sa->totrct.ymax + 1);
+				}
+			}
 			glDisable(GL_BLEND);
 		}
 	}

@@ -185,6 +185,8 @@ class LOGIC_HT_header(Header):
 
         layout.separator()
         layout.operator("logic.convert_to_component", text="Convert to Python", icon='SCRIPT')
+        layout.separator()
+        layout.prop(context.space_data, "show_highlight_active", text="Highlight Active", icon='LIGHTPAINT')
 
 
 class LOGIC_MT_editor_menus(Menu):

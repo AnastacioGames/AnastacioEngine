@@ -43,7 +43,8 @@ SCA_ILogicBrick::SCA_ILogicBrick(SCA_IObject *gameobj)
 	m_Execute_Priority(0),
 	m_Execute_Ueber_Priority(0),
 	m_bActive(false),
-	m_eventval(0)
+	m_eventval(0),
+	m_blenderBrick(nullptr)
 {
 }
 
