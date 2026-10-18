@@ -65,6 +65,8 @@ SCA_ISensor::SCA_ISensor(SCA_IObject *gameobj, SCA_EventManager *eventmgr)
 	m_suspended(false),
 	m_links(0),
 	m_state(false),
+	m_riseCount(0),
+	m_riseOn(false),
 	m_prev_state(false),
 	m_replaced_with_Libload(false)
 {
@@ -260,6 +262,10 @@ void SCA_ISensor::UnregisterToManager()
 
 void SCA_ISensor::ActivateControllers(class SCA_LogicManager *logicmgr)
 {
+	if (m_state && !m_riseOn) {
+		++m_riseCount;
+	}
+	m_riseOn = m_state;
 	for (SCA_IController *controller : m_linkedcontrollers) {
 		if (controller->IsActive()) {
 			logicmgr->AddTriggeredController(controller, this);

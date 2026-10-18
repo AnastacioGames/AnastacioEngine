@@ -97931,3 +97931,30 @@ msgstr "Selecione o objeto que a câmera da cena deve seguir"
 msgid "Bricks added to the camera \"%s\""
 msgstr "Bricks adicionados à câmera \"%s\""
 
+msgid "Chase Enemy"
+msgstr "Inimigo que Persegue"
+
+msgid "Follows the object with the property \"player\" when it comes closer than 10 units (Steering, Seek)"
+msgstr "Segue o objeto com a propriedade \"player\" quando ele chega a menos de 10 unidades (Steering, Seek)"
+
+msgid "Checkpoint and Respawn"
+msgstr "Checkpoint e Renascer"
+
+msgid "Touching an object with the property \"checkpoint\" saves the place, touching one with \"kill\" returns there (or to the start)"
+msgstr "Tocar um objeto com a propriedade \"checkpoint\" salva o lugar; tocar um com \"kill\" volta para lá (ou para o início)"
+
+msgid "Menu Button"
+msgstr "Botão de Menu"
+
+msgid "Clicking the object opens a scene (choose it in Go To Scene), the mouse cursor is shown"
+msgstr "Clicar no objeto abre uma cena (escolha em Go To Scene); o cursor do mouse fica visível"
+
+msgid "Moving Platform"
+msgstr "Plataforma que Vai e Volta"
+
+msgid "Goes forth for 2 seconds and comes back, with two states and the Wait actuator"
+msgstr "Vai por 2 segundos e volta, com dois estados e o actuator Wait"
+
+msgid "No object has the property \"player\" to chase"
+msgstr "Nenhum objeto tem a propriedade \"player\" para perseguir"
+

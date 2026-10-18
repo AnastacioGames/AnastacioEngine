@@ -53,6 +53,8 @@ protected:
 	int m_endReason;
 	/// Number of times the actuator stopped with END_FINISHED, read by the Actuator sensor in "Finished" mode.
 	unsigned int m_finishCount;
+	/// Number of positive pulses received, read by the Debug Mode logic view.
+	unsigned int m_startCount;
 
 	std::vector<SCA_IController *> m_linkedcontrollers;
 
@@ -167,6 +169,10 @@ public:
 	void SetEndReason(KX_ACTUATOR_END reason);
 	int GetEndReason() const;
 	unsigned int GetFinishCount() const;
+	unsigned int GetStartCount() const
+	{
+		return m_startCount;
+	}
 };
 
 #endif  // __SCA_IACTUATOR_H__

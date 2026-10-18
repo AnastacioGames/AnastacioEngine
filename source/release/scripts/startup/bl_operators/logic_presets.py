@@ -69,6 +69,16 @@ class _Bricks:
             bpy.ops.object.game_property_new(type=typ, name=name)
             props[name].value = value
 
+    def then(self, actuator, actuators, name, state=1):
+        # what the "Then" button does: a Finished sensor for the actuator and a controller
+        s = self.sensor('ACTUATOR', name, actuator=actuator.name, mode='FINISHED')
+        c = self.link([s], actuators, name)
+        c.states = state
+        return c
+
+    def state_name(self, state, name):
+        self.game.state_names[state - 1].name = name
+
 
 def _walk(b):
     for key, name, loc, rot in (
@@ -124,6 +134,72 @@ def _health(b):
     b.link([dead], [die], "Die")
 
 
+def _platform(b):
+    # state 1 goes forth, state 2 comes back, each for 2 seconds
+    b.state_name(1, "Going")
+    b.state_name(2, "Returning")
+    for state, name, step, other in ((1, "Forth", 0.03, 2), (2, "Back", -0.03, 1)):
+        move = b.sensor('ALWAYS', "Every Frame " + name, use_pulse_true_level=True)
+        motion = b.actuator('MOTION', "Move " + name, offset_location=(0.0, step, 0.0), use_local_location=True)
+        b.link([move], [motion], "Move " + name).states = state
+        start = b.sensor('ALWAYS', "Start " + name)
+        wait = b.actuator('WAIT', "Wait " + name, duration=2.0)
+        b.link([start], [wait], "Time " + name).states = state
+        turn = b.actuator('STATE', "To " + ("Returning" if other == 2 else "Going"), operation='SET',
+                          states=tuple(i == other - 1 for i in range(30)))
+        b.then(wait, [turn], "Then " + name, state)
+
+
+def _chase(b, target):
+    near = b.sensor('NEAR', "Player Close", property="player", distance=10.0, reset_distance=12.0)
+    seek = b.actuator('STEERING', "Chase", mode='SEEK', target=target, velocity=3.0, distance=1.0,
+                      facing=True, facing_axis='Y', lock_z_velocity=True)
+    b.link([near], [seek], "Chase Player")
+
+
+_CHECKPOINT = """# Created by the "Checkpoint and Respawn" logic preset.
+def start(cont):
+    ob = cont.owner
+    ob["respawn_at"] = ob.worldPosition.copy()
+
+
+def save(cont):
+    s = cont.sensors[0]
+    if s.positive and s.hitObject is not None:
+        cont.owner["respawn_at"] = s.hitObject.worldPosition.copy()
+
+
+def respawn(cont):
+    if not cont.sensors[0].positive:
+        return
+    ob = cont.owner
+    ob.worldPosition = ob.get("respawn_at", ob.worldPosition)
+    if ob.getPhysicsId():
+        ob.worldLinearVelocity = (0.0, 0.0, 0.0)
+"""
+
+
+def _checkpoint(b):
+    if "logic_checkpoint.py" not in bpy.data.texts:
+        bpy.data.texts.new("logic_checkpoint.py").write(_CHECKPOINT)
+    for name, sensor, func in (
+            ("Remember Start", b.sensor('ALWAYS', "Game Start"), "start"),
+            ("Save Checkpoint", b.sensor('COLLISION', "Touch Checkpoint", property="checkpoint"), "save"),
+            ("Respawn", b.sensor('COLLISION', "Touch Danger", property="kill"), "respawn"),
+    ):
+        c = b.link([sensor], [], name, 'PYTHON')
+        c.mode = 'MODULE'
+        c.module = "logic_checkpoint." + func
+
+
+def _button(b, scene):
+    scene.game_settings.show_mouse = True
+    over = b.sensor('MOUSE', "Mouse Over", mouse_event='MOUSEOVER')
+    click = b.sensor('MOUSE', "Left Click", mouse_event='LEFTCLICK')
+    go = b.actuator('SCENE', "Go To Scene", mode='SET')
+    b.link([over, click], [go], "Click Button")
+
+
 class LOGIC_OT_preset_add(Operator):
     """Add a group of logic bricks already linked"""
     bl_idname = "logic.preset_add"
@@ -143,6 +219,15 @@ class LOGIC_OT_preset_add(Operator):
                                        "forward or back"),
             ('HEALTH', "Health and Damage", "Property \"health\" loses 10 when touching an object with "
                                              "the property \"damage\", the object ends at zero"),
+            ('CHASE', "Chase Enemy", "Follows the object with the property \"player\" when it comes "
+                                     "closer than 10 units (Steering, Seek)"),
+            ('CHECKPOINT', "Checkpoint and Respawn", "Touching an object with the property \"checkpoint\" "
+                                                     "saves the place, touching one with \"kill\" "
+                                                     "returns there (or to the start)"),
+            ('BUTTON', "Menu Button", "Clicking the object opens a scene (choose it in Go To Scene), "
+                                      "the mouse cursor is shown"),
+            ('PLATFORM', "Moving Platform", "Goes forth for 2 seconds and comes back, with two states "
+                                            "and the Wait actuator"),
         ),
     )
 
@@ -165,12 +250,25 @@ class LOGIC_OT_preset_add(Operator):
             return {'FINISHED'}
 
         b = _Bricks(ob, label)
+        if self.type == 'CHASE':
+            target = next((o for o in context.scene.objects if o != ob and "player" in o.game.properties),
+                          None)
+            if target is None:
+                self.report({'ERROR'}, pgettext_iface("No object has the property \"player\" to chase"))
+                return {'CANCELLED'}
+            _chase(b, target)
+            return {'FINISHED'}
+        if self.type == 'BUTTON':
+            _button(b, context.scene)
+            return {'FINISHED'}
         {
             'WALK': _walk,
             'JUMP': _jump,
             'COLLECT': _collect,
             'DOOR': _door,
             'HEALTH': _health,
+            'CHECKPOINT': _checkpoint,
+            'PLATFORM': _platform,
         }[self.type](b)
         return {'FINISHED'}
 

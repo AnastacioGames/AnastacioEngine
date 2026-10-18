@@ -314,4 +314,35 @@ Janela **Logic Bricks** no Debug Mode (`-g show_debug_mode = 1` ou opção da ce
 - actuators: rodando, quantas vezes concluíram e o último encerramento (finished/cancelled/failed);
 - a linha que acabou de ligar pisca em amarelo e some em 1 s.
 
-Nomes de estado e grupos ficam só no editor (não chegam ao jogo).
+Os grupos ficam só no editor; os nomes de estado chegam ao jogo (ficam no Object) e aparecem na janela.
+
+## F5 — Histórico, pausa no disparo e nomes de estado (feito)
+
+Na janela Logic Bricks:
+
+- **History**: as últimas 50 ocorrências *diferentes* do objeto (sensor ficou positivo, controller disparou,
+  actuator começou, actuator concluiu/foi cancelado/falhou), a mais nova em cima. Repetir uma ocorrência a sobe
+  para o topo e soma na coluna "x". Botão Clear; troca de objeto limpa.
+- **Pausar no disparo**: clicar no nome de um brick o marca (vermelho, `*`). Quando ele disparar, todas as cenas
+  são suspensas; o botão de pausa da barra continua.
+- Sensores e actuators contam as próprias subidas (`SCA_ISensor::GetRiseCount`, `SCA_IActuator::GetStartCount`),
+  então pulsos de um tick entre dois quadros (State, Property, Message) também entram no histórico e pausam.
+- **Nomes de estado**: "Active: Normal" em verde, nome na dica dos quadradinhos e na coluna dos controllers
+  ("off (Hurt)").
+
+## F6 — Mais presets e cena tutorial (feito)
+
+| Preset | Bricks |
+|---|---|
+| Inimigo que Persegue | Near `player` (10, solta em 12) → Steering Seek no objeto com `player` (3 u/s, para a 1) |
+| Checkpoint e Renascer | Python `logic_checkpoint.py`: guarda o início; Collision `checkpoint` salva o lugar; Collision `kill` volta |
+| Botão de Menu | Mouse Over + Left Click → Scene Set (o usuário escolhe a cena); liga o cursor do mouse |
+| Plataforma que Vai e Volta | estados Going/Returning; em cada um Motion por tick + Wait 2 s; "Então" troca o estado |
+
+O inimigo precisa de física Dynamic: Steering num objeto Static anda só um passo.
+
+Cena tutorial: `docs/logic-bricks-2-tutorial.blend`, gerada por `tools/debug/cenas/criar_cena_bricks2_tutorial.py`
+(com um segundo argumento cria o Checker do teste automático). Tem jogador (Walk, Jump, Checkpoint, estados
+Normal/Hurt com Wait + "Então"), câmera, moeda, porta com Action, checkpoint, inimigo, plataforma e o texto
+"LEIA-ME". Teste: a plataforma faz os estados 1,2,1 e anda 3,6; o inimigo alcança o jogador, que fica em Hurt
+1,5 s e volta ao Normal; marcar "To Returning" pausa o jogo aos 2 s.

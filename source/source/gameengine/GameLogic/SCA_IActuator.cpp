@@ -42,7 +42,8 @@ SCA_IActuator::SCA_IActuator(SCA_IObject *gameobj, KX_ACTUATOR_TYPE type) :
 	m_posevent(false),
 	m_negevent(false),
 	m_endReason(END_NONE),
-	m_finishCount(0)
+	m_finishCount(0),
+	m_startCount(0)
 {
 }
 
@@ -72,6 +73,7 @@ void SCA_IActuator::AddEvent(bool event)
 {
 	if (event) {
 		m_posevent = true;
+		++m_startCount;
 	}
 	else {
 		m_negevent = true;
@@ -116,6 +118,7 @@ void SCA_IActuator::ProcessReplica()
 	m_linkedcontrollers.clear();
 	m_endReason = END_NONE;
 	m_finishCount = 0;
+	m_startCount = 0;
 }
 
 SCA_IActuator::~SCA_IActuator()
