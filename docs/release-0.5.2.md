@@ -244,3 +244,10 @@ No PC com Windows, para terminar:
   gh release upload v0.5.2 build/dist/AnastacioEngine-0.5.2-windows-x64.zip build/dist/RangeArmor-0.5.2-windows-x64.zip --clobber
   gh release edit v0.5.2 --draft=false --latest
   ```
+
+### Publicada (2026-10-18 20:13 UTC)
+
+- `v0.5.2` publicada pelo Linux como **Latest** (tag em `5e1509ca`), por ora só com o tar.xz Linux e o
+  `SHA256SUMS.txt` final. Os links Windows/RangeArmor do README dão 404 até o upload.
+- **Windows, agora só:** `gh release upload v0.5.2 build/dist/AnastacioEngine-0.5.2-windows-x64.zip build/dist/RangeArmor-0.5.2-windows-x64.zip --clobber`
+  (não rodar o `gh release edit`; já está publicada).
