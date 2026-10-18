@@ -233,3 +233,14 @@ No PC com Windows, para terminar:
   gh release delete-asset v0.5.2 Launcher-linux -y
   gh release edit v0.5.2 --draft=false --latest
   ```
+
+### Rascunho preparado pelo Linux (depois de 65f68e32)
+
+- Página da release (título e notas de `release-notes-0.5.2.md`) atualizada; `SHA256SUMS.txt` final com as
+  3 linhas acima já no rascunho; asset temporário `Launcher-linux` apagado. README já aponta para a 0.5.2.
+- **No Windows só falta** (o `SHA256SUMS.txt` não precisa subir de novo):
+
+  ```bash
+  gh release upload v0.5.2 build/dist/AnastacioEngine-0.5.2-windows-x64.zip build/dist/RangeArmor-0.5.2-windows-x64.zip --clobber
+  gh release edit v0.5.2 --draft=false --latest
+  ```
