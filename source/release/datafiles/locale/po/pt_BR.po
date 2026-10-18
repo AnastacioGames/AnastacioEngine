@@ -97997,3 +97997,45 @@ msgstr "Tempo para onde pular (com Relativo, segundos a mover)"
 
 msgid "Move from the current time (negative goes back)"
 msgstr "Move a partir do tempo atual (negativo volta)"
+
+msgid "Brick Groups"
+msgstr "Grupos de Bricks"
+
+msgid "Show Group"
+msgstr "Mostrar Grupo"
+
+msgid "Show the group field of the brick"
+msgstr "Mostra o campo de grupo do brick"
+
+msgid "New Brick Group"
+msgstr "Novo Grupo de Bricks"
+
+msgid "Put the brick in a new group (a typed name that is not in the list is added to it)"
+msgstr "Põe o brick num grupo novo (um nome digitado que não está na lista é adicionado a ela)"
+
+msgid "Take the brick out of its group"
+msgstr "Tira o brick do grupo"
+
+msgid "Add Brick Group"
+msgstr "Adicionar Grupo de Bricks"
+
+msgid "Add a brick group to the list of the active object"
+msgstr "Adiciona um grupo de bricks à lista do objeto ativo"
+
+msgid "Remove Brick Group"
+msgstr "Remover Grupo de Bricks"
+
+msgid "Remove the selected brick group; its bricks stay, without a group"
+msgstr "Remove o grupo selecionado; os bricks dele ficam, sem grupo"
+
+msgid "From Bricks"
+msgstr "Dos Bricks"
+
+msgid "Add Groups Used by Bricks"
+msgstr "Adicionar Grupos Usados pelos Bricks"
+
+msgid "Double click renames the group of its bricks too"
+msgstr "Duplo clique renomeia também o grupo dos bricks"
+
+msgid "Groups offered by the group field of the logic bricks"
+msgstr "Grupos oferecidos pelo campo de grupo dos logic bricks"

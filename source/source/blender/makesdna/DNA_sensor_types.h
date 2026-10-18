@@ -337,6 +337,7 @@ typedef struct bVRHeadSensor {
 #define SENS_DELTATIME	128
 #define SENS_SHOW_DESCR 256 /* Show Sensor Description */
 #define SENS_GROUP_HIDE 512 /* the brick group is collapsed in the editor */
+#define SENS_SHOW_GROUP 1024 /* the group field is shown in the brick */
 
 /* sensor->pulse */
 #define SENS_PULSE_CONT 	0

@@ -33,6 +33,8 @@ class _Bricks:
         self.ob = ob
         self.game = ob.game
         self.group = group
+        if group not in ob.game.brick_groups:
+            ob.game.brick_groups.new(group)
 
     def _add(self, kind, typ, name):
         getattr(bpy.ops.logic, kind + "_add")(type=typ, name=name, object=self.ob.name)
@@ -273,6 +275,104 @@ class LOGIC_OT_preset_add(Operator):
         return {'FINISHED'}
 
 
+def _brick(context):
+    for name in ("sensor", "controller", "actuator"):
+        brick = getattr(context, name, None)
+        if brick is not None:
+            return brick
+    return None
+
+
+class LOGIC_OT_brick_group_new(Operator):
+    """Put the brick in a new group (a typed name that is not in the list is added to it)"""
+    bl_idname = "logic.brick_group_new"
+    bl_label = "New Brick Group"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        brick = _brick(context)
+        if brick is None:
+            return {'CANCELLED'}
+        groups = brick.id_data.game.brick_groups
+        if brick.group and brick.group not in groups:
+            groups.new(brick.group)
+        else:
+            brick.group = groups.new(pgettext_iface("Group")).name
+        return {'FINISHED'}
+
+
+class LOGIC_OT_brick_group_clear(Operator):
+    """Take the brick out of its group"""
+    bl_idname = "logic.brick_group_clear"
+    bl_label = "Remove From Group"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        brick = _brick(context)
+        if brick is None:
+            return {'CANCELLED'}
+        brick.group = ""
+        return {'FINISHED'}
+
+
+def _used_groups(ob):
+    g = ob.game
+    names = []
+    for brick in list(g.sensors) + list(g.controllers) + list(g.actuators):
+        if brick.group and brick.group not in names:
+            names.append(brick.group)
+    return names
+
+
+class LOGIC_OT_brick_group_add(Operator):
+    """Add a brick group to the list of the active object"""
+    bl_idname = "logic.brick_group_add"
+    bl_label = "Add Brick Group"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    collect = bpy.props.BoolProperty(
+        name="From Bricks",
+        description="Add the groups that bricks already use and the list does not have",
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None
+
+    def execute(self, context):
+        game = context.active_object.game
+        if self.collect:
+            for name in _used_groups(context.active_object):
+                if name not in game.brick_groups:
+                    game.brick_groups.new(name)
+        else:
+            game.brick_groups.new(pgettext_iface("Group"))
+            game.active_brick_group_index = len(game.brick_groups) - 1
+        return {'FINISHED'}
+
+
+class LOGIC_OT_brick_group_remove(Operator):
+    """Remove the selected brick group; its bricks stay, without a group"""
+    bl_idname = "logic.brick_group_remove"
+    bl_label = "Remove Brick Group"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob is not None and 0 <= ob.game.active_brick_group_index < len(ob.game.brick_groups)
+
+    def execute(self, context):
+        game = context.active_object.game
+        game.brick_groups.remove(game.brick_groups[game.active_brick_group_index])
+        game.active_brick_group_index = max(0, min(game.active_brick_group_index, len(game.brick_groups) - 1))
+        return {'FINISHED'}
+
+
 classes = (
     LOGIC_OT_preset_add,
+    LOGIC_OT_brick_group_new,
+    LOGIC_OT_brick_group_clear,
+    LOGIC_OT_brick_group_add,
+    LOGIC_OT_brick_group_remove,
 )

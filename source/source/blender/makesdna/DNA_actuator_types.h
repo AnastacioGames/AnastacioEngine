@@ -470,6 +470,7 @@ typedef struct bActuator {
 #define ACT_PIN			32
 #define ACT_DEACTIVATE  64
 #define ACT_GROUP_HIDE  128 /* the brick group is collapsed in the editor */
+#define ACT_SHOW_GROUP  256 /* the group field is shown in the brick */
 
 /* link codes */
 #define LINK_SENSOR		0

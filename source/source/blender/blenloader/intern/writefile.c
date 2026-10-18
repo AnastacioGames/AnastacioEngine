@@ -1959,6 +1959,7 @@ static void write_object(WriteData *wd, Object *ob)
 		writedata(wd, DATA, sizeof(char) * ob->totcol, ob->matbits);
 		/* write_effects(wd, &ob->effect); */ /* not used anymore */
 		write_properties(wd, &ob->prop);
+		writelist(wd, DATA, bLogicBrickGroup, &ob->brick_groups);
 		write_sensors(wd, &ob->sensors);
 		write_controllers(wd, &ob->controllers);
 		write_actuators(wd, &ob->actuators);

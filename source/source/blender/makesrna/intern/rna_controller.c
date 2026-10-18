@@ -210,6 +210,11 @@ void RNA_def_controller(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Group", "Brick group shown as a collapsible header in the Logic Editor (empty = no group)");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "show_group", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CONT_SHOW_GROUP);
+	RNA_def_property_ui_text(prop, "Show Group", "Show the group field of the brick");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_enum_funcs(prop, NULL, "rna_Controller_type_set", NULL);

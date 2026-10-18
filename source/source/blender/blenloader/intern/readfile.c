@@ -5815,6 +5815,7 @@ static void direct_link_object(FileData *fd, Object *ob)
 	link_list(fd, &ob->particlesystem);
 	direct_link_particlesystems(fd, &ob->particlesystem);
 
+	link_list(fd, &ob->brick_groups);
 	link_list(fd, &ob->prop);
 	for (prop = ob->prop.first; prop; prop = prop->next) {
 		prop->poin = newdataadr(fd, prop->poin);

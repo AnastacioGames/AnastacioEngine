@@ -862,6 +862,33 @@ static bool is_sensor_linked(uiBlock *block, bSensor *sens)
 
 /* Sensors code */
 
+/* arrow next to the brick icon that shows or hides the group field */
+static void draw_brick_group_toggle(uiLayout *layout, PointerRNA *ptr)
+{
+	if (!RNA_boolean_get(ptr, "show_expanded"))
+		return;
+	uiItemR(layout, ptr, "show_group", UI_ITEM_R_NO_BG | UI_ITEM_R_ICON_ONLY, "",
+	        RNA_boolean_get(ptr, "show_group") ? ICON_DOWNARROW_HLT : ICON_RIGHTARROW_THIN);
+}
+
+/* group field: search in the object's brick groups, + new group, x out of the group */
+static void draw_brick_group_field(uiLayout *layout, PointerRNA *ptr, const char *context_name)
+{
+	Object *ob = (Object *)ptr->id.data;
+	PointerRNA game_ptr;
+	uiLayout *row;
+
+	if (!RNA_boolean_get(ptr, "show_group"))
+		return;
+
+	RNA_pointer_create(&ob->id, &RNA_GameObjectSettings, ob, &game_ptr);
+	row = uiLayoutRow(layout, true);
+	uiLayoutSetContextPointer(row, context_name, ptr);
+	uiItemPointerR(row, ptr, "group", &game_ptr, "brick_groups", "", ICON_GROUP);
+	uiItemO(row, "", ICON_ZOOMIN, "LOGIC_OT_brick_group_new");
+	uiItemO(row, "", ICON_X, "LOGIC_OT_brick_group_clear");
+}
+
 static void draw_sensor_header(uiLayout *layout, PointerRNA *ptr, PointerRNA *logic_ptr)
 {
 	uiLayout *box, *row, *sub;
@@ -874,6 +901,7 @@ static void draw_sensor_header(uiLayout *layout, PointerRNA *ptr, PointerRNA *lo
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "active"));
 	uiItemR(sub, ptr, "show_expanded", UI_ITEM_R_NO_BG, "", ICON_NONE);
 	uiItemR(sub, ptr, "show_description", UI_ITEM_R_NO_BG, "", ICON_TEXT);
+	draw_brick_group_toggle(sub, ptr);
 	if (RNA_boolean_get(ptr, "show_expanded")) {
 		uiItemR(sub, ptr, "type", 0, "", ICON_NONE);
 		uiItemR(sub, ptr, "name", 0, "", ICON_NONE);
@@ -1380,7 +1408,7 @@ static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 	if (!RNA_boolean_get(ptr, "show_expanded"))
 		return;
 
-	uiItemR(layout, ptr, "group", 0, "", ICON_GROUP);
+	draw_brick_group_field(layout, ptr, "sensor");
 	draw_sensor_internal_header(layout, ptr);
 
 	box = uiLayoutBox(layout);
@@ -1457,6 +1485,7 @@ static void draw_controller_header(uiLayout *layout, PointerRNA *ptr, int xco, i
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "active"));
 	uiItemR(sub, ptr, "show_expanded", UI_ITEM_R_NO_BG, "", ICON_NONE);
 	uiItemL(sub, "", ICON_LOGIC);
+	draw_brick_group_toggle(sub, ptr);
 	if (RNA_boolean_get(ptr, "show_expanded")) {
 		uiItemR(sub, ptr, "type", 0, "", ICON_NONE);
 		uiItemR(sub, ptr, "name", 0, "", ICON_NONE);
@@ -1522,7 +1551,7 @@ static void draw_brick_controller(uiLayout *layout, PointerRNA *ptr)
 	if (!RNA_boolean_get(ptr, "show_expanded"))
 		return;
 
-	uiItemR(layout, ptr, "group", 0, "", ICON_GROUP);
+	draw_brick_group_field(layout, ptr, "controller");
 	box = uiLayoutBox(layout);
 	uiLayoutSetActive(box, RNA_boolean_get(ptr, "active"));
 
@@ -1563,6 +1592,7 @@ static void draw_actuator_header(uiLayout *layout, PointerRNA *ptr, PointerRNA *
 	uiLayoutSetActive(sub, RNA_boolean_get(ptr, "active"));
 	uiItemR(sub, ptr, "show_expanded", UI_ITEM_R_NO_BG, "", ICON_NONE);
 	uiItemL(sub, "", ICON_LOGIC);
+	draw_brick_group_toggle(sub, ptr);
 	if (RNA_boolean_get(ptr, "show_expanded")) {
 		uiItemR(sub, ptr, "type", 0, "", ICON_NONE);
 		uiItemR(sub, ptr, "name", 0, "", ICON_NONE);
@@ -2621,7 +2651,7 @@ static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
 	if (!RNA_boolean_get(ptr, "show_expanded"))
 		return;
 
-	uiItemR(layout, ptr, "group", 0, "", ICON_GROUP);
+	draw_brick_group_field(layout, ptr, "actuator");
 	box = uiLayoutBox(layout);
 	uiLayoutSetActive(box, RNA_boolean_get(ptr, "active"));
 

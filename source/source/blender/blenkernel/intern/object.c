@@ -426,6 +426,7 @@ void BKE_object_free(Object *ob)
 		ob->mpath = NULL;
 	}
 	BKE_bproperty_free_list(&ob->prop);
+	BLI_freelistN(&ob->brick_groups);
 
 	free_sensors(&ob->sensors);
 	free_controllers(&ob->controllers);
@@ -1431,6 +1432,7 @@ void BKE_object_copy_data(Main *bmain, Object *ob_dst, const Object *ob_src, con
 
 	BLI_listbase_clear(&ob_dst->prop);
 	BKE_bproperty_copy_list(&ob_dst->prop, &ob_src->prop);
+	BLI_duplicatelist(&ob_dst->brick_groups, &ob_src->brick_groups);
 
 	BKE_sca_logic_copy(ob_dst, ob_src, flag_subdata);
 	BKE_python_component_copy_list(&ob_dst->components, &ob_src->components);

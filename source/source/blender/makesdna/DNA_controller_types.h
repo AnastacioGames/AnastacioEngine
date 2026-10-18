@@ -81,6 +81,7 @@ typedef struct bController {
 #define CONT_PRIO		16
 #define CONT_DEACTIVATE	32
 #define CONT_GROUP_HIDE	64 /* the brick group is collapsed in the editor */
+#define CONT_SHOW_GROUP	128 /* the group field is shown in the brick */
 
 /* pyctrl->flag */
 #define CONT_PY_DEBUG	1
