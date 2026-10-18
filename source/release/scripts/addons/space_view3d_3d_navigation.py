@@ -253,7 +253,7 @@ class VIEW3D_PT_3dnavigationPanel(Panel):
         col.operator("view3d.view_selected", text="View to Selected")
 
         col = layout.column(align=True)
-        col.label(text="Cursor:", icon='PIVOT_CURSOR')
+        col.label(text="Cursor:", icon='CURSOR')
         row = col.row(align=True)
         row.operator("view3d.snap_cursor_to_center", text="World Origin")
         row.operator("view3d.view_center_cursor", text="View")
@@ -299,8 +299,8 @@ class VIEW3D_PT_3dnavigationPanel2(Panel):
         row = layout.row()
         row.label(text="Zoom:")
         row = layout.row()
-        row.operator("opr.zoom_in_view1", text="In", icon='ADD')
-        row.operator("opr.zoom_out_view1", text="Out", icon='REMOVE')
+        row.operator("opr.zoom_in_view1", text="In", icon='ZOOMIN')
+        row.operator("opr.zoom_out_view1", text="Out", icon='ZOOMOUT')
 
         row = layout.row()
         row.label(text="Roll:")

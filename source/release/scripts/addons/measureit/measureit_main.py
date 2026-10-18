@@ -363,7 +363,7 @@ class MEASUREIT_PT_Edit(Panel):
                 row.prop(scene, 'measureit_gl_precision', text="Precision")
                 row.prop(scene, 'measureit_units')
                 row = box.row()
-                row.prop(scene, 'measureit_gl_show_d', text="Distances", toggle=True, icon="ALIGN_CENTER")
+                row.prop(scene, 'measureit_gl_show_d', text="Distances", toggle=True, icon="ALIGN")
                 row.prop(scene, 'measureit_gl_show_n', text="Texts", toggle=True, icon="FONT_DATA")
                 row = box.row()
                 row.prop(scene, 'measureit_hide_units', text="Hide measurement unit")
@@ -543,7 +543,7 @@ def add_item(box, idx, segment):
         if segment.gltype != 2 and segment.gltype != 10:
             row = box.row(align=True)
             if scene.measureit_gl_show_d is True and segment.gltype != 9:
-                row.prop(segment, 'gldist', text="Distance", toggle=True, icon="ALIGN_CENTER")
+                row.prop(segment, 'gldist', text="Distance", toggle=True, icon="ALIGN")
             if scene.measureit_gl_show_n is True:
                 row.prop(segment, 'glnames', text="Text", toggle=True, icon="FONT_DATA")
             # sum distances
@@ -713,10 +713,10 @@ class MEASUREIT_PT_Main(Panel):
             split.prop(scene, 'measureit_debug_norm_color', text="")
             if scene.measureit_debug_normals is False:
                 split = split.split(factor=0.50, align=True)
-                split.prop(scene, "measureit_debug_normals", icon="OBJECT_ORIGIN")
+                split.prop(scene, "measureit_debug_normals", icon="OBJECT_DATAMODE")
             else:
                 split = split.split(factor=0.5, align=True)
-                split.prop(scene, "measureit_debug_normals", icon="OBJECT_ORIGIN")
+                split.prop(scene, "measureit_debug_normals", icon="OBJECT_DATAMODE")
                 split.prop(scene, "measureit_debug_normal_size")
                 row = box.row()
                 split = row.split(factor=0.10, align=True)

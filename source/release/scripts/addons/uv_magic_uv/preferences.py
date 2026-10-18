@@ -49,7 +49,7 @@ def view3d_uvmap_menu_fn(self, context):
     sc = context.scene
 
     layout.separator()
-    layout.label(text="Copy/Paste UV", icon='IMAGE')
+    layout.label(text="Copy/Paste UV", icon='IMAGE_COL')
     # Copy/Paste UV
     layout.menu(ui.VIEW3D_MT_uv_map.MUV_MT_CopyPasteUV.bl_idname,
                 text="Copy/Paste UV")
@@ -58,7 +58,7 @@ def view3d_uvmap_menu_fn(self, context):
                 text="Transfer UV")
 
     layout.separator()
-    layout.label(text="UV Manipulation", icon='IMAGE')
+    layout.label(text="UV Manipulation", icon='IMAGE_COL')
     # Flip/Rotate UV
     ops = layout.operator(op.flip_rotate_uv.MUV_OT_FlipRotate.bl_idname,
                           text="Flip/Rotate UV")
@@ -79,7 +79,7 @@ def view3d_object_menu_fn(self, _):
     layout = self.layout
 
     layout.separator()
-    layout.label(text="Copy/Paste UV", icon='IMAGE')
+    layout.label(text="Copy/Paste UV", icon='IMAGE_COL')
     # Copy/Paste UV (Among Objecct)
     layout.menu(ui.VIEW3D_MT_object.MUV_MT_CopyPasteUV_Object.bl_idname,
                 text="Copy/Paste UV")
@@ -90,7 +90,7 @@ def image_uvs_menu_fn(self, _):
 
     layout.separator()
     # Copy/Paste UV (on UV/Image Editor)
-    layout.label(text="Copy/Paste UV", icon='IMAGE')
+    layout.label(text="Copy/Paste UV", icon='IMAGE_COL')
     layout.menu(ui.IMAGE_MT_uvs.MUV_MT_CopyPasteUV_UVEdit.bl_idname,
                 text="Copy/Paste UV")
 
