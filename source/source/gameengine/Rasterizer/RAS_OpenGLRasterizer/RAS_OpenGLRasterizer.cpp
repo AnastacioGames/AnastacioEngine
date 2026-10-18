@@ -35,6 +35,8 @@
 #include "GPU_glew.h"
 
 #include "RAS_MeshUser.h"
+#define RAS_WEBGL_COMPAT_NO_REMAP
+#include "RAS_WebGLCompat.h"
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
@@ -351,7 +353,10 @@ void RAS_OpenGLRasterizer::SetColorMask(bool r, bool g, bool b, bool a)
 
 void RAS_OpenGLRasterizer::DrawOverlayPlane()
 {
+	// The copy shader writes only output 0, the target may have more draw buffers (WebGL error).
+	RAS_NarrowDrawBuffersBegin();
 	m_screenPlane.Render();
+	RAS_NarrowDrawBuffersEnd();
 }
 
 void RAS_OpenGLRasterizer::SetViewport(int x, int y, int width, int height)

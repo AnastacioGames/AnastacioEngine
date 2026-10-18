@@ -28,6 +28,7 @@
  */
 
 #include "RAS_ParticleBuffer.h"
+#include "RAS_WebGLCompat.h"
 
 #include "CM_Message.h"
 
@@ -296,15 +297,15 @@ bool RAS_ParticleBuffer::Create()
 		glBindBuffer(GL_ARRAY_BUFFER, m_quadVbo);
 		glEnableVertexAttribArray(0);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (const void *)0);
-		glVertexAttribDivisorARB(0, 0);
+		RAS_VertexAttribDivisor(0, 0);
 
 		glBindBuffer(GL_ARRAY_BUFFER, m_vbo[i]);
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (const void *)0);
-		glVertexAttribDivisorARB(1, 1);
+		RAS_VertexAttribDivisor(1, 1);
 		glEnableVertexAttribArray(2);
 		glVertexAttribPointer(2, 1, GL_FLOAT, GL_FALSE, stride, (const void *)(6 * sizeof(float)));
-		glVertexAttribDivisorARB(2, 1);
+		RAS_VertexAttribDivisor(2, 1);
 	}
 	glBindVertexArray(0);
 	glBindBuffer(GL_ARRAY_BUFFER, 0);
@@ -503,7 +504,7 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection, 
 	}
 
 	glBindVertexArray(m_drawVao[m_readIndex]);
-	glDrawArraysInstancedARB(GL_TRIANGLE_STRIP, 0, 4, m_particleCount);
+	RAS_DrawArraysInstanced(GL_TRIANGLE_STRIP, 0, 4, m_particleCount);
 	glBindVertexArray(0);
 
 	if (m_backfaceCulling) {

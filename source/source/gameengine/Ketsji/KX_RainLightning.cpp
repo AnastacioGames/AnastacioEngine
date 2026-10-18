@@ -40,6 +40,7 @@
 #include "DNA_world_types.h"
 
 #include "GPU_glew.h"
+#include "RAS_WebGLCompat.h"
 #include "GPU_draw.h"
 
 #include <algorithm>
@@ -442,10 +443,10 @@ bool KX_RainLightning::EnsureGL()
 	}
 
 	GLuint vert = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vert, 1, &kVertexSource, nullptr);
+	RAS_ShaderSource(vert, kVertexSource);
 	glCompileShader(vert);
 	GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(frag, 1, &kFragmentSource, nullptr);
+	RAS_ShaderSource(frag, kFragmentSource);
 	glCompileShader(frag);
 
 	GLint status;
@@ -475,7 +476,7 @@ bool KX_RainLightning::EnsureGL()
 	glBindAttribLocation(m_program, 0, "in_pos");
 	glBindAttribLocation(m_program, 1, "in_uv");
 	glBindAttribLocation(m_program, 2, "in_bright");
-	glBindFragDataLocation(m_program, 0, "fragColor");
+	RAS_BindFragDataLocation(m_program, 0, "fragColor");
 	glLinkProgram(m_program);
 	glDeleteShader(vert);
 	glDeleteShader(frag);

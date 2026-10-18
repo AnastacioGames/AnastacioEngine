@@ -90,6 +90,7 @@ set(SRC
 	RAS_TransformFeedbackShader.cpp
 	RAS_TextureRenderer.cpp
 	RAS_TextUser.cpp
+	RAS_WebGLCompat.cpp
 	RAS_VertexInfo.cpp
 
 	RAS_2DFilterData.h
@@ -131,6 +132,7 @@ set(SRC
 	RAS_TransformFeedbackShader.h
 	RAS_TextureRenderer.h
 	RAS_TextUser.h
+	RAS_WebGLCompat.h
 	RAS_VertexInfo.h
 )
 

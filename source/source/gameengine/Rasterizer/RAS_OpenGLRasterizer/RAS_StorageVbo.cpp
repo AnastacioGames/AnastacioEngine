@@ -28,6 +28,13 @@
 #include "RAS_StorageVbo.h"
 #include "RAS_DisplayArray.h"
 
+#ifdef __EMSCRIPTEN__
+/* The GLEW ARB pointer is null on the Web. */
+extern "C" void emscripten_glDrawElementsInstanced(GLenum mode, GLsizei count, GLenum type, const void *indices, GLsizei instancecount);
+#  undef glDrawElementsInstancedARB
+#  define glDrawElementsInstancedARB emscripten_glDrawElementsInstanced
+#endif
+
 RAS_StorageVbo::RAS_StorageVbo(RAS_DisplayArray *array)
 	:m_array(array),
 	m_indices(0),

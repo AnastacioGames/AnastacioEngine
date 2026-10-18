@@ -32,6 +32,7 @@
 #include "CM_Message.h"
 
 #include "GPU_glew.h"
+#include "RAS_WebGLCompat.h"
 
 #include "DNA_object_types.h"
 
@@ -667,7 +668,7 @@ namespace {
 unsigned int CompileDrawProgram(const std::string &customFragShader)
 {
 	GLuint vert = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vert, 1, &drawVertexSource, nullptr);
+	RAS_ShaderSource(vert, drawVertexSource);
 	glCompileShader(vert);
 
 	// A custom script supplies its own `void main()`; the preamble already declares every
@@ -681,7 +682,7 @@ unsigned int CompileDrawProgram(const std::string &customFragShader)
 	const char *fragSource = fragSourceStr.c_str();
 
 	GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(frag, 1, &fragSource, nullptr);
+	RAS_ShaderSource(frag, fragSource);
 	glCompileShader(frag);
 
 	GLint status;

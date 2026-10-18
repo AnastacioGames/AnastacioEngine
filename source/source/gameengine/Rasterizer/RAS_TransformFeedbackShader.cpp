@@ -32,6 +32,7 @@
 #include "CM_Message.h"
 
 #include "GPU_glew.h"
+#include "RAS_WebGLCompat.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -65,7 +66,7 @@ bool RAS_TransformFeedbackShader::Create(const char *vertexSource, const std::ve
                                           const std::vector<std::pair<int, std::string>> &attribLocations)
 {
 	GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vertexShader, 1, &vertexSource, nullptr);
+	RAS_ShaderSource(vertexShader, vertexSource);
 	glCompileShader(vertexShader);
 
 	GLint status;
@@ -85,6 +86,21 @@ bool RAS_TransformFeedbackShader::Create(const char *vertexSource, const std::ve
 
 	m_program = glCreateProgram();
 	glAttachShader(m_program, vertexShader);
+#ifdef __EMSCRIPTEN__
+	// WebGL2 refuses to link a program without a fragment shader, even under RASTERIZER_DISCARD.
+	static const char *discardFragmentSource =
+		"#version 130\n"
+		"out vec4 fragColor;\n"
+		"void main() {\n"
+		"	fragColor = vec4(0.0);\n"
+		"}\n";
+	GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+	RAS_ShaderSource(fragmentShader, discardFragmentSource);
+	glCompileShader(fragmentShader);
+	glAttachShader(m_program, fragmentShader);
+	// The program keeps it alive once attached.
+	glDeleteShader(fragmentShader);
+#endif
 
 	// Must happen before glLinkProgram, same as glTransformFeedbackVaryings below -- keeps
 	// attribute locations stable across separately-linked programs sharing one VAO.

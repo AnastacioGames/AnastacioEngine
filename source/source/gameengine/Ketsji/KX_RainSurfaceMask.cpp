@@ -37,6 +37,7 @@
 #include "DNA_world_types.h"
 
 #include "GPU_glew.h"
+#include "RAS_WebGLCompat.h"
 
 #include <algorithm>
 #include <cmath>
@@ -201,10 +202,10 @@ bool KX_RainSurfaceMask::EnsureGL(int width, int height)
 
 	if (!m_program) {
 		GLuint vert = glCreateShader(GL_VERTEX_SHADER);
-		glShaderSource(vert, 1, &kVertexSource, nullptr);
+		RAS_ShaderSource(vert, kVertexSource);
 		glCompileShader(vert);
 		GLuint frag = glCreateShader(GL_FRAGMENT_SHADER);
-		glShaderSource(frag, 1, &kFragmentSource, nullptr);
+		RAS_ShaderSource(frag, kFragmentSource);
 		glCompileShader(frag);
 
 		GLint status;
@@ -232,7 +233,7 @@ bool KX_RainSurfaceMask::EnsureGL(int width, int height)
 		glAttachShader(m_program, vert);
 		glAttachShader(m_program, frag);
 		glBindAttribLocation(m_program, 0, "in_pos");
-		glBindFragDataLocation(m_program, 0, "fragColor");
+		RAS_BindFragDataLocation(m_program, 0, "fragColor");
 		glLinkProgram(m_program);
 		glDeleteShader(vert);
 		glDeleteShader(frag);
@@ -257,6 +258,12 @@ bool KX_RainSurfaceMask::EnsureGL(int width, int height)
 	}
 
 	if (!m_fbo) {
+		// The RG32F target needs EXT_color_buffer_float on WebGL2.
+		if (!RAS_FloatRenderTargetSupported()) {
+			CM_Warning("rain mask: no float render target, ripples/splash stay on every object");
+			m_glFailed = true;
+			return false;
+		}
 		glGenFramebuffers(1, &m_fbo);
 		glGenTextures(1, &m_texture);
 		glGenRenderbuffers(1, &m_depth);
