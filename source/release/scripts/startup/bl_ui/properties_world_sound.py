@@ -205,7 +205,10 @@ def ensure_weather_sounds(scene):
         if any(s.event == event and _slot_path(s) for m in effects for s in m.sounds):
             continue
         if not effects:
+            # Modulo novo vem como o do Add Sound Module: todos os slots com o som da engine,
+            # senao a explosao ficava muda num modulo criado so por causa da chuva.
             effects.append(_new_effects_module(world))
+            changed += _fill_engine_effects(effects[0])
         module = effects[0]
         names = {s.name for s in module.sounds}
         for name, slot_event in EFFECT_SLOTS:
