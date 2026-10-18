@@ -222,3 +222,12 @@ troca de estado passa por `SCA_LogicManager` linha ~150 (`Deactivate()` + `SetAc
 **Detecção no sensor:** o modo Concluído dá pulso positivo de um tick quando o actuator sai da lista ativa com
 `FINISHED`; um contador de conclusões no actuator evita perder conclusões que ocorrem no mesmo tick do
 reinício.
+
+## 9. F1a já existia (2026-10-18)
+
+O commit `6d1596fa` ("Nomes para layers da cena e states do Logic Editor") já entrega a F1a:
+`Object.state_names[30][32]` no DNA (vazio = número), `sca_state_name_get` (`sca.c`), RNA
+`game.state_names`, painel "States" na barra lateral do Logic Editor (visível, nome, inicial) e o nome na dica
+dos botões de estado do controller, do actuator State e de `uiTemplateGameStates`.
+Faltam só os extras opcionais: escolher o estado pelo nome numa lista no actuator State e um helper de nome
+na API Python. Próximo passo: F1b (grupos).
