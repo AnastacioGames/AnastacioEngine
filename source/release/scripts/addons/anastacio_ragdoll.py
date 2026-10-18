@@ -674,7 +674,7 @@ class ANASTACIO_PT_ragdoll(bpy.types.Panel):
         inheritance_row.prop(settings, 'angular_inheritance', text='Angular')
         box.operator('anastacio.ragdoll_runtime', icon='PHYSICS')
         if runtime_component(rig):
-            box.label(text='Componente anexado; atualizar aplica estes campos.', icon='CHECKMARK')
+            box.label(text='Componente anexado; atualizar aplica estes campos.', icon='FILE_TICK')
         else:
             box.label(text='Gerar corpos mantém apenas autoria até preparar execução.', icon='INFO')
 

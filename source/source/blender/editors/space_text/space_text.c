@@ -67,6 +67,9 @@ static SpaceLink *text_new(const bContext *UNUSED(C))
 	stext->spacetype = SPACE_TEXT;
 
 	stext->lheight = 12;
+	stext->showlinenrs = 1;
+	stext->showsyntax = 1;
+	stext->wordwrap = 1;
 	stext->tabnumber = 4;
 	stext->margin_column = 80;
 
@@ -105,9 +108,16 @@ static void text_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void text_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
+static void text_init(struct wmWindowManager *UNUSED(wm), ScrArea *sa)
 {
-
+	/* Line numbers, word wrap and syntax colors are always on (the sidebar no longer shows the
+	 * toggles), also in files saved with them off. */
+	SpaceText *st = sa->spacedata.first;
+	if (st && st->spacetype == SPACE_TEXT) {
+		st->showlinenrs = 1;
+		st->showsyntax = 1;
+		st->wordwrap = 1;
+	}
 }
 
 static SpaceLink *text_duplicate(SpaceLink *sl)

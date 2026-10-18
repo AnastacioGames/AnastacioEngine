@@ -214,6 +214,14 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         shutil.copytree(multiplayer_src, os.path.join(runtime_dir, modules_dir, "anastacio_network"),
                         dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))
 
+    # Video Player: its runtime module and the videos, which the game looks for in //videos/.
+    video_src = os.path.join(blender_dir, modules_dir, "anastacio_video.py")
+    if os.path.isfile(video_src) and not copy_scripts:
+        os.makedirs(os.path.join(runtime_dir, modules_dir), exist_ok=True)
+        shutil.copy2(video_src, os.path.join(runtime_dir, modules_dir, "anastacio_video.py"))
+    from bl_ui.properties_video_player import copy_videos
+    copy_videos(os.path.dirname(output_path), report=report)
+
     # And copy datafiles folder
     if copy_datafiles:
         print("Copying datafiles...", end=" ")

@@ -52,7 +52,7 @@ class MUV_PT_View3D_UVManipulation(bpy.types.Panel):
 
     def draw_header(self, _):
         layout = self.layout
-        layout.label(text="", icon='IMAGE')
+        layout.label(text="", icon='IMAGE_COL')
 
     def draw(self, context):
         sc = context.scene

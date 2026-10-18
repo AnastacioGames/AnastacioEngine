@@ -1198,6 +1198,42 @@ static const char *pyrna_enum_as_string(PointerRNA *ptr, PropertyRNA *prop)
 }
 
 
+/* Retorna true se 'prop' e um parametro de icone (enum rna_enum_icon_items) e
+ * substitui o nome invalido por ICON_ERROR, imprimindo um aviso por nome. */
+static bool pyrna_icon_fallback(PointerRNA *ptr, PropertyRNA *prop, const char *param, int *r_value)
+{
+	static char warned[64][64];
+	static int warned_len = 0;
+	const EnumPropertyItem *item = NULL;
+	bool free = false;
+	bool is_icon;
+	const char *fn = NULL;
+	int lineno = -1;
+	int i;
+
+	RNA_property_enum_items(BPy_GetContext(), ptr, prop, &item, NULL, &free);
+	is_icon = (item == rna_enum_icon_items);
+	if (free) {
+		MEM_freeN((void *)item);
+	}
+	if (!is_icon || !RNA_enum_value_from_id(rna_enum_icon_items, "ERROR", r_value)) {
+		return false;
+	}
+
+	for (i = 0; i < warned_len; i++) {
+		if (STREQLEN(warned[i], param, sizeof(warned[i]))) {
+			return true;
+		}
+	}
+	if (warned_len < (int)ARRAY_SIZE(warned)) {
+		BLI_strncpy(warned[warned_len++], param, sizeof(warned[0]));
+	}
+	PyC_FileAndNum_Safe(&fn, &lineno);
+	fprintf(stderr, "Warning: icon '%s' not found (2.79 icon enum), using 'ERROR' - %s:%d\n",
+	        param, fn ? fn : "<unknown>", lineno);
+	return true;
+}
+
 static int pyrna_string_to_enum(
         PyObject *item, PointerRNA *ptr, PropertyRNA *prop, int *r_value,
         const char *error_prefix)
@@ -1211,7 +1247,11 @@ static int pyrna_string_to_enum(
 		return -1;
 	}
 	else {
-		if (!RNA_property_enum_value(BPy_GetContext(), ptr, prop, param, r_value)) {
+		/* Anastacio: icone inexistente (ex.: nome do 2.8+) nao derruba o draw() do painel.
+		 * Usa ERROR e avisa uma vez por nome, com arquivo:linha do script. */
+		if (!RNA_property_enum_value(BPy_GetContext(), ptr, prop, param, r_value) &&
+		    !pyrna_icon_fallback(ptr, prop, param, r_value))
+		{
 			const char *enum_str = pyrna_enum_as_string(ptr, prop);
 			PyErr_Format(PyExc_TypeError,
 			             "%.200s enum \"%.200s\" not found in (%s)",

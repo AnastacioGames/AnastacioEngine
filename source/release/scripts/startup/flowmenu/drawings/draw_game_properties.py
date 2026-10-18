@@ -29,7 +29,7 @@ def draw_game_properties(self, context, layout):
             op_rem = row.operator("object.game_property_remove", text="", icon='X')
             op_rem.index = prop_index
         else:
-            op_add = row.operator("object.game_property_new", text="Add 'Text' Property", icon="ADD")
+            op_add = row.operator("object.game_property_new", text="Add 'Text' Property", icon="ZOOMIN")
             op_add.name = "Text"
             op_add.type = 'STRING'
 
@@ -44,7 +44,7 @@ def draw_game_properties(self, context, layout):
                 op_rem = row.operator("object.game_property_remove", text="", icon='X')
                 op_rem.index = prop_indexR
             else:
-                op_add = row.operator("object.game_property_new", text="Add Resolution", icon="ADD")
+                op_add = row.operator("object.game_property_new", text="Add Resolution", icon="ZOOMIN")
                 op_add.name = "Text-Res"
                 op_add.type = 'FLOAT'
 
@@ -56,7 +56,7 @@ def draw_game_properties(self, context, layout):
     row_header = layout.row()
     row_header.label(text="Game Properties", icon="GAME")
 
-    op_add_gen = row_header.operator("object.game_property_new", text="New", icon="ADD")
+    op_add_gen = row_header.operator("object.game_property_new", text="New", icon="ZOOMIN")
     op_add_gen.name = "Prop"
 
     # Lista de Propriedades

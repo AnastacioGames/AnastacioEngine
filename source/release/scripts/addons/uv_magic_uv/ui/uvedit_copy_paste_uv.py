@@ -48,7 +48,7 @@ class MUV_PT_UVEdit_CopyPasteUV(bpy.types.Panel):
 
     def draw_header(self, _):
         layout = self.layout
-        layout.label(text="", icon='IMAGE')
+        layout.label(text="", icon='IMAGE_COL')
 
     def draw(self, _):
         layout = self.layout
