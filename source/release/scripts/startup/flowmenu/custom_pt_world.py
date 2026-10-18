@@ -530,70 +530,70 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             col.active = weather.use_volumetric_fog
             low = weather.vfog_quality == 'LOW'
 
-            row = col.row(align=True)
+            row = col.row()
             row.prop(weather, "vfog_quality", text="")
             row.prop(weather, "vfog_resolution", text="")
-            row = col.row(align=True)
+            row = col.row()
             row.prop(weather, "vfog_color", text="")
             row.prop(weather, "vfog_density", text="Density")
 
             split = col.split()
-            c = split.column(align=True)
+            c = split.column()
             c.label(text="Shape:")
             c.prop(weather, "vfog_base", text="Base")
             c.prop(weather, "vfog_falloff", text="Falloff")
             c.prop(weather, "vfog_distance", text="Distance")
-            c = split.column(align=True)
+            c = split.column()
             c.label(text="Noise:")
             c.prop(weather, "vfog_noise_amount", text="Amount", slider=True)
             c.prop(weather, "vfog_noise_scale", text="Scale")
             c.prop(weather, "vfog_speed", text="Speed")
-            row = col.row(align=True)
+            row = col.row()
             row.prop(weather, "vfog_use_layer", toggle=True)
             row.prop(weather, "vfog_use_reach_clouds", toggle=True)
 
             split = col.split()
-            c = split.column(align=True)
+            c = split.column()
             c.label(text="Light:")
             c.prop(weather, "vfog_sun_intensity", text="Sun")
             c.prop(weather, "vfog_ambient", text="Ambient")
             c.prop(weather, "vfog_anisotropy", text="Anisotropy", slider=True)
-            c = split.column(align=True)
+            c = split.column()
             c.label(text="Lamps:")
             c.prop(weather, "vfog_use_lamps", text="Enabled")
-            lamps = c.column(align=True)
+            lamps = c.column()
             lamps.active = weather.vfog_use_lamps
             lamps.prop(weather, "vfog_light_intensity", text="Intensity")
             lamps.prop(weather, "vfog_max_lights", text="Max")
 
             split = col.split()
-            c = split.column(align=True)
+            c = split.column()
             c.label(text="Shafts:")
-            sun = c.column(align=True)
+            sun = c.column()
             sun.active = not low
             sun.prop(weather, "vfog_use_sun_shafts", text="Sun Shafts")
-            shafts = c.column(align=True)
+            shafts = c.column()
             shafts.active = weather.vfog_use_lamps and not low
             shafts.prop(weather, "vfog_use_shafts", text="Lamp Shafts")
             shafts.prop(weather, "vfog_shaft_intensity", text="Intensity")
-            dust = c.column(align=True)
+            dust = c.column()
             dust.active = not low
             dust.prop(weather, "vfog_dust", text="Dust", slider=True)
-            c = split.column(align=True)
+            c = split.column()
             c.label(text="Motion:")
             c.prop(weather, "vfog_use_wind", text="Wind")
-            wind = c.column(align=True)
+            wind = c.column()
             wind.active = weather.vfog_use_wind
             wind.prop(weather, "vfog_wind_direction", text="Direction")
             c.prop(weather, "vfog_use_time_of_day", text="Morning Fog")
-            morning = c.column(align=True)
+            morning = c.column()
             morning.active = weather.vfog_use_time_of_day
             morning.prop(weather, "vfog_morning_boost", text="Boost")
 
-            row = col.row(align=True)
+            row = col.row()
             row.prop(weather, "vfog_volumes_only", text="Only Volumes")
             row.prop(weather, "vfog_edge", text="Edge", slider=True)
-            info = col.column(align=True)
+            info = col.column()
             info.label(text="Add > Fog creates volumes, smoke sources and pushers", icon='INFO')
             info.label(text="fog_volume=density; fog_shape=sphere; fog_edge=soft edge", icon='INFO')
             info.label(text="fog_smoke=rise m/s; fog_fire=temperature; fog_push=radius m", icon='INFO')
@@ -613,7 +613,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             box = _rain_section(col, weather, "show_expanded_rain_droplets", "Droplets", "use_rain_droplets",
                                "use_rain_sound")
             if weather.show_expanded_rain_droplets:
-                sub = box.column(align=True)
+                sub = box.column()
                 sub.active = weather.use_rain_droplets
                 sub.prop(weather, "rain_style")
                 sub.prop(weather, "rain_intensity", slider=True)
@@ -629,9 +629,9 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                                                             ("splash", "Splash", "splash_effect", "show_expanded_rain_splash")):
                 box = _rain_section(col, weather, expanded_prop, label, "use_rain_" + effect)
                 if getattr(weather, expanded_prop):
-                    sub = box.column(align=True)
+                    sub = box.column()
                     sub.active = getattr(weather, "use_rain_" + effect)
-                    puddle_only = sub.row(align=True)
+                    puddle_only = sub.row()
                     puddle_only.prop(weather, "use_rain_" + effect + "_puddle_only")
                     prefix = "rain_" + effect + "_"
                     sub.prop(weather, prefix + "intensity")
@@ -644,7 +644,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 
             box = _rain_section(col, weather, "show_expanded_rain_puddles", "Puddles", "use_rain_puddles")
             if weather.show_expanded_rain_puddles:
-                sub = box.column(align=True)
+                sub = box.column()
                 sub.active = weather.use_rain_puddles
                 sub.prop(weather, "rain_puddle_amount", text="Amount", slider=True)
                 sub.prop(weather, "rain_puddle_size", text="Size")
@@ -657,10 +657,10 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
 
             box = _rain_section(col, weather, "show_expanded_rain_aura", "Aura", "use_rain_aura")
             if weather.show_expanded_rain_aura:
-                sub = box.column(align=True)
+                sub = box.column()
                 sub.active = weather.use_rain_aura
                 sub.prop(weather, "rain_aura_property", text="Property")
-                info = sub.column(align=True)
+                info = sub.column()
                 info.label(text="Only objects with \"%s\" set to True" % (weather.rain_aura_property or "..."), icon='INFO')
                 info.label(text="(every nearby object when none has it)")
                 sub.prop(weather, "rain_aura_style", text="Style")
@@ -672,7 +672,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             box = _rain_section(col, weather, "show_expanded_rain_lightning", "Lightning",
                                 "use_rain_lightning", "use_rain_lightning_sound")
             if weather.show_expanded_rain_lightning:
-                sub = box.column(align=True)
+                sub = box.column()
                 sub.active = weather.use_rain_lightning
                 sub.prop(weather, "rain_lightning_rate", text="Per Minute")
                 sub.prop(weather, "rain_lightning_intensity", text="Intensity")
@@ -686,13 +686,13 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         not_live_layout(row).prop(weather, "use_clouds", text="")
 
         if weather.show_expanded_clouds:
-            col = main_box.column(align=True)
+            col = main_box.column()
             col.active = weather.use_clouds
             col.prop(weather, "cloud_coverage", slider=True)
             col.prop(weather, "cloud_scale")
             col.prop(weather, "cloud_speed")
             col.prop(weather, "cloud_color", text="Cloud Color")
-            draw_cloud_quality(col.column(align=True), weather, 'CLOUDS')
+            draw_cloud_quality(col.column(), weather, 'CLOUDS')
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_vclouds", text="Clouds - Volumetric", emboss=True)
@@ -700,7 +700,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         not_live_layout(row).prop(weather, "use_volumetric_clouds", text="")
 
         if weather.show_expanded_vclouds:
-            col = main_box.column(align=True)
+            col = main_box.column()
             col.active = weather.use_volumetric_clouds
             col.prop(weather, "vcloud_coverage", slider=True)
             col.prop(weather, "vcloud_scale")
@@ -722,7 +722,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
             shadow_col.prop(weather, "vcloud_shadow_strength", text="Strength")
 
             if weather.vcloud_quality == 'HIGH':
-                info = col.column(align=True)
+                info = col.column()
                 info.label(text="High quality is costly on integrated GPUs", icon='INFO')
 
         row = main_box.row(align=True)
@@ -731,13 +731,13 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         not_live_layout(row).prop(weather, "use_sky_layers", text="")
 
         if weather.show_expanded_sky_layers:
-            col = main_box.column(align=True)
+            col = main_box.column()
             col.active = weather.use_sky_layers
             col.prop(weather, "sky_layer_coverage", slider=True)
             col.prop(weather, "sky_layer_scale")
             col.prop(weather, "sky_layer_speed")
             col.prop(weather, "sky_layer_color", text="Cloud Color")
-            draw_cloud_quality(col.column(align=True), weather, 'SKY_LAYERS')
+            draw_cloud_quality(col.column(), weather, 'SKY_LAYERS')
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_lensflare", text="Lens Flare", emboss=True)
@@ -745,7 +745,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         not_live_layout(row).prop(weather, "use_lens_flare", text="")
 
         if weather.show_expanded_lensflare:
-            col = main_box.column(align=True)
+            col = main_box.column()
             col.active = weather.use_lens_flare
             not_live_layout(col).prop_search(weather, "sun_object_name", scene, "objects",
                                             text=iface_("Sun Object") + " *")
@@ -757,7 +757,7 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         row.prop(weather, "use_earthquake", text="")
 
         if weather.show_expanded_earthquake:
-            col = main_box.column(align=True)
+            col = main_box.column()
             col.active = weather.use_earthquake
             col.prop(weather, "earthquake_level", slider=True, text="Level")
             col.prop(weather, "earthquake_scale", slider=True, text="Scale")
