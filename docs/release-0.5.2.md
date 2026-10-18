@@ -251,3 +251,6 @@ No PC com Windows, para terminar:
   `SHA256SUMS.txt` final. Os links Windows/RangeArmor do README dão 404 até o upload.
 - **Windows, agora só:** `gh release upload v0.5.2 build/dist/AnastacioEngine-0.5.2-windows-x64.zip build/dist/RangeArmor-0.5.2-windows-x64.zip --clobber`
   (não rodar o `gh release edit`; já está publicada).
+- Windows subiu `AnastacioEngine-0.5.2-windows-x64.zip` (`5a6d7756…`) e `RangeArmor-0.5.2-windows-x64.zip`
+  (`4e04cf15…`); digests do GitHub batem com o `SHA256SUMS.txt`. Os 4 links do README respondem 200.
+  **Release 0.5.2 completa.**
