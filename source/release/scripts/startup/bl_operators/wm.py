@@ -2791,7 +2791,7 @@ _RANGEARMOR_DEFAULT_FIELDS = {
     "ExportWindows64": True,
     "ExportLinux64": True,
     "EngineWindows64": "./engine/Windows64/AnastacioRuntime.exe",
-    "EngineLinux64": "./engine/Linux64/RangeRuntime",
+    "EngineLinux64": "./engine/Linux64/AnastacioRuntime",
     "PythonWindows64": "./engine/Windows64/2.79/python/bin/python.exe",
     "PythonLinux64": "./engine/Linux64/2.79/python/bin/python3.11",
     "AlternativePython": "/2.79/python/bin/python.exe",
@@ -3071,8 +3071,9 @@ class WM_OT_one_click_export_rangearmor(Operator):
             get_range_script = os.path.join(rangearmor_dir, "release", "scripts", "get_rangeengine_currentplatform.py")
             engine_windows = os.path.join(project_dir, "engine", "Windows64", "AnastacioRuntime.exe")
             engine_windows_legacy = os.path.join(project_dir, "engine", "Windows64", "RangeRuntime.exe")
-            engine_linux = os.path.join(project_dir, "engine", "Linux64", "RangeRuntime")
-            if os.path.isfile(get_range_script) and not any(os.path.isfile(path) for path in (engine_windows, engine_windows_legacy, engine_linux)):
+            engine_linux = os.path.join(project_dir, "engine", "Linux64", "AnastacioRuntime")
+            engine_linux_legacy = os.path.join(project_dir, "engine", "Linux64", "RangeRuntime")
+            if os.path.isfile(get_range_script) and not any(os.path.isfile(path) for path in (engine_windows, engine_windows_legacy, engine_linux, engine_linux_legacy)):
                 subprocess.run(
                     [python_exe, get_range_script, "--project", config_path, "--all-platforms"],
                     cwd=project_dir, capture_output=True, text=True, timeout=600,

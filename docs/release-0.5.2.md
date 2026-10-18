@@ -188,3 +188,14 @@ No PC com Windows, para terminar:
 - Validado: cache do Windows → 1ª execução recusa e refaz o BVH (`1 new`), Player/Enemy param em z=0,5;
   2ª execução usa o cache regravado. Pacote Linux refeito com a correção e trocado no rascunho:
   `73a960e4a0b43225017a863bd541c40944447f125d8e5c7fe37b5563cce833fa  AnastacioEngine-0.5.2-linux-x86_64.tar.xz` (o `SHA256SUMS.txt` do rascunho já tem esta linha).
+
+### Play Standalone não abria no Linux (corrigido)
+
+- `anastacio_cook._runtime_path()` só procurava `RangeRuntime` fora do Windows; o pacote Linux tem
+  `AnastacioRuntime` desde a 0.5.1, então Standalone dava "Player path not found" (o Play embutido
+  funcionava). Agora procura `AnastacioRuntime` e cai para `RangeRuntime`. Mesma função alimenta o Cook
+  da exportação (`RANGEARMOR_COOK_RUNTIME`). Padrão `EngineLinux64` da exportação e a checagem do runtime
+  no projeto também passaram a `AnastacioRuntime` (o `common.py` da RangeArmor já aceita os dois).
+- Validado: `wm.blenderplayer_start` com o editor do pacote abre o runtime e a cena roda (Player em z=0,5).
+- **Windows:** não muda nada no comportamento (lá já era `AnastacioRuntime.exe`); só entra no `git pull`.
+  O pacote Linux será refeito com isso e trocado no rascunho junto com o `SHA256SUMS.txt`.

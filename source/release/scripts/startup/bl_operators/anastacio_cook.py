@@ -39,7 +39,7 @@ def _runtime_path():
     binary = bpy.app.binary_path
     directory = os.path.dirname(binary)
     extension = os.path.splitext(binary)[1]
-    names = ("AnastacioRuntime.exe", "RangeRuntime.exe") if os.name == 'nt' else ("RangeRuntime" + extension,)
+    names = ("AnastacioRuntime.exe", "RangeRuntime.exe") if os.name == 'nt' else ("AnastacioRuntime" + extension, "RangeRuntime" + extension)
     candidates = [os.path.join(directory, name) for name in names]
     return next((path for path in candidates if os.path.isfile(path)), candidates[0])
 
