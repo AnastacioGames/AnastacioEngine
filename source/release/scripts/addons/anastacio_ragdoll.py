@@ -606,7 +606,7 @@ class ANASTACIO_UL_ragdoll_bones(bpy.types.UIList):
 
 
 class ANASTACIO_PT_ragdoll(bpy.types.Panel):
-    bl_label = 'Anastacio Ragdoll — Autoria'
+    bl_label = 'Ragdoll'
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = 'physics'
@@ -618,12 +618,12 @@ class ANASTACIO_PT_ragdoll(bpy.types.Panel):
         return context_rig(context) is not None
 
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout.box()
         rig = context_rig(context)
         settings = rig.anastacio_ragdoll
         layout.label(text=rig.name, icon='OUTLINER_OB_ARMATURE')
         layout.label(text='Caixas na pose de repouso', icon='BONE_DATA')
-        layout.prop(rig.data, 'pose_position', expand=True)
+        layout.row(align=True).prop(rig.data, 'pose_position', expand=True)
         layout.prop(settings, 'preview')
         layout.operator('anastacio.ragdoll_sync')
         layout.operator('anastacio.ragdoll_selected')
@@ -634,10 +634,22 @@ class ANASTACIO_PT_ragdoll(bpy.types.Panel):
             box = layout.box()
             box.label(text=item.name)
             box.prop(item, 'enabled')
-            for prop in ('width', 'depth', 'length_ratio', 'offset', 'rotation'):
-                box.prop(item, prop)
-            for prop in ('mass_weight', 'joint_limits', 'linear_damping', 'angular_damping'):
-                box.prop(item, prop)
+            def vector_row(prop):
+                box.label(text=item.bl_rna.properties[prop].name + ':')
+                box.row(align=True).prop(item, prop, text='')
+
+            box.label(text='Tamanho (largura X, profundidade Z, comprimento):')
+            size_row = box.row(align=True)
+            for prop, label in (('width', 'X'), ('depth', 'Z'), ('length_ratio', 'Comp.')):
+                size_row.prop(item, prop, text=label)
+            vector_row('offset')
+            vector_row('rotation')
+            box.prop(item, 'mass_weight')
+            vector_row('joint_limits')
+            box.label(text='Amortecimento:')
+            damping_row = box.row(align=True)
+            damping_row.prop(item, 'linear_damping', text='Linear')
+            damping_row.prop(item, 'angular_damping', text='Angular')
         try:
             parts = descriptors(rig)
             layout.label(text='{} corpos incluídos'.format(len(parts)))
@@ -656,8 +668,10 @@ class ANASTACIO_PT_ragdoll(bpy.types.Panel):
         if settings.auto_recover:
             box.prop(settings, 'recovery_delay')
         box.prop(settings, 'velocity_source')
-        box.prop(settings, 'linear_inheritance')
-        box.prop(settings, 'angular_inheritance')
+        box.label(text='Herança:')
+        inheritance_row = box.row(align=True)
+        inheritance_row.prop(settings, 'linear_inheritance', text='Linear')
+        inheritance_row.prop(settings, 'angular_inheritance', text='Angular')
         box.operator('anastacio.ragdoll_runtime', icon='PHYSICS')
         if runtime_component(rig):
             box.label(text='Componente anexado; atualizar aplica estes campos.', icon='CHECKMARK')
