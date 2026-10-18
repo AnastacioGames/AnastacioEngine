@@ -62,6 +62,7 @@ static const EnumPropertyItem actuator_type_items[] = {
 	{ACT_STEERING, "STEERING", 0, "Steering", ""},
 	{ACT_VIBRATION, "VIBRATION", 0, "Vibration", ""},
 	{ACT_VISIBILITY, "VISIBILITY", 0, "Visibility", ""},
+	{ACT_WAIT, "WAIT", 0, "Wait", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -100,6 +101,8 @@ static StructRNA *rna_Actuator_refine(struct PointerRNA *ptr)
 			return &RNA_VibrationActuator;
 		case ACT_VISIBILITY:
 			return &RNA_VisibilityActuator;
+		case ACT_WAIT:
+			return &RNA_WaitActuator;
 		case ACT_2DFILTER:
 			return &RNA_Filter2DActuator;
 		case ACT_PARENT:
@@ -521,6 +524,7 @@ const EnumPropertyItem *rna_Actuator_type_itemf(bContext *C, PointerRNA *ptr, Pr
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_STATE);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VIBRATION);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VISIBILITY);
+	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_WAIT);
 
 	RNA_enum_item_end(&item, &totitem);
 	*r_free = true;
@@ -2233,6 +2237,32 @@ static void rna_def_visibility_actuator(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
+static void rna_def_wait_actuator(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "WaitActuator", "Actuator");
+	RNA_def_struct_ui_text(srna, "Wait Actuator",
+	                       "Actuator that counts a time and finishes, to chain bricks with an Actuator sensor in "
+	                       "Finished mode");
+	RNA_def_struct_sdna_from(srna, "bWaitActuator", "data");
+
+	prop = RNA_def_property(srna, "duration", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 100000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 3600.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Duration",
+	                         "Seconds of simulation time to wait (the time scale affects it), "
+	                         "zero finishes in the same tick");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_restart", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_WAIT_RESTART);
+	RNA_def_property_ui_text(prop, "Restart",
+	                         "A positive pulse while waiting starts the count again (otherwise it is ignored)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+}
+
 static void rna_def_twodfilter_actuator(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2695,6 +2725,7 @@ void RNA_def_actuator(BlenderRNA *brna)
 	rna_def_game_actuator(brna);
 	rna_def_vibration_actuator(brna);
 	rna_def_visibility_actuator(brna);
+	rna_def_wait_actuator(brna);
 	rna_def_twodfilter_actuator(brna);
 	rna_def_parent_actuator(brna);
 	rna_def_state_actuator(brna);

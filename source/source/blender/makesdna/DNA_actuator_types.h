@@ -202,6 +202,11 @@ typedef struct bVibrationActuator {
 	int duration;
 } bVibrationActuator;
 
+typedef struct bWaitActuator {
+	float duration;	/* seconds of simulation time */
+	int flag;		/* ACT_WAIT_RESTART */
+} bWaitActuator;
+
 typedef struct bVisibilityActuator {
 	/** bit 0: Is this object visible?
 	 ** bit 1: Apply recursively
@@ -447,6 +452,7 @@ typedef struct bActuator {
 #define ACT_STEERING    24
 #define ACT_MOUSE		25
 #define ACT_VIBRATION	26
+#define ACT_WAIT		27
 
 /* actuator flag */
 #define ACT_SHOW		1
@@ -638,6 +644,9 @@ typedef struct bActuator {
 
 /* visibilityact->flag */
 /* Set means the object will become invisible */
+/* waitactuator->flag */
+#define ACT_WAIT_RESTART	(1 << 0)	/* a positive pulse while waiting starts the count again */
+
 #define ACT_VISIBILITY_INVISIBLE       (1 << 0)
 #define ACT_VISIBILITY_RECURSIVE       (1 << 1)
 #define ACT_VISIBILITY_OCCLUSION       (1 << 2)

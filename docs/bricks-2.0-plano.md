@@ -246,3 +246,28 @@ Definições da seção D tomadas:
 - Recolher fica em um bit de flag de cada brick (`SENS/CONT/ACT_GROUP_HIDE`).
 - O campo de grupo aparece no topo do brick expandido.
 Falta o teste à mão do usuário. Renomear um grupo inteiro de uma vez ficou para depois.
+
+## 11. F2a Esperar + Concluído (2026-10-18)
+
+Implementada, com o teste de runtime pendente (precisa abrir o jogo).
+- **Motivo de encerramento:** `SCA_IActuator::SetEndReason` (`END_NONE`/`FINISHED`/`CANCELLED`/`FAILED`) e um
+  contador de conclusões (`GetFinishCount`), zerado nas réplicas.
+  - Action: `FINISHED` no ramo "Handle a finished animation"; `CANCELLED` ao ser sobreposta ou parada (Loop Stop,
+    Property); `FAILED` sem action ou sem a propriedade.
+  - Sound: `FINISHED` quando o som que o actuator tocou chega ao fim; `CANCELLED` ao parar por pulso negativo;
+    `FAILED` sem som ou quando o play não começa. `stopSound()`/`pauseSound()` do Python não contam como concluído.
+- **Sensor Actuator, modo Concluído:** `bActuatorSensor.type` = `SENS_ACTUATOR_FINISHED` (1); RNA `mode`
+  (`ACTIVE`/`FINISHED`). Dispara quando o contador do actuator mudou desde a última avaliação: o pulso chega no tick
+  seguinte e vários no mesmo intervalo viram um. `Init()` (chamado ao voltar ao estado ativo) e o relink sincronizam o
+  contador, então conclusões de quando o sensor estava fora do estado são descartadas. Python: `sensor.mode`.
+- **Actuator Esperar** (`ACT_WAIT` = 27, `bWaitActuator {duration, flag}`, `SCA_WaitActuator`): tempo de lógica,
+  positivos ignorados enquanto conta (opção Restart), negativos ignorados, cancela quando os controllers saem do
+  estado (`IsNoLink`) ou o objeto é removido (`Deactivate`), duração zero conclui no mesmo tick. Python: `duration`,
+  `useRestart`, `waiting`, `elapsed`.
+- **pt-BR:** "Esperar", "Concluído" e as dicas no `pt_BR.po`.
+- **logic_to_python:** Esperar e sensor no modo Concluído ficam como TODO (controller continua em brick).
+- **Ainda não:** o atalho "Então" na interface (arrastar do actuator para criar o sensor) e o filtro de alvos
+  suportados na lista do sensor.
+- Cena de teste: casos W1 (0,5 s, 1 conclusão), W0 (zero), W2 (cancelado pelo estado), W3 (Restart com pulso
+  contínuo, nunca conclui), W4 (sem Restart, várias conclusões), A1 (Action sem action, falha) — imprime
+  `BRICKS2 result ... PASS/FAIL`.

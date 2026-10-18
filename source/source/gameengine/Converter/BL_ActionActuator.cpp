@@ -126,6 +126,7 @@ bool BL_ActionActuator::Update(double curtime)
 
 	// If we don't have an action, we can't do anything
 	if (m_actionName.empty()) {
+		SetEndReason(END_FAILED);
 		return false;
 	}
 
@@ -177,6 +178,7 @@ bool BL_ActionActuator::Update(double curtime)
 	if ((m_flag & ACT_FLAG_PLAY_END) && (m_flag & ACT_FLAG_ACTIVE) && obj->IsActionDone(m_layer)) {
 		m_flag &= ~ACT_FLAG_ACTIVE;
 		m_flag &= ~ACT_FLAG_PLAY_END;
+		SetEndReason(END_FINISHED);
 		return false;
 	}
 
@@ -238,6 +240,7 @@ bool BL_ActionActuator::Update(double curtime)
 				EXP_Value* prop = GetParent()->GetProperty(m_propname);
 				// If we don't have a property, we can't do anything, so just bail
 				if (!prop) {
+					SetEndReason(END_FAILED);
 					return false;
 				}
 				const float frame = prop->GetNumber();
@@ -267,6 +270,7 @@ bool BL_ActionActuator::Update(double curtime)
 			// Hopefully there wont be too many problems with two actuators using
 			// the same action...
 			m_flag &= ~ACT_FLAG_ACTIVE;
+			SetEndReason(END_CANCELLED);
 			return false;
 		}
 
@@ -279,6 +283,7 @@ bool BL_ActionActuator::Update(double curtime)
 
 				// We're done
 				m_flag &= ~ACT_FLAG_ACTIVE;
+				SetEndReason(END_CANCELLED);
 				return false;
 			}
 			case ACT_ACTION_LOOP_END:

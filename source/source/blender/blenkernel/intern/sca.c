@@ -500,6 +500,10 @@ void init_actuator(bActuator *act)
 	case ACT_VISIBILITY:
 		act->data= MEM_callocN(sizeof(bVisibilityActuator), "visibility act");
 		break;
+	case ACT_WAIT:
+		act->data = MEM_callocN(sizeof(bWaitActuator), "wait act");
+		((bWaitActuator *)act->data)->duration = 1.0f;
+		break;
 	case ACT_2DFILTER:
 		act->data = MEM_callocN(sizeof( bTwoDFilterActuator ), "2d filter act");
 		break;
@@ -1178,6 +1182,7 @@ void BKE_sca_actuators_id_loop(ListBase *actlist, SCAActuatorIDFunc func, void *
 			case ACT_GAME:
 			case ACT_VIBRATION:
 			case ACT_VISIBILITY:
+			case ACT_WAIT:
 			case ACT_SHAPEACTION:
 			case ACT_STATE:
 			case ACT_MOUSE:

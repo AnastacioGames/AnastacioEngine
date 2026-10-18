@@ -774,9 +774,23 @@ static void rna_def_actuator_sensor(BlenderRNA *brna)
 	RNA_def_struct_sdna_from(srna, "bActuatorSensor", "data");
 
 	/* XXX if eventually have Logics using RNA 100%, we could use the actuator data-block isntead of its name */
+	static const EnumPropertyItem mode_items[] = {
+		{SENS_ACTUATOR_ACTIVE, "ACTIVE", 0, "Active", "Positive while the actuator is active"},
+		{SENS_ACTUATOR_FINISHED, "FINISHED", 0, "Finished",
+		 "One tick pulse after the actuator finished its job (Action in Play, Ping Pong or Flipper, "
+		 "Sound in Play End, Wait); stopping, failing or leaving the state does not count"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
 	prop = RNA_def_property(srna, "actuator", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "name");
 	RNA_def_property_ui_text(prop, "Actuator", "Actuator name, actuator active state modifications will be detected");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "type");
+	RNA_def_property_enum_items(prop, mode_items);
+	RNA_def_property_ui_text(prop, "Mode", "When the sensor is positive");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 

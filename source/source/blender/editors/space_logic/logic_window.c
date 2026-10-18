@@ -440,6 +440,8 @@ static const char *actuator_name(int type)
 		return N_("Steering");
 	case ACT_MOUSE:
 		return N_("Mouse");
+	case ACT_WAIT:
+		return N_("Wait");
 	}
 	return N_("Unknown");
 }
@@ -1018,6 +1020,7 @@ static void draw_sensor_actuator(uiLayout *layout, PointerRNA *ptr)
 
 	RNA_pointer_create((ID *)ob, &RNA_GameObjectSettings, ob, &settings_ptr);
 	uiItemPointerR(layout, ptr, "actuator", &settings_ptr, "actuators", NULL, ICON_LOGIC);
+	uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
 }
 
 static void draw_sensor_armature(uiLayout *layout, PointerRNA *ptr)
@@ -2450,6 +2453,15 @@ static void draw_actuator_vibration(uiLayout *layout, PointerRNA *ptr)
 	}
 }
 
+static void draw_actuator_wait(uiLayout *layout, PointerRNA *ptr)
+{
+	uiLayout *row;
+	row = uiLayoutRow(layout, false);
+
+	uiItemR(row, ptr, "duration", 0, NULL, ICON_NONE);
+	uiItemR(row, ptr, "use_restart", 0, NULL, ICON_NONE);
+}
+
 static void draw_actuator_visibility(uiLayout *layout, PointerRNA *ptr)
 {
 	uiLayout *row;
@@ -2636,6 +2648,9 @@ static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
 			break;
 		case ACT_MOUSE:
 			draw_actuator_mouse(box, ptr);
+			break;
+		case ACT_WAIT:
+			draw_actuator_wait(box, ptr);
 			break;
 	}
 }

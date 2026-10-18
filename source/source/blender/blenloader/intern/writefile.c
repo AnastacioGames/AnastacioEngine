@@ -1606,6 +1606,9 @@ static void write_actuators(WriteData *wd, ListBase *lb)
 			case ACT_MOUSE:
 				writestruct(wd, DATA, bMouseActuator, 1, act->data);
 				break;
+			case ACT_WAIT:
+				writestruct(wd, DATA, bWaitActuator, 1, act->data);
+				break;
 			default:
 				; /* error: don't know how to write this file */
 		}

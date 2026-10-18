@@ -97845,3 +97845,30 @@ msgstr "Velocidade com que as camadas de nuvem se movem"
 
 msgid "Color tint of the cloud layers"
 msgstr "Tom de cor das camadas de nuvem"
+
+msgid "Wait"
+msgstr "Esperar"
+
+msgid "Finished"
+msgstr "Concluído"
+
+msgid "Wait Actuator"
+msgstr "Atuador Esperar"
+
+msgid "Actuator that counts a time and finishes, to chain bricks with an Actuator sensor in Finished mode"
+msgstr "Atuador que conta um tempo e conclui, para encadear bricks com um sensor Actuator no modo Concluído"
+
+msgid "Seconds of simulation time to wait (the time scale affects it), zero finishes in the same tick"
+msgstr "Segundos de tempo de simulação a esperar (a escala de tempo afeta), zero conclui no mesmo tick"
+
+msgid "A positive pulse while waiting starts the count again (otherwise it is ignored)"
+msgstr "Um pulso positivo durante a espera reinicia a contagem (senão é ignorado)"
+
+msgid "Positive while the actuator is active"
+msgstr "Positivo enquanto o atuador está ativo"
+
+msgid "One tick pulse after the actuator finished its job (Action in Play, Ping Pong or Flipper, Sound in Play End, Wait); stopping, failing or leaving the state does not count"
+msgstr "Pulso de um tick depois que o atuador concluiu (Action em Play, Ping Pong ou Flipper, Sound em Play End, Esperar); parar, falhar ou sair do estado não conta"
+
+msgid "When the sensor is positive"
+msgstr "Quando o sensor fica positivo"

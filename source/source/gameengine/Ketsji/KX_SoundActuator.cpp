@@ -75,6 +75,7 @@ KX_SoundActuator::KX_SoundActuator(SCA_IObject *gameobj,
 	m_3d = settings;
 	m_type = type;
 	m_isplaying = false;
+	m_playPending = false;
 }
 
 
@@ -173,6 +174,7 @@ EXP_Value *KX_SoundActuator::GetReplica()
 void KX_SoundActuator::ProcessReplica()
 {
 	SCA_IActuator::ProcessReplica();
+	m_playPending = false;
 #ifdef WITH_AUDASPACE
 	m_handle = nullptr;
 	m_sound = m_sound ? AUD_Sound_copy(m_sound) : nullptr;
@@ -193,6 +195,7 @@ bool KX_SoundActuator::Update(double curtime)
 
 #ifdef WITH_AUDASPACE
 	if (!m_sound) {
+		SetEndReason(END_FAILED);
 		return false;
 	}
 
@@ -212,6 +215,8 @@ bool KX_SoundActuator::Update(double curtime)
 						AUD_Handle_stop(m_handle);
 						m_handle = nullptr;
 					}
+					m_playPending = false;
+					SetEndReason(END_CANCELLED);
 					break;
 				}
 				case KX_SOUNDACT_PLAYEND:
@@ -254,6 +259,10 @@ bool KX_SoundActuator::Update(double curtime)
 			play();
 			// play() may have created/restarted the handle: re-query the status.
 			isplaying = m_handle ? (AUD_Handle_getStatus(m_handle) == AUD_STATUS_PLAYING) : false;
+			m_playPending = isplaying;
+			if (!isplaying) {
+				SetEndReason(END_FAILED);
+			}
 		}
 	}
 	// Status was queried above; only stop() clears the handle in between.
@@ -288,6 +297,11 @@ bool KX_SoundActuator::Update(double curtime)
 	else {
 		m_isplaying = false;
 		result = false;
+		// the sound played until its end (it was not stopped by a negative pulse)
+		if (m_playPending) {
+			m_playPending = false;
+			SetEndReason(END_FINISHED);
+		}
 	}
 #endif  // WITH_AUDASPACE
 
@@ -384,6 +398,7 @@ EXP_PYMETHODDEF_DOC_NOARGS(KX_SoundActuator, pauseSound,
 		AUD_Handle_pause(m_handle);
 	}
 #endif  // WITH_AUDASPACE
+	m_playPending = false;
 
 	Py_RETURN_NONE;
 }
@@ -398,6 +413,7 @@ EXP_PYMETHODDEF_DOC_NOARGS(KX_SoundActuator, stopSound,
 		m_handle = nullptr;
 	}
 #endif  // WITH_AUDASPACE
+	m_playPending = false;
 
 	Py_RETURN_NONE;
 }

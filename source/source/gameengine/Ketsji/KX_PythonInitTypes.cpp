@@ -124,6 +124,7 @@
 #include "SCA_PythonController.h"
 #include "SCA_RandomActuator.h"
 #include "SCA_VibrationActuator.h"
+#include "SCA_WaitActuator.h"
 #include "SCA_IController.h"
 #include "KX_NavMeshObject.h"
 #include "KX_MouseActuator.h"
@@ -328,6 +329,7 @@ PyMODINIT_FUNC initGameTypesPythonBinding(void)
 		PyType_Ready_Attr(dict, SCA_RandomActuator, init_getset);
 		PyType_Ready_Attr(dict, SCA_RandomSensor, init_getset);
 		PyType_Ready_Attr(dict, SCA_VibrationActuator, init_getset);
+		PyType_Ready_Attr(dict, SCA_WaitActuator, init_getset);
 		PyType_Ready_Attr(dict, SCA_XNORController, init_getset);
 		PyType_Ready_Attr(dict, SCA_XORController, init_getset);
 		PyType_Ready_Attr(dict, SCA_IController, init_getset);
