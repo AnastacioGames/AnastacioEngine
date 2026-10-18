@@ -56,6 +56,8 @@
 #include "BLT_translation.h"
 
 #include "UI_interface.h"
+#include "WM_api.h"
+#include "WM_types.h"
 #include "UI_view2d.h"
 
 #include "RNA_access.h"
@@ -1362,6 +1364,7 @@ static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 	if (!RNA_boolean_get(ptr, "show_expanded"))
 		return;
 
+	uiItemR(layout, ptr, "group", 0, "", ICON_GROUP);
 	draw_sensor_internal_header(layout, ptr);
 
 	box = uiLayoutBox(layout);
@@ -1503,6 +1506,7 @@ static void draw_brick_controller(uiLayout *layout, PointerRNA *ptr)
 	if (!RNA_boolean_get(ptr, "show_expanded"))
 		return;
 
+	uiItemR(layout, ptr, "group", 0, "", ICON_GROUP);
 	box = uiLayoutBox(layout);
 	uiLayoutSetActive(box, RNA_boolean_get(ptr, "active"));
 
@@ -2571,6 +2575,7 @@ static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
 	if (!RNA_boolean_get(ptr, "show_expanded"))
 		return;
 
+	uiItemR(layout, ptr, "group", 0, "", ICON_GROUP);
 	box = uiLayoutBox(layout);
 	uiLayoutSetActive(box, RNA_boolean_get(ptr, "active"));
 
@@ -2635,6 +2640,442 @@ static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
 	}
 }
 
+static void draw_controller_brick(uiBlock *block, uiLayout *layout, Object *ob, bController *cont, int xco, int width, int yco)
+{
+	PointerRNA ptr;
+	uiLayout *split, *subsplit, *col;
+	uiBut *but;
+
+	RNA_pointer_create((ID *)ob, &RNA_Controller, cont, &ptr);
+
+	/* use two nested splits to align inlinks/links properly */
+	split = uiLayoutSplit(layout, 0.05f, false);
+
+	/* put inlink button to the left */
+	col = uiLayoutColumn(split, false);
+	uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
+	uiLayoutSetAlignment(col, UI_LAYOUT_ALIGN_LEFT);
+	but = uiDefIconBut(block, UI_BTYPE_INLINK, 0, ICON_INLINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, cont, LINK_CONTROLLER, 0, 0, 0, "");
+	if (!RNA_boolean_get(&ptr, "active")) {
+		UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
+	}
+
+	//col = uiLayoutColumn(split, true);
+	/* nested split for middle and right columns */
+	subsplit = uiLayoutSplit(split, 0.95f, false);
+
+	col = uiLayoutColumn(subsplit, true);
+	uiLayoutSetContextPointer(col, "controller", &ptr);
+
+	/* should make UI template for controller header.. function will do for now */
+//			draw_controller_header(col, &ptr);
+	draw_controller_header(col, &ptr, xco, width, yco); //provisory for 2.50 beta
+
+	/* draw the brick contents */
+	draw_brick_controller(col, &ptr);
+
+	/* put link button to the right */
+	col = uiLayoutColumn(subsplit, false);
+	uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
+	uiLayoutSetAlignment(col, UI_LAYOUT_ALIGN_LEFT);
+	but = uiDefIconBut(block, UI_BTYPE_LINK, 0, ICON_LINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
+	if (!RNA_boolean_get(&ptr, "active")) {
+		UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
+	}
+
+	// Line color, check if line color is equal to wcol_box.inner, if true, use black line color.
+	char line_color[3] = {cont->color[0], cont->color[1], cont->color[2]};
+	if (U.themes.first) {
+		bTheme *btheme = U.themes.first;
+
+		if (line_color[0] == btheme->tui.wcol_box.inner[0] &&
+			line_color[1] == btheme->tui.wcol_box.inner[1] &&
+			line_color[2] == btheme->tui.wcol_box.inner[2]) {
+
+			line_color[0] = 0;
+			line_color[1] = 0;
+			line_color[2] = 0;
+		}
+	}
+
+	UI_but_link_set(but, NULL, (void ***)&(cont->links), &cont->totlinks, LINK_CONTROLLER, LINK_ACTUATOR, line_color);
+
+	// Set controller color to actuators.
+	if (cont->links) {
+		for (int i = 0; i < cont->totlinks; i++) {
+			if (cont->links[i]) {
+				bActuator *act = cont->links[i];
+				copy_v3_v3_char(act->color, cont->color);
+			}
+		}
+	}
+	// Reset color (We don't know when all links will be removed from it so the color must be constantly received from the sensor).
+	if (U.themes.first) {
+		bTheme *btheme = U.themes.first;
+		copy_v3_v3_char(cont->color, btheme->tui.wcol_box.inner);
+	}
+}
+
+static void draw_sensor_brick(bContext *C, uiBlock *block, uiLayout *layout, Object *ob, bSensor *sens, PointerRNA *logic_ptr)
+{
+	PointerRNA ptr;
+	uiBut *but;
+	uiLayout *split, *col;
+
+	RNA_pointer_create((ID *)ob, &RNA_Sensor, sens, &ptr);
+
+	/* make as visible, for move operator */
+	sens->flag |= SENS_VISIBLE;
+
+	split = uiLayoutSplit(layout, 0.95f, false);
+	col = uiLayoutColumn(split, true);
+	uiLayoutSetContextPointer(col, "sensor", &ptr);
+
+	/* should make UI template for sensor header.. function will do for now */
+	draw_sensor_header(col, &ptr, logic_ptr);
+
+	/* draw the brick contents */
+	draw_brick_sensor(col, &ptr, C);
+
+	/* put link button to the right */
+	col = uiLayoutColumn(split, false);
+	uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
+	but = uiDefIconBut(block, UI_BTYPE_LINK, 0, ICON_LINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
+	if (!RNA_boolean_get(&ptr, "active")) {
+		UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
+	}
+
+	// Line color, check if line color is equal to wcol_box.inner, if true, use black line color.
+	char line_color[3] = {sens->color[0], sens->color[1], sens->color[2]};
+	if (U.themes.first) {
+		bTheme *btheme = U.themes.first;
+
+		if (line_color[0] == btheme->tui.wcol_box.inner[0] &&
+			line_color[1] == btheme->tui.wcol_box.inner[1] &&
+			line_color[2] == btheme->tui.wcol_box.inner[2]) {
+
+			line_color[0] = 0;
+			line_color[1] = 0;
+			line_color[2] = 0;
+		}
+	}
+
+	/* use old-school uiButtons for links for now */
+	UI_but_link_set(but, NULL, (void ***)&sens->links, &sens->totlinks, LINK_SENSOR, LINK_CONTROLLER, line_color);
+
+	// Set sensor color to controllers.
+	if (sens->links) {
+		for (int i = 0; i < sens->totlinks; i++) {
+			if (sens->links[i]) {
+				bController *cont = sens->links[i];
+				copy_v3_v3_char(cont->color, sens->color);
+			}
+		}
+	}
+}
+
+static void draw_actuator_brick(bContext *C, uiBlock *block, uiLayout *layout, Object *ob, bActuator *act, PointerRNA *logic_ptr)
+{
+	PointerRNA ptr;
+	uiBut *but;
+	uiLayout *split, *col;
+
+	RNA_pointer_create((ID *)ob, &RNA_Actuator, act, &ptr);
+
+	/* make as visible, for move operator */
+	act->flag |= ACT_VISIBLE;
+
+	split = uiLayoutSplit(layout, 0.05f, false);
+
+	/* put inlink button to the left */
+	col = uiLayoutColumn(split, false);
+	uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
+	but = uiDefIconBut(block, UI_BTYPE_INLINK, 0, ICON_INLINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, act, LINK_ACTUATOR, 0, 0, 0, "");
+	if (!RNA_boolean_get(&ptr, "active")) {
+		UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
+	}
+
+	col = uiLayoutColumn(split, true);
+	uiLayoutSetContextPointer(col, "actuator", &ptr);
+
+	/* should make UI template for actuator header.. function will do for now */
+	draw_actuator_header(col, &ptr, logic_ptr);
+
+	/* draw the brick contents */
+	draw_brick_actuator(col, &ptr, C);
+
+	// Reset color (the current color is constantly received from the controller).
+	if (U.themes.first) {
+		bTheme *btheme = U.themes.first;
+		copy_v3_v3_char(act->color, btheme->tui.wcol_box.inner);
+	}
+}
+
+/* ****************** Brick groups ****************** */
+
+/* Bricks with a group name are drawn under a collapsible header, after the bricks without a group.
+ * This only changes the drawing: the execution order is still the order of the lists.
+ * Wires that go to (or come from) a brick inside a collapsed group end at the group header. */
+
+static bool sensor_is_shown(SpaceLogic *slogic, uiBlock *block, Object *ob, bSensor *sens)
+{
+	return ((ob->scaflag & OB_ALLSTATE) ||
+	        !(slogic->scaflag & BUTS_SENS_STATE) ||
+	        (sens->totlinks == 0) ||                                         /* always display sensor without links so that is can be edited */
+	        (sens->flag & SENS_PIN && slogic->scaflag & BUTS_SENS_STATE) ||  /* states can hide some sensors, pinned sensors ignore the visible state */
+	        (is_sensor_linked(block, sens)));
+}
+
+static bool controller_is_shown(Object *ob, bController *cont)
+{
+	return ((ob->scaflag & OB_ALLSTATE) || (ob->state & cont->state_mask));
+}
+
+static bool actuator_is_shown(SpaceLogic *slogic, Object *ob, bActuator *act)
+{
+	return ((ob->scaflag & OB_ALLSTATE) ||
+	        !(slogic->scaflag & BUTS_ACT_STATE) ||
+	        !(act->flag & ACT_LINKED) ||   /* always display actuators without links so that is can be edited */
+	        (act->flag & ACT_VISIBLE) ||   /* this actuator has visible connection, display it */
+	        (act->flag & ACT_PIN && slogic->scaflag & BUTS_ACT_STATE));  /* pinned actuators ignore the visible state */
+}
+
+/* sets 'seen' when an earlier brick of the list already uses the group name of 'brick' */
+#define GROUP_SEEN_BEFORE(type, first, brick, seen) \
+	{ \
+		type *_b; \
+		seen = false; \
+		for (_b = (first); _b != (brick); _b = _b->next) { \
+			if (STREQ(_b->group, (brick)->group)) { seen = true; break; } \
+		} \
+	} (void)0
+
+/* toggles the collapsed flag of every brick of a group, using the first brick as reference */
+#define GROUP_TOGGLE(type, first, group_v, hideflag) \
+	{ \
+		type *_b; \
+		char _name[sizeof(((type *)NULL)->group)]; \
+		int _hide = -1; \
+		BLI_strncpy(_name, (const char *)(group_v), sizeof(_name)); \
+		for (_b = (first); _b; _b = _b->next) { \
+			if (STREQ(_b->group, _name)) { \
+				if (_hide == -1) _hide = (_b->flag & (hideflag)) == 0; \
+				SET_FLAG_FROM_TEST(_b->flag, _hide, (hideflag)); \
+			} \
+		} \
+	} (void)0
+
+static void do_sensor_group_toggle(bContext *C, void *ob_v, void *group_v)
+{
+	Object *ob = ob_v;
+	GROUP_TOGGLE(bSensor, ob->sensors.first, group_v, SENS_GROUP_HIDE);
+	WM_event_add_notifier(C, NC_LOGIC, NULL);
+}
+
+static void do_controller_group_toggle(bContext *C, void *ob_v, void *group_v)
+{
+	Object *ob = ob_v;
+	GROUP_TOGGLE(bController, ob->controllers.first, group_v, CONT_GROUP_HIDE);
+	WM_event_add_notifier(C, NC_LOGIC, NULL);
+}
+
+static void do_actuator_group_toggle(bContext *C, void *ob_v, void *group_v)
+{
+	Object *ob = ob_v;
+	GROUP_TOGGLE(bActuator, ob->actuators.first, group_v, ACT_GROUP_HIDE);
+	WM_event_add_notifier(C, NC_LOGIC, NULL);
+}
+
+/* draws the header button in the current layout of the block */
+static void draw_group_header_button(uiBlock *block, char *group, bool hidden, int count,
+                                     uiButHandleFunc func, Object *ob)
+{
+	char label[64];
+	uiBut *but;
+
+	if (hidden) BLI_snprintf(label, sizeof(label), "%s  (%d)", group, count);
+	else BLI_strncpy(label, group, sizeof(label));
+
+	but = uiDefIconTextBut(block, UI_BTYPE_BUT, 0, hidden ? ICON_TRIA_RIGHT : ICON_TRIA_DOWN, label,
+	                       0, 0, UI_UNIT_X * 10, UI_UNIT_Y, NULL, 0, 0, 0, 0,
+	                       hidden ? TIP_("Show the bricks of this group") : TIP_("Hide the bricks of this group"));
+	UI_but_drawflag_enable(but, UI_BUT_TEXT_LEFT);
+	UI_but_func_set(but, func, ob, group);
+}
+
+static void draw_sensor_column(bContext *C, SpaceLogic *slogic, uiBlock *block, uiLayout *layout, Object *ob, PointerRNA *logic_ptr)
+{
+	static char no_color[3] = {0, 0, 0};
+	bSensor *sens, *other;
+	bool seen;
+
+	for (sens = ob->sensors.first; sens; sens = sens->next) {
+		if (sens->group[0] == '\0' && sensor_is_shown(slogic, block, ob, sens))
+			draw_sensor_brick(C, block, layout, ob, sens, logic_ptr);
+	}
+
+	for (sens = ob->sensors.first; sens; sens = sens->next) {
+		uiLayout *split, *head, *outrow;
+		bool hidden = (sens->flag & SENS_GROUP_HIDE) != 0;
+		int count = 0;
+
+		if (sens->group[0] == '\0') continue;
+		GROUP_SEEN_BEFORE(bSensor, ob->sensors.first, sens, seen);
+		if (seen) continue;
+
+		for (other = sens; other; other = other->next) {
+			if (STREQ(other->group, sens->group) && sensor_is_shown(slogic, block, ob, other)) count++;
+		}
+		if (count == 0) continue;
+
+		split = uiLayoutSplit(layout, 0.95f, false);
+		head = uiLayoutRow(split, false);
+		outrow = uiLayoutRow(split, true);
+
+		UI_block_layout_set_current(block, head);
+		draw_group_header_button(block, sens->group, hidden, count, do_sensor_group_toggle, ob);
+
+		UI_block_layout_set_current(block, outrow);
+		if (hidden) {
+			/* the wires of the hidden sensors leave from the group header */
+			for (other = sens; other; other = other->next) {
+				uiBut *but;
+				if (!STREQ(other->group, sens->group) || !sensor_is_shown(slogic, block, ob, other)) continue;
+				but = uiDefIconBut(block, UI_BTYPE_LINK, 0, ICON_LINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
+				UI_but_link_set(but, NULL, (void ***)&other->links, &other->totlinks, LINK_SENSOR, LINK_CONTROLLER, no_color);
+			}
+		}
+		else {
+			uiItemL(outrow, "", ICON_NONE);
+		}
+		UI_block_layout_set_current(block, layout);
+
+		if (!hidden) {
+			for (other = sens; other; other = other->next) {
+				if (STREQ(other->group, sens->group) && sensor_is_shown(slogic, block, ob, other))
+					draw_sensor_brick(C, block, layout, ob, other, logic_ptr);
+			}
+		}
+	}
+}
+
+static void draw_controller_column(uiBlock *block, uiLayout *layout, Object *ob, int xco, int width, int yco)
+{
+	static char no_color[3] = {0, 0, 0};
+	bController *cont, *other;
+	bool seen;
+
+	for (cont = ob->controllers.first; cont; cont = cont->next) {
+		if (cont->group[0] == '\0' && controller_is_shown(ob, cont))
+			draw_controller_brick(block, layout, ob, cont, xco, width, yco);
+	}
+
+	for (cont = ob->controllers.first; cont; cont = cont->next) {
+		uiLayout *split, *subsplit, *inrow, *head, *outrow;
+		bool hidden = (cont->flag & CONT_GROUP_HIDE) != 0;
+		int count = 0;
+
+		if (cont->group[0] == '\0') continue;
+		GROUP_SEEN_BEFORE(bController, ob->controllers.first, cont, seen);
+		if (seen) continue;
+
+		for (other = cont; other; other = other->next) {
+			if (STREQ(other->group, cont->group) && controller_is_shown(ob, other)) count++;
+		}
+		if (count == 0) continue;
+
+		split = uiLayoutSplit(layout, 0.05f, false);
+		inrow = uiLayoutRow(split, true);
+		subsplit = uiLayoutSplit(split, 0.95f, false);
+		head = uiLayoutRow(subsplit, false);
+		outrow = uiLayoutRow(subsplit, true);
+
+		UI_block_layout_set_current(block, head);
+		draw_group_header_button(block, cont->group, hidden, count, do_controller_group_toggle, ob);
+
+		if (hidden) {
+			/* the wires of the hidden controllers arrive at and leave from the group header */
+			UI_block_layout_set_current(block, inrow);
+			for (other = cont; other; other = other->next) {
+				if (STREQ(other->group, cont->group) && controller_is_shown(ob, other))
+					uiDefIconBut(block, UI_BTYPE_INLINK, 0, ICON_INLINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, other, LINK_CONTROLLER, 0, 0, 0, "");
+			}
+			UI_block_layout_set_current(block, outrow);
+			for (other = cont; other; other = other->next) {
+				uiBut *but;
+				if (!STREQ(other->group, cont->group) || !controller_is_shown(ob, other)) continue;
+				but = uiDefIconBut(block, UI_BTYPE_LINK, 0, ICON_LINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
+				UI_but_link_set(but, NULL, (void ***)&other->links, &other->totlinks, LINK_CONTROLLER, LINK_ACTUATOR, no_color);
+			}
+		}
+		else {
+			uiItemL(inrow, "", ICON_NONE);
+			uiItemL(outrow, "", ICON_NONE);
+		}
+		UI_block_layout_set_current(block, layout);
+
+		if (!hidden) {
+			for (other = cont; other; other = other->next) {
+				if (STREQ(other->group, cont->group) && controller_is_shown(ob, other))
+					draw_controller_brick(block, layout, ob, other, xco, width, yco);
+			}
+		}
+	}
+}
+
+static void draw_actuator_column(bContext *C, SpaceLogic *slogic, uiBlock *block, uiLayout *layout, Object *ob, PointerRNA *logic_ptr)
+{
+	bActuator *act, *other;
+	bool seen;
+
+	for (act = ob->actuators.first; act; act = act->next) {
+		if (act->group[0] == '\0' && actuator_is_shown(slogic, ob, act))
+			draw_actuator_brick(C, block, layout, ob, act, logic_ptr);
+	}
+
+	for (act = ob->actuators.first; act; act = act->next) {
+		uiLayout *split, *inrow, *head;
+		bool hidden = (act->flag & ACT_GROUP_HIDE) != 0;
+		int count = 0;
+
+		if (act->group[0] == '\0') continue;
+		GROUP_SEEN_BEFORE(bActuator, ob->actuators.first, act, seen);
+		if (seen) continue;
+
+		for (other = act; other; other = other->next) {
+			if (STREQ(other->group, act->group) && actuator_is_shown(slogic, ob, other)) count++;
+		}
+		if (count == 0) continue;
+
+		split = uiLayoutSplit(layout, 0.05f, false);
+		inrow = uiLayoutRow(split, true);
+		head = uiLayoutRow(split, false);
+
+		UI_block_layout_set_current(block, head);
+		draw_group_header_button(block, act->group, hidden, count, do_actuator_group_toggle, ob);
+
+		if (hidden) {
+			/* the wires of the hidden actuators arrive at the group header */
+			UI_block_layout_set_current(block, inrow);
+			for (other = act; other; other = other->next) {
+				if (STREQ(other->group, act->group) && actuator_is_shown(slogic, ob, other))
+					uiDefIconBut(block, UI_BTYPE_INLINK, 0, ICON_INLINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, other, LINK_ACTUATOR, 0, 0, 0, "");
+			}
+		}
+		else {
+			uiItemL(inrow, "", ICON_NONE);
+		}
+		UI_block_layout_set_current(block, layout);
+
+		if (!hidden) {
+			for (other = act; other; other = other->next) {
+				if (STREQ(other->group, act->group) && actuator_is_shown(slogic, ob, other))
+					draw_actuator_brick(C, block, layout, ob, other, logic_ptr);
+			}
+		}
+	}
+}
+
 void logic_buttons(bContext *C, ARegion *ar)
 {
 	SpaceLogic *slogic= CTX_wm_space_logic(C);
@@ -2643,7 +3084,6 @@ void logic_buttons(bContext *C, ARegion *ar)
 	PointerRNA logic_ptr, settings_ptr, object_ptr;
 	uiLayout *layout, *row, *box;
 	uiBlock *block;
-	uiBut *but;
 	char uiblockstr[32];
 	short a, count;
 	int xco, yco, width, height;
@@ -2713,8 +3153,6 @@ void logic_buttons(bContext *C, ARegion *ar)
 	uiItemR(row, &logic_ptr, "show_controllers_linked_controller", 0, IFACE_("Link"), ICON_NONE);
 	
 	for (a = 0; a < count; a++) {
-		bController *cont;
-		PointerRNA ptr;
 		uiLayout *split, *subsplit, *col;
 
 
@@ -2768,79 +3206,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 		uiItemS(layout);
 
-		for (cont= ob->controllers.first; cont; cont=cont->next) {
-			RNA_pointer_create((ID *)ob, &RNA_Controller, cont, &ptr);
-
-			if (!(ob->scaflag & OB_ALLSTATE) && !(ob->state & cont->state_mask))
-				continue;
-
-			/* use two nested splits to align inlinks/links properly */
-			split = uiLayoutSplit(layout, 0.05f, false);
-
-			/* put inlink button to the left */
-			col = uiLayoutColumn(split, false);
-			uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
-			uiLayoutSetAlignment(col, UI_LAYOUT_ALIGN_LEFT);
-			but = uiDefIconBut(block, UI_BTYPE_INLINK, 0, ICON_INLINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, cont, LINK_CONTROLLER, 0, 0, 0, "");
-			if (!RNA_boolean_get(&ptr, "active")) {
-				UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
-			}
-
-			//col = uiLayoutColumn(split, true);
-			/* nested split for middle and right columns */
-			subsplit = uiLayoutSplit(split, 0.95f, false);
-
-			col = uiLayoutColumn(subsplit, true);
-			uiLayoutSetContextPointer(col, "controller", &ptr);
-
-			/* should make UI template for controller header.. function will do for now */
-//			draw_controller_header(col, &ptr);
-			draw_controller_header(col, &ptr, xco, width, yco); //provisory for 2.50 beta
-
-			/* draw the brick contents */
-			draw_brick_controller(col, &ptr);
-
-			/* put link button to the right */
-			col = uiLayoutColumn(subsplit, false);
-			uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
-			uiLayoutSetAlignment(col, UI_LAYOUT_ALIGN_LEFT);
-			but = uiDefIconBut(block, UI_BTYPE_LINK, 0, ICON_LINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
-			if (!RNA_boolean_get(&ptr, "active")) {
-				UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
-			}
-
-			// Line color, check if line color is equal to wcol_box.inner, if true, use black line color.
-			char line_color[3] = {cont->color[0], cont->color[1], cont->color[2]};
-			if (U.themes.first) {
-				bTheme *btheme = U.themes.first;
-
-				if (line_color[0] == btheme->tui.wcol_box.inner[0] &&
-					line_color[1] == btheme->tui.wcol_box.inner[1] &&
-					line_color[2] == btheme->tui.wcol_box.inner[2]) {
-
-					line_color[0] = 0;
-					line_color[1] = 0;
-					line_color[2] = 0;
-				}
-			}
-
-			UI_but_link_set(but, NULL, (void ***)&(cont->links), &cont->totlinks, LINK_CONTROLLER, LINK_ACTUATOR, line_color);
-
-			// Set controller color to actuators.
-			if (cont->links) {
-				for (int i = 0; i < cont->totlinks; i++) {
-					if (cont->links[i]) {
-						bActuator *act = cont->links[i];
-						copy_v3_v3_char(act->color, cont->color);
-					}
-				}
-			}
-			// Reset color (We don't know when all links will be removed from it so the color must be constantly received from the sensor).
-			if (U.themes.first) {
-				bTheme *btheme = U.themes.first;
-				copy_v3_v3_char(cont->color, btheme->tui.wcol_box.inner);
-			}
-		}
+		draw_controller_column(block, layout, ob, xco, width, yco);
 	}
 	UI_block_layout_resolve(block, NULL, &yco);	/* stores final height in yco */
 	height = yco;
@@ -2859,8 +3225,6 @@ void logic_buttons(bContext *C, ARegion *ar)
 	uiItemR(row, &logic_ptr, "show_sensors_active_states", 0, IFACE_("State"), ICON_NONE);
 
 	for (a=0; a<count; a++) {
-		bSensor *sens;
-		PointerRNA ptr;
 
 		ob= (Object *)idar[a];
 
@@ -2878,69 +3242,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 		uiItemS(layout);
 
-		for (sens= ob->sensors.first; sens; sens=sens->next) {
-			RNA_pointer_create((ID *)ob, &RNA_Sensor, sens, &ptr);
-
-			if ((ob->scaflag & OB_ALLSTATE) ||
-				!(slogic->scaflag & BUTS_SENS_STATE) ||
-				(sens->totlinks == 0) ||											/* always display sensor without links so that is can be edited */
-				(sens->flag & SENS_PIN && slogic->scaflag & BUTS_SENS_STATE) ||	/* states can hide some sensors, pinned sensors ignore the visible state */
-				(is_sensor_linked(block, sens))
-				)
-			{	// gotta check if the current state is visible or not
-				uiLayout *split, *col;
-
-				/* make as visible, for move operator */
-				sens->flag |= SENS_VISIBLE;
-
-				split = uiLayoutSplit(layout, 0.95f, false);
-				col = uiLayoutColumn(split, true);
-				uiLayoutSetContextPointer(col, "sensor", &ptr);
-
-				/* should make UI template for sensor header.. function will do for now */
-				draw_sensor_header(col, &ptr, &logic_ptr);
-
-				/* draw the brick contents */
-				draw_brick_sensor(col, &ptr, C);
-
-				/* put link button to the right */
-				col = uiLayoutColumn(split, false);
-				uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
-				but = uiDefIconBut(block, UI_BTYPE_LINK, 0, ICON_LINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, NULL, 0, 0, 0, 0, "");
-				if (!RNA_boolean_get(&ptr, "active")) {
-					UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
-				}
-
-				// Line color, check if line color is equal to wcol_box.inner, if true, use black line color.
-				char line_color[3] = {sens->color[0], sens->color[1], sens->color[2]};
-				if (U.themes.first) {
-					bTheme *btheme = U.themes.first;
-
-					if (line_color[0] == btheme->tui.wcol_box.inner[0] &&
-						line_color[1] == btheme->tui.wcol_box.inner[1] &&
-						line_color[2] == btheme->tui.wcol_box.inner[2]) {
-
-						line_color[0] = 0;
-						line_color[1] = 0;
-						line_color[2] = 0;
-					}
-				}
-
-				/* use old-school uiButtons for links for now */
-				UI_but_link_set(but, NULL, (void ***)&sens->links, &sens->totlinks, LINK_SENSOR, LINK_CONTROLLER, line_color);
-
-				// Set sensor color to controllers.
-				if (sens->links) {
-					for (int i = 0; i < sens->totlinks; i++) {
-						if (sens->links[i]) {
-							bController *cont = sens->links[i];
-							copy_v3_v3_char(cont->color, sens->color);
-						}
-					}
-				}
-
-			}
-		}
+		draw_sensor_column(C, slogic, block, layout, ob, &logic_ptr);
 	}
 	UI_block_layout_resolve(block, NULL, &yco);	/* stores final height in yco */
 	height = MIN2(height, yco);
@@ -2959,8 +3261,6 @@ void logic_buttons(bContext *C, ARegion *ar)
 	uiItemR(row, &logic_ptr, "show_actuators_active_states", 0, IFACE_("State"), ICON_NONE);
 
 	for (a=0; a<count; a++) {
-		bActuator *act;
-		PointerRNA ptr;
 
 		ob= (Object *)idar[a];
 
@@ -2980,49 +3280,7 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 		uiItemS(layout);
 
-		for (act= ob->actuators.first; act; act=act->next) {
-
-			RNA_pointer_create((ID *)ob, &RNA_Actuator, act, &ptr);
-
-			if ((ob->scaflag & OB_ALLSTATE) ||
-				!(slogic->scaflag & BUTS_ACT_STATE) ||
-				!(act->flag & ACT_LINKED) ||		/* always display actuators without links so that is can be edited */
-				(act->flag & ACT_VISIBLE) ||		/* this actuator has visible connection, display it */
-				(act->flag & ACT_PIN && slogic->scaflag & BUTS_ACT_STATE)	/* states can hide some sensors, pinned sensors ignore the visible state */
-				)
-			{	// gotta check if the current state is visible or not
-				uiLayout *split, *col;
-
-				/* make as visible, for move operator */
-				act->flag |= ACT_VISIBLE;
-
-				split = uiLayoutSplit(layout, 0.05f, false);
-
-				/* put inlink button to the left */
-				col = uiLayoutColumn(split, false);
-				uiLayoutSetActive(col, RNA_boolean_get(&ptr, "active"));
-				but = uiDefIconBut(block, UI_BTYPE_INLINK, 0, ICON_INLINK, 0, 0, UI_UNIT_X, UI_UNIT_Y, act, LINK_ACTUATOR, 0, 0, 0, "");
-				if (!RNA_boolean_get(&ptr, "active")) {
-					UI_but_flag_enable(but, UI_BUT_SCA_LINK_GREY);
-				}
-
-				col = uiLayoutColumn(split, true);
-				uiLayoutSetContextPointer(col, "actuator", &ptr);
-
-				/* should make UI template for actuator header.. function will do for now */
-				draw_actuator_header(col, &ptr, &logic_ptr);
-
-				/* draw the brick contents */
-				draw_brick_actuator(col, &ptr, C);
-
-				// Reset color (the current color is constantly received from the controller).
-				if (U.themes.first) {
-					bTheme *btheme = U.themes.first;
-					copy_v3_v3_char(act->color, btheme->tui.wcol_box.inner);
-				}
-
-			}
-		}
+		draw_actuator_column(C, slogic, block, layout, ob, &logic_ptr);
 	}
 	UI_block_layout_resolve(block, NULL, &yco);	/* stores final height in yco */
 	height = MIN2(height, yco);

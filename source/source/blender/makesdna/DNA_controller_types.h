@@ -59,6 +59,7 @@ typedef struct bController {
 
 	char pad[5];
 	char color[3]; /* controller color (bSensor controls this) */
+	char group[32]; /* brick group name, empty = no group */
 
 } bController;
 
@@ -79,6 +80,7 @@ typedef struct bController {
 #define CONT_MASK		8
 #define CONT_PRIO		16
 #define CONT_DEACTIVATE	32
+#define CONT_GROUP_HIDE	64 /* the brick group is collapsed in the editor */
 
 /* pyctrl->flag */
 #define CONT_PY_DEBUG	1

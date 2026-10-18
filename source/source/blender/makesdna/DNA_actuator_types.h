@@ -293,7 +293,7 @@ typedef struct bActuator {
 
 	char pad[5];
 	char color[3]; /* controller color (bController controls this) */
-
+	char group[32]; /* brick group name, empty = no group */
 } bActuator;
 
 /* objectactuator->flag */
@@ -456,6 +456,7 @@ typedef struct bActuator {
 #define ACT_VISIBLE		16
 #define ACT_PIN			32
 #define ACT_DEACTIVATE  64
+#define ACT_GROUP_HIDE  128 /* the brick group is collapsed in the editor */
 
 /* link codes */
 #define LINK_SENSOR		0

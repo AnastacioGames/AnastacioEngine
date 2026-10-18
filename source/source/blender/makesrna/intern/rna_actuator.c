@@ -599,6 +599,11 @@ static void rna_def_actuator(BlenderRNA *brna)
 	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_Actuator_name_set");
 	RNA_def_struct_name_property(srna, prop);
 
+	prop = RNA_def_property(srna, "group", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "group");
+	RNA_def_property_ui_text(prop, "Group", "Brick group shown as a collapsible header in the Logic Editor (empty = no group)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_enum_items(prop, actuator_type_items);

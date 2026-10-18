@@ -231,3 +231,18 @@ O commit `6d1596fa` ("Nomes para layers da cena e states do Logic Editor") já e
 dos botões de estado do controller, do actuator State e de `uiTemplateGameStates`.
 Faltam só os extras opcionais: escolher o estado pelo nome numa lista no actuator State e um helper de nome
 na API Python. Próximo passo: F1b (grupos).
+
+## 10. F1b grupos (2026-10-18)
+
+Feita. Cada brick (sensor, controller, actuator) ganhou `char group[32]` no DNA e `group` no RNA; vazio = sem grupo,
+então arquivos antigos e da Range original continuam iguais.
+Definições da seção D tomadas:
+- **Identidade:** o nome é a chave, por coluna e por objeto. Bricks com o mesmo texto formam o mesmo grupo.
+- **Brick compartilhado:** cada brick está em um só grupo; os fios entre grupos diferentes são desenhados normalmente.
+- **Grupo escondido:** o cabeçalho recolhido mostra `Nome (n)` e recebe os fios dos bricks ocultos (botões de
+  link/inlink no próprio cabeçalho), então dá para ver para onde vai cada fio e até ligar novos.
+- **Ordem:** os sem grupo vêm primeiro, depois cada grupo na ordem em que aparece. É só desenho; a execução segue a
+  ordem das listas.
+- Recolher fica em um bit de flag de cada brick (`SENS/CONT/ACT_GROUP_HIDE`).
+- O campo de grupo aparece no topo do brick expandido.
+Falta o teste à mão do usuário. Renomear um grupo inteiro de uma vez ficou para depois.

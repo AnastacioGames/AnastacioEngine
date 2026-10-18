@@ -200,6 +200,7 @@ typedef struct bSensor {
 
 	char description[64]; /* user description */
 	char color[3]; /* sensor color */
+	char group[32]; /* brick group name, empty = no group */
 } bSensor;
 
 typedef struct bJoystickSensor {
@@ -335,6 +336,7 @@ typedef struct bVRHeadSensor {
 #define SENS_DEACTIVATE	64
 #define SENS_DELTATIME	128
 #define SENS_SHOW_DESCR 256 /* Show Sensor Description */
+#define SENS_GROUP_HIDE 512 /* the brick group is collapsed in the editor */
 
 /* sensor->pulse */
 #define SENS_PULSE_CONT 	0
