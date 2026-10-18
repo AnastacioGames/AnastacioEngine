@@ -6,6 +6,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-18 - Preparação da 0.5.2
+
+- Versão 0.5.2 em `ANASTACIO_VERSION_STRING`, About (`wm.py`), `stage_release_windows.py` e
+  `container-build-22.04.sh`. Novidades, testes feitos e checklist do Linux em `docs/release-0.5.2.md`.
+- `script_load_modules` (ctest) falhava ao importar `anastacio_video` (só existe no jogo, importa `Range`):
+  entrou na BLACKLIST de `bl_load_py_modules.py`. ctest 15/15.
+
 ## 2026-10-18 - Liga/desliga o som de cada efeito e variação dos one-shots
 
 - Checkbox de som em todo efeito que toca som da engine, ligado por padrão (arquivos antigos seguem com som):

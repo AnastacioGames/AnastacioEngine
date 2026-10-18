@@ -44,6 +44,7 @@ BLACKLIST = {
     os.path.join("Range_Particle_Emitter", "Range_Emitter"),
     os.path.join("anastacio_network", "component"),
     "anastacio_ragdoll_runtime",
+    "anastacio_video",
     # Not an importable package name (space and hyphen).
     "BGE Post-Process",
     # Helper modules imported by add-ons through `sys.path`, not add-ons themselves.
