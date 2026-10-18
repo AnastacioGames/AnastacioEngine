@@ -1021,6 +1021,17 @@ static void draw_sensor_actuator(uiLayout *layout, PointerRNA *ptr)
 	RNA_pointer_create((ID *)ob, &RNA_GameObjectSettings, ob, &settings_ptr);
 	uiItemPointerR(layout, ptr, "actuator", &settings_ptr, "actuators", NULL, ICON_LOGIC);
 	uiItemR(layout, ptr, "mode", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+
+	if (RNA_enum_get(ptr, "mode") == SENS_ACTUATOR_FINISHED) {
+		bSensor *sens = (bSensor *)ptr->data;
+		bActuatorSensor *as = (bActuatorSensor *)sens->data;
+		bActuator *act = BLI_findstring(&ob->actuators, as->name, offsetof(bActuator, name));
+
+		/* the sensor never fires for actuators that do not report when they finish */
+		if (act && !ED_logic_actuator_reports_finish(act)) {
+			uiItemL(layout, IFACE_("This actuator never finishes (use Wait, Action or Sound)"), ICON_ERROR);
+		}
+	}
 }
 
 static void draw_sensor_armature(uiLayout *layout, PointerRNA *ptr)

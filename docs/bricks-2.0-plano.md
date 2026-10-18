@@ -270,7 +270,8 @@ Implementada, com o teste de runtime pendente (precisa abrir o jogo).
   `LOGIC_OT_actuator_then`. Cria o sensor Actuator em Concluído apontado para o actuator e um And ligado a ele, no
   estado do controller que já move o actuator. O usuário liga o And aos próximos actuators. No lugar do arrasto de
   uma saída: na UI atual um fio da 3ª coluna até a 1ª exigiria um tipo novo de link.
-- **Ainda não:** o filtro de alvos suportados na lista do sensor.
+- Alvo sem suporte: no modo Concluído, o sensor mostra um aviso quando o actuator escolhido nunca conclui. A lista
+  continua com todos os actuators (filtrar a busca exigiria um callback próprio no uiItemPointerR).
 - Teste no jogo: PASS em 2026-10-18 (o runtime não imprime no stdout redirecionado; gravar o resultado em arquivo).
 - Cena de teste: casos W1 (0,5 s, 1 conclusão), W0 (zero), W2 (cancelado pelo estado), W3 (Restart com pulso
   contínuo, nunca conclui), W4 (sem Restart, várias conclusões), A1 (Action sem action, falha) — imprime

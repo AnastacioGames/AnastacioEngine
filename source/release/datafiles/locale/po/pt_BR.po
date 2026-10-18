@@ -97882,3 +97882,5 @@ msgstr "Então"
 msgid "Add an Actuator sensor in Finished mode for this actuator, linked to a new And controller: link the controller to the actuators that run when this one finishes"
 msgstr "Adiciona um sensor Actuator no modo Concluído para este actuator, ligado a um controller And novo: ligue o controller aos actuators que rodam quando este terminar"
 
+msgid "This actuator never finishes (use Wait, Action or Sound)"
+msgstr "Este actuator nunca conclui (use Esperar, Action ou Sound)"
