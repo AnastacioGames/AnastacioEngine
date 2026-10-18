@@ -1609,6 +1609,9 @@ static void write_actuators(WriteData *wd, ListBase *lb)
 			case ACT_WAIT:
 				writestruct(wd, DATA, bWaitActuator, 1, act->data);
 				break;
+			case ACT_VIDEO:
+				writestruct(wd, DATA, bVideoActuator, 1, act->data);
+				break;
 			default:
 				; /* error: don't know how to write this file */
 		}

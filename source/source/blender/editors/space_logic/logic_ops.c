@@ -1094,7 +1094,7 @@ bool ED_logic_actuator_reports_finish(const bActuator *act)
 		/* without Self Terminated it steers until a negative pulse */
 		return act->data && (((bSteeringActuator *)act->data)->flag & ACT_STEERING_SELFTERMINATED);
 	}
-	return ELEM(act->type, ACT_WAIT, ACT_ACTION, ACT_SOUND);
+	return ELEM(act->type, ACT_WAIT, ACT_ACTION, ACT_SOUND, ACT_VIDEO);
 }
 
 static int actuator_then_exec(bContext *C, wmOperator *op)

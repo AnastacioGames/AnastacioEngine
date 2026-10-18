@@ -504,6 +504,9 @@ void init_actuator(bActuator *act)
 		act->data = MEM_callocN(sizeof(bWaitActuator), "wait act");
 		((bWaitActuator *)act->data)->duration = 1.0f;
 		break;
+	case ACT_VIDEO:
+		act->data = MEM_callocN(sizeof(bVideoActuator), "video act");
+		break;
 	case ACT_2DFILTER:
 		act->data = MEM_callocN(sizeof( bTwoDFilterActuator ), "2d filter act");
 		break;
@@ -652,6 +655,10 @@ void set_sca_new_poins_ob(Object *ob)
 			else if (act->type==ACT_PARENT) {
 				bParentActuator *para = act->data;
 				ID_NEW_REMAP(para->ob);
+			}
+			else if (act->type==ACT_VIDEO) {
+				bVideoActuator *va = act->data;
+				ID_NEW_REMAP(va->ob);
 			}
 			else if (act->type==ACT_ARMATURE) {
 				bArmatureActuator *aa = act->data;
@@ -1156,6 +1163,12 @@ void BKE_sca_actuators_id_loop(ListBase *actlist, SCAActuatorIDFunc func, void *
 			{
 				bParentActuator *pa = actuator->data;
 				func(actuator, (ID **)&pa->ob, userdata, IDWALK_CB_NOP);
+				break;
+			}
+			case ACT_VIDEO:
+			{
+				bVideoActuator *va = actuator->data;
+				func(actuator, (ID **)&va->ob, userdata, IDWALK_CB_NOP);
 				break;
 			}
 			case ACT_ARMATURE:

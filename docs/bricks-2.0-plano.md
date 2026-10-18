@@ -346,3 +346,22 @@ Cena tutorial: `docs/logic-bricks-2-tutorial.blend`, gerada por `tools/debug/cen
 Normal/Hurt com Wait + "Então"), câmera, moeda, porta com Action, checkpoint, inimigo, plataforma e o texto
 "LEIA-ME". Teste: a plataforma faz os estados 1,2,1 e anda 3,6; o inimigo alcança o jogador, que fica em Hurt
 1,5 s e volta ao Normal; marcar "To Returning" pausa o jogo aos 2 s.
+
+## F7 — Actuator Vídeo (feito)
+
+Novo `ACT_VIDEO` (28, `bVideoActuator`: objeto, segundos, modo, flag) que comanda o componente Video Player
+(`anastacio_video.VideoPlayer`) do objeto escolhido, ou do próprio objeto se o campo ficar vazio. No jogo é
+`KX_VideoActuator`, que procura o componente com o atributo `anastacio_video` e chama os métodos dele.
+
+| Modo | Faz | Concluído |
+|---|---|---|
+| Play / Restart | toca (Restart volta ao 0 antes) | quando o vídeo acaba; em loop nunca. Pausar, parar ou sair do estado: cancelado |
+| Play/Pause | pausa se está tocando, senão toca | como Play quando toca; na hora quando pausa |
+| Pause / Stop / Seek | na hora | no mesmo tick |
+
+Seek usa Segundos; com Relativo soma ao tempo atual. O tempo fica entre 0 e a duração. Se o comando chega
+antes do `start()` do componente (Always no primeiro tick), ele espera um tick. Sem Video Player no objeto:
+falhou, com um aviso no console.
+
+Teste headless (`--server`): Seek concluído no mesmo tick; Play depois do Seek para 3 s concluiu; o "Então" do
+Play deu Restart; o Pause cancelou o Restart sem concluir.

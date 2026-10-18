@@ -207,6 +207,12 @@ typedef struct bWaitActuator {
 	int flag;		/* ACT_WAIT_RESTART */
 } bWaitActuator;
 
+typedef struct bVideoActuator {
+	struct Object *ob;	/* object with the Video Player, NULL: the actuator's own object */
+	float seconds;		/* ACT_VIDEO_SEEK */
+	short mode, flag;	/* ACT_VIDEO_PLAY..., ACT_VIDEO_RELATIVE */
+} bVideoActuator;
+
 typedef struct bVisibilityActuator {
 	/** bit 0: Is this object visible?
 	 ** bit 1: Apply recursively
@@ -453,6 +459,7 @@ typedef struct bActuator {
 #define ACT_MOUSE		25
 #define ACT_VIBRATION	26
 #define ACT_WAIT		27
+#define ACT_VIDEO		28
 
 /* actuator flag */
 #define ACT_SHOW		1
@@ -646,6 +653,16 @@ typedef struct bActuator {
 /* Set means the object will become invisible */
 /* waitactuator->flag */
 #define ACT_WAIT_RESTART	(1 << 0)	/* a positive pulse while waiting starts the count again */
+
+/* videoactuator->mode */
+#define ACT_VIDEO_PLAY		0	/* stays active until the video ends: finished */
+#define ACT_VIDEO_PAUSE		1
+#define ACT_VIDEO_TOGGLE	2
+#define ACT_VIDEO_STOP		3
+#define ACT_VIDEO_RESTART	4
+#define ACT_VIDEO_SEEK		5
+/* videoactuator->flag */
+#define ACT_VIDEO_RELATIVE	(1 << 0)	/* seek from the current time */
 
 #define ACT_VISIBILITY_INVISIBLE       (1 << 0)
 #define ACT_VISIBILITY_RECURSIVE       (1 << 1)

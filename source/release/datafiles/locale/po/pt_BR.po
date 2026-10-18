@@ -97958,3 +97958,42 @@ msgstr "Vai por 2 segundos e volta, com dois estados e o actuator Wait"
 msgid "No object has the property \"player\" to chase"
 msgstr "Nenhum objeto tem a propriedade \"player\" para perseguir"
 
+
+msgid "Video"
+msgstr "Vídeo"
+
+msgid "Video Actuator"
+msgstr "Atuador Vídeo"
+
+msgid "Controls the Video Player of an object (added in the Video Player panel)"
+msgstr "Controla o Video Player de um objeto (adicionado no painel Video Player)"
+
+msgid "Play/Pause"
+msgstr "Tocar/Pausar"
+
+msgid "Play the video; the actuator finishes when it ends (not when looping)"
+msgstr "Toca o vídeo; o atuador termina quando ele acaba (não em loop)"
+
+msgid "Pause where it is"
+msgstr "Pausa onde está"
+
+msgid "Pause a playing video, play a paused one"
+msgstr "Pausa um vídeo tocando, toca um pausado"
+
+msgid "Stop and go back to the start (a fullscreen video is hidden)"
+msgstr "Para e volta ao começo (um vídeo em tela cheia é escondido)"
+
+msgid "Play from the start; finishes when the video ends"
+msgstr "Toca do começo; termina quando o vídeo acaba"
+
+msgid "Jump to a time of the video"
+msgstr "Pula para um tempo do vídeo"
+
+msgid "Object with the Video Player (empty: this object)"
+msgstr "Objeto com o Video Player (vazio: este objeto)"
+
+msgid "Time to jump to (with Relative, seconds to move)"
+msgstr "Tempo para onde pular (com Relativo, segundos a mover)"
+
+msgid "Move from the current time (negative goes back)"
+msgstr "Move a partir do tempo atual (negativo volta)"

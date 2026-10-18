@@ -94,6 +94,7 @@ public:
 		KX_ACT_MOUSE,
 		KX_ACT_LIGHTNING,
 		KX_ACT_WAIT,
+		KX_ACT_VIDEO,
 	};
 
 	/** Why an actuator stopped. Only the actuators that support the "Finished" sensor fill it,
