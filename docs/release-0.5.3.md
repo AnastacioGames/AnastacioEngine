@@ -54,6 +54,8 @@ e90d6f46ba3ae7b18df111d3ddebca1a6ba9d6527d20a2015e9fa67b620a5a58  AnastacioEngin
 cef2d3c228aa7e7167ea27cf2718f4d2bced3662638021996808834f6e85b504  RangeArmor-0.5.3-linux-x86_64.tar.xz
 ```
 
-- **Falta (usuário):** abrir `RangeArmor Panel` no Linux, criar projeto com um `.range`, Export Linux64 e
-  rodar o jogo exportado com janela. Depois, com autorização: acrescentar as duas linhas no
-  `SHA256SUMS.txt`, `gh release upload v0.5.3 ... --clobber` e publicar.
+- Teste com janela (PC Linux): `RangeArmor Panel` abre sem erro nem biblioteca faltando. Jogo exportado
+  (Linux64, `docs/logic-bricks-2-tutorial.blend` como Main File, pasta copiada para fora do projeto) roda pelo
+  launcher: shaders compilados no 1º Play, Player/Enemy em z=0,5, screenshot com cena e sombra certas.
+  O `Example Game.rasec` do modelo não abre no runtime atual; num projeto real o Main File é o `.range` do jogo.
+- Publicada: os dois tar.xz Linux e o `SHA256SUMS.txt` com 4 linhas subiram para a `v0.5.3` (já publicada pelo Windows).
