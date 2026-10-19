@@ -39,9 +39,14 @@ Desligado, cada ponto instrumentado custa um `if`. Num jogo exportado nada muda 
 | `usage` | Primeiro frame em que cada objeto passa no culling da câmera ou de uma sombra; cada imagem enviada para a GPU (tamanho, ms, frame) | Um teste de ponteiro por objeto visível por frame |
 | `frames` | Uma linha por frame: tempo total e as categorias do profiler acima de 0,05 ms | Uma linha por frame (~60 KB por minuto) |
 | `sector` | Câmera num trilho (ver abaixo): posição, progresso na curva e para onde a câmera olha, por frame | Só com `RANGE_TRACE_RAIL` |
+| `work` | Por frame: draw calls, trocas de material e luz e os contadores de `CM_WorkCounters.h` acima de 0. O launcher liga junto `RANGE_AUDIT_TRANSFORMS` (`objetos.txt`: objetos que mais geram trabalho) | Uma linha por frame |
 
-Próximos (ver `docs/roadmap.md`): `runtime` (sons, scripts, troca de cena), `shaders` e `work` (formato
-novo para `RANGE_SHADER_LOG` e `CM_WorkCounters`).
+Só no launcher (variáveis próprias, gravadas na pasta do trace e resumidas no relatório): `shaders` liga o
+`RANGE_SHADER_LOG` (`shaders.txt`: cada shader, textura e imagem, com frame e ms) e `profile` liga o
+`RANGE_PROFILE` (`profile.txt`), o log de ragdoll do RolimaRacer e o log do runtime (`tmp/`). Ver
+`docs/engine-profiling.md`.
+
+Próximo (ver `docs/roadmap.md`): `runtime` (sons, scripts, troca de cena).
 
 ## Trilho de câmera (sector)
 
@@ -68,7 +73,7 @@ A lógica do jogo continua rodando; para chegar na cena é preciso passar pelo m
 
 Uma linha JSON por evento: `{"t":segundos,"f":frame,"ev":"tipo",...}`. Tipos: `session`, `scene_load`,
 `load_shaders`, `object`, `mesh`, `material`, `object_left_out`, `convert_object`, `visible`, `image`, `frame`,
-`rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `end`.
+`rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `work`, `end`.
 Objetos são casados por nome entre cenas, porque réplicas e objetos On Demand entram na cena de destino com
 o nome do original (os On Demand aparecem primeiro na cena temporária `..ConvertSceneObject..`).
 

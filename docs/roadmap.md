@@ -546,10 +546,11 @@ iOS fora do escopo.
 
 - **Range Trace (`docs/range-trace.md`)** — fases 1 a 3 feitas em 2026-10-19 (`load`, `usage`, relatório,
   `.bat`, launcher com janela e Game > Range Trace..., `frames` com frames lentos e `sector` com trilho de
-  câmera e mapa de calor). Falta: rodar o trilho no RolimaRacer com janela (`Pista_1;Pista1.009;
-  Camera_debug_track`) e conferir o sentido da curva. Próximas: redesenhar o `relatorio.html` (simples,
-  organizado, cores para pontos de atenção) com um agente especialista em relatórios/web; (4) `runtime`
-  (sons, scripts, troca de cena), `shaders` e `work` no formato do trace.
+  câmera e mapa de calor). Trilho testado no RolimaRacer com janela
+  (espera a largada, `CONTAGEM_321`). Feitos em 2026-10-19: relatório redesenhado (resumo, linha do tempo,
+  mapa interativo, tabelas ordenáveis) e módulos `work`, `shaders` e `profile` no launcher, substituindo
+  `abrir_rolima_profile.bat` e `abrir_auditoria_trabalho_repetido.bat`. Próxima: (4) `runtime` (sons,
+  scripts, troca de cena).
 - **Onde perdemos feio para o ThunderPlayer (benchmark 2026-10-09)** — refeito o teste do Codex
   (`D:\ThunderPlayer-investigacao\benchmark\diagnostico\`, `run_diagnostics_2026_10_09.py`, `runs-2026-10-09.json`;
   relatorio original em `RESULTADO-DIAGNOSTICO.md`). RX 6800M, 1280x720, MSAA 2x, FPS medio de 2 rodadas:
@@ -669,7 +670,7 @@ iOS fora do escopo.
   "modificado" sempre ligada). Feito: contadores + detector em execução (`61d35afc`); regra no
   `AGENTS.md` e verificador estático `tools/check_trabalho_repetido.py` (`--selftest` acha o bug de
   `98f54d7f` na versão antiga) em 2026-10-17. Falta: rodar o detector nos jogos reais parado e em
-  movimento com o usuário jogando (`tools/debug/abrir_auditoria_trabalho_repetido.bat`); em background
+  movimento com o usuário jogando (Range Trace, módulo `work`); em background
   só a cena de abertura do RolimaRacer foi medida (1 objeto, contadores 0). Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md).
   Varredura do engine inteiro concluída: ~100 suspeitos classificados por gravidade em
   [auditoria-suspeitos.md](auditoria-suspeitos.md) (só leitura, nada medido). Bugs do nível 0 (8/8)
@@ -679,7 +680,7 @@ iOS fora do escopo.
   Abertos: picos longos no swap, inicialmente observados ao voltar do ragdoll; a rodada
   instrumentada de 2026-10-14 teve seis quedas sem SPIKE próximo e duas pausas entre
   quedas, sem causa identificada. Conferir novamente após correção dos scripts, com
-  10 pilotos pelo menu (`tools/debug/abrir_rolima_profile.bat`). Também aberto: upload
+  10 pilotos pelo menu (Range Trace, módulos `frames`, `shaders` e `profile`). Também aberto: upload
   lento de imagens (38 ms para 1024x512, leitura + mipmaps na CPU).
   Ver changelog de 2026-10-10.
 - **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em

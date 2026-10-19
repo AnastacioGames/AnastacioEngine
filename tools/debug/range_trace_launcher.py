@@ -30,7 +30,12 @@ MODULOS = (
     ('usage', 'Uso: primeiro frame em que cada objeto é desenhado; envio de imagens'),
     ('frames', 'Frames lentos: custo de cada frame por categoria e o que carregou junto'),
     ('sector', 'Trilho: câmera percorre a curva da pista e mede o custo por trecho'),
+    ('work', 'Trabalho repetido: transforms, bounds e chamadas de GPU por frame; objetos que mais pesam'),
+    ('shaders', 'Shaders e texturas: cada shader compilado e textura criada, com o frame e os ms'),
+    ('profile', 'Profiler completo e logs do jogo (range_profile, log do runtime, ragdoll do Rolima)'),
 )
+# Módulos que o launcher liga por variável própria, fora do RANGE_TRACE_MODULES.
+SO_LAUNCHER = ('shaders', 'profile')
 # Campos do trilho (módulo sector), lembrados por jogo.
 CAMPOS_TRILHO = (('cena', 'Cena', 14), ('curva', 'Curva', 16), ('camera', 'Câmera', 20), ('inicio', 'Início', 14),
                  ('segundos', 'Segundos', 6), ('esperar', 'Esperar (largada)', 14))
@@ -266,7 +271,8 @@ class Launcher(tk.Tk):
             ttk.Checkbutton(linha, variable=self.mods[m]).pack(side='left')
             tk.Label(linha, text=m, bg=CARTAO, fg=OURO, font=(FONTE, 11, 'bold'), width=7,
                      anchor='w').pack(side='left')
-            tk.Label(linha, text=descricao, bg=CARTAO, fg=TEXTO, font=(FONTE, 10), anchor='w').pack(side='left')
+            tk.Label(linha, text=descricao, bg=CARTAO, fg=TEXTO, font=(FONTE, 10), anchor='w', justify='left',
+                     wraplength=380).pack(side='left', fill='x')
 
         # Trilho de câmera (módulo sector), na coluna da direita: campos em duas colunas.
         self.coluna = direita
@@ -462,8 +468,22 @@ class Launcher(tk.Tk):
         with open(os.path.join(self.pasta_trace, META), 'w', encoding='utf-8') as f:
             json.dump({'jogo': jogo, 'exe': exe, 'modulos': modulos,
                        'trilho': trilho if 'sector' in modulos else None}, f, ensure_ascii=False)
-        env = dict(os.environ, RANGE_TRACE=self.pasta_trace, RANGE_TRACE_MODULES=','.join(modulos))
-        env.pop('RANGE_TRACE_RAIL', None)
+        do_trace = [m for m in modulos if m not in SO_LAUNCHER] or ['frames']
+        env = dict(os.environ, RANGE_TRACE=self.pasta_trace, RANGE_TRACE_MODULES=','.join(do_trace))
+        for var in ('RANGE_TRACE_RAIL', 'RANGE_AUDIT_TRANSFORMS', 'RANGE_SHADER_LOG', 'RANGE_PROFILE',
+                    'ROLIMA_RAGDOLL_TRACE'):
+            env.pop(var, None)
+        if 'work' in modulos:
+            env['RANGE_AUDIT_TRANSFORMS'] = os.path.join(self.pasta_trace, 'objetos.txt')
+        if 'shaders' in modulos:
+            env['RANGE_SHADER_LOG'] = os.path.join(self.pasta_trace, 'shaders.txt')
+        if 'profile' in modulos:
+            env['RANGE_PROFILE'] = os.path.join(self.pasta_trace, 'profile.txt')
+            env['ROLIMA_RAGDOLL_TRACE'] = os.path.join(self.pasta_trace, 'ragdoll.jsonl')
+            # O player grava range_runtime.log.txt no TEMP.
+            tmp = os.path.join(self.pasta_trace, 'tmp')
+            os.makedirs(tmp, exist_ok=True)
+            env['TEMP'] = env['TMP'] = tmp
         if 'sector' in modulos:
             env['RANGE_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
                                                 '%g' % max(segundos, 1.0), 'reverse' if trilho['inverter'] else 'forward',

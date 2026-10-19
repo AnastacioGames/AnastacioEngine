@@ -42,6 +42,8 @@ enum CM_TraceModule {
 	CM_TRACE_FRAMES = 1 << 2,
 	/// Camera on a curve at constant speed, set by RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;auto|none|object[;KEY+seconds]]].
 	CM_TRACE_SECTOR = 1 << 3,
+	/// Update work counters of each frame (CM_WorkCounters.h) and draw calls; RANGE_AUDIT_TRANSFORMS adds per object.
+	CM_TRACE_WORK = 1 << 4,
 };
 
 /// Bit mask of the modules on; 0 when RANGE_TRACE is unset.

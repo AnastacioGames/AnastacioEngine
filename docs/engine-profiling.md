@@ -22,8 +22,9 @@ com uma linha `START`.
 | `RANGE_SHADER_LOG=<arquivo>` | uma linha por shader criado, textura de GPU criada e imagem enviada (`image WxH [mipmap] <nome>` com o tempo, incluindo a leitura do arquivo). O `SPIKE` passa a listar `firstbind:`. Cruze o `frame=` com o do `SPIKE`. |
 
 Exemplo (PowerShell): `$env:RANGE_PROFILE="prof.txt"; AnastacioRuntime.exe jogo.range`.
-Para o RolimaRacer, `tools/debug/abrir_rolima_profile.bat` liga os dois logs e grava em
-`debug-logs/perfil-rolima-<data-hora>/`.
+Pelo launcher do Range Trace (**Game > Range Trace...**): o módulo `profile` liga o `RANGE_PROFILE` (e o log de
+ragdoll do RolimaRacer) e o módulo `shaders` liga o `RANGE_SHADER_LOG`, gravando na pasta do trace; o relatório
+resume o log de shaders.
 Rodadas de ~10 s bastam; os primeiros 30 frames (carregamento) são ignorados.
 
 ### Eventos de ragdoll do RolimaRacer

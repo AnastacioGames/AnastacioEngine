@@ -160,6 +160,26 @@ const std::string KX_KetsjiEngine::m_renderQueriesLabels[QUERY_MAX] = {
 	"Time:" // QUERY_TIME
 };
 
+/// Range Trace "work": update work and GPU calls of the last frame (CM_WorkCounters.h), only the counters above 0.
+static void trace_work()
+{
+	static const char *names[CM_WORK_COUNTER_MAX] = {"nodes", "syncs", "bounds", "matrices", "notifies", "lightUniforms",
+	                                                  "passUniforms", "instancing"};
+	char buf[64];
+	std::string parts;
+	snprintf(buf, sizeof(buf), "\"draws\":%d,\"matBinds\":%d,\"lightBinds\":%d", RAS_Rasterizer::GetLastDrawCalls(),
+	         RAS_Rasterizer::GetLastMaterialChanges(), RAS_Rasterizer::GetLastLightBinds());
+	parts = buf;
+	for (int i = 0; i < CM_WORK_COUNTER_MAX; ++i) {
+		const int value = CM_WorkCountLast((CM_WorkCounter)i);
+		if (value) {
+			snprintf(buf, sizeof(buf), ",\"%s\":%d", names[i], value);
+			parts += buf;
+		}
+	}
+	CM_TraceEvent("work", parts);
+}
+
 static void trace_image_upload(const char *name, int w, int h, bool mipmap, double ms);
 static void trace_frame(const double *categoryMs, const std::string *labels, int numCategories);
 
@@ -463,6 +483,9 @@ void KX_KetsjiEngine::BeginFrame()
 {
 	CM_WorkCountersSwap();
 	CM_WorkAuditFrame(GetClockTime());
+	if (CM_TraceOn(CM_TRACE_WORK)) {
+		trace_work();
+	}
 
 	if (m_flags & SHOW_RENDER_QUERIES) {
 		m_logger.StartLog(tc_overhead);

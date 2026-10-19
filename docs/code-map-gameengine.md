@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-10-19 (`HEAD` `c9e6f480`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-10-19 (`HEAD` `dd11e9d7`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -13,10 +13,10 @@ Caminhos abaixo relativos a `source/source/gameengine/`.
 
 ---
 
-## `Ketsji/KX_Scene.cpp` (5.181 linhas)
+## `Ketsji/KX_Scene.cpp` (5.234 linhas)
 
 Cena em execução: dona dos objetos, listas de render, câmera ativa, cutscene e bindings Python. O header é
-`Ketsji/KX_Scene.h` (832 linhas).
+`Ketsji/KX_Scene.h` (838 linhas).
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
@@ -38,9 +38,9 @@ Cena em execução: dona dos objetos, listas de render, câmera ativa, cutscene 
 | Física e rede | `Get/SetPhysicsEnvironment` 2339–2344, gravidade 2353–2358, `Get/SetNetworkMessageScene` 2329–2334, `Get/SetSuspendedDelta` 2363–2368 |
 | Merge de cenas | `MergeScene_LogicBrick` 2378, `MergeScene_GameObject` 2401, `MergeScene` 3350 |
 | Iluminação (flag) | `Get/SetUseLightScatter` 2582–2587 |
-| Cutscene | `SetCutsceneManager` 3532, `StopCutscene` 3543, `RestartCutscene` 3553, `UpdateCutscene` 3564, `TakePendingCutsceneEvents` 3844, `DispatchCutsceneEvents` 3900 (~280 linhas), `ClearCutsceneSpawnedObjects` 4203, `GetCutsceneManager` 4219 |
+| Cutscene | `SetCutsceneManager` 3532, `StopCutscene` 3543, `RestartCutscene` 3553, `UpdateCutscene` 3564, `TakePendingCutsceneEvents` 3897, `DispatchCutsceneEvents` 3953 (~280 linhas), `ClearCutsceneSpawnedObjects` 4256, `GetCutsceneManager` 4272 |
 | Busca e texto | `FindObjectWithComponent` 2655, `FindGameObject` 2677, `GetLocalizedText` 2695 |
-| Callbacks de Python | `RunDrawingCallbacks` 4261, `RunOnRemoveCallbacks` 4277 |
+| Callbacks de Python | `RunDrawingCallbacks` 4314, `RunOnRemoveCallbacks` 4330 |
 | Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 3711 |
 
 Observações: `DispatchCutsceneEvents` e `AddReplicaObject` são as funções mais longas; a remoção de objetos tem

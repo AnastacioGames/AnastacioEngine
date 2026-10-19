@@ -69,6 +69,11 @@ def mediana(valores):
     return v[len(v) // 2] if v else 0.0
 
 
+def percentil(valores, p):
+    v = sorted(valores)
+    return v[min(len(v) - 1, int(len(v) * p))] if v else 0.0
+
+
 def analisar_frames(eventos):
     """Frames lentos (modulo frames) e custo por trecho do trilho (modulo sector)."""
     frames = {}
@@ -231,6 +236,71 @@ def analisar(eventos):
                 _eventos_rail=[e for e in eventos if e['ev'] in ('rail_start', 'rail_go', 'rail_end')])
 
 
+def analisar_extras(pasta, eventos):
+    """Modulos work (eventos + objetos.txt), shaders (shaders.txt) e profile (arquivos ao lado)."""
+    x = {}
+    work = [e for e in eventos if e['ev'] == 'work' and e['f'] > FRAMES_DE_LOAD]
+    if work:
+        chaves = sorted({k for e in work for k in e if k not in ('t', 'f', 'ev')})
+        linhas = []
+        for k in chaves:
+            v = sorted(e.get(k, 0) for e in work)
+            linhas.append((k, mediana(v), percentil(v, 0.95), v[-1], sum(v) / len(v)))
+        x['work'] = dict(n=len(work), linhas=linhas)
+    objetos = os.path.join(pasta, 'objetos.txt')
+    if os.path.isfile(objetos):
+        soma = defaultdict(float)
+        segundos = set()
+        with open(objetos, encoding='utf-8', errors='replace') as f:
+            for linha in f:
+                partes = linha.split()
+                if len(partes) < 4 or not partes[0].isdigit():
+                    continue
+                segundos.add(partes[0])
+                try:
+                    soma[(partes[1], ' '.join(partes[2:-1]))] += float(partes[-1])
+                except ValueError:
+                    pass
+        n = max(len(segundos), 1)
+        x['objetos'] = sorted(((tipo, nome, v / n) for (tipo, nome), v in soma.items()), key=lambda r: r[2], reverse=True)
+    shaders = os.path.join(pasta, 'shaders.txt')
+    if os.path.isfile(shaders):
+        itens = []
+        texturas = 0
+        with open(shaders, encoding='utf-8', errors='replace') as f:
+            for linha in f:
+                partes = linha.split()
+                if len(partes) < 3 or not partes[0].startswith('t='):
+                    continue
+                try:
+                    t = float(partes[0][2:].rstrip('s'))
+                    fr = int(partes[1].split('=')[1])
+                except (ValueError, IndexError):
+                    continue
+                if partes[2] == 'texture':
+                    texturas += 1
+                elif partes[2].startswith('ms='):
+                    tipo = partes[3] if len(partes) > 3 else '?'
+                    nome = ' '.join(partes[5:]) if tipo == 'image' else partes[-1]
+                    itens.append(dict(t=t, f=fr, ms=float(partes[2][3:]), tipo=tipo, nome=nome or '-'))
+        por_tipo = defaultdict(lambda: [0, 0.0])
+        for it in itens:
+            por_tipo[it['tipo']][0] += 1
+            por_tipo[it['tipo']][1] += it['ms']
+        x['shaders'] = dict(itens=itens, texturas=texturas, por_tipo=dict(por_tipo),
+                            no_jogo=sorted((it for it in itens if it['f'] > FRAMES_DE_LOAD and it['tipo'] != 'prefetch'
+                                            and it['ms'] >= 1.0), key=lambda it: it['ms'], reverse=True))
+    arquivos = []
+    for nome in ('profile.txt', 'ragdoll.jsonl', 'ragdoll-summary.md', 'objetos.txt', 'shaders.txt'):
+        if os.path.isfile(os.path.join(pasta, nome)):
+            arquivos.append(nome)
+    tmp = os.path.join(pasta, 'tmp')
+    if os.path.isdir(tmp):
+        arquivos += ['tmp/' + n for n in sorted(os.listdir(tmp)) if n.endswith('.txt')]
+    x['arquivos'] = arquivos
+    return x
+
+
 def obs_objeto(o):
     """Camada e marcas que mudam a leitura de "nunca desenhado"."""
     partes = ['ativa' if o['active_layer'] else 'inativa']
@@ -335,6 +405,21 @@ def resumo_md(a):
                 w('| %d | %.1f | %.1f | %s | %s |' % (pk['f'], pk['t'], pk['ms'], texto_cats(pk['cats']),
                                                      '; '.join(pk['cargas']) or '-'))
     resumo_trilho(a, w)
+    x = a.get('extras', {})
+    if 'work' in x:
+        w('')
+        w('## Trabalho por frame (mediana / p95 / max)')
+        w('')
+        for k, med, p95, mx, _media in x['work']['linhas']:
+            w('- %s: %.0f / %.0f / %d' % (k, med, p95, mx))
+        for tipo, nome, v in x.get('objetos', [])[:10]:
+            w('- objeto %s %s: %.1f por frame' % (tipo, nome, v))
+    if 'shaders' in x:
+        w('')
+        w('## Shaders e imagens no jogo (%d, depois do frame %d e acima de 1 ms)' % (len(x['shaders']['no_jogo']), FRAMES_DE_LOAD))
+        w('')
+        for it in x['shaders']['no_jogo'][:TOP_RESUMO]:
+            w('- %s %s: %.1f ms, frame %d' % (it['tipo'], it['nome'], it['ms'], it['f']))
     w('')
     w('## Cargas durante o jogo (depois do frame %d)' % FRAMES_DE_LOAD)
     w('')
@@ -523,9 +608,6 @@ def secao(id_, titulo, n=None, nota=None):
     return s
 
 
-def percentil(valores, p):
-    v = sorted(valores)
-    return v[min(len(v) - 1, int(len(v) * p))] if v else 0.0
 
 
 def html_kpis(a, w):
@@ -550,6 +632,11 @@ def html_kpis(a, w):
                   'ok' if not a['nunca'] else 'warn'))
         mb = sum(mb_imagem(a['imagens'][i]) for i in a['imgs_atoa'] if i in a['imagens'])
         k.append(('VRAM a toa', '%.1f' % mb, 'MB', '%d imagens' % len(a['imgs_atoa']), 'ok' if mb < 8 else 'warn'))
+    sh = a['extras'].get('shaders')
+    if sh:
+        n = len(sh['no_jogo'])
+        k.append(('GPU no jogo', '%d' % n, '', '%.0f ms em shaders e imagens' % sum(it['ms'] for it in sh['no_jogo']),
+                  'ok' if n == 0 else 'warn' if n < 10 else 'bad'))
     ms_tarde = sum(t[3] for t in a['tardias'])
     k.append(('Cargas no jogo', '%d' % len(a['tardias']), '', '%.0f ms no total' % ms_tarde,
               'ok' if ms_tarde < 50 else 'warn' if ms_tarde < 300 else 'bad'))
@@ -747,6 +834,66 @@ def html_picos(a, w):
     w('</section>')
 
 
+def html_work(a, w):
+    x = a['extras']
+    if 'work' not in x and 'objetos' not in x:
+        return
+    w(secao('trabalho', 'Trabalho por frame', '%d frames' % x['work']['n'] if 'work' in x else None,
+            'Contadores do motor em cada frame de jogo. Numa cena parada devem ficar perto de zero: um contador que '
+            'fica no numero de objetos indica trabalho refeito todo frame sobre dados que nao mudaram.'))
+    if 'work' in x:
+        nomes = {'draws': 'draw calls', 'matBinds': 'trocas de material', 'lightBinds': 'binds de luz',
+                 'nodes': 'nos de cena atualizados', 'syncs': 'syncs de transform', 'bounds': 'bounds enviados',
+                 'matrices': 'matrizes de malha mudadas', 'notifies': 'notificacoes de update',
+                 'lightUniforms': 'uniforms de luz', 'passUniforms': 'uniforms de material',
+                 'instancing': 'envios de instancing'}
+        linhas = [(nomes.get(k, k), k, '%.0f' % med, '%.0f' % p95, '%d' % mx, '%.1f' % media)
+                  for k, med, p95, mx, media in x['work']['linhas']]
+        w(tabela(('contador', 'chave', 'mediana', 'p95', 'max', 'media'), linhas, (2, 3, 4, 5)))
+    if x.get('objetos'):
+        w('<h3>Objetos que mais geram trabalho <span class="chip">%d</span></h3>' % len(x['objetos']))
+        w('<p class="nota">Media por frame de cada objeto: raiz = arvore de transform atualizada; sync = transform '
+          'copiada para a fisica ou o render. Objeto parado com valor alto e suspeito.</p>')
+        w(tabela(('tipo', 'objeto', 'por frame'), [(t, n, '%.1f' % v) for t, n, v in x['objetos']], (2,), filtro=True))
+    w('</section>')
+
+
+def html_shaders(a, w):
+    x = a['extras'].get('shaders')
+    if not x:
+        return
+    no_jogo = x['no_jogo']
+    w(secao('shaders', 'Shaders e texturas', '%d entradas' % len(x['itens']),
+            'Log da GPU (RANGE_SHADER_LOG). create = compilado agora; cached = veio do cache; prefetch = aquecido no '
+            'load; image = imagem enviada. Compilar shader no meio do jogo e a travada mais comum.'))
+    resumo = ''.join('<div class="kpi"><span class="rot">%s</span><span class="val">%d</span>'
+                     '<span class="sub">%.0f ms no total</span></div>' % (esc(t), n, ms)
+                     for t, (n, ms) in sorted(x['por_tipo'].items(), key=lambda kv: -kv[1][1]))
+    resumo += ('<div class="kpi"><span class="rot">texturas criadas</span><span class="val">%d</span>'
+               '<span class="sub">na GPU</span></div>' % x['texturas'])
+    w('<div class="kpis" style="margin-top:8px">%s</div>' % resumo)
+    w('<h3>Depois do frame %d e acima de 1 ms <span class="chip %s">%d</span></h3>' % (
+        FRAMES_DE_LOAD, 'warn' if no_jogo else 'ok', len(no_jogo)))
+    w(tabela(('tipo', 'nome', 'ms', 'frame', 'segundo'),
+             [(it['tipo'], it['nome'], '%.1f' % it['ms'], it['f'], '%.1f' % it['t']) for it in no_jogo], (2, 3, 4)))
+    w('<h3>Os mais lentos da sessao</h3>')
+    top = sorted(x['itens'], key=lambda it: it['ms'], reverse=True)[:40]
+    w(tabela(('tipo', 'nome', 'ms', 'frame', 'segundo'),
+             [(it['tipo'], it['nome'], '%.1f' % it['ms'], it['f'], '%.1f' % it['t']) for it in top], (2, 3, 4)))
+    w('<p class="nota">O frame deste log e o do profiler da GPU; pode diferir alguns frames do trace.</p>')
+    w('</section>')
+
+
+def html_arquivos(a, w):
+    arqs = a['extras'].get('arquivos')
+    if not arqs:
+        return
+    w(secao('arquivos', 'Arquivos da sessao', len(arqs), 'Logs completos gravados nesta pasta.'))
+    w('<div class="painel" style="display:flex;flex-wrap:wrap;gap:8px">%s</div>' % ''.join(
+        '<a class="chip" style="text-transform:none" href="%s">%s</a>' % (esc(n), esc(n)) for n in arqs))
+    w('</section>')
+
+
 JS = r'''
 (function(){
   var raiz=document.documentElement, KEY='range-trace-tema';
@@ -851,10 +998,16 @@ def relatorio_html(a, meta=None, pasta=''):
         secoes.append(('trilho', 'Trilho'))
     if a['frames']:
         secoes.append(('lentos', 'Frames lentos'))
+    if 'work' in a['extras'] or 'objetos' in a['extras']:
+        secoes.append(('trabalho', 'Trabalho'))
+    if 'shaders' in a['extras']:
+        secoes.append(('shaders', 'Shaders'))
     secoes.append(('cenas', 'Cenas'))
     if a['tem_uso']:
         secoes.append(('desperdicio', 'Desperdicio'))
     secoes += [('cargas', 'Cargas no jogo'), ('imagens', 'Imagens'), ('fora', 'Deixados de fora')]
+    if a['extras'].get('arquivos'):
+        secoes.append(('arquivos', 'Arquivos'))
 
     w('<header class="topo"><div class="wrap">')
     w('<div class="titulo"><h1>Range Trace</h1>%s<span class="fim">%s<button class="tema" id="tema" type="button">Tema</button></span></div>' % (
@@ -879,6 +1032,8 @@ def relatorio_html(a, meta=None, pasta=''):
     html_tempo(a, w, (ini, go, fim))
     html_trilho(a, w)
     html_picos(a, w)
+    html_work(a, w)
+    html_shaders(a, w)
 
     w(secao('cenas', 'Cenas carregadas', len(a['cenas'])))
     linhas = []
@@ -943,6 +1098,7 @@ def relatorio_html(a, meta=None, pasta=''):
               for e in a['deixados']]
     w(tabela(('objeto', 'cena', 'motivo'), linhas))
     w('</section>')
+    html_arquivos(a, w)
     w('</main><script>%s</script></body></html>' % JS)
     return '\n'.join(p)
 
@@ -963,7 +1119,9 @@ def main():
     pasta = args[0]
     caminho = os.path.join(pasta, 'trace.jsonl') if os.path.isdir(pasta) else pasta
     pasta = os.path.dirname(os.path.abspath(caminho))
-    a = analisar(ler_eventos(caminho))
+    eventos = ler_eventos(caminho)
+    a = analisar(eventos)
+    a['extras'] = analisar_extras(pasta, eventos)
     md = resumo_md(a)
     with open(os.path.join(pasta, 'resumo.md'), 'w', encoding='utf-8') as f:
         f.write(md)
