@@ -190,6 +190,8 @@ class Launcher(tk.Tk):
         self.trilho_vars = {chave: tk.StringVar() for chave, _, _ in CAMPOS_TRILHO}
         self.trilho_inverter = tk.BooleanVar()
         self.trilho_velocidade = tk.StringVar(value='1')
+        self.modo_ia = tk.BooleanVar(value=cfg.get('modo_ia', False))
+        self.pista_ia = tk.StringVar(value=cfg.get('pista_ia', 'Pista_1'))
         self.carregar_trilho()
         self.jogo.trace_add('write', lambda *_: self.carregar_trilho())
         self.tema = cfg['tema'] if cfg['tema'] in TEMAS else 'escuro'
@@ -317,6 +319,19 @@ class Launcher(tk.Tk):
                      anchor='w').grid(row=r, column=0, sticky='w', pady=4)
             campo(corpo, var).grid(row=r, column=1, sticky='ew', padx=(0, 8), pady=4)
             botao(corpo, 'Procurar...', escolher).grid(row=r, column=2, pady=4)
+
+        # Modo IA: o jogo pula o menu, larga na pista com 10 pilotos e o Player 1 no piloto automático.
+        corpo = self.cartao('Modo IA')
+        linha = tk.Frame(corpo, bg=CARTAO)
+        linha.pack(fill='x')
+        ttk.Checkbutton(linha, text='Largar direto na pista com o Player 1 na IA', variable=self.modo_ia).pack(side='left')
+        tk.Label(linha, text='Pista', bg=CARTAO, fg=APAGADO, font=(FONTE, 9)).pack(side='left', padx=(16, 8))
+        campo(linha, self.pista_ia).pack(side='left', fill='x', expand=True)
+        tk.Label(corpo, text='Sem menu: monta o grid de 10 pilotos (fila tripla) e o carro do Player 1 já larga '
+                 'pilotado pela IA. A tecla I continua alternando entre IA e controle manual. '
+                 'Só funciona em jogos que leem ROLIMA_MODO_IA (RolimaRacer).',
+                 bg=CARTAO, fg=APAGADO, font=(FONTE, 9), justify='left', anchor='w',
+                 wraplength=int(500 * self.escala)).pack(fill='x', pady=(6, 0))
 
         # Últimos relatórios da pasta de saída.
         self.coluna = direita
@@ -460,18 +475,21 @@ class Launcher(tk.Tk):
         self.trilhos[os.path.normcase(jogo)] = trilho
         cfg = ler_config()
         cfg.update({'jogo': jogo, 'exe': exe, 'modulos': modulos, 'saida': self.saida.get(),
-                    'abrir_relatorio': self.abrir.get(), 'tema': self.tema, 'trilhos': self.trilhos})
+                    'abrir_relatorio': self.abrir.get(), 'tema': self.tema, 'trilhos': self.trilhos,
+                    'modo_ia': self.modo_ia.get(), 'pista_ia': self.pista_ia.get().strip() or 'Pista_1'})
         salvar_config(cfg)
 
         self.pasta_trace = os.path.join(self.saida.get(), 'trace-' + time.strftime('%Y%m%d-%H%M%S'))
         os.makedirs(self.pasta_trace, exist_ok=True)
         with open(os.path.join(self.pasta_trace, META), 'w', encoding='utf-8') as f:
             json.dump({'jogo': jogo, 'exe': exe, 'modulos': modulos,
-                       'trilho': trilho if 'sector' in modulos else None}, f, ensure_ascii=False)
+                       'trilho': trilho if 'sector' in modulos else None,
+                       'modo_ia': (self.pista_ia.get().strip() or 'Pista_1') if self.modo_ia.get() else None},
+                      f, ensure_ascii=False)
         do_trace = [m for m in modulos if m not in SO_LAUNCHER] or ['frames']
         env = dict(os.environ, RANGE_TRACE=self.pasta_trace, RANGE_TRACE_MODULES=','.join(do_trace))
         for var in ('RANGE_TRACE_RAIL', 'RANGE_AUDIT_TRANSFORMS', 'RANGE_SHADER_LOG', 'RANGE_PROFILE',
-                    'ROLIMA_RAGDOLL_TRACE'):
+                    'ROLIMA_RAGDOLL_TRACE', 'ROLIMA_MODO_IA'):
             env.pop(var, None)
         if 'work' in modulos:
             env['RANGE_AUDIT_TRANSFORMS'] = os.path.join(self.pasta_trace, 'objetos.txt')
@@ -488,6 +506,8 @@ class Launcher(tk.Tk):
             env['RANGE_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
                                                 '%g' % max(segundos, 1.0), 'reverse' if trilho['inverter'] else 'forward',
                                                 trilho['inicio'] or 'auto', trilho['esperar']))
+        if self.modo_ia.get():
+            env['ROLIMA_MODO_IA'] = self.pista_ia.get().strip() or 'Pista_1'
         self.rodando = True
         self.botao.configure(state='disabled')
         self.botao_pasta.configure(state='normal')

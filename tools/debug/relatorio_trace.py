@@ -317,6 +317,12 @@ def texto_cats(cats):
     return ', '.join('%s %.1f' % (k, v) for k, v in cats)
 
 
+def chips_cats(cats):
+    """Categorias com a mesma cor do grafico; a maior em negrito."""
+    return Html(' '.join('<span class="cat"><i style="background:%s"></i>%s%s %.1f%s</span>' % (
+        cor_cat(k), '<b>' if n == 0 else '', esc(k), v, '</b>' if n == 0 else '') for n, (k, v) in enumerate(cats)))
+
+
 def resumo_trilho(a, w):
     if not a['trilho_inicio'] and not a['trilho_fim']:
         return
@@ -552,6 +558,8 @@ tbody tr:hover td { background:var(--sunk); }
 .vazio { padding:14px; color:var(--muted); border:1px dashed var(--line); border-radius:8px; }
 .grade2 { display:grid; grid-template-columns:repeat(auto-fit, minmax(min(100%, 420px), 1fr)); gap:16px; }
 .grade2 > div { min-width:0; }
+.cat { display:inline-flex; align-items:center; gap:4px; margin-right:10px; white-space:nowrap; }
+.cat i { width:9px; height:9px; border-radius:2px; display:inline-block; }
 .calor { display:inline-block; width:10px; height:10px; border-radius:2px; vertical-align:-1px; margin-right:6px; }
 @media (prefers-reduced-motion: reduce) { * { transition:none !important; } }
 '''
@@ -583,8 +591,21 @@ def esc(v):
     return html.escape(str(v))
 
 
-def tabela(cabecalho, linhas, numericas=(), filtro=False, id_=None):
-    """Tabela ordenavel (clique no cabecalho); filtro de texto nas listas longas."""
+class Html(str):
+    """Celula ja em HTML: a tabela nao escapa."""
+
+
+def num(v):
+    try:
+        return float(str(v).replace(',', ''))
+    except ValueError:
+        return None
+
+
+def tabela(cabecalho, linhas, numericas=(), filtro=False, id_=None, calor=(), piso=None):
+    """Tabela ordenavel (clique no cabecalho); filtro de texto nas listas longas.
+    calor: colunas pintadas de verde (baixo) a vermelho (alto) dentro da propria coluna;
+    piso: {coluna: valor} abaixo do qual a celula fica verde."""
     if not linhas:
         return '<div class="vazio">Nenhum.</div>'
     h = []
@@ -594,9 +615,26 @@ def tabela(cabecalho, linhas, numericas=(), filtro=False, id_=None):
     h.append('<div class="rolagem"><table><thead><tr>' +
              ''.join('<th%s>%s</th>' % (' data-n="1"' if i in numericas else '', esc(c)) for i, c in enumerate(cabecalho)) +
              '</tr></thead><tbody>')
+    faixas = {}
+    for c in calor:
+        vals = [x for x in (num(l[c]) for l in linhas) if x is not None]
+        if vals:
+            faixas[c] = ((piso or {}).get(c, min(vals)), max(vals))
+
+    def celula(i, v):
+        cls = ' class="n"' if i in numericas else ''
+        txt = v if isinstance(v, Html) else esc(v)
+        x = num(v) if i in faixas else None
+        if x is None:
+            return '<td%s>%s</td>' % (cls, txt)
+        lo, hi = faixas[i]
+        t = 0.0 if hi <= lo else max(0.0, min(1.0, (x - lo) / (hi - lo)))
+        cor = cor_calor(t ** 0.6, 0.0, 1.0)
+        return ('<td%s style="background:color-mix(in srgb, %s %d%%, transparent)"><span class="calor" style="background:%s">'
+                '</span>%s</td>' % (cls, cor, 10 + round(t * 26), cor, txt))
+
     for linha in linhas:
-        h.append('<tr>' + ''.join('<td%s>%s</td>' % (' class="n"' if i in numericas else '', esc(v))
-                                  for i, v in enumerate(linha)) + '</tr>')
+        h.append('<tr>' + ''.join(celula(i, v) for i, v in enumerate(linha)) + '</tr>')
     h.append('</tbody></table></div>')
     return ''.join(h)
 
@@ -810,11 +848,11 @@ def html_trilho(a, w):
     w('</div></div>')
     w('<h3>Todos os trechos</h3>')
     linhas = [(st['i'] + 1, '%d-%d%%' % (st['i'] * 100 // SETORES, (st['i'] + 1) * 100 // SETORES),
-               '%.2f' % st['media'], '%.1f' % st['p95'], '%.1f' % st['max'], texto_cats(st['cats']),
+               '%.2f' % st['media'], '%.1f' % st['p95'], '%.1f' % st['max'], chips_cats(st['cats']),
                '%.0f, %.0f' % (st['x'], st['y']), 'quente' if st['quente'] else '')
               for st in setores]
     w(tabela(('trecho', '% da curva', 'media ms', 'p95 ms', 'max ms', 'categorias (media ms)', 'centro x,y', ''),
-             linhas, (0, 2, 3, 4)))
+             linhas, (0, 2, 3, 4), calor=(2, 3, 4)))
     # Dados para a dica do mapa/faixa.
     w('<script>var SETORES={%s};</script>' % ','.join(
         '%d:["%d-%d%%",%.2f,%.1f,%s]' % (st['i'], st['i'] * 100 // SETORES, (st['i'] + 1) * 100 // SETORES, st['media'],
@@ -828,9 +866,10 @@ def html_picos(a, w):
     w(secao('lentos', 'Frames lentos', len(a['picos']),
             'Mediana %.1f ms; lento = acima de %.1f ms, sem a espera ociosa. "Carregou junto" = cargas registradas no '
             'mesmo frame ou no anterior: a causa mais provavel da travada.' % (a['frame_mediana'], a['pico_limite'])))
-    linhas = [(pk['f'], '%.1f' % pk['t'], '%.1f' % pk['ms'], texto_cats(pk['cats']), '; '.join(pk['cargas']) or '-')
+    linhas = [(pk['f'], '%.1f' % pk['t'], '%.1f' % pk['ms'], chips_cats(pk['cats']), '; '.join(pk['cargas']) or '-')
               for pk in a['picos']]
-    w(tabela(('frame', 'segundo', 'ms', 'categorias (ms)', 'carregou junto'), linhas, (0, 1, 2)))
+    w(tabela(('frame', 'segundo', 'ms', 'categorias (ms)', 'carregou junto'), linhas, (0, 1, 2),
+             calor=(2,), piso={2: a['pico_limite']}))
     w('</section>')
 
 
@@ -849,12 +888,12 @@ def html_work(a, w):
                  'instancing': 'envios de instancing'}
         linhas = [(nomes.get(k, k), k, '%.0f' % med, '%.0f' % p95, '%d' % mx, '%.1f' % media)
                   for k, med, p95, mx, media in x['work']['linhas']]
-        w(tabela(('contador', 'chave', 'mediana', 'p95', 'max', 'media'), linhas, (2, 3, 4, 5)))
+        w(tabela(('contador', 'chave', 'mediana', 'p95', 'max', 'media'), linhas, (2, 3, 4, 5), calor=(3, 4)))
     if x.get('objetos'):
         w('<h3>Objetos que mais geram trabalho <span class="chip">%d</span></h3>' % len(x['objetos']))
         w('<p class="nota">Media por frame de cada objeto: raiz = arvore de transform atualizada; sync = transform '
           'copiada para a fisica ou o render. Objeto parado com valor alto e suspeito.</p>')
-        w(tabela(('tipo', 'objeto', 'por frame'), [(t, n, '%.1f' % v) for t, n, v in x['objetos']], (2,), filtro=True))
+        w(tabela(('tipo', 'objeto', 'por frame'), [(t, n, '%.1f' % v) for t, n, v in x['objetos']], (2,), filtro=True, calor=(2,)))
     w('</section>')
 
 
@@ -875,11 +914,11 @@ def html_shaders(a, w):
     w('<h3>Depois do frame %d e acima de 1 ms <span class="chip %s">%d</span></h3>' % (
         FRAMES_DE_LOAD, 'warn' if no_jogo else 'ok', len(no_jogo)))
     w(tabela(('tipo', 'nome', 'ms', 'frame', 'segundo'),
-             [(it['tipo'], it['nome'], '%.1f' % it['ms'], it['f'], '%.1f' % it['t']) for it in no_jogo], (2, 3, 4)))
+             [(it['tipo'], it['nome'], '%.1f' % it['ms'], it['f'], '%.1f' % it['t']) for it in no_jogo], (2, 3, 4), calor=(2,), piso={2: 1.0}))
     w('<h3>Os mais lentos da sessao</h3>')
     top = sorted(x['itens'], key=lambda it: it['ms'], reverse=True)[:40]
     w(tabela(('tipo', 'nome', 'ms', 'frame', 'segundo'),
-             [(it['tipo'], it['nome'], '%.1f' % it['ms'], it['f'], '%.1f' % it['t']) for it in top], (2, 3, 4)))
+             [(it['tipo'], it['nome'], '%.1f' % it['ms'], it['f'], '%.1f' % it['t']) for it in top], (2, 3, 4), calor=(2,)))
     w('<p class="nota">O frame deste log e o do profiler da GPU; pode diferir alguns frames do trace.</p>')
     w('</section>')
 
@@ -1043,7 +1082,7 @@ def relatorio_html(a, meta=None, pasta=''):
                        '%.0f' % c['ms'], '%.0f' % sh.get('textures_ms', 0), '%.0f' % sh.get('shaders_ms', 0),
                        c['objects'], c['meshes'], c['materials']))
     w(tabela(('cena', 'frame', 'segundo', 'conversao ms', 'texturas ms', 'shaders ms', 'objetos', 'malhas',
-              'materiais'), linhas, range(1, 9)))
+              'materiais'), linhas, range(1, 9), calor=(3, 4, 5)))
     w('</section>')
 
     if a['tem_uso']:
@@ -1051,11 +1090,11 @@ def relatorio_html(a, meta=None, pasta=''):
                 'Nem pela camera, nem em sombra, no trecho que voce jogou. Camada inativa = modelo de Add Object nunca '
                 'adicionado. Candidatos a Load Mode On Demand ou a sair do jogo.'))
         linhas = [(o['name'], nome_cena(o['scene']), obs_objeto(o), a['tris'](o), ', '.join(o['meshes'])) for o in a['nunca']]
-        w(tabela(('objeto', 'cena', 'camada', 'triangulos', 'malhas'), linhas, (3,), filtro=True))
+        w(tabela(('objeto', 'cena', 'camada', 'triangulos', 'malhas'), linhas, (3,), filtro=True, calor=(3,)))
         w('<div class="grade2"><div>')
         w('<h3>Malhas so desses objetos <span class="chip">%d</span></h3>' % len(a['malhas_atoa']))
         linhas = [(m, a['malhas'][m]['tris'], ', '.join(a['malhas'][m]['materials'])) for m in a['malhas_atoa']]
-        w(tabela(('malha', 'triangulos', 'materiais'), linhas, (1,)))
+        w(tabela(('malha', 'triangulos', 'materiais'), linhas, (1,), calor=(1,)))
         w('</div><div>')
         w('<h3>Imagens a toa <span class="chip">%d</span></h3>' % len(a['imgs_atoa']))
         linhas = []
@@ -1063,14 +1102,14 @@ def relatorio_html(a, meta=None, pasta=''):
             e = a['imagens'].get(i)
             linhas.append((i, '%dx%d' % (e['w'], e['h']) if e else '-', '%.2f' % mb_imagem(e) if e else 'nao enviada',
                            e['f'] if e else '-'))
-        w(tabela(('imagem', 'tamanho', 'MB', 'frame do envio'), linhas, (2, 3)))
+        w(tabela(('imagem', 'tamanho', 'MB', 'frame do envio'), linhas, (2, 3), calor=(2,)))
         w('</div><div>')
         w('<h3>Materiais a toa <span class="chip">%d</span></h3>' % len(a['mats_atoa']))
         w(tabela(('material',), [(m,) for m in a['mats_atoa']]))
         w('</div><div>')
         w('<h3>Desenhados so em sombra <span class="chip">%d</span></h3>' % len(a['so_sombra']))
         linhas = [(o['name'], nome_cena(o['scene']), a['tris'](o)) for o in a['so_sombra']]
-        w(tabela(('objeto', 'cena', 'triangulos'), linhas, (2,)))
+        w(tabela(('objeto', 'cena', 'triangulos'), linhas, (2,), calor=(2,)))
         w('</div></div>')
         w('<h3>Invisiveis por design <span class="chip">%d</span></h3>' % len(a['invisiveis']))
         w('<p class="nota">Navmesh e objetos com Visible desligado (colisores, gatilhos). Carregam, mas nao deveriam ser '
@@ -1084,13 +1123,13 @@ def relatorio_html(a, meta=None, pasta=''):
             'Trabalho feito depois do frame %d. Se o ms for alto, e candidata a travada: pre-carregar ou mover para o '
             'load.' % FRAMES_DE_LOAD))
     linhas = [(tipo, nome, nome_cena(cena), '%.1f' % ms, f, '%.1f' % t) for tipo, nome, cena, ms, f, t in a['tardias']]
-    w(tabela(('tipo', 'nome', 'cena', 'ms', 'frame', 'segundo'), linhas, (3, 4, 5)))
+    w(tabela(('tipo', 'nome', 'cena', 'ms', 'frame', 'segundo'), linhas, (3, 4, 5), calor=(3,), piso={3: 0.0}))
     w('</section>')
 
     w(secao('imagens', 'Imagens enviadas para a GPU', len(a['imagens'])))
     linhas = sorted(((i, '%dx%d' % (e['w'], e['h']), '%.2f' % mb_imagem(e), '%.1f' % e['ms'], e['f'])
                      for i, e in a['imagens'].items()), key=lambda x: float(x[2]), reverse=True)
-    w(tabela(('imagem', 'tamanho', 'MB', 'ms', 'frame'), linhas, (2, 3, 4)))
+    w(tabela(('imagem', 'tamanho', 'MB', 'ms', 'frame'), linhas, (2, 3, 4), calor=(2, 3)))
     w('</section>')
 
     w(secao('fora', 'Deixados de fora no load', len(a['deixados'])))

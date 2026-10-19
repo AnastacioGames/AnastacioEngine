@@ -67,7 +67,13 @@ Usa a amostragem de curva e o cálculo de caminho do evento Camera Path da Cutsc
 (`BL_SampleCutscenePath`, `EvaluateCutscenePath`); o trilho roda em `KX_Scene::UpdateTraceRail`, depois da
 física, para valer sobre câmeras do gameplay. No RolimaRacer: `Pista_1;Pista1.009;Camera_debug_track;120;reverse;auto;CONTAGEM_321` (a curva foi desenhada no
 sentido contrário ao da corrida; o início `auto` acha a `LinhadeChegada`).
-A lógica do jogo continua rodando; para chegar na cena é preciso passar pelo menu normalmente.
+A lógica do jogo continua rodando; para chegar na cena é preciso passar pelo menu normalmente (ou usar o Modo IA).
+
+## Modo IA (RolimaRacer)
+
+O cartão Modo IA do launcher passa `ROLIMA_MODO_IA=<pista>` (padrão `Pista_1`). O `BrainCore` do jogo pula o
+menu e monta a corrida como o botão Go Race (SINGLE_PLAYER, 10 pilotos), e o `ia_car.py` larga o Player 1 no
+piloto automático; a tecla I continua alternando. Combina com o trilho ou serve para trace sem jogar.
 
 ## Formato
 
