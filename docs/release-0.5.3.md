@@ -59,3 +59,5 @@ cef2d3c228aa7e7167ea27cf2718f4d2bced3662638021996808834f6e85b504  RangeArmor-0.5
   launcher: shaders compilados no 1º Play, Player/Enemy em z=0,5, screenshot com cena e sombra certas.
   O `Example Game.rasec` do modelo não abre no runtime atual; num projeto real o Main File é o `.range` do jogo.
 - Publicada: os dois tar.xz Linux e o `SHA256SUMS.txt` com 4 linhas subiram para a `v0.5.3` (já publicada pelo Windows).
+- Site de docs (`AnastacioDocs`, `d54716b`): RangeArmor também no Linux nas páginas de export (pt/en) e
+  aviso da 0.5.0 sobre o `web/` no Linux removido. **Release 0.5.3 completa.**
