@@ -120,6 +120,19 @@ def relatorios_recentes(pasta, quantos=RECENTES):
     return [(c, j, time.strftime('%d/%m %H:%M', time.localtime(t))) for t, c, j in achados[:quantos]]
 
 
+def campo(pai, var):
+    """Campo de texto com margem interna. tk.Entry dentro de um Frame em vez de ttk.Entry:
+    a borda do tema clam deixa pontos claros nos cantos no tema escuro."""
+    caixa = tk.Frame(pai, bg=CAMPO, highlightthickness=1, highlightbackground=BORDA, highlightcolor=BORDA)
+    entrada = tk.Entry(caixa, textvariable=var, relief='flat', bd=0, font=(FONTE, 10), bg=CAMPO, fg=TEXTO,
+                       insertbackground=TEXTO, selectbackground=OURO, selectforeground=TEXTO_OURO,
+                       highlightthickness=0)
+    entrada.pack(fill='x', padx=10, pady=7)
+    entrada.bind('<FocusIn>', lambda _: caixa.configure(highlightbackground=OURO))
+    entrada.bind('<FocusOut>', lambda _: caixa.configure(highlightbackground=BORDA))
+    return caixa
+
+
 def botao(pai, texto, comando, destaque=False, perigo=False, **kw):
     cor = TEXTO_OURO if destaque else (PERIGO if perigo else TEXTO)
     return tk.Button(pai, text=texto, command=comando, relief='flat', bd=0, cursor='hand2',
@@ -205,7 +218,7 @@ class Launcher(tk.Tk):
         self.icone_jogo.grid(row=0, column=0, rowspan=2, padx=(0, 16))
         self.nome_jogo = tk.Label(corpo, bg=CARTAO, fg=TEXTO, font=(FONTE, 17, 'bold'), anchor='w')
         self.nome_jogo.grid(row=0, column=1, columnspan=2, sticky='ew')
-        ttk.Entry(corpo, textvariable=self.jogo).grid(row=1, column=1, sticky='ew', padx=(0, 8))
+        campo(corpo, self.jogo).grid(row=1, column=1, sticky='ew', padx=(0, 8))
         botao(corpo, 'Procurar...', lambda: self.escolher_arquivo(
             self.jogo, (('Jogo', '*.range *.blend'), ('Todos', '*.*')))).grid(row=1, column=2)
         self.jogo.trace_add('write', lambda *_: self.atualizar_jogo())
@@ -230,7 +243,7 @@ class Launcher(tk.Tk):
                 ('Saída', self.saida, self.escolher_pasta))):
             tk.Label(corpo, text=rotulo, bg=CARTAO, fg=APAGADO, font=(FONTE, 10), width=10,
                      anchor='w').grid(row=r, column=0, sticky='w', pady=4)
-            ttk.Entry(corpo, textvariable=var).grid(row=r, column=1, sticky='ew', padx=(0, 8), pady=4)
+            campo(corpo, var).grid(row=r, column=1, sticky='ew', padx=(0, 8), pady=4)
             botao(corpo, 'Procurar...', escolher).grid(row=r, column=2, pady=4)
 
         # Últimos relatórios da pasta de saída.
