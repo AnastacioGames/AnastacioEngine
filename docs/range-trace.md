@@ -45,14 +45,20 @@ novo para `RANGE_SHADER_LOG` e `CM_WorkCounters`).
 
 ## Trilho de câmera (sector)
 
-`RANGE_TRACE_RAIL=cena;curva;objeto;segundos[;reverse]`, com o módulo `sector` (o launcher liga `frames`
+`RANGE_TRACE_RAIL=cena;curva;objeto;segundos[;reverse|forward[;início]]`, com o módulo `sector` (o launcher liga `frames`
 junto). Quando a cena é convertida, o objeto (normalmente uma câmera) passa a seguir a primeira spline da
-curva com velocidade constante em tempo real, olhando para um ponto 8 m à frente com o horizonte nivelado,
-e vira a câmera ativa. No fim da curva o jogo fecha sozinho. `reverse` percorre do último ponto ao primeiro.
+curva com velocidade constante em tempo real e vira a câmera ativa. Olha para a média das direções de 4 a
+16 m à frente, suavizada (constante de 0,15 s), com o horizonte nivelado. No fim da curva o jogo fecha
+sozinho. `reverse` percorre ao contrário. Início, numa curva fechada: `auto` (padrão) começa no ponto mais
+perto do objeto com componente `CheckPoint` e `Finish Line` ligado; um nome de objeto começa perto dele;
+`none` usa o primeiro ponto da curva. O início é resolvido no primeiro frame do trilho, porque os
+CheckPoints costumam vir de instâncias de grupo. Durante o trilho as viewports das outras câmeras são
+desligadas (tela dividida).
 VSync é desligado durante o trilho para medir o custo real de cada trecho.
 Usa a amostragem de curva e o cálculo de caminho do evento Camera Path da Cutscene
 (`BL_SampleCutscenePath`, `EvaluateCutscenePath`); o trilho roda em `KX_Scene::UpdateTraceRail`, depois da
-física, para valer sobre câmeras do gameplay. No RolimaRacer: `Pista_1;Pista1.009;Camera_debug_track;120`.
+física, para valer sobre câmeras do gameplay. No RolimaRacer: `Pista_1;Pista1.009;Camera_debug_track;120;reverse;auto` (a curva foi desenhada no
+sentido contrário ao da corrida; o início `auto` acha a `LinhadeChegada`).
 A lógica do jogo continua rodando; para chegar na cena é preciso passar pelo menu normalmente.
 
 ## Formato

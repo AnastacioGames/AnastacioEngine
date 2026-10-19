@@ -32,7 +32,8 @@ MODULOS = (
     ('sector', 'Trilho: câmera percorre a curva da pista e mede o custo por trecho'),
 )
 # Campos do trilho (módulo sector), lembrados por jogo.
-CAMPOS_TRILHO = (('cena', 'Cena', 14), ('curva', 'Curva', 16), ('camera', 'Câmera', 20), ('segundos', 'Segundos', 6))
+CAMPOS_TRILHO = (('cena', 'Cena', 14), ('curva', 'Curva', 16), ('camera', 'Câmera', 20), ('inicio', 'Início', 14),
+                 ('segundos', 'Segundos', 6))
 TRILHO_PADRAO = {
     os.path.normcase(r'D:\ProjetoRolimaRacer\RolimaRacer.range'):
         {'cena': 'Pista_1', 'curva': 'Pista1.009', 'camera': 'Camera_debug_track', 'segundos': '120'},
@@ -262,7 +263,8 @@ class Launcher(tk.Tk):
                 row=0, column=i, sticky='w', padx=(0, 8))
             campo(corpo, self.trilho_vars[chave]).grid(row=1, column=i, sticky='ew', padx=(0, 8))
         tk.Label(corpo, text='Com o módulo sector ligado, a câmera entra na curva quando a cena carrega, anda em '
-                 'velocidade constante olhando para a frente e o jogo fecha no fim. VSync fica desligado no trilho.',
+                 'velocidade constante olhando para a frente e o jogo fecha no fim. VSync fica desligado no trilho. '
+                 'Início: auto = CheckPoint com Finish Line; ou o nome de um objeto; none = primeiro ponto da curva.',
                  bg=CARTAO, fg=APAGADO, font=(FONTE, 9), justify='left', anchor='w',
                  wraplength=int(760 * self.escala)).grid(row=2, column=0, columnspan=len(CAMPOS_TRILHO),
                                                          sticky='w', pady=(8, 0))
@@ -321,7 +323,7 @@ class Launcher(tk.Tk):
         chave = os.path.normcase(self.jogo.get())
         valores = self.trilhos.get(chave) or TRILHO_PADRAO.get(chave) or {}
         for k, var in self.trilho_vars.items():
-            var.set(valores.get(k, '60' if k == 'segundos' else ''))
+            var.set(valores.get(k, {'segundos': '60', 'inicio': 'auto'}.get(k, '')))
         self.trilho_inverter.set(bool(valores.get('inverter')))
 
     def atualizar_jogo(self):
@@ -427,7 +429,8 @@ class Launcher(tk.Tk):
         env.pop('RANGE_TRACE_RAIL', None)
         if 'sector' in modulos:
             env['RANGE_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
-                                                trilho['segundos'] or '60') + (('reverse',) if trilho['inverter'] else ()))
+                                                trilho['segundos'] or '60', 'reverse' if trilho['inverter'] else 'forward',
+                                                trilho['inicio'] or 'auto'))
         self.rodando = True
         self.botao.configure(state='disabled')
         self.botao_pasta.configure(state='normal')

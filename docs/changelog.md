@@ -16,6 +16,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   `EvaluateCutscenePath` da Cutscene). Relatório: 40 trechos, faixa e mapa de calor visto de cima.
 - Launcher: módulos `frames` e `sector`, cartão do trilho (cena, curva, câmera, segundos, inverter sentido)
   lembrado por jogo; RolimaRacer já vem com `Pista_1`, `Pista1.009`, `Camera_debug_track`.
+- Ajustes depois do teste no RolimaRacer: viewports das outras câmeras desligadas no trilho (tela dividida);
+  olhar suavizado (média de 4 a 16 m à frente e constante de 0,15 s; o maior tranco de giro caiu de 27°
+  para menos de 4° por frame); início do trilho no CheckPoint com `Finish Line` (`auto`), num objeto pelo
+  nome ou no primeiro ponto; campo Início no launcher. No RolimaRacer o `auto` acha a `LinhadeChegada`.
 - Testado com um `.range` gerado (círculo de 50 m, `--server`): a câmera percorre a curva nos dois sentidos,
   olhando ~4° para dentro da curva (o esperado para 8 m à frente), e o jogo fecha no fim.
 

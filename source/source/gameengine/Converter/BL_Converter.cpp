@@ -716,7 +716,7 @@ static const char *trace_object_type(const Object *ob)
 
 /** Range Trace "load": catalog of what a scene conversion created (objects, meshes, materials with
  * their images) and what it left out, for tools/debug/relatorio_trace.py to cross with the usage events. */
-/// Range Trace "sector": RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse] starts the camera rail when that scene is converted.
+/// Range Trace "sector": RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;start]] starts the camera rail when that scene is converted.
 static void trace_start_rail(BL_SceneConverter& converter, KX_Scene *scene)
 {
 	const char *env = getenv("RANGE_TRACE_RAIL");
@@ -753,12 +753,11 @@ static void trace_start_rail(BL_SceneConverter& converter, KX_Scene *scene)
 		CM_TraceEvent("rail_end", "\"scene\":" + CM_TraceStr(parts[0]) + ",\"reason\":\"not_found\"");
 		return;
 	}
-	// Fifth field "reverse": run the curve from its last point to its first.
-	if (parts.size() > 4 && parts[4] == "reverse") {
-		std::reverse(points.begin(), points.end());
-	}
+	// Fifth field "reverse"; sixth, the start: "auto" (CheckPoint with Finish Line), an object name or "none".
+	const bool reverse = parts.size() > 4 && parts[4] == "reverse";
+	const std::string start = (parts.size() > 5 && !parts[5].empty()) ? parts[5] : "auto";
 	const double seconds = (parts.size() > 3) ? atof(parts[3].c_str()) : 60.0;
-	scene->StartTraceRail(camera, curve, std::move(points), seconds > 0.0 ? seconds : 60.0);
+	scene->StartTraceRail(camera, curve, std::move(points), seconds > 0.0 ? seconds : 60.0, reverse, start);
 }
 
 static void trace_scene_load(BL_SceneConverter& converter, KX_Scene *scene, double seconds, bool libloading)

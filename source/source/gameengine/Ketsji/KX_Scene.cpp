@@ -36,6 +36,7 @@
 #endif
 
 #include <algorithm>
+#include <cfloat>
 #include <cmath>
 
 #include "CM_WorkCounters.h"
@@ -97,6 +98,8 @@
 #include "DNA_group_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_property_types.h"
+#include "DNA_python_component_types.h"
+#include "BLI_listbase.h"
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
 #include "DNA_node_types.h"
@@ -3614,7 +3617,8 @@ static void EvaluateCutscenePath(const std::vector<mt::vec3> &points, float frac
 	direction = mt::zero3;
 }
 
-void KX_Scene::StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::vector<mt::vec3> points, double seconds)
+void KX_Scene::StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::vector<mt::vec3> points, double seconds,
+                              bool reverse, const std::string& start)
 {
 	TraceRail& rail = m_traceRail;
 	rail = TraceRail();
@@ -3625,11 +3629,73 @@ void KX_Scene::StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::
 	rail.m_curve = curve;
 	rail.m_points = std::move(points);
 	rail.m_seconds = std::max(seconds, 1.0);
+	rail.m_reverse = reverse;
+	rail.m_startRule = start;
 	// VSync would show every sector at the refresh period; measure the real frame cost instead.
 	KX_GetActiveEngine()->GetCanvas()->SetSwapControl(RAS_ICanvas::VSYNC_OFF);
 	CM_TraceEvent("rail_start", "\"scene\":" + CM_TraceStr(GetName()) + ",\"camera\":" + CM_TraceStr(camera->GetName()) +
 	              ",\"curve\":" + CM_TraceStr(curve->GetName()) + ",\"seconds\":" + std::to_string(rail.m_seconds) +
 	              ",\"length\":" + std::to_string(rail.m_length));
+}
+
+/// The object of a CheckPoint component with "Finish Line" on (group instances carry the original's components).
+static bool IsFinishLine(KX_GameObject *gameobj)
+{
+	const Object *ob = gameobj->GetBlenderObject();
+	if (!ob) {
+		return false;
+	}
+	LISTBASE_FOREACH (const PythonComponent *, component, &ob->components) {
+		if (!STREQ(component->name, "CheckPoint")) {
+			continue;
+		}
+		LISTBASE_FOREACH (const PythonComponentProperty *, prop, &component->properties) {
+			if (STREQ(prop->name, "Finish Line") && prop->type == CPROP_TYPE_BOOLEAN && prop->boolval) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void KX_Scene::StartTraceRailOrigin()
+{
+	TraceRail& rail = m_traceRail;
+	KX_GameObject *start = nullptr;
+	if (rail.m_startRule != "none") {
+		for (KX_GameObject *gameobj : *m_objectlist) {
+			if ((rail.m_startRule == "auto") ? IsFinishLine(gameobj) : gameobj->GetName() == rail.m_startRule) {
+				start = gameobj;
+				break;
+			}
+		}
+	}
+	std::vector<mt::vec3>& points = rail.m_points;
+	const bool closed = (points.front() - points.back()).LengthSquared() < 1e-6f;
+	if (start && closed) {
+		// Rotate the loop so it begins at the sample nearest to the start object.
+		const mt::mat3x4 curveTransform = rail.m_curve->NodeGetWorldTransform();
+		const mt::vec3 target = start->NodeGetWorldPosition();
+		points.pop_back();
+		std::size_t nearest = 0;
+		float best = FLT_MAX;
+		for (std::size_t i = 0; i < points.size(); ++i) {
+			const float d = (curveTransform * points[i] - target).LengthSquared();
+			if (d < best) {
+				best = d;
+				nearest = i;
+			}
+		}
+		std::rotate(points.begin(), points.begin() + nearest, points.end());
+		points.push_back(points.front());
+	}
+	// Reversing a closed loop keeps its starting point.
+	if (rail.m_reverse) {
+		std::reverse(points.begin(), points.end());
+	}
+	CM_TraceEvent("rail_origin", "\"start\":" + CM_TraceStr(start ? start->GetName() : "") + ",\"rule\":" +
+	              CM_TraceStr(rail.m_startRule) + ",\"closed\":" + (closed ? "true" : "false") + ",\"reverse\":" +
+	              (rail.m_reverse ? "true" : "false"));
 }
 
 void KX_Scene::UpdateTraceRail()
@@ -3645,6 +3711,10 @@ void KX_Scene::UpdateTraceRail()
 		CM_TraceEvent("rail_end", "\"scene\":" + CM_TraceStr(GetName()) + ",\"reason\":\"lost\"");
 		return;
 	}
+	if (!rail.m_started) {
+		rail.m_started = true;
+		StartTraceRailOrigin();
+	}
 
 	// Real time, not logic time: the camera keeps a constant speed even when frames are slow.
 	const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
@@ -3653,18 +3723,38 @@ void KX_Scene::UpdateTraceRail()
 	}
 	const float fraction = std::min(float((now - rail.m_start) / rail.m_seconds), 1.0f);
 
-	// Look at a point a few meters ahead on the curve: smoother than the segment direction.
-	const float lookAhead = std::min(8.0f / rail.m_length, 1.0f);
-	mt::vec3 local, direction, aheadLocal, aheadDirection;
+	mt::vec3 local, direction;
 	EvaluateCutscenePath(rail.m_points, fraction, local, direction);
-	EvaluateCutscenePath(rail.m_points, std::min(fraction + lookAhead, 1.0f), aheadLocal, aheadDirection);
-
 	const mt::mat3x4 curveTransform = rail.m_curve->NodeGetWorldTransform();
 	const mt::vec3 position = curveTransform * local;
-	mt::vec3 forward = curveTransform * aheadLocal - position;
-	if (forward.LengthSquared() < 1e-6f) {
-		forward = rail.m_curve->NodeGetWorldOrientation() * direction;
+
+	// Target look: average direction to points 4 to 16 m ahead, so the corners of the sampled
+	// polyline do not turn the camera in steps.
+	mt::vec3 target = mt::zero3;
+	for (const float meters : {4.0f, 8.0f, 12.0f, 16.0f}) {
+		mt::vec3 aheadLocal, aheadDirection;
+		EvaluateCutscenePath(rail.m_points, std::min(fraction + meters / rail.m_length, 1.0f), aheadLocal, aheadDirection);
+		const mt::vec3 toAhead = curveTransform * aheadLocal - position;
+		if (toAhead.LengthSquared() > 1e-6f) {
+			target += toAhead.Normalized();
+		}
 	}
+	if (target.LengthSquared() < 1e-6f) {
+		target = rail.m_curve->NodeGetWorldOrientation() * direction;
+	}
+
+	// Ease the look toward the target (time constant 0.15 s), independent of the frame rate.
+	const double dt = (rail.m_last < 0.0) ? 0.0 : now - rail.m_last;
+	rail.m_last = now;
+	if (rail.m_forward.LengthSquared() < 1e-6f || dt <= 0.0) {
+		rail.m_forward = target;
+	}
+	else if (target.LengthSquared() > 1e-6f) {
+		const float blend = 1.0f - (float)std::exp(-dt / 0.15);
+		rail.m_forward = rail.m_forward.Normalized() + (target.Normalized() - rail.m_forward.Normalized()) * blend;
+	}
+	const mt::vec3 forward = rail.m_forward;
+
 	rail.m_camera->NodeSetWorldPosition(position);
 	if (forward.LengthSquared() > 1e-8f) {
 		const mt::vec3 zAxis = -forward.Normalized();
