@@ -6,6 +6,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-19 - Range Trace, fase 1 (o que carrega e o que é desenhado)
+
+- Novo `CM_Trace` (`gameengine/Common`): `RANGE_TRACE=<pasta>` grava `trace.jsonl`, módulos por
+  `RANGE_TRACE_MODULES`. Módulo `load` em `BL_Converter.cpp` (catálogo de objetos, malhas, materiais com
+  imagens e deixados de fora por cena; tempos de conversão/texturas/shaders; On Demand convertido no jogo).
+  Módulo `usage` em `KX_Scene::CalculateVisibleMeshes` (primeira vez visível na câmera ou sombra) e gancho
+  `GPU_profile_image_hook` (`gpu_shader.c`/`gpu_draw.c`) para cada imagem enviada à GPU.
+- `tools/debug/relatorio_trace.py` (HTML + `resumo.md`) e `tools/debug/abrir_trace.bat`. Guia: `docs/range-trace.md`.
+- Teste `--server` no RolimaRacer: 5 cenas, 533 objetos, 187 malhas, 60 materiais, 35 imagens registrados;
+  sem janela nada é desenhado, então o módulo `usage` falta conferir no jogo com janela.
+
 ## 2026-10-18 - Release 0.5.3 (Windows)
 
 - Versão 0.5.3 com as correções do módulo Effects (sons da chuva) e das partículas/chuva no WebGL2.

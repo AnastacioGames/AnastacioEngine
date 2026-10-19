@@ -37,6 +37,9 @@
 #include "KX_GameObject.h"
 #include "SCA_LogicManager.h"
 #include "KX_Mesh.h"
+#include "RAS_MeshMaterial.h"
+#include "RAS_MaterialBucket.h"
+#include "RAS_IMaterial.h"
 #include "RAS_BucketManager.h"
 #include "KX_PhysicsEngineEnums.h"
 #include "KX_KetsjiEngine.h"
@@ -79,7 +82,10 @@
 extern "C" {
 #  include "DNA_mesh_types.h"
 #  include "DNA_material_types.h"
+#  include "DNA_image_types.h"
+#  include "DNA_node_types.h"
 #  include "DNA_object_types.h"
+#  include "DNA_texture_types.h"
 #  include "BLI_blenlib.h"
 #  include "BLI_linklist.h"
 #  include "BLO_readfile.h"
@@ -101,6 +107,7 @@ extern "C" {
 
 #include "BLI_task.h"
 #include "CM_Message.h"
+#include "CM_Trace.h"
 
 #include "GPU_material.h" // GPU_shader_cache_stats
 #include "GPU_shader.h" // GPU_shader_binary_cache_set
@@ -340,6 +347,7 @@ KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::stri
 		}
 	}
 
+	const double convertStart = PIL_check_seconds_timer();
 	// Same throwaway scene trick as FindOrConvertMainObject(), keeping the layers of the source scene.
 	Scene *tempScene = BKE_scene_add(m_maggie, "..ConvertSceneObject..");
 	tempScene->lay = lay;
@@ -366,6 +374,12 @@ KX_GameObject *BL_Converter::ConvertSceneObject(KX_Scene *scene, const std::stri
 	if (!gameobj) {
 		error = "conversion failed";
 		return nullptr;
+	}
+	if (CM_TraceOn(CM_TRACE_LOAD)) {
+		// Its objects were listed under the throwaway scene by ConvertScene(); this says where they went.
+		CM_TraceEvent("convert_object", "\"scene\":" + CM_TraceStr(scene->GetName()) + ",\"name\":" + CM_TraceStr(name) +
+		              ",\"objects\":" + std::to_string(objects.size()) + ",\"ms\":" +
+		              std::to_string((PIL_check_seconds_timer() - convertStart) * 1000.0));
 	}
 
 	if (liveParent) {
@@ -589,6 +603,12 @@ static void print_load_shaders(KX_Scene *scene, const char *stage, size_t materi
 		BL_LoadLog::Add(scene->GetName(), std::string(stage) + " merge", merge, detail.str());
 	}
 	BL_LoadLog::Add(scene->GetName(), std::string(stage) + " shaders", shaders, detail.str());
+	if (CM_TraceOn(CM_TRACE_LOAD)) {
+		CM_TraceEvent("load_shaders", "\"scene\":" + CM_TraceStr(scene->GetName()) + ",\"stage\":" + CM_TraceStr(stage) +
+		              ",\"materials\":" + std::to_string(materials) + ",\"textures_ms\":" + std::to_string(textures * 1000.0) +
+		              ",\"shaders_ms\":" + std::to_string(shaders * 1000.0) + ",\"compiled\":" + std::to_string(compiled) +
+		              ",\"reused\":" + std::to_string(reused));
+	}
 }
 
 void BL_Converter::ConvertScene(KX_Scene *scene, bool compileShaders)
@@ -650,6 +670,111 @@ bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsi
 			materials[i - 1]->ReloadMaterial();
 		}
 	});
+}
+
+/// Images used by a material: image texture nodes (also inside groups) and legacy texture slots.
+static void trace_material_images(bNodeTree *ntree, std::set<std::string>& images, std::set<bNodeTree *>& visited)
+{
+	if (!ntree || !visited.insert(ntree).second) {
+		return;
+	}
+	for (bNode *node = (bNode *)ntree->nodes.first; node; node = node->next) {
+		if (!node->id) {
+			continue;
+		}
+		if (GS(node->id->name) == ID_IM) {
+			images.insert(node->id->name + 2);
+		}
+		else if (GS(node->id->name) == ID_NT) {
+			trace_material_images((bNodeTree *)node->id, images, visited);
+		}
+	}
+}
+
+static std::string trace_json_list(const std::set<std::string>& names)
+{
+	std::string out = "[";
+	for (const std::string& name : names) {
+		out += (out.size() > 1 ? "," : "") + CM_TraceStr(name);
+	}
+	return out + "]";
+}
+
+static const char *trace_object_type(const Object *ob)
+{
+	switch (ob->type) {
+		case OB_MESH: return "mesh";
+		case OB_CAMERA: return "camera";
+		case OB_LAMP: return "light";
+		case OB_ARMATURE: return "armature";
+		case OB_EMPTY: return "empty";
+		case OB_FONT: return "text";
+		case OB_CURVE: return "curve";
+		default: return "other";
+	}
+}
+
+/** Range Trace "load": catalog of what a scene conversion created (objects, meshes, materials with
+ * their images) and what it left out, for tools/debug/relatorio_trace.py to cross with the usage events. */
+static void trace_scene_load(BL_SceneConverter& converter, KX_Scene *scene, double seconds, bool libloading)
+{
+	const std::string sceneName = CM_TraceStr(scene->GetName());
+	const unsigned int sceneLay = scene->GetBlenderScene()->lay;
+	std::set<KX_Mesh *> meshes;
+	std::set<Material *> materials;
+
+	for (KX_GameObject *gameobj : converter.GetObjects()) {
+		const Object *ob = gameobj->GetBlenderObject();
+		std::set<std::string> meshNames;
+		for (KX_Mesh *mesh : gameobj->GetMeshList()) {
+			meshNames.insert(mesh->GetName());
+			meshes.insert(mesh);
+		}
+		CM_TraceEvent("object", "\"scene\":" + sceneName + ",\"name\":" + CM_TraceStr(gameobj->GetName()) +
+		              ",\"type\":\"" + (ob ? trace_object_type(ob) : "other") + "\",\"active_layer\":" +
+		              ((ob && (ob->lay & sceneLay)) ? "true" : "false") + ",\"meshes\":" + trace_json_list(meshNames));
+	}
+
+	for (KX_Mesh *mesh : meshes) {
+		std::set<std::string> matNames;
+		for (unsigned short i = 0; i < mesh->GetNumMaterials(); ++i) {
+			RAS_IMaterial *mat = mesh->GetMeshMaterial(i)->GetBucket()->GetMaterial();
+			matNames.insert(mat->GetName());
+			if (Material *ma = mat->GetBlenderMaterial()) {
+				materials.insert(ma);
+			}
+		}
+		CM_TraceEvent("mesh", "\"scene\":" + sceneName + ",\"name\":" + CM_TraceStr(mesh->GetName()) +
+		              ",\"tris\":" + std::to_string(mesh->GetNumPolygons()) + ",\"materials\":" + trace_json_list(matNames));
+	}
+
+	for (Material *ma : materials) {
+		std::set<std::string> images;
+		std::set<bNodeTree *> visited;
+		trace_material_images(ma->nodetree, images, visited);
+		for (int i = 0; i < MAX_MTEX; ++i) {
+			if (ma->mtex[i] && ma->mtex[i]->tex && ma->mtex[i]->tex->ima) {
+				images.insert(ma->mtex[i]->tex->ima->id.name + 2);
+			}
+		}
+		CM_TraceEvent("material", "\"scene\":" + sceneName + ",\"name\":" + CM_TraceStr(ma->id.name + 2) +
+		              ",\"images\":" + trace_json_list(images));
+	}
+
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(scene->GetBlenderScene(), sce_iter, base)) {
+		if (!converter.FindGameObject(base->object)) {
+			const bool editorOnly = (base->object->gameflag & OB_TASK_EDITOR_ONLY) != 0;
+			CM_TraceEvent("object_left_out", "\"scene\":" + sceneName + ",\"name\":" + CM_TraceStr(base->object->id.name + 2) +
+			              ",\"reason\":\"" + (editorOnly ? "editor_only" : "load_mode") + "\"");
+		}
+	}
+
+	CM_TraceEvent("scene_load", "\"scene\":" + sceneName + ",\"ms\":" + std::to_string(seconds * 1000.0) +
+	              ",\"libload\":" + (libloading ? "true" : "false") + ",\"objects\":" +
+	              std::to_string(converter.GetObjects().size()) + ",\"meshes\":" + std::to_string(meshes.size()) +
+	              ",\"materials\":" + std::to_string(materials.size()));
 }
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)
@@ -751,6 +876,9 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	       << load_ms(loadStats.culling) << "ms, bounds " << load_ms(loadStats.bounds) << "ms";
 	CM_Message("[Load] convert \"" << scene->GetName() << "\": " << load_ms(convertTime) << "ms, " << detail.str());
 	BL_LoadLog::Add(scene->GetName(), "convert", convertTime, detail.str());
+	if (CM_TraceOn(CM_TRACE_LOAD)) {
+		trace_scene_load(converter, scene, convertTime, libloading);
+	}
 }
 
 void BL_Converter::PostConvertScene(const BL_SceneConverter& converter)

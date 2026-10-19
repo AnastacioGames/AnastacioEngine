@@ -40,6 +40,9 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 - [Plano Android (APK WebView sobre o Web)](android-export-plan.md): plano revisado; prova em APK/aparelho
   real antes do exportador, com critérios de input, persistência, desempenho e ciclo de vida.
 
+- [Range Trace](range-trace.md): log opcional do que o jogo carrega e do que é desenhado, com relatório
+  (`tools/debug/abrir_trace.bat`).
+
 - [Roadmap](roadmap.md): somente trabalho aberto ou validação pendente.
 - [Relatório de melhorias](../relatorio-melhorias-anastacioengine.md): inventário conciso do que a engine já
   possui e das decisões técnicas vigentes.

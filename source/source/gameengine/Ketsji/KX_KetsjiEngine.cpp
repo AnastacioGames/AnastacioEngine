@@ -112,6 +112,8 @@ extern "C" {
 #endif
 #include "KX_SceneScheduler.h"
 #include "KX_DebugRenderer.h"
+#include "CM_Trace.h"
+#include "GPU_shader.h" // GPU_profile_image_hook
 #include "GPU_glew.h"
 
 #define DEFAULT_LOGIC_TIC_RATE 60.0
@@ -157,6 +159,8 @@ const std::string KX_KetsjiEngine::m_renderQueriesLabels[QUERY_MAX] = {
 	"Primitives:", // QUERY_PRIMITIVES
 	"Time:" // QUERY_TIME
 };
+
+static void trace_image_upload(const char *name, int w, int h, bool mipmap, double ms);
 
 /**
  * Constructor of the Ketsji Engine
@@ -256,6 +260,10 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_renderQueries.emplace_back(RAS_Query::SAMPLES);
 	m_renderQueries.emplace_back(RAS_Query::PRIMITIVES);
 	m_renderQueries.emplace_back(RAS_Query::TIME);
+
+	if (CM_TraceOn(CM_TRACE_LOAD) || CM_TraceOn(CM_TRACE_USAGE)) {
+		GPU_profile_image_hook = trace_image_upload;
+	}
 }
 
 /**
@@ -618,8 +626,19 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 	}
 }
 
+/// Range Trace: image sent to the GPU (first draw that needs it, or a prefetch at load).
+static void trace_image_upload(const char *name, int w, int h, bool mipmap, double ms)
+{
+	CM_TraceEvent("image", "\"name\":" + CM_TraceStr(name ? name : "") + ",\"w\":" + std::to_string(w) + ",\"h\":" +
+	              std::to_string(h) + ",\"mipmap\":" + (mipmap ? "true" : "false") + ",\"ms\":" + std::to_string(ms));
+}
+
 bool KX_KetsjiEngine::NextFrame()
 {
+	if (CM_TraceModules()) {
+		static long traceFrame = 0;
+		CM_TraceSetFrame(++traceFrame);
+	}
 #ifndef __EMSCRIPTEN__
     net::anastacioSteamService().pump(); // Once per rendered frame, shared by all scenes.
 #endif
@@ -1044,6 +1063,8 @@ void KX_KetsjiEngine::StopEngine()
 #ifndef __EMSCRIPTEN__
     net::anastacioSteamService().unload(); // After scene components have been destroyed.
 #endif
+	CM_TraceEnd();
+
 	// Shutdown KX_Imgui
 	if (m_imgui) {
 		m_imgui->Stop();

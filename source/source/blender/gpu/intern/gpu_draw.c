@@ -653,7 +653,7 @@ int GPU_verify_image(
 		return 0;
 
 	/* RANGE_SHADER_LOG: time an upload from here, as the image file may also be read now. */
-	const double log_start_time = GPU_profile_log_enabled() ? PIL_check_seconds_timer() : 0.0;
+	const double log_start_time = (GPU_profile_log_enabled() || GPU_profile_image_hook) ? PIL_check_seconds_timer() : 0.0;
 
 	/* check if we have a valid image buffer */
 	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);

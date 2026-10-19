@@ -212,6 +212,8 @@ void GPU_profile_log_texture(int w, int h, bool depth, int samples);
 /* RANGE_SHADER_LOG on: true when the log is open, and a line per image uploaded (name, size, mipmaps, duration). */
 bool GPU_profile_log_enabled(void);
 void GPU_profile_log_image(const char *name, int w, int h, bool mipmap, double ms);
+/* Range Trace (CM_Trace.h, module "usage"): when set, called for every image upload, log or not. */
+extern void (*GPU_profile_image_hook)(const char *name, int w, int h, bool mipmap, double ms);
 /* RANGE_SHADER_LOG on: a free line (e.g. layer switch timings in the editor). */
 void GPU_profile_log_line(const char *text);
 /* RANGE_SHADER_LOG on: seconds spent building mesh GPU buffers (gpu_buffers.c), creating shaders and

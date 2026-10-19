@@ -1017,10 +1017,15 @@ bool GPU_profile_log_enabled(void)
 	return gpu_profile_log_file() != NULL;
 }
 
+void (*GPU_profile_image_hook)(const char *name, int w, int h, bool mipmap, double ms) = NULL;
+
 void GPU_profile_log_image(const char *name, int w, int h, bool mipmap, double ms)
 {
 	FILE *log_file = gpu_profile_log_file();
 	GPU_profile_image_seconds += ms / 1000.0;
+	if (GPU_profile_image_hook) {
+		GPU_profile_image_hook(name, w, h, mipmap, ms);
+	}
 	if (log_file) {
 		fprintf(log_file, "t=%.3fs frame=%ld ms=%.2f image %dx%d%s %s\n", PIL_check_seconds_timer() - log_start,
 		        GPU_profile_frame, ms, w, h, mipmap ? " mipmap" : "", name ? name : "-");

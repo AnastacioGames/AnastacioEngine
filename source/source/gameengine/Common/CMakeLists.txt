@@ -45,6 +45,7 @@ set(SRC
 	CM_LogBuffer.cpp
 	CM_Message.cpp
 	CM_Thread.cpp
+	CM_Trace.cpp
 
 	CM_Clock.h
 	CM_Format.h
@@ -55,6 +56,7 @@ set(SRC
 	CM_RefCount.h
 	CM_Template.h
 	CM_Thread.h
+	CM_Trace.h
 	CM_Update.h
 )
 

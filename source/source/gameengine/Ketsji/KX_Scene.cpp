@@ -137,6 +137,10 @@ extern "C" {
 #endif
 
 #include "CM_Message.h"
+#include "CM_Trace.h"
+
+#include <mutex>
+#include <unordered_set>
 #include "CM_List.h"
 #include "RAS_ParticleBuffer.h"
 
@@ -2091,6 +2095,25 @@ void KX_Scene::EndShadowCulling()
 	m_shadowCullCache.clear();
 }
 
+/// Range Trace "usage": one event the first time each object passes the culling of a camera or a shadow.
+static void trace_visible(KX_Scene *scene, const std::vector<KX_GameObject *>& objects, bool shadow)
+{
+	static std::mutex mutex;
+	static std::unordered_set<KX_GameObject *> seen[2];
+	static std::unordered_set<std::string> names[2];
+	std::lock_guard<std::mutex> lock(mutex);
+	for (KX_GameObject *gameobj : objects) {
+		// Pointer first: no string work per frame for objects already reported.
+		if (!seen[shadow].insert(gameobj).second) {
+			continue;
+		}
+		if (names[shadow].insert(scene->GetName() + '\n' + gameobj->GetName()).second) {
+			CM_TraceEvent("visible", "\"scene\":" + CM_TraceStr(scene->GetName()) + ",\"name\":" +
+			              CM_TraceStr(gameobj->GetName()) + ",\"pass\":\"" + (shadow ? "shadow" : "camera") + "\"");
+		}
+	}
+}
+
 std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf)
 {
 	std::vector<KX_GameObject *> objects;
@@ -2118,6 +2141,9 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 			if (!culled) {
 				objects.push_back(entry.m_object);
 			}
+		}
+		if (CM_TraceOn(CM_TRACE_USAGE)) {
+			trace_visible(this, objects, true);
 		}
 		return objects;
 	}
@@ -2171,6 +2197,10 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 	}
 
 	m_boundingBoxManager->ClearModified();
+
+	if (CM_TraceOn(CM_TRACE_USAGE)) {
+		trace_visible(this, objects, is_shadowbuf);
+	}
 
 	return objects;
 }
