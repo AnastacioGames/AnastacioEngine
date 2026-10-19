@@ -3451,6 +3451,24 @@ void shade_only_shadow(float i, float shadfac, float energy, vec3 shadcol, out v
 	outshadrgb = i * energy * (1.0 - shadfac) * (vec3(1.0) - shadcol);
 }
 
+void shade_alpha_fresnel(vec3 view, vec3 vn, float alpha, float fac, float blend, out float outalpha)
+{
+	float t = blend + (1.0 - blend) * pow(1.0 + abs(dot(view, vn)), fac);
+	outalpha = alpha * clamp(t, 0.0, 1.0);
+}
+
+void shadow_cast_alpha_discard(vec4 col, float shad_alpha, float pass, out vec4 outcol)
+{
+	if (pass > 0.5) {
+		/* Interleaved gradient noise: an even pattern the PCF filter averages into a partial shadow. */
+		float n = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+		if (n >= shad_alpha) {
+			discard;
+		}
+	}
+	outcol = col;
+}
+
 void shade_only_shadow_amount(float shadfac, float visifac, float energy, out float amount)
 {
 	amount = (1.0 - shadfac) * clamp(visifac, 0.0, 1.0) * step(1e-4, energy);

@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-19 - Fresnel, Z Offset e Shadow Casting Alpha no modo Game
+
+- Fresnel da transparência (`raytrace_transparency.fresnel`/`fresnel_factor`): mesma fórmula do Blender Internal
+  (`shade_alpha_fresnel`); precisa de Transparency e blend Alpha/Alpha Sort. Painel Transparency do Game.
+- Z Offset: o jogo já aplicava só o termo de inclinação (nada em decal visto de frente); agora soma
+  `-zoffs * 8` unidades de profundidade (`RAS_MaterialBucket::BindNode`). Viewport GLSL faz igual (`gpu_draw.c`).
+  Muda o resultado de materiais antigos com Z Offset diferente de zero.
+- Shadow Casting Alpha (`shadow_cast_alpha`): no jogo o caster vai para o bucket de sombra alfa e descarta
+  em pontilhado (`shadow_cast_alpha_discard`, uniform `GPU_DYNAMIC_SHADOW_DEPTH_PASS`); o filtro suave vira
+  sombra parcial. Não vale com Variance. Viewport: prévia por stipple 25/50/100% (`draw_mesh_object`).
+- Cena `tools/debug/cenas/criar_cena_material_bi_game.py` (uma opção por layer); aceita no jogo.
+
 ## 2026-10-19 - Material Shadows Only no modo Game (shadow catcher)
 
 - `use_only_shadow` agora funciona no GLSL do jogo (antes só no Blender Internal): o material mostra só a

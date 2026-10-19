@@ -1292,6 +1292,17 @@ bool GPU_material_ssgi_approximate(Scene *scene)
 }
 
 static float GPU_shadow_color_pass; /* defined with GPU_lamp_shadow_color_begin() */
+static float GPU_shadow_depth_pass = 0.0f;
+
+void GPU_shadow_depth_pass_set(bool enable)
+{
+	GPU_shadow_depth_pass = enable ? 1.0f : 0.0f;
+}
+
+bool GPU_shadow_depth_pass_get(void)
+{
+	return GPU_shadow_depth_pass > 0.5f;
+}
 
 void GPU_material_shadow_color_link(GPUMaterial *material, GPUNodeLink *base, GPUNodeLink *alpha)
 {
@@ -3956,6 +3967,12 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 		}
 	}
 
+	/* Fresnel transparency (Blender Internal formula): more transparent facing the view. */
+	if ((ma->mode & MA_TRANSP) && ma->fresnel_tra != 0.0f) {
+		GPU_link(mat, "shade_alpha_fresnel", shi->view, shi->vn, shr->alpha,
+		         GPU_uniform(&ma->fresnel_tra), GPU_uniform(&ma->fresnel_tra_i), &shr->alpha);
+	}
+
 	if (ma->mode & MA_TRANSP && ma->mode2 & MA_DEPTH_TRANSP) {
 		GPU_link(mat, "shade_alpha_depth",
 				 GPU_material_builtin(mat, GPU_VIEW_POSITION),
@@ -4026,6 +4043,13 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 					 shr->combined, &shr->combined);*/
 
 		GPU_link(mat, "shade_alpha_opaque", shr->combined, &shr->combined);
+	}
+
+	/* Shadow Casting Alpha: dithered holes in the depth shadow map, softened by the shadow filter.
+	 * KX_BlenderMaterial puts these casters in the alpha shadow bucket, drawn with this shader. */
+	if ((ma->mode2 & MA_CASTSHADOW) && ma->shad_alpha > 0.0f && ma->shad_alpha < 0.999f) {
+		GPU_link(mat, "shadow_cast_alpha_discard", shr->combined, GPU_uniform(&ma->shad_alpha),
+		         GPU_dynamic_uniform(&GPU_shadow_depth_pass, GPU_DYNAMIC_SHADOW_DEPTH_PASS, NULL), &shr->combined);
 	}
 
 	if (ma->shade_flag & MA_OBCOLOR) {

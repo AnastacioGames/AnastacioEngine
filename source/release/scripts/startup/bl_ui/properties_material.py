@@ -1233,6 +1233,7 @@ class MATERIAL_PT_game_shadow(MaterialButtonsPanel, Panel):
             sub = col.column()
             sub.active = mat.use_cast_shadows
             sub.prop(mat, "use_colored_shadows", text="Colored")
+            sub.prop(mat, "shadow_cast_alpha", text="Casting Alpha", slider=True)
             glow = sub.column()
             glow.active = mat.use_cast_shadows and mat.use_colored_shadows
             glow.prop(mat, "colored_shadow_glow", slider=True)
@@ -1303,6 +1304,19 @@ class MATERIAL_PT_transp_game(MaterialButtonsPanel, Panel):
         col.prop(mat, "depth_transp_factor", text="Fade Distance")
         if mat.use_depth_transparency and not (use_transp and blended):
             box.label(text="No effect: needs Enabled and a blending mode", icon='ERROR')
+
+        if simple:
+            box = layout.box()
+            box.label(text="Fresnel:", icon="MATSPHERE")
+            col = box.column(align=True)
+            col.active = use_transp and blended
+            rayt = mat.raytrace_transparency
+            col.prop(rayt, "fresnel", slider=True)
+            sub = col.row()
+            sub.active = use_transp and blended and rayt.fresnel > 0.0
+            sub.prop(rayt, "fresnel_factor", text="Blend", slider=True)
+
+        layout.prop(mat, "offset_z")
 
 
 class VolumeButtonsPanel:

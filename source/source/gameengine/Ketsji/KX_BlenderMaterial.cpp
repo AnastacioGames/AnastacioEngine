@@ -120,7 +120,9 @@ KX_BlenderMaterial::KX_BlenderMaterial(Material *mat, const std::string& name, K
 	 * cast their shadow with their own shader: the solid shadow bucket draws with a generic
 	 * override shader that ignores the deformation, so the shadow would not follow the wind.
 	 * (Variance shadows still override every bucket, see RAS_BucketManager.) */
-	if (mat && !(m_rasMode & (RAS_ALPHA | RAS_ALPHA_SHADOW)) && (GPU_material_moves_vertices(mat) || (mat->shade_flag & MA_FOLIAGE))) {
+	/* Shadow Casting Alpha discards in the material shader too (shadow_cast_alpha_discard). */
+	if (mat && !(m_rasMode & (RAS_ALPHA | RAS_ALPHA_SHADOW)) && (GPU_material_moves_vertices(mat) || (mat->shade_flag & MA_FOLIAGE) ||
+	    (mat->shad_alpha > 0.0f && mat->shad_alpha < 0.999f))) {
 		m_rasMode |= RAS_ALPHA_SHADOW;
 	}
 

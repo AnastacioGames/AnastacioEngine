@@ -134,7 +134,8 @@ void RAS_MaterialBucket::BindNode(const RAS_MaterialNodeTuple& tuple)
 	RAS_ManagerNodeData *managerData = tuple.m_managerData;
 	RAS_Rasterizer *rasty = managerData->m_rasty;
 	rasty->SetCullFace(m_nodeData.m_cullFace);
-	rasty->SetPolygonOffset(managerData->m_drawingMode, -m_nodeData.m_zoffset, 0.0f);
+	/* Slope term alone does nothing on faces seen head-on (decals): add constant depth steps too. */
+	rasty->SetPolygonOffset(managerData->m_drawingMode, -m_nodeData.m_zoffset, -m_nodeData.m_zoffset * 8.0f);
 
 	if (!managerData->m_shaderOverride) {
 		ActivateMaterial(managerData->m_rasty);

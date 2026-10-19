@@ -3122,10 +3122,12 @@ static void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3
 		invert_m4_m4(rv3d.persinv, rv3d.viewinv);
 
 		/* no need to call ED_view3d_draw_offscreen_init since shadow buffers were already updated */
+		GPU_shadow_depth_pass_set(!vsm);
 		ED_view3d_draw_offscreen(
 		            bmain, scene, v3d, &ar, winsize, winsize, viewmat, winmat,
 		            false, false, true,
 		            NULL, NULL, NULL, NULL);
+		GPU_shadow_depth_pass_set(false);
 
 		if (vsm) {
 			GPU_shader_unbind();
@@ -3191,10 +3193,12 @@ static void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3
 				mul_m4_m4m4(crv3d.persmat, crv3d.winmat, crv3d.viewmat);
 				invert_m4_m4(crv3d.persinv, crv3d.viewinv);
 
+				GPU_shadow_depth_pass_set(!cvsm);
 				ED_view3d_draw_offscreen(
 				            bmain, scene, v3d, &car, cWinsize, cWinsize, cViewOut, cWinOut,
 				            false, false, true,
 				            NULL, NULL, NULL, NULL);
+				GPU_shadow_depth_pass_set(false);
 
 				if (cvsm) {
 					GPU_shader_unbind();

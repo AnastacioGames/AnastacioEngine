@@ -44,6 +44,7 @@
 #include "RAS_Rasterizer.h"
 
 #include "GPU_texture.h"
+#include "GPU_material.h"
 
 #include "RAS_BucketManager.h"
 
@@ -250,9 +251,11 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 				rasty->SetOverrideShader(RAS_Rasterizer::RAS_OVERRIDE_SHADER_NONE);
 				m_nodeData.m_shaderOverride = false;
 
+				GPU_shadow_depth_pass_set(true);
 				RenderBasicBuckets(rasty, ALPHA_SHADOW_INSTANCING_BUCKET);
 				// Render alpha shadow regular materials with ordering.
 				RenderBasicBuckets(rasty, ALPHA_SHADOW_BUCKET);
+				GPU_shadow_depth_pass_set(false);
 			}
 
 			break;

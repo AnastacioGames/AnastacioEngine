@@ -90,6 +90,7 @@
 #include "GPU_draw.h"
 #include "GPU_select.h"
 #include "GPU_basic_shader.h"
+#include "GPU_material.h"
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
@@ -4801,26 +4802,53 @@ static void draw_mesh_fancy(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D
 	dm->release(dm);
 }
 
+static bool draw_mesh_object_body(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d, Base *base,
+                                  const char dt, const unsigned char ob_wire_col[4], const short dflag);
+
 /* returns true if nothing was drawn, for detecting to draw an object center */
 static bool draw_mesh_object(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d, Base *base,
                              const char dt, const unsigned char ob_wire_col[4], const short dflag)
 {
 	Object *ob = base->object;
-	Object *obedit = scene->obedit;
-	Mesh *me = ob->data;
-	BMEditMesh *em = me->edit_btmesh;
-	bool do_alpha_after = false, drawlinked = false, retval = false;
+	bool retval;
 
 	/* If we are drawing shadows and any of the materials don't cast a shadow,
 	 * then don't draw the object */
+	float shad_alpha = 1.0f;
 	if (v3d->flag2 & V3D_RENDER_SHADOW) {
 		for (int i = 1; i <= ob->totcol; ++i) {
 			Material *ma = give_current_material(ob, i);
 			if (ma && !(ma->mode2 & MA_CASTSHADOW)) {
 				return true;
 			}
+			if (ma && ma->shad_alpha > 0.0f) {
+				shad_alpha = min_ff(shad_alpha, ma->shad_alpha);
+			}
 		}
 	}
+
+	/* Shadow Casting Alpha preview: the viewport draws shadow maps solid, so a stipple stands in
+	 * for the game's dithered discard (shadow_cast_alpha_discard), in 25/50/100% steps. */
+	const bool shadow_stipple = (v3d->flag2 & V3D_RENDER_SHADOW) && GPU_shadow_depth_pass_get() && shad_alpha < 0.75f;
+	if (shadow_stipple) {
+		GPU_basic_shader_stipple(shad_alpha < 0.375f ? GPU_SHADER_STIPPLE_QUARTTONE : GPU_SHADER_STIPPLE_HALFTONE);
+		glEnable(GL_POLYGON_STIPPLE);
+	}
+	retval = draw_mesh_object_body(scene, ar, v3d, rv3d, base, dt, ob_wire_col, dflag);
+	if (shadow_stipple) {
+		glDisable(GL_POLYGON_STIPPLE);
+	}
+	return retval;
+}
+
+static bool draw_mesh_object_body(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d, Base *base,
+                                  const char dt, const unsigned char ob_wire_col[4], const short dflag)
+{
+	Object *ob = base->object;
+	Object *obedit = scene->obedit;
+	Mesh *me = ob->data;
+	BMEditMesh *em = me->edit_btmesh;
+	bool do_alpha_after = false, drawlinked = false, retval = false;
 
 	if (obedit && ob != obedit && ob->data == obedit->data) {
 		if (BKE_key_from_object(ob) || BKE_key_from_object(obedit)) {}

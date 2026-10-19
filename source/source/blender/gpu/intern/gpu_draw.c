@@ -2018,6 +2018,22 @@ static void GPU_get_object_info(float oi[3], Material *mat)
 	oi[2] = random * (1.0f / (float)0xFFFFFFFF);
 }
 
+static void gpu_material_zoffset(float zoffs)
+{
+	static float current = 0.0f;
+	if (zoffs == current)
+		return;
+	current = zoffs;
+	if (zoffs != 0.0f) {
+		glPolygonOffset(-zoffs, -zoffs * 8.0f);
+		glEnable(GL_POLYGON_OFFSET_FILL);
+	}
+	else {
+		glPolygonOffset(0.0f, 0.0f);
+		glDisable(GL_POLYGON_OFFSET_FILL);
+	}
+}
+
 static int gpu_object_material_bind_impl(int nr, void *attribs)
 {
 	GPUVertexAttribs *gattribs = attribs;
@@ -2112,6 +2128,9 @@ static int gpu_object_material_bind_impl(int nr, void *attribs)
 
 			if (GMS.is_alpha_pass) glDepthMask(1);
 
+			/* Z Offset, as the game engine draws it (RAS_MaterialBucket::BindNode). */
+			gpu_material_zoffset(mat->zoffs);
+
 			if (GMS.backface_culling) {
 				if (mat->game.flag)
 					glEnable(GL_CULL_FACE);
@@ -2189,6 +2208,7 @@ int GPU_get_material_alpha_blend(void)
 
 void GPU_object_material_unbind(void)
 {
+	gpu_material_zoffset(0.0f);
 	GMS.lastmatnr = -1;
 	GMS.lastretval = 1;
 

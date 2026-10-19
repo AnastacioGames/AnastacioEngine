@@ -228,6 +228,7 @@ typedef enum GPUDynamicType {
 	GPU_DYNAMIC_WORLD_MOON_SIZE      = 13 | GPU_DYNAMIC_GROUP_WORLD,
 	GPU_DYNAMIC_WORLD_MOON_BRIGHTNESS = 14 | GPU_DYNAMIC_GROUP_WORLD,
 	GPU_DYNAMIC_SHADOW_COLOR_PASS    = 15 | GPU_DYNAMIC_GROUP_WORLD,
+	GPU_DYNAMIC_SHADOW_DEPTH_PASS    = 16 | GPU_DYNAMIC_GROUP_WORLD,
 
 	GPU_DYNAMIC_MAT_DIFFRGB          = 1  | GPU_DYNAMIC_GROUP_MAT,
 	GPU_DYNAMIC_MAT_REF              = 2  | GPU_DYNAMIC_GROUP_MAT,
@@ -467,6 +468,9 @@ int GPU_lamp_shadow_buffer_type(GPULamp *lamp);
  * to the lamp's color target, cleared to white, where the Colored Shadows casters multiply their
  * transmittance (rgb) and keep their nearest depth (alpha). False without a color target. */
 bool GPU_lamp_shadow_color_begin(GPULamp *lamp);
+/* Shadow Casting Alpha: 1 while the casters draw into a depth shadow map with their own shader. */
+void GPU_shadow_depth_pass_set(bool enable);
+bool GPU_shadow_depth_pass_get(void);
 /* drew_casters false: the target was only cleared, white (see GPU_lamp_shadow_color_dirty). */
 void GPU_lamp_shadow_color_end(GPULamp *lamp, bool drew_casters);
 bool GPU_lamp_shadow_color_dirty(GPULamp *lamp);
