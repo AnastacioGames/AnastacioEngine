@@ -741,7 +741,7 @@ public:
 	/** Range Trace "sector": move a camera along curve points (curve local space) at constant
 	 * real-time speed, looking ahead, and quit the game at the end (docs/range-trace.md). */
 	void StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::vector<mt::vec3> points, double seconds,
-	                    bool reverse, const std::string& start);
+	                    bool reverse, const std::string& start, const std::string& wait);
 	void UpdateTraceRail();
 	/// Rotate (and reverse) the rail points so the run starts at the requested object.
 	void StartTraceRailOrigin();
@@ -760,6 +760,12 @@ public:
 		bool m_reverse = false;
 		/// "auto", "none" or an object name; resolved on the first rail frame (group instances exist by then).
 		std::string m_startRule;
+		/// Wait before moving: globalDict key that must turn true (e.g. the race countdown), then extra seconds.
+		std::string m_waitKey;
+		double m_waitSeconds = 0.0;
+		/// Time the wait began counting its seconds (key true, or first frame without a key); -1 still waiting the key.
+		double m_waitFrom = -1.0;
+		bool m_moving = false;
 		bool m_started = false;
 		bool m_done = false;
 	};

@@ -45,7 +45,7 @@ novo para `RANGE_SHADER_LOG` e `CM_WorkCounters`).
 
 ## Trilho de câmera (sector)
 
-`RANGE_TRACE_RAIL=cena;curva;objeto;segundos[;reverse|forward[;início]]`, com o módulo `sector` (o launcher liga `frames`
+`RANGE_TRACE_RAIL=cena;curva;objeto;segundos[;reverse|forward[;início[;esperar]]]`, com o módulo `sector` (o launcher liga `frames`
 junto; a opção Velocidade do launcher — Normal, 1,5×, 2× ou 3× — divide os segundos da volta). Quando a cena é convertida, o objeto (normalmente uma câmera) passa a seguir a primeira spline da
 curva com velocidade constante em tempo real e vira a câmera ativa. Olha para a média das direções de 4 a
 16 m à frente, suavizada (constante de 0,15 s), com o horizonte nivelado. No fim da curva o jogo fecha
@@ -54,10 +54,13 @@ perto do objeto com componente `CheckPoint` e `Finish Line` ligado; um nome de o
 `none` usa o primeiro ponto da curva. O início é resolvido no primeiro frame do trilho, porque os
 CheckPoints costumam vir de instâncias de grupo. Durante o trilho as viewports das outras câmeras são
 desligadas (tela dividida).
+Esperar: a câmera fica parada no início até `range.logic.globalDict[CHAVE]` ficar verdadeiro e mais N
+segundos (`CHAVE`, `N` ou `CHAVE+N`); os frames da espera não entram no mapa (evento `rail_go` marca a
+partida). No RolimaRacer, `CONTAGEM_321` (fica True no GO da largada) pula as travadas do load e da contagem.
 VSync é desligado durante o trilho para medir o custo real de cada trecho.
 Usa a amostragem de curva e o cálculo de caminho do evento Camera Path da Cutscene
 (`BL_SampleCutscenePath`, `EvaluateCutscenePath`); o trilho roda em `KX_Scene::UpdateTraceRail`, depois da
-física, para valer sobre câmeras do gameplay. No RolimaRacer: `Pista_1;Pista1.009;Camera_debug_track;120;reverse;auto` (a curva foi desenhada no
+física, para valer sobre câmeras do gameplay. No RolimaRacer: `Pista_1;Pista1.009;Camera_debug_track;120;reverse;auto;CONTAGEM_321` (a curva foi desenhada no
 sentido contrário ao da corrida; o início `auto` acha a `LinhadeChegada`).
 A lógica do jogo continua rodando; para chegar na cena é preciso passar pelo menu normalmente.
 
@@ -65,7 +68,7 @@ A lógica do jogo continua rodando; para chegar na cena é preciso passar pelo m
 
 Uma linha JSON por evento: `{"t":segundos,"f":frame,"ev":"tipo",...}`. Tipos: `session`, `scene_load`,
 `load_shaders`, `object`, `mesh`, `material`, `object_left_out`, `convert_object`, `visible`, `image`, `frame`,
-`rail_start`, `rail`, `rail_end`, `end`.
+`rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `end`.
 Objetos são casados por nome entre cenas, porque réplicas e objetos On Demand entram na cena de destino com
 o nome do original (os On Demand aparecem primeiro na cena temporária `..ConvertSceneObject..`).
 

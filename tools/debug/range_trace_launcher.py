@@ -33,10 +33,11 @@ MODULOS = (
 )
 # Campos do trilho (módulo sector), lembrados por jogo.
 CAMPOS_TRILHO = (('cena', 'Cena', 14), ('curva', 'Curva', 16), ('camera', 'Câmera', 20), ('inicio', 'Início', 14),
-                 ('segundos', 'Segundos', 6))
+                 ('segundos', 'Segundos', 6), ('esperar', 'Esperar (largada)', 14))
 TRILHO_PADRAO = {
     os.path.normcase(r'D:\ProjetoRolimaRacer\RolimaRacer.range'):
-        {'cena': 'Pista_1', 'curva': 'Pista1.009', 'camera': 'Camera_debug_track', 'segundos': '120'},
+        {'cena': 'Pista_1', 'curva': 'Pista1.009', 'camera': 'Camera_debug_track', 'segundos': '120',
+         'esperar': 'CONTAGEM_321'},
 }
 
 PADRAO = {
@@ -281,7 +282,9 @@ class Launcher(tk.Tk):
         base = 2 * ((len(CAMPOS_TRILHO) + 1) // 2)
         tk.Label(corpo, text='Com o módulo sector ligado, a câmera entra na curva quando a cena carrega, anda em '
                  'velocidade constante olhando para a frente e o jogo fecha no fim. VSync fica desligado no trilho. '
-                 'Início: auto = CheckPoint com Finish Line; ou o nome de um objeto; none = primeiro ponto da curva.',
+                 'Início: auto = CheckPoint com Finish Line; ou o nome de um objeto; none = primeiro ponto da curva. '
+                 'Esperar: a câmera fica parada no início até a chave do globalDict ficar verdadeira '
+                 '(CONTAGEM_321 = largada) e mais os segundos (ex.: CONTAGEM_321+2, ou só 5).',
                  bg=CARTAO, fg=APAGADO, font=(FONTE, 9), justify='left', anchor='w',
                  wraplength=int(500 * self.escala)).grid(row=base, column=0, columnspan=2,
                                                          sticky='w', pady=(8, 0))
@@ -349,7 +352,8 @@ class Launcher(tk.Tk):
         chave = os.path.normcase(self.jogo.get())
         valores = self.trilhos.get(chave) or TRILHO_PADRAO.get(chave) or {}
         for k, var in self.trilho_vars.items():
-            var.set(valores.get(k, {'segundos': '60', 'inicio': 'auto'}.get(k, '')))
+            padrao = (TRILHO_PADRAO.get(chave) or {}).get(k, {'segundos': '60', 'inicio': 'auto'}.get(k, ''))
+            var.set(valores.get(k, padrao))
         self.trilho_inverter.set(bool(valores.get('inverter')))
         self.trilho_velocidade.set(str(valores.get('velocidade', '1')))
 
@@ -463,7 +467,7 @@ class Launcher(tk.Tk):
         if 'sector' in modulos:
             env['RANGE_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
                                                 '%g' % max(segundos, 1.0), 'reverse' if trilho['inverter'] else 'forward',
-                                                trilho['inicio'] or 'auto'))
+                                                trilho['inicio'] or 'auto', trilho['esperar']))
         self.rodando = True
         self.botao.configure(state='disabled')
         self.botao_pasta.configure(state='normal')

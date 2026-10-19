@@ -40,7 +40,7 @@ enum CM_TraceModule {
 	CM_TRACE_USAGE = 1 << 1,
 	/// One line per frame with its time by profiler category (spikes and sector costs).
 	CM_TRACE_FRAMES = 1 << 2,
-	/// Camera on a curve at constant speed, set by RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;auto|none|object]].
+	/// Camera on a curve at constant speed, set by RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;auto|none|object[;KEY+seconds]]].
 	CM_TRACE_SECTOR = 1 << 3,
 };
 

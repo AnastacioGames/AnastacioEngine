@@ -3618,7 +3618,7 @@ static void EvaluateCutscenePath(const std::vector<mt::vec3> &points, float frac
 }
 
 void KX_Scene::StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::vector<mt::vec3> points, double seconds,
-                              bool reverse, const std::string& start)
+                              bool reverse, const std::string& start, const std::string& wait)
 {
 	TraceRail& rail = m_traceRail;
 	rail = TraceRail();
@@ -3630,6 +3630,19 @@ void KX_Scene::StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::
 	rail.m_points = std::move(points);
 	rail.m_seconds = std::max(seconds, 1.0);
 	rail.m_reverse = reverse;
+	// Wait: "KEY", "seconds" or "KEY+seconds".
+	const std::size_t plus = wait.find('+');
+	const std::string key = wait.substr(0, plus);
+	const bool number = !key.empty() && key.find_first_not_of("0123456789.,") == std::string::npos;
+	if (number) {
+		rail.m_waitSeconds = atof(key.c_str());
+	}
+	else {
+		rail.m_waitKey = key;
+		if (plus != std::string::npos) {
+			rail.m_waitSeconds = atof(wait.c_str() + plus + 1);
+		}
+	}
 	rail.m_startRule = start;
 	// VSync would show every sector at the refresh period; measure the real frame cost instead.
 	KX_GetActiveEngine()->GetCanvas()->SetSwapControl(RAS_ICanvas::VSYNC_OFF);
@@ -3698,6 +3711,32 @@ void KX_Scene::StartTraceRailOrigin()
 	              (rail.m_reverse ? "true" : "false"));
 }
 
+/// True when there is no key, or range.logic.globalDict[key] is truthy.
+static bool TraceRailKeyTrue(const std::string& key)
+{
+	if (key.empty()) {
+		return true;
+	}
+#ifdef WITH_PYTHON
+	PyObject *gameLogic = PyImport_ImportModule("GameLogic");
+	if (!gameLogic) {
+		PyErr_Clear();
+		return false;
+	}
+	bool result = false;
+	PyObject *globalDict = PyDict_GetItemString(PyModule_GetDict(gameLogic), "globalDict");
+	if (globalDict && PyDict_Check(globalDict)) {
+		PyObject *value = PyDict_GetItemString(globalDict, key.c_str());
+		result = value && PyObject_IsTrue(value) == 1;
+	}
+	Py_DECREF(gameLogic);
+	PyErr_Clear();
+	return result;
+#else
+	return true;
+#endif
+}
+
 void KX_Scene::UpdateTraceRail()
 {
 	TraceRail& rail = m_traceRail;
@@ -3718,7 +3757,19 @@ void KX_Scene::UpdateTraceRail()
 
 	// Real time, not logic time: the camera keeps a constant speed even when frames are slow.
 	const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
-	if (rail.m_start < 0.0) {
+	// Hold at the start until the globalDict key is true (e.g. CONTAGEM_321 at the race GO) and the extra
+	// seconds pass, so the rail skips the load and countdown hitches.
+	if (!rail.m_moving) {
+		if (rail.m_waitFrom < 0.0 && TraceRailKeyTrue(rail.m_waitKey)) {
+			rail.m_waitFrom = now;
+		}
+		if (rail.m_waitFrom >= 0.0 && now - rail.m_waitFrom >= rail.m_waitSeconds) {
+			rail.m_moving = true;
+			rail.m_start = now;
+			CM_TraceEvent("rail_go", "\"scene\":" + CM_TraceStr(GetName()));
+		}
+	}
+	if (rail.m_start < 0.0 || !rail.m_moving) {
 		rail.m_start = now;
 	}
 	const float fraction = std::min(float((now - rail.m_start) / rail.m_seconds), 1.0f);
@@ -3781,7 +3832,9 @@ void KX_Scene::UpdateTraceRail()
 	snprintf(fields, sizeof(fields),
 	         "\"p\":%.5f,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"lx\":%.3f,\"ly\":%.3f,\"lz\":%.3f", fraction,
 	         position.x, position.y, position.z, look.x, look.y, look.z);
-	CM_TraceEvent("rail", "\"scene\":" + CM_TraceStr(GetName()) + "," + fields);
+	if (rail.m_moving) {
+		CM_TraceEvent("rail", "\"scene\":" + CM_TraceStr(GetName()) + "," + fields);
+	}
 
 	if (fraction >= 1.0f) {
 		rail.m_done = true;
