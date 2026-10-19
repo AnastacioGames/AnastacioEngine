@@ -211,11 +211,11 @@ class Launcher(tk.Tk):
 
         # Cabeçalho com o logo da engine (sempre escuro) e a troca de tema.
         faixa = tk.Frame(self, bg=CABECALHO)
-        faixa.pack(fill='x', pady=(0, 18))
+        faixa.pack(fill='x', pady=(0, 14))
         topo = tk.Frame(faixa, bg=CABECALHO)
-        topo.pack(fill='x', padx=24, pady=(16, 14))
+        topo.pack(fill='x', padx=24, pady=(8, 6))
         if 'logo' not in self.imagens:
-            self.imagens['logo'] = carregar_imagem(LOGO, int(400 * self.escala))
+            self.imagens['logo'] = carregar_imagem(LOGO, int(290 * self.escala))
         if self.imagens['logo']:
             tk.Label(topo, image=self.imagens['logo'], bg=CABECALHO).pack(side='left')
         else:
@@ -226,8 +226,8 @@ class Launcher(tk.Tk):
         tk.Button(lado, text='\u2600  Tema claro' if self.tema == 'escuro' else '\u263e  Tema escuro',
                   command=self.trocar_tema, relief='flat', bd=0, cursor='hand2', font=(FONTE, 9),
                   bg='#2a2d35', fg='#e8e6e1', activebackground='#3a3d45', activeforeground='#ffffff',
-                  padx=10, pady=3).pack(anchor='e', pady=(0, 8))
-        tk.Label(lado, text='Trace Launcher', bg=CABECALHO, fg='#e8e6e1', font=(FONTE, 20, 'bold')).pack(anchor='e')
+                  padx=10, pady=2).pack(anchor='e', pady=(0, 4))
+        tk.Label(lado, text='Trace Launcher', bg=CABECALHO, fg='#e8e6e1', font=(FONTE, 16, 'bold')).pack(anchor='e')
         tk.Label(lado, text='o que o jogo carrega e o que ele de fato desenha', bg=CABECALHO, fg='#8d8f97',
                  font=(FONTE, 10)).pack(anchor='e')
 
