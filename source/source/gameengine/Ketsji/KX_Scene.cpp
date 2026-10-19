@@ -3678,6 +3678,12 @@ void KX_Scene::UpdateTraceRail()
 	if (rail.m_camera->GetGameObjectType() == SCA_IObject::OBJ_CAMERA && GetActiveCamera() != rail.m_camera) {
 		SetActiveCamera(static_cast<KX_Camera *>(rail.m_camera));
 	}
+	// Split screen: cameras with a viewport are drawn instead of the active one; keep only the rail's.
+	for (KX_Camera *cam : *GetCameraList()) {
+		if (cam != rail.m_camera && cam->UseViewport()) {
+			cam->EnableViewport(false);
+		}
+	}
 
 	// Where the camera looks (its -Z), to check it faces the way it moves.
 	const mt::vec3 look = -rail.m_camera->NodeGetWorldOrientation().GetColumn(2);
