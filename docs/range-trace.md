@@ -46,7 +46,7 @@ novo para `RANGE_SHADER_LOG` e `CM_WorkCounters`).
 ## Trilho de câmera (sector)
 
 `RANGE_TRACE_RAIL=cena;curva;objeto;segundos[;reverse|forward[;início]]`, com o módulo `sector` (o launcher liga `frames`
-junto). Quando a cena é convertida, o objeto (normalmente uma câmera) passa a seguir a primeira spline da
+junto; a opção Velocidade do launcher — Normal, 1,5×, 2× ou 3× — divide os segundos da volta). Quando a cena é convertida, o objeto (normalmente uma câmera) passa a seguir a primeira spline da
 curva com velocidade constante em tempo real e vira a câmera ativa. Olha para a média das direções de 4 a
 16 m à frente, suavizada (constante de 0,15 s), com o horizonte nivelado. No fim da curva o jogo fecha
 sozinho. `reverse` percorre ao contrário. Início, numa curva fechada: `auto` (padrão) começa no ponto mais

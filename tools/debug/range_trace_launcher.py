@@ -183,6 +183,7 @@ class Launcher(tk.Tk):
         self.trilhos = cfg.get('trilhos', {})
         self.trilho_vars = {chave: tk.StringVar() for chave, _, _ in CAMPOS_TRILHO}
         self.trilho_inverter = tk.BooleanVar()
+        self.trilho_velocidade = tk.StringVar(value='1')
         self.carregar_trilho()
         self.jogo.trace_add('write', lambda *_: self.carregar_trilho())
         self.tema = cfg['tema'] if cfg['tema'] in TEMAS else 'escuro'
@@ -205,7 +206,7 @@ class Launcher(tk.Tk):
         estilo.theme_use('clam')
         estilo.configure('TEntry', fieldbackground=CAMPO, foreground=TEXTO, insertcolor=TEXTO,
                          bordercolor=BORDA, lightcolor=BORDA, darkcolor=BORDA, padding=6)
-        for nome, fundo in (('TCheckbutton', CARTAO), ('Fundo.TCheckbutton', FUNDO)):
+        for nome, fundo in (('TCheckbutton', CARTAO), ('Fundo.TCheckbutton', FUNDO), ('TRadiobutton', CARTAO)):
             estilo.configure(nome, background=fundo, foreground=TEXTO, font=(FONTE, 10),
                              indicatorbackground=CAMPO, indicatorforeground=OURO, focuscolor=fundo)
             estilo.map(nome, background=[('active', fundo)], indicatorbackground=[('active', BORDA)])
@@ -271,6 +272,13 @@ class Launcher(tk.Tk):
         ttk.Checkbutton(corpo, text='Inverter sentido (do último ponto da curva para o primeiro)',
                         variable=self.trilho_inverter).grid(row=3, column=0, columnspan=len(CAMPOS_TRILHO),
                                                             sticky='w', pady=(6, 0))
+        # Velocidade: multiplica a rapidez da câmera (divide os segundos da volta).
+        linha = tk.Frame(corpo, bg=CARTAO)
+        linha.grid(row=4, column=0, columnspan=len(CAMPOS_TRILHO), sticky='w', pady=(6, 0))
+        tk.Label(linha, text='Velocidade', bg=CARTAO, fg=APAGADO, font=(FONTE, 9)).pack(side='left', padx=(0, 8))
+        for valor, rotulo in (('1', 'Normal'), ('1.5', '1,5×'), ('2', '2×'), ('3', '3×')):
+            ttk.Radiobutton(linha, text=rotulo, value=valor,
+                            variable=self.trilho_velocidade).pack(side='left', padx=(0, 10))
 
         # Execução: executável e pasta de saída.
         corpo = self.cartao('Execução')
@@ -325,6 +333,7 @@ class Launcher(tk.Tk):
         for k, var in self.trilho_vars.items():
             var.set(valores.get(k, {'segundos': '60', 'inicio': 'auto'}.get(k, '')))
         self.trilho_inverter.set(bool(valores.get('inverter')))
+        self.trilho_velocidade.set(str(valores.get('velocidade', '1')))
 
     def atualizar_jogo(self):
         caminho = self.jogo.get()
@@ -408,6 +417,12 @@ class Launcher(tk.Tk):
             return
         trilho = {k: var.get().strip() for k, var in self.trilho_vars.items()}
         trilho['inverter'] = self.trilho_inverter.get()
+        trilho['velocidade'] = self.trilho_velocidade.get()
+        try:
+            segundos = float((trilho['segundos'] or '60').replace(',', '.')) / float(trilho['velocidade'])
+        except ValueError:
+            self.status.set('Segundos do trilho inválido.')
+            return
         if 'sector' in modulos:
             if not (trilho['cena'] and trilho['curva'] and trilho['camera']):
                 self.status.set('O módulo sector precisa de cena, curva e câmera.')
@@ -429,7 +444,7 @@ class Launcher(tk.Tk):
         env.pop('RANGE_TRACE_RAIL', None)
         if 'sector' in modulos:
             env['RANGE_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
-                                                trilho['segundos'] or '60', 'reverse' if trilho['inverter'] else 'forward',
+                                                '%g' % max(segundos, 1.0), 'reverse' if trilho['inverter'] else 'forward',
                                                 trilho['inicio'] or 'auto'))
         self.rodando = True
         self.botao.configure(state='disabled')
