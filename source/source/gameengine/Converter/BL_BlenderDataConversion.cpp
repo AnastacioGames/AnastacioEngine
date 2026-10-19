@@ -3658,6 +3658,19 @@ static void BL_CollectNodeImages(bNodeTree *ntree, std::vector<Image *>& images,
 		else if (GS(node->id->name) == ID_NT) {
 			BL_CollectNodeImages((bNodeTree *)node->id, images, visited);
 		}
+		else if (GS(node->id->name) == ID_MA) {
+			// Material node: its textures are drawn too, but the converter never sees that
+			// material, so without this they were decoded on the first draw (spike mid-game).
+			Material *ma = (Material *)node->id;
+			for (unsigned short i = 0; i < MAX_MTEX; ++i) {
+				if (ma->mtex[i] && ma->mtex[i]->tex && ma->mtex[i]->tex->type == TEX_IMAGE && ma->mtex[i]->tex->ima) {
+					images.push_back(ma->mtex[i]->tex->ima);
+				}
+			}
+			if (ma->use_nodes) {
+				BL_CollectNodeImages(ma->nodetree, images, visited);
+			}
+		}
 	}
 }
 
