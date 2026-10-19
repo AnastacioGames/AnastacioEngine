@@ -61,9 +61,9 @@ build/dist/
   mesma página/release do GitHub que a engine, mas como arquivo distinto, já que o código-fonte da
   RangeArmor foi recuperado do histórico para `tools/rangearmor/` em 2026-10-08 para revisão e
   versionamento (`tools/RangeArmor-master/` continua ignorado pelo Git). O painel (GUI,
-  Rust/eframe, com Godot preservado como backup) só foi validado no Windows; não existe pacote `RangeArmor-<versao>-linux-x64`
-  separado, porque o painel já exporta jogos para Linux x86_64 embutindo o launcher Rust compilado para
-  `x86_64-unknown-linux-gnu`.
+  Rust/eframe, com Godot preservado como backup) roda no Windows e, desde a 0.5.3, também no Linux:
+  `RangeArmor-<versao>-linux-x86_64.tar.xz`, montado por `tools/linux/stage_rangearmor_linux.sh`
+  (ver `docs/release-0.5.3.md`).
 - `SHA256SUMS.txt`: hashes SHA-256 de todos os artefatos da release (Windows e Linux); publicar junto dos
   arquivos para permitir verificação de integridade por quem baixar.
 

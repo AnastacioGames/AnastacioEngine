@@ -24,12 +24,15 @@ assert ws.weather_sounds_handler in bpy.app.handlers.game_pre
 world.weather_settings.use_rain = False
 assert ws.ensure_weather_sounds(scene) == 0 and len(world.sound_modules) == 0
 
-# So um Empty com Lightning, sem chuva: entra so o trovao, o slot Rain fica vazio.
+# So um Empty com Lightning, sem chuva: o modulo Effects criado vem como o do Add Sound Module,
+# com o som da engine em todos os slots (79556dad), inclusive os 3 trovoes.
 empty = bpy.data.objects.new("Raio", None)
 scene.objects.link(empty)
 empty.use_lightning = True
-assert ws.ensure_weather_sounds(scene) == 3
-assert not any(s.filepath for m in world.sound_modules for s in m.sounds if s.event != 'THUNDER')
+n = ws.ensure_weather_sounds(scene)
+slots = [s for m in world.sound_modules for s in m.sounds]
+assert n == len(ws.EFFECT_SLOTS) == len(slots), (n, len(slots))
+assert all(s.filepath for s in slots), [(s.name, s.filepath) for s in slots]
 # Som do raio desligado no Empty: nada entra.
 for m in list(world.sound_modules):
     world.sound_modules.remove(m)
@@ -66,8 +69,9 @@ assert len(by_event.get('RAIN', [])) == 1, by_event
 for fp in by_event['THUNDER'] + by_event['RAIN']:
     assert fp.startswith("//"), fp
     assert os.path.isfile(bpy.path.abspath(fp)), fp
-# Slots sem som continuam vazios depois de salvar (o save gravava "//..\..\\" neles).
-assert not any(s.filepath for s in effects[0].sounds if s.event not in ('THUNDER', 'RAIN')),     [s.filepath for s in effects[0].sounds]
+# Modulo criado pela chuva traz todos os sons da engine, todos relativos e copiados para o projeto.
+for s in effects[0].sounds:
+    assert s.filepath.startswith("//") and os.path.isfile(bpy.path.abspath(s.filepath)), (s.name, s.filepath)
 for name in ("trovao1.wav", "trovao2.wav", "trovao3.wav", "chuva.wav"):
     assert os.path.isfile(os.path.join(out_dir, "sounds", name)), name
 

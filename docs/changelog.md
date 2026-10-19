@@ -11,6 +11,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Versão 0.5.3 com as correções do módulo Effects (sons da chuva) e das partículas/chuva no WebGL2.
   Zips Windows e RangeArmor montados e conferidos; Linux (engine e RangeArmor Linux) fica para depois.
   Detalhes em `docs/release-0.5.3.md`.
+- Linux 0.5.3: pacote da engine e primeira RangeArmor para Linux (`tools/linux/stage_rangearmor_linux.sh`);
+  `test_weather_sounds_auto.py` ajustado ao módulo Effects completo de `79556dad`.
 
 ## 2026-10-18 - .cooked de outro compilador quebrava a colisão
 

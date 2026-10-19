@@ -27,3 +27,33 @@ e90d6f46ba3ae7b18df111d3ddebca1a6ba9d6527d20a2015e9fa67b620a5a58  AnastacioEngin
    trocando 0.5.2 por 0.5.3 (os launchers vêm de `RangeArmor-0.5.3-windows-x64.zip`).
 3. Baixar o `SHA256SUMS.txt` da release, acrescentar as duas linhas Linux e subir com `--clobber`;
    atualizar README (linha Linux) e as notas.
+
+## Linux (feito no PC Linux, 2026-10-18)
+
+- Engine: container `localhost/anastacio-linux-builder:ubuntu22.04` + runtime web de `build-web-release/bin`
+  recompilado depois de `4d81b518`. **Atenção:** essa imagem tem `VERSION=0.5.1` e `WEB_RUNTIME_DIR=/web-build/bin`
+  no ambiente e roda o script do repo como CMD; passe os dois:
+  `podman run --rm -e VERSION=0.5.3 -e WEB_RUNTIME_DIR=/work/build-web-release/bin -v $PWD:/work:Z localhost/anastacio-linux-builder:ubuntu22.04`.
+  Todas as conferências do `container-build-22.04.sh` OK; `ctest` 10/10.
+- `tools/test_*.py` com o editor do pacote extraído (`-b`): todos OK. `test_weather_sounds_auto.py` foi
+  atualizado: desde `79556dad` o módulo Effects criado pelo raio/chuva vem com os 14 sons da engine, e o
+  teste ainda esperava só os 3 trovões. Os dois que precisam de janela (`test_material_atlas_modal.py`,
+  `test_material_atlas_integration.py -- --undo`) não rodaram: este PC está sem `xvfb-run` (código sem
+  mudança desde a 0.5.2, onde passaram).
+- RangeArmor Linux (primeira vez): `tools/linux/stage_rangearmor_linux.sh` monta o pacote. Painel compilado
+  em `rust:1.95-bullseye` (glibc máx. 2.30); `release/data`, `icons`, `scripts` do git; `release/launcher/`
+  inteiro do `RangeArmor-0.5.3-windows-x64.zip` (`Launcher` `3cb1ade9…`, `Launcher.exe` `40aecdf5…`);
+  sem `ResourceHacker` e sem `godot_backup`. Testes do launcher 4/4. Os testes do painel que chamam
+  `python` falham no container (só tem `python3`), não é bug do painel.
+- Export Linux64 sem janela: `build_release.py` (com `python3` do sistema, como o painel faz quando o
+  pacote não tem `python/bin`) gerou o jogo; o executável copiado para outra pasta abriu o `AnastacioRuntime`
+  (parou em "Unable to open a display", esperado sem tela).
+
+```text
+5d271afc846cc52073a2d8b830ba68603e31be40369d33eb5698a6a15e442f43  AnastacioEngine-0.5.3-linux-x86_64.tar.xz
+cef2d3c228aa7e7167ea27cf2718f4d2bced3662638021996808834f6e85b504  RangeArmor-0.5.3-linux-x86_64.tar.xz
+```
+
+- **Falta (usuário):** abrir `RangeArmor Panel` no Linux, criar projeto com um `.range`, Export Linux64 e
+  rodar o jogo exportado com janela. Depois, com autorização: acrescentar as duas linhas no
+  `SHA256SUMS.txt`, `gh release upload v0.5.3 ... --clobber` e publicar.

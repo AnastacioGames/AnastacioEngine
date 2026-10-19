@@ -14,13 +14,13 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.5.3](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.3)** (Windows; Linux ainda na 0.5.2)
+Versão atual: **[AnastacioEngine 0.5.3](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.3)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
 | [Windows x64 (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/AnastacioEngine-0.5.3-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
-| [Linux x86_64 (0.5.2)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.2/AnastacioEngine-0.5.2-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. |
-| [RangeArmor 0.5.3](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e exporta jogos para Windows e Linux. |
+| [Linux x86_64 (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/AnastacioEngine-0.5.3-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. |
+| [RangeArmor 0.5.3 Windows](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-windows-x64.zip) · [Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-linux-x86_64.tar.xz) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
 | [SHA-256 dos pacotes acima](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/SHA256SUMS.txt) | Hashes para conferir o download. |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `AnastacioEngine` (Linux).

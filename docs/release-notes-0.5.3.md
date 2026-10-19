@@ -13,5 +13,7 @@ Versão de correções sobre a 0.5.2.
 
 - `AnastacioEngine-0.5.3-windows-x64.zip`: editor e runtime para Windows.
 - `RangeArmor-0.5.3-windows-x64.zip`: painel de exportação (Windows); exporta jogos para Windows e Linux.
-- Linux: o pacote da engine e uma RangeArmor para Linux vão entrar nesta release depois. Até lá, use o
-  pacote Linux da 0.5.2.
+- `AnastacioEngine-0.5.3-linux-x86_64.tar.xz`: editor e runtime para Linux, com as bibliotecas incluídas.
+- `RangeArmor-0.5.3-linux-x86_64.tar.xz` (**novo**): o painel da RangeArmor agora também roda no Linux e
+  exporta jogos para Linux e Windows. Extraia e abra `RangeArmor Panel`. O painel usa o `python3` do sistema
+  para os scripts de exportação; o Set Icons (ícone do `.exe`) precisa do `wine`.
