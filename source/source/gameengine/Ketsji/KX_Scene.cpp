@@ -139,6 +139,7 @@ extern "C" {
 #include "CM_Message.h"
 #include "CM_Trace.h"
 
+#include <chrono>
 #include <mutex>
 #include <unordered_set>
 #include "CM_List.h"
@@ -3611,6 +3612,86 @@ static void EvaluateCutscenePath(const std::vector<mt::vec3> &points, float frac
 	}
 	position = points.back();
 	direction = mt::zero3;
+}
+
+void KX_Scene::StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::vector<mt::vec3> points, double seconds)
+{
+	TraceRail& rail = m_traceRail;
+	rail = TraceRail();
+	for (std::size_t i = 1; i < points.size(); ++i) {
+		rail.m_length += (points[i] - points[i - 1]).Length();
+	}
+	rail.m_camera = camera;
+	rail.m_curve = curve;
+	rail.m_points = std::move(points);
+	rail.m_seconds = std::max(seconds, 1.0);
+	// VSync would show every sector at the refresh period; measure the real frame cost instead.
+	KX_GetActiveEngine()->GetCanvas()->SetSwapControl(RAS_ICanvas::VSYNC_OFF);
+	CM_TraceEvent("rail_start", "\"scene\":" + CM_TraceStr(GetName()) + ",\"camera\":" + CM_TraceStr(camera->GetName()) +
+	              ",\"curve\":" + CM_TraceStr(curve->GetName()) + ",\"seconds\":" + std::to_string(rail.m_seconds) +
+	              ",\"length\":" + std::to_string(rail.m_length));
+}
+
+void KX_Scene::UpdateTraceRail()
+{
+	TraceRail& rail = m_traceRail;
+	if (!rail.m_camera || rail.m_done) {
+		return;
+	}
+	if (!m_objectlist->SearchValue(rail.m_camera) || !m_objectlist->SearchValue(rail.m_curve) ||
+	    rail.m_points.size() < 2 || rail.m_length <= 0.0f)
+	{
+		rail.m_done = true;
+		CM_TraceEvent("rail_end", "\"scene\":" + CM_TraceStr(GetName()) + ",\"reason\":\"lost\"");
+		return;
+	}
+
+	// Real time, not logic time: the camera keeps a constant speed even when frames are slow.
+	const double now = std::chrono::duration<double>(std::chrono::steady_clock::now().time_since_epoch()).count();
+	if (rail.m_start < 0.0) {
+		rail.m_start = now;
+	}
+	const float fraction = std::min(float((now - rail.m_start) / rail.m_seconds), 1.0f);
+
+	// Look at a point a few meters ahead on the curve: smoother than the segment direction.
+	const float lookAhead = std::min(8.0f / rail.m_length, 1.0f);
+	mt::vec3 local, direction, aheadLocal, aheadDirection;
+	EvaluateCutscenePath(rail.m_points, fraction, local, direction);
+	EvaluateCutscenePath(rail.m_points, std::min(fraction + lookAhead, 1.0f), aheadLocal, aheadDirection);
+
+	const mt::mat3x4 curveTransform = rail.m_curve->NodeGetWorldTransform();
+	const mt::vec3 position = curveTransform * local;
+	mt::vec3 forward = curveTransform * aheadLocal - position;
+	if (forward.LengthSquared() < 1e-6f) {
+		forward = rail.m_curve->NodeGetWorldOrientation() * direction;
+	}
+	rail.m_camera->NodeSetWorldPosition(position);
+	if (forward.LengthSquared() > 1e-8f) {
+		const mt::vec3 zAxis = -forward.Normalized();
+		mt::vec3 xAxis = mt::cross(mt::axisZ3, zAxis);
+		if (xAxis.LengthSquared() > 1e-6f) {
+			xAxis.Normalize();
+			rail.m_camera->NodeSetGlobalOrientation(mt::mat3(xAxis, mt::cross(zAxis, xAxis), zAxis));
+		}
+	}
+	rail.m_camera->NodeUpdate();
+	if (rail.m_camera->GetGameObjectType() == SCA_IObject::OBJ_CAMERA && GetActiveCamera() != rail.m_camera) {
+		SetActiveCamera(static_cast<KX_Camera *>(rail.m_camera));
+	}
+
+	// Where the camera looks (its -Z), to check it faces the way it moves.
+	const mt::vec3 look = -rail.m_camera->NodeGetWorldOrientation().GetColumn(2);
+	char fields[200];
+	snprintf(fields, sizeof(fields),
+	         "\"p\":%.5f,\"x\":%.2f,\"y\":%.2f,\"z\":%.2f,\"lx\":%.3f,\"ly\":%.3f,\"lz\":%.3f", fraction,
+	         position.x, position.y, position.z, look.x, look.y, look.z);
+	CM_TraceEvent("rail", "\"scene\":" + CM_TraceStr(GetName()) + "," + fields);
+
+	if (fraction >= 1.0f) {
+		rail.m_done = true;
+		CM_TraceEvent("rail_end", "\"scene\":" + CM_TraceStr(GetName()) + ",\"reason\":\"finished\"");
+		KX_GetActiveEngine()->RequestExit(KX_ExitInfo::QUIT_GAME);
+	}
 }
 
 void KX_Scene::UpdateCutscenePaths(double time)

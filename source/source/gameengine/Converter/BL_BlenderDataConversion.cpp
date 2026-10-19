@@ -2634,7 +2634,7 @@ static void bl_ConvertBlenderObject_Single(BL_SceneConverter& converter,
 }
 
 /// Sample the first spline of a curve object into points in the curve's local space.
-static std::vector<mt::vec3> BL_SampleCutscenePath(Object *ob)
+std::vector<mt::vec3> BL_SampleCutscenePath(Object *ob)
 {
 	std::vector<mt::vec3> points;
 	if (!ob || ob->type != OB_CURVE || !ob->data) {

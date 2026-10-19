@@ -140,6 +140,9 @@ void KX_SimulationPipeline::Update()
 		}
 		if (!scene->IsSuspended()) {
 
+			// Range Trace sector rail: after physics and logic, so it wins over gameplay cameras.
+			scene->UpdateTraceRail();
+
 			// Publish one shared player/camera reference after physics. Distance-based
 			// systems (currently foliage wind) all consume this same frame position.
 			scene->UpdateOptimizationReference();

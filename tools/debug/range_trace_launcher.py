@@ -28,12 +28,20 @@ RECENTES = 6
 MODULOS = (
     ('load', 'Carga: cenas, objetos, malhas, materiais, imagens, On Demand'),
     ('usage', 'Uso: primeiro frame em que cada objeto é desenhado; envio de imagens'),
+    ('frames', 'Frames lentos: custo de cada frame por categoria e o que carregou junto'),
+    ('sector', 'Trilho: câmera percorre a curva da pista e mede o custo por trecho'),
 )
+# Campos do trilho (módulo sector), lembrados por jogo.
+CAMPOS_TRILHO = (('cena', 'Cena', 14), ('curva', 'Curva', 16), ('camera', 'Câmera', 20), ('segundos', 'Segundos', 6))
+TRILHO_PADRAO = {
+    os.path.normcase(r'D:\ProjetoRolimaRacer\RolimaRacer.range'):
+        {'cena': 'Pista_1', 'curva': 'Pista1.009', 'camera': 'Camera_debug_track', 'segundos': '120'},
+}
 
 PADRAO = {
     'jogo': r'D:\ProjetoRolimaRacer\RolimaRacer.range',
     'exe': os.path.join(RAIZ, 'build', 'bin', 'AnastacioRuntime.exe'),
-    'modulos': [m for m, _ in MODULOS],
+    'modulos': ['load', 'usage', 'frames'],
     'saida': os.path.join(RAIZ, 'debug-logs'),
     'abrir_relatorio': True,
     'tema': 'escuro',
@@ -171,6 +179,11 @@ class Launcher(tk.Tk):
         self.status = tk.StringVar(value='Escolha o jogo e os módulos, depois clique em Jogar com trace.')
         self.pasta_trace = None
         self.imagens = {}
+        self.trilhos = cfg.get('trilhos', {})
+        self.trilho_vars = {chave: tk.StringVar() for chave, _, _ in CAMPOS_TRILHO}
+        self.trilho_inverter = tk.BooleanVar()
+        self.carregar_trilho()
+        self.jogo.trace_add('write', lambda *_: self.carregar_trilho())
         self.tema = cfg['tema'] if cfg['tema'] in TEMAS else 'escuro'
         self.rodando = False
         self.montar()
@@ -241,6 +254,22 @@ class Launcher(tk.Tk):
                      anchor='w').pack(side='left')
             tk.Label(linha, text=descricao, bg=CARTAO, fg=TEXTO, font=(FONTE, 10), anchor='w').pack(side='left')
 
+        # Trilho de câmera (módulo sector).
+        corpo = self.cartao('Trilho de câmera (sector)')
+        for i, (chave, rotulo, largura) in enumerate(CAMPOS_TRILHO):
+            corpo.columnconfigure(i, weight=largura)
+            tk.Label(corpo, text=rotulo, bg=CARTAO, fg=APAGADO, font=(FONTE, 9), anchor='w').grid(
+                row=0, column=i, sticky='w', padx=(0, 8))
+            campo(corpo, self.trilho_vars[chave]).grid(row=1, column=i, sticky='ew', padx=(0, 8))
+        tk.Label(corpo, text='Com o módulo sector ligado, a câmera entra na curva quando a cena carrega, anda em '
+                 'velocidade constante olhando para a frente e o jogo fecha no fim. VSync fica desligado no trilho.',
+                 bg=CARTAO, fg=APAGADO, font=(FONTE, 9), justify='left', anchor='w',
+                 wraplength=int(760 * self.escala)).grid(row=2, column=0, columnspan=len(CAMPOS_TRILHO),
+                                                         sticky='w', pady=(8, 0))
+        ttk.Checkbutton(corpo, text='Inverter sentido (do último ponto da curva para o primeiro)',
+                        variable=self.trilho_inverter).grid(row=3, column=0, columnspan=len(CAMPOS_TRILHO),
+                                                            sticky='w', pady=(6, 0))
+
         # Execução: executável e pasta de saída.
         corpo = self.cartao('Execução')
         corpo.columnconfigure(1, weight=1)
@@ -287,6 +316,13 @@ class Launcher(tk.Tk):
         corpo = tk.Frame(caixa, bg=CARTAO)
         corpo.pack(fill='x', padx=16, pady=(0, 14))
         return corpo
+
+    def carregar_trilho(self):
+        chave = os.path.normcase(self.jogo.get())
+        valores = self.trilhos.get(chave) or TRILHO_PADRAO.get(chave) or {}
+        for k, var in self.trilho_vars.items():
+            var.set(valores.get(k, '60' if k == 'segundos' else ''))
+        self.trilho_inverter.set(bool(valores.get('inverter')))
 
     def atualizar_jogo(self):
         caminho = self.jogo.get()
@@ -368,14 +404,30 @@ class Launcher(tk.Tk):
         if not os.path.isfile(exe):
             self.status.set('Executável não encontrado: %s' % exe)
             return
-        salvar_config({'jogo': jogo, 'exe': exe, 'modulos': modulos, 'saida': self.saida.get(),
-                       'abrir_relatorio': self.abrir.get(), 'tema': self.tema})
+        trilho = {k: var.get().strip() for k, var in self.trilho_vars.items()}
+        trilho['inverter'] = self.trilho_inverter.get()
+        if 'sector' in modulos:
+            if not (trilho['cena'] and trilho['curva'] and trilho['camera']):
+                self.status.set('O módulo sector precisa de cena, curva e câmera.')
+                return
+            if 'frames' not in modulos:
+                modulos.append('frames')  # o custo por trecho vem do custo de cada frame
+        self.trilhos[os.path.normcase(jogo)] = trilho
+        cfg = ler_config()
+        cfg.update({'jogo': jogo, 'exe': exe, 'modulos': modulos, 'saida': self.saida.get(),
+                    'abrir_relatorio': self.abrir.get(), 'tema': self.tema, 'trilhos': self.trilhos})
+        salvar_config(cfg)
 
         self.pasta_trace = os.path.join(self.saida.get(), 'trace-' + time.strftime('%Y%m%d-%H%M%S'))
         os.makedirs(self.pasta_trace, exist_ok=True)
         with open(os.path.join(self.pasta_trace, META), 'w', encoding='utf-8') as f:
-            json.dump({'jogo': jogo, 'exe': exe, 'modulos': modulos}, f, ensure_ascii=False)
+            json.dump({'jogo': jogo, 'exe': exe, 'modulos': modulos,
+                       'trilho': trilho if 'sector' in modulos else None}, f, ensure_ascii=False)
         env = dict(os.environ, RANGE_TRACE=self.pasta_trace, RANGE_TRACE_MODULES=','.join(modulos))
+        env.pop('RANGE_TRACE_RAIL', None)
+        if 'sector' in modulos:
+            env['RANGE_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
+                                                trilho['segundos'] or '60') + (('reverse',) if trilho['inverter'] else ()))
         self.rodando = True
         self.botao.configure(state='disabled')
         self.botao_pasta.configure(state='normal')

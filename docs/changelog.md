@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-19 - Range Trace, fase 3 (frames lentos e trilho de câmera)
+
+- Módulo `frames`: uma linha por frame com o tempo das categorias do profiler (`KX_KetsjiEngine`, ao lado do
+  `KX_EngineProfiler::EndFrame`). O relatório lista os frames lentos com as categorias e o que carregou junto.
+- Módulo `sector`: `RANGE_TRACE_RAIL=cena;curva;objeto;segundos[;reverse]` põe uma câmera na curva com
+  velocidade constante em tempo real, olhando 8 m à frente, VSync desligado, e fecha o jogo no fim
+  (`KX_Scene::StartTraceRail`/`UpdateTraceRail`, reaproveitando `BL_SampleCutscenePath` e
+  `EvaluateCutscenePath` da Cutscene). Relatório: 40 trechos, faixa e mapa de calor visto de cima.
+- Launcher: módulos `frames` e `sector`, cartão do trilho (cena, curva, câmera, segundos, inverter sentido)
+  lembrado por jogo; RolimaRacer já vem com `Pista_1`, `Pista1.009`, `Camera_debug_track`.
+- Testado com um `.range` gerado (círculo de 50 m, `--server`): a câmera percorre a curva nos dois sentidos,
+  olhando ~4° para dentro da curva (o esperado para 8 m à frente), e o jogo fecha no fim.
+
 ## 2026-10-19 - Range Trace, fase 2 (launcher com janela)
 
 - `tools/debug/range_trace_launcher.py` (tkinter) e `abrir_trace_launcher.bat`: escolhe jogo, executável,

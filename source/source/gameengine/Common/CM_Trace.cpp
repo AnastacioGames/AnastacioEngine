@@ -40,6 +40,8 @@ const struct {
 } moduleNames[] = {
 	{"load", CM_TRACE_LOAD},
 	{"usage", CM_TRACE_USAGE},
+	{"frames", CM_TRACE_FRAMES},
+	{"sector", CM_TRACE_SECTOR},
 };
 
 struct TraceState

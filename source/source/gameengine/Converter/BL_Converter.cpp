@@ -716,6 +716,51 @@ static const char *trace_object_type(const Object *ob)
 
 /** Range Trace "load": catalog of what a scene conversion created (objects, meshes, materials with
  * their images) and what it left out, for tools/debug/relatorio_trace.py to cross with the usage events. */
+/// Range Trace "sector": RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse] starts the camera rail when that scene is converted.
+static void trace_start_rail(BL_SceneConverter& converter, KX_Scene *scene)
+{
+	const char *env = getenv("RANGE_TRACE_RAIL");
+	if (!env || !env[0]) {
+		return;
+	}
+	std::vector<std::string> parts;
+	std::stringstream stream(env);
+	std::string part;
+	while (std::getline(stream, part, ';')) {
+		parts.push_back(part);
+	}
+	if (parts.size() < 3 || parts[0] != scene->GetName()) {
+		return;
+	}
+	KX_GameObject *curve = nullptr;
+	KX_GameObject *camera = nullptr;
+	for (KX_GameObject *gameobj : converter.GetObjects()) {
+		if (gameobj->GetName() == parts[1]) {
+			curve = gameobj;
+		}
+		if (gameobj->GetName() == parts[2]) {
+			camera = gameobj;
+		}
+	}
+	std::vector<mt::vec3> points;
+	if (curve) {
+		points = BL_SampleCutscenePath(curve->GetBlenderObject());
+	}
+	if (!camera || points.size() < 2) {
+		CM_Error("Range Trace rail: scene \"" << parts[0] << "\" needs curve \"" << parts[1] << "\" and object \""
+		         << parts[2] << "\" (" << (curve ? "curve found" : "curve missing") << ", "
+		         << (camera ? "object found" : "object missing") << ")");
+		CM_TraceEvent("rail_end", "\"scene\":" + CM_TraceStr(parts[0]) + ",\"reason\":\"not_found\"");
+		return;
+	}
+	// Fifth field "reverse": run the curve from its last point to its first.
+	if (parts.size() > 4 && parts[4] == "reverse") {
+		std::reverse(points.begin(), points.end());
+	}
+	const double seconds = (parts.size() > 3) ? atof(parts[3].c_str()) : 60.0;
+	scene->StartTraceRail(camera, curve, std::move(points), seconds > 0.0 ? seconds : 60.0);
+}
+
 static void trace_scene_load(BL_SceneConverter& converter, KX_Scene *scene, double seconds, bool libloading)
 {
 	const std::string sceneName = CM_TraceStr(scene->GetName());
@@ -881,6 +926,9 @@ void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, b
 	BL_LoadLog::Add(scene->GetName(), "convert", convertTime, detail.str());
 	if (CM_TraceOn(CM_TRACE_LOAD)) {
 		trace_scene_load(converter, scene, convertTime, libloading);
+	}
+	if (CM_TraceOn(CM_TRACE_SECTOR)) {
+		trace_start_rail(converter, scene);
 	}
 }
 

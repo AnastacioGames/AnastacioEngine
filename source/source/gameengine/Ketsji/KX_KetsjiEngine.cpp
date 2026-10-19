@@ -161,6 +161,7 @@ const std::string KX_KetsjiEngine::m_renderQueriesLabels[QUERY_MAX] = {
 };
 
 static void trace_image_upload(const char *name, int w, int h, bool mipmap, double ms);
+static void trace_frame(const double *categoryMs, const std::string *labels, int numCategories);
 
 /**
  * Constructor of the Ketsji Engine
@@ -627,6 +628,23 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 }
 
 /// Range Trace: image sent to the GPU (first draw that needs it, or a prefetch at load).
+/// Range Trace "frames": total time and the categories above 0.05 ms, short keys to keep lines small.
+static void trace_frame(const double *categoryMs, const std::string *labels, int numCategories)
+{
+	double total = 0.0;
+	std::string parts;
+	char buf[96];
+	for (int i = 0; i < numCategories; ++i) {
+		total += categoryMs[i];
+		if (categoryMs[i] >= 0.05) {
+			snprintf(buf, sizeof(buf), "%s\"%s\":%.2f", parts.empty() ? "" : ",", labels[i].c_str(), categoryMs[i]);
+			parts += buf;
+		}
+	}
+	snprintf(buf, sizeof(buf), "\"ms\":%.2f,\"c\":{", total);
+	CM_TraceEvent("frame", buf + parts + "}");
+}
+
 static void trace_image_upload(const char *name, int w, int h, bool mipmap, double ms)
 {
 	CM_TraceEvent("image", "\"name\":" + CM_TraceStr(name ? name : "") + ",\"w\":" + std::to_string(w) + ",\"h\":" +
@@ -911,6 +929,9 @@ void KX_KetsjiEngine::UpdateSleepTime()
 			categoryMs[i] = m_logger.GetLast(i) * 1000.0;
 		}
 		KX_EngineProfiler::EndFrame(m_clock.GetTimeSecond(), categoryMs, m_profileLabels, tc_numCategories);
+		if (CM_TraceOn(CM_TRACE_FRAMES)) {
+			trace_frame(categoryMs, m_profileLabels, tc_numCategories);
+		}
 		g_profileFrameEnd = m_clock.GetTimeSecond();
 	}
 

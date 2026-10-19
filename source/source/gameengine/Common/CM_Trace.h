@@ -38,6 +38,10 @@ enum CM_TraceModule {
 	CM_TRACE_LOAD = 1 << 0,
 	/// First time each object is drawn (camera or shadow) and each image is sent to the GPU.
 	CM_TRACE_USAGE = 1 << 1,
+	/// One line per frame with its time by profiler category (spikes and sector costs).
+	CM_TRACE_FRAMES = 1 << 2,
+	/// Camera on a curve at constant speed, set by RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse].
+	CM_TRACE_SECTOR = 1 << 3,
 };
 
 /// Bit mask of the modules on; 0 when RANGE_TRACE is unset.

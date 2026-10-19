@@ -94,4 +94,7 @@ void BL_ConvertCustomMouseCursor(KX_Scene *kxscene, Main *maggie, KX_KetsjiEngin
 
 SCA_IInputDevice::SCA_EnumInputs BL_ConvertKeyCode(int key_code);
 
+/// Sample the first spline of a curve object into points in the curve's local space.
+std::vector<mt::vec3> BL_SampleCutscenePath(Object *ob);
+
 #endif  // __BL_BLENDERDATACONVERSION_H__

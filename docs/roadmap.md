@@ -544,12 +544,12 @@ iOS fora do escopo.
 
 ## Performance
 
-- **Range Trace (`docs/range-trace.md`)** — fases 1 e 2 feitas em 2026-10-19 (`load`, `usage`, relatório, `.bat`, launcher com janela e
-  Game > Range Trace...; `usage` validado com janela no RolimaRacer). Invisíveis por design já ficam
-  numa lista própria. Próximas: redesenhar o `relatorio.html` (simples, organizado, cores para
-  pontos de atenção), com um agente especialista em relatórios/web; (3) `spikes` (frames lentos + o que carregou neles, a partir do `RANGE_PROFILE`)
-  e `sector` (câmera em trilho com velocidade constante, custo por trecho da pista e mapa de calor);
-  (4) `runtime` (sons, scripts, troca de cena), `shaders` e `work` no formato do trace.
+- **Range Trace (`docs/range-trace.md`)** — fases 1 a 3 feitas em 2026-10-19 (`load`, `usage`, relatório,
+  `.bat`, launcher com janela e Game > Range Trace..., `frames` com frames lentos e `sector` com trilho de
+  câmera e mapa de calor). Falta: rodar o trilho no RolimaRacer com janela (`Pista_1;Pista1.009;
+  Camera_debug_track`) e conferir o sentido da curva. Próximas: redesenhar o `relatorio.html` (simples,
+  organizado, cores para pontos de atenção) com um agente especialista em relatórios/web; (4) `runtime`
+  (sons, scripts, troca de cena), `shaders` e `work` no formato do trace.
 - **Onde perdemos feio para o ThunderPlayer (benchmark 2026-10-09)** — refeito o teste do Codex
   (`D:\ThunderPlayer-investigacao\benchmark\diagnostico\`, `run_diagnostics_2026_10_09.py`, `runs-2026-10-09.json`;
   relatorio original em `RESULTADO-DIAGNOSTICO.md`). RX 6800M, 1280x720, MSAA 2x, FPS medio de 2 rodadas:
