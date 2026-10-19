@@ -1237,6 +1237,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_GameObject,rayCast);
 	EXP_PYMETHOD_DOC_O(KX_GameObject,getDistanceTo);
 	EXP_PYMETHOD_DOC_O(KX_GameObject,getVectTo);
+	EXP_PYMETHOD_DOC(KX_GameObject,getCurvePoints);
 	EXP_PYMETHOD_DOC_O(KX_GameObject,getTurnTo);
 	EXP_PYMETHOD_DOC(KX_GameObject, sendMessage);
 	EXP_PYMETHOD(KX_GameObject, ReinstancePhysicsMesh);

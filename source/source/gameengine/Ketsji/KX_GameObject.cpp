@@ -3078,6 +3078,7 @@ PyMethodDef KX_GameObject::Methods[] = {
 	EXP_PYMETHODTABLE_KEYWORDS(KX_GameObject, rayCast),
 	EXP_PYMETHODTABLE_O(KX_GameObject, getDistanceTo),
 	EXP_PYMETHODTABLE_O(KX_GameObject, getVectTo),
+	EXP_PYMETHODTABLE_KEYWORDS(KX_GameObject, getCurvePoints),
 	EXP_PYMETHODTABLE_O(KX_GameObject, getTurnTo),
 
 	EXP_PYMETHODTABLE_KEYWORDS(KX_GameObject, sendMessage),
@@ -6310,6 +6311,24 @@ EXP_PYMETHODDEF_DOC_O(KX_GameObject, getDistanceTo,
 	}
 
 	return nullptr;
+}
+
+EXP_PYMETHODDEF_DOC(KX_GameObject, getCurvePoints,
+                    "getCurvePoints(world=True): sample the first spline of a curve object\n"
+                    "Returns a list of Vectors (world space by default, local space with world=False); empty if not a curve\n")
+{
+	int world = 1;
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "|p:getCurvePoints", {"world", 0}, &world)) {
+		return nullptr;
+	}
+
+	const std::vector<mt::vec3> points = BL_SampleCutscenePath(GetBlenderObject());
+	const mt::mat3x4 trans = NodeGetWorldTransform();
+	PyObject *list = PyList_New(points.size());
+	for (unsigned int i = 0; i < points.size(); ++i) {
+		PyList_SET_ITEM(list, i, PyObjectFrom(world ? (trans * points[i]) : points[i]));
+	}
+	return list;
 }
 
 EXP_PYMETHODDEF_DOC_O(KX_GameObject, getVectTo,
