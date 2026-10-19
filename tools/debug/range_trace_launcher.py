@@ -145,9 +145,16 @@ def botao(pai, texto, comando, destaque=False, perigo=False, **kw):
 
 class Launcher(tk.Tk):
     def __init__(self, jogo=None):
+        # Sem isto o Windows amplia a janela como bitmap em telas com escala > 100% e a fonte fica borrada.
+        try:
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(2)
+        except (AttributeError, OSError):
+            pass
         super().__init__()
+        self.escala = self.winfo_fpixels('1i') / 96.0
         self.title('Anastacio Trace Launcher')
-        self.minsize(860, 0)
+        self.minsize(int(860 * self.escala), 0)
         try:
             self.iconbitmap(ICONE)
         except tk.TclError:
@@ -195,7 +202,7 @@ class Launcher(tk.Tk):
         topo = tk.Frame(faixa, bg=CABECALHO)
         topo.pack(fill='x', padx=24, pady=(16, 14))
         if 'logo' not in self.imagens:
-            self.imagens['logo'] = carregar_imagem(LOGO, 400)
+            self.imagens['logo'] = carregar_imagem(LOGO, int(400 * self.escala))
         if self.imagens['logo']:
             tk.Label(topo, image=self.imagens['logo'], bg=CABECALHO).pack(side='left')
         else:
@@ -259,7 +266,7 @@ class Launcher(tk.Tk):
         acoes = tk.Frame(rodape, bg=FUNDO)
         acoes.pack(fill='x', pady=(12, 0))
         tk.Label(acoes, textvariable=self.status, bg=FUNDO, fg=APAGADO, font=(FONTE, 10), anchor='w',
-                 justify='left', wraplength=480).pack(side='left', fill='x', expand=True)
+                 justify='left', wraplength=int(480 * self.escala)).pack(side='left', fill='x', expand=True)
         self.botao = botao(acoes, '\u25b6  Jogar com trace', self.iniciar, destaque=True)
         self.botao.pack(side='right')
         if self.rodando:
@@ -285,10 +292,10 @@ class Launcher(tk.Tk):
         caminho = self.jogo.get()
         nome = os.path.splitext(os.path.basename(caminho))[0] or 'Nenhum jogo escolhido'
         self.nome_jogo.configure(text=nome)
-        icone = carregar_imagem(os.path.join(os.path.dirname(caminho), 'icon.png'), 72) if caminho else None
+        icone = carregar_imagem(os.path.join(os.path.dirname(caminho), 'icon.png'), int(72 * self.escala)) if caminho else None
         self.imagens['jogo'] = icone
         if icone:
-            self.icone_jogo.configure(image=icone, text='', width=72, height=72)
+            self.icone_jogo.configure(image=icone, text='', width=int(72 * self.escala), height=int(72 * self.escala))
         else:
             self.icone_jogo.configure(image='', text='?', width=3, height=1)
 
