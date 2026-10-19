@@ -138,6 +138,8 @@ protected:
 	mt::vec3 m_prevRenderPos = mt::zero3;
 	mt::vec3 m_prevRenderForward = mt::zero3;
 	float m_speed = 0.0f;
+	/// Smoothed world velocity (m/s) of the rendered camera, used by the rain.
+	mt::vec3 m_velocity = mt::zero3;
 	float m_speedOverride = -1.0f;
 	mt::vec2 m_turn = mt::zero2;
 
@@ -263,6 +265,7 @@ public:
 	const mt::vec2& GetFocusScreenPosition() const;
 	bool IsFocusValid() const;
 	float GetCameraSpeed() const;
+	const mt::vec3& GetCameraVelocity() const;
 	const mt::vec2& GetCameraTurn() const;
 	/// Orientation that is rendered (base orientation plus tracking and shake roll).
 	mt::mat3 GetRenderOrientation() const;

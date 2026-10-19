@@ -100,6 +100,7 @@ RAS_ScopeExit<Fn> MakeScopeExit(Fn fn)
 
 /// Texture unit of the rain mask (ge_RainMask); custom filters keep 0-7 but the rain filter has none.
 static const int kRainMaskUnit = 7;
+static const int kRainShelterUnit = 6;
 /// Volumetric Fog: Spot shadow maps on 20 and 21, Sun on 22 (17-19 are the previous frame and clouds history),
 /// their Colored Shadows targets on 23-25.
 static const int kVFogShadowUnit = 20;
@@ -130,6 +131,10 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainColor", // GE_RAIN_COLOR_UNIFORM
 	"ge_RainStyle", // GE_RAIN_STYLE_UNIFORM
 	"ge_RainFallPhase", // GE_RAIN_FALL_PHASE_UNIFORM
+	"ge_RainVelocity", // GE_RAIN_VELOCITY_UNIFORM
+	"ge_RainVelocityStretch", // GE_RAIN_VELOCITY_STRETCH_UNIFORM
+	"ge_RainShelter", // GE_RAIN_SHELTER_UNIFORM
+	"ge_RainShelterArea", // GE_RAIN_SHELTER_AREA_UNIFORM
 	"ge_RainParams4", // GE_RAIN_PARAMS4_UNIFORM
 	"ge_RainStreakWidth", // GE_RAIN_STREAK_WIDTH_UNIFORM
 	"ge_RainRippleNormal", // GE_RAIN_RIPPLE_NORMAL_UNIFORM
@@ -528,6 +533,11 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 		glActiveTexture(GL_TEXTURE0 + kRainMaskUnit);
 		glBindTexture(GL_TEXTURE_2D, m_buildInFilters.rain_mask_texture);
 	}
+	// Rain under a roof: height map of the rain_shelter objects (KX_RainShelterMap).
+	if (m_predefinedUniforms[GE_RAIN_SHELTER_UNIFORM] != -1 && m_buildInFilters.rain_shelter_area[3] > 0.5f) {
+		glActiveTexture(GL_TEXTURE0 + kRainShelterUnit);
+		glBindTexture(GL_TEXTURE_2D, m_buildInFilters.rain_shelter_texture);
+	}
 
 	if (m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1 && m_frameInputs && m_frameInputs->previousTexture) {
 		glActiveTexture(GL_TEXTURE0 + m_frameInputs->previousTextureUnit);
@@ -586,6 +596,10 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 
 	if (m_predefinedUniforms[GE_RAIN_MASK_UNIFORM] != -1 && m_buildInFilters.rain_mask_flags) {
 		glActiveTexture(GL_TEXTURE0 + kRainMaskUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	if (m_predefinedUniforms[GE_RAIN_SHELTER_UNIFORM] != -1 && m_buildInFilters.rain_shelter_area[3] > 0.5f) {
+		glActiveTexture(GL_TEXTURE0 + kRainShelterUnit);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
@@ -858,6 +872,18 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[GE_RAIN_FALL_PHASE_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_FALL_PHASE_UNIFORM], RAS_Uniform::UNI_FLOAT, &m_buildInFilters.rain_fall_phase, sizeof(float), 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_VELOCITY_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_VELOCITY_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.rain_velocity, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_VELOCITY_STRETCH_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_VELOCITY_STRETCH_UNIFORM], RAS_Uniform::UNI_FLOAT, &m_buildInFilters.rain_velocity_stretch, sizeof(float), 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_SHELTER_UNIFORM] != -1) {
+		SetUniform(m_predefinedUniforms[GE_RAIN_SHELTER_UNIFORM], kRainShelterUnit);
+	}
+	if (m_predefinedUniforms[GE_RAIN_SHELTER_AREA_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_SHELTER_AREA_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.rain_shelter_area, sizeof(float) * 4, 1);
 	}
 
 	if (m_predefinedUniforms[GE_CLOUDS_PARAMS_UNIFORM] != -1) {

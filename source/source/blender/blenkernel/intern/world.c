@@ -345,6 +345,9 @@ void BKE_world_init(World *wrld)
 	wrld->rain_color[1] = 0.8f;
 	wrld->rain_color[2] = 0.8f;
 	wrld->rain_streak_width = 0.35f;
+	wrld->rain_velocity = 1.0f;
+	wrld->rain_velocity_stretch = 1.0f;
+	wrld->rain_velocity_max = 40.0f;
 	wrld->rain_splash_size = 1.0f;
 	wrld->rain_splash_rate = 0.9f;
 	wrld->rain_splash_intensity = 1.0f;

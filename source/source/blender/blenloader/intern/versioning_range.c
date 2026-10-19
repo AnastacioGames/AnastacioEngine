@@ -666,6 +666,15 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_velocity")) {
+    /* Chuva com velocidade: ligada tambem nos arquivos antigos; parada a chuva fica igual. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_velocity = 1.0f;
+      wo->rain_velocity_stretch = 1.0f;
+      wo->rain_velocity_max = 40.0f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "foliage_distance")) {
     /* Files from before Foliage Optimization get the same wind distance as new materials. */
     LISTBASE_FOREACH (Material *, ma, &main->mat) {

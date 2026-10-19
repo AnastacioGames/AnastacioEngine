@@ -105,6 +105,10 @@ typedef struct BuildInFilters {
 	float rain_ripple_normal;
 	float rain_color[3];
 	float rain_streak_width;
+	/* Rain with velocity: camera velocity in view space times the influence (xyz, m/s) and the
+	 * speed where the effect peaks (w); how much the streaks stretch. */
+	float rain_velocity[4];
+	float rain_velocity_stretch;
 	float rain_splash_size;
 	float rain_splash_rate;
 	float rain_splash_intensity;
@@ -132,6 +136,10 @@ typedef struct BuildInFilters {
 	/* Ripples/Splash only on marked objects: mask texture (KX_RainSurfaceMask) and which
 	 * effects use it (bit 1 ripples, bit 2 splash, bit 4 puddles; 0 = every surface). Refreshed every frame. */
 	unsigned int rain_mask_texture;
+	/* Rain under a roof: height map of the "rain_shelter" objects (KX_RainShelterMap) and its
+	 * area (center x, y, 1 / size, 1 = valid; 0 = no shelter). Refreshed every frame. */
+	unsigned int rain_shelter_texture;
+	float rain_shelter_area[4];
 	int rain_mask_flags;
 	/* Lightning: flash, bolt brightness, bolt screen position (refreshed every frame) */
 	float rain_lightning[4];

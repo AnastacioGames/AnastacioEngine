@@ -42,6 +42,7 @@
 #include <vector>
 #include "KX_RainAura.h"
 #include "KX_RainSurfaceMask.h"
+#include "KX_RainShelterMap.h"
 #include "KX_RainLightning.h"
 #include "KX_VFogGlow.h"
 #include "RAS_ParticleBuffer.h" // Per-object GPU particle emitters, see KX_GameObject::GetParticleBuffer.
@@ -1019,6 +1020,20 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				}
 				rainParams->useRainSplash = (world->weather_flag & WO_WEATHER_RAIN_SPLASH) != 0;
 				rainParams->rain_streak_width = world->rain_streak_width;
+				// Rain with velocity: the drops come at the camera as it moves (car, nitro).
+				// View space, so the shader tilts the streaks on screen directly.
+				{
+					mt::vec3 vel = mt::zero3;
+					KX_Camera *cam = scene->GetActiveCamera();
+					if (cam && world->rain_velocity > 0.0f) {
+						vel = cam->GetRenderOrientation().Transpose() * cam->GetCameraVelocity() * world->rain_velocity;
+					}
+					rainParams->rain_velocity[0] = vel.x;
+					rainParams->rain_velocity[1] = vel.y;
+					rainParams->rain_velocity[2] = vel.z;
+					rainParams->rain_velocity[3] = std::max(world->rain_velocity_max, 1.0f);
+					rainParams->rain_velocity_stretch = world->rain_velocity_stretch;
+				}
 				rainParams->rain_ripple = world->rain_ripple;
 				rainParams->rain_ripple_normal = world->rain_ripple_normal;
 				rainParams->rain_splash_size = world->rain_splash_size;
@@ -1045,6 +1060,17 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				rainParams->rain_sky_zenith[0] = world->zenr;
 				rainParams->rain_sky_zenith[1] = world->zeng;
 				rainParams->rain_sky_zenith[2] = world->zenb;
+
+				// Rain under a roof: the "rain_shelter" objects seen from above, around the camera.
+				rainParams->rain_shelter_area[3] = 0.0f;
+				if (world->weather_flag & WO_WEATHER_RAIN) {
+					const mt::mat4 viewInv = rasterizer->GetViewMatrix().Inverse();
+					const mt::vec3 camPos(viewInv(0, 3), viewInv(1, 3), viewInv(2, 3));
+					KX_RainShelterMap *shelter = scene->GetRainShelterMap();
+					if (shelter->Render(scene, m_engine->GetFrameTime(), camPos, rainParams->rain_shelter_area)) {
+						rainParams->rain_shelter_texture = shelter->GetTexture();
+					}
+				}
 
 				// Ripples/Splash only on the objects with ripples_effect/splash_effect, when any
 				// object has them: those objects go into a mask with this camera's matrices.

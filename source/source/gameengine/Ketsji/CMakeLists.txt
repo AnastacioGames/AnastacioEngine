@@ -175,6 +175,7 @@ set(SRC
 	KX_NodeRelationships.cpp
 	KX_Scene.cpp
 	KX_RainAura.cpp
+	KX_RainShelterMap.cpp
 	KX_RainSurfaceMask.cpp
 	KX_RainLightning.cpp
 	KX_SceneActuator.cpp
@@ -299,6 +300,7 @@ set(SRC
 	KX_NodeRelationships.h
 	KX_Scene.h
 	KX_RainAura.h
+	KX_RainShelterMap.h
 	KX_RainSurfaceMask.h
 	KX_RainLightning.h
 	KX_SceneActuator.h

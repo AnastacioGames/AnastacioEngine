@@ -1186,6 +1186,24 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Streak Width", "Width of the Classic rain streaks in pixels (1.0 = 2 px at 1080p, lower is thinner)");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "rain_velocity", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 2.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Velocity Influence", "How much the camera motion bends the rain: the drops come at the camera as it moves, like a car driving into the rain (0 = off)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_velocity_stretch", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 3.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 3.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Velocity Stretch", "How much the streaks stretch with the speed (1 = default)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_velocity_max", PROP_FLOAT, PROP_VELOCITY);
+	RNA_def_property_range(prop, 1.0f, 500.0f);
+	RNA_def_property_ui_range(prop, 1.0f, 200.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "Max Speed", "Camera speed (m/s) where the rain reaches the full speed effect (Classic style)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "use_rain_splash", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_SPLASH);
 	RNA_def_property_ui_text(prop, "Splash", "Drops bouncing up when the rain hits upward-facing surfaces and edges; only on objects with the game property splash_effect when any object has it");
