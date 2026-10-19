@@ -1240,6 +1240,11 @@ class MATERIAL_PT_game_shadow(MaterialButtonsPanel, Panel):
         col = split.column()
         col.prop(mat, "use_shadows", text="Receive")
         col.prop(mat, "use_two_sided_shadows")
+        sub = col.column()
+        sub.active = mat.use_shadows
+        sub.prop(mat, "use_only_shadow", text="Shadows Only")
+        if mat.use_only_shadow and mat.game_settings.alpha_blend in {'OPAQUE', 'CLIP'}:
+            sub.label(text="Use Alpha Blend", icon='ERROR')
 
 class MATERIAL_PT_transp_game(MaterialButtonsPanel, Panel):
     bl_label = "Transparency"

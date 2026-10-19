@@ -392,6 +392,8 @@ typedef struct GPUShadeInput {
 
 typedef struct GPUShadeResult {
 	GPUNodeLink *diff, *spec, *combined, *alpha;
+	/* Shadows Only: max shadow amount over the lamps (NULL until a shadowed lamp is seen). */
+	GPUNodeLink *onlyshadow;
 } GPUShadeResult;
 
 void GPU_shadeinput_set(GPUMaterial *mat, struct Material *ma, GPUShadeInput *shi);

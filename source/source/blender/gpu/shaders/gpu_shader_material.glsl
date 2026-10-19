@@ -3451,6 +3451,17 @@ void shade_only_shadow(float i, float shadfac, float energy, vec3 shadcol, out v
 	outshadrgb = i * energy * (1.0 - shadfac) * (vec3(1.0) - shadcol);
 }
 
+void shade_only_shadow_amount(float shadfac, float visifac, float energy, out float amount)
+{
+	amount = (1.0 - shadfac) * clamp(visifac, 0.0, 1.0) * step(1e-4, energy);
+}
+
+void shade_only_shadow_result(vec3 rgb, float alpha, float amount, out vec4 outcol, out float outalpha)
+{
+	outcol = vec4(rgb, 1.0);
+	outalpha = alpha * clamp(amount, 0.0, 1.0);
+}
+
 void shade_only_shadow_diffuse(vec3 shadrgb, vec3 rgb, vec4 diff, out vec4 outdiff)
 {
 	outdiff = diff - vec4(rgb * shadrgb, 0.0);

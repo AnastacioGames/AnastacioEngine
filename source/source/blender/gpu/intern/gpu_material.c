@@ -2496,6 +2496,16 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 				         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias), &lcol);
 			}
 
+			/* Shadows Only material (shadow catcher): keep how much this lamp is blocked. */
+			if (ma->mode & MA_ONLYSHADOW) {
+				GPUNodeLink *amount;
+				GPU_link(mat, "shade_only_shadow_amount", shadfac, visifac, energy, &amount);
+				if (shr->onlyshadow)
+					GPU_link(mat, "math_max", shr->onlyshadow, amount, &shr->onlyshadow);
+				else
+					shr->onlyshadow = amount;
+			}
+
 			if (lamp->mode & LA_ONLYSHADOW) {
 				GPUNodeLink *shadrgb;
 				GPU_link(mat, "shade_only_shadow", i, shadfac, energy, GPU_uniform(lamp->shadow_color), &shadrgb);
@@ -3936,6 +3946,14 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 			GPU_link(mat, "shade_add", shr->combined, shr->spec, &shr->combined);
 		GPU_link(mat, "math_multiply", shi->emit, GPU_select_uniform(&ma->emit, GPU_DYNAMIC_MAT_EMIT, ma, ma), &shi->emit);
 		GPU_link(mat, "shade_maddf", shr->combined, shi->emit, shi->emitrgb, &shr->combined); /*emition color*/
+
+		/* Shadows Only: the surface is the diffuse color, visible only where shadowed (needs a blend mode). */
+		if (ma->mode & MA_ONLYSHADOW) {
+			GPUNodeLink *amount = shr->onlyshadow;
+			if (!amount)
+				GPU_link(mat, "set_value_zero", &amount);
+			GPU_link(mat, "shade_only_shadow_result", shi->rgb, shi->alpha, amount, &shr->combined, &shr->alpha);
+		}
 	}
 
 	if (ma->mode & MA_TRANSP && ma->mode2 & MA_DEPTH_TRANSP) {

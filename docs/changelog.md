@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-19 - Material Shadows Only no modo Game (shadow catcher)
+
+- `use_only_shadow` agora funciona no GLSL do jogo (antes só no Blender Internal): o material mostra só a
+  sombra recebida, na cor difusa, com alpha = alpha do material × sombra (maior valor entre as lamps com sombra).
+  Precisa de Alpha Blend; o painel Shadow do Game mostra a opção e avisa se o blend for Opaque/Clip.
+- `gpu_material.c` (`shade_one_light`/`GPU_shaderesult_set`), GLSL `shade_only_shadow_amount`/`_result`,
+  campo `onlyshadow` no `GPUShadeResult`. Só materiais clássicos (não nós).
+- Cena de teste `tools/debug/cenas/criar_cena_shadow_catcher.py`: layers 1-3 com jeitos manuais
+  (Multiply, cor do horizonte, Multiply com borda esmaecida) e layer 4 com a opção nativa; aceita no jogo.
+
 ## 2026-10-19 - Range Trace, fase 3 (frames lentos e trilho de câmera)
 
 - Módulo `frames`: uma linha por frame com o tempo das categorias do profiler (`KX_KetsjiEngine`, ao lado do
