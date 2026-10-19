@@ -52,10 +52,9 @@ o nome do original (os On Demand aparecem primeiro na cena temporária `..Conver
 - **Carregados e nunca desenhados:** objetos com malha que não apareceram nem na câmera nem em sombra.
   Em camada inativa são modelos de Add Object: só contam se o jogo nunca os adicionou na sessão.
   O resultado vale para o que você jogou: um objeto de um trecho que você não visitou aparece aqui.
+- **Invisíveis por design:** navmesh e objetos com Visible desligado (colisores, gatilhos) ficam numa lista
+  própria, fora do desperdício. Objetos com Static Batch levam a marca `static batch` na coluna camada.
 - **Só em sombra:** fora da câmera o tempo todo, mas projetando sombra.
 - **Malhas, materiais e imagens à toa:** usados só pelos objetos nunca desenhados.
 - **Cargas durante o jogo:** On Demand, LibLoad/AddScene e imagens enviadas depois dos primeiros 5 frames,
   por ms. As maiores são candidatas a pré-carregar.
-
-Limite conhecido: objetos invisíveis por design (navmesh, colisores, Static Batch) aparecem em
-"nunca desenhados"; o evento `object` ainda não diz se o objeto é visível.

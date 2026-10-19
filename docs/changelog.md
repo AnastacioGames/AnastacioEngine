@@ -12,6 +12,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   saída e módulos, lembra as escolhas em `%APPDATA%\AnastacioEngine`, roda o jogo e abre o relatório ao fechar.
 - Editor: Game > Range Trace... (`bl_operators/anastacio_trace.py`) abre o launcher com o arquivo atual.
 - `usage` validado com janela no RolimaRacer (313 `visible`, 182 `image`).
+- Evento `object` ganha `visible`, `navmesh` e `static_batch`; o relatório separa os invisíveis por design
+  (navmesh, colisores) da lista de nunca desenhados e marca os objetos com Static Batch.
 
 ## 2026-10-19 - Range Trace, fase 1 (o que carrega e o que é desenhado)
 

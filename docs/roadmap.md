@@ -545,8 +545,9 @@ iOS fora do escopo.
 ## Performance
 
 - **Range Trace (`docs/range-trace.md`)** — fases 1 e 2 feitas em 2026-10-19 (`load`, `usage`, relatório, `.bat`, launcher com janela e
-  Game > Range Trace...; `usage` validado com janela no RolimaRacer). Próximas: marcar objetos invisíveis
-  (navmesh, colisor) no evento `object`; (3) `spikes` (frames lentos + o que carregou neles, a partir do `RANGE_PROFILE`)
+  Game > Range Trace...; `usage` validado com janela no RolimaRacer). Invisíveis por design já ficam
+  numa lista própria. Próximas: redesenhar o `relatorio.html` (simples, organizado, cores para
+  pontos de atenção), com um agente especialista em relatórios/web; (3) `spikes` (frames lentos + o que carregou neles, a partir do `RANGE_PROFILE`)
   e `sector` (câmera em trilho com velocidade constante, custo por trecho da pista e mapa de calor);
   (4) `runtime` (sons, scripts, troca de cena), `shaders` e `work` no formato do trace.
 - **Onde perdemos feio para o ThunderPlayer (benchmark 2026-10-09)** — refeito o teste do Codex

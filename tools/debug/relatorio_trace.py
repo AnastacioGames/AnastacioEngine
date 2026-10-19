@@ -81,15 +81,21 @@ def analisar(eventos):
 
     nunca = []
     so_sombra = []
+    invisiveis = []  # navmesh e objetos invisiveis por design: nao contam como desperdicio de desenho
     for o in com_malha.values():
         if o['name'] in vistos['camera']:
             continue
+        if o.get('navmesh') or o.get('visible') is False:
+            if o['name'] not in vistos['shadow']:
+                invisiveis.append(o)
+                continue
         if o['name'] in vistos['shadow']:
             so_sombra.append(o)
         else:
             nunca.append(o)
     nunca.sort(key=tris, reverse=True)
     so_sombra.sort(key=tris, reverse=True)
+    invisiveis.sort(key=tris, reverse=True)
 
     # Malha/material/imagem "a toa": todos os objetos que usam nunca foram desenhados.
     usada = set()
@@ -121,10 +127,18 @@ def analisar(eventos):
 
     return dict(sessao=sessao, modulos=modulos, cenas=cenas, shaders=shaders, objetos=objetos, malhas=malhas,
                 materiais=materiais, imagens=imagens, deixados=deixados, tem_uso=tem_uso, nunca=nunca,
-                so_sombra=so_sombra, malhas_atoa=malhas_atoa, mats_atoa=mats_atoa, imgs_atoa=imgs_atoa,
+                so_sombra=so_sombra, invisiveis=invisiveis, malhas_atoa=malhas_atoa, mats_atoa=mats_atoa, imgs_atoa=imgs_atoa,
                 tardias=tardias, tris=tris, com_malha=com_malha,
                 fim=next((e for e in reversed(eventos) if e['ev'] == 'end'), None),
                 duracao=eventos[-1]['t'] if eventos else 0.0)
+
+
+def obs_objeto(o):
+    """Camada e marcas que mudam a leitura de "nunca desenhado"."""
+    partes = ['ativa' if o['active_layer'] else 'inativa']
+    if o.get('static_batch'):
+        partes.append('static batch')
+    return ', '.join(partes)
 
 
 def nome_cena(nome):
@@ -164,12 +178,12 @@ def resumo_md(a):
         w('%d objetos (%d triangulos), %d malhas, %d materiais, %d imagens (~%.1f MB de VRAM enviados).' % (
             len(a['nunca']), tri_nunca, len(a['malhas_atoa']), len(a['mats_atoa']), len(a['imgs_atoa']), mb))
         w('Objetos em camada inativa sao modelos de Add Object: so contam se o jogo nunca os adicionou.')
+        w('Invisiveis por design (navmesh, Visible desligado) ficam fora: %d objetos.' % len(a['invisiveis']))
         w('')
         w('| objeto | cena | camada | triangulos |')
         w('|---|---|---|---|')
         for o in a['nunca'][:TOP_RESUMO]:
-            w('| %s | %s | %s | %d |' % (o['name'], nome_cena(o['scene']),
-                                        'ativa' if o['active_layer'] else 'inativa', a['tris'](o)))
+            w('| %s | %s | %s | %d |' % (o['name'], nome_cena(o['scene']), obs_objeto(o), a['tris'](o)))
         if a['so_sombra']:
             w('')
             w('## Desenhado so em sombra (%d)' % len(a['so_sombra']))
@@ -245,9 +259,16 @@ def relatorio_html(a):
         w('<h2>Objetos carregados e nunca desenhados (%d)</h2>' % len(a['nunca']))
         w('<p class="muted">Nem pela camera, nem em sombra. Camada inativa = modelo de Add Object nunca '
           'adicionado. Candidatos a Load Mode On Demand ou a sair do jogo.</p>')
-        linhas = [(o['name'], nome_cena(o['scene']), 'ativa' if o['active_layer'] else 'inativa', a['tris'](o),
+        linhas = [(o['name'], nome_cena(o['scene']), obs_objeto(o), a['tris'](o),
                    ', '.join(o['meshes'])) for o in a['nunca']]
         w(bloco('ver lista', tabela(('objeto', 'cena', 'camada', 'triangulos', 'malhas'), linhas, (3,)), len(linhas)))
+
+        w('<h2>Invisiveis por design (%d)</h2>' % len(a['invisiveis']))
+        w('<p class="muted">Navmesh e objetos com Visible desligado (colisores, gatilhos). Carregam, mas nao '
+          'deveriam ser desenhados; nao entram nas listas de desperdicio.</p>')
+        linhas = [(o['name'], nome_cena(o['scene']), 'navmesh' if o.get('navmesh') else 'invisivel', a['tris'](o))
+                  for o in a['invisiveis']]
+        w(bloco('ver lista', tabela(('objeto', 'cena', 'motivo', 'triangulos'), linhas, (3,)), len(linhas)))
 
         w('<h2>Desenhados so em sombra (%d)</h2>' % len(a['so_sombra']))
         linhas = [(o['name'], nome_cena(o['scene']), a['tris'](o)) for o in a['so_sombra']]

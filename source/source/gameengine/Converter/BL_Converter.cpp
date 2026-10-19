@@ -732,7 +732,10 @@ static void trace_scene_load(BL_SceneConverter& converter, KX_Scene *scene, doub
 		}
 		CM_TraceEvent("object", "\"scene\":" + sceneName + ",\"name\":" + CM_TraceStr(gameobj->GetName()) +
 		              ",\"type\":\"" + (ob ? trace_object_type(ob) : "other") + "\",\"active_layer\":" +
-		              ((ob && (ob->lay & sceneLay)) ? "true" : "false") + ",\"meshes\":" + trace_json_list(meshNames));
+		              ((ob && (ob->lay & sceneLay)) ? "true" : "false") + ",\"visible\":" +
+		              (gameobj->GetVisible() ? "true" : "false") + ",\"navmesh\":" +
+		              ((ob && ob->body_type == OB_BODY_TYPE_NAVMESH) ? "true" : "false") + ",\"static_batch\":" +
+		              ((ob && (ob->gameflag2 & OB_STATIC_BATCH)) ? "true" : "false") + ",\"meshes\":" + trace_json_list(meshNames));
 	}
 
 	for (KX_Mesh *mesh : meshes) {
