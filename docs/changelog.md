@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-18 - Release 0.5.3 (Windows)
+
+- Versão 0.5.3 com as correções do módulo Effects (sons da chuva) e das partículas/chuva no WebGL2.
+  Zips Windows e RangeArmor montados e conferidos; Linux (engine e RangeArmor Linux) fica para depois.
+  Detalhes em `docs/release-0.5.3.md`.
+
 ## 2026-10-18 - .cooked de outro compilador quebrava a colisão
 
 - O BVH de malha estática no `.cooked` é o `btOptimizedBvh` gravado com `serializeInPlace` (layout de memória
