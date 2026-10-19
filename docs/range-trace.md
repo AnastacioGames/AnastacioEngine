@@ -6,6 +6,14 @@ Código: `source/source/gameengine/Common/CM_Trace.h/.cpp`. Relatório: `tools/d
 
 ## Como usar
 
+Com janela: no editor, **Game > Range Trace...** (abre com o arquivo atual), ou
+`tools\debug\abrir_trace_launcher.bat [jogo.range]`. A janela escolhe jogo, executável, pasta de saída e
+módulos, lembra as escolhas em `%APPDATA%\AnastacioEngine\range_trace_launcher.json` (nada é gravado no
+`.range`), roda o jogo e abre o relatório quando ele fecha. Usa o Python do sistema (`pythonw`, com tkinter);
+o item do menu só aparece num checkout do código (procura `tools/debug` ao lado de `build/bin`).
+
+Pela linha de comando:
+
 ```
 tools\debug\abrir_trace.bat [jogo.range] [modulos]
 ```
@@ -30,7 +38,7 @@ Desligado, cada ponto instrumentado custa um `if`. Num jogo exportado nada muda 
 
 Próximos (ver `docs/roadmap.md`): `runtime` (sons, scripts, troca de cena), `spikes` (frames lentos com o
 que carregou neles, reaproveita `RANGE_PROFILE`), `sector` (câmera num trilho medindo o custo por trecho da
-pista), `shaders` e `work` (formato novo para `RANGE_SHADER_LOG` e `CM_WorkCounters`), e o launcher com janela.
+pista), `shaders` e `work` (formato novo para `RANGE_SHADER_LOG` e `CM_WorkCounters`).
 
 ## Formato
 
@@ -48,3 +56,6 @@ o nome do original (os On Demand aparecem primeiro na cena temporária `..Conver
 - **Malhas, materiais e imagens à toa:** usados só pelos objetos nunca desenhados.
 - **Cargas durante o jogo:** On Demand, LibLoad/AddScene e imagens enviadas depois dos primeiros 5 frames,
   por ms. As maiores são candidatas a pré-carregar.
+
+Limite conhecido: objetos invisíveis por design (navmesh, colisores, Static Batch) aparecem em
+"nunca desenhados"; o evento `object` ainda não diz se o objeto é visível.
