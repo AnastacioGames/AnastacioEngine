@@ -163,7 +163,7 @@ class Launcher(tk.Tk):
         super().__init__()
         self.escala = self.winfo_fpixels('1i') / 96.0
         self.title('Anastacio Trace Launcher')
-        self.minsize(int(860 * self.escala), 0)
+        self.minsize(int(1180 * self.escala), 0)
         try:
             self.iconbitmap(ICONE)
         except tk.TclError:
@@ -233,6 +233,17 @@ class Launcher(tk.Tk):
         tk.Label(lado, text='o que o jogo carrega e o que ele de fato desenha', bg=CABECALHO, fg='#8d8f97',
                  font=(FONTE, 10)).pack(anchor='e')
 
+        # Duas colunas: jogo, módulos e execução à esquerda; trilho e relatórios à direita.
+        colunas = tk.Frame(self, bg=FUNDO)
+        colunas.pack(fill='both', expand=True, padx=24)
+        colunas.columnconfigure(0, weight=1, uniform='col')
+        colunas.columnconfigure(1, weight=1, uniform='col')
+        esquerda = tk.Frame(colunas, bg=FUNDO)
+        esquerda.grid(row=0, column=0, sticky='nsew', padx=(0, 7))
+        direita = tk.Frame(colunas, bg=FUNDO)
+        direita.grid(row=0, column=1, sticky='nsew', padx=(7, 0))
+        self.coluna = esquerda
+
         # Jogo: ícone (icon.png da pasta do jogo), nome e caminho.
         corpo = self.cartao('Jogo')
         corpo.columnconfigure(1, weight=1)
@@ -256,31 +267,37 @@ class Launcher(tk.Tk):
                      anchor='w').pack(side='left')
             tk.Label(linha, text=descricao, bg=CARTAO, fg=TEXTO, font=(FONTE, 10), anchor='w').pack(side='left')
 
-        # Trilho de câmera (módulo sector).
+        # Trilho de câmera (módulo sector), na coluna da direita: campos em duas colunas.
+        self.coluna = direita
         corpo = self.cartao('Trilho de câmera (sector)')
-        for i, (chave, rotulo, largura) in enumerate(CAMPOS_TRILHO):
-            corpo.columnconfigure(i, weight=largura)
+        corpo.columnconfigure(0, weight=1, uniform='trilho')
+        corpo.columnconfigure(1, weight=1, uniform='trilho')
+        for i, (chave, rotulo, _) in enumerate(CAMPOS_TRILHO):
+            linha_campo, coluna_campo = 2 * (i // 2), i % 2
             tk.Label(corpo, text=rotulo, bg=CARTAO, fg=APAGADO, font=(FONTE, 9), anchor='w').grid(
-                row=0, column=i, sticky='w', padx=(0, 8))
-            campo(corpo, self.trilho_vars[chave]).grid(row=1, column=i, sticky='ew', padx=(0, 8))
+                row=linha_campo, column=coluna_campo, sticky='w', padx=(0, 8), pady=(4 if i > 1 else 0, 0))
+            campo(corpo, self.trilho_vars[chave]).grid(row=linha_campo + 1, column=coluna_campo, sticky='ew',
+                                                       padx=(0, 8))
+        base = 2 * ((len(CAMPOS_TRILHO) + 1) // 2)
         tk.Label(corpo, text='Com o módulo sector ligado, a câmera entra na curva quando a cena carrega, anda em '
                  'velocidade constante olhando para a frente e o jogo fecha no fim. VSync fica desligado no trilho. '
                  'Início: auto = CheckPoint com Finish Line; ou o nome de um objeto; none = primeiro ponto da curva.',
                  bg=CARTAO, fg=APAGADO, font=(FONTE, 9), justify='left', anchor='w',
-                 wraplength=int(760 * self.escala)).grid(row=2, column=0, columnspan=len(CAMPOS_TRILHO),
+                 wraplength=int(500 * self.escala)).grid(row=base, column=0, columnspan=2,
                                                          sticky='w', pady=(8, 0))
         ttk.Checkbutton(corpo, text='Inverter sentido (do último ponto da curva para o primeiro)',
-                        variable=self.trilho_inverter).grid(row=3, column=0, columnspan=len(CAMPOS_TRILHO),
+                        variable=self.trilho_inverter).grid(row=base + 1, column=0, columnspan=2,
                                                             sticky='w', pady=(6, 0))
         # Velocidade: multiplica a rapidez da câmera (divide os segundos da volta).
         linha = tk.Frame(corpo, bg=CARTAO)
-        linha.grid(row=4, column=0, columnspan=len(CAMPOS_TRILHO), sticky='w', pady=(6, 0))
+        linha.grid(row=base + 2, column=0, columnspan=2, sticky='w', pady=(6, 0))
         tk.Label(linha, text='Velocidade', bg=CARTAO, fg=APAGADO, font=(FONTE, 9)).pack(side='left', padx=(0, 8))
         for valor, rotulo in (('1', 'Normal'), ('1.5', '1,5×'), ('2', '2×'), ('3', '3×')):
             ttk.Radiobutton(linha, text=rotulo, value=valor,
                             variable=self.trilho_velocidade).pack(side='left', padx=(0, 10))
 
         # Execução: executável e pasta de saída.
+        self.coluna = esquerda
         corpo = self.cartao('Execução')
         corpo.columnconfigure(1, weight=1)
         for r, (rotulo, var, escolher) in enumerate((
@@ -293,6 +310,7 @@ class Launcher(tk.Tk):
             botao(corpo, 'Procurar...', escolher).grid(row=r, column=2, pady=4)
 
         # Últimos relatórios da pasta de saída.
+        self.coluna = direita
         self.lista = self.cartao('Últimos relatórios', botao_extra=('Abrir o último', self.abrir_ultimo))
         self.saida.trace_add('write', lambda *_: self.atualizar_recentes())
         self.atualizar_recentes()
@@ -305,7 +323,7 @@ class Launcher(tk.Tk):
         acoes = tk.Frame(rodape, bg=FUNDO)
         acoes.pack(fill='x', pady=(12, 0))
         tk.Label(acoes, textvariable=self.status, bg=FUNDO, fg=APAGADO, font=(FONTE, 10), anchor='w',
-                 justify='left', wraplength=int(480 * self.escala)).pack(side='left', fill='x', expand=True)
+                 justify='left', wraplength=int(760 * self.escala)).pack(side='left', fill='x', expand=True)
         self.botao = botao(acoes, '\u25b6  Jogar com trace', self.iniciar, destaque=True)
         self.botao.pack(side='right')
         if self.rodando:
@@ -315,8 +333,8 @@ class Launcher(tk.Tk):
         self.botao_pasta.pack(side='right', padx=10)
 
     def cartao(self, titulo, botao_extra=None):
-        caixa = tk.Frame(self, bg=CARTAO, highlightthickness=1, highlightbackground=BORDA)
-        caixa.pack(fill='x', padx=24, pady=(0, 14))
+        caixa = tk.Frame(self.coluna, bg=CARTAO, highlightthickness=1, highlightbackground=BORDA)
+        caixa.pack(fill='x', pady=(0, 14))
         cabeca = tk.Frame(caixa, bg=CARTAO)
         cabeca.pack(fill='x', padx=16, pady=(12, 6))
         tk.Label(cabeca, text=titulo.upper(), bg=CARTAO, fg=OURO, font=(FONTE, 9, 'bold')).pack(side='left')
