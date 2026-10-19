@@ -29,6 +29,18 @@ No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
 
+## Novidades da 0.5.3
+
+- **RangeArmor no Linux:** o painel da RangeArmor agora também roda no Linux
+  ([download](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-linux-x86_64.tar.xz))
+  e exporta jogos para Linux e Windows. Extraia, renomeie a pasta para `rangearmor` e coloque dentro da pasta
+  da engine. Usa o `python3` do sistema; o Set Icons (ícone do `.exe`) precisa do `wine`.
+- **Efeitos na Web e no Android:** partículas (fumaça, fogo, light flicker) e chuva funcionam no WebGL2.
+- **Sons de efeito:** o módulo Effects criado pela chuva já vem com os sons da engine, então explosão e
+  destruição não ficam mais mudas.
+
+Lista completa em [docs/release-notes-0.5.3.md](docs/release-notes-0.5.3.md).
+
 ## Novidades da 0.5.2
 
 - **Logic Bricks 2.0:** grupos recolhíveis, actuator Wait e modo Finished para encadear ações, botão Then,
