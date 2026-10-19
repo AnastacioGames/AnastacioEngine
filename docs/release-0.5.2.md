@@ -254,3 +254,48 @@ No PC com Windows, para terminar:
 - Windows subiu `AnastacioEngine-0.5.2-windows-x64.zip` (`5a6d7756…`) e `RangeArmor-0.5.2-windows-x64.zip`
   (`4e04cf15…`); digests do GitHub batem com o `SHA256SUMS.txt`. Os 4 links do README respondem 200.
   **Release 0.5.2 completa.**
+
+## RangeArmor para Linux (pendente, PC Linux)
+
+Pedido no Discord (musikai, 2026-10-18): no Linux não havia como exportar, porque só existia o
+`RangeArmor-0.5.2-windows-x64.zip`. Conferido no código: painel (`tools/rangearmor/source/gui-rs`,
+egui/eframe/rfd), `build.rs` (o `winres` só roda no Windows) e scripts de `release/scripts` já funcionam no Linux.
+Nenhuma mudança de código é necessária; falta compilar, empacotar e testar.
+
+Os launchers (`release/launcher/Launcher*`) não ficam no git: pegue os do zip Windows publicado, que já
+têm o `Launcher` Linux certo (`3cb1ade9…`) e o `Launcher.exe` (para exportar também para Windows).
+
+```bash
+cd ~/AnastacioEngine && git pull
+# 1. painel (precisa de libgtk-3-dev / libxkbcommon-dev para o rfd e o eframe, se faltar)
+cd tools/rangearmor/source/gui-rs
+cargo build --release --target-dir /tmp/ra-panel
+strip /tmp/ra-panel/release/rangearmor_panel
+
+# 2. montar a pasta (mesma estrutura do zip Windows, sem ResourceHacker nem godot_backup)
+cd ~/AnastacioEngine
+gh release download v0.5.2 -p 'RangeArmor-0.5.2-windows-x64.zip' -D /tmp/ra-win --clobber
+unzip -o -q /tmp/ra-win/RangeArmor-0.5.2-windows-x64.zip -d /tmp/ra-win
+D=/tmp/RangeArmor-0.5.2-linux-x86_64 && rm -rf "$D" && mkdir -p "$D/release"
+cp /tmp/ra-panel/release/rangearmor_panel "$D/RangeArmor Panel"
+cp -r tools/rangearmor/release/{data,icons,scripts} "$D/release/"
+cp -r /tmp/ra-win/RangeArmor-0.5.2-windows-x64/release/launcher "$D/release/"
+find "$D" -name __pycache__ -prune -exec rm -rf {} +
+chmod +x "$D/RangeArmor Panel" "$D/release/launcher/Launcher"
+sha256sum "$D/release/launcher/Launcher"   # tem que dar 3cb1ade9…
+```
+
+3. **Teste (usuário):** abrir `RangeArmor Panel`, criar projeto apontando para um `.range`, Export Linux64,
+   rodar o jogo exportado em outra pasta. No Linux o Windows64 só exporta se houver runtime Windows
+   disponível (variável por plataforma em `get_rangeengine_currentplatform.py`); isso é esperado.
+4. Empacotar e publicar (com autorização):
+
+```bash
+cd /tmp && tar -cJf RangeArmor-0.5.2-linux-x86_64.tar.xz RangeArmor-0.5.2-linux-x86_64
+sha256sum RangeArmor-0.5.2-linux-x86_64.tar.xz
+gh release download v0.5.2 -p SHA256SUMS.txt -D /tmp --clobber
+sha256sum RangeArmor-0.5.2-linux-x86_64.tar.xz >> /tmp/SHA256SUMS.txt
+gh release upload v0.5.2 RangeArmor-0.5.2-linux-x86_64.tar.xz /tmp/SHA256SUMS.txt --clobber
+```
+
+5. Depois: link no README e nas notas da release; responder o musikai.
