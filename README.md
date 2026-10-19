@@ -35,7 +35,12 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
   ([download](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-linux-x86_64.tar.xz))
   e exporta jogos para Linux e Windows. Extraia, renomeie a pasta para `rangearmor` e coloque dentro da pasta
   da engine. Usa o `python3` do sistema; o Set Icons (ícone do `.exe`) precisa do `wine`.
-- **Efeitos na Web e no Android:** partículas (fumaça, fogo, light flicker) e chuva funcionam no WebGL2.
+- **Efeitos na Web e no Android (WebGL2):** os efeitos que antes não apareciam no navegador agora rodam:
+  - partículas de fumaça, fogo e light flicker;
+  - chuva com aura em volta da câmera, raios/relâmpagos e máscara de superfície molhada;
+  - shaders dos efeitos convertidos para WebGL2, partículas animadas na GPU e saída de cor em float
+    conferida antes de usar;
+  - cópia da tela sem erro de buffers de desenho, que deixava a imagem preta ou faltando efeito.
 - **Sons de efeito:** o módulo Effects criado pela chuva já vem com os sons da engine, então explosão e
   destruição não ficam mais mudas.
 

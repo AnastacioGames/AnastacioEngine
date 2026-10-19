@@ -1,13 +1,18 @@
 # AnastacioEngine 0.5.3
 
-Versão de correções sobre a 0.5.2.
+Versão de correções sobre a 0.5.2, com foco nos efeitos do export Web/Android, e a primeira RangeArmor para Linux.
 
 ## Correções
 
 - **Sons de efeito:** quando a chuva criava o módulo Effects do World Sound, ele vinha vazio e os outros
   efeitos (explosão, destruição) ficavam mudos. Agora o módulo já vem com os sons da engine, como no
   Add Sound Module.
-- **Export Web e Android:** as partículas (fumaça, fogo, light flicker) e a chuva agora funcionam no WebGL2.
+- **Export Web e Android (WebGL2):** os efeitos que antes não apareciam no navegador agora rodam:
+  - partículas de fumaça, fogo e light flicker;
+  - chuva com aura em volta da câmera, raios/relâmpagos e máscara de superfície molhada;
+  - shaders dos efeitos convertidos para WebGL2, partículas animadas na GPU e saída de cor em float
+    conferida antes de usar;
+  - cópia da tela sem erro de buffers de desenho, que deixava a imagem preta ou faltando efeito.
 
 ## Downloads
 
