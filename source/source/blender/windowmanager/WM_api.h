@@ -530,6 +530,16 @@ bool        WM_jobs_has_running(struct wmWindowManager *wm);
 void		WM_job_main_thread_lock_acquire(struct wmJob *job);
 void		WM_job_main_thread_lock_release(struct wmJob *job);
 
+			/* screen recording (wm_screencast.c) */
+bool		WM_screencast_start(struct bContext *C, struct wmWindow *win, const struct rcti *rect, int fps, int crf,
+		                    bool show_cursor, const char *filepath, struct ReportList *reports);
+bool		WM_screencast_stop(struct ReportList *reports);
+bool		WM_screencast_is_running(void);
+double		WM_screencast_elapsed(void);
+const char *WM_screencast_filepath(void);
+bool		WM_screencast_is_paused(void);
+void		WM_screencast_pause_set(bool paused);
+
 			/* clipboard */
 char       *WM_clipboard_text_get(bool selection, int *r_len);
 char       *WM_clipboard_text_get_firstline(bool selection, int *r_len);

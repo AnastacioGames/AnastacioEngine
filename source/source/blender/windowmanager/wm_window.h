@@ -59,6 +59,11 @@ bool		wm_window_get_swap_interval(wmWindow *win, int *intervalOut);
 void		wm_get_cursor_position			(wmWindow *win, int *x, int *y);
 void		wm_cursor_position_from_ghost	(wmWindow *win, int *x, int *y);
 void		wm_cursor_position_to_ghost		(wmWindow *win, int *x, int *y);
+bool		wm_cursor_button_pressed		(void);
+
+/* wm_screencast.c */
+void		wm_screencast_capture			(wmWindow *win);
+void		wm_screencast_window_destroyed	(wmWindow *win);
 
 void		wm_window_testbreak		(void);
 

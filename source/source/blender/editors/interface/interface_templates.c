@@ -3990,7 +3990,8 @@ static void do_running_jobs(bContext *C, void *UNUSED(arg), int event)
 			G.is_break = true;
 			break;
 		case B_STOPCAST:
-			WM_jobs_stop(CTX_wm_manager(C), CTX_wm_screen(C), NULL);
+			/* the operator toggles: stops and reports where the video was saved */
+			WM_operator_name_call(C, "SCREEN_OT_screencast", WM_OP_EXEC_DEFAULT, NULL);
 			break;
 		case B_STOPANIM:
 			WM_operator_name_call(C, "SCREEN_OT_animation_play", WM_OP_INVOKE_SCREEN, NULL);
@@ -4172,6 +4173,18 @@ void uiTemplateRunningJobs(uiLayout *layout, bContext *C)
 			                 "", 0, 0, UI_UNIT_X, UI_UNIT_Y,
 			                 NULL, 0.0f, 0.0f, 0, 0, TIP_("Stop this job"));
 		}
+	}
+
+	if (WM_screencast_is_running()) {
+		char time_str[32], text[64];
+		BLI_timecode_string_from_time_simple(time_str, sizeof(time_str), WM_screencast_elapsed());
+		BLI_snprintf(text, sizeof(text), "%s %s", IFACE_("Recording"), time_str);
+
+		uiLayout *row = uiLayoutRow(layout, true);
+		block = uiLayoutGetBlock(row);
+		uiBut *but = uiDefIconTextBut(block, UI_BTYPE_BUT, B_STOPCAST, ICON_REC, text, 0, 0, UI_UNIT_X * 6.0f, UI_UNIT_Y,
+		                              NULL, 0.0f, 0.0f, 0, 0, TIP_("Stop recording the screen and save the video"));
+		UI_but_flag_enable(but, UI_BUT_REDALERT);
 	}
 
 	if (screen->animtimer)

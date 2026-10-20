@@ -105,6 +105,7 @@ extern char datatoc_roboto_mono_medium_ttf[];
 
 #include "LA_SystemCommandLine.h"
 #include "LA_PlayerLauncher.h"
+#include "GPG_Canvas.h"
 
 #include "GHOST_ISystem.h"
 
@@ -1766,6 +1767,8 @@ int main(int argc,
 					}
 				} while (ELEM(exitInfo.m_code, KX_ExitInfo::RESTART_GAME, KX_ExitInfo::START_OTHER_GAME));
 			}
+
+			GPG_ScreencastEnd();
 
 			// GPU_init() runs only once a window is open (not when the game file failed to load).
 			if (gpuInitialized) {

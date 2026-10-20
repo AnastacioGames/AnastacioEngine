@@ -41,6 +41,7 @@ _modules = [
     "anastacio_text_atlas",
     "anastacio_locale",
     "anastacio_material_recipes",
+    "anastacio_screencast",
     "logic_to_python",
     "logic_presets",
     "mask",

@@ -3656,6 +3656,13 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 		RNA_pointer_create(&CTX_wm_screen(C)->id, &RNA_SpaceInfo, sa->spacedata.first, &space_ptr);
 		uiItemR(layout, &space_ptr, "show_screen_selector", 0, IFACE_("Screen Selector"), ICON_NONE);
 		uiItemR(layout, &space_ptr, "show_scene_selector", 0, IFACE_("Scene Selector"), ICON_NONE);
+
+		/* registered from Python (bl_ui/space_info.py) */
+		PointerRNA wm_ptr;
+		RNA_pointer_create(&CTX_wm_manager(C)->id, &RNA_WindowManager, CTX_wm_manager(C), &wm_ptr);
+		if (RNA_struct_find_property(&wm_ptr, "info_show_screen_recorder")) {
+			uiItemR(layout, &wm_ptr, "info_show_screen_recorder", 0, IFACE_("Screen Recorder"), ICON_NONE);
+		}
 	}
 	else if (sa->spacetype == SPACE_VIEW3D) {
 		PointerRNA space_ptr;
@@ -4840,6 +4847,7 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(SCREEN_OT_back_to_previous);
 	WM_operatortype_append(SCREEN_OT_spacedata_cleanup);
 	WM_operatortype_append(SCREEN_OT_screenshot);
+	WM_operatortype_append(SCREEN_OT_screencast);
 	WM_operatortype_append(SCREEN_OT_settings_show);
 	WM_operatortype_append(SCREEN_OT_drivers_editor_show);
 	WM_operatortype_append(SCREEN_OT_asset_browser_show);
@@ -4973,6 +4981,7 @@ void ED_keymap_screen(wmKeyConfig *keyconf)
 	RNA_boolean_set(kmi->ptr, "use_hide_panels", true);
 
 	WM_keymap_add_item(keymap, "SCREEN_OT_screenshot", F3KEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "SCREEN_OT_screencast", F3KEY, KM_PRESS, KM_CTRL | KM_ALT, 0);
 
 	kmi = WM_keymap_add_item(keymap, "SCREEN_OT_space_context_cycle", TABKEY, KM_PRESS, KM_CTRL, 0);
 	RNA_enum_set(kmi->ptr, "direction", SPACE_CONTEXT_CYCLE_NEXT);

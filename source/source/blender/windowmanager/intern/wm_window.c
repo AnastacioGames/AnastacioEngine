@@ -161,6 +161,7 @@ static void wm_window_check_position(rcti *rect)
 static void wm_ghostwindow_destroy(wmWindow *win)
 {
 	if (win->ghostwin) {
+		wm_screencast_window_destroyed(win);
 		GHOST_DisposeWindow(g_system, win->ghostwin);
 		win->ghostwin = NULL;
 		win->multisamples = 0;
@@ -1035,6 +1036,18 @@ void wm_get_cursor_position(wmWindow *win, int *x, int *y)
 	wm_cursor_position_from_ghost(win, x, y);
 }
 
+bool wm_cursor_button_pressed(void)
+{
+	const GHOST_TButtonMask masks[3] = {GHOST_kButtonMaskLeft, GHOST_kButtonMaskMiddle, GHOST_kButtonMaskRight};
+	for (int i = 0; i < 3; i++) {
+		int down = 0;
+		if (GHOST_GetButtonState(g_system, masks[i], &down) == GHOST_kSuccess && down) {
+			return true;
+		}
+	}
+	return false;
+}
+
 typedef enum {
 	SHIFT    = 's',
 	CONTROL  = 'c',
@@ -1859,6 +1872,8 @@ void wm_window_raise(wmWindow *win)
 
 void wm_window_swap_buffers(wmWindow *win)
 {
+	/* Every presented frame (editor and embedded game) passes here: record it before the swap. */
+	wm_screencast_capture(win);
 
 #ifdef WIN32
 	glDisable(GL_SCISSOR_TEST);

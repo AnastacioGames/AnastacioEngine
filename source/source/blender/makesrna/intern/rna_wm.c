@@ -917,6 +917,31 @@ static bool rna_KeyMapItem_userdefined_get(PointerRNA *ptr)
 	return kmi->id < 0;
 }
 
+static bool rna_wm_is_screencast_running_get(PointerRNA *UNUSED(ptr))
+{
+	return WM_screencast_is_running();
+}
+
+static bool rna_wm_screencast_paused_get(PointerRNA *UNUSED(ptr))
+{
+	return WM_screencast_is_paused();
+}
+
+static void rna_wm_screencast_paused_set(PointerRNA *UNUSED(ptr), bool value)
+{
+	WM_screencast_pause_set(value);
+}
+
+static void rna_wm_screencast_filepath_get(PointerRNA *UNUSED(ptr), char *value)
+{
+	strcpy(value, WM_screencast_filepath());
+}
+
+static int rna_wm_screencast_filepath_length(PointerRNA *UNUSED(ptr))
+{
+	return strlen(WM_screencast_filepath());
+}
+
 static void rna_wmClipboard_get(PointerRNA *UNUSED(ptr), char *value)
 {
 	char *pbuf;
@@ -2042,6 +2067,22 @@ static void rna_def_windowmanager(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "clipboard", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_funcs(prop, "rna_wmClipboard_get", "rna_wmClipboard_length", "rna_wmClipboard_set");
 	RNA_def_property_ui_text(prop, "Text Clipboard", "");
+
+	prop = RNA_def_property(srna, "is_screencast_running", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_boolean_funcs(prop, "rna_wm_is_screencast_running_get", NULL);
+	RNA_def_property_ui_text(prop, "Recording Screen", "A screen recording (screen.screencast) is running");
+
+	prop = RNA_def_property(srna, "screencast_paused", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_boolean_funcs(prop, "rna_wm_screencast_paused_get", "rna_wm_screencast_paused_set");
+	RNA_def_property_ui_text(prop, "Screen Recording Paused",
+	                         "Leave this time out of the screen recording (set while the standalone player runs)");
+
+	prop = RNA_def_property(srna, "screencast_filepath", PROP_STRING, PROP_FILEPATH);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_string_funcs(prop, "rna_wm_screencast_filepath_get", "rna_wm_screencast_filepath_length", NULL);
+	RNA_def_property_ui_text(prop, "Screen Recording File", "Video being recorded, or the last one of this session");
 
 	RNA_api_wm(srna);
 }

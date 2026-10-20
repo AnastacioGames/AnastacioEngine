@@ -76,6 +76,8 @@ void BKE_ffmpeg_property_del(struct RenderData *rd, void *type, void *prop_);
 
 void *BKE_ffmpeg_context_create(void);
 void BKE_ffmpeg_context_free(void *context_v);
+void BKE_ffmpeg_context_realtime_set(void *context_v, bool realtime);
+void BKE_ffmpeg_screencast_settings(struct RenderData *rd, int fps, int crf);
 
 #ifdef __cplusplus
 }

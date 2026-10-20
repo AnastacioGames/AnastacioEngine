@@ -1577,14 +1577,31 @@ class WM_OT_blenderplayer_start(Operator):
         # finish the call with the path to the blend file
         args.append(filepath)
 
+        # Screen recorder running: the player records its own window (the editor waits, so
+        # its recording is paused meanwhile and that time is left out of the editor video).
+        from . import anastacio_screencast
+        wm = context.window_manager
+        env, video = anastacio_screencast.standalone_env(context)
+        if env:
+            wm.screencast_paused = True
+
         try:
-            subprocess.call(args)
+            subprocess.call(args, env=env)
         except Exception as ex:
             self.report({'ERROR'}, "Failed to launch %r: %s" % (player_path, ex))
             return {'CANCELLED'}
         finally:
+            if env:
+                wm.screencast_paused = False
             if os.path.exists(filepath):
                 os.remove(filepath)
+
+        if video:
+            if os.path.isfile(video):
+                anastacio_screencast.last_standalone_filepath = video
+                self.report({'INFO'}, "Standalone player recording saved: %s" % video)
+            else:
+                self.report({'WARNING'}, "The standalone player didn't save its recording")
 
         return {'FINISHED'}
 

@@ -41,8 +41,93 @@
 #include "BLI_utildefines.h"
 
 #include "BKE_image.h"
+#include "BKE_screencast.h"
 #include "MEM_guardedalloc.h"
 #include "DNA_space_types.h"
+
+#include "CM_Message.h"
+
+#include <cstdlib>
+
+/* Screen recording of the player window, started by the editor's screen recorder: when it
+ * launches the standalone player while recording, it passes RANGE_SCREENCAST_FILE (plus
+ * _FPS, _CRF and _CURSOR) and the game records itself from its first frame until it quits.
+ * Kept outside the canvas, which is recreated when the game restarts or loads another file. */
+static Screencast *g_screencast = nullptr;
+static GHOST_IWindow *g_screencast_window = nullptr;
+static bool g_screencast_checked = false;
+
+static int screencast_env_int(const char *name, int fallback)
+{
+	const char *value = getenv(name);
+	return (value && value[0]) ? atoi(value) : fallback;
+}
+
+static void screencast_capture(GHOST_IWindow *window)
+{
+	GHOST_Rect bnds;
+
+	if (!g_screencast_checked) {
+		g_screencast_checked = true;
+		const char *filepath = getenv("RANGE_SCREENCAST_FILE");
+		if (filepath && filepath[0]) {
+			window->getClientBounds(bnds);
+			g_screencast = BKE_screencast_begin(
+			        bnds.getWidth(), bnds.getHeight(),
+			        screencast_env_int("RANGE_SCREENCAST_FPS", 30), screencast_env_int("RANGE_SCREENCAST_CRF", 18),
+			        screencast_env_int("RANGE_SCREENCAST_CURSOR", 1) != 0, 10.0f, filepath, nullptr);
+			if (g_screencast) {
+				g_screencast_window = window;
+				CM_Message("Recording the game window: " << BKE_screencast_filepath(g_screencast));
+			}
+		}
+	}
+
+	if (!g_screencast || window != g_screencast_window || !BKE_screencast_frame_due(g_screencast)) {
+		return;
+	}
+
+	int w, h;
+	BKE_screencast_size(g_screencast, &w, &h);
+	window->getClientBounds(bnds);
+	const int y = bnds.getHeight() - h;  /* anchored to the top-left corner */
+	if (w > bnds.getWidth() || y < 0) {
+		/* Window got smaller than the recording: keep the last frame on screen. */
+		BKE_screencast_frame_skipped(g_screencast);
+		return;
+	}
+
+	ScreencastCursor cursor = {0};
+	GHOST_ISystem *system = GHOST_ISystem::getSystem();
+	GHOST_TInt32 sx, sy, cx, cy;
+	if (BKE_screencast_show_cursor(g_screencast) && window->getCursorVisibility() &&
+	    system->getCursorPosition(sx, sy) == GHOST_kSuccess)
+	{
+		const float margin = BKE_screencast_cursor_radius(g_screencast) * 2.0f;
+		bool left = false, middle = false, right = false;
+		window->screenToClient(sx, sy, cx, cy);
+		cursor.x = cx;
+		cursor.y = bnds.getHeight() - 1 - cy - y;
+		cursor.visible = (cursor.x > -margin && cursor.x < w + margin &&
+		                  cursor.y > -margin && cursor.y < h + margin);
+		system->getButtonState(GHOST_kButtonMaskLeft, left);
+		system->getButtonState(GHOST_kButtonMaskMiddle, middle);
+		system->getButtonState(GHOST_kButtonMaskRight, right);
+		cursor.pressed = left || middle || right;
+	}
+
+	BKE_screencast_capture(g_screencast, 0, y, &cursor);
+}
+
+void GPG_ScreencastEnd()
+{
+	if (g_screencast) {
+		g_screencast_window->activateDrawingContext();
+		BKE_screencast_end(g_screencast, nullptr);
+		g_screencast = nullptr;
+		g_screencast_window = nullptr;
+	}
+}
 
 GPG_Canvas::GPG_Canvas(RAS_Rasterizer *rasty, const RAS_OffScreen::AttachmentList& attachments, GHOST_IWindow *window, int numSamples)
 	:RAS_ICanvas(attachments, numSamples),
@@ -175,6 +260,7 @@ void GPG_Canvas::SetMouseState(RAS_MouseState mousestate)
 void GPG_Canvas::SwapBuffers()
 {
 	if (m_window) {
+		screencast_capture(m_window);
 		m_window->swapBuffers();
 	}
 }

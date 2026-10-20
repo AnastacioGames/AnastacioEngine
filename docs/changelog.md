@@ -6,6 +6,46 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Gravação de tela (screencast) refeita
+
+- O screencast da 2.79 (Ctrl+Alt+F3) não existia mais nesta base; só o screenshot. Volta como
+  `SCREEN_OT_screencast` (liga/desliga), menu Window ▸ Record Screen e Ctrl+Alt+F3. Opções: `fps` (30),
+  `quality` (Low/Medium/High/Very High = CRF 28/23/18/14), `full` (janela inteira ou só a 3D View), `show_cursor`,
+  `filepath` (vazio: `<blend>_screencast_<data-hora>.mp4` ao lado do .blend, ou na pasta padrão).
+- Núcleo em `windowmanager/intern/wm_screencast.c`: captura logo antes de cada swap
+  (`wm_window_swap_buffers`), então grava o editor e o jogo rodando embutido; lê o back buffer (o front buffer
+  é indefinido com compositor) por um anel de 3 PBOs com fence, sem travar a GPU; encoder H.264/MP4 numa
+  thread própria com fila e pool de 8 quadros (se não der conta, descarta e avisa em vez de travar a UI);
+  cada quadro leva o tempo de captura como pts, então janela parada não gera trabalho e o vídeo sai em tempo
+  real; cursor desenhado no quadro (anel, preenchido com botão apertado). Segue a janela pelo `ghostwin`
+  (sobrevive a abrir outro arquivo); para sozinho ao fechar a janela e ao sair.
+- Header Info: botão vermelho "Recording mm:ss" (atualiza a cada 1 s) que para e informa o arquivo salvo.
+- `writeffmpeg.c`: encoder usa várias threads (o padrão do libavcodec era 1; na gravação ao vivo, metade dos
+  núcleos), buffer RGB intermediário alocado uma vez por stream (era por quadro), cópia por linha com
+  `memcpy`; modo realtime (`BKE_ffmpeg_context_realtime_set`) pula as opções x264 legadas (subq 6, 3
+  B-frames, CAVLC) que anulavam o preset rápido. Também vale para render de animação em vídeo (threads e
+  buffer).
+- Screenshot: indentação enganosa do crop corrigida e `glFinish` redundante removido.
+- Compilado (RangeEngine + RangeRuntime). Gravação testada pelo usuário com janela: OK.
+- Header Info, lado esquerdo (depois dos menus; no canto direito o popover saía da janela): botão `Rec` + popover `INFO_PT_screen_recorder` (Start/Stop, Full Window, Show
+  Cursor, Frame Rate, Quality, pasta de destino, `Open Folder`, `Play Last`). Clique direito no header Info:
+  checkbox `Screen Recorder` (`WindowManager.info_show_screen_recorder`) mostra/esconde. As opções ficam em
+  `WindowManager.screencast_*` (Python) e o operador C as lê quando não recebe a propriedade, então o
+  Ctrl+Alt+F3 usa as mesmas. RNA novo: `WindowManager.is_screencast_running` e `screencast_filepath`
+  (vídeo atual ou último da sessão). Operadores em `bl_operators/anastacio_screencast.py`.
+- `Full Window` desligado grava a 3D View: a ativa, senão a maior da tela (antes era a área ativa, que
+  pelo popover seria o próprio header Info); sem 3D View, grava a janela. Jogo em Standalone (processo
+  separado, `AnastacioRuntime`) agora também é gravado, veja abaixo.
+- Gravação do Standalone automática: o núcleo (PBOs, fila, encoder, cursor) saiu de `wm_screencast.c` para
+  `blenkernel/intern/screencast.c` (`BKE_screencast.h`), usado pelo editor e pelo runtime. Com o editor
+  gravando e `Record Standalone Player` ligado (padrão), `wm.blenderplayer_start` passa
+  `RANGE_SCREENCAST_FILE/_FPS/_CRF/_CURSOR` ao runtime, que grava a própria janela desde o 1º quadro até sair
+  (`GPG_Canvas::SwapBuffers`, encerra em `GPG_ScreencastEnd` antes de fechar a janela; sobrevive a restart e
+  troca de arquivo do jogo). Arquivo `<blend>_standalone_<data-hora>.mp4` na mesma pasta. Enquanto o
+  Standalone roda, a gravação do editor fica pausada (`WindowManager.screencast_paused`, tempo fora do
+  vídeo). `Play Last` abre a mais recente das duas. Testado em background (janela escondida do Cook): vídeo
+  1280x720 com a imagem do jogo; falta teste com janela.
+
 ## 2026-10-20 - Idiomas do jogo (Range.locale) e atlas de texto
 
 - `Range.locale` (puro Python, `scripts/modules/range_locale.py`, ligado pelo `initGamePython`): tabela

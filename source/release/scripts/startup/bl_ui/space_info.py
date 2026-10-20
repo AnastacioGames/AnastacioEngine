@@ -18,7 +18,7 @@
 
 # <pep8 compliant>
 import bpy
-from bpy.types import Header, Menu
+from bpy.types import Header, Menu, Panel
 
 
 class INFO_HT_header(Header):
@@ -53,6 +53,16 @@ class INFO_HT_header(Header):
             # on the scene entry in the Outliner.
             if context.space_data.show_scene_selector:
                 layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
+
+        wm = context.window_manager
+        if wm.info_show_screen_recorder:
+            # Left side, next to the menus, away from the window corner.
+            layout.separator(factor=1)
+            row = layout.row(align=True)
+            if not wm.is_screencast_running:
+                # While recording, the red "Recording mm:ss" button (running jobs) stops it.
+                row.operator("screen.screencast", text="Rec", icon='REC')
+            row.popover(panel="INFO_PT_screen_recorder", text="" if not wm.is_screencast_running else "Rec")
 
         layout.separator_spacer()
 
@@ -92,7 +102,50 @@ class INFO_HT_header(Header):
 
         layout.separator(factor=1)
 
-        row = layout.row(align=1)
+
+class INFO_PT_screen_recorder(Panel):
+    bl_space_type = 'INFO'
+    bl_region_type = 'HEADER'
+    bl_label = "Screen Recorder"
+    bl_ui_units_x = 12
+
+    def draw(self, context):
+        layout = self.layout
+        wm = context.window_manager
+
+        layout.label(text="Screen Recorder", icon='REC')
+
+        col = layout.column()
+        col.scale_y = 1.4
+        if wm.is_screencast_running:
+            col.alert = True
+            col.operator("screen.screencast", text="Stop Recording", icon='CANCEL')
+        else:
+            col.operator("screen.screencast", text="Start Recording", icon='REC')
+        layout.label(text="Shortcut: Ctrl+Alt+F3 (start/stop)")
+
+        layout.separator()
+
+        col = layout.column()
+        col.active = not wm.is_screencast_running
+        col.prop(wm, "screencast_full")
+        col.prop(wm, "screencast_show_cursor")
+        col.prop(wm, "screencast_fps")
+        col.prop(wm, "screencast_quality", text="Quality")
+        layout.prop(wm, "screencast_record_standalone")
+
+        layout.separator()
+
+        layout.label(text="Save to:")
+        layout.prop(wm, "screencast_directory", text="")
+        if not wm.screencast_directory:
+            layout.label(text="Empty: next to the .blend file", icon='INFO')
+
+        row = layout.row(align=True)
+        row.operator("screen.screencast_open_folder", text="Open Folder", icon='FILE_FOLDER')
+        sub = row.row(align=True)
+        sub.enabled = not wm.is_screencast_running
+        sub.operator("screen.screencast_play_last", text="Play Last", icon='PLAY')
 
 
 class INFO_MT_editor_menus(Menu):
@@ -359,6 +412,7 @@ class INFO_MT_window(Menu):
         layout.separator(factor=1)
 
         layout.operator("screen.screenshot", icon="CAMERA_DATA")
+        layout.operator("screen.screencast", text="Record Screen (start/stop)", icon='REC')
 
         if sys.platform[:3] == "win":
             layout.separator(factor=1)
@@ -398,6 +452,7 @@ class INFO_MT_help(Menu):
 
 classes = (
     INFO_HT_header,
+    INFO_PT_screen_recorder,
     INFO_MT_editor_menus,
     INFO_MT_file,
     INFO_MT_file_import,
@@ -410,6 +465,61 @@ classes = (
     INFO_MT_opengl_render,
     INFO_MT_window,
     INFO_MT_help,
+)
+
+
+def _redraw_info_headers(self, context):
+    for win in context.window_manager.windows:
+        for area in win.screen.areas:
+            if area.type == 'INFO':
+                area.tag_redraw()
+
+
+# Screen recorder settings, read by screen.screencast (also from Ctrl+Alt+F3) when the
+# operator is run without them.
+bpy.types.WindowManager.info_show_screen_recorder = bpy.props.BoolProperty(
+    name="Screen Recorder",
+    description="Show the screen recorder (Rec button and its options) in the Info header",
+    default=True,
+    update=_redraw_info_headers,
+)
+bpy.types.WindowManager.screencast_full = bpy.props.BoolProperty(
+    name="Full Window",
+    description="Record the whole window (otherwise only the 3D View)",
+    default=True,
+)
+bpy.types.WindowManager.screencast_show_cursor = bpy.props.BoolProperty(
+    name="Show Cursor",
+    description="Draw the mouse cursor in the video, highlighted while a button is held",
+    default=True,
+)
+bpy.types.WindowManager.screencast_fps = bpy.props.IntProperty(
+    name="Frame Rate",
+    description="Frames per second to capture",
+    default=30, min=1, max=120, soft_min=10, soft_max=60,
+)
+bpy.types.WindowManager.screencast_quality = bpy.props.EnumProperty(
+    name="Quality",
+    description="Video quality",
+    items=(
+        ('LOW', "Low", "Smallest files"),
+        ('MEDIUM', "Medium", "Balanced size and quality"),
+        ('HIGH', "High", "Sharp text and UI, larger files"),
+        ('VERY_HIGH', "Very High", "Nearly lossless, large files"),
+    ),
+    default='HIGH',
+)
+bpy.types.WindowManager.screencast_record_standalone = bpy.props.BoolProperty(
+    name="Record Standalone Player",
+    description="While recording, a game started with Standalone records its own window "
+                "to a separate video (<file>_standalone_<date>.mp4, same folder and settings)",
+    default=True,
+)
+bpy.types.WindowManager.screencast_directory = bpy.props.StringProperty(
+    name="Folder",
+    description="Folder for the recordings (empty: next to the .blend file, or the Documents folder when it isn't saved)",
+    subtype='DIR_PATH',
+    default="",
 )
 
 if __name__ == "__main__":  # only for live edit.

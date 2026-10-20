@@ -86,4 +86,8 @@ public:
 	virtual void EndDraw();
 };
 
+/// Finishes the screen recording started from the editor (RANGE_SCREENCAST_FILE), if any.
+/// Call while the window still exists.
+void GPG_ScreencastEnd();
+
 #endif  // __GPG_CANVAS_H__

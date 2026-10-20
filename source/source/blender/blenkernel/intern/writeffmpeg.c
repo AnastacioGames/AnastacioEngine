@@ -36,6 +36,7 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_threads.h"
 
 #ifdef WITH_AUDASPACE
 #  include <AUD_Device.h>
@@ -80,7 +81,12 @@ typedef struct FFMpegContext {
 	AVCodecContext *video_codec;
 	AVCodecContext *audio_codec;
 	AVFrame *current_frame;
+	AVFrame *rgb_frame;  /* BGR32 staging frame, reused across frames (NULL when encoding BGR32 directly). */
 	struct SwsContext *img_convert_ctx;
+
+	/* Live capture (screencast): fast encoder preset, no legacy x264 expert options and
+	 * leave CPU for the editor/game. Set with BKE_ffmpeg_context_realtime_set(). */
+	bool realtime;
 
 	uint8_t *audio_input_buffer;
 	uint8_t *audio_deinterleave_buffer;
@@ -377,11 +383,15 @@ static AVFrame *generate_video_frame(FFMpegContext *context, uint8_t *pixels, Re
 	AVFrame *rgb_frame;
 
 	if (c->pix_fmt != AV_PIX_FMT_BGR32) {
-		rgb_frame = alloc_picture(AV_PIX_FMT_BGR32, width, height);
-		if (!rgb_frame) {
-			BKE_report(reports, RPT_ERROR, "Could not allocate temporary frame");
-			return NULL;
+		/* Allocated once per stream instead of once per frame. */
+		if (context->rgb_frame == NULL) {
+			context->rgb_frame = alloc_picture(AV_PIX_FMT_BGR32, width, height);
+			if (!context->rgb_frame) {
+				BKE_report(reports, RPT_ERROR, "Could not allocate temporary frame");
+				return NULL;
+			}
 		}
+		rgb_frame = context->rgb_frame;
 	}
 	else {
 		rgb_frame = context->current_frame;
@@ -393,20 +403,10 @@ static AVFrame *generate_video_frame(FFMpegContext *context, uint8_t *pixels, Re
 	 * on CPU-Endianess */
 
 	if (ENDIAN_ORDER == L_ENDIAN) {
+		/* RGBA bytes already are BGR32 on little endian: only the vertical flip is needed. */
 		int y;
 		for (y = 0; y < height; y++) {
-			uint8_t *target = rgb_frame->data[0] + width * 4 * (height - y - 1);
-			uint8_t *src = rendered_frame + width * 4 * y;
-			uint8_t *end = src + width * 4;
-			while (src != end) {
-				target[3] = src[3];
-				target[2] = src[2];
-				target[1] = src[1];
-				target[0] = src[0];
-
-				target += 4;
-				src += 4;
-			}
+			memcpy(rgb_frame->data[0] + width * 4 * (height - y - 1), rendered_frame + width * 4 * y, width * 4);
 		}
 	}
 	else {
@@ -431,7 +431,6 @@ static AVFrame *generate_video_frame(FFMpegContext *context, uint8_t *pixels, Re
 		sws_scale(context->img_convert_ctx, (const uint8_t *const *) rgb_frame->data,
 		          rgb_frame->linesize, 0, c->height,
 		          context->current_frame->data, context->current_frame->linesize);
-		delete_picture(rgb_frame);
 	}
 
 	/* The frame holds the encoder's format after the conversion above (it was
@@ -583,6 +582,13 @@ static AVStream *alloc_video_stream(FFMpegContext *context, RenderData *rd, int 
 	c->gop_size = context->ffmpeg_gop_size;
 	c->max_b_frames = context->ffmpeg_max_b_frames;
 
+	/* The libavcodec default is a single encoder thread. Live capture keeps half
+	 * the cores free for the editor/game that is being recorded. */
+	{
+		const int threads = BLI_system_thread_count();
+		c->thread_count = (context->realtime && threads > 1) ? threads / 2 : threads;
+	}
+
 	if (context->ffmpeg_crf >= 0) {
 		ffmpeg_dict_set_int(&opts, "crf", context->ffmpeg_crf);
 	}
@@ -637,6 +643,16 @@ static AVStream *alloc_video_stream(FFMpegContext *context, RenderData *rd, int 
 	codec = avcodec_find_encoder(c->codec_id);
 	if (!codec)
 		return NULL;
+
+	if (codec->capabilities & AV_CODEC_CAP_FRAME_THREADS) {
+		c->thread_type = FF_THREAD_FRAME;
+	}
+	else if (codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
+		c->thread_type = FF_THREAD_SLICE;
+	}
+	else {
+		c->thread_count = 1;
+	}
 
 	/* Be sure to use the correct pixel format(e.g. RGB, YUV) */
 
@@ -710,7 +726,11 @@ static AVStream *alloc_video_stream(FFMpegContext *context, RenderData *rd, int 
 	st->sample_aspect_ratio = c->sample_aspect_ratio = av_d2q(((double) rd->xasp / (double) rd->yasp), 255);
 	st->avg_frame_rate = av_inv_q(c->time_base);
 
-	set_ffmpeg_properties(rd, c, "video", &opts);
+	/* Live capture skips the legacy x264 expert options (subq 6, 3 B-frames, CAVLC...):
+	 * they override the fast preset and can't keep up with real time. */
+	if (!context->realtime) {
+		set_ffmpeg_properties(rd, c, "video", &opts);
+	}
 
 	if (avcodec_open2(c, codec, &opts) < 0) {
 		BLI_strncpy(error, IMB_ffmpeg_last_error(), error_size);
@@ -1379,6 +1399,10 @@ static void end_ffmpeg_impl(FFMpegContext *context, int is_autosplit)
 		delete_picture(context->current_frame);
 		context->current_frame = NULL;
 	}
+	if (context->rgb_frame != NULL) {
+		delete_picture(context->rgb_frame);
+		context->rgb_frame = NULL;
+	}
 	if (context->outfile != NULL && context->outfile->oformat) {
 		if (!(context->outfile->oformat->flags & AVFMT_NOFILE)) {
 			avio_close(context->outfile->pb);
@@ -1811,6 +1835,32 @@ void *BKE_ffmpeg_context_create(void)
 	context->stamp_data = NULL;
 
 	return context;
+}
+
+void BKE_ffmpeg_context_realtime_set(void *context_v, bool realtime)
+{
+	FFMpegContext *context = context_v;
+	context->realtime = realtime;
+}
+
+void BKE_ffmpeg_screencast_settings(RenderData *rd, int fps, int crf)
+{
+	/* H.264 in MP4, constant quality, no audio. The frame rate is the time base:
+	 * frames are written with their capture time as pts, so idle stretches cost nothing. */
+	rd->ffcodecdata.type = FFMPEG_MPEG4;
+	rd->ffcodecdata.codec = AV_CODEC_ID_H264;
+	rd->ffcodecdata.audio_codec = AV_CODEC_ID_NONE;
+	rd->ffcodecdata.constant_rate_factor = crf;
+	rd->ffcodecdata.ffmpeg_preset = FFM_PRESET_REALTIME;
+	rd->ffcodecdata.gop_size = fps * 2;
+	rd->ffcodecdata.flags = 0;
+	rd->frs_sec = (short)fps;
+	rd->frs_sec_base = 1.0f;
+	rd->xasp = rd->yasp = 1.0f;
+	rd->mode &= ~R_FIELDS;
+	rd->scemode |= R_EXTENSION;
+	rd->im_format.imtype = R_IMF_IMTYPE_FFMPEG;
+	rd->im_format.planes = R_IMF_PLANES_RGB;
 }
 
 void BKE_ffmpeg_context_free(void *context_v)

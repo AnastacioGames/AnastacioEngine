@@ -508,6 +508,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 			}
 		}
 
+		WM_screencast_stop(NULL);  /* finish the video while its window still exists */
 		WM_jobs_kill_all(wm);
 
 		for (win = wm->windows.first; win; win = win->next) {
