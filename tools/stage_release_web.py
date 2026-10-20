@@ -50,6 +50,18 @@ def main():
         sys.exit("Runtime Web incompleto em %s (falta %s). Compile o preset web-runtime-release."
                  % (args.runtime_dir, ", ".join(missing)))
 
+    # Manifesto velho com artefatos novos (pos-build que nao rodou) quebra o Export Web do usuario
+    # com WEB-PKG-001. Confere aqui, antes de copiar, com a mesma regra do editor.
+    sys.path.insert(0, os.path.join(ROOT, "source", "release", "scripts", "modules"))
+    from range_web import manifest as mf
+    data, problems = mf.load_manifest(os.path.join(args.runtime_dir, "RangeRuntime.manifest.json"))
+    if data is not None:
+        problems = mf.verify_artifacts(data, args.runtime_dir)
+    if problems:
+        sys.exit("Manifesto do runtime Web nao confere com os artefatos em %s (%s).\n"
+                 "Regenere: python3 tools/web/make-runtime-manifest.py --runtime-dir %s"
+                 % (args.runtime_dir, "; ".join(str(f.message) for f in problems), args.runtime_dir))
+
     web = os.path.join(args.package, "web")
     shutil.rmtree(web, ignore_errors=True)
     runtime = os.path.join(web, "runtime")
