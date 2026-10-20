@@ -339,6 +339,16 @@ static void create_properties(PythonComponent *pycomp, PyObject *cls)
 				free = true;
 			}
 		}
+		else if (STREQ(kind, "color") && PySequence_Check(pyvalue)) {
+			/* Range.args.Color: 3 or 4 floats drawn with the color picker. */
+			const int len = (int)PySequence_Size(pyvalue);
+			cprop->type = (len == 4) ? CPROP_TYPE_COL4 : CPROP_TYPE_COL3;
+			for (int j = 0; j < len && j < 4; ++j) {
+				PyObject *v = PySequence_GetItem(pyvalue, j);
+				cprop->vec[j] = v ? (float)PyFloat_AsDouble(v) : 0.0f;
+				Py_XDECREF(v);
+			}
+		}
 		else if (PyBool_Check(pyvalue)) {
 			cprop->type = CPROP_TYPE_BOOLEAN;
 			cprop->boolval = PyLong_AsLong(pyvalue) != 0;

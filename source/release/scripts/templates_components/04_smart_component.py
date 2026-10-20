@@ -30,6 +30,7 @@ Campos de Range.args (no jogo cada um chega como o tipo normal):
     Choice("Andar", "Andar", "Correr")     -> str (o 1º é o padrão, depois as opções)
     Object(tip="...")                      -> KX_GameObject, ou None
     Scene(tip="...")                       -> str com o nome da cena ("" se vazio)
+    Color(1, 0.5, 0, 1, tip="...")         -> cor com seletor (3 ou 4 valores)
     Header("Seção", icon="AUTO", open=True) -> título que abre e fecha
 """
 
@@ -38,7 +39,7 @@ import math
 
 from mathutils import Vector
 from Range import types, logic
-from Range.args import Float, Int, Bool, Text, Choice, Object, Scene, Header
+from Range.args import Float, Int, Bool, Text, Choice, Object, Scene, Color, Header
 
 
 class Perseguidor(types.KX_PythonComponent):
@@ -56,7 +57,7 @@ class Perseguidor(types.KX_PythonComponent):
         Header("Alerta", icon="COLOR", open=False),
         ("Agressivo", Bool(True, tip="Pisca e cresce quando está perto")),
         ("Piscadas por segundo", Int(4, min=1, max=12, tip="Velocidade do pisca-pisca")),
-        ("Cor de alerta", [1.0, 0.1, 0.1, 1.0]),    # jeito antigo: também vale, sem dica
+        ("Cor de alerta", Color(1.0, 0.1, 0.1, 1.0, tip="Cor ao piscar. Clique para abrir o seletor")),
         ("Nome", Text("Inimigo", tip="Aparece no console quando ele te pega")),
         ("Cena ao pegar", Scene(tip="Cena que aparece por cima quando ele te pega (opcional)")),
     ])

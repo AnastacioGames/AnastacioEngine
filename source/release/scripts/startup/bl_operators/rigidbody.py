@@ -62,7 +62,7 @@ class RigidBodyJointComponent(Range.types.KX_PythonComponent):
         ("Joint Type", {"Hinge", "Limited Hinge (6DOF)", "Slider (6DOF)", "Ball Socket", "Cone Twist (6DOF)"}),
         ("Enabled", True), ("Disable Linked Collision", False),
         ("Use Breaking", False), ("Breaking Threshold", 0.0),
-        ("C_Header /Pivot and Axis/EMPTY_AXIS", True),
+        ("C_Header /Pivot and Axis/MANIPUL", True),
         ("Pivot", (0.0, 0.0, 0.0)), ("Axis (degrees)", (0.0, 0.0, 0.0)),
         ("C_Header /Limits/CONSTRAINT", True),
         ("Linear Min", (0.0, 0.0, 0.0)), ("Linear Max", (0.0, 0.0, 0.0)),

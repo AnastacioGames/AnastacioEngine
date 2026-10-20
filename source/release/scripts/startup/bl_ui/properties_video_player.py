@@ -288,6 +288,9 @@ class OBJECT_OT_video_player_texture(Operator):
         if mat is None:
             return {'CANCELLED'}
         ensure_video_texture(mat)
+        ob = context.object
+        if ob is not None and ob.type == 'MESH' and not ob.data.uv_textures:
+            ob.data.uv_textures.new()   # the video texture is mapped by UV
         return {'FINISHED'}
 
 
@@ -385,9 +388,11 @@ def draw_video_player(layout, ob, component):
             mat = bpy.data.materials.get(name) if name else ob.active_material
             if mat is None:
                 box.label(text="The object needs a material to show the video", icon='ERROR')
-            elif video_texture_slot(mat) is None:
+            elif video_texture_slot(mat) is None or not ob.data.uv_textures:
                 row = box.row()
-                row.label(text="Material has no image texture", icon='ERROR')
+                text = ("Material has no image texture" if video_texture_slot(mat) is None
+                        else "Mesh has no UV map")
+                row.label(text=text, icon='ERROR')
                 row.operator("object.video_player_texture", icon='TEXTURE').material = mat.name
         else:
             field(box, "Material")

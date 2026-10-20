@@ -1,6 +1,6 @@
 # Range.args: friendlier fields for Python Component "args".
 #
-#     from Range.args import Float, Int, Bool, Text, Choice, Object, Scene, Header
+#     from Range.args import Float, Int, Bool, Text, Choice, Object, Scene, Color, Header
 #
 #     class Patrol(types.KX_PythonComponent):
 #         args = OrderedDict([
@@ -17,7 +17,7 @@
 #
 # Pure Python and no bpy: this module also runs inside exported games.
 
-__all__ = ("Float", "Int", "Bool", "Text", "Choice", "Object", "Scene", "Header")
+__all__ = ("Float", "Int", "Bool", "Text", "Choice", "Object", "Scene", "Color", "Header")
 
 
 def _meta(value, kind, tip, **extra):
@@ -85,6 +85,20 @@ class Scene(str):
     logic.addScene(args[name]); "" when nothing was picked."""
     def __new__(cls, tip=""):
         return _meta(str.__new__(cls, ""), "scene", tip)
+
+
+class Color(tuple):
+    """Color with the color picker. Color(r, g, b) or Color(r, g, b, a).
+
+    In the game, args[name] is a mathutils.Color-like sequence of 3 or 4
+    floats, ready for obj.color (use 4 values for that)."""
+    def __new__(cls, *values, tip=""):
+        if len(values) == 1:
+            values = tuple(values[0])
+        values = tuple(float(v) for v in values) or (1.0, 1.0, 1.0)
+        if len(values) not in (3, 4):
+            raise ValueError("Color needs 3 or 4 values (r, g, b[, a])")
+        return _meta(tuple.__new__(cls, values), "color", tip)
 
 
 def Header(name, icon="FULLSCREEN", open=True):

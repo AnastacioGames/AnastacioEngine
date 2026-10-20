@@ -153,7 +153,10 @@ def _plain(value):
 def _search_paths():
     paths = []
     if bpy.data.filepath:
-        paths.append(os.path.dirname(bpy.data.filepath))
+        folder = os.path.dirname(bpy.data.filepath)
+        paths.append(folder)
+        # Same as the game: components saved in //scripts (e.g. the joint).
+        paths.append(os.path.join(folder, "scripts"))
     for lib in bpy.data.libraries:
         paths.append(os.path.dirname(bpy.path.abspath(lib.filepath)))
     return [os.path.normcase(os.path.abspath(p)) for p in paths if p]
@@ -379,6 +382,7 @@ def _check_object(obj):
         # Something changed (or first look, or new code): validate every field,
         # so a warning that depends on another field stays right.
         changed = list(values)
+        before = dict(state.warnings), state.error
         state.entry = entry
         state.values = values
         ed = _instance(entry, obj, comp)
@@ -398,11 +402,23 @@ def _check_object(obj):
                 del state.warnings[name]
         # on_change may have changed values: take them as seen.
         state.values = _snapshot(comp)
+        if (state.warnings, state.error) != before:
+            _redraw_properties()
+
+
+def _redraw_properties():
+    # The panel was drawn before on_change ran: show the new warnings now.
+    wm = bpy.context.window_manager
+    for win in (wm.windows if wm else ()):
+        for area in win.screen.areas:
+            if area.type == 'PROPERTIES':
+                area.tag_redraw()
 
 
 @persistent
 def _scene_update(scene):
-    obj = bpy.context.active_object if hasattr(bpy.context, "active_object") else None
+    # The scene's own active object: bpy.context may have no screen here.
+    obj = scene.objects.active
     if obj is None or not obj.game.components:
         return
     try:
