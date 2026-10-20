@@ -22,7 +22,7 @@
 
 import bpy
 from bpy.types import Operator
-from bpy.props import EnumProperty
+from bpy.props import BoolProperty, EnumProperty, StringProperty
 from bpy.app.translations import pgettext_iface
 
 
@@ -118,7 +118,7 @@ def _collect(b):
 def _door(b):
     b.property("open", 'BOOL', False)
     key = b.key('E', "Key E")
-    near = b.sensor('NEAR', "Player Near", property="player", distance=3.0)
+    near = b.sensor('NEAR', "Player Near", property="player", distance=3.0, reset_distance=4.0)
     toggle = b.actuator('PROPERTY', "Toggle Open", mode='TOGGLE', property="open")
     b.link([key, near], [toggle], "Use Door")
     is_open = b.sensor('PROPERTY', "Is Open", evaluation_type='PROPEQUAL', property="open", value="True")
@@ -202,6 +202,43 @@ def _button(b, scene):
     b.link([over, click], [go], "Click Button")
 
 
+def _mouse_look(b):
+    a = b.actuator('MOUSE', "Mouse Look", mode='LOOK')
+    b.link([b.sensor('ALWAYS', "Always")], [a], "Mouse Look")
+
+
+def _shoot(b, bullet):
+    s = b.sensor('MOUSE', "Left Click", mouse_event='LEFTCLICK')
+    a = b.actuator('EDIT_OBJECT', "Shoot", mode='ADDOBJECT', time=120, linear_velocity=(0.0, 20.0, 0.0),
+                   use_local_linear_velocity=True)
+    if bullet is not None:
+        a.object = bullet
+    b.link([s], [a], "Shoot")
+
+
+def _spawn_timer(b, model):
+    s = b.sensor('DELAY', "Every 2 Seconds", delay=120, use_repeat=True)
+    a = b.actuator('EDIT_OBJECT', "Spawn", mode='ADDOBJECT')
+    if model is not None:
+        a.object = model
+    b.link([s], [a], "Spawn")
+
+
+def _turret(b):
+    radar = b.sensor('RADAR', "Player in Sight", property="player", axis='YAXIS', angle=60.0,
+                     distance=15.0)
+    aim = b.actuator('EDIT_OBJECT', "Aim", mode='TRACKTO', track_axis='TRACKAXISY', up_axis='UPAXISZ',
+                     use_3d_tracking=False)
+    b.link([radar], [aim], "Aim at Player")
+    return aim
+
+
+def _pause(b, scene):
+    key = b.key('P', "Key P")
+    pause = b.actuator('SCENE', "Pause Scene", mode='SUSPEND', scene=scene)
+    b.link([key], [pause], "Pause")
+
+
 class LOGIC_OT_preset_add(Operator):
     """Add a group of logic bricks already linked"""
     bl_idname = "logic.preset_add"
@@ -230,6 +267,14 @@ class LOGIC_OT_preset_add(Operator):
                                       "the mouse cursor is shown"),
             ('PLATFORM', "Moving Platform", "Goes forth for 2 seconds and comes back, with two states "
                                             "and the Wait actuator"),
+            ('MOUSE_LOOK', "Mouse Look", "The object turns with the mouse (Mouse actuator, Look)"),
+            ('SHOOT', "Shoot", "Left click adds the object of Add Object in front, fast (choose the "
+                               "bullet, it must be on a hidden layer)"),
+            ('SPAWN_TIMER', "Spawn Every 2 Seconds", "Adds the object of Add Object every 2 seconds (choose "
+                                                     "it, it must be on a hidden layer)"),
+            ('TURRET', "Turret", "Turns to the object with the property \"player\" when it enters a "
+                                 "60 degree radar of 15 units"),
+            ('PAUSE', "Pause Key", "P suspends the scene (an overlay scene can resume it)"),
         ),
     )
 
@@ -263,6 +308,21 @@ class LOGIC_OT_preset_add(Operator):
         if self.type == 'BUTTON':
             _button(b, context.scene)
             return {'FINISHED'}
+        if self.type in ('SHOOT', 'SPAWN_TIMER'):
+            # the other selected mesh becomes the object to add
+            other = next((o for o in context.selected_objects if o != ob and o.type == 'MESH'), None)
+            (_shoot if self.type == 'SHOOT' else _spawn_timer)(b, other)
+            return {'FINISHED'}
+        if self.type == 'PAUSE':
+            _pause(b, context.scene)
+            return {'FINISHED'}
+        if self.type == 'TURRET':
+            aim = _turret(b)
+            target = next((o for o in context.scene.objects if o != ob and "player" in o.game.properties),
+                          None)
+            if target is not None:
+                aim.track_object = target
+            return {'FINISHED'}
         {
             'WALK': _walk,
             'JUMP': _jump,
@@ -271,7 +331,57 @@ class LOGIC_OT_preset_add(Operator):
             'HEALTH': _health,
             'CHECKPOINT': _checkpoint,
             'PLATFORM': _platform,
+            'MOUSE_LOOK': _mouse_look,
         }[self.type](b)
+        return {'FINISHED'}
+
+
+class LOGIC_OT_brick_inspector_show(Operator):
+    """Open this brick in the Logic Editor and close the others of the object"""
+    bl_idname = "logic.brick_inspector_show"
+    bl_label = "Show Brick"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    kind = StringProperty(options={'HIDDEN'})
+    name = StringProperty(options={'HIDDEN'})
+
+    def execute(self, context):
+        ob = context.active_object
+        if ob is None:
+            return {'CANCELLED'}
+        game = ob.game
+        for bricks in (game.sensors, game.controllers, game.actuators):
+            for b in bricks:
+                b.show_expanded = False
+        target = getattr(game, self.kind + "s", {}).get(self.name)
+        if target is None:
+            return {'CANCELLED'}
+        target.show_expanded = True
+        if self.kind == "sensor":
+            for c in target.controllers:
+                c.show_expanded = True
+        for area in context.screen.areas:
+            if area.type == 'LOGIC_EDITOR':
+                area.tag_redraw()
+        return {'FINISHED'}
+
+
+class LOGIC_OT_brick_inspector_object(Operator):
+    """Make this object the active one to see its bricks"""
+    bl_idname = "logic.brick_inspector_object"
+    bl_label = "Show Object"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    name = StringProperty(options={'HIDDEN'})
+
+    def execute(self, context):
+        ob = context.scene.objects.get(self.name)
+        if ob is None:
+            return {'CANCELLED'}
+        for o in context.selected_objects:
+            o.select = False
+        ob.select = True
+        context.scene.objects.active = ob
         return {'FINISHED'}
 
 
@@ -375,4 +485,12 @@ classes = (
     LOGIC_OT_brick_group_clear,
     LOGIC_OT_brick_group_add,
     LOGIC_OT_brick_group_remove,
+    LOGIC_OT_brick_inspector_show,
+    LOGIC_OT_brick_inspector_object,
+)
+
+bpy.types.WindowManager.brick_inspector_show_info = BoolProperty(
+    name="Show Tips",
+    description="Also list tips, such as bricks that are not linked",
+    default=True,
 )

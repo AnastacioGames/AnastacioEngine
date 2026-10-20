@@ -32,6 +32,17 @@ Campos de Range.args (no jogo cada um chega como o tipo normal):
     Scene(tip="...")                       -> str com o nome da cena ("" se vazio)
     Color(1, 0.5, 0, 1, tip="...")         -> cor com seletor (3 ou 4 valores)
     Header("Seção", icon="AUTO", open=True) -> título que abre e fecha
+    ObjectList(tip="...")                  -> str com nomes "A;B": use objects(self.object.scene, args[...])
+    Point(0, 0, 1, tip="...")              -> Vector (posição no mundo, cruz na viewport)
+
+Opções que qualquer campo aceita (só editor; o jogo ignora):
+    show_if="Pular" ou show_if=("Modo", "Correr")  -> só aparece quando o outro campo tem esse valor
+    required=True        -> aviso enquanto está vazio
+    Object/ObjectList: filter="LAMP", line=True (seta/caminho), create=True (botão "+")
+    Float: circle=True (círculo do raio), warn_above=15 (aviso acima do valor)
+
+Atalho: Properties > Game > Component Manager tem o Smart Component Wizard, que
+monta tudo isso sem digitar, e o "Add Field" no fim de cada caixa.
 """
 
 from collections import OrderedDict

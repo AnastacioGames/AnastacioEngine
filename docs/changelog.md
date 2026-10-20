@@ -19,6 +19,49 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Validado com teste isolado (tom de 1 s tocado via waveOut): duração 1,003 s, ~40 ms após o início reportado
   pelo waveOut. Falta ouvir uma gravação real do editor/Standalone.
 
+## 2026-10-20 - Bricks Espertos
+
+- `modules/range_brick_inspector.py`: verificações e desenho na viewport por tipo de brick nativo, só no editor (o jogo exportado não muda). Registro com `@check(kind, tipo)` e `@gizmo(kind, tipo)`.
+- Avisos: Steering sem alvo, Path Following sem navmesh, Track To/Camera/Parent sem objeto, Add Object sem objeto ou em camada visível, Action/Sound/Scene não escolhidos, propriedade inexistente (Property sensor/actuator), Near/Radar/Collision sem objeto com a propriedade e em objeto No Collision, Ray/Near com distância 0, Message sem quem escute/envie, Motion com força em objeto não dinâmico, Python controller sem módulo/arquivo, Keyboard sem tecla, além de bricks sem ligação.
+- Viewport (mesma opção "Component Gizmos"): esfera do Near, cone do Radar, linha do Ray, seta do Steering/Track To/Camera até o alvo, com o nome do brick.
+- Painel "Brick Inspector" no Logic Editor (N): lista os problemas do objeto ativo, clique abre o brick; lista outros objetos com problemas.
+- Presets novos: Mouse Look, Shoot, Spawn Every 2 Seconds, Turret, Pause Key. Door com Reset Distance corrigido.
+
+## 2026-10-20 - Smart Component Wizard: etapas 2-4
+
+- `Range.args`: opções de editor que o jogo e o C ignoram: `show_if="Campo"` / `("Campo", "valor")`,
+  `required`, `filter` (MESH, LAMP...), `line`, `create`, `circle`, `warn_above`. Tipos novos sem C:
+  `ObjectList` (texto "A;B", chega como str; `objects(scene, valor)` dá os KX_GameObject, inclusive os de camada
+  escondida) e `Point(x, y, z)` (VEC3, chega como Vector).
+- `range_component_editor` cuida dessas opções sem classe `Editor`: avisos automáticos (vazio, tipo errado, é o
+  próprio objeto, nome que não existe, camada escondida → None no jogo, acima do limite), seta/caminho/círculo/cruz
+  na viewport, e `meta_of` / `is_visible` para o painel.
+- Caixa do component (`draw_component_body`): esconde campos pelo `show_if`; ObjectList com linhas, selecionar,
+  subir, remover, "Add Selected", "New"; Point com "3D Cursor" e "Selected"; Object com "+" (cria luz/câmera se o
+  filtro pedir). Botão "Add Field" no fim da caixa: põe um campo novo só no `args` do código (texto ou arquivo),
+  confere se compila e recarrega.
+- Wizard: tipos Object List e Point, filtro, "Show only if", prévia da caixa no painel e `wizard_preview.py` que
+  segue cada mudança. Receitas novas: Vida, Câmera seguidora, Luz piscando, Girador; Patrulha usa lista de pontos;
+  Spawner sorteia entre "Modelos" e pode nascer num Point.
+- Achado: no jogo, Object de camada escondida chega como None (`KX_PythonComponent.cpp` só busca nos ativos);
+  fica o aviso no editor e o ObjectList como saída, sem mexer em C.
+- Testado em background: 11 receitas, todos os tipos, Add Field (inclusive nome repetido recusado), prévia ao vivo,
+  desenho das caixas; e `--server` com Patrulha (anda P1 → P2) e Spawner (bolas no Point 7, 8, 9).
+
+## 2026-10-20 - Smart Component Wizard (etapa 1)
+
+- Properties > Game > Component Manager: o "Create New Script" virou o Smart Component Wizard
+  (`startup/smart_component_wizard.py`); também em Text Editor > Text > New Smart Component.
+- Receitas para começar: Vazio, Perseguidor, Patrulha, Coletável, Spawner, Porta, Zona de gatilho. Cada uma vem
+  com campos e código de jogo; se um campo da receita for removido ou renomeado, `update()` fica vazio (aviso).
+- Lista de campos (+ por tipo, −, subir/descer, duplicar) com padrão, min/max, dica, opções do Choice, ícone de
+  seção. Extras que geram a classe `Editor`: linha até o Object, círculo do Float, obrigatório, aviso acima de um
+  valor, escolher objeto pelo nome ao adicionar, botão "Criar <campo>" (Empty já ligado ao campo).
+- Gera texto interno do .blend ou `//scripts/<arquivo>.py`, adiciona no objeto ativo e mostra o código; a lupa mostra
+  a prévia em `wizard_preview.py`. Gerador sem bpy em `modules/range_component_wizard.py`.
+- Testado em background: as 7 receitas criam, registram e o editor acha campos e `Editor`. Falta teste com janela
+  e Play das receitas.
+
 ## 2026-10-20 - Build Linux no container mais rápido
 
 - `tools/linux/container-build.sh` é o jeito normal: gera (uma vez) a imagem `anastacio-build:22.04-<hash>` do
