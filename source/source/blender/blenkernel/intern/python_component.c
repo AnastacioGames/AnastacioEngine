@@ -21,6 +21,7 @@
  */
 
 #include "DNA_python_component_types.h"
+#include "DNA_object_types.h"
 #include "DNA_property_types.h" /* For MAX_PROPSTRING */
 #include "DNA_windowmanager_types.h"
 #include "BLI_listbase.h"
@@ -867,6 +868,32 @@ void BKE_python_component_free(PythonComponent *pc)
 	free_properties(&pc->properties);
 
 	MEM_freeN(pc);
+}
+
+/* Object and Scene fields keep the picked ID by name (the game looks it up by
+ * name). When that ID is renamed in the editor, follow it. */
+void BKE_python_component_id_renamed(Main *bmain, ID *id, const char *oldname)
+{
+	short type;
+
+	if (!bmain || !id || !oldname || !oldname[0] || STREQ(oldname, id->name + 2)) {
+		return;
+	}
+	switch (GS(id->name)) {
+		case ID_OB: type = CPROP_TYPE_OBJECT; break;
+		case ID_SCE: type = CPROP_TYPE_SCENE; break;
+		default: return;
+	}
+
+	for (Object *ob = bmain->object.first; ob; ob = ob->id.next) {
+		for (PythonComponent *pc = ob->components.first; pc; pc = pc->next) {
+			for (PythonComponentProperty *cprop = pc->properties.first; cprop; cprop = cprop->next) {
+				if (cprop->type == type && STREQ(cprop->strval, oldname)) {
+					BLI_strncpy(cprop->strval, id->name + 2, sizeof(cprop->strval));
+				}
+			}
+		}
+	}
 }
 
 void BKE_python_component_free_list(ListBase *lb)

@@ -19,7 +19,7 @@ Status (2026-10-20): etapas 1 a 7 implementadas (ver "Feito").
 - **Etapa 3**: `Object(tip=...)` = `CPROP_TYPE_OBJECT`, nome guardado em `strval`. No
   editor o `value` é um ponteiro para `Object` (seletor de objeto); `object_name` dá o nome.
   No jogo `KX_PythonComponent` troca o nome pelo `KX_GameObject` da cena (ou `None`) em
-  `awake`/`start`/`update_args`. Renomear o objeto ainda solta o alvo (questão em aberto).
+  `awake`/`start`/`update_args`. Renomear o objeto (ou a cena) atualiza o campo.
 - **Etapa 4**: `requires` (`physics`, `components`) e classe `Editor` (`on_attach`, `on_change` com aviso
   por campo, `buttons`), em `scripts/modules/range_component_editor.py`; o C chama
   `BKE_python_component_attached` depois de adicionar. `on_change` valida todos os campos quando qualquer
@@ -223,9 +223,9 @@ alvo escolhido com o mouse.
 
 ## Questões em aberto
 
-- `Object` por nome quebra ao renomear; vale um ponteiro real no DNA (mais
-  trabalho, mais robusto)? Sugestão: começar por nome e atualizar ao renomear
-  via handler.
+- ~~`Object` por nome quebra ao renomear~~ Resolvido: continua por nome (o jogo
+  procura pelo nome), e `BKE_python_component_id_renamed` troca o nome nos
+  campos Object/Scene ao renomear pelo RNA (painel, F2, Python) e pelo Outliner.
 - `requires` deve só configurar ou também impedir remover a física depois?
 - Gizmos rodando também durante o jogo no modo debug (como o `Show Debug
   Properties`)?

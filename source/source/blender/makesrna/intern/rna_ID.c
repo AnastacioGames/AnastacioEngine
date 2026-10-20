@@ -91,6 +91,7 @@ const EnumPropertyItem rna_enum_id_type_items[] = {
 #include "BKE_library.h"
 #include "BKE_library_query.h"
 #include "BKE_library_remap.h"
+#include "BKE_python_component.h"
 #include "BKE_animsys.h"
 #include "BKE_material.h"
 #include "BKE_depsgraph.h"
@@ -114,9 +115,13 @@ int rna_ID_name_length(PointerRNA *ptr)
 void rna_ID_name_set(PointerRNA *ptr, const char *value)
 {
 	ID *id = (ID *)ptr->data;
+	char oldname[MAX_ID_NAME - 2];
+	BLI_strncpy(oldname, id->name + 2, sizeof(oldname));
 	BLI_strncpy_utf8(id->name + 2, value, sizeof(id->name) - 2);
 	BLI_assert(BKE_id_is_in_gobal_main(id));
 	BLI_libblock_ensure_unique_name(G_MAIN, id->name);
+	/* Smart Component Object/Scene fields follow the rename. */
+	BKE_python_component_id_renamed(G_MAIN, id, oldname);
 }
 
 static int rna_ID_name_editable(PointerRNA *ptr, const char **UNUSED(r_info))

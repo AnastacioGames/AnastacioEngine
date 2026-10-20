@@ -39,6 +39,7 @@
 #include "BLT_translation.h"
 
 #include "BKE_context.h"
+#include "BKE_python_component.h"
 #include "BKE_deform.h"
 #include "BKE_depsgraph.h"
 #include "BKE_fcurve.h"
@@ -569,6 +570,8 @@ static void namebutton_cb(bContext *C, void *tsep, char *oldname)
 
 		if (tselem->type == 0) {
 			BLI_libblock_ensure_unique_name(bmain, tselem->id->name);
+			/* Smart Component Object/Scene fields follow the rename. */
+			BKE_python_component_id_renamed(bmain, tselem->id, oldname);
 
 			switch (GS(tselem->id->name)) {
 				case ID_MA:
