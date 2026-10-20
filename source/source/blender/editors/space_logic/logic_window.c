@@ -3424,7 +3424,9 @@ void logic_buttons(bContext *C, ARegion *ar)
 	short a, count;
 	int xco, yco, width, height;
 
-	if (ob==NULL) return;
+	/* slogic is NULL when a Python context override (e.g. game_start with a 3D View area)
+	 * shadows the Logic area set by the live draw during the game. */
+	if (ob==NULL || slogic==NULL) return;
 
 	RNA_pointer_create(NULL, &RNA_SpaceLogicEditor, slogic, &logic_ptr);
 	idar= get_selected_and_linked_obs(C, &count, slogic->scaflag);

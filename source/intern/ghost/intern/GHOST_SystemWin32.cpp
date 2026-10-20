@@ -36,6 +36,7 @@
 #include <dwmapi.h>
 #include <psapi.h>
 #include <windowsx.h>
+#include <timeapi.h>
 
 #include "utfconv.h"
 
@@ -205,6 +206,11 @@ GHOST_SystemWin32::GHOST_SystemWin32(bool hiddenWindows)
 	// Require COM for GHOST_DropTargetWin32 created in GHOST_WindowWin32.
 	OleInitialize(0);
 
+	// Default Windows timer resolution is ~15.6 ms, so Sleep(1) and std::this_thread::sleep_for
+	// in the editor loop and the game frame pacing overshoot by up to a whole frame (uneven
+	// physics steps). Ask for 1 ms for the lifetime of the process.
+	::timeBeginPeriod(1);
+
 #ifdef WITH_INPUT_NDOF
 	m_ndofManager = new GHOST_NDOFManagerWin32(*this);
 #endif
@@ -212,6 +218,8 @@ GHOST_SystemWin32::GHOST_SystemWin32(bool hiddenWindows)
 
 GHOST_SystemWin32::~GHOST_SystemWin32()
 {
+	::timeEndPeriod(1);
+
 	// Shutdown COM
 	OleUninitialize();
 	toggleConsole(1);
