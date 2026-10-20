@@ -1,5 +1,8 @@
 # AnastacioEngine 0.5.4
 
+> **Em andamento (2026-10-20):** a 0.5.4 ainda não foi lançada. Vai receber mais recursos antes da
+> publicação; acrescente as novidades aqui e refaça os pacotes antes de publicar.
+
 Corrige o Export Web do pacote Linux e traz os Smart Components, idiomas no jogo, gravação de tela e
 novas opções de material no modo Game.
 

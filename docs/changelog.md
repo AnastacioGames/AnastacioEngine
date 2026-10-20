@@ -13,7 +13,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   no `python3` do sistema (`WEB_MANIFEST_PYTHON`). Conferido: apagar o `.wasm` e relinkar regenera o manifesto.
 - Versão 0.5.4 (`ANASTACIO_VERSION_STRING`, About, scripts de release). Runtime Web recompilado; pacotes
   `AnastacioEngine-0.5.4-linux-x86_64.tar.xz` e `RangeArmor-0.5.4-linux-x86_64.tar.xz` em `build-linux/dist/`.
-  Notas em `docs/release-notes-0.5.4.md`. A publicação no GitHub fica para quando houver mais mudanças.
+  Notas em `docs/release-notes-0.5.4.md`. **Não lançada de propósito:** a 0.5.4 vai receber mais recursos antes
+  de sair; pacotes e notas serão refeitos na hora de publicar.
 - Testes no pacote extraído: manifesto Web confere; Export Web pelo editor (`validate-web.py --export`) sem
   problemas; `tools/test_*.py` OK (os dois de atlas com janela não rodaram); `AnastacioRuntime --server` roda a
   cena; painel RangeArmor sem biblioteca faltando (glibc máx. 2.30). Sem teste no navegador (máquina sem Node).
