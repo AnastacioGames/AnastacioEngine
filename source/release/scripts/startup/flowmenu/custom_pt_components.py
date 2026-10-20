@@ -145,53 +145,7 @@ class CUSTOM_PT_game_object_components(PropertyPanel, Panel):
             sub = row.row(align=0)
             sub.operator("logic.python_component_remove", text="", icon='X').index = i
 
-            if len(c.properties) == 1 and c.properties[0].name == "C_Icons":
-                continue
-
-            if c.show_expanded and len(c.properties) > 0:
-                expanded = True
-                collapsed = True
-                prop_box = box.box().column()
-
-                for prop in c.properties:
-                    if prop.name[:8] == "C_Header":
-                        row = prop_box.row()
-                        expanded = prop.value
-                        collapsed = prop.value
-                        split = prop.name.split("/")
-                        name = split[1] if len(split) > 1 else "HEADER"
-                        icon = split[2] if len(split) > 2 else "FULLSCREEN"
-                        row.scale_y = 1.2
-                        try:
-                            row.prop(prop, "value", text=name, toggle=1, icon=icon, emboss=1)
-                        except:
-                            prop_box.label(text="Header Error", icon="ERROR")
-                        continue
-                    elif prop.name[:10] == "C_Collapse" and collapsed:
-                        collapsed = prop.value
-                        split = prop.name.split("/")
-                        name = " ".join(split[1]) if len(split) > 1 else "COLLAPSE"
-                        icon = split[2] if len(split) > 2 else "MOD_BOOLEAN"
-                        row = prop_box.row()
-                        row.prop(prop, "value", text=name, toggle=1, emboss=0 if collapsed else 1, icon=icon)
-                        row.scale_y = 0.9
-                        sep = prop_box.row()
-                        sep.prop(prop, "value", text=" ", toggle=1, emboss=1)
-                        sep.scale_y = 0.2
-                        sep.enabled = False
-                        if collapsed: prop_box.separator()
-                        continue
-                    else:
-                        if expanded and collapsed:
-                            text = prop.name
-                            try:
-                                split = prop.name.split("/") if "@" in prop.name else [prop.name]
-                                if len(split) > 1: text = split[1] + ":"
-                                if not prop.name == "C_Icons":
-                                    row = prop_box.row(align=True)
-                                    row.label(text=text, icon="DOT")
-                                    row.prop(prop, "value", text="")
-                            except:
-                                row = prop_box.row(align=True)
-                                row.label(text=text)
-                                row.prop(prop, "value", text="")
+            # Same box as Game Components: Smart Component fields, warnings,
+            # draw_ui and Editor buttons.
+            from bl_ui.properties_game import draw_component_body
+            draw_component_body(box, ob, c, i)

@@ -75,99 +75,106 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
             row.operator("logic.python_component_move_down", icon="TRIA_DOWN", text="").index = i
             row = row.row(align=0)
             row.operator("logic.python_component_remove", text="", icon='X').index = i
-            lastHeader = None
-
-            # Smart Components: errors, on_change warnings and Editor buttons.
-            error, warnings, buttons, editor = _component_editor_info(c)
-            if error:
-                row = box.row()
-                row.alert = True
-                row.label(text=error, icon="CANCEL")
-            cbox = box
-
-            only_icons = len(c.properties) == 1 and c.properties[0].name == "C_Icons"
-            show_fields = getattr(editor, "fields", True) is not False
-            if show_fields and not only_icons and c.show_expanded and len(c.properties) > 0:
-                expanded  = True
-                collapsed = True
-                box = box.box().column()
-                armature=""
-
-                for prop in c.properties:
-                    if prop.name[:8] == "C_Header":
-                        row = box.row()
-                        expanded  = prop.value
-                        collapsed = prop.value
-                        split=prop.name.split("/")
-                        name=split[1] if len(split) > 1 else "HEADER"
-                        icon=split[2] if len(split) > 2 else "FULLSCREEN"
-                        if icon not in _ui_icons():
-                            icon = "FULLSCREEN"   # unknown name: default icon instead of no header
-                        row.scale_y = 1.2
-                        try:
-                            row.prop(prop,"value", text=name, toggle=1, icon=icon, emboss=1)
-                        except:
-                            print(f"ERROR! Please check header: '{prop.name}' It needs to be like this 'C_Header/HeaderName/Icon'")
-                        continue
-
-                    elif prop.name[:10] == "C_Collapse" and collapsed:
-                        collapsed  = prop.value
-                        split=prop.name.split("/")
-                        name = " ".join(split[1]) if len(split) > 1 else "COLLAPSE"
-                        icon = split[2] if len(split) > 2 else "MOD_BOOLEAN"
-
-                        # LABEL
-                        row = box.row() ; row = box.row() ; row = box.row()
-                        row.prop(prop,"value",text=name,toggle=1,emboss=0 if collapsed else 1, icon=icon)
-                        row.scale_y = 0.9
-
-                        # SEPARATOR
-                        row = box.row()
-                        row.prop(prop,"value",text=" ",toggle=1,emboss=1)
-                        row.scale_y = 0.2
-                        row.enabled = False
-
-                        if collapsed: row = box.row() ; row = box.row() ; row = box.row() ; row = box.row() ; row = box.row()
-                        continue
-                    else:
-                        if expanded and collapsed: row = box.row()
-                    text=prop.name
-
-                    try:
-                        if expanded and collapsed:
-                            split = prop.name.split("/") if "@" in prop.name else [prop.name]
-                            if len(split)>1: text=split[1]+":"
-
-                            if not prop.name=="C_Icons": 
-                                row.label(text=text, icon="DOT")
-                                col = row.column()
-                                # Range.args: Float/Int with min and max draw a slider.
-                                col.prop(prop, "value", text="", slider=prop.use_slider)
-                                warning = warnings.get(prop.name)
-                                if warning:
-                                    box.row().label(text=warning, icon="ERROR")
-                    except:
-                        if expanded and collapsed:
-                            row.label(text=text)
-                            col = row.column()
-                            col.prop(prop, "value", text="")
-
-            if editor is not None and hasattr(editor, "draw_ui") and c.show_expanded:
-                import range_component_editor as rce
-                failed = rce.draw_ui(cbox.column(), ob, c)
-                if failed and not error:
-                    row = cbox.row()
-                    row.alert = True
-                    row.label(text=failed, icon="CANCEL")
-
-            if buttons and c.show_expanded:
-                col = cbox.column(align=True)
-                for b in buttons:
-                    op = col.operator("logic.component_editor_button", text=b[0], icon=b[2])
-                    op.index = i
-                    op.method = b[1]
+            draw_component_body(box, ob, c, i)
 
         layout.operator("wm.flowmenu_ot_init", text="Add...", icon="PLUS")
+
+
+def draw_component_body(box, ob, c, i):
+    """Fields, warnings, draw_ui and buttons of a component box.
+
+    Shared by Game Components and the flowmenu Object's Components panel."""
+    lastHeader = None
+
+    # Smart Components: errors, on_change warnings and Editor buttons.
+    error, warnings, buttons, editor = _component_editor_info(c)
+    if error:
+        row = box.row()
+        row.alert = True
+        row.label(text=error, icon="CANCEL")
+    cbox = box
+
+    only_icons = len(c.properties) == 1 and c.properties[0].name == "C_Icons"
+    show_fields = getattr(editor, "fields", True) is not False
+    if show_fields and not only_icons and c.show_expanded and len(c.properties) > 0:
+        expanded  = True
+        collapsed = True
+        box = box.box().column()
+        armature=""
+
+        for prop in c.properties:
+            if prop.name[:8] == "C_Header":
+                row = box.row()
+                expanded  = prop.value
+                collapsed = prop.value
+                split=prop.name.split("/")
+                name=split[1] if len(split) > 1 else "HEADER"
+                icon=split[2] if len(split) > 2 else "FULLSCREEN"
+                if icon not in _ui_icons():
+                    icon = "FULLSCREEN"   # unknown name: default icon instead of no header
+                row.scale_y = 1.2
+                try:
+                    row.prop(prop,"value", text=name, toggle=1, icon=icon, emboss=1)
+                except:
+                    print(f"ERROR! Please check header: '{prop.name}' It needs to be like this 'C_Header/HeaderName/Icon'")
+                continue
+
+            elif prop.name[:10] == "C_Collapse" and collapsed:
+                collapsed  = prop.value
+                split=prop.name.split("/")
+                name = " ".join(split[1]) if len(split) > 1 else "COLLAPSE"
+                icon = split[2] if len(split) > 2 else "MOD_BOOLEAN"
+
+                # LABEL
+                row = box.row() ; row = box.row() ; row = box.row()
+                row.prop(prop,"value",text=name,toggle=1,emboss=0 if collapsed else 1, icon=icon)
+                row.scale_y = 0.9
+
+                # SEPARATOR
+                row = box.row()
+                row.prop(prop,"value",text=" ",toggle=1,emboss=1)
+                row.scale_y = 0.2
+                row.enabled = False
+
+                if collapsed: row = box.row() ; row = box.row() ; row = box.row() ; row = box.row() ; row = box.row()
+                continue
+            else:
+                if expanded and collapsed: row = box.row()
+            text=prop.name
+
+            try:
+                if expanded and collapsed:
+                    split = prop.name.split("/") if "@" in prop.name else [prop.name]
+                    if len(split)>1: text=split[1]+":"
+
+                    if not prop.name=="C_Icons": 
+                        row.label(text=text, icon="DOT")
+                        col = row.column()
+                        # Range.args: Float/Int with min and max draw a slider.
+                        col.prop(prop, "value", text="", slider=prop.use_slider)
+                        warning = warnings.get(prop.name)
+                        if warning:
+                            box.row().label(text=warning, icon="ERROR")
+            except:
+                if expanded and collapsed:
+                    row.label(text=text)
+                    col = row.column()
+                    col.prop(prop, "value", text="")
+
+    if editor is not None and hasattr(editor, "draw_ui") and c.show_expanded:
+        import range_component_editor as rce
+        failed = rce.draw_ui(cbox.column(), ob, c)
+        if failed and not error:
+            row = cbox.row()
+            row.alert = True
+            row.label(text=failed, icon="CANCEL")
+
+    if buttons and c.show_expanded:
+        col = cbox.column(align=True)
+        for b in buttons:
+            op = col.operator("logic.component_editor_button", text=b[0], icon=b[2])
+            op.index = i
+            op.method = b[1]
 
 
 def _ui_icons():
