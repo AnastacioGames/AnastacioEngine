@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Release 0.5.4 (Linux, montada e testada; não publicada)
+
+- Causa do WEB-PKG-001 da 0.5.3 Linux: no build Web feito no Linux o `PYTHON_EXECUTABLE` fica `NOTFOUND`, então o
+  POST_BUILD que regenera `RangeRuntime.manifest.json` não era criado. `blenderplayer/CMakeLists.txt` agora cai
+  no `python3` do sistema (`WEB_MANIFEST_PYTHON`). Conferido: apagar o `.wasm` e relinkar regenera o manifesto.
+- Versão 0.5.4 (`ANASTACIO_VERSION_STRING`, About, scripts de release). Runtime Web recompilado; pacotes
+  `AnastacioEngine-0.5.4-linux-x86_64.tar.xz` e `RangeArmor-0.5.4-linux-x86_64.tar.xz` em `build-linux/dist/`.
+  Notas em `docs/release-notes-0.5.4.md`. A publicação no GitHub fica para quando houver mais mudanças.
+- Testes no pacote extraído: manifesto Web confere; Export Web pelo editor (`validate-web.py --export`) sem
+  problemas; `tools/test_*.py` OK (os dois de atlas com janela não rodaram); `AnastacioRuntime --server` roda a
+  cena; painel RangeArmor sem biblioteca faltando (glibc máx. 2.30). Sem teste no navegador (máquina sem Node).
+
 ## 2026-10-20 - Build Linux no container mais rápido
 
 - `tools/linux/container-build.sh` é o jeito normal: gera (uma vez) a imagem `anastacio-build:22.04-<hash>` do
