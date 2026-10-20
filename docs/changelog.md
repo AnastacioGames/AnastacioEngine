@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Export Game (1 Click) no Linux acha um Python
+
+- O pacote Linux (0.5.2 e 0.5.3) leva `2.79/python/lib/python3.11`, mas não `2.79/python/bin/python3.11`; o
+  "Get RanGE" copia a mesma pasta, então o 1 Click parava com "Could not find a Python interpreter".
+  `_resolve_python` (`bl_operators/wm.py`) mantém os caminhos do `config.json` e, só no Linux e se nenhum
+  existir, usa `/opt/anastacio-python311/bin/python3.11` e depois o `python3` do sistema.
+- Teste no pacote 0.5.3 extraído (projeto limpo, `logic-bricks-2-tutorial.blend` como `data/game.range`, sem
+  Python posto à mão): build Linux64 ok; jogo copiado para fora do projeto roda sem erro no log.
+- O `python3.11` passou a ir no pacote (`package-runtime.sh`); o fallback acima fica só como reserva.
+
 ## 2026-10-20 - Template "04 Smart Component" no Text Editor
 
 - `templates_components/04_smart_component.py`: o Perseguidor do exemplo num arquivo só, com o cabeçalho

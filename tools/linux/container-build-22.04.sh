@@ -66,4 +66,5 @@ grep -q "$pkg/2.79/datafiles/icons_upbge/" /tmp/pkg-list.txt
 grep -q "$pkg/2.79/datafiles/icons_blender5/" /tmp/pkg-list.txt
 grep -q "$pkg/2.79/datafiles/sounds/effects/trovao1.wav" /tmp/pkg-list.txt
 grep -q "$pkg/2.79/scripts/modules/anastacio_network/" /tmp/pkg-list.txt
+grep -q "$pkg/2.79/python/bin/python3.11" /tmp/pkg-list.txt
 if grep -q "Range_Components_Label.rar" /tmp/pkg-list.txt; then exit 1; fi

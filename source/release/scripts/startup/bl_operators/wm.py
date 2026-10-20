@@ -3038,6 +3038,14 @@ class WM_OT_one_click_export_rangearmor(Operator):
         if os.path.isfile(bundled):
             return bundled
 
+        # Reserva no Linux se o pacote vier sem bin/python3.11: Python da maquina de build ou python3 do sistema.
+        if cur_os == "Linux":
+            import shutil
+            for candidate in ("/opt/anastacio-python311/bin/python3.11",
+                              shutil.which("python3")):
+                if candidate and os.path.isfile(candidate):
+                    return candidate
+
         return None
 
     def execute(self, context):
