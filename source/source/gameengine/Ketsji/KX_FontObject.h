@@ -34,12 +34,26 @@
 
 #include "KX_GameObject.h"
 
+#include <string>
 #include <unordered_map>
 #include <vector>
 
 class RAS_BoundingBox;
 struct Curve;
 struct GPUTexture;
+
+/// Current language for game text (filled by the range_locale Python module, Range.locale).
+struct KX_LocaleState {
+	/// translation key -> text in the current language (fallbacks already resolved).
+	std::unordered_map<std::string, std::string> table;
+	/// Font (VFont name) and atlas (text Curve name) of the language; empty: the text's own.
+	std::string font;
+	std::string atlas;
+	/// Bumped on every change; texts compare it with their own copy.
+	unsigned int version = 0;
+};
+KX_LocaleState& KX_GetLocale();
+void KX_ResetLocale();
 
 class KX_FontObject : public KX_GameObject
 {
@@ -77,6 +91,8 @@ public:
 	void UpdateTextFromProperty();
 	/// Return text dimensions in blender unit.
 	const mt::vec2 GetTextDimensions();
+	/// Take the current language (Range.locale) when it changed since the last call.
+	void UpdateLocale();
 
 protected:
 	// similar to rna_curve -> prop_align_items
@@ -130,11 +146,26 @@ protected:
 	GPUTexture *m_atlasTexture;
 	bool m_atlasTextureTried;
 
+	/// Curve whose bitmap atlas is drawn (the text's own, or another one set by language/Python).
+	Curve *m_atlasCurve;
+
+	/// Range.locale: translation key, follow the language font and last language version applied.
+	std::string m_localeKey;
+	bool m_localeFont;
+	unsigned int m_localeVersion;
+
 	bool UseAtlas() const
 	{
 		return !m_atlasLookup.empty();
 	}
 	void BuildAtlasQuads();
+	/// Draw with the atlas of cu (nullptr: no atlas, font glyphs).
+	void SetAtlasCurve(Curve *cu);
+	/// Load the font of vfont (nullptr: the text's own).
+	void SetVFont(struct VFont *vfont);
+	/// Set the text like Python text does (through the "Text" property when present).
+	void SetTextOrProperty(const std::string& text);
+	void ApplyLocale();
 	void GetTextAabb(mt::vec2& min, mt::vec2& max);
 
 #ifdef WITH_PYTHON
@@ -147,6 +178,14 @@ protected:
 	static int pyattr_set_shadow_offset(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_shadow_color(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_shadow_color(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_atlas(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_atlas(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_locale_key(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_locale_key(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_locale_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_locale_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 #endif
 };
 

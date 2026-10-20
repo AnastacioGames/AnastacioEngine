@@ -95,6 +95,7 @@ extern "C" {
 #include "KX_DynamicActuator.h"
 #include "KX_GameActuator.h"
 #include "KX_KetsjiEngine.h"
+#include "KX_FontObject.h"
 #include "KXImgui/KX_PythonImgui.h"
 #include "KX_MouseActuator.h"
 #include "KX_MovementSensor.h"
@@ -1267,7 +1268,48 @@ static PyObject *gPyNextFrame(PyObject *, PyObject *Py_UNUSED(ignored))
 }
 
 
+PyDoc_STRVAR(gPySetLocale_doc,
+"_setLocale(table, font, atlas)\n"
+"Internal (used by Range.locale): texts of the current language by translation key,\n"
+"and the font / atlas names for the texts that follow the language font.");
+static PyObject *gPySetLocale(PyObject *, PyObject *args)
+{
+	PyObject *table;
+	const char *font = "";
+	const char *atlas = "";
+	if (!PyArg_ParseTuple(args, "O!|ss:_setLocale", &PyDict_Type, &table, &font, &atlas)) {
+		return nullptr;
+	}
+	std::unordered_map<std::string, std::string> map;
+	PyObject *key, *value;
+	Py_ssize_t pos = 0;
+	while (PyDict_Next(table, &pos, &key, &value)) {
+		if (!PyUnicode_Check(key) || !PyUnicode_Check(value)) {
+			PyErr_SetString(PyExc_TypeError, "_setLocale: table must map str to str");
+			return nullptr;
+		}
+		map[_PyUnicode_AsString(key)] = _PyUnicode_AsString(value);
+	}
+	KX_LocaleState& locale = KX_GetLocale();
+	locale.table.swap(map);
+	locale.font = font;
+	locale.atlas = atlas;
+	++locale.version;
+	// Now, not at the next draw: scripts read the new text and dimensions right away.
+	if (KX_KetsjiEngine *engine = KX_GetActiveEngine()) {
+		for (KX_Scene *scene : engine->CurrentScenes()) {
+			for (KX_GameObject *gameobj : scene->GetObjectList()) {
+				if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_TEXT) {
+					static_cast<KX_FontObject *>(gameobj)->UpdateLocale();
+				}
+			}
+		}
+	}
+	Py_RETURN_NONE;
+}
+
 static struct PyMethodDef game_methods[] = {
+	{"_setLocale", (PyCFunction)gPySetLocale, METH_VARARGS, (const char *)gPySetLocale_doc},
 	{"expandPath", (PyCFunction)gPyExpandPath, METH_VARARGS, (const char *)gPyExpandPath_doc},
 	{"startGame", (PyCFunction)gPyStartGame, METH_VARARGS, (const char *)gPyStartGame_doc},
 	{"endGame", (PyCFunction)gPyEndGame, METH_NOARGS, (const char *)gPyEndGame_doc},
@@ -3119,11 +3161,33 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 	PyModule_AddObject(gameLogic, "globalDict", pyGlobalDict);
 	Py_INCREF(pyGlobalDict);
 
+	// Range.locale: game localization, pure Python in scripts/modules/range_locale.py.
+	KX_ResetLocale();
+	if (PyObject *localeMod = PyImport_ImportModule("range_locale")) {
+		PyObject *rangeMod = PyDict_GetItemString(modules, "Range");
+		if (rangeMod) {
+			Py_INCREF(localeMod);
+			PyModule_AddObject(rangeMod, "locale", localeMod);
+		}
+		PyObject *ret = PyObject_CallMethod(localeMod, "_start", nullptr);
+		if (ret) {
+			Py_DECREF(ret);
+		}
+		else {
+			PyErr_Print();
+		}
+		Py_DECREF(localeMod);
+	}
+	else {
+		PyErr_Print();
+	}
+
 	KX_Python_InstallConsoleRedirect();
 }
 
 void exitGamePython()
 {
+	KX_ResetLocale();
 	restoreObjectConvertFlags();
 	KX_Python_RestoreConsoleRedirect();
 

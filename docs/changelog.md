@@ -6,6 +6,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Idiomas do jogo (Range.locale) e atlas de texto
+
+- `Range.locale` (puro Python, `scripts/modules/range_locale.py`, ligado pelo `initGamePython`): tabela
+  `//locale/translations.csv` (key + uma coluna por idioma BCP 47; colunas `context`/`note`/`_x` ignoradas) e
+  `//locale/locale.json` (base, nomes, `font`/`atlas` por idioma; `atlas: "-"` = sem atlas). Reserva
+  `pt-BR → pt → base → chave`; `tr(key, **fmt)`; idioma do sistema na 1ª abertura; escolha em
+  `globalDict["locale.language"]`; `onChange`.
+- Curve: `locale_key[64]` (Translation Key) e flag `CU_LOCALE_FONT` (Language Font). `KX_FontObject` aplica o
+  idioma na hora (`Range.logic._setLocale` percorre as cenas), no `ProcessReplica` e no desenho; atlas vem de
+  `m_atlasCurve` (próprio ou de outro Curve). Python novo: `font`, `atlas`, `translationKey`, `useLanguageFont`.
+- Editor: painel Text ▸ Translation e Scene ▸ Localization (`bl_operators/anastacio_locale.py`): criar/abrir
+  a tabela, chaves a partir dos textos, `Generate Language Atlases` (Curve `LocaleAtlas_<código>` com fake user,
+  só as letras da coluna + dígitos/pontuação).
+- Bitmap Atlas: "Generate from Font" não gera .json (dados ficam no .range); botões Show JSON (Text Editor),
+  Open Folder e Copy Atlas to Selected; Load aceita `X.json` + `X.png`.
+- Testado com `--server` (cena gerada): troca de texto/atlas, reserva, `addObject` já traduzido, normalização.
+  Sem teste com janela ainda.
+- RolimaRacer migrado: `Tools/migrar_idiomas.py` gerou a tabela (129 chaves), `_language.py` virou ponte
+  (mesmos textos conferidos chave a chave), `Language Font` em 169 textos, russo com Roboto-Regular.
+
 ## 2026-10-19 - Fresnel, Z Offset e Shadow Casting Alpha no modo Game
 
 - Fresnel da transparência (`raytrace_transparency.fresnel`/`fresnel_factor`): mesma fórmula do Blender Internal

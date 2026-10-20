@@ -38,6 +38,8 @@
 #include "KX_Globals.h"
 #include "KX_PythonInit.h"
 #include "KX_PyMath.h"
+#include "KX_KetsjiEngine.h"
+#include "BL_Converter.h"
 #include "BLI_math.h"
 #include "EXP_StringValue.h"
 #include "RAS_Rasterizer.h"
@@ -66,6 +68,57 @@ extern "C" {
 
 /* proptotype */
 int GetFontId(VFont *font);
+
+KX_LocaleState& KX_GetLocale()
+{
+	static KX_LocaleState state;
+	return state;
+}
+
+void KX_ResetLocale()
+{
+	KX_LocaleState& locale = KX_GetLocale();
+	locale.table.clear();
+	locale.font.clear();
+	locale.atlas.clear();
+	++locale.version;
+}
+
+/// Datablock by name (without the 2 letter ID code) in the game file, then in libloaded files.
+static ID *find_game_id(const std::string& name, ListBase *(*base)(Main *))
+{
+	if (ID *id = (ID *)BLI_findstring(base(G.main), name.c_str(), offsetof(ID, name) + 2)) {
+		return id;
+	}
+	KX_KetsjiEngine *engine = KX_GetActiveEngine();
+	BL_Converter *converter = engine ? engine->GetConverter() : nullptr;
+	if (converter) {
+		for (Main *maggie : converter->GetMainList()) {
+			if (maggie != G.main) {
+				if (ID *id = (ID *)BLI_findstring(base(maggie), name.c_str(), offsetof(ID, name) + 2)) {
+					return id;
+				}
+			}
+		}
+	}
+	return nullptr;
+}
+
+static ListBase *main_vfonts(Main *bmain)
+{
+	return &bmain->vfont;
+}
+
+static ListBase *main_curves(Main *bmain)
+{
+	return &bmain->curve;
+}
+
+static bool curve_has_atlas(const Curve *cu)
+{
+	return cu && (cu->flag & CU_BITMAP_ATLAS) && cu->atlas_image && cu->atlas_glyphs &&
+	       cu->atlas_count > 0 && cu->atlas_size > 0.0f && cu->atlas_cell > 0.0f;
+}
 
 static std::vector<std::string> split_string(std::string str)
 {
@@ -100,17 +153,15 @@ KX_FontObject::KX_FontObject(void *sgReplicationInfo,
 	m_do_color_management(do_color_management),
 	m_curve(static_cast<Curve *>(ob->data)),
 	m_atlasTexture(nullptr),
-	m_atlasTextureTried(false)
+	m_atlasTextureTried(false),
+	m_atlasCurve(nullptr),
+	m_localeVersion(0)
 {
 	Curve *text = static_cast<Curve *> (ob->data);
 
-	if ((text->flag & CU_BITMAP_ATLAS) && text->atlas_image && text->atlas_glyphs &&
-	    text->atlas_count > 0 && text->atlas_size > 0.0f && text->atlas_cell > 0.0f)
-	{
-		for (int i = 0; i < text->atlas_count; ++i) {
-			m_atlasLookup[(unsigned int)text->atlas_glyphs[i].code] = i;
-		}
-	}
+	SetAtlasCurve(text);
+	m_localeKey = text->locale_key;
+	m_localeFont = (text->flag & CU_LOCALE_FONT) != 0;
 	m_fsize = text->fsize;
 	m_line_spacing = text->linedist;
 	m_offset = mt::vec3(text->xof, text->yof, 0.0f);
@@ -159,6 +210,8 @@ void KX_FontObject::ProcessReplica()
 	}
 
 	m_boundingBox = m_boundingBox->GetReplica();
+	// Added objects: the template (inactive layer) may still have an older language.
+	UpdateLocale();
 }
 
 void KX_FontObject::AddMeshUser()
@@ -174,9 +227,98 @@ void KX_FontObject::AddMeshUser()
 	m_meshUser->NewMeshSlot(arrayBucket);
 }
 
+void KX_FontObject::SetAtlasCurve(Curve *cu)
+{
+	m_atlasLookup.clear();
+	m_atlasCurve = curve_has_atlas(cu) ? cu : nullptr;
+	if (m_atlasCurve) {
+		for (int i = 0; i < cu->atlas_count; ++i) {
+			m_atlasLookup[(unsigned int)cu->atlas_glyphs[i].code] = i;
+		}
+	}
+	// The GPU texture is cached on the Image: only fetch it again at the next draw.
+	m_atlasTexture = nullptr;
+	m_atlasTextureTried = false;
+}
+
+void KX_FontObject::SetVFont(VFont *vfont)
+{
+	if (!vfont) {
+		vfont = m_curve->vfont;
+	}
+	const int fontid = vfont ? GetFontId(vfont) : -1;
+	if (fontid == -1) {
+		return;
+	}
+	if (m_fontid != -1) {
+		BLF_unload_id(m_fontid);
+	}
+	m_fontid = fontid;
+}
+
+void KX_FontObject::SetTextOrProperty(const std::string& text)
+{
+	/* Allow for some logic brick control */
+	EXP_Value *tprop = GetProperty("Text");
+	if (tprop) {
+		EXP_Value *newstringprop = new EXP_StringValue(text, "Text");
+		SetProperty("Text", newstringprop);
+		newstringprop->Release();
+	}
+	else {
+		SetText(text);
+	}
+}
+
+void KX_FontObject::UpdateLocale()
+{
+	if ((!m_localeKey.empty() || m_localeFont) && m_localeVersion != KX_GetLocale().version) {
+		ApplyLocale();
+	}
+}
+
+void KX_FontObject::ApplyLocale()
+{
+	const KX_LocaleState& locale = KX_GetLocale();
+	m_localeVersion = locale.version;
+
+	if (m_localeFont) {
+		VFont *vfont = locale.font.empty() ? nullptr : (VFont *)find_game_id(locale.font, main_vfonts);
+		if (!locale.font.empty() && !vfont) {
+			CM_Warning("Range.locale: font \"" << locale.font << "\" not found in the game file");
+		}
+		SetVFont(vfont);
+
+		Curve *atlas = m_curve;
+		if (locale.atlas == "-") {
+			atlas = nullptr;
+		}
+		else if (!locale.atlas.empty()) {
+			atlas = (Curve *)find_game_id(locale.atlas, main_curves);
+			if (!curve_has_atlas(atlas)) {
+				CM_Warning("Range.locale: atlas \"" << locale.atlas << "\" not found (text data with a bitmap atlas)");
+				atlas = nullptr;
+			}
+		}
+		SetAtlasCurve(atlas);
+	}
+
+	if (!m_localeKey.empty()) {
+		const auto it = locale.table.find(m_localeKey);
+		if (it != locale.table.end()) {
+			SetTextOrProperty(it->second);
+			return;
+		}
+	}
+	// New font/atlas: the glyphs and the alignment change.
+	SetText(m_text);
+}
+
 void KX_FontObject::UpdateBuckets()
 {
 	RAS_TextUser *textUser = static_cast<RAS_TextUser *>(m_meshUser);
+
+	UpdateLocale();
 
 	// Update datas and add mesh slot to be rendered only if the object is not culled.
 	if (m_sgNode->IsDirty(SG_Node::DIRTY_RENDER)) {
@@ -224,17 +366,17 @@ void KX_FontObject::UpdateBuckets()
 		iuser.ok = 1;
 		iuser.frames = 1;
 		iuser.sfra = 1;
-		m_atlasTexture = GPU_texture_from_blender(m_curve->atlas_image, &iuser, GL_TEXTURE_2D, false, 0.0, true);
+		m_atlasTexture = GPU_texture_from_blender(m_atlasCurve->atlas_image, &iuser, GL_TEXTURE_2D, false, 0.0, true);
 		m_atlasTextureTried = true;
 	}
 	textUser->SetAtlas(m_atlasTexture, m_atlasTexture ? &m_atlasQuads : nullptr,
-	                  (m_curve->flag & CU_ATLAS_HARD_EDGE) != 0);
+	                  m_atlasCurve && (m_atlasCurve->flag & CU_ATLAS_HARD_EDGE) != 0);
 	textUser->ActivateMeshSlots();
 }
 
 void KX_FontObject::BuildAtlasQuads()
 {
-	const Curve *cu = m_curve;
+	const Curve *cu = m_atlasCurve;
 	// Atlas pixels to text space: the font em (atlas_size) maps to the Size of the text.
 	const float s = m_fsize / cu->atlas_size;
 	const float cell = cu->atlas_cell * s;
@@ -510,9 +652,113 @@ PyAttributeDef KX_FontObject::Attributes[] = {
     EXP_PYATTRIBUTE_RW_FUNCTION("useShadows", KX_FontObject, pyattr_get_use_shadows, pyattr_set_use_shadows),
     EXP_PYATTRIBUTE_RW_FUNCTION("shadowOffset", KX_FontObject, pyattr_get_shadow_offset, pyattr_set_shadow_offset),
     EXP_PYATTRIBUTE_RW_FUNCTION("shadowColor", KX_FontObject, pyattr_get_shadow_color, pyattr_set_shadow_color),
+	EXP_PYATTRIBUTE_RW_FUNCTION("font", KX_FontObject, pyattr_get_font, pyattr_set_font),
+	EXP_PYATTRIBUTE_RW_FUNCTION("atlas", KX_FontObject, pyattr_get_atlas, pyattr_set_atlas),
+	EXP_PYATTRIBUTE_RW_FUNCTION("translationKey", KX_FontObject, pyattr_get_locale_key, pyattr_set_locale_key),
+	EXP_PYATTRIBUTE_RW_FUNCTION("useLanguageFont", KX_FontObject, pyattr_get_locale_font, pyattr_set_locale_font),
 	/* EXP_PYATTRIBUTE_INT_RW("dpi", 0, 10000, false, KX_FontObject, m_dpi), */// no real need for expose this I think
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
+
+PyObject *KX_FontObject::pyattr_get_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	VFont *vfont = self->m_curve->vfont;
+	if (!vfont) {
+		Py_RETURN_NONE;
+	}
+	return PyUnicode_FromString(vfont->id.name + 2);
+}
+
+int KX_FontObject::pyattr_set_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	VFont *vfont = nullptr;
+	if (value != Py_None) {
+		if (!PyUnicode_Check(value)) {
+			PyErr_SetString(PyExc_TypeError, "KX_FontObject.font = str: name of a font in the game file, or None");
+			return PY_SET_ATTR_FAIL;
+		}
+		vfont = (VFont *)find_game_id(_PyUnicode_AsString(value), main_vfonts);
+		if (!vfont) {
+			PyErr_Format(PyExc_ValueError, "KX_FontObject.font: no font named \"%s\" in the game file "
+			             "(the font name shown in the Text properties)", _PyUnicode_AsString(value));
+			return PY_SET_ATTR_FAIL;
+		}
+	}
+	self->SetVFont(vfont);
+	self->SetText(self->m_text);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_FontObject::pyattr_get_atlas(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	if (!self->m_atlasCurve) {
+		Py_RETURN_NONE;
+	}
+	return PyUnicode_FromString(self->m_atlasCurve->id.name + 2);
+}
+
+int KX_FontObject::pyattr_set_atlas(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	Curve *cu = nullptr;
+	if (value != Py_None) {
+		if (!PyUnicode_Check(value)) {
+			PyErr_SetString(PyExc_TypeError, "KX_FontObject.atlas = str: name of the text data holding a "
+			                "bitmap atlas, \"\" for the own atlas, or None for no atlas");
+			return PY_SET_ATTR_FAIL;
+		}
+		const std::string name = _PyUnicode_AsString(value);
+		cu = name.empty() ? self->m_curve : (Curve *)find_game_id(name, main_curves);
+		if (!name.empty() && !curve_has_atlas(cu)) {
+			PyErr_Format(PyExc_ValueError, "KX_FontObject.atlas: no text data named \"%s\" with a bitmap atlas",
+			             name.c_str());
+			return PY_SET_ATTR_FAIL;
+		}
+	}
+	self->SetAtlasCurve(cu);
+	self->SetText(self->m_text);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_FontObject::pyattr_get_locale_key(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	return PyUnicode_FromStdString(self->m_localeKey);
+}
+
+int KX_FontObject::pyattr_set_locale_key(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	if (!PyUnicode_Check(value)) {
+		PyErr_SetString(PyExc_TypeError, "KX_FontObject.translationKey = str");
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_localeKey = _PyUnicode_AsString(value);
+	self->m_localeVersion = KX_GetLocale().version - 1;  // apply at the next draw
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_FontObject::pyattr_get_locale_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	return PyBool_FromLong(self->m_localeFont);
+}
+
+int KX_FontObject::pyattr_set_locale_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	const int param = PyObject_IsTrue(value);
+	if (param == -1) {
+		PyErr_SetString(PyExc_TypeError, "KX_FontObject.useLanguageFont = bool");
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_localeFont = param;
+	self->m_localeVersion = KX_GetLocale().version - 1;
+	return PY_SET_ATTR_SUCCESS;
+}
 
 PyObject *KX_FontObject::pyattr_get_text(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
@@ -526,18 +772,7 @@ int KX_FontObject::pyattr_set_text(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBU
 	if (!PyUnicode_Check(value)) {
 		return PY_SET_ATTR_FAIL;
 	}
-	const char *chars = _PyUnicode_AsString(value);
-
-	/* Allow for some logic brick control */
-	EXP_Value *tprop = self->GetProperty("Text");
-	if (tprop) {
-		EXP_Value *newstringprop = new EXP_StringValue(std::string(chars), "Text");
-		self->SetProperty("Text", newstringprop);
-		newstringprop->Release();
-	}
-	else {
-		self->SetText(std::string(chars));
-	}
+	self->SetTextOrProperty(_PyUnicode_AsString(value));
 
 	return PY_SET_ATTR_SUCCESS;
 }

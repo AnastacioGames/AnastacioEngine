@@ -1092,6 +1092,20 @@ static void rna_def_font(BlenderRNA *UNUSED(brna), StructRNA *srna)
 	                         "the font (missing glyphs fall back to the font)");
 	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
 
+	prop = RNA_def_property(srna, "locale_key", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "locale_key");
+	RNA_def_property_ui_text(prop, "Translation Key",
+	                         "Key of this text in the project translation table (locale/translations.csv): "
+	                         "in game the text shows the current language (empty: not translated)");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
+	prop = RNA_def_property(srna, "use_locale_font", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_LOCALE_FONT);
+	RNA_def_property_ui_text(prop, "Language Font",
+	                         "In game, use the font and bitmap atlas set for the current language "
+	                         "(locale/locale.json), e.g. a Cyrillic font for Russian");
+	RNA_def_property_update(prop, 0, "rna_Curve_update_data");
+
 	prop = RNA_def_property(srna, "use_atlas_hard_edge", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", CU_ATLAS_HARD_EDGE);
 	RNA_def_property_ui_text(prop, "Hard Edge",

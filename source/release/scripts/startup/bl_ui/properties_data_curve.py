@@ -472,6 +472,32 @@ class DATA_PT_text_panel_category(Panel):
         row.prop(context.window_manager, "ae_text_panel_category", expand=True)
 
 
+def draw_locale_project(layout):
+    """Project-wide localization buttons (Scene > Localization and Text > Translation)."""
+    import bpy
+    import os
+    path = bpy.path.abspath("//locale/translations.csv")
+    col = layout.column(align=True)
+    if not bpy.data.filepath:
+        col.label(text="Save the .range to use locale/translations.csv", icon='INFO')
+        return
+    if os.path.isfile(path):
+        try:
+            import range_locale
+            rows, langs = range_locale._read_csv(path)
+            col.label(text="%d keys: %s" % (len(rows), ", ".join(langs)), icon='FILE_TEXT')
+        except Exception as ex:
+            col.label(text="translations.csv: %s" % ex, icon='ERROR')
+        row = col.row(align=True)
+        row.operator("locale.table_open", text="Open Table", icon='TEXT').file = 'CSV'
+        row.operator("locale.table_open", text="locale.json", icon='SETTINGS').file = 'CONFIG'
+        row.operator("locale.folder_open", text="", icon='FILE_FOLDER')
+        col.operator("locale.table_create", text="Add Missing Keys", icon='FILE_REFRESH')
+        col.operator("locale.atlases_generate", icon='IMAGE_DATA')
+    else:
+        col.operator("locale.table_create", text="Create Translation Table", icon='NEW')
+
+
 class GameTextPanel(CurveButtonsPanel):
     """Game Text tab: only what KX_FontObject uses when the game runs."""
 
@@ -490,6 +516,34 @@ class DATA_PT_game_text_font(GameTextPanel, Panel):
         box.label(text="Font:", icon="FONT_DATA")
         box.template_ID(text, "font", open="font.open", unlink="font.unlink")
         box.prop(text, "size", text="Size")
+
+
+class DATA_PT_game_text_translation(GameTextPanel, Panel):
+    bl_label = "Translation"
+
+    def draw(self, context):
+        text = context.curve
+        box = self.layout.box()
+        box.label(text="Translation:", icon="WORLD")
+        col = box.column()
+        col.prop(text, "locale_key")
+        col.prop(text, "use_locale_font")
+        if text.locale_key:
+            try:
+                import range_locale
+                import bpy
+                import os
+                path = bpy.path.abspath("//locale/translations.csv")
+                if os.path.isfile(path):
+                    rows, _ = range_locale._read_csv(path)
+                    if text.locale_key not in rows:
+                        col.label(text="Key not in translations.csv", icon='ERROR')
+            except Exception:
+                pass
+        col.operator("locale.keys_from_text", icon='COPYDOWN')
+        box = self.layout.box()
+        box.label(text="Project:", icon="FILE_TEXT")
+        draw_locale_project(box)
 
 
 class DATA_PT_game_text_alignment(GameTextPanel, Panel):
@@ -550,7 +604,7 @@ class DATA_PT_game_text_shadow(GameTextPanel, Panel):
 
 
 class DATA_PT_game_text_viewport(GameTextPanel, Panel):
-    bl_label = "Viewport"
+    bl_label = "Viewport Preview Game Text"
 
     def draw(self, context):
         text = context.curve
@@ -566,6 +620,7 @@ class DATA_PT_game_text_viewport(GameTextPanel, Panel):
             # KX_FontObject uses the object color, not the material.
             box.label(text="Text Color:")
             box.prop(context.object, "color", text="")
+        box.operator("font.text_preview_copy_to_selected", icon='COPYDOWN')
 
 
 class DATA_PT_game_text_atlas(GameTextPanel, Panel):
@@ -596,7 +651,12 @@ class DATA_PT_game_text_atlas(GameTextPanel, Panel):
                 text.atlas_glyph_count, text.atlas_cell, text.atlas_size))
         else:
             col.label(text="Press Generate from Font, then edit the image and Reload", icon='INFO')
-        col.operator("font.text_atlas_import", text="Load atlas.json (tools/text_atlas.py)", icon='FILE_FOLDER')
+        col.operator("font.text_atlas_import", text="Load .json Atlas (tools/text_atlas.py)", icon='FILE_FOLDER')
+        if text.atlas_glyph_count:
+            row = col.row(align=True)
+            row.operator("font.text_atlas_show_json", text="Show JSON", icon='TEXT')
+            row.operator("font.text_atlas_open_folder", text="Open Folder", icon='FILE_FOLDER')
+            col.operator("font.text_atlas_copy_to_selected", icon='COPYDOWN')
 
 
 class DATA_PT_text_boxes(CurveButtonsPanelText, Panel):
@@ -654,6 +714,7 @@ classes = (
     DATA_PT_context_curve,
     DATA_PT_text_panel_category,
     DATA_PT_game_text_font,
+    DATA_PT_game_text_translation,
     DATA_PT_game_text_alignment,
     DATA_PT_game_text_spacing,
     DATA_PT_game_text_shadow,

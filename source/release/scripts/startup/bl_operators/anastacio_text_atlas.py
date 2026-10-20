@@ -27,9 +27,11 @@ def _text_curve(context):
 def _apply_atlas(cu, json_path):
     with open(json_path, encoding="utf-8") as f:
         data = json.load(f)
-    png = os.path.join(os.path.dirname(json_path), "atlas.png")
+    png = os.path.splitext(json_path)[0] + ".png"  # same name first (TextAtlas_X.json -> .png)
     if not os.path.isfile(png):
-        raise RuntimeError("atlas.png not found next to %s" % json_path)
+        png = os.path.join(os.path.dirname(json_path), "atlas.png")
+    if not os.path.isfile(png):
+        raise RuntimeError("no .png with the same name (or atlas.png) next to %s" % json_path)
 
     image = cu.atlas_image
     if image and os.path.normcase(bpy.path.abspath(image.filepath)) == os.path.normcase(png):
@@ -418,7 +420,8 @@ class FONT_OT_text_atlas_pack(Operator):
 
 
 class FONT_OT_text_atlas_import(Operator, ImportHelper):
-    """Load a bitmap atlas (atlas.json + atlas.png made by tools/text_atlas.py build) into this text"""
+    """Load a bitmap atlas from a .json file (atlas.json + atlas.png made by tools/text_atlas.py build, """ \
+        """or a .json with a .png of the same name) into this text. Generate from Font makes no .json"""
     bl_idname = "font.text_atlas_import"
     bl_label = "Load Bitmap Atlas"
     bl_options = {'REGISTER', 'UNDO'}
@@ -476,7 +479,149 @@ class FONT_OT_text_atlas_reload(Operator):
         return {'FINISHED'}
 
 
+def _atlas_dict(cu):
+    """The atlas of this text in the atlas.json format of tools/text_atlas.py."""
+    image = cu.atlas_image
+    w, h = image.size if image else (0, 0)
+    return {
+        "version": 1, "size": cu.atlas_size, "width": w, "height": h,
+        "cell": cu.atlas_cell, "padding": cu.atlas_padding,
+        "baseline": cu.atlas_baseline, "line_height": cu.atlas_line_height,
+        "image": bpy.path.abspath(image.filepath) if image and image.filepath else (image.name if image else ""),
+        "glyphs": [{"code": g.code, "u0": g.uv_min[0], "v0": g.uv_min[1],
+                    "u1": g.uv_max[0], "v1": g.uv_max[1], "advance": g.advance}
+                   for g in cu.atlas_glyphs],
+    }
+
+
+def _copy_atlas(src, dst):
+    dst.atlas_image = src.atlas_image
+    dst.atlas_glyphs_resize(len(src.atlas_glyphs))
+    for d, s in zip(dst.atlas_glyphs, src.atlas_glyphs):
+        d.code, d.uv_min, d.uv_max, d.advance = s.code, s.uv_min[:], s.uv_max[:], s.advance
+    for prop in ("atlas_size", "atlas_padding", "atlas_cell", "atlas_baseline",
+                 "atlas_line_height", "use_atlas_hard_edge", "use_bitmap_atlas"):
+        setattr(dst, prop, getattr(src, prop))
+    if JSON_KEY in src:
+        dst[JSON_KEY] = src[JSON_KEY]
+    elif JSON_KEY in dst:
+        del dst[JSON_KEY]
+
+
+class FONT_OT_text_atlas_copy_to_selected(Operator):
+    """Give this text's bitmap atlas (same image and glyphs) to all selected text objects"""
+    bl_idname = "font.text_atlas_copy_to_selected"
+    bl_label = "Copy Atlas to Selected"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        cu = _text_curve(context)
+        return cu is not None and cu.atlas_glyph_count > 0
+
+    def execute(self, context):
+        src = _text_curve(context)
+        done = set()
+        for ob in context.selected_objects:
+            if ob.type == 'FONT' and ob.data != src and ob.data not in done:
+                _copy_atlas(src, ob.data)
+                done.add(ob.data)
+        if not done:
+            self.report({'WARNING'}, "Select the other text objects too (this one active)")
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Bitmap atlas copied to %d texts" % len(done))
+        return {'FINISHED'}
+
+
+class FONT_OT_text_preview_copy_to_selected(Operator):
+    """Give this text's viewport preview settings (Preview Game Text, Hide Original Text, """         """Text Color) to all selected text objects"""
+    bl_idname = "font.text_preview_copy_to_selected"
+    bl_label = "Copy Preview to Selected"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None and context.object.type == 'FONT'
+
+    def execute(self, context):
+        src = context.object
+        count = 0
+        for ob in context.selected_objects:
+            if ob.type == 'FONT' and ob != src:
+                ob.data.use_game_text_preview = src.data.use_game_text_preview
+                ob.data.use_game_text_hide_curve = src.data.use_game_text_hide_curve
+                ob.color = src.color
+                count += 1
+        if not count:
+            self.report({'WARNING'}, "Select the other text objects too (this one active)")
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Preview settings copied to %d texts" % count)
+        return {'FINISHED'}
+
+
+class FONT_OT_text_atlas_show_json(Operator):
+    """Open the atlas data (atlas.json) in the Text Editor. """         """Atlases made by Generate from Font have no file: the data lives in the .range"""
+    bl_idname = "font.text_atlas_show_json"
+    bl_label = "Show atlas.json"
+
+    @classmethod
+    def poll(cls, context):
+        cu = _text_curve(context)
+        return cu is not None and (JSON_KEY in cu or cu.atlas_glyph_count > 0)
+
+    def execute(self, context):
+        cu = _text_curve(context)
+        path = bpy.path.abspath(cu[JSON_KEY]) if JSON_KEY in cu else ""
+        if path and os.path.isfile(path):
+            text = next((t for t in bpy.data.texts
+                         if t.filepath and os.path.normcase(bpy.path.abspath(t.filepath)) == os.path.normcase(path)), None)
+            if text is None:
+                text = bpy.data.texts.load(path)
+            else:
+                text.from_string(open(path, encoding="utf-8").read())
+        else:
+            name = "TextAtlas_%s.json" % cu.name
+            text = bpy.data.texts.get(name) or bpy.data.texts.new(name)
+            text.from_string(json.dumps(_atlas_dict(cu), indent=1, ensure_ascii=False))
+        shown = False
+        for area in context.screen.areas:
+            if area.type == 'TEXT_EDITOR':
+                area.spaces.active.text = text
+                shown = True
+                break
+        if shown:
+            self.report({'INFO'}, "%s open in the Text Editor" % text.name)
+        else:
+            self.report({'INFO'}, "%s created: open a Text Editor to see it" % text.name)
+        return {'FINISHED'}
+
+
+class FONT_OT_text_atlas_open_folder(Operator):
+    """Open the folder with the atlas files (atlas.json / PNG) in the file browser of the system"""
+    bl_idname = "font.text_atlas_open_folder"
+    bl_label = "Open Atlas Folder"
+
+    @classmethod
+    def poll(cls, context):
+        cu = _text_curve(context)
+        return cu is not None and (JSON_KEY in cu or (cu.atlas_image is not None and cu.atlas_image.filepath))
+
+    def execute(self, context):
+        cu = _text_curve(context)
+        path = cu[JSON_KEY] if JSON_KEY in cu else cu.atlas_image.filepath
+        folder = os.path.dirname(bpy.path.abspath(path))
+        if not os.path.isdir(folder):
+            self.report({'WARNING'}, "Folder not found: %s (press Edit Externally to write the PNG)" % folder)
+            return {'CANCELLED'}
+        bpy.ops.wm.path_open(filepath=folder)
+        return {'FINISHED'}
+
+
 classes = (
+    FONT_OT_text_preview_copy_to_selected,
+    FONT_OT_text_atlas_copy_to_selected,
+    FONT_OT_text_atlas_show_json,
+    FONT_OT_text_atlas_open_folder,
     FONT_OT_text_atlas_generate,
     FONT_OT_text_atlas_edit_external,
     FONT_OT_text_atlas_pack,

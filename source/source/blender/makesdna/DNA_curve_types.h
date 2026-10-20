@@ -273,6 +273,9 @@ typedef struct Curve {
 	int atlas_pad;
 	struct Image *atlas_image;
 	struct TextAtlasGlyph *atlas_glyphs;
+
+	/* game localization (Range.locale): key in the project's translation table */
+	char locale_key[64];
 } Curve;
 
 #define CURVE_VFONT_ANY(cu) \
@@ -321,6 +324,8 @@ enum {
 	CU_BITMAP_ATLAS       = 1 << 18,
 	/** Font: bitmap atlas with hard edge (alpha test at 0.5), crisp when magnified */
 	CU_ATLAS_HARD_EDGE    = 1 << 19,
+	/** Font: in game, use the font/atlas of the current language (Range.locale) */
+	CU_LOCALE_FONT        = 1 << 20,
 };
 
 /* Curve.twist_mode */

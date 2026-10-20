@@ -257,6 +257,19 @@ class SCENE_PT_scene(SceneButtonsPanel, Panel):
             box.prop(scene, "active_clip", text="Active Clip")
 
 
+class SCENE_PT_localization(SceneButtonsPanel, Panel):
+    """Range.locale: translation table and language fonts of the game"""
+    bl_label = "Localization"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    def draw(self, context):
+        from .properties_data_curve import draw_locale_project
+        box = self.layout.box()
+        box.label(text="Game Languages:", icon="WORLD")
+        draw_locale_project(box)
+
+
 class SCENE_PT_unit(SceneButtonsPanel, Panel):
     bl_label = "Units"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
@@ -739,6 +752,7 @@ classes = (
     SCENE_MT_units_length_presets,
     SCENE_UL_keying_set_paths,
     SCENE_PT_scene,
+    SCENE_PT_localization,
     SCENE_PT_unit,
     SCENE_PT_keying_sets,
     SCENE_PT_keying_set_paths,

@@ -40,6 +40,7 @@ _modules = [
     "anastacio_ssgi",
     "anastacio_trace",
     "anastacio_text_atlas",
+    "anastacio_locale",
     "anastacio_material_recipes",
     "logic_to_python",
     "logic_presets",
