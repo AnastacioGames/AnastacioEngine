@@ -6,6 +6,27 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Smart Component Wizard: etapas 2-4 (branch smart-wizard)
+
+- `Range.args`: opções de editor que o jogo e o C ignoram: `show_if="Campo"` / `("Campo", "valor")`,
+  `required`, `filter` (MESH, LAMP...), `line`, `create`, `circle`, `warn_above`. Tipos novos sem C:
+  `ObjectList` (texto "A;B", chega como str; `objects(scene, valor)` dá os KX_GameObject, inclusive os de camada
+  escondida) e `Point(x, y, z)` (VEC3, chega como Vector).
+- `range_component_editor` cuida dessas opções sem classe `Editor`: avisos automáticos (vazio, tipo errado, é o
+  próprio objeto, nome que não existe, camada escondida → None no jogo, acima do limite), seta/caminho/círculo/cruz
+  na viewport, e `meta_of` / `is_visible` para o painel.
+- Caixa do component (`draw_component_body`): esconde campos pelo `show_if`; ObjectList com linhas, selecionar,
+  subir, remover, "Add Selected", "New"; Point com "3D Cursor" e "Selected"; Object com "+" (cria luz/câmera se o
+  filtro pedir). Botão "Add Field" no fim da caixa: põe um campo novo só no `args` do código (texto ou arquivo),
+  confere se compila e recarrega.
+- Wizard: tipos Object List e Point, filtro, "Show only if", prévia da caixa no painel e `wizard_preview.py` que
+  segue cada mudança. Receitas novas: Vida, Câmera seguidora, Luz piscando, Girador; Patrulha usa lista de pontos;
+  Spawner sorteia entre "Modelos" e pode nascer num Point.
+- Achado: no jogo, Object de camada escondida chega como None (`KX_PythonComponent.cpp` só busca nos ativos);
+  fica o aviso no editor e o ObjectList como saída, sem mexer em C.
+- Testado em background: 11 receitas, todos os tipos, Add Field (inclusive nome repetido recusado), prévia ao vivo,
+  desenho das caixas; e `--server` com Patrulha (anda P1 → P2) e Spawner (bolas no Point 7, 8, 9).
+
 ## 2026-10-20 - Smart Component Wizard (etapa 1, branch smart-wizard)
 
 - Properties > Game > Component Manager: o "Create New Script" virou o Smart Component Wizard

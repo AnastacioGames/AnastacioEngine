@@ -88,6 +88,7 @@ def draw_component_body(box, ob, c, i):
 
     # Smart Components: errors, on_change warnings and Editor buttons.
     error, warnings, buttons, editor = _component_editor_info(c)
+    metas = _component_meta(c)
     if error:
         row = box.row()
         row.alert = True
@@ -139,6 +140,9 @@ def draw_component_body(box, ob, c, i):
                 if collapsed: row = box.row() ; row = box.row() ; row = box.row() ; row = box.row() ; row = box.row()
                 continue
             else:
+                meta = metas.get(prop.name)
+                if meta and not _field_visible(c, prop.name, meta):
+                    continue   # Range.args show_if: hidden right now
                 if expanded and collapsed: row = box.row()
             text=prop.name
 
@@ -147,11 +151,21 @@ def draw_component_body(box, ob, c, i):
                     split = prop.name.split("/") if "@" in prop.name else [prop.name]
                     if len(split)>1: text=split[1]+":"
 
-                    if not prop.name=="C_Icons": 
+                    if not prop.name=="C_Icons":
                         row.label(text=text, icon="DOT")
                         col = row.column()
-                        # Range.args: Float/Int with min and max draw a slider.
-                        col.prop(prop, "value", text="", slider=prop.use_slider)
+                        kind = meta.get("kind") if meta else None
+                        if kind == "objectlist":
+                            _draw_object_list(box, col, i, prop, meta)
+                        else:
+                            sub = col.row(align=True)
+                            # Range.args: Float/Int with min and max draw a slider.
+                            sub.prop(prop, "value", text="", slider=prop.use_slider)
+                            if kind == "object" and meta.get("create"):
+                                _field_tool(sub, i, prop.name, 'CREATE', icon="ZOOMIN")
+                            elif kind == "point":
+                                _field_tool(sub, i, prop.name, 'POINT_CURSOR', icon="CURSOR")
+                                _field_tool(sub, i, prop.name, 'POINT_SELECTED', icon="OBJECT_DATA")
                         warning = warnings.get(prop.name)
                         if warning:
                             box.row().label(text=warning, icon="ERROR")
@@ -175,6 +189,154 @@ def draw_component_body(box, ob, c, i):
             op = col.operator("logic.component_editor_button", text=b[0], icon=b[2])
             op.index = i
             op.method = b[1]
+
+    # Smart Component Wizard: one more field in the code (startup/smart_component_wizard.py).
+    if c.show_expanded and c.module and hasattr(bpy.types, "SMARTWIZ_OT_add_field"):
+        row = cbox.row()
+        row.alignment = 'RIGHT'
+        row.operator("smart_wizard.add_field", text="Add Field", icon="ZOOMIN", emboss=False).index = i
+
+
+def _component_meta(c):
+    try:
+        import range_component_editor as rce
+        return rce.meta_of(c)
+    except Exception:
+        return {}
+
+
+def _field_visible(c, name, meta):
+    try:
+        import range_component_editor as rce
+        return rce.is_visible(c, name, meta)
+    except Exception:
+        return True
+
+
+def _field_tool(layout, index, field, action, text="", icon="NONE", item=-1):
+    op = layout.operator("logic.component_field_tool", text=text, icon=icon)
+    op.index = index
+    op.field = field
+    op.action = action
+    op.item = item
+    return op
+
+
+def _draw_object_list(box, col, index, prop, meta):
+    """Range.args.ObjectList: one row per object, add selected, create, remove."""
+    import range_component_editor as rce
+    names = rce.list_names(prop.value)
+    lst = col.column(align=True)
+    for n, name in enumerate(names):
+        row = lst.row(align=True)
+        found = name in bpy.data.objects
+        row.alert = not found
+        row.label(text="%d. %s" % (n + 1, name), icon="OBJECT_DATA" if found else "ERROR")
+        _field_tool(row, index, prop.name, 'LIST_SELECT', icon="RESTRICT_SELECT_OFF", item=n)
+        _field_tool(row, index, prop.name, 'LIST_UP', icon="TRIA_UP", item=n)
+        _field_tool(row, index, prop.name, 'LIST_REMOVE', icon="X", item=n)
+    row = lst.row(align=True)
+    _field_tool(row, index, prop.name, 'LIST_ADD_SELECTED', text="Add Selected", icon="ZOOMIN")
+    if meta.get("create"):
+        _field_tool(row, index, prop.name, 'CREATE', text="New", icon="EMPTY_DATA")
+    if names:
+        _field_tool(row, index, prop.name, 'LIST_CLEAR', icon="TRASH")
+
+
+_EMPTY_LOOK = {"object": 'SPHERE', "objectlist": 'PLAIN_AXES'}
+
+
+class LOGIC_OT_component_field_tool(Operator):
+    """Helper buttons of Range.args fields (ObjectList, Point, Object create)"""
+    bl_idname = "logic.component_field_tool"
+    bl_label = "Field Tool"
+    bl_options = {'REGISTER', 'UNDO', 'INTERNAL'}
+
+    index: IntProperty(options={'HIDDEN'})
+    field: StringProperty(options={'HIDDEN'})
+    item: IntProperty(default=-1, options={'HIDDEN'})
+    action: EnumProperty(options={'HIDDEN'}, items=[
+        ('CREATE', "Create", "Create an Empty in front of the object and put it in the field"),
+        ('LIST_ADD_SELECTED', "Add Selected", "Add the selected objects (in selection order of names)"),
+        ('LIST_REMOVE', "Remove", "Remove from the list"),
+        ('LIST_UP', "Move Up", "Move up in the list"),
+        ('LIST_SELECT', "Select", "Select this object"),
+        ('LIST_CLEAR', "Clear", "Empty the list"),
+        ('POINT_CURSOR', "From 3D Cursor", "Put the point where the 3D cursor is"),
+        ('POINT_SELECTED', "From Selected", "Put the point on the selected object (not this one)"),
+    ])
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None
+
+    def execute(self, context):
+        import range_args
+        import range_component_editor as rce
+        ob = context.active_object
+        if self.index >= len(ob.game.components):
+            return {'CANCELLED'}
+        comp = ob.game.components[self.index]
+        prop = comp.properties.get(self.field)
+        if prop is None:
+            return {'CANCELLED'}
+        meta = rce.meta_of(comp).get(self.field, {})
+        kind = meta.get("kind")
+        sep = range_args.LIST_SEP
+        names = rce.list_names(prop.value) if kind == "objectlist" else []
+        act = self.action
+
+        if act == 'CREATE':
+            name = ("%s %d" % (self.field, len(names) + 1) if kind == "objectlist"
+                    else "%s of %s" % (self.field, ob.name))
+            # Same type as the filter asks, so the new object has no warning.
+            flt = meta.get("filter")
+            data = None
+            if flt == "LAMP":
+                data = bpy.data.lamps.new(name, 'POINT')
+            elif flt == "CAMERA":
+                data = bpy.data.cameras.new(name)
+            new = bpy.data.objects.new(name, data)
+            if data is None:
+                new.empty_draw_type = _EMPTY_LOOK.get(kind, 'PLAIN_AXES')
+            last = bpy.data.objects.get(names[-1]) if names else None
+            base = last.matrix_world if last else ob.matrix_world
+            new.location = base * Vector((0.0, 4.0, 0.0))
+            context.scene.objects.link(new)
+            if kind == "objectlist":
+                names.append(new.name)
+            else:
+                prop.value = new
+        elif act == 'LIST_ADD_SELECTED':
+            for o in context.selected_objects:
+                if o != ob and o.name not in names:
+                    names.append(o.name)
+        elif act == 'LIST_REMOVE' and 0 <= self.item < len(names):
+            del names[self.item]
+        elif act == 'LIST_UP' and 0 < self.item < len(names):
+            names[self.item - 1], names[self.item] = names[self.item], names[self.item - 1]
+        elif act == 'LIST_CLEAR':
+            names = []
+        elif act == 'LIST_SELECT' and 0 <= self.item < len(names):
+            o = bpy.data.objects.get(names[self.item])
+            if o is not None:
+                o.select = True
+        elif act == 'POINT_CURSOR':
+            prop.value = tuple(context.scene.cursor_location)
+        elif act == 'POINT_SELECTED':
+            others = [o for o in context.selected_objects if o != ob]
+            if not others:
+                self.report({'WARNING'}, "Select another object too (this one stays active)")
+                return {'CANCELLED'}
+            prop.value = tuple(others[0].matrix_world.translation)
+
+        if kind == "objectlist" and act.startswith(('LIST', 'CREATE')) and act != 'LIST_SELECT':
+            value = sep.join(names)
+            if len(value) > 127:
+                self.report({'ERROR'}, "List too long (128 characters): use shorter object names")
+                return {'CANCELLED'}
+            prop.value = value
+        return {'FINISHED'}
 
 
 def _ui_icons():
@@ -3109,7 +3271,8 @@ class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
         row.operator("object.animation_event_add", text="Add Animation Event", icon='ZOOMIN')
 
 classes = (
-    GAME_PT_game_components,
+    LOGIC_OT_component_field_tool,
+GAME_PT_game_components,
     LOGIC_OT_component_editor_button,
     GAME_PT_game_properties,
     PHYSICS_PT_game_category,

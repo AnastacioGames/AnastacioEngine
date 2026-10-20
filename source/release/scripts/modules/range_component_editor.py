@@ -36,7 +36,8 @@ import traceback
 from types import ModuleType
 from bpy.app.handlers import persistent
 
-__all__ = ("editor_of", "state_of", "attach", "run_button", "draw_ui", "enable_gizmos", "Gizmo")
+__all__ = ("editor_of", "state_of", "attach", "run_button", "draw_ui", "enable_gizmos", "Gizmo",
+           "meta_of", "is_visible", "list_names")
 
 _RANGE_SUBMODULES = ("types", "logic", "events", "render", "constraints", "application",
                      "imgui", "network", "audio", "texture")
@@ -87,7 +88,7 @@ class _FakeSubmodule(ModuleType):
 
 
 class _Entry:
-    __slots__ = ("file", "mtime", "checked", "cls", "editor", "requires", "error")
+    __slots__ = ("file", "mtime", "checked", "cls", "editor", "requires", "error", "meta")
 
     def __init__(self):
         self.file = None
@@ -97,6 +98,7 @@ class _Entry:
         self.editor = None
         self.requires = None
         self.error = None
+        self.meta = {}
 
 
 class _State:
@@ -204,6 +206,7 @@ def _import_component(module_name):
 
 def _load(entry, module, classname):
     entry.cls = entry.editor = entry.requires = entry.error = None
+    entry.meta = {}
     try:
         mod = _import_component(module)
         entry.file = getattr(mod, "__file__", None)
@@ -214,10 +217,26 @@ def _load(entry, module, classname):
         entry.cls = cls
         entry.editor = getattr(cls, "Editor", None)
         entry.requires = getattr(cls, "requires", None)
+        entry.meta = _read_meta(cls)
     except Exception:
         # Console only: Add and Reload already report it, and game code that
         # can't be imported here is still a valid component.
         _report("%s.%s" % (module, classname), "editor import")
+
+
+def _read_meta(cls):
+    """{field: Range.args options} of the class args (fields without options left out)."""
+    args = getattr(cls, "args", None)
+    out = {}
+    try:
+        items = list(args.items())
+    except Exception:
+        return out
+    for name, value in items:
+        meta = getattr(value, "_range_meta", None)
+        if isinstance(name, str) and isinstance(meta, dict):
+            out[name] = meta
+    return out
 
 
 def _signature(path, module):
@@ -284,6 +303,81 @@ def editor_of(component):
     """The Editor class of the component, or None."""
     entry = _entry_of(component)
     return entry.editor if entry else None
+
+
+def meta_of(component):
+    """{field: options} from Range.args (filter, show_if, line...). {} if none."""
+    entry = _entry_of(component)
+    return entry.meta if entry else {}
+
+
+def list_names(value):
+    """ObjectList value -> [names]."""
+    import range_args
+    return [n.strip() for n in str(value or "").split(range_args.LIST_SEP) if n.strip()]
+
+
+def _field_value(component, name):
+    p = component.properties.get(name)
+    return None if p is None else _plain(p.value)
+
+
+def is_visible(component, name, meta=None):
+    """False when show_if of the field says it is hidden now."""
+    meta = meta if meta is not None else meta_of(component).get(name)
+    cond = meta.get("show_if") if meta else None
+    if not cond:
+        return True
+    if isinstance(cond, str):
+        v = _field_value(component, cond)
+        return bool(v) if v is not None else True
+    try:
+        other, wanted = cond[0], cond[1:]
+    except (TypeError, IndexError):
+        return True
+    v = _field_value(component, other)
+    if v is None:
+        return True
+    return any(v == w or str(v) == str(w) for w in wanted)
+
+
+_FILTER_NAMES = {"LAMP": "a light", "MESH": "a mesh", "CAMERA": "a camera", "EMPTY": "an Empty",
+                 "ARMATURE": "an armature", "CURVE": "a curve", "FONT": "a text"}
+
+
+def _auto_warning(obj, comp, name, meta, value):
+    """Warning from the Range.args options (required, filter...), or None."""
+    kind = meta.get("kind")
+    if not is_visible(comp, name, meta):
+        return None
+    empty = value is None or value == "" or (kind == "objectlist" and not list_names(value))
+    if meta.get("required") and empty:
+        return {"object": "Empty: pick an object", "scene": "Empty: pick a scene",
+                "objectlist": "Empty: add at least one object"}.get(kind, "Empty: fill this field")
+    flt = meta.get("filter")
+    if kind == "object" and value is not None:
+        if value == obj:
+            return "It is the object itself: pick another"
+        if flt and value.type != flt:
+            return "Needs %s (this one is %s)" % (_FILTER_NAMES.get(flt, flt), value.type.title())
+        scenes = obj.users_scene
+        if scenes and not any(a and b for a, b in zip(value.layers, scenes[0].layers)):
+            return "In a hidden layer: arrives as None in the game (use an Object List)"
+    if kind == "objectlist" and value:
+        names = list_names(value)
+        missing = [n for n in names if n not in bpy.data.objects]
+        if missing:
+            return "Not found: %s" % ", ".join(missing)
+        if flt:
+            wrong = [n for n in names if bpy.data.objects[n].type != flt]
+            if wrong:
+                return "Needs %s: %s" % (_FILTER_NAMES.get(flt, flt), ", ".join(wrong))
+        if len(value) > 120:
+            return "Too many names (max ~120 characters): use shorter names"
+    above = meta.get("warn_above")
+    if above is not None and isinstance(value, (int, float)) and value > above:
+        return "Above %g: check if that is right" % above
+    return None
 
 
 def state_of(component):
@@ -373,7 +467,8 @@ def _snapshot(component):
 def _check_object(obj):
     for comp in obj.game.components:
         entry = _entry_of(comp)
-        if not entry or not entry.editor or not hasattr(entry.editor, "on_change"):
+        user = entry is not None and entry.editor is not None and hasattr(entry.editor, "on_change")
+        if not entry or not (user or entry.meta):
             continue
         state = _states.setdefault(comp.as_pointer(), _State())
         values = _snapshot(comp)
@@ -385,14 +480,19 @@ def _check_object(obj):
         before = dict(state.warnings), state.error
         state.entry = entry
         state.values = values
-        ed = _instance(entry, obj, comp)
+        ed = _instance(entry, obj, comp) if user else None
         state.error = None
         for name in changed:
-            try:
-                msg = ed.on_change(obj, name, _plain(comp.properties[name].value))
-            except Exception:
-                state.error = _report("%s.%s" % (comp.module, comp.name), "on_change")
-                break
+            value = _plain(comp.properties[name].value)
+            msg = None
+            if user:
+                try:
+                    msg = ed.on_change(obj, name, value)
+                except Exception:
+                    state.error = _report("%s.%s" % (comp.module, comp.name), "on_change")
+                    break
+            if not msg and name in entry.meta:
+                msg = _auto_warning(obj, comp, name, entry.meta[name], value)
             if msg:
                 state.warnings[name] = str(msg)
             else:
@@ -572,7 +672,14 @@ def _draw_gizmos_view():
         for obj, selected in targets:
             for comp in obj.game.components:
                 entry = _entry_of(comp)
-                if not entry or not entry.editor or not hasattr(entry.editor, "draw_gizmo"):
+                if not entry:
+                    continue
+                if entry.meta:
+                    try:
+                        _auto_gizmos(obj, comp, entry.meta)
+                    except Exception:
+                        _report("%s.%s" % (comp.module, comp.name), "field gizmos")
+                if not entry.editor or not hasattr(entry.editor, "draw_gizmo"):
                     continue
                 state = _states.setdefault(comp.as_pointer(), _State())
                 try:
@@ -582,6 +689,35 @@ def _draw_gizmos_view():
                     state.error = _report("%s.%s" % (comp.module, comp.name), "draw_gizmo")
     finally:
         bgl.glPopAttrib()
+
+
+def _auto_gizmos(obj, comp, meta):
+    """Viewport drawing asked by the Range.args options (line, circle, Point)."""
+    pos = obj.matrix_world.translation
+    for name, m in meta.items():
+        if name not in comp.properties or not is_visible(comp, name, m):
+            continue
+        kind = m.get("kind")
+        value = _plain(comp.properties[name].value)
+        if kind == "object" and m.get("line") and value is not None:
+            _gizmo.arrow(pos, value.matrix_world.translation, "YELLOW", width=2)
+        elif kind == "objectlist" and m.get("line"):
+            pts = [bpy.data.objects[n].matrix_world.translation for n in list_names(value)
+                   if n in bpy.data.objects]
+            if pts:
+                _gizmo.path([pos] + pts, "CYAN", width=2)
+                for i, p in enumerate(pts):
+                    _gizmo.text(p, "%s %d" % (name, i + 1), "CYAN")
+        elif kind == "float" and m.get("circle") and isinstance(value, float) and value > 0:
+            _gizmo.circle(pos, value, "GREEN")
+        elif kind == "point" and value is not None:
+            from mathutils import Vector
+            p, r = Vector(value), 0.3
+            for axis in ((r, 0, 0), (0, r, 0), (0, 0, r)):
+                _gizmo.line(p - Vector(axis), p + Vector(axis), "ORANGE", width=2)
+            _gizmo.text(p, name, "ORANGE")
+            if m.get("line"):
+                _gizmo.line(pos, p, "ORANGE")
 
 
 def _draw_gizmos_pixel():

@@ -1,19 +1,22 @@
 # Smart Component Wizard: panel that builds a Smart Component without typing
 # the args by hand. The code itself comes from modules/range_component_wizard.
 #
-# State lives in WindowManager.smart_wizard (not saved with the game data).
-# Drawn inside Properties > Game > Component Manager (flowmenu) through
-# draw_wizard(), and also from the Text Editor menu Text > New Smart Component.
+# State lives in WindowManager.smart_wizard. Drawn inside Properties > Game >
+# Component Manager (flowmenu) through draw_wizard(), and also from the Text
+# Editor menu Text > New Smart Component. "Add Field" (smart_wizard.add_field)
+# adds one field to the code of a component that already exists.
 
 import os
 
 import bpy
+from bpy.app.handlers import persistent
 from bpy.types import Operator, PropertyGroup, UIList
 from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProperty,
                        FloatVectorProperty, IntProperty, PointerProperty, StringProperty)
 
 import range_component_wizard as W
 
+PREVIEW_TEXT = "wizard_preview.py"
 
 _KIND_INFO = (
     ("FLOAT", "Float", "Number with decimals (slider with min/max)", "IPO_LINEAR"),
@@ -21,13 +24,27 @@ _KIND_INFO = (
     ("BOOL", "Bool", "Checkbox on/off", "CHECKBOX_HLT"),
     ("TEXT", "Text", "Text", "FONT_DATA"),
     ("CHOICE", "Choice", "List of options", "COLLAPSEMENU"),
-    ("OBJECT", "Object", "Pick an object of the scene (line, create button...)", "OBJECT_DATA"),
+    ("OBJECT", "Object", "Pick an object of the scene", "OBJECT_DATA"),
+    ("OBJECTLIST", "Object List", "Several objects in order (waypoints, doors...)", "OUTLINER_OB_GROUP_INSTANCE"),
+    ("POINT", "Point", "A position in the world, with a cross in the viewport", "CURSOR"),
     ("SCENE", "Scene", "Pick a scene of the file", "SCENE_DATA"),
     ("COLOR", "Color", "Color with picker", "COLOR"),
     ("HEADER", "Section", "Title that opens and closes the fields below it", "FULLSCREEN"),
 )
 _KIND_ITEMS = [(k, n, d, i, idx) for idx, (k, n, d, i) in enumerate(_KIND_INFO)]
 _KIND_ICON = {k: i for k, n, d, i in _KIND_INFO}
+_KIND_NAME = {k: n for k, n, d, i in _KIND_INFO}
+
+_FILTER_ITEMS = [
+    ("ANY", "Any Type", "Any object", 0),
+    ("MESH", "Mesh", "", 1),
+    ("LAMP", "Light", "", 2),
+    ("CAMERA", "Camera", "", 3),
+    ("EMPTY", "Empty", "", 4),
+    ("ARMATURE", "Armature", "", 5),
+    ("CURVE", "Curve", "", 6),
+    ("FONT", "Text", "", 7),
+]
 
 _RECIPE_ITEMS = [(k, W.RECIPES[k]["label"], W.RECIPES[k]["tip"], idx)
                  for idx, k in enumerate(W.RECIPE_ORDER)]
@@ -51,6 +68,7 @@ class SmartWizardField(PropertyGroup):
     s_default = StringProperty(name="Default", default="")
     c_default = FloatVectorProperty(name="Default", subtype='COLOR', size=4, min=0.0, max=1.0,
                                     default=(1.0, 1.0, 1.0, 1.0))
+    p_default = FloatVectorProperty(name="Default", subtype='XYZ', size=3, default=(0.0, 0.0, 0.0))
     items = StringProperty(name="Options", default="A, B, C",
                            description="Options separated by comma. The default must be one of them")
     use_min = BoolProperty(name="Min", default=False)
@@ -60,31 +78,50 @@ class SmartWizardField(PropertyGroup):
     tip = StringProperty(name="Tip", default="", description="Shown when the mouse is over the field")
     icon = StringProperty(name="Icon", default="FULLSCREEN", description="Icon name (e.g. AUTO, COLOR)")
     start_open = BoolProperty(name="Starts Open", default=True)
-    gizmo = BoolProperty(name="Draw in Viewport", default=False,
-                         description="Object: arrow from the object to it. Float: circle with this radius")
+    line = BoolProperty(name="Line in Viewport", default=False,
+                        description="Object: arrow to it. Object List: path through them. Point: line to it")
+    circle = BoolProperty(name="Circle in Viewport", default=False,
+                          description="Circle around the object with this value as radius")
     required = BoolProperty(name="Required", default=False, description="Warning while it is empty")
     use_warn = BoolProperty(name="Warn Above", default=False, description="Warning when the value is bigger")
     warn_above = FloatProperty(name="Warn Above", default=10.0)
+    filter = EnumProperty(name="Only", items=_FILTER_ITEMS, default="ANY",
+                          description="Type of object accepted (another type shows a warning)")
     auto = StringProperty(name="Auto Pick", default="",
                           description="When added, pick the first object whose name starts with this "
                                       "(e.g. Jogador). Empty = off")
     create = BoolProperty(name="Create Button", default=False,
-                          description="Button in the box that creates an Empty and puts it in this field")
+                          description="\"+\" button in the box that creates an object for this field")
+    use_show_if = BoolProperty(name="Show Only If", default=False,
+                               description="Hide this field unless another field has some value")
+    show_if_field = StringProperty(name="Field", default="",
+                                   description="Name of the other field (a Bool, or any field with a value below)")
+    show_if_value = StringProperty(name="Value", default="",
+                                   description="Value the other field must have. Empty: the Bool is on")
 
     def to_dict(self):
         k = self.kind
         default = {"FLOAT": self.f_default, "INT": self.i_default, "BOOL": self.b_default,
-                   "COLOR": tuple(self.c_default)}.get(k, self.s_default)
+                   "COLOR": tuple(self.c_default), "POINT": tuple(self.p_default)}.get(k, self.s_default)
         num = k in ("FLOAT", "INT")
+        objs = k in ("OBJECT", "OBJECTLIST")
+        show_if = None
+        if self.use_show_if and self.show_if_field.strip() and k != "HEADER":
+            v = self.show_if_value.strip()
+            show_if = (self.show_if_field.strip(), v) if v else self.show_if_field.strip()
         return W.field(
             self.name.strip(), k, default,
             min=self.v_min if num and self.use_min else None,
             max=self.v_max if num and self.use_max else None,
             tip=self.tip, items=[i.strip() for i in self.items.split(",")],
             icon=self.icon.strip() or "FULLSCREEN", open=self.start_open,
-            gizmo=("LINE" if k == "OBJECT" else "CIRCLE" if k == "FLOAT" else "NONE") if self.gizmo else "NONE",
-            required=self.required, warn_above=self.warn_above if num and self.use_warn else None,
-            auto=self.auto if k == "OBJECT" else "", create=self.create and k == "OBJECT")
+            line=self.line and k in ("OBJECT", "OBJECTLIST", "POINT"),
+            circle=self.circle and k == "FLOAT",
+            required=self.required and k in ("OBJECT", "OBJECTLIST", "SCENE", "TEXT"),
+            warn_above=self.warn_above if num and self.use_warn else None,
+            filter="" if not objs or self.filter == "ANY" else self.filter,
+            create=self.create and objs, auto=self.auto if k == "OBJECT" else "",
+            show_if=show_if)
 
     def from_dict(self, f):
         self.name, self.kind, self.tip = f["name"], f["kind"], f["tip"]
@@ -97,6 +134,8 @@ class SmartWizardField(PropertyGroup):
             self.b_default = bool(d)
         elif f["kind"] == "COLOR":
             self.c_default = (tuple(d) + (1.0,))[:4]
+        elif f["kind"] == "POINT":
+            self.p_default = (tuple(d) + (0.0, 0.0, 0.0))[:3]
         else:
             self.s_default = str(d)
         self.use_min, self.use_max = f["min"] is not None, f["max"] is not None
@@ -107,12 +146,18 @@ class SmartWizardField(PropertyGroup):
         if f["items"]:
             self.items = ", ".join(f["items"])
         self.icon, self.start_open = f["icon"], f["open"]
-        self.gizmo = f["gizmo"] != "NONE"
-        self.required = f["required"]
+        self.line, self.circle, self.required = f["line"], f["circle"], f["required"]
         self.use_warn = f["warn_above"] is not None
         if f["warn_above"] is not None:
             self.warn_above = f["warn_above"]
+        self.filter = f["filter"] or "ANY"
         self.auto, self.create = f["auto"], f["create"]
+        cond = f["show_if"]
+        self.use_show_if = bool(cond)
+        if isinstance(cond, str):
+            self.show_if_field, self.show_if_value = cond, ""
+        elif cond:
+            self.show_if_field, self.show_if_value = cond[0], str(cond[1])
 
 
 def _module_changed(self, context):
@@ -142,6 +187,10 @@ class SmartWizardSettings(PropertyGroup):
     ])
     attach = BoolProperty(name="Add to Active Object", default=True)
     open_code = BoolProperty(name="Open Code", default=True, description="Show the code in a Text Editor")
+    show_preview = BoolProperty(name="Preview", default=True,
+                                description="How the component box will look")
+    # Add Field (existing component): the field being added.
+    new_field = PointerProperty(type=SmartWizardField)
 
 
 def _wizard(context):
@@ -156,6 +205,12 @@ def _fields(settings):
     return [f.to_dict() for f in settings.fields]
 
 
+def _code(s):
+    label = W.RECIPES[s.loaded_recipe]["label"] if s.loaded_recipe != "EMPTY" else s.class_name.strip()
+    return W.generate(s.module.strip() or "meu_component", s.class_name.strip() or "MeuComponent",
+                      _fields(s), s.loaded_recipe, _physics(s), label=label)
+
+
 # ----------------------------------------------------------------------------
 # List
 
@@ -167,13 +222,17 @@ class SMARTWIZ_UL_fields(UIList):
             return
         row.prop(item, "name", text="", emboss=False, icon=_KIND_ICON.get(item.kind, "DOT"))
         extra = []
-        if item.kind in ("OBJECT", "FLOAT") and item.gizmo:
-            extra.append("line" if item.kind == "OBJECT" else "circle")
+        if item.line and item.kind in ("OBJECT", "OBJECTLIST", "POINT"):
+            extra.append("line")
+        if item.circle and item.kind == "FLOAT":
+            extra.append("circle")
         if item.required:
             extra.append("required")
+        if item.use_show_if:
+            extra.append("if " + item.show_if_field)
         sub = row.row()
         sub.alignment = 'RIGHT'
-        sub.label(text=item.kind.title() + (" · " + ", ".join(extra) if extra else ""))
+        sub.label(text=_KIND_NAME[item.kind] + (" · " + ", ".join(extra) if extra else ""))
 
 
 # ----------------------------------------------------------------------------
@@ -199,7 +258,7 @@ class SMARTWIZ_OT_load_recipe(Operator):
         s.loaded_recipe = s.recipe
         if s.module in ("", "meu_component") or s.module.startswith("meu_"):
             s.module = "meu_" + W.identifier(W.RECIPES[s.recipe]["label"])
-        s.physics = "NO_COLLISION" if s.recipe in ("CHASER", "PATROL") else "KEEP"
+        s.physics = W.RECIPES[s.recipe].get("physics") or "KEEP"
         return {'FINISHED'}
 
 
@@ -214,24 +273,33 @@ class SMARTWIZ_OT_field_add(Operator):
     def execute(self, context):
         s = _wizard(context)
         names = {f.name for f in s.fields}
-        base = "Seção" if self.kind == "HEADER" else dict((k, n) for k, n, d, i in _KIND_INFO)[self.kind]
+        base = "Seção" if self.kind == "HEADER" else _KIND_NAME[self.kind]
         name, i = base, 2
         while name in names:
             name, i = "%s %d" % (base, i), i + 1
         f = s.fields.add()
-        f.kind = self.kind
-        f.name = name
-        if self.kind == "FLOAT":
-            f.f_default, f.use_min, f.use_max = 1.0, True, True
-        elif self.kind == "INT":
-            f.i_default, f.use_min, f.use_max, f.v_max = 1, True, True, 10
-        elif self.kind == "CHOICE":
-            f.s_default = "A"
+        _new_field_defaults(f, self.kind, name)
         new = len(s.fields) - 1
         target = min(s.index + 1, new) if new else 0
         s.fields.move(new, target)
         s.index = target
         return {'FINISHED'}
+
+
+def _new_field_defaults(f, kind, name):
+    f.kind = kind
+    f.name = name
+    if kind == "FLOAT":
+        f.f_default, f.use_min, f.use_max, f.v_min, f.v_max = 1.0, True, True, 0.0, 10.0
+    elif kind == "INT":
+        f.i_default, f.use_min, f.use_max, f.v_min, f.v_max = 1, True, True, 0.0, 10.0
+    elif kind == "CHOICE":
+        f.items, f.s_default = "A, B, C", "A"
+    elif kind in ("OBJECT", "OBJECTLIST"):
+        f.line = True
+        f.create = kind == "OBJECTLIST"
+    elif kind == "POINT":
+        f.line, f.p_default = True, (0.0, 0.0, 1.0)
 
 
 class SMARTWIZ_OT_field_remove(Operator):
@@ -298,14 +366,12 @@ class SMARTWIZ_OT_create(Operator):
     def execute(self, context):
         s = _wizard(context)
         module, cls = s.module.strip(), s.class_name.strip()
-        fields = _fields(s)
-        errors = W.check(module, cls, fields)
+        errors = W.check(module, cls, _fields(s))
         if errors:
             self.report({'ERROR'}, errors[0])
             return {'CANCELLED'}
 
-        code = W.generate(module, cls, fields, s.loaded_recipe, _physics(s),
-                          label=W.RECIPES[s.loaded_recipe]["label"] if s.loaded_recipe != "EMPTY" else cls)
+        code = _code(s)
         filename = module + ".py"
 
         if s.save_to == 'TEXT':
@@ -356,17 +422,151 @@ class SMARTWIZ_OT_create(Operator):
 class SMARTWIZ_OT_preview(Operator):
     bl_idname = "smart_wizard.preview"
     bl_label = "Preview Code"
-    bl_description = "Show the code that will be created in a Text Editor (text 'wizard_preview.py')"
+    bl_description = ("Show the code in a Text Editor (text '%s'). It follows every change "
+                      "while the text exists" % PREVIEW_TEXT)
 
     def execute(self, context):
-        s = _wizard(context)
-        code = W.generate(s.module.strip() or "meu_component", s.class_name.strip() or "MeuComponent",
-                          _fields(s), s.loaded_recipe, _physics(s))
-        text = bpy.data.texts.get("wizard_preview.py") or bpy.data.texts.new("wizard_preview.py")
+        text = bpy.data.texts.get(PREVIEW_TEXT) or bpy.data.texts.new(PREVIEW_TEXT)
+        text.clear()
+        text.write(_code(_wizard(context)))
+        _live["code"] = text.as_string()
+        if not _show_text(context, text):
+            self.report({'INFO'}, "Open the text %s in a Text Editor" % PREVIEW_TEXT)
+        return {'FINISHED'}
+
+
+# Live code preview: the text follows the wizard while it exists. Checked on
+# scene updates (cheap: only regenerates when the wizard settings changed).
+_live = {"sig": None, "code": None}
+
+
+def _signature(s):
+    return (s.module, s.class_name, s.loaded_recipe, s.physics,
+            tuple(tuple(sorted(f.to_dict().items(), key=lambda kv: kv[0])) for f in s.fields))
+
+
+@persistent
+def _live_preview(scene):
+    text = bpy.data.texts.get(PREVIEW_TEXT)
+    if text is None:
+        return
+    wm = bpy.context.window_manager
+    if wm is None:
+        return
+    s = wm.smart_wizard
+    try:
+        sig = repr(_signature(s))
+    except Exception:
+        return
+    if sig == _live["sig"]:
+        return
+    _live["sig"] = sig
+    code = _code(s)
+    if code != _live["code"]:
+        _live["code"] = code
         text.clear()
         text.write(code)
-        if not _show_text(context, text):
-            self.report({'INFO'}, "Open the text wizard_preview.py in a Text Editor")
+
+
+# ----------------------------------------------------------------------------
+# Add Field to an existing component
+
+def _component_source(comp):
+    """(text or None, file path or None) where the component's code lives."""
+    module = comp.module
+    text = bpy.data.texts.get(module + ".py") or bpy.data.texts.get(module)
+    path = None
+    if text is not None and text.filepath and not text.is_in_memory:
+        path = bpy.path.abspath(text.filepath)
+    if text is None and bpy.data.filepath:
+        folder = os.path.dirname(bpy.data.filepath)
+        for cand in (os.path.join(folder, module + ".py"), os.path.join(folder, "scripts", module + ".py")):
+            if os.path.isfile(cand):
+                path = cand
+                break
+        if path:
+            for t in bpy.data.texts:
+                if t.filepath and os.path.normcase(bpy.path.abspath(t.filepath)) == os.path.normcase(path):
+                    text = t
+                    break
+    return text, path
+
+
+class SMARTWIZ_OT_add_field(Operator):
+    bl_idname = "smart_wizard.add_field"
+    bl_label = "Add Field"
+    bl_description = "Add a field to the code of this component (only the args list changes)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index = IntProperty(options={'HIDDEN'})
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None
+
+    def _comp(self, context):
+        comps = context.active_object.game.components
+        return comps[self.index] if self.index < len(comps) else None
+
+    def invoke(self, context, event):
+        comp = self._comp(context)
+        if comp is None:
+            return {'CANCELLED'}
+        text, path = _component_source(comp)
+        if text is None and path is None:
+            self.report({'ERROR'}, "Code of %s not found (text or file %s.py)" % (comp.name, comp.module))
+            return {'CANCELLED'}
+        f = _wizard(context).new_field
+        names = {p.name for p in comp.properties}
+        name, i = "Campo", 2
+        while name in names:
+            name, i = "Campo %d" % i, i + 1
+        _new_field_defaults(f, f.kind or "FLOAT", name)
+        return context.window_manager.invoke_props_dialog(self, width=380)
+
+    def draw(self, context):
+        self.layout.label(text="New field in %s" % self._comp(context).name, icon="ZOOMIN")
+        _draw_field(self.layout, _wizard(context).new_field)
+
+    def execute(self, context):
+        comp = self._comp(context)
+        if comp is None:
+            return {'CANCELLED'}
+        f = _wizard(context).new_field.to_dict()
+        if f["kind"] != "HEADER" and f["name"] in comp.properties:
+            self.report({'ERROR'}, "There is already a field %s" % f["name"])
+            return {'CANCELLED'}
+        problems = W.check("m", "C", [f])
+        if problems:
+            self.report({'ERROR'}, problems[0])
+            return {'CANCELLED'}
+        text, path = _component_source(comp)
+        if text is not None:
+            source = text.as_string()
+        else:
+            with open(path, encoding="utf-8") as fh:
+                source = fh.read()
+        new, error = W.add_field(source, comp.name, f)
+        if error:
+            self.report({'ERROR'}, error)
+            return {'CANCELLED'}
+        try:
+            compile(new, comp.module, "exec")
+        except SyntaxError as e:
+            self.report({'ERROR'}, "Could not add it safely (%s): nothing changed" % e.msg)
+            return {'CANCELLED'}
+        if path:
+            with open(path, "w", encoding="utf-8") as fh:
+                fh.write(new)
+        if text is not None:
+            text.clear()
+            text.write(new)
+        try:
+            bpy.ops.logic.python_component_reload(index=self.index)
+        except RuntimeError as e:
+            self.report({'WARNING'}, "Field written, reload failed: %s" % e)
+            return {'FINISHED'}
+        self.report({'INFO'}, "Field %s added to %s" % (f["name"], comp.name))
         return {'FINISHED'}
 
 
@@ -398,6 +598,8 @@ def _draw_field(layout, f):
         col.prop(f, "s_default")
     elif k == "COLOR":
         col.prop(f, "c_default")
+    elif k == "POINT":
+        col.prop(f, "p_default")
 
     if k in ("FLOAT", "INT"):
         row = col.row(align=True)
@@ -417,16 +619,78 @@ def _draw_field(layout, f):
 
     col.prop(f, "tip")
 
-    if k == "OBJECT":
+    if k in ("OBJECT", "OBJECTLIST"):
+        col.prop(f, "filter")
         row = col.row()
-        row.prop(f, "gizmo", text="Line to it")
+        row.prop(f, "line", text="Path" if k == "OBJECTLIST" else "Arrow to it")
         row.prop(f, "required")
-        row.prop(f, "create")
-        col.prop(f, "auto")
+        row.prop(f, "create", text="\"+\" Button")
+        if k == "OBJECT":
+            col.prop(f, "auto")
+    elif k == "POINT":
+        col.prop(f, "line", text="Line to it")
     elif k == "FLOAT":
-        col.prop(f, "gizmo", text="Circle with this radius")
-    elif k == "SCENE":
+        col.prop(f, "circle", text="Circle with this radius")
+    elif k in ("SCENE", "TEXT"):
         col.prop(f, "required")
+
+    row = col.row(align=True)
+    row.prop(f, "use_show_if", text="Show only if")
+    sub = row.row(align=True)
+    sub.active = f.use_show_if
+    sub.prop(f, "show_if_field", text="")
+    sub.prop(f, "show_if_value", text="")
+
+
+def _preview_visible(fields_by_name, f):
+    if not f.use_show_if or not f.show_if_field.strip():
+        return True
+    other = fields_by_name.get(f.show_if_field.strip())
+    if other is None:
+        return True
+    want = f.show_if_value.strip()
+    d = other.to_dict()["default"]
+    if not want:
+        return bool(d)
+    return str(d) == want
+
+
+def _draw_preview(layout, s):
+    """The component box as it will look (defaults; show_if from the defaults)."""
+    box = layout.box()
+    box.label(text=s.class_name or "Component", icon="SCRIPTPLUGINS")
+    col = box.column()
+    by_name = {f.name: f for f in s.fields}
+    open_ = True
+    for f in s.fields:
+        if f.kind == "HEADER":
+            row = col.row()
+            row.scale_y = 1.2
+            row.label(text=f.name, icon=f.icon if f.icon else "FULLSCREEN")
+            open_ = f.start_open
+            continue
+        if not open_ or not _preview_visible(by_name, f):
+            continue
+        row = col.row()
+        row.label(text=f.name, icon="DOT")
+        k = f.kind
+        prop = {"FLOAT": "f_default", "INT": "i_default", "BOOL": "b_default", "TEXT": "s_default",
+                "COLOR": "c_default", "POINT": "p_default"}.get(k)
+        if prop:
+            sub = row.row(align=True)
+            sub.prop(f, prop, text="", slider=k in ("FLOAT", "INT") and f.use_min and f.use_max)
+            if k == "POINT":
+                sub.label(icon="CURSOR")
+        elif k == "CHOICE":
+            row.label(text=f.s_default or (f.items.split(",")[0].strip()), icon="COLLAPSEMENU")
+        elif k == "OBJECTLIST":
+            row.label(text="(list)  + Add Selected" + ("  + New" if f.create else ""),
+                      icon="OUTLINER_OB_GROUP_INSTANCE")
+        else:
+            row.label(text="(pick %s)%s" % (_KIND_NAME[k].lower(), "  +" if f.create else ""),
+                      icon=_KIND_ICON[k])
+        if f.required:
+            col.label(text="Empty: pick one", icon="ERROR")
 
 
 def draw_wizard(layout, context):
@@ -456,11 +720,15 @@ def draw_wizard(layout, context):
         _draw_field(layout.box(), s.fields[s.index])
 
     if s.loaded_recipe != "EMPTY":
-        names = {f.name for f in s.fields}
-        missing = [f["name"] for f in W.RECIPES[s.loaded_recipe]["fields"] if f["name"] not in names]
+        missing = W.recipe_missing(s.loaded_recipe, _fields(s))
         if missing:
             layout.label(text="Recipe code needs: %s (update() stays empty)" % ", ".join(missing),
                          icon="ERROR")
+
+    row = layout.row()
+    row.prop(s, "show_preview", icon="TRIA_DOWN" if s.show_preview else "TRIA_RIGHT", emboss=False)
+    if s.show_preview and len(s.fields):
+        _draw_preview(layout, s)
 
     col = layout.column()
     col.prop(s, "physics")
@@ -510,6 +778,7 @@ classes = (
     SMARTWIZ_OT_field_duplicate,
     SMARTWIZ_OT_create,
     SMARTWIZ_OT_preview,
+    SMARTWIZ_OT_add_field,
     SMARTWIZ_OT_popup,
 )
 
@@ -519,9 +788,13 @@ def register():
         bpy.utils.register_class(c)
     bpy.types.WindowManager.smart_wizard = PointerProperty(type=SmartWizardSettings)
     bpy.types.TEXT_MT_text.append(_text_menu)
+    if _live_preview not in bpy.app.handlers.scene_update_post:
+        bpy.app.handlers.scene_update_post.append(_live_preview)
 
 
 def unregister():
+    if _live_preview in bpy.app.handlers.scene_update_post:
+        bpy.app.handlers.scene_update_post.remove(_live_preview)
     bpy.types.TEXT_MT_text.remove(_text_menu)
     del bpy.types.WindowManager.smart_wizard
     for c in reversed(classes):
