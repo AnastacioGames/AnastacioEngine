@@ -62,6 +62,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Testado em background: as 7 receitas criam, registram e o editor acha campos e `Editor`. Falta teste com janela
   e Play das receitas.
 
+## 2026-10-20 - Release 0.5.4 (Linux, montada e testada; não publicada)
+
+- Causa do WEB-PKG-001 da 0.5.3 Linux: no build Web feito no Linux o `PYTHON_EXECUTABLE` fica `NOTFOUND`, então o
+  POST_BUILD que regenera `RangeRuntime.manifest.json` não era criado. `blenderplayer/CMakeLists.txt` agora cai
+  no `python3` do sistema (`WEB_MANIFEST_PYTHON`). Conferido: apagar o `.wasm` e relinkar regenera o manifesto.
+- Versão 0.5.4 (`ANASTACIO_VERSION_STRING`, About, scripts de release). Runtime Web recompilado; pacotes
+  `AnastacioEngine-0.5.4-linux-x86_64.tar.xz` e `RangeArmor-0.5.4-linux-x86_64.tar.xz` em `build-linux/dist/`.
+  Notas em `docs/release-notes-0.5.4.md`. **Não lançada de propósito:** a 0.5.4 vai receber mais recursos antes
+  de sair; pacotes e notas serão refeitos na hora de publicar.
+- Testes no pacote extraído: manifesto Web confere; Export Web pelo editor (`validate-web.py --export`) sem
+  problemas; `tools/test_*.py` OK (os dois de atlas com janela não rodaram); `AnastacioRuntime --server` roda a
+  cena; painel RangeArmor sem biblioteca faltando (glibc máx. 2.30). Sem teste no navegador (máquina sem Node).
+
 ## 2026-10-20 - Build Linux no container mais rápido
 
 - `tools/linux/container-build.sh` é o jeito normal: gera (uma vez) a imagem `anastacio-build:22.04-<hash>` do

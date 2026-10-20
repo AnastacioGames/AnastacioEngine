@@ -6,7 +6,7 @@ cenas de teste, a RangeArmor (asset separado) e o cache local do ImGui. Depois z
 preservando separadores "/" (ZIP extraido no Linux depende disso).
 
 Uso:
-    python tools/stage_release_windows.py 0.5.3
+    python tools/stage_release_windows.py 0.5.4
 """
 import hashlib
 import ast
@@ -155,7 +155,7 @@ def main() -> None:
         args.remove("--zip-only")
     if len(args) != 1:
         raise SystemExit(
-            "uso: python tools/stage_release_windows.py <versao> [--no-zip | --zip-only], ex: 0.5.3"
+            "uso: python tools/stage_release_windows.py <versao> [--no-zip | --zip-only], ex: 0.5.4"
         )
     version = args[0]
 

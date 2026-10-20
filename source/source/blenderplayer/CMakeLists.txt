@@ -157,16 +157,22 @@ if(EMSCRIPTEN)
 
 	# Regenera RangeRuntime.manifest.json a cada link: um manifesto velho (hashes dos
 	# artefatos antigos) bloqueia o export Web com WEB-PKG-001. Roda no python do host.
-	if(PYTHON_EXECUTABLE)
+	# No host Linux o PYTHON_EXECUTABLE fica NOTFOUND no build Emscripten; cai no python3 do sistema.
+	set(_web_manifest_python ${PYTHON_EXECUTABLE})
+	if(NOT _web_manifest_python)
+		find_program(WEB_MANIFEST_PYTHON NAMES python3 python)
+		set(_web_manifest_python ${WEB_MANIFEST_PYTHON})
+	endif()
+	if(_web_manifest_python)
 		add_custom_command(TARGET RangeRuntime POST_BUILD
-			COMMAND ${PYTHON_EXECUTABLE}
+			COMMAND ${_web_manifest_python}
 				${CMAKE_SOURCE_DIR}/../tools/web/make-runtime-manifest.py
 				--runtime-dir $<TARGET_FILE_DIR:RangeRuntime>
 			COMMENT "Gerando RangeRuntime.manifest.json"
 			VERBATIM
 		)
 	else()
-		message(WARNING "PYTHON_EXECUTABLE ausente: o manifesto do runtime Web nao sera regenerado no build")
+		message(WARNING "Python do host ausente: o manifesto do runtime Web nao sera regenerado no build")
 	endif()
 endif()
 
