@@ -124,6 +124,65 @@ class LOGIC_PT_brick_groups(Panel):
         layout.label(text="Double click renames the group of its bricks too", icon='INFO')
 
 
+class LOGIC_PT_brick_inspector(Panel):
+    """Smart Bricks: what looks wrong in the bricks, without running the game"""
+    bl_space_type = 'LOGIC_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "Brick Inspector"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob and ob.game
+
+    def draw(self, context):
+        import range_brick_inspector as bricks
+        layout = self.layout
+        ob = context.active_object
+        game = ob.game
+        wm = context.window_manager
+
+        row = layout.row(align=True)
+        row.label(text="%d sensors, %d controllers, %d actuators"
+                  % (len(game.sensors), len(game.controllers), len(game.actuators)))
+        if hasattr(wm, "range_component_gizmos"):
+            layout.prop(wm, "range_component_gizmos", text="Viewport")
+
+        found = bricks.problems(ob)
+        if not wm.brick_inspector_show_info:
+            found = [p for p in found if p.level != bricks.INFO]
+        col = layout.column(align=True)
+        if not found:
+            col.label(text="No problems found", icon='FILE_TICK')
+        for p in found:
+            box = col.box()
+            row = box.row(align=True)
+            op = row.operator("logic.brick_inspector_show", text=p.brick.name, icon=p.icon, emboss=False)
+            op.kind = p.kind
+            op.name = p.brick.name
+            row.label(text=p.kind.title())
+            box.label(text=p.text)
+        layout.prop(wm, "brick_inspector_show_info")
+
+        others = []
+        for o in context.scene.objects:
+            if o == ob or not (len(o.game.sensors) or len(o.game.actuators)):
+                continue
+            bad, _ = bricks.count(o)
+            if bad:
+                others.append((o, bad))
+            if len(others) >= 20:
+                break
+        if others:
+            layout.separator()
+            layout.label(text="Other objects with problems:")
+            col = layout.column(align=True)
+            for o, bad in others:
+                op = col.operator("logic.brick_inspector_object", text="%s (%d)" % (o.name, bad),
+                                  icon='OBJECT_DATA')
+                op.name = o.name
+
+
 class LOGIC_PT_states(Panel):
     bl_space_type = 'LOGIC_EDITOR'
     bl_region_type = 'UI'
@@ -225,6 +284,7 @@ classes = (
     LOGIC_PT_properties,
     LOGIC_PT_brick_groups,
     LOGIC_PT_states,
+    LOGIC_PT_brick_inspector,
     LOGIC_MT_logicbricks_add,
     LOGIC_HT_header,
     LOGIC_MT_editor_menus,

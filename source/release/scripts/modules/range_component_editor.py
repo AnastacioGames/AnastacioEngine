@@ -649,10 +649,15 @@ def _gizmo_targets(context):
     if mode == 'OFF':
         return []
     if mode == 'SELECTED':
-        return [(o, True) for o in context.selected_objects if o.game.components]
+        return [(o, True) for o in context.selected_objects if _has_logic(o)]
     selected = {o.as_pointer() for o in context.selected_objects}
     return [(o, o.as_pointer() in selected) for o in context.visible_objects
-            if o.game.components]
+            if _has_logic(o)]
+
+
+def _has_logic(o):
+    g = o.game
+    return bool(len(g.components) or len(g.sensors) or len(g.actuators))
 
 
 def _draw_gizmos_view():
@@ -669,7 +674,16 @@ def _draw_gizmos_view():
     try:
         bgl.glDisable(bgl.GL_DEPTH_TEST)
         bgl.glEnable(bgl.GL_BLEND)
+        try:
+            import range_brick_inspector as bricks
+        except Exception:
+            bricks = None
         for obj, selected in targets:
+            if bricks is not None:
+                try:
+                    bricks.draw(obj, _gizmo, selected)
+                except Exception:
+                    _report(obj.name, "logic brick gizmos")
             for comp in obj.game.components:
                 entry = _entry_of(comp)
                 if not entry:

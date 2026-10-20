@@ -3329,7 +3329,7 @@ bpy.types.Scene.show_expanded_game_cursor = bpy.props.BoolProperty(name="Expande
 # Smart Components: which objects run Editor.draw_gizmo in the viewport.
 bpy.types.WindowManager.range_component_gizmos = EnumProperty(
     name="Component Gizmos",
-    description="Viewport drawing of Smart Components (Editor.draw_gizmo)",
+    description="Viewport drawing of Smart Components (Editor.draw_gizmo) and of the logic bricks (Near, Radar, Ray, Steering, Track To, Camera)",
     items=(
         ('OFF', "Off", "Don't draw component gizmos"),
         ('SELECTED', "Selected", "Draw gizmos of the selected objects"),

@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Bricks Espertos (branch smart-wizard)
+
+- `modules/range_brick_inspector.py`: verificações e desenho na viewport por tipo de brick nativo, só no editor (o jogo exportado não muda). Registro com `@check(kind, tipo)` e `@gizmo(kind, tipo)`.
+- Avisos: Steering sem alvo, Path Following sem navmesh, Track To/Camera/Parent sem objeto, Add Object sem objeto ou em camada visível, Action/Sound/Scene não escolhidos, propriedade inexistente (Property sensor/actuator), Near/Radar/Collision sem objeto com a propriedade e em objeto No Collision, Ray/Near com distância 0, Message sem quem escute/envie, Motion com força em objeto não dinâmico, Python controller sem módulo/arquivo, Keyboard sem tecla, além de bricks sem ligação.
+- Viewport (mesma opção "Component Gizmos"): esfera do Near, cone do Radar, linha do Ray, seta do Steering/Track To/Camera até o alvo, com o nome do brick.
+- Painel "Brick Inspector" no Logic Editor (N): lista os problemas do objeto ativo, clique abre o brick; lista outros objetos com problemas.
+- Presets novos: Mouse Look, Shoot, Spawn Every 2 Seconds, Turret, Pause Key. Door com Reset Distance corrigido.
+
 ## 2026-10-20 - Smart Component Wizard: etapas 2-4 (branch smart-wizard)
 
 - `Range.args`: opções de editor que o jogo e o C ignoram: `show_if="Campo"` / `("Campo", "valor")`,
