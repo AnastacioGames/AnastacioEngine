@@ -6,6 +6,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Template "04 Smart Component" no Text Editor
+
+- `templates_components/04_smart_component.py`: o Perseguidor do exemplo num arquivo só, com o cabeçalho
+  explicando que é o jeito novo (Range.args + classe `Editor`, tudo opcional, jogo igual), passo a passo
+  de uso e a lista dos campos de `Range.args`.
+- Menu Templates > Components: só lista `.py` (aparecia a pasta `__pycache__` como "Pycache").
+- `range_component_editor`: component vindo de texto interno (sem arquivo no disco) recarrega pelo
+  conteúdo do texto, já que não há mtime. Testado: abrir o template, renomear para `perseguidor.py`, Add,
+  avisos, editar o texto (o aviso novo aparece) e Play `--server` (persegue e para a 1,5 m).
+
 ## 2026-10-20 - Smart Components: classe `Editor` (etapa 4)
 
 - Component pode ter `requires = {"physics": "...", "components": ["mod.Classe"]}` e uma classe interna

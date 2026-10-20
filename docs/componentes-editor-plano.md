@@ -24,6 +24,7 @@ Status (2026-10-20): etapas 1 a 4 implementadas (ver "Feito"); 5 a 7 abertas.
   por campo, `buttons`), em `scripts/modules/range_component_editor.py`; o C chama
   `BKE_python_component_attached` depois de adicionar. `on_change` valida todos os campos quando qualquer
   um muda (assim um aviso que depende de outro campo fica certo). `requires` só configura ao adicionar.
+  Etapa 7 (parte): template "04 Smart Component" no Text Editor.
   Extra: `Scene(tip=...)` escolhe uma cena (no jogo chega o nome, para `logic.addScene`).
 
 ## Objetivo

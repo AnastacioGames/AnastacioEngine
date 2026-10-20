@@ -438,6 +438,7 @@ class TEXT_MT_templates_components(Menu):
             bpy.utils.script_paths("templates_components"),
             "text.open",
             props_default={"internal": True},
+            filter_ext=lambda ext: ext == ".py",   # not the __pycache__ folder
         )
 
 

@@ -199,7 +199,9 @@ def _load(entry, module, classname):
     try:
         mod = _import_component(module)
         entry.file = getattr(mod, "__file__", None)
-        entry.mtime = _mtime(entry.file)
+        if not entry.file or not os.path.isfile(entry.file):
+            entry.file = None   # internal text (Text Editor): watched by its content
+        entry.mtime = _signature(entry.file, module)
         cls = getattr(mod, classname)
         entry.cls = cls
         entry.editor = getattr(cls, "Editor", None)
@@ -210,11 +212,15 @@ def _load(entry, module, classname):
         _report("%s.%s" % (module, classname), "editor import")
 
 
-def _mtime(path):
-    try:
-        return os.stat(path).st_mtime
-    except (OSError, TypeError):
-        return 0.0
+def _signature(path, module):
+    """File mtime, or a hash of the internal text the module came from."""
+    if path:
+        try:
+            return os.stat(path).st_mtime
+        except OSError:
+            return 0.0
+    text = bpy.data.texts.get(module + ".py") or bpy.data.texts.get(module)
+    return hash(text.as_string()) if text else 0.0
 
 
 def _entry_of(component):
@@ -231,7 +237,7 @@ def _entry_of(component):
         entry.checked = now
     elif now - entry.checked > _MTIME_CHECK:
         entry.checked = now
-        if entry.file and _mtime(entry.file) != entry.mtime:
+        if _signature(entry.file, module) != entry.mtime:
             _load(entry, module, classname)
     return entry
 
