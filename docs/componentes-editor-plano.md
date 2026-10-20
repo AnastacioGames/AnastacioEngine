@@ -1,6 +1,6 @@
 # Plano: Components com lado de editor ("Smart Components")
 
-Status (2026-10-20): etapas 1 a 6 implementadas (ver "Feito"); 7 aberta.
+Status (2026-10-20): etapas 1 a 7 implementadas (ver "Feito").
 
 ## Feito
 
@@ -25,6 +25,7 @@ Status (2026-10-20): etapas 1 a 6 implementadas (ver "Feito"); 7 aberta.
   `BKE_python_component_attached` depois de adicionar. `on_change` valida todos os campos quando qualquer
   um muda (assim um aviso que depende de outro campo fica certo). `requires` só configura ao adicionar.
   Etapa 7 (parte): template "04 Smart Component" no Text Editor.
+  Etapa 7: guia "Smart Components" no site da API (pt, en, es, ru), com gizmos e draw_ui.
   Extra: `Scene(tip=...)` escolhe uma cena (no jogo chega o nome, para `logic.addScene`).
 - **Etapa 5**: `Editor.draw_gizmo(self, obj, args, g, selected)`. `g` (classe `Gizmo` em
   `range_component_editor.py`) tem `line`, `path`, `circle` (eixo X/Y/Z ou vetor), `sphere`,
