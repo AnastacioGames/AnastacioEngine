@@ -287,6 +287,7 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
         row.menu("PARTICLE_MT_gpu_particle_presets", text=preset_label)
         row.operator("particle.gpu_particle_preset_add", text="", icon='ZOOMIN')
         row.operator("particle.gpu_particle_preset_add", text="", icon='ZOOMOUT').remove_active = True
+        row.operator("particle.gpu_particles_copy_to_selected", text="", icon='COPYDOWN')
 
         # ---- Emitter ----
         row = main_box.row(align=True)
@@ -1749,6 +1750,63 @@ class PARTICLE_OT_import_gpu_debug_values(Operator):
         return {'FINISHED'}
 
 
+def _copy_rna_struct(src, dst, skip=()):
+    """Copia todas as propriedades editaveis de src para dst (recursivo em structs aninhados)."""
+    for prop in src.bl_rna.properties:
+        ident = prop.identifier
+        if ident == "rna_type" or ident in skip:
+            continue
+        if prop.type == 'POINTER':
+            sub_src = getattr(src, ident)
+            if prop.is_readonly:
+                if sub_src is not None and not isinstance(sub_src, bpy.types.ID):
+                    _copy_rna_struct(sub_src, getattr(dst, ident))
+                continue
+            try:
+                setattr(dst, ident, sub_src)
+            except (AttributeError, TypeError, ValueError):
+                pass
+        elif prop.type == 'COLLECTION' or prop.is_readonly:
+            continue
+        else:
+            try:
+                setattr(dst, ident, getattr(src, ident))
+            except (AttributeError, TypeError, ValueError):
+                pass
+
+
+class PARTICLE_OT_gpu_particles_copy_to_selected(Operator):
+    bl_idname = "particle.gpu_particles_copy_to_selected"
+    bl_label = "Copy GPU Particles to Selected"
+    bl_description = "Copy the GPU Particle System (main and Mix) from the active object to the other selected objects"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return ob is not None and any(o is not ob for o in context.selected_objects)
+
+    def execute(self, context):
+        src = context.object
+        count = 0
+        for ob in context.selected_objects:
+            if ob is src:
+                continue
+            ob.use_gpu_particles = src.use_gpu_particles
+            ob.use_gpu_particles_mix = src.use_gpu_particles_mix
+            ob.use_gpu_particle_collider = src.use_gpu_particle_collider
+            ob.gpu_particle_active_preset = src.gpu_particle_active_preset
+            for a, b in ((src.gpu_particles, ob.gpu_particles),
+                         (src.gpu_particles_mix, ob.gpu_particles_mix)):
+                # particle_look aplica valores padrao ao mudar: vai primeiro, o resto depois
+                if hasattr(a, "particle_look"):
+                    b.particle_look = a.particle_look
+                _copy_rna_struct(a, b, skip={"particle_look"})
+            count += 1
+        self.report({'INFO'}, tip_("GPU particles copied to %d object(s)") % count)
+        return {'FINISHED'}
+
+
 @bpy.app.handlers.persistent
 def _gpu_debug_load_post_handler(dummy):
     path = _gpu_debug_sidecar_path()
@@ -1777,6 +1835,7 @@ classes = (
     PARTICLE_PT_context_particles,
     PARTICLE_PT_gpu_emitter,
     PARTICLE_OT_import_gpu_debug_values,
+    PARTICLE_OT_gpu_particles_copy_to_selected,
     PARTICLE_PT_emission,
     PARTICLE_PT_hair_dynamics,
     PARTICLE_PT_cache,
