@@ -8,6 +8,7 @@ import re
 
 import bpy
 from bpy.types import Operator
+from bpy.app.handlers import persistent
 from bpy.props import BoolProperty, EnumProperty, StringProperty
 
 import range_locale
@@ -52,6 +53,7 @@ def write_table(header, rows):
         w = csv.writer(f)
         w.writerow(header)
         w.writerows(rows)
+    _stats_cache["key"] = None
     _refresh_text_block(path)
 
 
@@ -88,7 +90,9 @@ def language_columns(header):
 
 
 def slug(text):
-    s = text.strip().lower()
+    import unicodedata
+    s = unicodedata.normalize("NFKD", text.strip().lower())
+    s = "".join(c for c in s if not unicodedata.combining(c))
     s = re.sub(r"\s+", "_", s)
     s = re.sub(r"[^\w.]+", "", s)
     return s[:60] or "text"
@@ -235,7 +239,7 @@ def _default_config():
     header, _ = read_table()
     codes = [c for _, c in language_columns(header)] or ["en"]
     return {"base": codes[0],
-            "languages": {c: {"name": c, "font": "", "atlas": ""} for c in codes},
+            "languages": {c: {"name": range_locale.native_name(c), "font": "", "atlas": ""} for c in codes},
             "default": {"font": "", "atlas": ""}}
 
 
@@ -282,7 +286,7 @@ class LOCALE_OT_atlases_generate(Operator):
             vfont = bpy.data.fonts.get(entry.get("font") or "") or (model.vfont if model else None)
             name = ATLAS_PREFIX + code
             cu = bpy.data.curves.get(name)
-            if cu is None or cu.type != 'FONT':
+            if cu is None or not isinstance(cu, bpy.types.TextCurve):
                 cu = bpy.data.curves.new(name, 'FONT')
             cu.use_fake_user = True  # no object uses it: keep it in the .range
             if vfont:
@@ -316,7 +320,418 @@ def _style_items():
         [(key, v[0], v[1]) for key, v in STYLES.items()]
 
 
+# ---------------------------------------------------------------------------
+# Simple flow: Enable Languages -> Translate All Texts -> write the translations ->
+# Language Button. Everything below works on the same CSV/JSON as the operators above.
+
+COMMON_LANGUAGES = ["en", "pt-BR", "es", "fr", "de", "it", "ru", "ja", "ko", "zh-CN", "pl", "tr"]
+
+_stats_cache = {"key": None, "value": None}
+
+
+def table_stats():
+    """{'languages', 'keys', 'missing': {code: n}, 'rows'} of the CSV (cached by mtime)."""
+    path = csv_path()
+    try:
+        st = os.stat(path)
+        key = (path, st.st_mtime_ns, st.st_size)
+    except OSError:
+        return None
+    if _stats_cache["key"] != key:
+        rows, langs = range_locale._read_csv(path)
+        missing = {c: sum(1 for t in rows.values() if not t.get(c)) for c in langs}
+        _stats_cache["key"] = key
+        _stats_cache["value"] = {"languages": langs, "keys": len(rows), "missing": missing,
+                                 "rows": rows}
+    return _stats_cache["value"]
+
+
+def texts_without_key(scene):
+    return [ob for ob in scene.objects
+            if ob.type == 'FONT' and not ob.data.locale_key.strip() and ob.data.body.strip()
+            and not any(c.module == "range_language" for c in ob.game.components)]
+
+
+def _language_items(self, context):
+    items = [(c, "%s (%s)" % (range_locale.native_name(c), c), "") for c in COMMON_LANGUAGES]
+    return items + [('OTHER', "Other...", "Type any language code (BCP 47)")]
+
+
+def _system_common():
+    code = range_locale.system_language()
+    if code in COMMON_LANGUAGES:
+        return code
+    prefix = code.split("-")[0]
+    return next((c for c in COMMON_LANGUAGES if c.split("-")[0] == prefix), "en")
+
+
+def _ensure_config_languages(codes):
+    cfg = read_config() or {}
+    langs = cfg.setdefault("languages", {})
+    for c in codes:
+        e = langs.setdefault(c, {})
+        e.setdefault("name", range_locale.native_name(c))
+        e.setdefault("font", "")
+        e.setdefault("atlas", "")
+    cfg.setdefault("base", codes[0] if codes else "en")
+    cfg.setdefault("default", {"font": "", "atlas": ""})
+    write_config(cfg)
+
+
+class LOCALE_OT_enable(Operator):
+    """Turn on game languages for this project: creates the locale folder with the """ \
+        """translation table (one column per language) next to the .range"""
+    bl_idname = "locale.enable"
+    bl_label = "Enable Languages"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    base = EnumProperty(name="Texts are written in", items=_language_items,
+                        description="Language of the texts already in the scene")
+    second = EnumProperty(name="Translate to", items=_language_items,
+                          description="First translation; add more later with Add Language")
+    translate_all = BoolProperty(name="Prepare all texts of the scene", default=True,
+                                 description="Give every text a Translation Key and put it in the table")
+
+    def invoke(self, context, event):
+        self.base = _system_common()
+        self.second = "en" if self.base != "en" else "pt-BR"
+        return context.window_manager.invoke_props_dialog(self, width=320)
+
+    def execute(self, context):
+        if _need_saved(self):
+            return {'CANCELLED'}
+        codes = []
+        for c in (self.base, self.second):
+            if c != 'OTHER' and c not in codes:
+                codes.append(c)
+        header, rows = read_table()
+        if not header:
+            header = ["key"] + (codes or ["en"]) + ["context"]
+            write_table(header, rows)
+        _ensure_config_languages([c for _, c in language_columns(header)])
+        if self.translate_all:
+            bpy.ops.locale.translate_all()
+        self.report({'INFO'}, "Languages on: %s" % ", ".join(c for _, c in language_columns(header)))
+        return {'FINISHED'}
+
+
+class LOCALE_OT_language_add(Operator):
+    """Add a language column to the translation table"""
+    bl_idname = "locale.language_add"
+    bl_label = "Add Language"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    language = EnumProperty(name="Language", items=_language_items)
+    code = StringProperty(name="Code", description="Only for Other: e.g. nl, sv, pt-PT, es-419")
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_props_dialog(self)
+
+    def draw(self, context):
+        self.layout.prop(self, "language")
+        if self.language == 'OTHER':
+            self.layout.prop(self, "code")
+
+    def execute(self, context):
+        code = self.code.strip() if self.language == 'OTHER' else self.language
+        if not code:
+            self.report({'ERROR'}, "Type the language code")
+            return {'CANCELLED'}
+        code = range_locale.normalize(code)
+        header, rows = read_table()
+        if not header:
+            self.report({'ERROR'}, "Press Enable Languages first")
+            return {'CANCELLED'}
+        cols = language_columns(header)
+        if code in [c for _, c in cols]:
+            self.report({'INFO'}, "%s is already in the table" % code)
+            return {'CANCELLED'}
+        # new column right after the last language (before context / notes)
+        at = cols[-1][0] + 1 if cols else 1
+        header.insert(at, code)
+        for r in rows:
+            while len(r) < at:
+                r.append("")
+            r.insert(at, "")
+        write_table(header, rows)
+        _ensure_config_languages([code])
+        self.report({'INFO'}, "%s added: write its texts in the table" % range_locale.native_name(code))
+        return {'FINISHED'}
+
+
+class LOCALE_OT_language_remove(Operator):
+    """Remove this language column (and its translations) from the table"""
+    bl_idname = "locale.language_remove"
+    bl_label = "Remove Language"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    code = StringProperty()
+
+    def invoke(self, context, event):
+        return context.window_manager.invoke_confirm(self, event)
+
+    def execute(self, context):
+        header, rows = read_table()
+        cols = dict((c, i) for i, c in language_columns(header))
+        if self.code not in cols or len(cols) < 2:
+            self.report({'WARNING'}, "The table needs at least one language")
+            return {'CANCELLED'}
+        i = cols[self.code]
+        del header[i]
+        for r in rows:
+            if len(r) > i:
+                del r[i]
+        write_table(header, rows)
+        cfg = read_config()
+        if cfg.get("languages", {}).pop(self.code, None) is not None:
+            write_config(cfg)
+        return {'FINISHED'}
+
+
+def _unique_key(base, used):
+    key, n = base, 2
+    while key in used:
+        key = "%s_%d" % (base, n)
+        n += 1
+    used.add(key)
+    return key
+
+
+class LOCALE_OT_translate_all(Operator):
+    """Prepare every text of the scene for translation in one click: gives each text """ \
+        """without a key a Translation Key, turns on Language Font and puts its text in the table"""
+    bl_idname = "locale.translate_all"
+    bl_label = "Translate All Texts"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        if _need_saved(self):
+            return {'CANCELLED'}
+        apply_preview('OFF')
+        header, rows = read_table()
+        if not header:
+            self.report({'ERROR'}, "Press Enable Languages first")
+            return {'CANCELLED'}
+        cols = language_columns(header)
+        base_col = cols[0][0] if cols else 1
+        by_text = {}
+        for r in rows:
+            if r and len(r) > base_col and r[base_col]:
+                by_text.setdefault(r[base_col], r[0].strip())
+        used = {r[0].strip() for r in rows if r}
+        keyed = 0
+        for ob in texts_without_key(context.scene):
+            cu = ob.data
+            if cu.locale_key.strip():
+                continue  # same data used by another object, done already
+            cu.use_locale_font = True
+            body = cu.body.replace("\n", "\\n")
+            key = by_text.get(body)  # same text already in the table: one translation for both
+            if key is None:
+                key = _unique_key(slug(cu.body), used)
+                row = [""] * len(header)
+                row[0] = key
+                row[base_col] = body
+                rows.append(row)
+                by_text[body] = key
+            cu.locale_key = key
+            keyed += 1
+        for ob in _game_texts(context, False):
+            if ob.data.locale_key:
+                ob.data.use_locale_font = True
+        write_table(header, rows)
+        bpy.ops.locale.table_create()  # keys typed by hand that are not in the table yet
+        context.scene.locale_preview = 'OFF'
+        self.report({'INFO'}, "%d texts ready for translation" % keyed)
+        return {'FINISHED'}
+
+
+class LOCALE_OT_button_add(Operator):
+    """Make the active object a language button: a click on it goes to the next language """ \
+        """and, on a text, it shows the language name. No script needed"""
+    bl_idname = "locale.button_add"
+    bl_label = "Add Language Button"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None
+
+    def execute(self, context):
+        ob = context.object
+        if any(c.module == "range_language" for c in ob.game.components):
+            self.report({'INFO'}, "%s already has a Language Button" % ob.name)
+            return {'CANCELLED'}
+        override = context.copy()
+        override.update(object=ob, active_object=ob)
+        result = bpy.ops.logic.python_component_register(override,
+                                                         component_name="range_language.LanguageButton")
+        if 'FINISHED' not in result:
+            self.report({'ERROR'}, "Could not add the Language Button")
+            return {'CANCELLED'}
+        if ob.type == 'FONT':
+            # the button shows the language name, not a translated text
+            ob.data.locale_key = ""
+            ob.data.use_locale_font = True
+        self.report({'INFO'}, "Language Button added: a click switches the language "
+                              "(Game > Components to change it)")
+        return {'FINISHED'}
+
+
+GUIDE = """GAME LANGUAGES - quick guide
+============================
+
+1. Scene > Localization > Enable Languages
+   Choose the language your texts are written in and the first translation.
+   It creates the folder locale/ next to the .range with translations.csv
+   and already prepares every text of the scene.
+
+2. Translate All Texts
+   Run it again after adding new texts: they get a Translation Key and go
+   into the table. Texts with the same words share one translation.
+
+3. Write the translations
+   Open Table opens translations.csv here (Alt+S saves) - or open the file
+   in Excel / LibreOffice / Google Sheets: one row per text, one column per
+   language. Empty cell = shows the first language.
+   Preview Language (in the panel) shows the texts in that language in the
+   viewport; the file always keeps the original.
+
+4. Language menu in the game
+   Select a text and press Add Language Button: a click on it switches to
+   the next language and it shows the language name. Nothing else to do.
+   The choice is saved; the first time, the game uses the system language.
+
+5. Letters the font does not have (Russian, Japanese...)
+   Generate Atlases bakes the letters of each language. For another font in
+   one language, set "font" in locale.json (Open Config).
+
+In scripts (optional):
+   Range.locale.language = "pt-BR"
+   Range.locale.tr("hud.lap", lap=2, total=3)   # cell text "Lap {lap} of {total}"
+   Range.locale.next()                          # next language
+   Logic bricks: Python controller, Module mode: range_locale.next
+"""
+
+
+class LOCALE_OT_guide(Operator):
+    """Show the step by step guide of game languages"""
+    bl_idname = "locale.guide"
+    bl_label = "Languages Guide"
+
+    def execute(self, context):
+        text = bpy.data.texts.get("Languages_Guide.txt") or bpy.data.texts.new("Languages_Guide.txt")
+        text.from_string(GUIDE)
+        for area in context.screen.areas:
+            if area.type == 'TEXT_EDITOR':
+                area.spaces.active.text = text
+                return {'FINISHED'}
+
+        # no Text Editor on screen: show it in a popup
+        def draw(menu, ctx):
+            for line in GUIDE.splitlines()[2:]:
+                menu.layout.label(text=line)
+        context.window_manager.popup_menu(draw, title="Game Languages", icon='WORLD')
+        return {'FINISHED'}
+
+
+# --- viewport preview: texts in one language; the .range always keeps the original ---
+
+BASE_PROP = "_locale_base_body"
+
+
+def _restore_bodies():
+    for cu in bpy.data.curves:
+        if isinstance(cu, bpy.types.TextCurve) and BASE_PROP in cu:
+            cu.body = cu[BASE_PROP]
+            del cu[BASE_PROP]
+
+
+def apply_preview(code):
+    _restore_bodies()
+    stats = table_stats() if bpy.data.filepath else None
+    if not code or code == 'OFF' or not stats:
+        return 0
+    rows = stats["rows"]
+    count = 0
+    for cu in bpy.data.curves:
+        if not isinstance(cu, bpy.types.TextCurve) or not cu.locale_key or cu.locale_key not in rows:
+            continue
+        texts = rows[cu.locale_key]
+        text = texts.get(code) or texts.get(code.split("-")[0])
+        if text is None or text == cu.body:
+            continue
+        cu[BASE_PROP] = cu.body
+        cu.body = text
+        count += 1
+    return count
+
+
+def _preview_items(self, context):
+    items = [('OFF', "Original", "Texts as written")]
+    stats = table_stats() if bpy.data.filepath else None
+    for c in (stats["languages"] if stats else []):
+        items.append((c, range_locale.native_name(c), c))
+    return items
+
+
+def _preview_update(self, context):
+    apply_preview(self.locale_preview)
+
+
+_saved_preview = []
+
+
+@persistent
+def _save_pre(*args):
+    # never save the preview text
+    scene = bpy.context.scene
+    _saved_preview[:] = [scene.locale_preview] if scene else []
+    _restore_bodies()
+
+
+@persistent
+def _save_post(*args):
+    if _saved_preview and _saved_preview[0] != 'OFF':
+        apply_preview(_saved_preview[0])
+
+
+@persistent
+def _load_post(*args):
+    _restore_bodies()
+    for sc in bpy.data.scenes:
+        if "locale_preview" in sc:
+            del sc["locale_preview"]
+
+
+_HANDLERS = (("save_pre", _save_pre), ("save_post", _save_post), ("load_post", _load_post))
+
+
+def register_props():
+    bpy.types.Scene.locale_preview = EnumProperty(
+        name="Preview Language", items=_preview_items, update=_preview_update,
+        description="Show the texts in this language in the viewport (the file keeps the original)")
+    for name, fn in _HANDLERS:
+        lst = getattr(bpy.app.handlers, name)
+        if fn not in lst:
+            lst.append(fn)
+
+
+def unregister_props():
+    for name, fn in _HANDLERS:
+        lst = getattr(bpy.app.handlers, name)
+        if fn in lst:
+            lst.remove(fn)
+    del bpy.types.Scene.locale_preview
+
+
 classes = (
+    LOCALE_OT_enable,
+    LOCALE_OT_language_add,
+    LOCALE_OT_language_remove,
+    LOCALE_OT_translate_all,
+    LOCALE_OT_button_add,
+    LOCALE_OT_guide,
     LOCALE_OT_table_create,
     LOCALE_OT_keys_from_text,
     LOCALE_OT_table_open,

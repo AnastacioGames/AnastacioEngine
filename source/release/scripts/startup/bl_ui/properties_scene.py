@@ -259,14 +259,12 @@ class SCENE_PT_scene(SceneButtonsPanel, Panel):
 
 class SCENE_PT_localization(SceneButtonsPanel, Panel):
     """Range.locale: translation table and language fonts of the game"""
-    bl_label = "Localization"
-    bl_options = {'DEFAULT_CLOSED'}
+    bl_label = "Game Languages"
     COMPAT_ENGINES = {'BLENDER_GAME'}
 
     def draw(self, context):
         from .properties_data_curve import draw_locale_project
         box = self.layout.box()
-        box.label(text="Game Languages:", icon="WORLD")
         draw_locale_project(box)
 
 

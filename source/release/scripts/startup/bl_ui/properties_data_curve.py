@@ -472,30 +472,68 @@ class DATA_PT_text_panel_category(Panel):
         row.prop(context.window_manager, "ae_text_panel_category", expand=True)
 
 
-def draw_locale_project(layout):
-    """Project-wide localization buttons (Scene > Localization and Text > Translation)."""
+def draw_locale_project(layout, full=True):
+    """Game languages of the project, in steps (Scene > Localization and Text > Translation)."""
     import bpy
-    import os
-    path = bpy.path.abspath("//locale/translations.csv")
+    context = bpy.context
     col = layout.column(align=True)
     if not bpy.data.filepath:
-        col.label(text="Save the .range to use locale/translations.csv", icon='INFO')
+        col.label(text="Save the .range first (the translations go next to it)", icon='INFO')
         return
-    if os.path.isfile(path):
-        try:
-            import range_locale
-            rows, langs = range_locale._read_csv(path)
-            col.label(text="%d keys: %s" % (len(rows), ", ".join(langs)), icon='FILE_TEXT')
-        except Exception as ex:
-            col.label(text="translations.csv: %s" % ex, icon='ERROR')
-        row = col.row(align=True)
-        row.operator("locale.table_open", text="Open Table", icon='TEXT').file = 'CSV'
-        row.operator("locale.table_open", text="locale.json", icon='SETTINGS').file = 'CONFIG'
-        row.operator("locale.folder_open", text="", icon='FILE_FOLDER')
-        col.operator("locale.table_create", text="Add Missing Keys", icon='FILE_REFRESH')
-        col.operator("locale.atlases_generate", icon='IMAGE_DATA')
+    try:
+        from bl_operators.anastacio_locale import table_stats, texts_without_key
+        stats = table_stats()
+    except Exception as ex:
+        col.label(text="translations.csv: %s" % ex, icon='ERROR')
+        return
+    if stats is None:
+        col.label(text="The game has one language now.", icon='INFO')
+        col.scale_y = 1.0
+        row = col.row()
+        row.scale_y = 1.6
+        row.operator("locale.enable", icon='WORLD')
+        col.operator("locale.guide", text="How does it work?", icon='QUESTION')
+        return
+
+    import range_locale
+    langs = stats["languages"]
+    col.label(text="Languages (%d texts):" % stats["keys"])
+    for i, code in enumerate(langs):
+        row = col.box().row(align=True)
+        name = range_locale.native_name(code)
+        if i == 0:
+            row.label(text="%s  (original)" % name, icon='FILE_TEXT')
+        else:
+            missing = stats["missing"].get(code, 0)
+            if missing:
+                row.label(text="%s  -  %d to translate" % (name, missing), icon='ERROR')
+            else:
+                row.label(text="%s  -  done" % name, icon='FILE_TICK')
+        if i > 0 and full:
+            row.operator("locale.language_remove", text="", icon='X', emboss=False).code = code
+    col.operator("locale.language_add", icon='ZOOMIN')
+
+    col = layout.column(align=True)
+    pending = texts_without_key(context.scene)
+    if pending:
+        col.label(text="%d new texts not in the table" % len(pending), icon='ERROR')
+        row = col.row()
+        row.alert = True
+        row.operator("locale.translate_all", text="Translate All Texts", icon='FILE_REFRESH')
     else:
-        col.operator("locale.table_create", text="Create Translation Table", icon='NEW')
+        col.operator("locale.translate_all", text="Translate All Texts", icon='FILE_REFRESH')
+    row = col.row(align=True)
+    row.operator("locale.table_open", text="Open Table", icon='TEXT').file = 'CSV'
+    row.operator("locale.folder_open", text="", icon='FILE_FOLDER')
+
+    col = layout.column(align=True)
+    col.prop(context.scene, "locale_preview", icon='VISIBLE_IPO_ON')
+    if full:
+        col.operator("locale.button_add", text="Language Button on Active Object", icon='HAND')
+        row = col.row(align=True)
+        row.operator("locale.atlases_generate", text="Generate Atlases", icon='IMAGE_DATA')
+        row.operator("locale.table_open", text="Config", icon='SETTINGS').file = 'CONFIG'
+    col.operator("locale.guide", text="Guide", icon='QUESTION')
 
 
 class GameTextPanel(CurveButtonsPanel):
@@ -523,27 +561,27 @@ class DATA_PT_game_text_translation(GameTextPanel, Panel):
 
     def draw(self, context):
         text = context.curve
+        ob = context.object
         box = self.layout.box()
-        box.label(text="Translation:", icon="WORLD")
+        box.label(text="This Text:", icon="WORLD")
         col = box.column()
-        col.prop(text, "locale_key")
+        if ob and any(c.module == "range_language" for c in ob.game.components):
+            col.label(text="Language Button: shows the language name", icon='HAND')
+        else:
+            col.prop(text, "locale_key")
+            if text.locale_key:
+                try:
+                    from bl_operators.anastacio_locale import table_stats
+                    stats = table_stats()
+                    if stats and text.locale_key not in stats["rows"]:
+                        col.label(text="Key not in the table: press Translate All Texts", icon='ERROR')
+                except Exception:
+                    pass
         col.prop(text, "use_locale_font")
-        if text.locale_key:
-            try:
-                import range_locale
-                import bpy
-                import os
-                path = bpy.path.abspath("//locale/translations.csv")
-                if os.path.isfile(path):
-                    rows, _ = range_locale._read_csv(path)
-                    if text.locale_key not in rows:
-                        col.label(text="Key not in translations.csv", icon='ERROR')
-            except Exception:
-                pass
-        col.operator("locale.keys_from_text", icon='COPYDOWN')
+        col.operator("locale.button_add", text="Make it a Language Button", icon='HAND')
         box = self.layout.box()
         box.label(text="Project:", icon="FILE_TEXT")
-        draw_locale_project(box)
+        draw_locale_project(box, full=False)
 
 
 class DATA_PT_game_text_alignment(GameTextPanel, Panel):

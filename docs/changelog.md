@@ -25,6 +25,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Sem teste com janela ainda.
 - RolimaRacer migrado: `Tools/migrar_idiomas.py` gerou a tabela (129 chaves), `_language.py` virou ponte
   (mesmos textos conferidos chave a chave), `Language Font` em 169 textos, russo com Roboto-Regular.
+- Fluxo simplificado (painel Scene ▸ Game Languages em passos): `Enable Languages` (idioma dos textos +
+  primeira tradução, já prepara a cena), lista de idiomas com "N to translate"/"done", `Add/Remove
+  Language`, `Translate All Texts` (chave sem acento a partir do texto; textos iguais dividem a chave),
+  `Preview Language` na viewport (guarda o original em `_locale_base_body`; `save_pre` restaura, o .range
+  nunca salva a prévia), `Guide`. Componente `range_language.LanguageButton` (clique/tecla → próximo,
+  anterior ou um idioma; mostra o nome nativo) e `Range.locale.next/previous/step/native_name` (também
+  como controlador Python em modo Module). Guia em `docs/idiomas.md`. Testado em background (editor + `--server`).
 
 ## 2026-10-19 - Fresnel, Z Offset e Shadow Casting Alpha no modo Game
 

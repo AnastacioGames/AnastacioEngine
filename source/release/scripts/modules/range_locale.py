@@ -21,6 +21,23 @@ SAVE_KEY = "locale.language"  # in Range.logic.globalDict, saved with it by the 
 
 _IGNORED_COLUMNS = {"context", "note", "notes", "comment", "comments"}
 
+# native names used when locale.json does not give one
+NATIVE_NAMES = {
+    "en": "English", "en-US": "English (US)", "en-GB": "English (UK)",
+    "pt": "Português", "pt-BR": "Português (Brasil)", "pt-PT": "Português (Portugal)",
+    "es": "Español", "es-419": "Español (Latinoamérica)", "fr": "Français", "de": "Deutsch",
+    "it": "Italiano", "ru": "Русский", "uk": "Українська", "pl": "Polski", "tr": "Türkçe",
+    "nl": "Nederlands", "sv": "Svenska", "cs": "Čeština", "ja": "日本語", "ko": "한국어",
+    "zh": "中文", "zh-CN": "简体中文", "zh-TW": "繁體中文", "zh-Hans": "简体中文",
+    "zh-Hant": "繁體中文", "ar": "العربية", "hi": "हिन्दी", "id": "Bahasa Indonesia",
+    "th": "ไทย", "vi": "Tiếng Việt", "el": "Ελληνικά", "hu": "Magyar", "ro": "Română",
+}
+
+
+def native_name(code):
+    code = normalize(code)
+    return NATIVE_NAMES.get(code) or NATIVE_NAMES.get(code.split("-")[0]) or code
+
 _state = {
     "base": "en",
     "languages": [],      # column order of the CSV
@@ -98,7 +115,7 @@ def reload():
             print("Range.locale: could not read %s: %s" % (path, ex))
     langs = {normalize(k): v for k, v in (cfg.get("languages") or {}).items()}
     s["base"] = normalize(cfg.get("base") or (s["languages"][0] if s["languages"] else "en"))
-    s["names"] = {k: v.get("name", k) for k, v in langs.items() if isinstance(v, dict)}
+    s["names"] = {k: v.get("name") for k, v in langs.items() if isinstance(v, dict) and v.get("name")}
     s["fonts"] = {k: {"font": v.get("font", ""), "atlas": v.get("atlas", "")}
                   for k, v in langs.items() if isinstance(v, dict)}
     default = cfg.get("default") or {}
@@ -219,7 +236,35 @@ def set_language(code, save=True):
 def name(code=None):
     """Native name of a language ('Português'), from locale.json, else the code."""
     code = normalize(code) if code else _state["language"]
-    return _state["names"].get(code, code)
+    found = _state["names"].get(code)
+    return found if found and found != code else native_name(code)
+
+
+def step(offset=1):
+    """Go to the next (1) or previous (-1) language of the table; returns the new code."""
+    langs = _state["languages"]
+    if not langs:
+        return _state["language"]
+    try:
+        i = langs.index(_state["language"])
+    except ValueError:
+        i = 0 if offset > 0 else 1
+    return set_language(langs[(i + offset) % len(langs)])
+
+
+def _sensors_ok(cont):
+    return all(s.positive for s in cont.sensors) if cont.sensors else True
+
+
+# Python controller in Module mode, no script needed: range_locale.next / range_locale.previous
+def next(cont=None):
+    if cont is None or _sensors_ok(cont):
+        return step(1)
+
+
+def previous(cont=None):
+    if cont is None or _sensors_ok(cont):
+        return step(-1)
 
 
 def _start():
