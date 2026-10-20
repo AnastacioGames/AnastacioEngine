@@ -134,6 +134,28 @@ for dirpath, _, files in os.walk(root):
 # so age em builds antigos com o RUNPATH absoluto, por isso patched == 0 e aceitavel.
 PY
 
+# O export do RangeArmor (editor e painel) roda os scripts com <versao>/python/bin/python3.11; sem ele o
+# export nao acha interpretador (musikai/Fumangy, 0.5.3). Copiado depois do patch acima porque o RUNPATH
+# dele precisa ser $ORIGIN/../lib (a libpython fica em <versao>/python/lib), nao $ORIGIN/lib.
+mkdir -p "$bundle_python/bin"
+cp -L "$python_root/bin/python3.11" "$bundle_python/bin/python3.11"
+python3 - "$bundle_python/bin/python3.11" "$python_root/lib" <<'PY'
+import sys
+path, old = sys.argv[1], sys.argv[2].encode()
+new = b"$ORIGIN/../lib"
+data = open(path, "rb").read()
+if old + b"\0" in data:
+    assert len(new) <= len(old), "RUNPATH novo maior que o antigo"
+    data = data.replace(old + b"\0", new + b"\0" * (len(old) - len(new) + 1))
+    open(path, "wb").write(data)
+PY
+chmod 755 "$bundle_python/bin/python3.11"
+ln -sf python3.11 "$bundle_python/bin/python3"
+if ! "$bundle_python/bin/python3.11" -c 'import encodings, json, zipfile' >/dev/null 2>&1; then
+  printf 'python3.11 embutido em %s nao roda sozinho.\n' "$bundle_python/bin" >&2
+  exit 1
+fi
+
 # Confere que libpython (lib/, RUNPATH $ORIGIN/lib do CMake) e a stdlib vao juntos.
 mkdir -p "$staging_dir/lib"
 [ -e "$staging_dir/lib/libpython3.11.so.1.0" ] || cp -L "$python_root/lib/libpython3.11.so.1.0" "$staging_dir/lib/"

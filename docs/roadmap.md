@@ -251,6 +251,13 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 `RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; ultimo pacote publicado 0.4.6; 0.5.0 em preparacao. Ver
 [linux-build.md](linux-build.md). Pendente:
 
+- **Export RangeArmor no Linux (musikai/Fumangy, 2026-10-20) — fazer ao abrir no Linux**: corrigido no
+  código, falta validar lá. (1) Gerar o pacote com `tools/linux/package-runtime.sh` e conferir que
+  `2.79/python/bin/python3.11` está dentro e roda fora da máquina de build (sem `/opt/anastacio-python311`).
+  (2) Recompilar o painel no container (`stage_rangearmor_linux.sh`) e criar um New Project: `EngineLinux64`
+  deve vir `./engine/Linux64/AnastacioRuntime`. (3) Exportar pelo botão de um clique do editor um `.range`
+  qualquer, inclusive com config.json antigo (`python3.10`/`RangeRuntime`). Depois publicar como 0.5.4.
+
 - **Bugs do Kitsuy (2026-09-28)**: corrigidos e validados no Windows e no Linux (Intel integrada,
   NVIDIA via offload e llvmpipe sem GPU; ver changelog). Falta mandar o build ao Kitsuy.
 

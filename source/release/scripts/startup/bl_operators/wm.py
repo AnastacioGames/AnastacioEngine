@@ -3015,6 +3015,12 @@ class WM_OT_one_click_export_rangearmor(Operator):
             if os.path.isfile(candidate):
                 return candidate
 
+        # Projetos antigos apontam para python3.10/python3.5m; o pacote atual traz 3.11.
+        bundled = os.path.join(engine_dir, "%d.%d" % bpy.app.version[:2], "python", "bin",
+                               "python.exe" if cur_os == "Windows" else "python3.11")
+        if os.path.isfile(bundled):
+            return bundled
+
         return None
 
     def execute(self, context):

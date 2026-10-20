@@ -131,7 +131,7 @@ impl Default for ProjectData {
             engine_windows32: "./engine/Windows32/RangeRuntime.exe".to_owned(),
             engine_windows64: "./engine/Windows64/AnastacioRuntime.exe".to_owned(),
             engine_linux32: "./engine/Linux32/RangeRuntime".to_owned(),
-            engine_linux64: "./engine/Linux64/RangeRuntime".to_owned(),
+            engine_linux64: "./engine/Linux64/AnastacioRuntime".to_owned(),
             python_windows32: "./engine/Windows32/2.79/python/bin/python.exe".to_owned(),
             python_windows64: "./engine/Windows64/2.79/python/bin/python.exe".to_owned(),
             python_linux32: "./engine/Linux32/2.79/python/bin/python3.5m".to_owned(),
@@ -229,7 +229,7 @@ pub struct LoadedProject {
     pub data: ProjectData,
 }
 
-/// Resolve only the two standard Windows names; explicit custom runtimes win.
+/// Resolve only the standard Windows/Linux names; explicit custom runtimes win.
 pub fn resolve_runtime(path: PathBuf) -> PathBuf {
     if path.is_file() {
         return path;
@@ -237,6 +237,8 @@ pub fn resolve_runtime(path: PathBuf) -> PathBuf {
     let alternate = match path.file_name().and_then(|name| name.to_str()) {
         Some("RangeRuntime.exe") => "AnastacioRuntime.exe",
         Some("AnastacioRuntime.exe") => "RangeRuntime.exe",
+        Some("RangeRuntime") => "AnastacioRuntime",
+        Some("AnastacioRuntime") => "RangeRuntime",
         _ => return path,
     };
     let candidate = path.with_file_name(alternate);
