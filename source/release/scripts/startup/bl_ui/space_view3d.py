@@ -3815,6 +3815,8 @@ class VIEW3D_PT_overlay(Panel):
         layout.prop(view, "show_outline_selected")
         layout.prop(view, "show_all_objects_origin")
         layout.prop(view, "show_relationship_lines")
+        if hasattr(context.window_manager, "range_component_gizmos"):
+            layout.prop(context.window_manager, "range_component_gizmos")
 
         layout.prop(view, "show_floor", text="Grid")
         sub = layout.column(align=True)

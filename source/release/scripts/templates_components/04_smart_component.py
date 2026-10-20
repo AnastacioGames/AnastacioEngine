@@ -6,7 +6,8 @@ mesmo componente com dois recursos novos, todos opcionais:
 1. Campos melhores (Range.args): slider com limite, dica ao passar o mouse,
    seções, lista em ordem, e escolher um objeto ou uma cena com o mouse.
 2. Uma classe "Editor" que roda só no editor (o jogo ignora): arruma o objeto
-   ao adicionar, mostra avisos nos campos e cria botões na caixa do componente.
+   ao adicionar, mostra avisos nos campos, cria botões na caixa do componente
+   e desenha guias na viewport (raio, linha até o alvo).
 
 Nada muda no jogo: args["Velocidade"] continua sendo um float, e o jogo
 exportado roda sem bpy. Os componentes antigos continuam funcionando igual.
@@ -105,6 +106,20 @@ class Perseguidor(types.KX_PythonComponent):
             alvo.location = obj.matrix_world * Vector((0, 4, 0))
             context.scene.objects.link(alvo)
             self.args["Alvo"] = alvo
+
+        def draw_gizmo(self, obj, args, g, selected):
+            # Desenho na viewport (não aparece no jogo). Por padrão só roda
+            # com o objeto selecionado; Overlay > Component Gizmos muda isso.
+            # g: line, path, circle, sphere, box, arrow, text. Cor: "YELLOW",
+            # "RED", ... ou (r, g, b). Posições em coordenadas do mundo.
+            pos = obj.matrix_world.translation
+            g.circle(pos, args["Distancia de parada"], "GREEN")
+            if args["Agressivo"]:
+                g.circle(pos, args["Distancia de parada"] * 3.0, "RED")
+            alvo = args["Alvo"]                        # Object do editor, ou None
+            if alvo is not None:
+                g.arrow(pos, alvo.matrix_world.translation, "YELLOW", width=2)
+            g.text(pos, args["Nome"])
 
         def colocar_no_chao(self, obj, context):
             context.scene.update()   # matriz do objeto em dia

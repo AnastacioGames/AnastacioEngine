@@ -13,6 +13,8 @@
 #                     return "Too fast"        # warning drawn under the field
 #             buttons = [("Add waypoint", "add_waypoint", "PLUS")]
 #             def add_waypoint(self, obj, context): ...
+#             def draw_gizmo(self, obj, args, g, selected):   # viewport drawing
+#                 g.circle(obj.location, args["Radius"], "YELLOW")
 #
 # Inside Editor methods: self.object (bpy Object), self.component (the bpy
 # PythonComponent) and self.args (read/write the fields by name). bpy may be
@@ -31,7 +33,7 @@ import traceback
 from types import ModuleType
 from bpy.app.handlers import persistent
 
-__all__ = ("editor_of", "state_of", "attach", "run_button")
+__all__ = ("editor_of", "state_of", "attach", "run_button", "enable_gizmos", "Gizmo")
 
 _RANGE_SUBMODULES = ("types", "logic", "events", "render", "constraints", "application",
                      "imgui", "network", "audio", "texture")
@@ -403,3 +405,181 @@ def _ensure_handler():
         handlers.scene_update_post.append(_scene_update)
     if _load_post not in handlers.load_post:
         handlers.load_post.append(_load_post)
+
+
+# ---------------------------------------------------------------------------
+# draw_gizmo: Editor.draw_gizmo(self, obj, args, g, selected) on each viewport
+# redraw. Which objects are asked is set by the "Component Gizmos" option in
+# the viewport Overlay popover (WindowManager.range_component_gizmos).
+
+_COLORS = {
+    "WHITE": (1.0, 1.0, 1.0), "BLACK": (0.0, 0.0, 0.0), "GRAY": (0.5, 0.5, 0.5),
+    "RED": (1.0, 0.25, 0.2), "GREEN": (0.3, 0.9, 0.3), "BLUE": (0.3, 0.5, 1.0),
+    "YELLOW": (1.0, 0.85, 0.2), "ORANGE": (1.0, 0.55, 0.1), "CYAN": (0.2, 0.9, 1.0),
+    "MAGENTA": (1.0, 0.3, 0.9), "PURPLE": (0.6, 0.35, 1.0),
+}
+_DEFAULT_COLOR = (1.0, 0.85, 0.2, 1.0)
+_gizmo_handles = []
+_texts = []         # (position, text, color) collected in POST_VIEW, drawn in POST_PIXEL
+
+
+def _rgba(color):
+    if color is None:
+        return _DEFAULT_COLOR
+    if isinstance(color, str):
+        c = _COLORS.get(color.upper(), _DEFAULT_COLOR[:3])
+        return (c[0], c[1], c[2], 1.0)
+    c = tuple(color)
+    return c if len(c) == 4 else (c[0], c[1], c[2], 1.0)
+
+
+class Gizmo:
+    """The 'g' given to draw_gizmo. Positions are world space (obj.location,
+    obj.matrix_world.translation, tuples...). color: a name ("YELLOW", "RED",
+    ...) or (r, g, b[, a]). width: line width in pixels."""
+
+    def _lines(self, mode, points, color, width):
+        import bgl
+        bgl.glColor4f(*_rgba(color))
+        bgl.glLineWidth(float(width))
+        bgl.glBegin(mode)
+        for p in points:
+            bgl.glVertex3f(*_v(p))
+        bgl.glEnd()
+
+    def line(self, a, b, color=None, width=1):
+        import bgl
+        self._lines(bgl.GL_LINES, (a, b), color, width)
+
+    def path(self, points, color=None, width=1, closed=False):
+        import bgl
+        self._lines(bgl.GL_LINE_LOOP if closed else bgl.GL_LINE_STRIP, points, color, width)
+
+    def circle(self, center, radius, color=None, width=1, axis="Z", segments=32):
+        """axis: normal of the circle, "X"/"Y"/"Z" or a vector."""
+        import math
+        from mathutils import Vector
+        n = Vector({"X": (1, 0, 0), "Y": (0, 1, 0), "Z": (0, 0, 1)}.get(axis, axis) if
+                   isinstance(axis, str) else axis).normalized()
+        u = n.orthogonal().normalized()
+        w = n.cross(u)
+        c = _v(center)
+        pts = []
+        for i in range(max(3, int(segments))):
+            t = 2.0 * math.pi * i / segments
+            pts.append(c + (u * math.cos(t) + w * math.sin(t)) * radius)
+        self.path(pts, color, width, closed=True)
+
+    def sphere(self, center, radius, color=None, width=1):
+        for axis in "XYZ":
+            self.circle(center, radius, color, width, axis)
+
+    def box(self, center, size, color=None, width=1):
+        """Axis-aligned box; size is the full size, a number or (x, y, z)."""
+        import bgl
+        from mathutils import Vector
+        s = Vector((size, size, size) if isinstance(size, (int, float)) else size) * 0.5
+        c = _v(center)
+        corners = [c + Vector((x * s.x, y * s.y, z * s.z))
+                   for x in (-1, 1) for y in (-1, 1) for z in (-1, 1)]
+        edges = (0, 1, 2, 3, 4, 5, 6, 7, 0, 2, 1, 3, 4, 6, 5, 7, 0, 4, 1, 5, 2, 6, 3, 7)
+        self._lines(bgl.GL_LINES, [corners[i] for i in edges], color, width)
+
+    def arrow(self, start, end, color=None, width=1):
+        import bgl
+        a, b = _v(start), _v(end)
+        d = b - a
+        if d.length < 1e-6:
+            return
+        head = min(d.length * 0.25, 0.5)
+        back = b - d.normalized() * head
+        side = d.orthogonal().normalized() * head * 0.4
+        up = d.normalized().cross(side)
+        self._lines(bgl.GL_LINES, (a, b, b, back + side, b, back - side, b, back + up, b, back - up),
+                    color, width)
+
+    def text(self, position, text, color=None):
+        _texts.append((_v(position), str(text), _rgba(color or "WHITE")))
+
+
+def _v(p):
+    from mathutils import Vector
+    return Vector(p).to_3d() if not isinstance(p, Vector) else p.to_3d()
+
+
+_gizmo = Gizmo()
+
+
+def _gizmo_targets(context):
+    """[(obj, selected)] whose draw_gizmo runs on this redraw."""
+    mode = getattr(context.window_manager, "range_component_gizmos", 'SELECTED')
+    if mode == 'OFF':
+        return []
+    if mode == 'SELECTED':
+        return [(o, True) for o in context.selected_objects if o.game.components]
+    selected = {o.as_pointer() for o in context.selected_objects}
+    return [(o, o.as_pointer() in selected) for o in context.visible_objects
+            if o.game.components]
+
+
+def _draw_gizmos_view():
+    import bgl
+    del _texts[:]
+    context = bpy.context
+    try:
+        targets = _gizmo_targets(context)
+    except Exception:
+        return
+    if not targets:
+        return
+    bgl.glPushAttrib(bgl.GL_ENABLE_BIT | bgl.GL_CURRENT_BIT | bgl.GL_LINE_BIT)
+    try:
+        bgl.glDisable(bgl.GL_DEPTH_TEST)
+        bgl.glEnable(bgl.GL_BLEND)
+        for obj, selected in targets:
+            for comp in obj.game.components:
+                entry = _entry_of(comp)
+                if not entry or not entry.editor or not hasattr(entry.editor, "draw_gizmo"):
+                    continue
+                state = _states.setdefault(comp.as_pointer(), _State())
+                try:
+                    ed = _instance(entry, obj, comp)
+                    ed.draw_gizmo(obj, ed.args, _gizmo, selected)
+                except Exception:
+                    state.error = _report("%s.%s" % (comp.module, comp.name), "draw_gizmo")
+    finally:
+        bgl.glPopAttrib()
+
+
+def _draw_gizmos_pixel():
+    if not _texts:
+        return
+    import blf
+    import bgl
+    from bpy_extras.view3d_utils import location_3d_to_region_2d
+    context = bpy.context
+    region, rv3d = context.region, context.region_data
+    if region is None or rv3d is None:
+        return
+    font = 0
+    blf.size(font, 12, 72)
+    for pos, text, color in _texts:
+        xy = location_3d_to_region_2d(region, rv3d, pos)
+        if xy is None:
+            continue
+        if hasattr(blf, "color"):
+            blf.color(font, *color)
+        else:
+            bgl.glColor4f(*color)
+        blf.position(font, xy.x + 6, xy.y - 4, 0.0)
+        blf.draw(font, text)
+    del _texts[:]
+
+
+def enable_gizmos():
+    """Install the viewport draw handlers once (called by bl_ui at startup)."""
+    if _gizmo_handles:
+        return
+    sv = bpy.types.SpaceView3D
+    _gizmo_handles.append(sv.draw_handler_add(_draw_gizmos_view, (), 'WINDOW', 'POST_VIEW'))
+    _gizmo_handles.append(sv.draw_handler_add(_draw_gizmos_pixel, (), 'WINDOW', 'POST_PIXEL'))

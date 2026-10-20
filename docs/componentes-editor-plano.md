@@ -1,6 +1,6 @@
 # Plano: Components com lado de editor ("Smart Components")
 
-Status (2026-10-20): etapas 1 a 4 implementadas (ver "Feito"); 5 a 7 abertas.
+Status (2026-10-20): etapas 1 a 5 implementadas (ver "Feito"); 6 e 7 abertas.
 
 ## Feito
 
@@ -26,6 +26,14 @@ Status (2026-10-20): etapas 1 a 4 implementadas (ver "Feito"); 5 a 7 abertas.
   um muda (assim um aviso que depende de outro campo fica certo). `requires` só configura ao adicionar.
   Etapa 7 (parte): template "04 Smart Component" no Text Editor.
   Extra: `Scene(tip=...)` escolhe uma cena (no jogo chega o nome, para `logic.addScene`).
+- **Etapa 5**: `Editor.draw_gizmo(self, obj, args, g, selected)`. `g` (classe `Gizmo` em
+  `range_component_editor.py`) tem `line`, `path`, `circle` (eixo X/Y/Z ou vetor), `sphere`,
+  `box`, `arrow`, `text`; cor por nome (`"YELLOW"`, `"RED"`...) ou tupla; posições no mundo.
+  Dois draw handlers da View3D (POST_VIEW para linhas, POST_PIXEL para textos), instalados
+  pelo `properties_game.py` na carga da UI. Opção "Component Gizmos" no popover Overlay
+  (`WindowManager.range_component_gizmos`: Off / Selected (padrão) / All). Erro no
+  `draw_gizmo` vira o aviso vermelho da caixa e sai uma vez no console. Template 04
+  desenha os raios e a seta até o alvo. Gizmos durante o jogo: não (questão em aberto).
 
 ## Objetivo
 

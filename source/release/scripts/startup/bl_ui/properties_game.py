@@ -3136,6 +3136,24 @@ classes = (
 
 bpy.types.Scene.show_expanded_game_cursor = bpy.props.BoolProperty(name="Expanded", default=False)
 
+# Smart Components: which objects run Editor.draw_gizmo in the viewport.
+bpy.types.WindowManager.range_component_gizmos = EnumProperty(
+    name="Component Gizmos",
+    description="Viewport drawing of Smart Components (Editor.draw_gizmo)",
+    items=(
+        ('OFF', "Off", "Don't draw component gizmos"),
+        ('SELECTED', "Selected", "Draw gizmos of the selected objects"),
+        ('ALL', "All", "Draw gizmos of every visible object"),
+    ),
+    default='SELECTED',
+)
+
+try:
+    import range_component_editor
+    range_component_editor.enable_gizmos()
+except Exception as e:
+    print("Component gizmos:", e)
+
 if __name__ == "__main__":  # only for live edit.
     from bpy.utils import register_class
     for cls in classes:
