@@ -104,6 +104,11 @@ typedef struct FFMpegContext {
 #ifdef WITH_AUDASPACE
 	AUD_Device *audio_mixdown_device;
 #endif
+	/* Live audio instead of the scene mixdown (screencast). */
+	BKE_ffmpeg_audio_read_fn audio_read;
+	void *audio_read_data;
+	bool audio_flush;
+	float *audio_float_buffer;
 } FFMpegContext;
 
 #define FFMPEG_AUTOSPLIT_SIZE 2000000000
@@ -145,7 +150,30 @@ static int write_audio_frame(FFMpegContext *context)
 	pkt.size = 0;
 	pkt.data = NULL;
 
-	AUD_Device_read(context->audio_mixdown_device, context->audio_input_buffer, context->audio_input_samples);
+	if (context->audio_read) {
+		/* Interleaved float from the live source, converted to the packed encoder format. */
+		const int count = context->audio_input_samples * c->channels;
+		const enum AVSampleFormat packed = av_get_packed_sample_fmt(c->sample_fmt);
+		float *dst = (packed == AV_SAMPLE_FMT_FLT) ? (float *)context->audio_input_buffer : context->audio_float_buffer;
+		if (!context->audio_read(context->audio_read_data, dst, context->audio_input_samples, c->channels,
+		                         context->audio_flush))
+		{
+			return 1;  /* not captured yet: try again with the next video frame */
+		}
+		if (packed == AV_SAMPLE_FMT_S16) {
+			int16_t *out = (int16_t *)context->audio_input_buffer;
+			for (int i = 0; i < count; i++) {
+				const float v = dst[i] < -1.0f ? -1.0f : (dst[i] > 1.0f ? 1.0f : dst[i]);
+				out[i] = (int16_t)(v * 32767.0f);
+			}
+		}
+		else if (packed != AV_SAMPLE_FMT_FLT) {
+			memset(context->audio_input_buffer, 0, count * context->audio_sample_size);
+		}
+	}
+	else {
+		AUD_Device_read(context->audio_mixdown_device, context->audio_input_buffer, context->audio_input_samples);
+	}
 	context->audio_time += (double) context->audio_input_samples / (double) c->sample_rate;
 
 #ifdef FFMPEG_HAVE_ENCODE_AUDIO2
@@ -897,6 +925,10 @@ static AVStream *alloc_audio_stream(FFMpegContext *context, RenderData *rd, int 
 
 	context->audio_time = 0.0f;
 
+	if (context->audio_read) {
+		context->audio_float_buffer = MEM_mallocN(sizeof(float) * context->audio_input_samples * c->channels, __func__);
+	}
+
 	return st;
 }
 /* essential functions -- start, append, end */
@@ -1295,6 +1327,7 @@ int BKE_ffmpeg_start(void *context_v, struct Scene *scene, RenderData *rd, int r
 		}
 
 		specs.rate = rd->ffcodecdata.audio_mixrate;
+		if (context->audio_read == NULL)
 		context->audio_mixdown_device = BKE_sound_mixdown(scene, specs, preview ? rd->psfra : rd->sfra, rd->ffcodecdata.audio_volume);
 #ifdef FFMPEG_CODEC_TIME_BASE
 		c->time_base.den = specs.rate;
@@ -1427,6 +1460,7 @@ static void end_ffmpeg_impl(FFMpegContext *context, int is_autosplit)
 		av_free(context->audio_deinterleave_buffer);
 		context->audio_deinterleave_buffer = NULL;
 	}
+	MEM_SAFE_FREE(context->audio_float_buffer);
 
 	if (context->img_convert_ctx != NULL) {
 		sws_freeContext(context->img_convert_ctx);
@@ -1843,13 +1877,36 @@ void BKE_ffmpeg_context_realtime_set(void *context_v, bool realtime)
 	context->realtime = realtime;
 }
 
-void BKE_ffmpeg_screencast_settings(RenderData *rd, int fps, int crf)
+void BKE_ffmpeg_context_audio_source_set(void *context_v, BKE_ffmpeg_audio_read_fn read, void *data)
 {
-	/* H.264 in MP4, constant quality, no audio. The frame rate is the time base:
-	 * frames are written with their capture time as pts, so idle stretches cost nothing. */
+	FFMpegContext *context = context_v;
+	context->audio_read = read;
+	context->audio_read_data = data;
+}
+
+void BKE_ffmpeg_audio_flush(void *context_v, double to_time)
+{
+	FFMpegContext *context = context_v;
+#ifdef WITH_AUDASPACE
+	context->audio_flush = true;
+	write_audio_frames(context, to_time);
+	context->audio_flush = false;
+#else
+	UNUSED_VARS(context, to_time);
+#endif
+}
+
+void BKE_ffmpeg_screencast_settings(RenderData *rd, int fps, int crf, int audio_rate)
+{
+	/* H.264 in MP4, constant quality, AAC stereo when audio_rate > 0. The frame rate is the time
+	 * base: frames are written with their capture time as pts, so idle stretches cost nothing. */
 	rd->ffcodecdata.type = FFMPEG_MPEG4;
 	rd->ffcodecdata.codec = AV_CODEC_ID_H264;
-	rd->ffcodecdata.audio_codec = AV_CODEC_ID_NONE;
+	rd->ffcodecdata.audio_codec = (audio_rate > 0) ? AV_CODEC_ID_AAC : AV_CODEC_ID_NONE;
+	rd->ffcodecdata.audio_mixrate = audio_rate;
+	rd->ffcodecdata.audio_channels = FFM_CHANNELS_STEREO;
+	rd->ffcodecdata.audio_bitrate = 192;
+	rd->ffcodecdata.audio_volume = 1.0f;
 	rd->ffcodecdata.constant_rate_factor = crf;
 	rd->ffcodecdata.ffmpeg_preset = FFM_PRESET_REALTIME;
 	rd->ffcodecdata.gop_size = fps * 2;

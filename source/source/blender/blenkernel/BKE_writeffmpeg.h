@@ -77,7 +77,16 @@ void BKE_ffmpeg_property_del(struct RenderData *rd, void *type, void *prop_);
 void *BKE_ffmpeg_context_create(void);
 void BKE_ffmpeg_context_free(void *context_v);
 void BKE_ffmpeg_context_realtime_set(void *context_v, bool realtime);
-void BKE_ffmpeg_screencast_settings(struct RenderData *rd, int fps, int crf);
+void BKE_ffmpeg_screencast_settings(struct RenderData *rd, int fps, int crf, int audio_rate);
+
+/* Live audio source used instead of the scene mixdown. Fills samples * channels interleaved
+ * floats, or returns false when they aren't available yet (never when flush is set, then
+ * missing samples are silence). Called from the thread that appends the video frames. */
+typedef bool (*BKE_ffmpeg_audio_read_fn)(void *data, float *dst, int samples, int channels, bool flush);
+/* Before BKE_ffmpeg_start(). */
+void BKE_ffmpeg_context_audio_source_set(void *context_v, BKE_ffmpeg_audio_read_fn read, void *data);
+/* Writes the audio up to to_time seconds, padding with silence; before BKE_ffmpeg_end(). */
+void BKE_ffmpeg_audio_flush(void *context_v, double to_time);
 
 #ifdef __cplusplus
 }

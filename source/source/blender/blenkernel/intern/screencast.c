@@ -59,6 +59,8 @@
 
 #include "PIL_time.h"
 
+#include "screencast_audio.h"
+
 #include "GPU_glew.h"
 
 #define SCREENCAST_PBO_COUNT 3
@@ -107,6 +109,8 @@ struct Screencast {
 	RenderData rd;
 	ReportList encoder_reports;
 	bool encoder_failed;
+
+	ScreencastAudio *audio;  /* NULL: video without sound */
 
 	int frames_written, frames_dropped, frames_skipped;
 	char filepath[FILE_MAX];
@@ -404,6 +408,9 @@ void BKE_screencast_pause_set(Screencast *sc, bool paused)
 		sc->start_time += PIL_check_seconds_timer() - sc->pause_time;
 	}
 	sc->paused = paused;
+	if (sc->audio) {
+		screencast_audio_timeline_set(sc->audio, sc->start_time, paused);
+	}
 }
 
 bool BKE_screencast_is_paused(const Screencast *sc)
@@ -437,8 +444,18 @@ const char *BKE_screencast_filepath(const Screencast *sc)
 	return sc->filepath;
 }
 
+#ifdef WITH_FFMPEG
+static bool screencast_audio_read_cb(void *data, float *dst, int samples, int channels, bool flush)
+{
+	return screencast_audio_read(data, dst, samples, channels, flush);
+}
+#endif
+
 static void screencast_free(Screencast *sc)
 {
+	if (sc->audio) {
+		screencast_audio_end(sc->audio);
+	}
 	if (sc->mh_context) {
 		sc->mh.context_free(sc->mh_context);
 	}
@@ -452,7 +469,7 @@ static void screencast_free(Screencast *sc)
 }
 
 Screencast *BKE_screencast_begin(
-        int w, int h, int fps, int crf, bool show_cursor, float cursor_radius,
+        int w, int h, int fps, int crf, bool show_cursor, float cursor_radius, bool audio,
         const char *filepath, ReportList *reports)
 {
 	/* H.264 with 4:2:0 chroma needs even dimensions. */
@@ -477,9 +494,19 @@ Screencast *BKE_screencast_begin(
 	/* Output: H.264/MP4 when built with FFmpeg, AVI JPEG otherwise. */
 	BLI_strncpy(sc->rd.pic, filepath, sizeof(sc->rd.pic));
 #ifdef WITH_FFMPEG
-	BKE_ffmpeg_screencast_settings(&sc->rd, sc->fps, crf);
+	if (audio) {
+		sc->audio = screencast_audio_begin(PIL_check_seconds_timer());
+		if (sc->audio == NULL) {
+#ifdef _WIN32
+			BKE_report(reports, RPT_WARNING, "Recording without sound: sound capture needs Windows 10 (2004) or newer");
 #else
-	UNUSED_VARS(crf);
+			BKE_report(reports, RPT_WARNING, "Recording without sound: sound capture is only available on Windows");
+#endif
+		}
+	}
+	BKE_ffmpeg_screencast_settings(&sc->rd, sc->fps, crf, sc->audio ? SCREENCAST_AUDIO_RATE : 0);
+#else
+	UNUSED_VARS(crf, audio);
 	sc->rd.im_format.imtype = R_IMF_IMTYPE_AVIJPEG;
 	sc->rd.im_format.quality = 90;
 	sc->rd.frs_sec = (short)sc->fps;
@@ -502,8 +529,11 @@ Screencast *BKE_screencast_begin(
 	}
 #ifdef WITH_FFMPEG
 	BKE_ffmpeg_context_realtime_set(sc->mh_context, true);
+	if (sc->audio) {
+		BKE_ffmpeg_context_audio_source_set(sc->mh_context, screencast_audio_read_cb, sc->audio);
+	}
 #endif
-	/* No scene: no audio and no stamp metadata. */
+	/* No scene: sound comes from the live capture, no stamp metadata. */
 	if (!sc->mh.start_movie(sc->mh_context, NULL, &sc->rd, w, h, reports, false, "")) {
 		BKE_report(reports, RPT_ERROR, "Could not start the screen recording video");
 		screencast_free(sc);
@@ -532,6 +562,9 @@ Screencast *BKE_screencast_begin(
 	BLI_threadpool_insert(&sc->threads, sc);
 
 	sc->start_time = PIL_check_seconds_timer();
+	if (sc->audio) {
+		screencast_audio_timeline_set(sc->audio, sc->start_time, false);
+	}
 	return sc;
 }
 
@@ -566,6 +599,11 @@ void BKE_screencast_end(Screencast *sc, ReportList *reports)
 		screencast_frame_release(sc, sc->last_frame);
 		sc->last_frame = NULL;
 	}
+#ifdef WITH_FFMPEG
+	if (sc->audio && !sc->encoder_failed) {
+		BKE_ffmpeg_audio_flush(sc->mh_context, duration);
+	}
+#endif
 	sc->mh.end_movie(sc->mh_context);
 
 	if (reports) {
@@ -588,8 +626,9 @@ void BKE_screencast_end(Screencast *sc, ReportList *reports)
 			            "(lower the frame rate or record a single area)", sc->frames_dropped);
 		}
 	}
-	printf("Screencast: %s, %.1f s, %d frames written, %d dropped, %d skipped (window smaller than recording)%s\n",
+	printf("Screencast: %s, %.1f s, %d frames written, %d dropped, %d skipped (window smaller than recording), %s%s\n",
 	       sc->filepath, duration, sc->frames_written, sc->frames_dropped, sc->frames_skipped,
+	       sc->audio ? "with sound" : "no sound",
 	       sc->encoder_failed ? ", encoder failed" : "");
 
 	screencast_free(sc);

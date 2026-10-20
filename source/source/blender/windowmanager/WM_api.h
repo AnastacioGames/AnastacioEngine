@@ -532,7 +532,7 @@ void		WM_job_main_thread_lock_release(struct wmJob *job);
 
 			/* screen recording (wm_screencast.c) */
 bool		WM_screencast_start(struct bContext *C, struct wmWindow *win, const struct rcti *rect, int fps, int crf,
-		                    bool show_cursor, const char *filepath, struct ReportList *reports);
+		                    bool show_cursor, bool audio, const char *filepath, struct ReportList *reports);
 bool		WM_screencast_stop(struct ReportList *reports);
 bool		WM_screencast_is_running(void);
 double		WM_screencast_elapsed(void);

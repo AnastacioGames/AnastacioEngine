@@ -144,7 +144,7 @@ static void screencast_activate_context(GHOST_WindowHandle ghostwin)
 }
 
 bool WM_screencast_start(
-        bContext *C, wmWindow *win, const rcti *rect, int fps, int crf, bool show_cursor,
+        bContext *C, wmWindow *win, const rcti *rect, int fps, int crf, bool show_cursor, bool audio,
         const char *filepath, ReportList *reports)
 {
 	if (g_screencast) {
@@ -155,7 +155,7 @@ bool WM_screencast_start(
 	screencast_activate_context(win->ghostwin);
 	Screencast *core = BKE_screencast_begin(
 	        BLI_rcti_size_x(rect) + 1, BLI_rcti_size_y(rect) + 1, fps, crf, show_cursor,
-	        10.0f * max_ff(U.pixelsize, 1.0f), filepath, reports);
+	        10.0f * max_ff(U.pixelsize, 1.0f), audio, filepath, reports);
 	if (core == NULL) {
 		return false;
 	}

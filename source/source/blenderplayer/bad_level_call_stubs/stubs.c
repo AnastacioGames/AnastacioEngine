@@ -586,7 +586,7 @@ double      WM_jobs_starttime(struct wmWindowManager *wm, void *owner) RET_ZERO
 void		WM_jobs_stop(struct wmWindowManager *wm, void *owner, void *startjob) RET_NONE
 bool        WM_jobs_test(struct wmWindowManager *wm, void *owner, int job_type) RET_ZERO
 bool        WM_screencast_start(struct bContext *C, struct wmWindow *win, const struct rcti *rect, int fps, int crf,
-                                bool show_cursor, const char *filepath, struct ReportList *reports) RET_ZERO
+                                bool show_cursor, bool audio, const char *filepath, struct ReportList *reports) RET_ZERO
 bool        WM_screencast_stop(struct ReportList *reports) RET_ZERO
 bool        WM_screencast_is_running(void) RET_ZERO
 double      WM_screencast_elapsed(void) RET_ZERO

@@ -130,6 +130,7 @@ class INFO_PT_screen_recorder(Panel):
         col.active = not wm.is_screencast_running
         col.prop(wm, "screencast_full")
         col.prop(wm, "screencast_show_cursor")
+        col.prop(wm, "screencast_audio")
         col.prop(wm, "screencast_fps")
         col.prop(wm, "screencast_quality", text="Quality")
         layout.prop(wm, "screencast_record_standalone")
@@ -491,6 +492,11 @@ bpy.types.WindowManager.screencast_full = bpy.props.BoolProperty(
 bpy.types.WindowManager.screencast_show_cursor = bpy.props.BoolProperty(
     name="Show Cursor",
     description="Draw the mouse cursor in the video, highlighted while a button is held",
+    default=True,
+)
+bpy.types.WindowManager.screencast_audio = bpy.props.BoolProperty(
+    name="Audio",
+    description="Record the sound of the editor and of the game (Windows 10 2004 or newer)",
     default=True,
 )
 bpy.types.WindowManager.screencast_fps = bpy.props.IntProperty(

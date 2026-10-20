@@ -79,6 +79,7 @@ def standalone_env(context):
         "RANGE_SCREENCAST_FPS": str(wm.screencast_fps),
         "RANGE_SCREENCAST_CRF": str(QUALITY_CRF.get(wm.screencast_quality, 18)),
         "RANGE_SCREENCAST_CURSOR": "1" if wm.screencast_show_cursor else "0",
+        "RANGE_SCREENCAST_AUDIO": "1" if wm.screencast_audio else "0",
     })
     return env, filepath
 

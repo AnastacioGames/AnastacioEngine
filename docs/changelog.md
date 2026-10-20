@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Screencast grava o som
+
+- Opção **Audio** (ligada por padrão) no popover do Rec, no operador `screen.screencast` (`audio`) e no Standalone
+  (`RANGE_SCREENCAST_AUDIO`). O MP4 ganha uma faixa AAC estéreo 48 kHz 192 kbps.
+- Captura em `blenkernel/intern/screencast_audio.cc`: WASAPI process loopback (Windows 10 2004+), que pega o som
+  deste processo e dos filhos, qualquer que seja o device do audaspace (OpenAL/SDL), sem o som de outros programas.
+  As amostras são posicionadas na linha do tempo da gravação pelo timestamp QPC de cada pacote (mesmo relógio do
+  `PIL_check_seconds_timer`); lacunas viram silêncio, e o tempo pausado é descartado.
+- `writeffmpeg`: fonte de áudio ao vivo (`BKE_ffmpeg_context_audio_source_set`) no lugar do mixdown da cena e
+  `BKE_ffmpeg_audio_flush` no fim. Sem suporte (Windows antigo, Linux): grava sem som e avisa.
+- Validado com teste isolado (tom de 1 s tocado via waveOut): duração 1,003 s, ~40 ms após o início reportado
+  pelo waveOut. Falta ouvir uma gravação real do editor/Standalone.
+
 ## 2026-10-20 - Build Linux no container mais rápido
 
 - `tools/linux/container-build.sh` é o jeito normal: gera (uma vez) a imagem `anastacio-build:22.04-<hash>` do

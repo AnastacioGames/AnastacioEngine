@@ -170,6 +170,7 @@ set(SRC
 	intern/sca.c
 	intern/scene.c
 	intern/screencast.c
+	intern/screencast_audio.cc
 	intern/screen.c
 	intern/seqcache.c
 	intern/seqeffects.c
@@ -292,6 +293,7 @@ set(SRC
 	BKE_sca.h
 	BKE_scene.h
 	BKE_screencast.h
+	intern/screencast_audio.h
 	BKE_screen.h
 	BKE_sequencer.h
 	BKE_shrinkwrap.h

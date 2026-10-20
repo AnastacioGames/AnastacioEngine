@@ -40,9 +40,10 @@ typedef struct ScreencastCursor {
 	bool visible, pressed;
 } ScreencastCursor;
 
-/* Needs the GL context of the recorded window to be current. w and h are made even. */
+/* Needs the GL context of the recorded window to be current. w and h are made even.
+ * audio: also record the sound of this process and the ones it starts (Windows). */
 Screencast *BKE_screencast_begin(
-        int w, int h, int fps, int crf, bool show_cursor, float cursor_radius,
+        int w, int h, int fps, int crf, bool show_cursor, float cursor_radius, bool audio,
         const char *filepath, struct ReportList *reports);
 /* Reports the result (when reports is not NULL) and frees. Needs the same GL context. */
 void BKE_screencast_end(Screencast *sc, struct ReportList *reports);

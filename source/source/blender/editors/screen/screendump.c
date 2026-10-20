@@ -343,6 +343,7 @@ static void screencast_props_from_wm(bContext *C, wmOperator *op)
 		{"quality", "screencast_quality"},
 		{"full", "screencast_full"},
 		{"show_cursor", "screencast_show_cursor"},
+		{"audio", "screencast_audio"},
 		{"directory", "screencast_directory"},
 	};
 	wmWindowManager *wm = CTX_wm_manager(C);
@@ -449,7 +450,8 @@ static int screencast_exec(bContext *C, wmOperator *op)
 
 	if (!WM_screencast_start(C, win, &rect, RNA_int_get(op->ptr, "fps"),
 	                         screencast_quality_crf(RNA_enum_get(op->ptr, "quality")),
-	                         RNA_boolean_get(op->ptr, "show_cursor"), filepath, op->reports))
+	                         RNA_boolean_get(op->ptr, "show_cursor"), RNA_boolean_get(op->ptr, "audio"),
+	                         filepath, op->reports))
 	{
 		return OPERATOR_CANCELLED;
 	}
@@ -495,5 +497,8 @@ void SCREEN_OT_screencast(wmOperatorType *ot)
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 	prop = RNA_def_boolean(ot->srna, "show_cursor", true, "Show Cursor",
 	                       "Draw the mouse cursor in the video, highlighted while a button is held");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_boolean(ot->srna, "audio", true, "Audio",
+	                       "Record the sound of the editor and of the game (Windows 10 2004 or newer)");
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }

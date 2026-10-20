@@ -75,7 +75,8 @@ static void screencast_capture(GHOST_IWindow *window)
 			g_screencast = BKE_screencast_begin(
 			        bnds.getWidth(), bnds.getHeight(),
 			        screencast_env_int("RANGE_SCREENCAST_FPS", 30), screencast_env_int("RANGE_SCREENCAST_CRF", 18),
-			        screencast_env_int("RANGE_SCREENCAST_CURSOR", 1) != 0, 10.0f, filepath, nullptr);
+			        screencast_env_int("RANGE_SCREENCAST_CURSOR", 1) != 0, 10.0f,
+			        screencast_env_int("RANGE_SCREENCAST_AUDIO", 1) != 0, filepath, nullptr);
 			if (g_screencast) {
 				g_screencast_window = window;
 				CM_Message("Recording the game window: " << BKE_screencast_filepath(g_screencast));
