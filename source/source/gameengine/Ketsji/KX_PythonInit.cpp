@@ -3161,6 +3161,20 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 	PyModule_AddObject(gameLogic, "globalDict", pyGlobalDict);
 	Py_INCREF(pyGlobalDict);
 
+	// Range.args: component field helpers, pure Python in scripts/modules/range_args.py.
+	if (PyObject *argsMod = PyImport_ImportModule("range_args")) {
+		PyObject *rangeMod = PyDict_GetItemString(modules, "Range");
+		if (rangeMod) {
+			Py_INCREF(argsMod);
+			PyModule_AddObject(rangeMod, "args", argsMod);
+		}
+		PyDict_SetItemString(modules, "Range.args", argsMod);
+		Py_DECREF(argsMod);
+	}
+	else {
+		PyErr_Print();
+	}
+
 	// Range.locale: game localization, pure Python in scripts/modules/range_locale.py.
 	KX_ResetLocale();
 	if (PyObject *localeMod = PyImport_ImportModule("range_locale")) {

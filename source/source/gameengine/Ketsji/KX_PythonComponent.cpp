@@ -25,6 +25,7 @@
 #include "KX_PythonComponent.h"
 #include "EXP_PythonCallBack.h"
 #include "KX_GameObject.h"
+#include "KX_Scene.h"
 
 #include "CM_Message.h"
 
@@ -92,6 +93,29 @@ KX_GameObject *KX_PythonComponent::GetGameObject() const
 	return m_gameobj;
 }
 
+/* Same as BKE_python_component_argument_dict_new, with Range.args Object fields
+ * (stored as the object name) swapped for the KX_GameObject, or None. */
+static PyObject *component_arg_dict_new(PythonComponent *pc, KX_GameObject *gameobj)
+{
+	PyObject *args = (PyObject *)BKE_python_component_argument_dict_new(pc);
+	if (!args) {
+		return nullptr;
+	}
+
+	KX_Scene *scene = gameobj ? gameobj->GetScene() : nullptr;
+	for (PythonComponentProperty *cprop = (PythonComponentProperty *)pc->properties.first; cprop; cprop = cprop->next) {
+		if (cprop->type != CPROP_TYPE_OBJECT) {
+			continue;
+		}
+		KX_GameObject *target = (scene && cprop->strval[0]) ? scene->GetObjectList()->FindValue(cprop->strval) : nullptr;
+		PyObject *value = target ? target->GetProxy() : (Py_INCREF(Py_None), Py_None);
+		PyDict_SetItemString(args, cprop->name, value);
+		Py_DECREF(value);
+	}
+
+	return args;
+}
+
 void KX_PythonComponent::SetGameObject(KX_GameObject *gameobj)
 {
 	m_gameobj = gameobj;
@@ -113,7 +137,7 @@ void KX_PythonComponent::LiveUpdateArgs()
 		return;
 	}
 	PyObject *proxy = GetProxy();
-	PyObject *arg_dict = (PyObject *)BKE_python_component_argument_dict_new(m_pc);
+	PyObject *arg_dict = component_arg_dict_new(m_pc, m_gameobj);
 	if (!arg_dict) {
 		return;
 	}
@@ -141,7 +165,7 @@ void KX_PythonComponent::LiveUpdateArgs()
 
 void KX_PythonComponent::Awake()
 {
-	PyObject *arg_dict = (PyObject *)BKE_python_component_argument_dict_new(m_pc);
+	PyObject *arg_dict = component_arg_dict_new(m_pc, m_gameobj);
 
 	PyObject *ret = PyObject_CallMethod(GetProxy(), "awake", "O", arg_dict);
 
@@ -158,7 +182,7 @@ void KX_PythonComponent::Awake()
 
 void KX_PythonComponent::Start()
 {
-	PyObject *arg_dict = (PyObject *)BKE_python_component_argument_dict_new(m_pc);
+	PyObject *arg_dict = component_arg_dict_new(m_pc, m_gameobj);
 
 	PyObject *ret = PyObject_CallMethod(GetProxy(), "start", "O", arg_dict);
 

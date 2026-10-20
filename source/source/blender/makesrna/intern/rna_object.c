@@ -39,6 +39,7 @@
 #include "BLI_listbase.h"
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
+#include "BLI_path_util.h"
 
 //#include "BKE_action.h"
 #include "BKE_camera.h"
@@ -203,6 +204,10 @@ const EnumPropertyItem rna_enum_object_axis_items[] = {
 #include "BKE_particle.h"
 #include "BKE_scene.h"
 #include "BKE_deform.h"
+#include "BKE_python_component.h"
+#include "BKE_report.h"
+
+#include "DNA_python_component_types.h"
 
 #include "ED_object.h"
 #include "ED_particle.h"
@@ -2104,6 +2109,42 @@ static void rna_Object_modifier_clear(Object *object, bContext *C)
 	WM_main_add_notifier(NC_OBJECT | ND_MODIFIER | NA_REMOVED, object);
 }
 
+static PythonComponent *rna_GameObjectSettings_components_new(Object *object, bContext *C, ReportList *reports,
+                                                              const char *import)
+{
+	char buf[FILE_MAX];
+	PythonComponent *pycomp;
+
+	BLI_strncpy(buf, import, sizeof(buf));
+	pycomp = BKE_python_component_new(buf, reports, C);
+
+	if (!pycomp) {
+		return NULL;
+	}
+
+	BLI_addtail(&object->components, pycomp);
+	BKE_python_component_attached(object, pycomp);
+	WM_main_add_notifier(NC_LOGIC, NULL);
+
+	return pycomp;
+}
+
+static void rna_GameObjectSettings_components_remove(Object *object, ReportList *reports, PointerRNA *comp_ptr)
+{
+	PythonComponent *pycomp = comp_ptr->data;
+
+	if (BLI_findindex(&object->components, pycomp) == -1) {
+		BKE_reportf(reports, RPT_ERROR, "Component '%s' not found in object '%s'", pycomp->name, object->id.name + 2);
+		return;
+	}
+
+	BLI_remlink(&object->components, pycomp);
+	BKE_python_component_free(pycomp);
+	RNA_POINTER_INVALIDATE(comp_ptr);
+
+	WM_main_add_notifier(NC_LOGIC, NULL);
+}
+
 static void rna_Object_boundbox_get(PointerRNA *ptr, float *values)
 {
 	Object *ob = (Object *)ptr->id.data;
@@ -3470,6 +3511,35 @@ static void rna_def_logic_brick_group(BlenderRNA *brna)
 	RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
 }
 
+/* object.game.components */
+static void rna_def_object_game_components(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	RNA_def_property_srna(cprop, "GameObjectComponents");
+	srna = RNA_def_struct(brna, "GameObjectComponents", NULL);
+	RNA_def_struct_sdna(srna, "Object");
+	RNA_def_struct_ui_text(srna, "Game Object Components", "Collection of python components");
+
+	func = RNA_def_function(srna, "new", "rna_GameObjectSettings_components_new");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT | FUNC_USE_REPORTS);
+	RNA_def_function_ui_description(func, "Add a python component to the object (no need to make it active)");
+	parm = RNA_def_string(func, "component_name", NULL, FILE_MAX, "Component",
+	                      "The component class name with module (module.ComponentName)");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_pointer(func, "component", "PythonComponent", "", "Newly added component");
+	RNA_def_function_return(func, parm);
+
+	func = RNA_def_function(srna, "remove", "rna_GameObjectSettings_components_remove");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	RNA_def_function_ui_description(func, "Remove a python component from the object");
+	parm = RNA_def_pointer(func, "component", "PythonComponent", "", "Component to remove");
+	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED | PARM_RNAPTR);
+	RNA_def_parameter_clear_flags(parm, PROP_THICK_WRAP, 0);
+}
+
 static void rna_def_object_game_settings(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -3521,6 +3591,7 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_collection_sdna(prop, NULL, "components", NULL);
 	RNA_def_property_struct_type(prop, "PythonComponent"); /* rna_python_component.c */
 	RNA_def_property_ui_text(prop, "Components", "Game engine components");
+	rna_def_object_game_components(brna, prop);
 
 	prop = RNA_def_property(srna, "show_sensors", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "scaflag", OB_SHOWSENS);

@@ -74,8 +74,16 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
             row.operator("logic.python_component_remove", text="", icon='X').index = i
             lastHeader = None
 
-            if len(c.properties) == 1 and c.properties[0].name == "C_Icons": continue
-            if c.show_expanded and len(c.properties) > 0:
+            # Smart Components: errors, on_change warnings and Editor buttons.
+            error, warnings, buttons = _component_editor_info(c)
+            if error:
+                row = box.row()
+                row.alert = True
+                row.label(text=error, icon="CANCEL")
+            cbox = box
+
+            only_icons = len(c.properties) == 1 and c.properties[0].name == "C_Icons"
+            if not only_icons and c.show_expanded and len(c.properties) > 0:
                 expanded  = True
                 collapsed = True
                 box = box.box().column()
@@ -89,6 +97,8 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
                         split=prop.name.split("/")
                         name=split[1] if len(split) > 1 else "HEADER"
                         icon=split[2] if len(split) > 2 else "FULLSCREEN"
+                        if icon not in _ui_icons():
+                            icon = "FULLSCREEN"   # unknown name: default icon instead of no header
                         row.scale_y = 1.2
                         try:
                             row.prop(prop,"value", text=name, toggle=1, icon=icon, emboss=1)
@@ -127,14 +137,71 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
                             if not prop.name=="C_Icons": 
                                 row.label(text=text, icon="DOT")
                                 col = row.column()
-                                col.prop(prop, "value", text="")
+                                # Range.args: Float/Int with min and max draw a slider.
+                                col.prop(prop, "value", text="", slider=prop.use_slider)
+                                warning = warnings.get(prop.name)
+                                if warning:
+                                    box.row().label(text=warning, icon="ERROR")
                     except:
                         if expanded and collapsed:
                             row.label(text=text)
                             col = row.column()
                             col.prop(prop, "value", text="")
-                        
+
+            if buttons and c.show_expanded:
+                col = cbox.column(align=True)
+                for b in buttons:
+                    op = col.operator("logic.component_editor_button", text=b[0], icon=b[2])
+                    op.index = i
+                    op.method = b[1]
+
         layout.operator("wm.flowmenu_ot_init", text="Add...", icon="PLUS")
+
+
+def _ui_icons():
+    return bpy.types.UILayout.bl_rna.functions["prop"].parameters["icon"].enum_items
+
+
+def _component_editor_info(c):
+    """(error, {field: warning}, [(text, method, icon)]) of a Smart Component."""
+    try:
+        import range_component_editor as rce
+        error, warnings = rce.state_of(c)
+        editor = rce.editor_of(c)
+        buttons = []
+        icons = _ui_icons()
+        for b in getattr(editor, "buttons", ()) if editor else ():
+            text, method = str(b[0]), str(b[1])
+            icon = str(b[2]) if len(b) > 2 else "NONE"
+            buttons.append((text, method, icon if icon in icons else "NONE"))
+        return error, warnings, buttons
+    except Exception as e:
+        return "Editor: %s" % e, {}, []
+
+
+class LOGIC_OT_component_editor_button(Operator):
+    """Run a button declared in the component's Editor class"""
+    bl_idname = "logic.component_editor_button"
+    bl_label = "Component Button"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index: IntProperty(options={'HIDDEN'})
+    method: StringProperty(options={'HIDDEN'})
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None
+
+    def execute(self, context):
+        import range_component_editor as rce
+        ob = context.active_object
+        if self.index >= len(ob.game.components):
+            return {'CANCELLED'}
+        error = rce.run_button(context, ob, ob.game.components[self.index], self.method)
+        if error:
+            self.report({'ERROR'}, error)
+            return {'CANCELLED'}
+        return {'FINISHED'}
 
 class GAME_PT_game_properties(GameButtonsPanel, Panel):
     bl_label = "Game Properties"
@@ -3016,6 +3083,7 @@ class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
 
 classes = (
     GAME_PT_game_components,
+    LOGIC_OT_component_editor_button,
     GAME_PT_game_properties,
     PHYSICS_PT_game_category,
     PHYSICS_PT_game_physics,

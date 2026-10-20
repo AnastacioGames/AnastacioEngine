@@ -6,6 +6,29 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Smart Components: classe `Editor` (etapa 4)
+
+- Component pode ter `requires = {"physics": "...", "components": ["mod.Classe"]}` e uma classe interna
+  `Editor` (só editor; o jogo ignora): `on_attach(self, obj)`, `on_change(self, obj, nome, valor)` (texto
+  devolvido = aviso embaixo do campo; roda para todos os campos quando algo muda e ao abrir), `buttons =
+  [(texto, metodo, icone)]` com `metodo(self, obj, context)`. Dentro: `self.object`, `self.component`,
+  `self.args["Campo"]` lê/grava.
+- `scripts/modules/range_component_editor.py`: importa o component com um `Range` falso tolerante (qualquer
+  `logic.x`/`events.y` no topo do módulo funciona), cache por arquivo + mtime (checa a cada 1 s), tira do
+  `sys.modules` o que veio da pasta do jogo. Erro em código do `Editor` vira linha vermelha na caixa e é
+  impresso uma vez; erro de import só no console (Add/Reload já avisam). `on_change` roda num
+  `scene_update_post` só para o objeto ativo e só quando um valor muda.
+- C: `BKE_python_component_attached` chama `range_component_editor._attached` depois do `BLI_addtail` em
+  `components.new()` e nos operadores Add/Create (`logic_ops.c`). Painel: aviso por campo, erro e botões
+  (`LOGIC_OT_component_editor_button`, com undo).
+- Testes (background): requires, on_attach por `new()` e pelo operador, avisos que dependem de outro campo,
+  botões, erro proposital, dois components que se pedem (sem laço), jogo `--server` igual; os 66 tipos de
+  component do RolimaRacer importam sem erro.
+- `Range.args.Scene(tip=...)` (`CPROP_TYPE_SCENE` = 11, nome em `strval`): seletor de cena no editor
+  (`ComponentSceneProperty`, `value` + `scene_name`); no jogo chega o nome (str), pronto para
+  `logic.addScene`. Testado: o exemplo adiciona a cena "Pegou" por cima ao pegar o jogador.
+- Painel: `Header` com ícone que não existe usa `FULLSCREEN` em vez de não desenhar o cabeçalho.
+
 ## 2026-10-20 - Gravação de tela (screencast) refeita
 
 - O screencast da 2.79 (Ctrl+Alt+F3) não existia mais nesta base; só o screenshot. Volta como
@@ -45,6 +68,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Standalone roda, a gravação do editor fica pausada (`WindowManager.screencast_paused`, tempo fora do
   vídeo). `Play Last` abre a mais recente das duas. Testado em background (janela escondida do Cook): vídeo
   1280x720 com a imagem do jogo; falta teste com janela.
+
+## 2026-10-20 - Components: `components.new()`, `Range.args` e campo Object
+
+Etapas 1-3 de `docs/componentes-editor-plano.md`.
+
+- `obj.game.components.new("modulo.Classe")` / `.remove(comp)` no RNA (`GameObjectComponents`), sem depender
+  do objeto ativo; falha de import vira `RuntimeError`. `load_component` limpa erro pendente no fim.
+- `Range.args` (puro Python, `scripts/modules/range_args.py`; real no `Range` falso do editor e no jogo):
+  `Float`/`Int` (`min`, `max`, `tip`), `Bool`, `Text`, `Choice` (ordem declarada, diferente do `set`),
+  `Object` e `Header` (gera o `C_Header/Nome/Icone`). São subclasses de `int`/`float`/`str`: o jogo recebe os
+  mesmos valores de antes.
+- DNA `PythonComponentProperty`: `min`, `max`, `metaflag`, `tip[256]` (zero = sem dica; arquivos antigos e da
+  Range upstream iguais). Limite dinâmico no `value`, slider no painel com `min` e `max`, dica no tooltip
+  (`interface_region_tooltip.c`). Reload mantém o valor e atualiza as dicas.
+- `CPROP_TYPE_OBJECT`: nome em `strval`, seletor de objeto no editor (`value` ponteiro, `object_name`); no
+  jogo `KX_PythonComponent` entrega o `KX_GameObject` da cena ou `None` (awake/start/update_args).
+- Testado em background: editor (tipos, clamp 50 → 20, Choice, Object, Reload, alvo apagado) e
+  `AnastacioRuntime --server` (args no `start`: Object chega como `KX_LightObject`, apagado como `None`).
+  RolimaRacer abre com os 483 components iguais. Sem teste com janela ainda (tooltip e slider).
 
 ## 2026-10-20 - Idiomas do jogo (Range.locale) e atlas de texto
 

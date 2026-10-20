@@ -45,6 +45,7 @@
 #endif
 
 #include <string.h>
+#include <stdint.h>
 
 #ifdef WITH_PYTHON
 
@@ -218,6 +219,47 @@ static void free_properties(ListBase *lb)
 }
 
 #ifdef WITH_PYTHON
+/* Range.args helpers (scripts/modules/range_args.py) are plain int/float/str
+ * subclasses carrying a "_range_meta" dict: kind, min, max, tip, items. */
+static PyObject *get_range_meta(PyObject *pyvalue, const char **r_kind)
+{
+	PyObject *meta = PyObject_GetAttrString(pyvalue, "_range_meta");
+	*r_kind = "";
+
+	if (!meta) {
+		PyErr_Clear();
+		return NULL;
+	}
+	if (!PyDict_Check(meta)) {
+		Py_DECREF(meta);
+		return NULL;
+	}
+
+	PyObject *kind = PyDict_GetItemString(meta, "kind");
+	if (kind && PyUnicode_Check(kind)) {
+		*r_kind = _PyUnicode_AsString(kind);
+	}
+	return meta;
+}
+
+static void apply_range_meta(PythonComponentProperty *cprop, PyObject *meta)
+{
+	PyObject *item;
+
+	if ((item = PyDict_GetItemString(meta, "min")) && item != Py_None) {
+		cprop->min = (float)PyFloat_AsDouble(item);
+		cprop->metaflag |= CPROP_META_MIN;
+	}
+	if ((item = PyDict_GetItemString(meta, "max")) && item != Py_None) {
+		cprop->max = (float)PyFloat_AsDouble(item);
+		cprop->metaflag |= CPROP_META_MAX;
+	}
+	if ((item = PyDict_GetItemString(meta, "tip")) && PyUnicode_Check(item)) {
+		BLI_strncpy(cprop->tip, _PyUnicode_AsString(item), sizeof(cprop->tip));
+	}
+	PyErr_Clear();
+}
+
 static void create_properties(PythonComponent *pycomp, PyObject *cls)
 {
 	PyObject *args_dict, *pyitems;
@@ -257,8 +299,47 @@ static void create_properties(PythonComponent *pycomp, PyObject *cls)
 
 		cprop = create_property(name);
 
+		const char *kind;
+		PyObject *meta = get_range_meta(pyvalue, &kind);
+
 		// Determine the type and default value
-		if (PyBool_Check(pyvalue)) {
+		if (STREQ(kind, "bool")) {
+			cprop->type = CPROP_TYPE_BOOLEAN;
+			cprop->boolval = PyObject_IsTrue(pyvalue) == 1;
+		}
+		else if (STREQ(kind, "object") || STREQ(kind, "scene")) {
+			cprop->type = STREQ(kind, "scene") ? CPROP_TYPE_SCENE : CPROP_TYPE_OBJECT;
+			BLI_strncpy((char *)cprop->strval, _PyUnicode_AsString(pyvalue), MAX_PROPSTRING);
+		}
+		else if (STREQ(kind, "choice")) {
+			/* Ordered, unlike a plain set: items in declaration order, value = default item. */
+			PyObject *items = PyDict_GetItemString(meta, "items");
+			const char *def = _PyUnicode_AsString(pyvalue);
+			cprop->type = CPROP_TYPE_SET;
+			cprop->itemval = 0;
+			memset(&cprop->enumval, 0, sizeof(ListBase));
+
+			for (Py_ssize_t j = 0, len = (items && PyTuple_Check(items)) ? PyTuple_Size(items) : 0; j < len; ++j) {
+				PyObject *v = PyTuple_GetItem(items, j);
+				if (!PyUnicode_Check(v)) {
+					continue;
+				}
+				LinkData *link = MEM_callocN(sizeof(LinkData), "PythonComponentProperty set link data");
+				char *str = MEM_callocN(MAX_PROPSTRING, "PythonComponentProperty set string");
+				BLI_strncpy(str, _PyUnicode_AsString(v), MAX_PROPSTRING);
+				if (def && STREQ(str, def)) {
+					cprop->itemval = BLI_listbase_count(&cprop->enumval);
+				}
+				link->data = str;
+				BLI_addtail(&cprop->enumval, link);
+			}
+
+			if (BLI_listbase_is_empty(&cprop->enumval)) {
+				printf("Choice property \"%s\" has no items, skipping\n", name);
+				free = true;
+			}
+		}
+		else if (PyBool_Check(pyvalue)) {
 			cprop->type = CPROP_TYPE_BOOLEAN;
 			cprop->boolval = PyLong_AsLong(pyvalue) != 0;
 		}
@@ -356,6 +437,11 @@ static void create_properties(PythonComponent *pycomp, PyObject *cls)
 			free = true;
 		}
 
+		if (meta) {
+			apply_range_meta(cprop, meta);
+			Py_DECREF(meta);
+		}
+
 		if (free) {
 			free_property(cprop);
 			continue;
@@ -391,7 +477,12 @@ static void create_properties(PythonComponent *pycomp, PyObject *cls)
 					/* We found a coresponding property in the old component, so the new one
 					 * is released, the old property is removed from the original list and
 					 * added to the new list.
+					 * The value is kept, but the editor hints always come from the new code.
 					 */
+					propit->min = cprop->min;
+					propit->max = cprop->max;
+					propit->metaflag = cprop->metaflag;
+					BLI_strncpy(propit->tip, cprop->tip, sizeof(propit->tip));
 					free_property(cprop);
 					/* The exisiting property is removed to allow at the end free properties
 					 * that are no longuer used.
@@ -448,6 +539,9 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 		PyDict_DelItemString(sys_modules, "Range.network"); \
 		PyDict_DelItemString(sys_modules, "Range.audio"); \
 		PyDict_DelItemString(sys_modules, "Range.texture"); \
+		if (PyDict_GetItemString(sys_modules, "Range.args")) { \
+			PyDict_DelItemString(sys_modules, "Range.args"); \
+		} \
 		BLI_split_dir_part(maggie->name, path, sizeof(path)); \
 		pypath = PyC_UnicodeFromByte(path); \
 		index = PySequence_Index(sys_path, pypath); \
@@ -466,6 +560,8 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 			} \
 			Py_DECREF(pypath); \
 		} \
+		/* Nothing may stay pending: components.new() is called from Python. */ \
+		PyErr_Clear(); \
 		PyGILState_Release(state); \
 		return value;
 
@@ -522,6 +618,17 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 	PyDict_SetItemString(sys_modules, "Range.audio", rangesubmod);
 	PyDict_SetItemString(sys_modules, "Range.texture", rangesubmod);
 	PyDict_SetItemString(PyModule_GetDict(rangemod), "__component__", Py_True);
+	/* Range.args is pure Python (scripts/modules/range_args.py), the real one in the editor too. */
+	{
+		PyObject *argsmod = PyImport_ImportModule("range_args");
+		if (argsmod) {
+			PyDict_SetItemString(sys_modules, "Range.args", argsmod);
+			PyModule_AddObject(rangemod, "args", argsmod); /* steals the reference */
+		}
+		else {
+			PyErr_Print();
+		}
+	}
 
 	// Try to load up the module
 	mod = PyImport_ImportModule(pc->module);
@@ -564,6 +671,31 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 	return true;
 
 #endif /* WITH_PYTHON */
+}
+
+void BKE_python_component_attached(struct Object *ob, PythonComponent *pc)
+{
+#ifdef WITH_PYTHON
+	/* range_component_editor (scripts/modules) finds both by pointer, imports the
+	 * component and runs "requires" and Editor.on_attach, guarding user errors. */
+	PyGILState_STATE state = PyGILState_Ensure();
+	PyObject *mod = PyImport_ImportModule("range_component_editor");
+	if (mod) {
+		PyObject *ret = PyObject_CallMethod(mod, "_attached", "KK",
+		                                    (unsigned long long)(uintptr_t)ob,
+		                                    (unsigned long long)(uintptr_t)pc);
+		Py_XDECREF(ret);
+		Py_DECREF(mod);
+	}
+	if (PyErr_Occurred()) {
+		PyErr_Print();
+	}
+	PyErr_Clear();
+	PyGILState_Release(state);
+#else
+	(void)ob;
+	(void)pc;
+#endif
 }
 
 PythonComponent *BKE_python_component_new(char *import, ReportList *reports, bContext *context)
@@ -754,7 +886,9 @@ void *BKE_python_component_argument_dict_new(PythonComponent *pc)
 		else if (cprop->type == CPROP_TYPE_BOOLEAN) {
 			value = PyBool_FromLong(cprop->boolval);
 		}
-		else if (cprop->type == CPROP_TYPE_STRING) {
+		else if (ELEM(cprop->type, CPROP_TYPE_STRING, CPROP_TYPE_OBJECT, CPROP_TYPE_SCENE)) {
+			/* CPROP_TYPE_OBJECT: the game (KX_PythonComponent) swaps the name for the object.
+			 * CPROP_TYPE_SCENE stays the name: the scene may not be loaded (logic.addScene). */
 			value = PyUnicode_FromString(cprop->strval);
 		}
 		else if (cprop->type == CPROP_TYPE_SET) {

@@ -782,6 +782,7 @@ static int component_register_exec(bContext *C, wmOperator *op)
 	}
 
 	BLI_addtail(&ob->components, pycomp);
+	BKE_python_component_attached(ob, pycomp);
 	WM_event_add_notifier(C, NC_LOGIC, NULL);
 
 	return OPERATOR_FINISHED;
@@ -805,6 +806,7 @@ static int component_create_exec(bContext *C, wmOperator *op)
 	}
 
 	BLI_addtail(&ob->components, pycomp);
+	BKE_python_component_attached(ob, pycomp);
 	WM_event_add_notifier(C, NC_LOGIC, NULL);
 
 	return OPERATOR_FINISHED;

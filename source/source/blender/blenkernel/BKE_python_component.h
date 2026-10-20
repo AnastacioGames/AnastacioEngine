@@ -29,6 +29,8 @@ extern "C" {
 
 struct PythonComponent *BKE_python_component_new(char *import, struct ReportList *reports, struct bContext *context);
 struct PythonComponent *BKE_python_component_create_file(char *import, struct ReportList *reports, struct bContext *context);
+/* Call the Smart Component editor side (requires, Editor.on_attach) after pc was added to ob. */
+void BKE_python_component_attached(struct Object *ob, struct PythonComponent *pc);
 void BKE_python_component_reload(struct PythonComponent *pc, struct ReportList *reports, struct bContext *context);
 void BKE_python_component_copy_list(struct ListBase *lbn, const struct ListBase *lbo);
 void BKE_python_component_free(struct PythonComponent *pc);

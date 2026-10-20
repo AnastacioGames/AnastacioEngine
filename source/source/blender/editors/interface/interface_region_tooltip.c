@@ -39,6 +39,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_userdef_types.h"
+#include "DNA_python_component_types.h"
 
 #include "BLI_math.h"
 #include "BLI_string.h"
@@ -352,6 +353,20 @@ static uiTooltipData *ui_tooltip_data_from_button(bContext *C, uiBut *but)
 		}
 
 	}
+	/* Python Component field: tip=... declared with Range.args in the component args. */
+	if (but->rnapoin.data && but->rnapoin.type && RNA_struct_is_a(but->rnapoin.type, &RNA_PythonComponentProperty)) {
+		const PythonComponentProperty *cprop = but->rnapoin.data;
+		if (cprop->tip[0]) {
+			uiTooltipField *field = text_field_add(
+			        data, &(uiTooltipFormat){
+			            .style = UI_TIP_STYLE_NORMAL,
+			            .color_id = UI_TIP_LC_VALUE,
+			            .is_pad = true,
+			        });
+			field->text = BLI_strdup(cprop->tip);
+		}
+	}
+
 	/* Enum field label & tip */
 	if (enum_tip.strinfo) {
 		uiTooltipField *field = text_field_add(

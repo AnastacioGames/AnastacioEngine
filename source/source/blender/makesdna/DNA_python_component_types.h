@@ -36,6 +36,12 @@ typedef struct PythonComponentProperty {
 	int itemval;
 	float vec[4];
 	ListBase enumval;
+	/* Editor hints from Range.args helpers (Float(.., min=, max=, tip=)).
+	 * All zero in older files and Range upstream files = no hint. */
+	float min, max;
+	int metaflag; /* CPROP_META_* */
+	int pad;
+	char tip[256];
 } PythonComponentProperty;
 
 typedef struct PythonComponent {
@@ -60,6 +66,14 @@ typedef struct PythonComponent {
 #define CPROP_TYPE_VEC4        7
 #define CPROP_TYPE_COL3        8
 #define CPROP_TYPE_COL4        9
+#define CPROP_TYPE_OBJECT      10 /* object name in strval */
+#define CPROP_TYPE_SCENE       11 /* scene name in strval */
+
+/* PythonComponentProperty.metaflag */
+enum {
+	CPROP_META_MIN = (1 << 0),
+	CPROP_META_MAX = (1 << 1),
+};
 
 enum {
 	COMPONENT_SHOW = (1 << 0)
