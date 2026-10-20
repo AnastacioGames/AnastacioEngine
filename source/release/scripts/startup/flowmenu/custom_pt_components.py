@@ -27,25 +27,15 @@ class CUSTOM_PT_game_components(PropertyPanel, Panel):
         row_tools = box_tools.row(align=True)
         row_tools.operator("wm.flowmenu_reload_all_components", text="Reload All Scripts", icon="RECOVER_LAST")
 
-        # --- ÁREA DO WIZARD (sempre visível) ---
+        # --- SMART COMPONENT WIZARD (startup/smart_component_wizard.py) ---
         box = layout.box()
-        row = box.row()
-        row.label(text="Create New Script", icon="FILE_SCRIPT")
-
-        col = box.row(align=True)
-        split = col.split(factor=0.35)
-        split.label(text="File Name:", icon="FILE_TEXT")
-        split.prop(scene, "flowmenu_wizard_module", text="")
-
-        split = col.split(factor=0.35)
-        split.label(text="Class Name:", icon="SCRIPTPLUGINS")
-        split.prop(scene, "flowmenu_wizard_class", text="")
-
-        box.separator()
-        row = box.row()
-        row.scale_y = 1.2
-        row.operator("wm.flowmenu_create_advanced_component", text="CREATE COMPONENT", icon="SCRIPTPLUGINS")
-        box.separator()
+        box.label(text="Create New Smart Component", icon="SCRIPTPLUGINS")
+        try:
+            from smart_component_wizard import draw_wizard
+        except ImportError:
+            box.label(text="Wizard not available", icon="ERROR")
+        else:
+            draw_wizard(box, context)
 
 # ==============================================================================
 # PAINEL CUSTOMIZADO: EXISTING COMPONENTS (Organizado por Módulos/Pastas)

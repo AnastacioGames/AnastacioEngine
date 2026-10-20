@@ -6,6 +6,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Smart Component Wizard (etapa 1, branch smart-wizard)
+
+- Properties > Game > Component Manager: o "Create New Script" virou o Smart Component Wizard
+  (`startup/smart_component_wizard.py`); também em Text Editor > Text > New Smart Component.
+- Receitas para começar: Vazio, Perseguidor, Patrulha, Coletável, Spawner, Porta, Zona de gatilho. Cada uma vem
+  com campos e código de jogo; se um campo da receita for removido ou renomeado, `update()` fica vazio (aviso).
+- Lista de campos (+ por tipo, −, subir/descer, duplicar) com padrão, min/max, dica, opções do Choice, ícone de
+  seção. Extras que geram a classe `Editor`: linha até o Object, círculo do Float, obrigatório, aviso acima de um
+  valor, escolher objeto pelo nome ao adicionar, botão "Criar <campo>" (Empty já ligado ao campo).
+- Gera texto interno do .blend ou `//scripts/<arquivo>.py`, adiciona no objeto ativo e mostra o código; a lupa mostra
+  a prévia em `wizard_preview.py`. Gerador sem bpy em `modules/range_component_wizard.py`.
+- Testado em background: as 7 receitas criam, registram e o editor acha campos e `Editor`. Falta teste com janela
+  e Play das receitas.
+
 ## 2026-10-20 - Build Linux no container mais rápido
 
 - `tools/linux/container-build.sh` é o jeito normal: gera (uma vez) a imagem `anastacio-build:22.04-<hash>` do
