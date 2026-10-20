@@ -6,13 +6,13 @@ Código: `source/source/gameengine/Common/CM_Trace.h/.cpp`. Relatório: `tools/d
 
 ## Como usar
 
-Com janela: no editor, **Game > Range Trace...** (abre com o arquivo atual), ou
+Com janela: `tools\debug\Range Trace.lnk` ou
 `tools\debug\abrir_trace_launcher.bat [jogo.range]`. A janela escolhe jogo, executável, pasta de saída e
 módulos, lembra as escolhas em `%APPDATA%\AnastacioEngine\range_trace_launcher.json` (nada é gravado no
 `.range`), roda o jogo e abre o relatório quando ele fecha.
 Mostra o ícone do jogo (`icon.png` na pasta do jogo), lista os últimos relatórios (abrir, pasta, apagar)
-e tem tema claro e escuro. Usa o Python do sistema (`pythonw`, com tkinter);
-o item do menu só aparece num checkout do código (procura `tools/debug` ao lado de `build/bin`).
+e tem tema claro e escuro. Usa o Python do sistema (`pythonw`, com tkinter). É ferramenta de
+desenvolvimento (padrões do RolimaRacer), por isso não fica no menu do editor.
 
 Pela linha de comando:
 

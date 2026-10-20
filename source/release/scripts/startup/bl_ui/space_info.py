@@ -285,8 +285,6 @@ class INFO_MT_game(Menu):
         sub.prop(gs, "show_obstacle_simulation", text="Obstacle Simulation")
         layout.menu("INFO_MT_game_show_debug")
 
-        layout.separator(factor=1)
-        layout.operator("wm.range_trace_launcher", icon='TIME')
 
         layout.separator(factor=1)
         layout.prop(gs, "use_auto_start")
