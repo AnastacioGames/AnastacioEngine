@@ -348,91 +348,94 @@ class OBJECT_PT_video_player(Panel):
             layout.operator("object.video_player_add", icon='FILE_MOVIE')
             return
 
-        props = component.properties
-        missing = [name for name in ("File", "Fullscreen", "Material") if name not in props]
-        if missing:
-            layout.label(text="Component out of date, add it again", icon='ERROR')
-            layout.operator("object.video_player_remove", icon='X')
-            return
+        draw_video_player(layout, ob, component)
+        layout.operator("object.video_player_remove", icon='X')
 
-        def field(col, name, text=None):
-            if name in props:
-                col.prop(props[name], "value", text=text if text is not None else name)
 
-        fullscreen = props["Fullscreen"].value
+def draw_video_player(layout, ob, component):
+    """Video Player fields; also the draw_ui of the component box (anastacio_video)."""
+    props = component.properties
+    missing = [name for name in ("File", "Fullscreen", "Material") if name not in props]
+    if missing:
+        layout.label(text="Component out of date, add it again", icon='ERROR')
+        return
 
-        box = layout.box()
-        box.label(text="Video:", icon='FILE_MOVIE')
-        row = box.row(align=True)
-        row.prop(props["File"], "value", text="File")
-        row.operator("object.video_player_file", text="", icon='FILESEL')
-        row = box.row(align=True)
-        row.operator("object.video_player_mode", text="Fullscreen Cutscene", icon='FULLSCREEN_ENTER',
-                     depress=fullscreen).mode = 'FULLSCREEN'
-        sub = row.row(align=True)
-        sub.enabled = ob.type == 'MESH'
-        sub.operator("object.video_player_mode", text="On Material", icon='MATERIAL',
-                     depress=not fullscreen).mode = 'MATERIAL'
-        if not fullscreen:
-            if ob.type == 'MESH':
-                box.prop_search(props["Material"], "value", ob.data, "materials", text="Material")
-                name = props["Material"].value
-                mat = bpy.data.materials.get(name) if name else ob.active_material
-                if mat is None:
-                    box.label(text="The object needs a material to show the video", icon='ERROR')
-                elif video_texture_slot(mat) is None:
-                    row = box.row()
-                    row.label(text="Material has no image texture", icon='ERROR')
-                    row.operator("object.video_player_texture", icon='TEXTURE').material = mat.name
-            else:
-                field(box, "Material")
+    def field(col, name, text=None):
+        if name in props:
+            col.prop(props[name], "value", text=text if text is not None else name)
 
+    fullscreen = props["Fullscreen"].value
+
+    box = layout.box()
+    box.label(text="Video:", icon='FILE_MOVIE')
+    row = box.row(align=True)
+    row.prop(props["File"], "value", text="File")
+    row.operator("object.video_player_file", text="", icon='FILESEL')
+    row = box.row(align=True)
+    row.operator("object.video_player_mode", text="Fullscreen Cutscene", icon='FULLSCREEN_ENTER',
+                 depress=fullscreen).mode = 'FULLSCREEN'
+    sub = row.row(align=True)
+    sub.enabled = ob.type == 'MESH'
+    sub.operator("object.video_player_mode", text="On Material", icon='MATERIAL',
+                 depress=not fullscreen).mode = 'MATERIAL'
+    if not fullscreen:
+        if ob.type == 'MESH':
+            box.prop_search(props["Material"], "value", ob.data, "materials", text="Material")
+            name = props["Material"].value
+            mat = bpy.data.materials.get(name) if name else ob.active_material
+            if mat is None:
+                box.label(text="The object needs a material to show the video", icon='ERROR')
+            elif video_texture_slot(mat) is None:
+                row = box.row()
+                row.label(text="Material has no image texture", icon='ERROR')
+                row.operator("object.video_player_texture", icon='TEXTURE').material = mat.name
+        else:
+            field(box, "Material")
+
+    box = layout.box()
+    split = box.split()
+    col = split.column()
+    col.label(text="Playback:", icon='PLAY')
+    field(col, "Autoplay")
+    field(col, "Loop")
+    field(col, "Speed")
+
+    col = split.column()
+    col.label(text="Sound:", icon='SOUND')
+    field(col, "Play Sound")
+    sub = col.column()
+    sub.active = "Play Sound" in props and props["Play Sound"].value
+    field(sub, "Volume")
+    if not fullscreen:
+        field(sub, "3D Sound")
+
+    if fullscreen:
         box = layout.box()
         split = box.split()
         col = split.column()
-        col.label(text="Playback:", icon='PLAY')
-        field(col, "Autoplay")
-        field(col, "Loop")
-        field(col, "Speed")
-
+        col.label(text="Cutscene:", icon='CAMERA_DATA')
+        field(col, "Pause Scene")
+        field(col, "Fill Screen")
+        field(col, "Fade")
         col = split.column()
-        col.label(text="Sound:", icon='SOUND')
-        field(col, "Play Sound")
+        col.label(text="Skip:", icon='FF')
+        field(col, "Skippable")
         sub = col.column()
-        sub.active = "Play Sound" in props and props["Play Sound"].value
-        field(sub, "Volume")
-        if not fullscreen:
-            field(sub, "3D Sound")
+        sub.active = "Skippable" in props and props["Skippable"].value
+        field(sub, "Skip Key", text="Key")
 
-        if fullscreen:
-            box = layout.box()
-            split = box.split()
-            col = split.column()
-            col.label(text="Cutscene:", icon='CAMERA_DATA')
-            field(col, "Pause Scene")
-            field(col, "Fill Screen")
-            field(col, "Fade")
-            col = split.column()
-            col.label(text="Skip:", icon='FF')
-            field(col, "Skippable")
-            sub = col.column()
-            sub.active = "Skippable" in props and props["Skippable"].value
-            field(sub, "Skip Key", text="Key")
-
-        if "Subtitles" in props:
-            box = layout.box()
-            box.label(text="Subtitles:", icon='FONT_DATA')
-            row = box.row(align=True)
-            row.prop(props["Subtitles"], "value", text="File")
-            op = row.operator("object.video_player_file", text="", icon='FILESEL')
-            op.field = "Subtitles"
-            row = box.row()
-            field(row, "Subtitle Size", text="Size")
-            row.operator("object.video_player_subtitles_example", icon='TEXT')
-            if not props["Subtitles"].value:
-                box.label(text="Empty: uses a .srt with the video's name, if there is one", icon='INFO')
-
-        layout.operator("object.video_player_remove", icon='X')
+    if "Subtitles" in props:
+        box = layout.box()
+        box.label(text="Subtitles:", icon='FONT_DATA')
+        row = box.row(align=True)
+        row.prop(props["Subtitles"], "value", text="File")
+        op = row.operator("object.video_player_file", text="", icon='FILESEL')
+        op.field = "Subtitles"
+        row = box.row()
+        field(row, "Subtitle Size", text="Size")
+        row.operator("object.video_player_subtitles_example", icon='TEXT')
+        if not props["Subtitles"].value:
+            box.label(text="Empty: uses a .srt with the video's name, if there is one", icon='INFO')
 
 
 classes = (

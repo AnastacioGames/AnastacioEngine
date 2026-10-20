@@ -150,6 +150,15 @@ class VideoPlayer(Range.types.KX_PythonComponent):
     anastacio_video = True
     runtime_version = RUNTIME_VERSION
 
+    # Editor side (Smart Component): the Game Components box draws the same UI
+    # as the Object > Video Player panel. Never runs in the game.
+    class Editor:
+        fields = False
+
+        def draw_ui(self, layout, obj, comp):
+            from bl_ui.properties_video_player import draw_video_player
+            draw_video_player(layout, obj, comp)
+
     def start(self, args):
         self.on_finished = None
         self.error = ""

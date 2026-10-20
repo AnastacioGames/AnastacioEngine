@@ -1,6 +1,6 @@
 # Plano: Components com lado de editor ("Smart Components")
 
-Status (2026-10-20): etapas 1 a 5 implementadas (ver "Feito"); 6 e 7 abertas.
+Status (2026-10-20): etapas 1 a 6 implementadas (ver "Feito"); 7 aberta.
 
 ## Feito
 
@@ -34,6 +34,14 @@ Status (2026-10-20): etapas 1 a 5 implementadas (ver "Feito"); 6 e 7 abertas.
   (`WindowManager.range_component_gizmos`: Off / Selected (padrão) / All). Erro no
   `draw_gizmo` vira o aviso vermelho da caixa e sai uma vez no console. Template 04
   desenha os raios e a seta até o alvo. Gizmos durante o jogo: não (questão em aberto).
+- **Etapa 6**: `Editor.draw_ui(self, layout, obj, comp)` desenha o que quiser na caixa do
+  component (depois dos campos, antes dos `buttons`); `fields = False` na classe Editor
+  esconde a lista padrão. Erro vira o aviso vermelho. Migrados: o rigid body joint
+  (`rigidbody.py`) agora tem `Target` como `Object` (sem lista de nomes, sem botão de
+  refresh), avisos no `on_change` e gizmo do pivô/eixo/alvo; módulos antigos ainda rodam
+  (Target string) e mostram o botão, que reescreve o módulo na forma nova. O Video Player
+  (`anastacio_video.VideoPlayer`) usa `fields = False` + `draw_ui` chamando
+  `draw_video_player` de `properties_video_player.py`, a mesma UI do painel Object.
 
 ## Objetivo
 

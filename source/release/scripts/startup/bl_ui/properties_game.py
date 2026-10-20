@@ -65,7 +65,10 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
                 row.label(c.name)
             
             row.operator("logic.python_component_reload", icon="RECOVER_LAST", text="").index = i
-            if c.module == "rigid_body_joint_component" and c.name == "RigidBodyJointComponent":
+            # Joint components written before the Smart Component version keep a
+            # name list as Target; the refresh rewrites the module in the new form.
+            if (c.module == "rigid_body_joint_component" and c.name == "RigidBodyJointComponent"
+                    and not _has_editor(c)):
                 row.operator("object.rigid_body_joint_component_refresh", icon="FILE_REFRESH", text="").component_index = i
             # row.separator()
             row.operator("logic.python_component_move_up", icon="TRIA_UP", text="").index = i
@@ -75,7 +78,7 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
             lastHeader = None
 
             # Smart Components: errors, on_change warnings and Editor buttons.
-            error, warnings, buttons = _component_editor_info(c)
+            error, warnings, buttons, editor = _component_editor_info(c)
             if error:
                 row = box.row()
                 row.alert = True
@@ -83,7 +86,8 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
             cbox = box
 
             only_icons = len(c.properties) == 1 and c.properties[0].name == "C_Icons"
-            if not only_icons and c.show_expanded and len(c.properties) > 0:
+            show_fields = getattr(editor, "fields", True) is not False
+            if show_fields and not only_icons and c.show_expanded and len(c.properties) > 0:
                 expanded  = True
                 collapsed = True
                 box = box.box().column()
@@ -148,6 +152,14 @@ class GAME_PT_game_components(GameButtonsPanel, Panel):
                             col = row.column()
                             col.prop(prop, "value", text="")
 
+            if editor is not None and hasattr(editor, "draw_ui") and c.show_expanded:
+                import range_component_editor as rce
+                failed = rce.draw_ui(cbox.column(), ob, c)
+                if failed and not error:
+                    row = cbox.row()
+                    row.alert = True
+                    row.label(text=failed, icon="CANCEL")
+
             if buttons and c.show_expanded:
                 col = cbox.column(align=True)
                 for b in buttons:
@@ -163,7 +175,7 @@ def _ui_icons():
 
 
 def _component_editor_info(c):
-    """(error, {field: warning}, [(text, method, icon)]) of a Smart Component."""
+    """(error, {field: warning}, [(text, method, icon)], Editor class) of a Smart Component."""
     try:
         import range_component_editor as rce
         error, warnings = rce.state_of(c)
@@ -174,9 +186,17 @@ def _component_editor_info(c):
             text, method = str(b[0]), str(b[1])
             icon = str(b[2]) if len(b) > 2 else "NONE"
             buttons.append((text, method, icon if icon in icons else "NONE"))
-        return error, warnings, buttons
+        return error, warnings, buttons, editor
     except Exception as e:
-        return "Editor: %s" % e, {}, []
+        return "Editor: %s" % e, {}, [], None
+
+
+def _has_editor(c):
+    try:
+        import range_component_editor as rce
+        return rce.editor_of(c) is not None
+    except Exception:
+        return False
 
 
 class LOGIC_OT_component_editor_button(Operator):

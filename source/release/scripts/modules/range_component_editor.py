@@ -15,6 +15,9 @@
 #             def add_waypoint(self, obj, context): ...
 #             def draw_gizmo(self, obj, args, g, selected):   # viewport drawing
 #                 g.circle(obj.location, args["Radius"], "YELLOW")
+#             fields = False                   # hide the default field list
+#             def draw_ui(self, layout, obj, comp):   # free UI in the box
+#                 layout.prop(comp.properties["Speed"], "value")
 #
 # Inside Editor methods: self.object (bpy Object), self.component (the bpy
 # PythonComponent) and self.args (read/write the fields by name). bpy may be
@@ -33,7 +36,7 @@ import traceback
 from types import ModuleType
 from bpy.app.handlers import persistent
 
-__all__ = ("editor_of", "state_of", "attach", "run_button", "enable_gizmos", "Gizmo")
+__all__ = ("editor_of", "state_of", "attach", "run_button", "draw_ui", "enable_gizmos", "Gizmo")
 
 _RANGE_SUBMODULES = ("types", "logic", "events", "render", "constraints", "application",
                      "imgui", "network", "audio", "texture")
@@ -299,6 +302,20 @@ def run_button(context, obj, component, method):
         state.error = None
     except Exception:
         state.error = _report("%s.%s" % (component.module, component.name), method)
+        return state.error
+    return None
+
+
+def draw_ui(layout, obj, component):
+    """Call Editor.draw_ui(layout, obj, comp). Returns the error text, or None."""
+    entry = _entry_of(component)
+    if not entry or not entry.editor or not hasattr(entry.editor, "draw_ui"):
+        return None
+    state = _states.setdefault(component.as_pointer(), _State())
+    try:
+        _instance(entry, obj, component).draw_ui(layout, obj, component)
+    except Exception:
+        state.error = _report("%s.%s" % (component.module, component.name), "draw_ui")
         return state.error
     return None
 

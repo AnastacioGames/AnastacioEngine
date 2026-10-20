@@ -52,12 +52,13 @@ _RIGID_BODY_JOINT_COMPONENT_TEMPLATE = '''"""Editable runtime Bullet joint creat
 from collections import OrderedDict
 import math
 import Range
+from Range.args import Object
 
 class RigidBodyJointComponent(Range.types.KX_PythonComponent):
     args = OrderedDict([
         ("C_Icons", "CONSTRAINT"),
         ("C_Header /Rigid Body Joint/CONSTRAINT", True),
-        ("Target", %(targets)r),
+        ("Target", Object(tip="The other body of the joint (needs game physics)")),
         ("Joint Type", {"Hinge", "Limited Hinge (6DOF)", "Slider (6DOF)", "Ball Socket", "Cone Twist (6DOF)"}),
         ("Enabled", True), ("Disable Linked Collision", False),
         ("Use Breaking", False), ("Breaking Threshold", 0.0),
@@ -73,11 +74,36 @@ class RigidBodyJointComponent(Range.types.KX_PythonComponent):
               "Slider (6DOF)": "GENERIC_6DOF_CONSTRAINT", "Ball Socket": "POINTTOPOINT_CONSTRAINT",
               "Cone Twist (6DOF)": "CONETWIST_CONSTRAINT"}
 
+    # Editor side (never runs in the game): warnings and viewport guides.
+    class Editor:
+        def on_change(self, obj, name, value):
+            if name == "Target":
+                if value is None:
+                    return "Choose the other body of the joint"
+                if value == obj:
+                    return "The target can't be the object itself"
+                if value.game.physics_type in {"NO_COLLISION", "STATIC", "OCCLUDER", "SENSOR", "NAVMESH"}:
+                    return "Target needs Rigid Body or Dynamic physics"
+
+        def draw_gizmo(self, obj, args, g, selected):
+            from mathutils import Euler, Vector
+            import math
+            pivot = obj.matrix_world * Vector(args["Pivot"])
+            rot = Euler([math.radians(a) for a in args["Axis (degrees)"]]).to_matrix()
+            axis = obj.matrix_world.to_3x3().normalized() * rot * Vector((1.0, 0.0, 0.0))
+            g.sphere(pivot, 0.08, "ORANGE")
+            g.arrow(pivot, pivot + axis * 0.6, "RED", width=2)
+            target = args["Target"]
+            if target is not None:
+                g.line(pivot, target.matrix_world.translation, "YELLOW")
+
     def start(self, args):
         if not args["Enabled"]: return
-        target = self.object.scene.objects.get(args["Target"])
+        target = args["Target"]
+        if isinstance(target, str):    # module written by an older version
+            target = self.object.scene.objects.get(target)
         if target is None or target is self.object:
-            print("RigidBodyJointComponent: choose another Target; refresh the list if needed")
+            print("RigidBodyJointComponent: choose another Target")
             return
         if not self.object.getPhysicsId() or not target.getPhysicsId():
             print("RigidBodyJointComponent: owner and target need game physics")
@@ -123,13 +149,11 @@ def _joint_component_path():
 
 
 def _write_joint_component(path, owner, scene):
-    targets = {"None"}
-    targets.update(obj.name for obj in scene.objects if obj != owner)
     directory = os.path.dirname(path)
     if not os.path.isdir(directory):
         os.makedirs(directory)
     with open(path, "w", encoding="utf-8") as component_file:
-        component_file.write(_RIGID_BODY_JOINT_COMPONENT_TEMPLATE % {"targets": targets})
+        component_file.write(_RIGID_BODY_JOINT_COMPONENT_TEMPLATE)
 
 
 class OBJECT_OT_rigid_body_joint_component_add(Operator):
@@ -173,7 +197,7 @@ class OBJECT_OT_rigid_body_joint_component_add(Operator):
 
 class OBJECT_OT_rigid_body_joint_component_refresh(Operator):
     bl_idname = "object.rigid_body_joint_component_refresh"
-    bl_label = "Refresh Target List"
+    bl_label = "Update Joint Component"
     bl_options = {'REGISTER', 'UNDO'}
     component_index: IntProperty(default=-1)
 
@@ -188,7 +212,7 @@ class OBJECT_OT_rigid_body_joint_component_refresh(Operator):
         except (OSError, RuntimeError) as exc:
             self.report({'ERROR'}, "Could not refresh target list: %s" % exc)
             return {'CANCELLED'}
-        self.report({'INFO'}, "Target list refreshed")
+        self.report({'INFO'}, "Joint component updated")
         return {'FINISHED'}
 
 
