@@ -83,3 +83,4 @@ debug-logs/
 # Cache de carregamento e backups gerados pela engine
 *.cooked
 docs/*.blend1
+.ccache-linux/

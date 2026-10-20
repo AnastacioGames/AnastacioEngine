@@ -6,6 +6,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Build Linux no container mais rápido
+
+- `tools/linux/container-build.sh` é o jeito normal: gera (uma vez) a imagem `anastacio-build:22.04-<hash>` do
+  `Containerfile.22.04` com apt, cmake, ccache, libsndfile 1.2.2 e Python 3.11 (`container-deps-22.04.sh`) e roda
+  o `container-build-22.04.sh` nela. O hash vem das receitas, então mudar uma delas gera a imagem de novo.
+  Rodar o `container-build-22.04.sh` direto no `ubuntu:22.04` continua funcionando (instala tudo antes).
+- ccache em `/work/.ccache-linux` (no `.gitignore`); `-j$(nproc)` no lugar de `-j16`.
+- `package-runtime.sh` comprime com `XZ_OPT=-T0` (xz em todos os núcleos); o `.tar.xz` fica ~5 MB maior.
+- Medido neste PC (16 núcleos): 1º build com imagem nova e cache vazio 1007 s; sem mudança no código, de 341 s
+  (xz com 1 núcleo) para 72 s. Pacote conferido: `python3.11` do pacote e o editor em `-b` rodam.
+
 ## 2026-10-20 - Export Game (1 Click) no Linux acha um Python
 
 - O pacote Linux (0.5.2 e 0.5.3) leva `2.79/python/lib/python3.11`, mas não `2.79/python/bin/python3.11`; o

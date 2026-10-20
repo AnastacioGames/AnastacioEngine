@@ -235,7 +235,8 @@ PY
 
 mkdir -p "$dist_dir"
 rm -f "$archive" "$archive.sha256"
-tar -C "$dist_dir" -cJf "$archive" "$package_name"
+# xz em todos os nucleos (com 1 so, comprimir o pacote leva minutos).
+XZ_OPT="${XZ_OPT:--T0}" tar -C "$dist_dir" -cJf "$archive" "$package_name"
 (
   cd "$dist_dir"
   sha256sum "$(basename "$archive")" > "$(basename "$archive").sha256"

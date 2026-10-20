@@ -1,0 +1,5 @@
+# Imagem de build Linux (ubuntu 22.04, glibc 2.35) com as dependencias ja instaladas.
+# Gerada e usada pelo tools/linux/container-build.sh; nao precisa rodar a mao.
+FROM docker.io/library/ubuntu:22.04
+COPY container-deps-22.04.sh install-python311.sh /deps/
+RUN bash /deps/container-deps-22.04.sh
