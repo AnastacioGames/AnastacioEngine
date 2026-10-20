@@ -481,7 +481,7 @@ def draw_locale_project(layout, full=True):
         col.label(text="Save the .range first (the translations go next to it)", icon='INFO')
         return
     try:
-        from bl_operators.anastacio_locale import table_stats, texts_without_key
+        from bl_operators.anastacio_locale import table_stats, texts_without_key, script_texts
         stats = table_stats()
     except Exception as ex:
         col.label(text="translations.csv: %s" % ex, icon='ERROR')
@@ -522,6 +522,9 @@ def draw_locale_project(layout, full=True):
         row.operator("locale.translate_all", text="Translate All Texts", icon='FILE_REFRESH')
     else:
         col.operator("locale.translate_all", text="Translate All Texts", icon='FILE_REFRESH')
+    scripted = len(script_texts(context.scene))
+    if scripted:
+        col.label(text="%d texts changed by your scripts: left as they are" % scripted, icon='INFO')
     row = col.row(align=True)
     row.operator("locale.table_open", text="Open Table", icon='TEXT').file = 'CSV'
     row.operator("locale.folder_open", text="", icon='FILE_FOLDER')

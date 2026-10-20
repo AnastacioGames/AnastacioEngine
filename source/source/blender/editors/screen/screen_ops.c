@@ -3671,6 +3671,19 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 		}
 	}
 
+	else if (sa->spacetype == SPACE_TEXT) {
+		/* the props are registered from Python (bl_ui/space_text.py) */
+		PointerRNA wm_ptr;
+
+		RNA_pointer_create(&CTX_wm_manager(C)->id, &RNA_WindowManager, CTX_wm_manager(C), &wm_ptr);
+		if (RNA_struct_find_property(&wm_ptr, "text_editor_show_tabs")) {
+			uiItemR(layout, &wm_ptr, "text_editor_show_tabs", 0, IFACE_("Show Tabs"), ICON_NONE);
+		}
+		if (RNA_struct_find_property(&wm_ptr, "text_editor_show_floating_menus")) {
+			uiItemR(layout, &wm_ptr, "text_editor_show_floating_menus", 0, IFACE_("Show Floating Menus"), ICON_NONE);
+		}
+	}
+
 	uiItemS(layout);
 
 	/* file browser should be fullscreen all the time, but other regions can be maximized/restored... */

@@ -346,10 +346,22 @@ def table_stats():
     return _stats_cache["value"]
 
 
+def script_driven(ob):
+    """Text changed by the game's own scripts (components, Python logic, a "Text" property):
+    Translate All leaves it alone, so it does not fight the game's own language system."""
+    game = ob.game
+    return bool(game.components) or any(c.type == 'PYTHON' for c in game.controllers) or         any(p.name == "Text" for p in game.properties)
+
+
 def texts_without_key(scene):
     return [ob for ob in scene.objects
             if ob.type == 'FONT' and not ob.data.locale_key.strip() and ob.data.body.strip()
-            and not any(c.module == "range_language" for c in ob.game.components)]
+            and not script_driven(ob)]
+
+
+def script_texts(scene):
+    return [ob for ob in scene.objects
+            if ob.type == 'FONT' and not ob.data.locale_key.strip() and script_driven(ob)]
 
 
 def _language_items(self, context):

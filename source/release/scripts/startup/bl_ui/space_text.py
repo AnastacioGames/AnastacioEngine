@@ -107,7 +107,7 @@ class TEXT_MT_floating_bar(Menu):
 
     @classmethod
     def poll(cls, context):
-        return _text_open(context)
+        return _text_open(context) and context.window_manager.text_editor_show_floating_menus
 
     def draw(self, context):
         layout = self.layout
@@ -136,7 +136,7 @@ class TEXT_MT_floating_bar_context(Menu):
 
     @classmethod
     def poll(cls, context):
-        return _text_open(context)
+        return _text_open(context) and context.window_manager.text_editor_show_floating_menus
 
     def draw(self, context):
         layout = self.layout
@@ -386,6 +386,7 @@ class TEXT_MT_view(Menu):
         layout.separator(factor=1)
 
         layout.prop(context.window_manager, "text_editor_show_tabs", text="Show Tabs")
+        layout.prop(context.window_manager, "text_editor_show_floating_menus", text="Show Floating Menus")
 
         layout.separator(factor=1)
 
@@ -590,6 +591,21 @@ bpy.types.WindowManager.text_editor_show_tabs = bpy.props.BoolProperty(
     name="Show Tabs",
     description="Show a row of buttons in the Text Editor header to quickly switch between open texts",
     default=True,
+)
+
+
+def _redraw_text_editors(self, context):
+    for win in context.window_manager.windows:
+        for area in win.screen.areas:
+            if area.type == 'TEXT_EDITOR':
+                area.tag_redraw()
+
+
+bpy.types.WindowManager.text_editor_show_floating_menus = bpy.props.BoolProperty(
+    name="Show Floating Menus",
+    description="Show the floating buttons over the text (undo, cut, find, zoom, save and the buttons for the kind of text)",
+    default=True,
+    update=_redraw_text_editors,
 )
 
 if __name__ == "__main__":  # only for live edit.
