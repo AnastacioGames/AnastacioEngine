@@ -121,7 +121,8 @@ State& GetState()
 struct GpuStamps
 {
 	static const int frames = 3;
-	static const int maxStamps = 32;
+	/* 64: every filter pass gets its own stamp (filter.*), twice with split screen. */
+	static const int maxStamps = 64;
 	GLuint queries[frames][maxStamps] = {};
 	int ids[frames][maxStamps] = {};
 	int count[frames] = {};

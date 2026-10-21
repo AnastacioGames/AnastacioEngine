@@ -31,6 +31,10 @@ uniform vec3 ge_RainSkyZenith;
 uniform vec3 ge_RainColor;
 uniform float ge_RainStyle; // 0 = Classic (screen-space streaks), 1 = Volumetric (world-space streaks)
 uniform float ge_RainFallPhase; // Volumetric fall offset (time * speed * 500), wrapped on the CPU in double
+uniform vec4 ge_RainVelocity; // camera velocity in view space (m/s, times Velocity Influence), max speed
+uniform float ge_RainVelocityStretch; // how much the streaks stretch with speed, 1 = default
+uniform sampler2D ge_RainShelter; // KX_RainShelterMap: height of the highest rain_shelter surface (world z)
+uniform vec4 ge_RainShelterArea; // map center x, y, 1 / map size (m), 1 = valid (0 = no shelter)
 
 vec2 texcoord;
 
@@ -129,6 +133,104 @@ vec3 getWorldPositionFromDepth(vec2 uv, float depthValue)
 	return worldSpacePosition.xyz;
 }
 
+/* Rain with velocity: the drops come at the camera as it moves, like a car driving into the
+ * rain. They seem to come out of one point on screen, the projection of the camera velocity
+ * minus the fall: standing still that point is far above the screen (vertical streaks), and
+ * at full speed it reaches the heading (streaks bursting outward, the nitro look). */
+#define RAIN_FALL_SPEED 9.0
+
+/* Rain under a roof: 1 where a rain_shelter object (tunnel, bridge) is above the point. */
+float rainSheltered(vec3 wp)
+{
+	if (ge_RainShelterArea.w < 0.5) {
+		return 0.0;
+	}
+	vec2 uv = (wp.xy - ge_RainShelterArea.xy) * ge_RainShelterArea.z + 0.5;
+	if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
+		return 0.0;
+	}
+	return step(wp.z + 0.5, texture(ge_RainShelter, uv).x);
+}
+
+/* 0 = still, 1 = at Max Speed. */
+float rainSpeedFactor()
+{
+	return clamp(length(ge_RainVelocity.xyz) / max(ge_RainVelocity.w, 1.0), 0.0, 1.0);
+}
+
+/* Ripples and Splash fade out at speed: from the moving car they only read as noise. Real
+ * speed (m/s, times Velocity Influence), not Max Speed: gone by about 36 km/h. */
+float rainSpeedSurfaceFade()
+{
+	return 1.0 - 0.9 * smoothstep(2.0, 10.0, length(ge_RainVelocity.xyz));
+}
+
+/* Streaks along rays out of `foe` (uv). dirSign 1 = outward (moving forward), -1 = inward. */
+float rainRadialLines(vec2 uv, vec2 res, vec2 foe, float dirSign, float cells, float speed, float len, float widthPx, float time, float seed)
+{
+	vec2 d = (uv - foe) * vec2(res.x / res.y, 1.0);
+	float r = length(d);
+	float a = atan(d.y, d.x) / 6.2832 + 0.5;
+	float col = floor(a * cells);
+	float hc = rainLineHash(vec2(col, seed));
+	/* log(r): the drops speed up and grow apart as they come closer, like real perspective. */
+	float y = log(max(r, 1e-3)) * 6.0 - dirSign * mod(time * speed * (0.7 + 0.6 * hc), 4096.0) + hc * 37.0;
+	float row = floor(y);
+	float f = fract(y);
+	float h1 = rainLineHash(vec2(col + seed, row));
+	float h3 = rainLineHash(vec2(col + row, seed * 1.7));
+	if (h3 < 0.35) {
+		return 0.0;
+	}
+	/* Head on the side the drop moves to, tail toward the point. */
+	float g = dirSign > 0.0 ? 1.0 - f : f;
+	float l = len * (0.6 + 0.4 * rainLineHash(vec2(row, col - seed)));
+	if (g > l) {
+		return 0.0;
+	}
+	float dx = abs(fract(a * cells) - (0.15 + 0.7 * h1)) / cells * 6.2832 * r * res.y;
+	float w = max(widthPx, 1.0);
+	float line = clamp(0.5 * w + 0.5 - dx, 0.0, 1.0) * min(widthPx, 1.0);
+	float tail = smoothstep(0.0, 0.03, g) * (1.0 - g / l);
+	/* Near the point the drops are far away: fade them out. */
+	return line * tail * smoothstep(0.03, 0.25, r) * (0.5 + 0.5 * h3);
+}
+
+/* Classic streaks with velocity: the screen streaks lean against the side motion and give way
+ * to the radial streaks as the speed grows. */
+float rainClassicVelocity(vec2 uv, vec2 res, float density, float speed, float wind, float widthScale, float time)
+{
+	vec3 v = ge_RainVelocity.xyz;
+	float s = rainSpeedFactor();
+	/* Moving right, the drops slide left on screen. */
+	float lean = wind - v.x / max(ge_RainVelocity.w, 1.0);
+	float classic = rainClassicStreaks(uv, res, density, speed, lean, widthScale, time);
+	if (s < 0.02) {
+		return classic;
+	}
+
+	/* Where the drops come from: camera velocity minus the fall, in view space (-z forward). */
+	vec3 down = mat3(unfviewmat) * vec3(0.0, 0.0, -1.0);
+	/* Fall weighted up a little: the point stays higher, the streaks lean less. */
+	vec3 rel = v - down * RAIN_FALL_SPEED * 1.4 * speed;
+	float dirSign = rel.z < 0.0 ? 1.0 : -1.0;
+	vec3 dir = rel * dirSign;
+	if (-dir.z < 1e-3) {
+		return classic;
+	}
+	vec2 foe = vec2(unfprojmat[0][0] * dir.x, unfprojmat[1][1] * dir.y) / -dir.z * 0.5 + 0.5;
+
+	float stretch = max(ge_RainVelocityStretch, 0.0);
+	float len = clamp((0.15 + 0.6 * s) * stretch, 0.05, 0.95);
+	float rate = speed * (1.0 + 4.0 * s);
+	float px = widthScale * 2.0 * res.y / 1080.0;
+	float radial = rainRadialLines(uv, res, foe, dirSign, 160.0 * density, rate * 1.4, len, px * 1.4, time, 3.1) * 0.9;
+	radial += rainRadialLines(uv, res, foe, dirSign, 320.0 * density, rate, len * 0.8, px, time, 7.7) * 0.6;
+
+	float k = smoothstep(0.03, 0.35, s);
+	return mix(classic, radial, k);
+}
+
 /* "Volumetric" rain style: world-space streaks marched along the view ray (base:
  * user-provided rain shader's getSingleRainLayer). Reuses this file's own
  * rainCellHash/getWorldPositionFromDepth instead of duplicating them, and is called
@@ -136,10 +238,12 @@ vec3 getWorldPositionFromDepth(vec2 uv, float depthValue)
  * calls -- but still samples 3 real, independently-hashed layers: collapsing them into
  * one continuous sample (an earlier version of this function) reads as much sparser
  * rain, since it's the 3 overlapping noise fields that make it look dense. */
-float rainStreakLayer(vec3 p, float layerScale, float speedMod, float seed, float phase)
+float rainStreakLayer(vec3 p, float layerScale, float speedMod, float seed, float phase, vec2 lean)
 {
 	vec3 p_scaled = p * layerScale * 4.5;
 	p_scaled.z += phase * speedMod;
+	/* Rain with velocity: the streaks lie along the drops' motion seen from the moving camera. */
+	p_scaled.xy -= lean * p_scaled.z;
 
 	vec3 cell = floor(p_scaled);
 	vec3 f = fract(p_scaled);
@@ -154,18 +258,25 @@ float rainStreakLayer(vec3 p, float layerScale, float speedMod, float seed, floa
 	return streak * verticalMask * h.z;
 }
 
-float rainVolumetricStreaks(vec3 camPos, vec3 viewDir, float sceneDepth, float phase)
+float rainVolumetricStreaks(vec3 camPos, vec3 viewDir, float sceneDepth, float phase, float speed)
 {
 	float rain = 0.0;
+	/* Camera velocity in world space over the fall speed: how much the streaks lean. */
+	vec3 v = mat3(unfinvviewmat) * ge_RainVelocity.xyz;
+	vec2 lean = v.xy / (RAIN_FALL_SPEED * max(speed, 0.1)) * 0.65 * max(ge_RainVelocityStretch, 0.0);
+	float l = length(lean);
+	if (l > 2.5) {
+		lean *= 2.5 / l;
+	}
 
 	if (sceneDepth > 1.5) {
-		rain += rainStreakLayer(camPos + viewDir * 1.5, 0.6, 1.2, 12.34, phase) * 0.1;
+		rain += rainStreakLayer(camPos + viewDir * 1.5, 0.6, 1.2, 12.34, phase, lean) * (1.0 - rainSheltered(camPos + viewDir * 1.5)) * 0.1;
 	}
 	if (sceneDepth > 4.0) {
-		rain += rainStreakLayer(camPos + viewDir * 4.0, 1.2, 1.0, 56.78, phase) * 0.3;
+		rain += rainStreakLayer(camPos + viewDir * 4.0, 1.2, 1.0, 56.78, phase, lean) * (1.0 - rainSheltered(camPos + viewDir * 4.0)) * 0.3;
 	}
 	if (sceneDepth > 10.0) {
-		rain += rainStreakLayer(camPos + viewDir * 10.0, 2.2, 0.8, 91.01, phase) * 0.8;
+		rain += rainStreakLayer(camPos + viewDir * 10.0, 2.2, 0.8, 91.01, phase, lean) * (1.0 - rainSheltered(camPos + viewDir * 10.0)) * 0.8;
 	}
 
 	return rain;
@@ -402,7 +513,7 @@ float rainSplash(vec2 uv, float size, float rate, float maxDist, float minUp, fl
 			continue;
 		}
 		vec3 wp = splashWorldPos(suv, ds);
-		if (distance(wp, camPos) > maxDist) {
+		if (distance(wp, camPos) > maxDist || rainSheltered(wp) > 0.5) {
 			continue;
 		}
 		if (ge_RainMaskFlags.y > 0.5 && !rainMarked(suv, 2.0, -splashViewPos(suv, ds).z)) {
@@ -458,7 +569,7 @@ float puddleField(vec2 p)
  * antialiasing: used by Splash > Only in Puddles for the spot where the drop lands. */
 float puddleWaterAt(vec3 wp, float nz, vec2 uv, float viewZ, vec3 camPos)
 {
-	if (nz < ge_RainPuddle2.z || distance(wp, camPos) > ge_RainPuddle2.y) {
+	if (nz < ge_RainPuddle2.z || distance(wp, camPos) > ge_RainPuddle2.y || rainSheltered(wp) > 0.5) {
 		return 0.0;
 	}
 	if (ge_RainMaskFlags.z > 0.5 && !rainMarked(uv, 4.0, viewZ)) {
@@ -490,7 +601,7 @@ void main()
 	float speed = ge_RainParams1.y;
 	float wind = ge_RainParams1.z;
 	float darken = ge_RainParams1.w;
-	float rippleIntensity = ge_RainParams2.x;
+	float rippleIntensity = ge_RainParams2.x * rainSpeedSurfaceFade();
 	float time = ge_RainParams2.y;
 	bool useDroplets = ge_RainParams2.z > 0.5;
 	bool useRipple = ge_RainParams2.w > 0.5;
@@ -528,10 +639,12 @@ void main()
 			vec3 viewDir = normalize(worldPos - camPos);
 			float sceneDepth = length(worldPos - camPos);
 
-			streaks = rainVolumetricStreaks(camPos, viewDir, sceneDepth, ge_RainFallPhase);
+			streaks = rainVolumetricStreaks(camPos, viewDir, sceneDepth, ge_RainFallPhase, speed);
 		}
 		else {
-			streaks = rainClassicStreaks(texcoord, vec2(textureSize(bgl_RenderedTexture, 0)), density, speed, wind, ge_RainStreakWidth, time);
+			streaks = rainClassicVelocity(texcoord, vec2(textureSize(bgl_RenderedTexture, 0)), density, speed, wind, ge_RainStreakWidth, time);
+			/* Screen streaks: no rain while the camera is under a shelter. */
+			streaks *= 1.0 - rainSheltered((unfinvviewmat * vec4(0.0, 0.0, 0.0, 1.0)).xyz);
 		}
 
 		finalColor += ge_RainColor * streaks * intensity;
@@ -571,7 +684,9 @@ void main()
 			aa = max(fwidth(field) * 1.5, 0.008);
 		}
 		float puddleDist = ge_RainPuddle2.y;
-		bool puddleHere = puddlesOn && !isBackground && camDist <= puddleDist && normal.z >= ge_RainPuddle2.z &&
+		/* Under a rain_shelter object (tunnel, bridge): dry, no puddles and no ripples. */
+		bool sheltered = !isBackground && rainSheltered(worldPos) > 0.5;
+		bool puddleHere = puddlesOn && !isBackground && !sheltered && camDist <= puddleDist && normal.z >= ge_RainPuddle2.z &&
 		    (ge_RainMaskFlags.z < 0.5 || rainMarked(texcoord, 4.0, viewZ));
 		float water = 0.0;
 		float wet = 0.0;
@@ -592,7 +707,7 @@ void main()
 		float puddleWater = 0.0;
 		vec3 N = vec3(0.0, 0.0, 1.0);
 		float amount = 0.0;
-		if (rippleOn && !isBackground && camDist <= rippleRadius && normal.z >= rippleMinUp &&
+		if (rippleOn && !isBackground && !sheltered && camDist <= rippleRadius && normal.z >= rippleMinUp &&
 		    (!ripplePuddleOnly || water > 0.001) &&
 		    (ge_RainMaskFlags.x < 0.5 || rainMarked(texcoord, 1.0, viewZ)))
 		{
@@ -650,7 +765,7 @@ void main()
 	}
 
 	if (ge_RainParams4.x > 0.5 && ge_RainParams4.w > 0.001) {
-		float splash = rainSplash(texcoord, ge_RainParams4.y, ge_RainParams4.z, ge_RainParams3.w, ge_RainParams5.w, time) * ge_RainParams4.w * 0.85;
+		float splash = rainSplash(texcoord, ge_RainParams4.y, ge_RainParams4.z, ge_RainParams3.w, ge_RainParams5.w, time) * ge_RainParams4.w * 0.85 * rainSpeedSurfaceFade();
 		if (splash > 0.0) {
 			/* Water: slightly refracts what is behind it and catches the sky light. */
 			vec2 texel = 1.0 / vec2(textureSize(bgl_DepthTexture, 0));

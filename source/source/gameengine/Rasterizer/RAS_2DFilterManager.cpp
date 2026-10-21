@@ -54,6 +54,8 @@ extern "C" {
 	extern char datatoc_RAS_SSAO2DFilter_glsl[];
   }
 
+void (*RAS_2DFilterManager::ProfilePassHook)(int pass) = nullptr;
+
 RAS_2DFilterManager::RAS_2DFilterManager(BuildInFilters filters)
 {
 	if (filters.useTonemap) {
@@ -411,6 +413,9 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	                                  m_cloudHistoryHeight == (int)previousofs->GetHeight() &&
 	                                  std::equal(viewport, viewport + 4, m_cloudHistoryViewport);
 
+	if (ProfilePassHook) {
+		ProfilePassHook(-1);
+	}
 	for (RAS_PassTo2DFilter::iterator begin = m_filters.begin(), it = begin, end = m_filters.end(); it != end; ++it) {
 		RAS_2DFilter *filter = it->second;
 		filter->SetFrameInputs(&m_frameInputs);
@@ -453,6 +458,9 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		 * if no modifications were made to the targeted off screen.
 		 * This output off screen is used for the next filter as input off screen */
 		previousofs = filter->Render(rasty, canvas, depthofs, colorofs, ftargetofs, sun_screen_pos);
+		if (ProfilePassHook) {
+			ProfilePassHook(it->first);
+		}
 		usesPrevious = usesPrevious || (filter->Ok() && filter->UsesPreviousTexture());
 		// Only Volumetric Clouds (mask bit 4) reuses frames; Clouds/Sky Layers alone don't pay the copy.
 		if (filter->Ok() && filter->UsesCloudHistory() && (filter->GetBuildInFilters()->cloud_mask & 4) &&

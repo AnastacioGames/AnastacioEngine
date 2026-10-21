@@ -43,6 +43,7 @@
 #include "KX_Scene.h"
 #include "KX_RainAura.h"
 #include "KX_RainSurfaceMask.h"
+#include "KX_RainShelterMap.h"
 #include "KX_RainLightning.h"
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
@@ -1888,6 +1889,9 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	if (m_rainAura) {
 		m_rainAura->RemoveObject(gameobj);
 	}
+	if (m_rainShelterMap) {
+		m_rainShelterMap->RemoveObject(gameobj);
+	}
 	if (m_rainSurfaceMask) {
 		m_rainSurfaceMask->RemoveObject(gameobj);
 	}
@@ -2874,6 +2878,14 @@ KX_RainSurfaceMask *KX_Scene::GetRainSurfaceMask()
 		m_rainSurfaceMask.reset(new KX_RainSurfaceMask());
 	}
 	return m_rainSurfaceMask.get();
+}
+
+KX_RainShelterMap *KX_Scene::GetRainShelterMap()
+{
+	if (!m_rainShelterMap) {
+		m_rainShelterMap.reset(new KX_RainShelterMap());
+	}
+	return m_rainShelterMap.get();
 }
 
 void KX_Scene::UpdateRainLightning(double time)

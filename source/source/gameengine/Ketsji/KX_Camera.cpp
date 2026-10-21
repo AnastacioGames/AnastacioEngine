@@ -267,6 +267,11 @@ float KX_Camera::GetCameraSpeed() const
 	return (m_speedOverride >= 0.0f) ? m_speedOverride : m_speed;
 }
 
+const mt::vec3& KX_Camera::GetCameraVelocity() const
+{
+	return m_velocity;
+}
+
 const mt::vec2& KX_Camera::GetCameraTurn() const
 {
 	return m_turn;
@@ -530,9 +535,17 @@ void KX_Camera::UpdateMotion(float dt)
 		return;
 	}
 
-	const float speed = (pos - m_prevRenderPos).Length() / dt;
+	const mt::vec3 velocity = (pos - m_prevRenderPos) / dt;
+	const float speed = velocity.Length();
 	const float k = std::min(1.0f, dt * 10.0f);
 	m_speed += (speed - m_speed) * k;
+	// A jump (respawn, camera switch) is not motion: the rain would flash sideways for a frame.
+	if (speed > 300.0f) {
+		m_velocity = mt::zero3;
+	}
+	else {
+		m_velocity += (velocity - m_velocity) * k;
+	}
 
 	// Turn of this frame as a screen fraction (what Directional Blur smears over).
 	const mt::vec3 delta = forward - m_prevRenderForward;

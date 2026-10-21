@@ -622,6 +622,12 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                     sub.prop(weather, "rain_density")
                     sub.prop(weather, "rain_wind", text="Wind")
                     sub.prop(weather, "rain_streak_width")
+                sub.prop(weather, "rain_velocity", slider=True)
+                vel = sub.column()
+                vel.active = weather.rain_velocity > 0.0
+                vel.prop(weather, "rain_velocity_stretch")
+                if weather.rain_style == 'CLASSIC':
+                    vel.prop(weather, "rain_velocity_max")
                 sub.prop(weather, "rain_darken", slider=True)
                 sub.prop(weather, "rain_color", text="Rain Color")
 

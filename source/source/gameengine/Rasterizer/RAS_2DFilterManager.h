@@ -41,6 +41,10 @@ typedef std::map<unsigned int, RAS_2DFilter *> RAS_PassTo2DFilter;
 class RAS_2DFilterManager
 {
 public:
+	/// Profiler hook (set by the game engine): called with -1 before the filters, then with
+	/// each filter pass index after it renders, to time every pass on the GPU.
+	static void (*ProfilePassHook)(int pass);
+
 	// Note: Keep it in order of pass index!!
 	enum FILTER_RESERVED_PASS {
 		FILTERPASS_SSGI         = 0,
