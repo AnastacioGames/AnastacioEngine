@@ -403,6 +403,10 @@ void LA_Launcher::InitEngine()
 	initGamePython(m_maggie, m_globalDict);
 #endif  // WITH_PYTHON
 
+	/* GPU and driver in the log before the scene loads: a driver crash while converting or warming up
+	 * shaders (old Intel HD, for example) used to leave a log without them. */
+	m_rasterizer->PrintHardwareInfo(false);
+
 	// Create a scene converter, create and convert the stratingscene.
 	m_converter = new BL_Converter(m_maggie, m_ketsjiEngine, m_alwaysUseExpandFraming, m_camZoom);
 	m_ketsjiEngine->SetConverter(m_converter);

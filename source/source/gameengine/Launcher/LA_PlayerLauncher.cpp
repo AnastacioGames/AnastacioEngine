@@ -132,8 +132,6 @@ void LA_PlayerLauncher::InitEngine()
 {
 	BKE_sound_init(m_maggie);
 	LA_Launcher::InitEngine();
-
-	m_rasterizer->PrintHardwareInfo(false);
 }
 
 void LA_PlayerLauncher::ExitEngine()
