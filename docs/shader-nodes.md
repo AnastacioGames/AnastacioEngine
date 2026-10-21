@@ -146,6 +146,31 @@ void main(out vec4 Color)
   quando o material não tem o uniform. O valor volta ao do nó quando o jogo termina.
 - Uniform sem o prefixo `u_` compila, mas ninguém o preenche.
 
+### Escolhas nomeadas em uniforms
+
+Um uniform escalar `u_` de tipo `int` ou `float` pode apresentar suas opções como um menu no nó. Acrescente
+`@choice` ao comentário final da declaração:
+
+```glsl
+uniform int u_mode; // @choice Linear=2, Smooth=7, Step=12 @default 7
+```
+
+Cada item é `Rótulo=inteiro`, separado por vírgulas. O número explícito é o valor que o socket e o shader
+recebem; a posição no menu não tem significado. Os rótulos podem ter espaços e UTF-8, mas não `,`, `=` ou `@`.
+São aceitos de 1 a 32 itens, com rótulos de até 63 bytes, e os valores inteiros devem estar entre
+`-16777216` e `16777216`, pois o socket usa `float` internamente.
+
+- `@default` é opcional; em um socket novo, sem ele é usado o primeiro item. Quando existe, deve ser um dos
+  valores da lista.
+- `@min` e `@max`, quando presentes, precisam incluir todos os valores do menu.
+- Rótulos e valores repetidos, sintaxe inválida, limites incompatíveis ou mais de um `@choice` descartam a
+  anotação inteira: o uniform permanece como campo numérico e o GLSL continua compilando.
+- Alterar, reordenar ou remover opções não recria o socket, nem altera um valor ou uma ligação já existentes.
+  Um valor salvo que não pertence mais à lista aparece como `Valor fora das opções: <n>` até que o usuário
+  escolha uma opção válida.
+- Uma entrada ligada mantém o desenho normal de socket ligado; o link prevalece. Ao desligá-la, o valor local
+  anterior volta a valer.
+
 ### TIME
 
 `TIME` (tempo do jogo, em segundos) pode ser usado no script sem ligar um nó Time.
@@ -370,6 +395,11 @@ Toon Outline, cubo com GLSL Script e cubo com o campo Geometry.
 
 `tools/debug/cenas/criar_cena_glsl_script_uniforms.py` testa o GLSL Script: dois scripts com helpers de mesmo
 nome no mesmo material, uniforms `u_` trocados pelo Python do jogo e script no Vertex Offset com `TIME`.
+
+`tools/debug/cenas/criar_cena_smart_node_choice.py` cria o caso de regressão do `@choice`: um uniform antigo
+sem menu, um Choice local com os valores não sequenciais 2, 7 e 12, e outro Choice ligado a um Value. Rode
+`tools/debug/cenas/inspecionar_cena_smart_node_choice.py` após salvar/reabrir para conferir os Texts, sockets e
+o link.
 
 `tools/debug/cenas/criar_cena_billboard_strands_explode.py` cria um plano com Billboard, um plano com Strands
 (ligado no Base Color pra inspecionar o Tip Factor) e um cubo com Explode (ligado no Metallic); salva o
