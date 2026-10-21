@@ -682,20 +682,25 @@ static void sigHandleCrashBacktrace(FILE *fp)
 	BLI_system_backtrace(fp);
 }
 
-static void sigHandleCrash(int signum)
+/// Backtrace file: <temp>/<game file name>.crash.txt, or blender.crash.txt before a file is loaded.
+static void crashFilePath(char *fname, size_t maxlen)
+{
+	if (!G.main || !G.main->name[0]) {
+		BLI_join_dirfile(fname, maxlen, BKE_tempdir_base(), "blender.crash.txt");
+	}
+	else {
+		BLI_join_dirfile(fname, maxlen, BKE_tempdir_base(), BLI_path_basename(G_MAIN->name));
+		BLI_path_extension_replace(fname, maxlen, ".crash.txt");
+	}
+}
+
+static void writeCrashFile()
 {
 	FILE *fp;
 	char header[512];
 
 	char fname[FILE_MAX];
-
-	if (!G.main || !G.main->name[0]) {
-		BLI_join_dirfile(fname, sizeof(fname), BKE_tempdir_base(), "blender.crash.txt");
-	}
-	else {
-		BLI_join_dirfile(fname, sizeof(fname), BKE_tempdir_base(), BLI_path_basename(G_MAIN->name));
-		BLI_path_extension_replace(fname, sizeof(fname), ".crash.txt");
-	}
+	crashFilePath(fname, sizeof(fname));
 
 	printf("Writing: %s\n", fname);
 	fflush(stdout);
@@ -719,6 +724,11 @@ static void sigHandleCrash(int signum)
 
 		fclose(fp);
 	}
+}
+
+static void sigHandleCrash(int signum)
+{
+	writeCrashFile();
 
 	/* really crash */
 	signal(signum, SIG_DFL);
@@ -836,24 +846,12 @@ LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS *ExceptionInfo)
 
 	fflush(stderr);
 
-	/* The console is hidden, so tell the user where the log is. Set RANGE_NO_CRASH_DIALOG
-	 * to skip the dialog in automated runs. */
-	if (!getenv("RANGE_NO_CRASH_DIALOG")) {
-		char logPath[FILE_MAX];
-		char text[FILE_MAX + 128];
-		BLI_join_dirfile(logPath, sizeof(logPath), BKE_tempdir_base(), "range_runtime.log.txt");
-		BLI_snprintf(text, sizeof(text),
-		             "AnastacioRuntime crashed.\n\nLog: %s\n"
-		             "Backtrace: <file>.crash.txt in the same folder.",
-		             logPath);
-		MessageBox(NULL, text, "AnastacioRuntime", MB_OK | MB_ICONERROR | MB_TOPMOST);
-	}
-
 	/* If this is a stack overflow then we can't walk the stack, so just show
 	 * where the error happened */
-	if (EXCEPTION_STACK_OVERFLOW != ExceptionInfo->ExceptionRecord->ExceptionCode) {
+	CHAR modulename[MAX_PATH] = "";
+	const bool stackOverflow = EXCEPTION_STACK_OVERFLOW == ExceptionInfo->ExceptionRecord->ExceptionCode;
+	if (!stackOverflow) {
 		HMODULE mod;
-		CHAR modulename[MAX_PATH];
 		LPVOID address = ExceptionInfo->ExceptionRecord->ExceptionAddress;
 
 		fprintf(stderr, "Address : 0x%p\n", address);
@@ -866,10 +864,49 @@ LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS *ExceptionInfo)
 		fflush(stderr);
 
 		/* Always write the crash backtrace (blender.crash.txt / <file>.crash.txt
-		 * in the temp dir), even in Release/NDEBUG builds. It used to be skipped
-		 * here, which meant the Standalone player's access violations left no
-		 * trace beyond the bare address/module printed above. */
-		sigHandleCrash(SIGSEGV);
+		 * in the temp dir), even in Release/NDEBUG builds. */
+		writeCrashFile();
+	}
+
+	/* A crash inside the OpenGL driver of the GPU vendor (Intel ig*icd, NVIDIA nvoglv, AMD atio*):
+	 * nothing in the game to fix, tell the player what helps. */
+	const char *moduleName = BLI_path_basename(modulename);
+	const bool gpuDriver = (BLI_strncasecmp(moduleName, "ig", 2) == 0 && BLI_strcasestr(moduleName, "icd")) ||
+	                       BLI_strncasecmp(moduleName, "nvoglv", 6) == 0 ||
+	                       BLI_strncasecmp(moduleName, "atio", 4) == 0 ||
+	                       BLI_strncasecmp(moduleName, "atig", 4) == 0 ||
+	                       BLI_strncasecmp(moduleName, "amdx", 4) == 0;
+	if (gpuDriver) {
+		fprintf(stderr, "Hint    : the crash happened inside the graphics card driver (%s)\n", moduleName);
+		fflush(stderr);
+	}
+
+	/* The console is hidden, so tell the user where the files are. Set RANGE_NO_CRASH_DIALOG
+	 * to skip the dialog in automated runs. */
+	if (!getenv("RANGE_NO_CRASH_DIALOG")) {
+		char logPath[FILE_MAX];
+		char crashPath[FILE_MAX];
+		char text[FILE_MAX * 2 + 512];
+		BLI_join_dirfile(logPath, sizeof(logPath), BKE_tempdir_base(), "range_runtime.log.txt");
+		crashFilePath(crashPath, sizeof(crashPath));
+		BLI_snprintf(text, sizeof(text),
+		             "AnastacioRuntime crashed.\n\n"
+		             "Please send these files to the game developer:\n"
+		             "Log: %s\n"
+		             "Backtrace: %s\n"
+		             "%s%s%s",
+		             logPath, stackOverflow ? "(not written: stack overflow)" : crashPath,
+		             gpuDriver ? "\nThe crash happened inside the graphics card driver (" : "",
+		             gpuDriver ? moduleName : "",
+		             gpuDriver ? ").\nUpdating the graphics driver usually fixes it. Lowering Anti-Aliasing,\n"
+		                         "Dynamic Resolution or 2D filters can also help." : "");
+		MessageBox(NULL, text, "AnastacioRuntime", MB_OK | MB_ICONERROR | MB_TOPMOST);
+	}
+
+	if (!stackOverflow) {
+		/* really crash */
+		signal(SIGSEGV, SIG_DFL);
+		TerminateProcess(GetCurrentProcess(), SIGSEGV);
 	}
 
 	return EXCEPTION_EXECUTE_HANDLER;

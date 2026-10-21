@@ -6,6 +6,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Crash do player em driver de vídeo antigo
+
+- Relato do Discord (0.5.3, Intel HD antiga): `EXCEPTION_ACCESS_VIOLATION` em `ig7icd64.dll` durante o aquecimento
+  de shaders da primeira abertura ("[Cooked] compiling every shader once"). Como o cache de shaders nunca era gravado,
+  toda abertura repetia o aquecimento e travava no mesmo lugar.
+- `CcdCookedData`: arquivo `<cache>.shaders.warming` enquanto o aquecimento roda; se ele sobrou de uma abertura que
+  morreu, o aquecimento é pulado (shaders compilam ao desenhar) com aviso no log. Apagado quando o cache é gravado.
+- `GPG_Ghost`: o diálogo de crash agora aparece depois de gravar o backtrace e mostra o caminho real do
+  `<jogo>.crash.txt` (antes dizia "<file>.crash.txt", e o usuário procurou o nome errado). Quando o módulo é driver
+  OpenGL (Intel `ig*icd*`, NVIDIA `nvoglv*`, AMD `atio*/atig*/amdx*`), o log ganha `Hint` e o diálogo sugere
+  atualizar o driver ou baixar AA, Dynamic Resolution e filtros 2D.
+
 ## 2026-10-20 - Screencast grava o som
 
 - Opção **Audio** (ligada por padrão) no popover do Rec, no operador `screen.screencast` (`audio`) e no Standalone

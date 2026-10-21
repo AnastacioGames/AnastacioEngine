@@ -185,6 +185,36 @@ static void OpenUserCache(const char *gamePath)
 	fclose(file);
 }
 
+/// Marker kept on disk while a warm-up runs: if it is still there, the last one never finished.
+static std::string WarmUpMarker()
+{
+	return userPath + ".warming";
+}
+
+/** A warm-up compiles every shader of the game, also ones a scene may never draw. When it kills the
+ *  process (an old GPU driver crashing on one shader), the next start skips it instead of crashing
+ *  again in the same place: shaders then compile when first drawn, as in the editor. */
+static void GuardWarmUp()
+{
+	if (!warmUp) {
+		return;
+	}
+	const std::string marker = WarmUpMarker();
+	if (BLI_exists(marker.c_str())) {
+		warmUp = false;
+		CM_Warning("[Cooked] the last shader warm-up did not finish (GPU driver crash?): skipping it, shaders "
+		           "compile when first drawn");
+		return;
+	}
+	char dir[FILE_MAX];
+	BLI_split_dir_part(marker.c_str(), dir, sizeof(dir));
+	BLI_dir_create_recursive(dir);
+	FILE *file = BLI_fopen(marker.c_str(), "wb");
+	if (file) {
+		fclose(file);
+	}
+}
+
 void Open(const std::string& mainFile, unsigned long long deviceKey)
 {
 	std::lock_guard<std::mutex> lock(mutex);
@@ -236,6 +266,7 @@ void Open(const std::string& mainFile, unsigned long long deviceKey)
 	// Exported game: the cooked file is read-only, its own shaders go to the user cache (read after it).
 	if (!record && device) {
 		OpenUserCache(mainFile.c_str());
+		GuardWarmUp();
 	}
 }
 
@@ -321,6 +352,10 @@ void Close()
 		BLI_split_dir_part(userPath.c_str(), dir, sizeof(dir));
 		BLI_dir_create_recursive(dir);
 		WriteFile(userPath, true);
+		const std::string marker = WarmUpMarker();
+		if (BLI_exists(marker.c_str())) {
+			BLI_delete(marker.c_str(), false, false);
+		}
 	}
 	hulls.clear();
 	shaders.clear();
