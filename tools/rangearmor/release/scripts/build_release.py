@@ -65,6 +65,10 @@ def build(data, args):
         _deliver(release, destination, [entry[:4] for entry in inputs], data, project,
                  use_cooked, args.get("--compress") and ".zip")
         print("> Build successful: Universal", destination)
+    elif args.get("--universal"):
+        missing = [key for key in ("Windows64", "Linux64") if key not in [entry[0] for entry in inputs]]
+        print("! Universal package skipped: no runtime for " + ", ".join(missing) +
+              ". Set both Windows and Linux runtimes in the Paths tab.")
 
 
 def _deliver(release, destination, targets, data, project, use_cooked, archive_ext):

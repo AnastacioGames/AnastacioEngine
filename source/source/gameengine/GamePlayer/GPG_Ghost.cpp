@@ -652,16 +652,21 @@ static BlendFileData *load_game_data(const char *progname, char *filename = null
 			BLI_strncpy(bfd->main->name, progname, sizeof(bfd->main->name));
 		}
 	}
-	else {
-		G.canOpenProtectedFile = true;
-		bfd = BLO_read_from_file(progname, BLO_READ_SKIP_NONE, &reports);
-	}
 
-	if (!bfd && filename) {
-		bfd = load_game_data(filename);
+	/* Not a runtime: read the game file. With no separate file name, progname is the game file. */
+	const char *gamefile = filename ? filename : progname;
+	if (!bfd && (filename || !BLO_is_a_runtime(progname))) {
+		BKE_reports_clear(&reports);
+		G.canOpenProtectedFile = true;
+		bfd = BLO_read_from_file(gamefile, BLO_READ_SKIP_NONE, &reports);
 		if (!bfd) {
-			CM_Error("loading " << filename << " failed: ");
-			BKE_reports_print(&reports, RPT_ERROR);
+			if (!BLI_is_file(gamefile)) {
+				CM_Error("game file not found: " << gamefile);
+			}
+			else {
+				CM_Error("could not load game file " << gamefile << " (not a valid .range/.rasec or made by an incompatible version)");
+				BKE_reports_print(&reports, RPT_ERROR);
+			}
 		}
 	}
 
@@ -1620,7 +1625,9 @@ int main(int argc,
 #endif
 
 					if (!bfd) {
-						usage(argv[0], isBlenderPlayer);
+						if (!filename[0]) {
+							usage(argv[0], isBlenderPlayer);
+						}
 						error = true;
 						exitInfo.m_code = KX_ExitInfo::QUIT_GAME;
 					}
