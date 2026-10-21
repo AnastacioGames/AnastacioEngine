@@ -2849,20 +2849,19 @@ PyMODINIT_FUNC initRANGE()
 	addSubModule(modules, mod, initAudioPythonBinding(), "Range.audio");
 	addSubModule(modules, mod, initVideoTexturePythonBinding(), "Range.texture");
 
-	/* Keep projects authored for BGE/UPBGE working without modifying their scripts.
-	 * The aliases deliberately share the Range module objects, so state such as
-	 * bge.logic.globalDict is identical when a project imports both spellings. */
-	PyDict_SetItemString(modules, "bge", mod);
-	PyDict_SetItemString(modules, "bge.application", PyDict_GetItemString(modules, "Range.application"));
-	PyDict_SetItemString(modules, "bge.constraints", PyDict_GetItemString(modules, "Range.constraints"));
-	PyDict_SetItemString(modules, "bge.events", PyDict_GetItemString(modules, "Range.events"));
-	PyDict_SetItemString(modules, "bge.logic", PyDict_GetItemString(modules, "Range.logic"));
-	PyDict_SetItemString(modules, "bge.render", PyDict_GetItemString(modules, "Range.render"));
-	PyDict_SetItemString(modules, "bge.types", PyDict_GetItemString(modules, "Range.types"));
-	PyDict_SetItemString(modules, "bge.imgui", PyDict_GetItemString(modules, "Range.imgui"));
-	PyDict_SetItemString(modules, "bge.network", PyDict_GetItemString(modules, "Range.network"));
-	PyDict_SetItemString(modules, "bge.audio", PyDict_GetItemString(modules, "Range.audio"));
-	PyDict_SetItemString(modules, "bge.texture", PyDict_GetItemString(modules, "Range.texture"));
+	/* Keep projects authored for BGE/UPBGE and for Range 1.5 (lowercase "range") working without
+	 * modifying their scripts. The aliases deliberately share the Range module objects, so state
+	 * such as bge.logic.globalDict is identical when a project imports several spellings. */
+	static const char *aliases[] = {"bge", "range"};
+	static const char *submodules[] = {"application", "constraints", "events", "logic", "render",
+	                                   "types", "imgui", "network", "audio", "texture"};
+	for (const char *alias : aliases) {
+		PyDict_SetItemString(modules, alias, mod);
+		for (const char *sub : submodules) {
+			PyDict_SetItemString(modules, (std::string(alias) + "." + sub).c_str(),
+			                     PyDict_GetItemString(modules, (std::string("Range.") + sub).c_str()));
+		}
+	}
 
 	return mod;
 }

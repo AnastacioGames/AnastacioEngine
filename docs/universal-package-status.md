@@ -52,7 +52,14 @@ validada no notebook Windows. O zip Universal NÃO está no repo (475 MB), entã
   Linux (2026-10-21, 1a8490da): CONFIRMADO, Example Game.rasec abre janela no player 0.5.4 Linux.
   Novo ponto (aberto): o script do template faz `import range` / `from range.render import ...` (API 1.5);
   a engine só registra `bge` (KX_PythonInit.cpp), então dá "No module named 'range'" e o
-  PlayerCollision não roda. Opções: alias `range` -> `bge` no player, ou atualizar o template.
+  PlayerCollision não roda. CORRIGIDO no Linux: KX_PythonInit.cpp registra também `range`
+  (minúsculo) como apelido de `Range`, igual ao `bge`. `import Range` e `import bge` não mudaram.
+  Example Game.rasec roda sem erro de Python no player Linux.
+
+## PARA O AGENTE NO NOTEBOOK WINDOWS
+- `git pull`, recompile o player Windows (skill build-anastacio) e rode `Example Game.rasec`:
+  não deve aparecer "No module named 'range'". Registre aqui o resultado.
+- Depois apague `D:\_uni_test` (teste Linux passou).
 - Obs.: após falha de carga, o player tenta ler o próprio executável (checagem de jogo embutido) e imprime o usage; a mensagem confunde.
 
 ## Pendente no Windows
