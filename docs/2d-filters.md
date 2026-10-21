@@ -4,7 +4,8 @@ Referência para quem escreve efeitos de tela (SSAO, SSGI, SSR, TAA, bloom, cont
 **2D Filter > Custom Filter** ou com `scene.filterManager.addFilter(...)`.
 
 Modelos prontos: no Text Editor, **Templates > 2D Filters (GLSL)** (`release/scripts/templates_glsl/`):
-SSAO, SSGI simples (com reprojeção temporal), bloom em um passe e contorno por profundidade/normal.
+SSAO, SSGI simples (com reprojeção temporal), bloom em um passe, contorno por profundidade/normal e **Filtro2D
+Brilho Objeto**, que acompanha um objeto escolhido no painel.
 
 ## Esqueleto
 
@@ -117,9 +118,10 @@ uniform vec4 u_target; // @object
   existe ou está atrás. `vec2` recebe só `xy`; `vec3`, `xyz`; `vec4`, `xyzw`.
 - O botão **+** cria a String vazia se faltar a property. Escolha o alvo no seletor de objeto do painel.
 
-Os quatro modelos em **Text Editor > Templates > 2D Filters (GLSL)** já trazem defaults e faixas úteis para
-Bloom, SSAO, SSGI e contorno. Eles preservam a compatibilidade com cenas anteriores: nenhuma property é criada
-automaticamente e o valor zero ainda ativa o fallback que cada shader já possuía.
+Os cinco modelos em **Text Editor > Templates > 2D Filters (GLSL)** já trazem defaults e faixas úteis para
+Bloom, SSAO, SSGI e contorno. **Filtro2D Brilho Objeto** usa `@object` em `u_alvo` e oferece intensidade,
+tamanho e cor laranja como controles. Os modelos preservam a compatibilidade com cenas anteriores: nenhuma
+property é criada automaticamente e o valor zero ainda ativa o fallback que cada shader já possuía.
 
 ## Erros e recompilação
 
