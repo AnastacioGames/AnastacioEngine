@@ -945,6 +945,11 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 				SetUniform(uniformLoc, (float)property->GetNumber());
 				break;
 			}
+			case VALUE_STRING_TYPE:
+			{
+				SetObjectUniform(prop, uniformLoc, property->GetText());
+				break;
+			}
 			default:
 			{
 				break;

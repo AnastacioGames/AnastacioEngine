@@ -528,11 +528,16 @@ static void LOGIC_OT_actuator_remove(wmOperatorType *ot)
 /* ************* Custom 2D Filter uniforms ************* */
 
 /* RAS_2DFilter sends int, float and bool game properties to uniforms. */
-int logic_filter2d_prop_type(const char *glsltype)
+int logic_filter2d_prop_type(const GLSLUniform *uni)
 {
+	const char *glsltype = uni->type;
 	if (STREQ(glsltype, "float")) return GPROP_FLOAT;
 	if (STREQ(glsltype, "int")) return GPROP_INT;
 	if (STREQ(glsltype, "bool")) return GPROP_BOOL;
+	/* Object uniform: a String property with an object name; the game sends its screen position. */
+	if (uni->ann.object && (STREQ(glsltype, "vec2") || STREQ(glsltype, "vec3") || STREQ(glsltype, "vec4"))) {
+		return GPROP_STRING;
+	}
 	return -1;
 }
 
@@ -575,7 +580,7 @@ float logic_filter2d_default(const GLSLUniform *uni, int type)
 
 static void filter2d_property_create(Object *ob, const GLSLUniform *uni)
 {
-	const int type = logic_filter2d_prop_type(uni->type);
+	const int type = logic_filter2d_prop_type(uni);
 	const float value = logic_filter2d_default(uni, type);
 
 	bProperty *prop = BKE_bproperty_new(type);
@@ -583,7 +588,7 @@ static void filter2d_property_create(Object *ob, const GLSLUniform *uni)
 	if (type == GPROP_FLOAT) {
 		*((float *)&prop->data) = value;
 	}
-	else {
+	else if (type != GPROP_STRING) { /* An Object uniform starts with no object picked. */
 		prop->data = (int)value;
 	}
 	BLI_addtail(&ob->prop, prop);
@@ -605,7 +610,7 @@ static int filter2d_property_add_exec(bContext *C, wmOperator *op)
 
 	const int tot = logic_filter2d_uniforms(((bTwoDFilterActuator *)act->data)->text, uniforms, &code);
 	for (int i = 0; i < tot; i++) {
-		if ((only[0] && !STREQ(only, uniforms[i].name)) || logic_filter2d_prop_type(uniforms[i].type) == -1 ||
+		if ((only[0] && !STREQ(only, uniforms[i].name)) || logic_filter2d_prop_type(&uniforms[i]) == -1 ||
 		    BKE_bproperty_object_get(ob, uniforms[i].name))
 		{
 			continue;

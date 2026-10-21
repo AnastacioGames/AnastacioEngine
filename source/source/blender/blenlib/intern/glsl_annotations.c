@@ -99,6 +99,9 @@ void BLI_glsl_annotations_parse(const char *p, GLSLAnnotations *ann)
 					p = end;
 				}
 			}
+			else if (STREQ(word, "object")) {
+				ann->object = true;
+			}
 			else if (STREQ(word, "choice")) {
 				const char *start = p;
 				while (*p && *p != '\n' && *p != '@') {

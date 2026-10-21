@@ -191,6 +191,11 @@ protected:
 	void BindTextures(RAS_OffScreen *detphofs, RAS_OffScreen *colorofs);
 	void UnbindTextures(RAS_OffScreen *detphofs, RAS_OffScreen *colorofs);
 	void ComputeTextureOffsets(RAS_ICanvas *canvas);
+	/** A String game property feeding a vec2/vec3/vec4 uniform names a scene object: set the
+	 * uniform to that object's screen position (Smart 2D Filter "Object" uniform). */
+	virtual void SetObjectUniform(const std::string& uniform, unsigned int loc, const std::string& objectName)
+	{
+	}
 
 public:
 	RAS_2DFilter(RAS_2DFilterData& data);

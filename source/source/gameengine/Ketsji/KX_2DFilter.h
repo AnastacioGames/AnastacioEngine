@@ -93,6 +93,7 @@ private:
 		std::vector<int> ints;
 	};
 	std::map<std::string, UniformValue> m_namedUniforms;
+	virtual void SetObjectUniform(const std::string& uniform, unsigned int loc, const std::string& objectName);
 	bool ApplyNamedUniform(const std::string& name, const UniformValue& value);
 };
 

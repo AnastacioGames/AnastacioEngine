@@ -30,6 +30,11 @@
 
 #include "CM_Message.h"
 #include "KX_2DFilterManager.h"
+#include "KX_Camera.h"
+#include "KX_Scene.h"
+
+#include <cfloat>
+#include <cmath>
 
 #include "GPU_glew.h"
 #include "GPU_shader.h"
@@ -133,6 +138,44 @@ std::vector<KX_2DFilter::ActiveUniform> KX_2DFilter::GetActiveUniforms() const
 		result.push_back({str, (unsigned int)type, size});
 	}
 	return result;
+}
+
+void KX_2DFilter::SetObjectUniform(const std::string& uniform, unsigned int loc, const std::string& objectName)
+{
+	unsigned int glType = 0;
+	for (const ActiveUniform& info : GetActiveUniforms()) {
+		if (info.name == uniform) {
+			glType = info.glType;
+			break;
+		}
+	}
+	int components;
+	if (glType == GL_FLOAT_VEC2) components = 2;
+	else if (glType == GL_FLOAT_VEC3) components = 3;
+	else if (glType == GL_FLOAT_VEC4) components = 4;
+	else return;
+
+	/* x, y: screen position in [0, 1] (off screen when behind: -1, -1); z: distance in front
+	 * of the camera; w: 1 when the object exists and is in front of the camera, else 0. */
+	float value[4] = {-1.0f, -1.0f, 0.0f, 0.0f};
+	KX_GameObject *owner = static_cast<KX_GameObject *>(m_gameObject);
+	KX_Scene *scene = owner ? owner->GetScene() : nullptr;
+	KX_Camera *cam = scene ? scene->GetActiveCamera() : nullptr;
+	KX_GameObject *target = scene ? scene->GetObjectList()->FindValue(objectName) : nullptr;
+	if (cam && target) {
+		const mt::vec3 viewPos = cam->NodeGetWorldOrientation().Inverse() *
+		                         (target->NodeGetWorldPosition() - cam->NodeGetWorldPosition());
+		const mt::vec4 clip = cam->GetProjectionMatrix(RAS_Rasterizer::RAS_STEREO_LEFTEYE) *
+		                      mt::vec4(viewPos.x, viewPos.y, viewPos.z, 1.0f);
+		if (std::isfinite(clip.w) && clip.w > FLT_EPSILON) {
+			value[0] = (clip.x / clip.w + 1.0f) * 0.5f;
+			value[1] = (clip.y / clip.w + 1.0f) * 0.5f;
+			value[2] = -viewPos.z;
+			value[3] = 1.0f;
+		}
+	}
+	static const int types[5] = {0, 0, RAS_Uniform::UNI_FLOAT2, RAS_Uniform::UNI_FLOAT3, RAS_Uniform::UNI_FLOAT4};
+	SetUniformfv(loc, types[components], value, sizeof(float) * components, 1);
 }
 
 bool KX_2DFilter::ApplyNamedUniform(const std::string& name, const UniformValue& value)

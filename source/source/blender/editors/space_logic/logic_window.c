@@ -50,6 +50,7 @@
 #include "BKE_property.h"
 #include "BKE_context.h"
 #include "BKE_library.h"
+#include "BKE_global.h"
 #include "BKE_main.h"
 #include "BKE_sca.h"
 
@@ -2069,7 +2070,7 @@ static void draw_filter2d_uniforms(uiLayout *layout, PointerRNA *ptr)
 		const GLSLUniform *uni = &uniforms[i];
 		uiLayout *row = uiLayoutRow(col, true);
 
-		if (logic_filter2d_prop_type(uni->type) == -1) {
+		if (logic_filter2d_prop_type(uni) == -1) {
 			char text[256];
 			BLI_snprintf(text, sizeof(text), "%s (%s): %s", uni->name, uni->type,
 			             "N\xc3\xa3o edit\xc3\xa1vel nesta vers\xc3\xa3o");
@@ -2087,7 +2088,7 @@ static void draw_filter2d_uniforms(uiLayout *layout, PointerRNA *ptr)
 			RNA_string_set(&opptr, "uniform", uni->name);
 			continue;
 		}
-		if (prop->type != logic_filter2d_prop_type(uni->type)) {
+		if (prop->type != logic_filter2d_prop_type(uni)) {
 			char text[256];
 			BLI_snprintf(text, sizeof(text), "%s: %s", uni->name,
 			             "tipo da propriedade difere do shader");
@@ -2104,8 +2105,16 @@ static void draw_filter2d_uniforms(uiLayout *layout, PointerRNA *ptr)
 			filter2d_choice_draw(row, &pptr, prop, uni->name, choice);
 		}
 		else if (prop->type == GPROP_FLOAT && uni->ann.has_min && uni->ann.has_max && uni->ann.min <= uni->ann.max) {
-			uiDefButR(uiLayoutGetBlock(row), UI_BTYPE_NUM_SLIDER, 0, uni->name, 0, 0, UI_UNIT_X * 10, UI_UNIT_Y,
-			          &pptr, "value", 0, uni->ann.min, uni->ann.max, 0, 3, NULL);
+			/* Direct float pointer: an RNA button would replace @min/@max by the game property's
+			 * own (huge) range. */
+			uiDefButF(uiLayoutGetBlock(row), UI_BTYPE_NUM_SLIDER, B_REDR, uni->name, 0, 0, UI_UNIT_X * 10, UI_UNIT_Y,
+			          (float *)&prop->data, uni->ann.min, uni->ann.max, 0, 3, NULL);
+		}
+		else if (prop->type == GPROP_STRING) {
+			/* Object uniform: the property holds the object name, the game sends its screen position. */
+			PointerRNA main_ptr;
+			RNA_main_pointer_create(G.main, &main_ptr);
+			uiItemPointerR(row, &pptr, "value", &main_ptr, "objects", uni->name, ICON_OBJECT_DATA);
 		}
 		else {
 			uiItemR(row, &pptr, "value", 0, uni->name, ICON_NONE);

@@ -42,7 +42,7 @@ struct Text;
  * *r_code must be freed with MEM_freeN (uniform choice annotations point into it). */
 int logic_filter2d_uniforms(struct Text *text, struct GLSLUniform *r_uniforms, char **r_code);
 /* Game property type (GPROP_INT/GPROP_FLOAT/GPROP_BOOL) feeding a uniform type, -1 when not editable. */
-int logic_filter2d_prop_type(const char *glsltype);
+int logic_filter2d_prop_type(const struct GLSLUniform *uni);
 /* Value of a new property: @choice default, else a valid scalar @default, else 0. */
 float logic_filter2d_default(const struct GLSLUniform *uni, int type);
 

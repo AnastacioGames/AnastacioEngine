@@ -42,6 +42,8 @@ typedef struct GLSLAnnotations {
 	/* Text after "@choice" in the parsed code (not a copy); choicelen -1 when "@choice" appears twice. */
 	const char *choice;
 	int choicelen;
+	/* "@object": a vec2/3/4 2D filter uniform fed with an object's screen position. */
+	bool object;
 } GLSLAnnotations;
 
 typedef struct GLSLUniform {
