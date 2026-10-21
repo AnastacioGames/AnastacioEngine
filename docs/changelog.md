@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Feedback visual do vácuo no RolimaRacer
+
+- `Speed_lines_FX.py` do jogo em `D:/ProjetoRolimaRacer` acrescenta risquinhos nas bordas da tela com transição suave, reutilizando os passes existentes. `camera_effect.py` abre o FOV em aproximadamente 3 graus, com prioridade do nitro.
+- `slipstream.py` limpa `slipstream_active` ao cair abaixo da velocidade mínima e evita reescrever a propriedade quando não muda.
+- Após comparar alternativas, o usuário escolheu somente a primeira opção: removidas fitas, refração e alternância por F8. O `.range` original não foi alterado.
+- Validação final em `build/tests/slipstream-20261021/`: seis amostras PASS, shaders válidos, contadores de transformação em zero na cena parada e player encerrando com exit code 0 (`runtime-first-only.log`). Custo GPU no jogo real não medido.
+- Um crash intermediário do teste foi causado pelo auxiliar `inspect.py`, que ocultou o módulo padrão usado pelo NumPy; renomeado para `scene_inspection.py` antes da validação final.
+
 ## 2026-10-21 - Smart 2D Filter: Object como uniform
 
 - Uniforms `vec2`, `vec3` e `vec4` anotados com `@object` recebem uma Game Property String e um seletor de objeto no painel do Custom Filter. A cada quadro, o shader recebe a posição do alvo na tela (`xy`), a distância à câmera (`z`) e a visibilidade (`w`); alvo ausente ou atrás da câmera fica inválido. Vetores sem `@object` permanecem não editáveis.
