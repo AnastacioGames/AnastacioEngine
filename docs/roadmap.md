@@ -422,7 +422,7 @@ pré-fraturados (Cell Fracture) e explosivos, com os painéis Destruction e Expl
 
 Em 2026-10-12 o painel Explosive ganhou Particle Explosion (5 tamanhos, estilos Fire/Electric/Concrete/Water, cores e
 quantidades), Ground Mark (decal no chão) e Mark Nearby Objects, todos com binding Python em `KX_GameObject` (ver
-changelog). Em aberto: a explosão de partículas não tem clarão de luz.
+changelog). Light Flash (clarão de luz) feito em 2026-10-21; falta o usuário conferir no editor (lâmpada some ao parar o jogo) e na demo.
 
 ### Deformação por impacto
 

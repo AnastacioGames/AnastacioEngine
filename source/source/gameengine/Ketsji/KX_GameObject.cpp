@@ -3150,6 +3150,7 @@ static const DestructionAttribute destruction_attributes[] = {
 	{"smokeDuration", EXPLOSIVE_SETTINGS, 'F', offsetof(RangeExplosiveSettings, smoke_duration), 0, 0.2f, 4.0f},
 	{"blastSpeed", EXPLOSIVE_SETTINGS, 'F', offsetof(RangeExplosiveSettings, blast_speed), 0, 0.2f, 4.0f},
 	{"useGroundMark", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_GROUND_MARK, 0, 0},
+	{"useLightFlash", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_LIGHT_FLASH, 0, 0},
 	{"useMarkNearby", EXPLOSIVE_SETTINGS, 'b', offsetof(RangeExplosiveSettings, flags), EXPLOSIVE_MARK_NEARBY, 0, 0},
 	{"markSize", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, mark_size), 0, 0.1f, 4.0f},
 	{"markLife", EXPLOSIVE_SETTINGS, 'f', offsetof(RangeExplosiveSettings, mark_life), 0, 0.0f, 3600.0f},

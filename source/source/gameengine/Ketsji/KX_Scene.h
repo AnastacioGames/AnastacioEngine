@@ -165,6 +165,11 @@ private:
 	/// World > Rain > Aura strokes, created the first frame the aura is enabled.
 	std::unique_ptr<KX_RainAura> m_rainAura;
 	std::unique_ptr<KX_RainLightning> m_rainLightning;
+	/// Explosive > Light Flash: the scene's shared point lamp (created by the converter) and its pulse.
+	KX_LightObject *m_flashLight = nullptr;
+	float m_flashAge = 0.0f;
+	float m_flashLife = 0.0f;
+	float m_flashEnergy = 0.0f;
 	/// World > Rain > Ripples/Splash only on objects with ripples_effect/splash_effect.
 	std::unique_ptr<KX_RainSurfaceMask> m_rainSurfaceMask;
 	std::unique_ptr<KX_RainShelterMap> m_rainShelterMap;
@@ -648,6 +653,10 @@ public:
 	/// Explosive > Particle Explosion: a built-in GPU particle blast at a world position, sized by
 	/// EXPLOSIVE_PARTICLES_* and styled by EXPLOSIVE_STYLE_* (DNA_object_types.h). Stepped with the emitters, freed when it ends.
 	void SpawnParticleExplosion(const mt::vec3 &position, const RangeExplosiveSettings &settings);
+	/// Explosive > Light Flash: the lamp the converter made for this scene (nullptr = none).
+	void SetFlashLight(KX_LightObject *light) { m_flashLight = light; }
+	/// Moves the flash lamp to the blast and lights it up; fades in UpdateGpuParticleEmitters.
+	void FlashExplosionLight(const mt::vec3 &position, const RangeExplosiveSettings &settings);
 	/// Default fire, smoke and spark colors of an EXPLOSIVE_STYLE_* (the ones the panel fills in).
 	static void GetExplosionStyleColors(int style, float fire[3], float smoke[3], float spark[3]);
 	void DrawParticleBlasts(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex);

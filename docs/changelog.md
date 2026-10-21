@@ -6,6 +6,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Explosive > Light Flash (clarão de luz na explosão)
+
+- Opção nova `use_light_flash` (Python `useLightFlash`) no painel Explosive, ao lado de Sound; também vale no efeito de quebra do Destructible. Flag `EXPLOSIVE_LIGHT_FLASH` (1 << 8), sem mudar a struct.
+- Como funciona: se algum explosivo da cena tem a opção, `BL_Converter::GetFlashLamp` cria antes da conversão uma lâmpada pontual "ExplosionFlash" (energia 0, sem sombra, todas as camadas) para os materiais compilarem com ela. A cada explosão, `KX_Scene::FlashExplosionLight` leva a luz até lá, com cor por estilo (Fire laranja, Electric azul, Concrete fraco, Water bem fraco; a cor do usuário tinge), alcance pelo raio/tamanho, subida rápida e queda suave com leve tremulação (0,3 s + 0,25 s × tamanho).
+- Custo: a cena tem uma luz a mais o tempo todo. Uma lâmpada por cena: explosões simultâneas usam a última. A lâmpada é apagada só quando o jogo termina (apagar antes liberaria materiais GPU ainda usados por outras cenas). Cenas convertidas por addScene assíncrono ou LibLoad não ganham a lâmpada. Ligar a opção pelo Python durante o jogo não cria a lâmpada.
+- Teste: `tools/debug/cenas/criar_cena_light_flash.py`. Com a opção, o brilho médio da imagem sobe de 114 para 129 logo após a explosão e volta a 112 em 0,8 s; sem a opção, fica em 114.
+
 ## 2026-10-21 - Static Batch inclui grupos instanciados
 
 - O Static Batch rodava em `BL_ConvertBlenderObjects`, antes de `DupliGroupRecurse` criar as cópias dos grupos instanciados, então elas ficavam de fora. Virou `BL_StaticBatchObjects`, chamado no fim de `BL_PostConvertBlenderObjects`, depois das instâncias; objetos já num batch (LibLoad) são pulados sem erro. Cena de teste (2 cubos num grupo, 4 instâncias, 2 cubos soltos, todos Static + Static Batch): 10 objetos num único batch.

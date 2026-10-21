@@ -1330,6 +1330,10 @@ void KX_DestructionManager::SpawnBlastEffects(KX_GameObject *gameobj, const Rang
 		m_scene->SpawnParticleExplosion(center, settings);
 	}
 
+	if (settings.flags & EXPLOSIVE_LIGHT_FLASH) {
+		m_scene->FlashExplosionLight(center, settings);
+	}
+
 	if (settings.flags & EXPLOSIVE_GROUND_MARK) {
 		AddGroundMark(gameobj, settings, center, ignore);
 	}

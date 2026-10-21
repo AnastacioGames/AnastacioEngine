@@ -35,6 +35,7 @@
 
 #include "KX_Scene.h"
 #include "KX_GameObject.h"
+#include "KX_LightObject.h"
 #include "SCA_LogicManager.h"
 #include "KX_Mesh.h"
 #include "RAS_MeshMaterial.h"
@@ -96,6 +97,8 @@ extern "C" {
 #  include "BKE_idcode.h"
 #  include "BKE_report.h"
 #  include "BKE_scene.h" // BKE_scene_add, BKE_scene_base_add
+#  include "BKE_lamp.h" // BKE_lamp_add
+#  include "DNA_lamp_types.h"
 #  include "BKE_object.h" // BKE_object_to_mat4, BKE_object_free_derived_caches
 #  include "BKE_armature.h" // BKE_armature_from_object, BKE_armature_find_bone_name
 #  include "DNA_armature_types.h"
@@ -187,6 +190,20 @@ BL_Converter::BL_Converter(Main *maggie, KX_KetsjiEngine *engine, bool alwaysUse
 
 BL_Converter::~BL_Converter()
 {
+	for (const auto& item : m_flashLamps) {
+		Base *base = BKE_scene_base_find(item.first, item.second);
+		if (base) {
+			BKE_scene_base_unlink(item.first, base);
+			MEM_freeN(base);
+		}
+		Object *ob = item.second;
+		ID *lamp = (ID *)ob->data;
+		ob->data = nullptr;
+		BKE_libblock_free(m_maggie, ob);
+		BKE_libblock_free(m_maggie, lamp);
+	}
+	m_flashLamps.clear();
+
 	// free any data that was dynamically loaded
 	while (!m_dynamicMaggies.empty()) {
 		FreeBlendFile(m_dynamicMaggies.front());
@@ -611,10 +628,60 @@ static void print_load_shaders(KX_Scene *scene, const char *stage, size_t materi
 	}
 }
 
+static bool flash_settings(const RangeExplosiveSettings& es)
+{
+	return (es.flags & EXPLOSIVE_LIGHT_FLASH) != 0;
+}
+
+/* Explosive > Light Flash: an invisible point lamp (energy 0, no shadow) in every layer, so the
+ * materials compile with it; KX_Scene::FlashExplosionLight moves and lights it at each blast.
+ * Only made when an explosive (or a destructible's break effect) of the scene asks for it. */
+Object *BL_Converter::GetFlashLamp(Scene *blenderscene)
+{
+	const auto it = m_flashLamps.find(blenderscene);
+	if (it != m_flashLamps.end()) {
+		return it->second;
+	}
+	bool wanted = false;
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(blenderscene, sce_iter, base)) {
+		const Object *ob = base->object;
+		if (((ob->gameflag2 & OB_EXPLOSIVE) && flash_settings(ob->explosive)) ||
+		    ((ob->gameflag2 & OB_DESTRUCTIBLE) && flash_settings(ob->destruction.fx)))
+		{
+			wanted = true;
+			break;
+		}
+	}
+	if (!wanted) {
+		return nullptr;
+	}
+	Lamp *la = BKE_lamp_add(m_maggie, "ExplosionFlash");
+	la->type = LA_LOCAL;
+	la->energy = 0.0f;
+	la->dist = 10.0f;
+	la->mode &= ~(LA_SHAD_BUF | LA_SHAD_RAY | LA_LAYER);
+	Object *ob = BKE_object_add_only_object(m_maggie, OB_LAMP, "ExplosionFlash");
+	ob->data = la;
+	ob->lay = (1 << 20) - 1;
+	ob->restrictflag |= OB_RESTRICT_SELECT;
+	BKE_scene_base_add(blenderscene, ob);
+	m_flashLamps[blenderscene] = ob;
+	return ob;
+}
+
 void BL_Converter::ConvertScene(KX_Scene *scene, bool compileShaders)
 {
+	Object *flashLamp = GetFlashLamp(scene->GetBlenderScene());
 	BL_SceneConverter converter(scene, BL_Resource::Library(m_maggie));
 	ConvertScene(converter, false, true);
+	if (flashLamp) {
+		KX_GameObject *light = converter.FindGameObject(flashLamp);
+		if (light && light->GetGameObjectType() == SCA_IObject::OBJ_LIGHT) {
+			scene->SetFlashLight(static_cast<KX_LightObject *>(light));
+		}
+	}
 	const double texturesStart = PIL_check_seconds_timer();
 	PostConvertScene(converter);
 	const double texturesEnd = PIL_check_seconds_timer();

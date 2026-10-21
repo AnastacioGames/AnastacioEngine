@@ -380,6 +380,7 @@ enum {
 	EXPLOSIVE_GROUND_MARK    = 1 << 5,  /* project the mark object on the ground */
 	EXPLOSIVE_MARK_NEARBY    = 1 << 6,  /* Ground Mark also on the objects around the blast */
 	EXPLOSIVE_NO_SOUND       = 1 << 7,  /* no World Sound > Effects sound (Explosion/Destruction); 0 = with sound */
+	EXPLOSIVE_LIGHT_FLASH    = 1 << 8,  /* a point light flashes at the blast (one shared lamp per scene) */
 };
 
 /* RangeExplosiveSettings.particle_size */

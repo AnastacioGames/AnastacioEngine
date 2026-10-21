@@ -3256,6 +3256,13 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Sound", "Play the Explosion or Destruction sound of World Sound > Effects for this size");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	prop = RNA_def_property(srna, "use_light_flash", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_LIGHT_FLASH);
+	RNA_def_property_ui_text(prop, "Light Flash",
+	                         "A point light flashes at the blast, lighting the ground and walls around it "
+	                         "(the scene gets one extra light while it runs)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "use_ground_mark", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_GROUND_MARK);
 	RNA_def_property_boolean_funcs(prop, NULL, "rna_RangeExplosiveSettings_use_ground_mark_set");

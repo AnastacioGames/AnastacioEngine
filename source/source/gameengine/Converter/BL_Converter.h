@@ -136,6 +136,10 @@ private:
 	std::map<KX_Scene *, PendingReload> m_reloads;
 	/// List of libraries to free.
 	std::vector<Main *> m_freeQueue;
+	/// Explosive > Light Flash: one temporary lamp per Blender scene, freed when the game ends
+	/// (not with the scene: freeing a lamp frees the GPU materials that other scenes may still use).
+	std::map<Scene *, Object *> m_flashLamps;
+	Object *GetFlashLamp(Scene *blenderscene);
 
 	/// Blender current maggie at game start.
 	Main *m_maggie;

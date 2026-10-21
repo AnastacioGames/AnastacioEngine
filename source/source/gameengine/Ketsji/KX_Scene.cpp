@@ -131,6 +131,7 @@ extern "C" {
 #endif
 
 #include "KX_LightObject.h"
+#include "RAS_ILightObject.h"
 
 #include "BLI_task.h"
 #include "BLI_path_util.h"
@@ -1851,6 +1852,9 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	}
 
 	bool ret = true;
+	if (gameobj == m_flashLight) {
+		m_flashLight = nullptr;
+	}
 	if (m_lightlist->RemoveValue(gameobj)) {
 		ret = (gameobj->Release() != nullptr);
 	}
@@ -2969,6 +2973,61 @@ void KX_Scene::UpdateGpuParticleEmitters(float deltaTime)
 	m_particleBlasts.erase(std::remove_if(m_particleBlasts.begin(), m_particleBlasts.end(),
 	                                      [](const std::unique_ptr<KX_ParticleBlast> &blast) { return blast->age > blast->life; }),
 	                       m_particleBlasts.end());
+
+	if (m_flashLight && m_flashLife > 0.0f) {
+		m_flashAge += deltaTime;
+		RAS_ILightObject *light = m_flashLight->GetLightData();
+		if (m_flashAge >= m_flashLife) {
+			m_flashLife = 0.0f;
+			light->m_energy = 0.0f;
+		}
+		else {
+			// Quick rise (first 8%), then a soft fade with a little fire flicker.
+			const float t = m_flashAge / m_flashLife;
+			const float rise = std::min(1.0f, t / 0.08f);
+			const float fall = (1.0f - t) * (1.0f - t);
+			const float flicker = 0.85f + 0.15f * std::sin(m_flashAge * 61.0f) * std::sin(m_flashAge * 23.0f);
+			light->m_energy = m_flashEnergy * rise * fall * flicker;
+		}
+	}
+}
+
+void KX_Scene::FlashExplosionLight(const mt::vec3 &position, const RangeExplosiveSettings &settings)
+{
+	if (!m_flashLight) {
+		return;
+	}
+	// Indexed by EXPLOSIVE_PARTICLES_* (Small, Medium, Large, Huge, Tiny), like the burst.
+	static const float kScales[5] = {0.5f, 1.0f, 2.0f, 3.5f, 0.25f};
+	const float scale = kScales[std::max(0, std::min(4, (int)settings.particle_size))];
+	const int style = std::max(0, std::min(3, (int)settings.particle_style));
+	const KX_BlastLayer *layers = kBlastStyles[style];
+	// Light of each style (Fire, Electric, Concrete, Water) and how strong it is: the fireball
+	// ramp is white-hot in the particles, its light is the orange of the flames.
+	static const float kLightColor[4][4] = {
+		{1.0f, 0.5f, 0.18f, 1.0f}, {0.45f, 0.7f, 1.0f, 1.0f}, {1.0f, 0.62f, 0.32f, 0.45f}, {0.7f, 0.85f, 1.0f, 0.25f}};
+	mt::vec3 color(kLightColor[style][0], kLightColor[style][1], kLightColor[style][2]);
+	// A user color tints the light by the same ratio as the fireball.
+	if (settings.flags & EXPLOSIVE_PARTICLE_COLORS) {
+		for (int i = 0; i < 3; ++i) {
+			color[i] *= settings.fire_color[i] / std::max(layers[0].color[i], 0.01f);
+		}
+		const float peak = std::max(color[0], std::max(color[1], color[2]));
+		if (peak > 1.0f) {
+			color /= peak;
+		}
+	}
+
+	RAS_ILightObject *light = m_flashLight->GetLightData();
+	light->m_color = color;
+	// Reach grows with the blast: the radius of the explosion when set, else the size preset.
+	light->m_distance = std::max(settings.radius * 2.0f, 8.0f * scale);
+	m_flashEnergy = 2.5f * std::sqrt(scale) * kLightColor[style][3];
+	m_flashLife = 0.3f + 0.25f * scale;
+	m_flashAge = 0.0f;
+	// Lift it into the fireball so the floor around is lit, not one hot spot under it.
+	m_flashLight->NodeSetWorldPosition(position + mt::vec3(0.0f, 0.0f, 1.0f * scale + 0.5f));
+	m_flashLight->NodeUpdate();
 }
 
 void KX_Scene::GetExplosionStyleColors(int style, float fire[3], float smoke[3], float spark[3])

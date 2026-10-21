@@ -890,7 +890,9 @@ def draw_blast_effect(layout, context, es, enabled, destruction):
         row.prop(es, "blast_speed")
 
     col = layout.box()
-    col.prop(es, "use_sound", icon='SPEAKER')
+    row = col.row()
+    row.prop(es, "use_sound", icon='SPEAKER')
+    row.prop(es, "use_light_flash", icon='LAMP_POINT')
 
     # Ground Mark: the Impact Decal projection, on the static surface under the blast.
     col = layout.box()
