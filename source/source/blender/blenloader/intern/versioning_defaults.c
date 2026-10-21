@@ -203,6 +203,7 @@ void BLO_update_defaults_userpref_blend(void)
   BKE_addon_ensure(&U.addons, "io_mesh_uv_layout");
   BKE_addon_ensure(&U.addons, "io_sequencer_edl");
   BKE_addon_ensure(&U.addons, "io_blend_utils");
+  BKE_addon_ensure(&U.addons, "anastacio_ragdoll"); /* Game Engine: Anastacio Ragdoll */
 }
 
 /**
