@@ -1069,6 +1069,8 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 					KX_RainShelterMap *shelter = scene->GetRainShelterMap();
 					if (shelter->Render(scene, m_engine->GetFrameTime(), camPos, rainParams->rain_shelter_area)) {
 						rainParams->rain_shelter_texture = shelter->GetTexture();
+						// w = 1 + Under Shelter: the shader reads both "valid" and the ground amount.
+						rainParams->rain_shelter_area[3] = 1.0f + std::min(std::max(world->rain_shelter_ground, 0.0f), 1.0f);
 					}
 				}
 

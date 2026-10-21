@@ -646,6 +646,8 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                     sub.prop(weather, prefix + "normal")
                     sub.prop(weather, prefix + "distance", text=label.rstrip("s") + " Distance")
                     sub.prop(weather, prefix + "min_up")
+                    if effect == "ripple":
+                        sub.prop(weather, "rain_shelter_ground", slider=True)
                     sub.label(text="Only objects with \"%s\" (all when none has it)" % prop_name, icon='INFO')
 
             box = _rain_section(col, weather, "show_expanded_rain_puddles", "Puddles", "use_rain_puddles")

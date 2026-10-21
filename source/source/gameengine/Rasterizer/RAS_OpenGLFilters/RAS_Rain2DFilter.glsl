@@ -34,7 +34,7 @@ uniform float ge_RainFallPhase; // Volumetric fall offset (time * speed * 500), 
 uniform vec4 ge_RainVelocity; // camera velocity in view space (m/s, times Velocity Influence), max speed
 uniform float ge_RainVelocityStretch; // how much the streaks stretch with speed, 1 = default
 uniform sampler2D ge_RainShelter; // KX_RainShelterMap: height of the highest rain_shelter surface (world z)
-uniform vec4 ge_RainShelterArea; // map center x, y, 1 / map size (m), 1 = valid (0 = no shelter)
+uniform vec4 ge_RainShelterArea; // map center x, y, 1 / map size (m), w: 0 = no shelter, 1 + Under Shelter (ground effects left under a roof)
 
 vec2 texcoord;
 
@@ -150,6 +150,31 @@ float rainSheltered(vec3 wp)
 		return 0.0;
 	}
 	return step(wp.z + 0.5, texture(ge_RainShelter, uv).x);
+}
+
+/* Ground effects (ripples, puddles) left under a shelter: World > Rain > Under Shelter. */
+float rainShelterGround()
+{
+	return clamp(ge_RainShelterArea.w - 1.0, 0.0, 1.0);
+}
+
+/* Soft roof edge: share of the points around wp (radius ~0.6 m) that are under a shelter. */
+float rainShelterSoft(vec3 wp)
+{
+	if (ge_RainShelterArea.w < 0.5) {
+		return 0.0;
+	}
+	const float r = 0.6;
+	float c = rainSheltered(wp) * 2.0;
+	c += rainSheltered(wp + vec3(r, 0.0, 0.0));
+	c += rainSheltered(wp + vec3(-r, 0.0, 0.0));
+	c += rainSheltered(wp + vec3(0.0, r, 0.0));
+	c += rainSheltered(wp + vec3(0.0, -r, 0.0));
+	c += rainSheltered(wp + vec3(r, r, 0.0) * 0.7071);
+	c += rainSheltered(wp + vec3(-r, r, 0.0) * 0.7071);
+	c += rainSheltered(wp + vec3(r, -r, 0.0) * 0.7071);
+	c += rainSheltered(wp + vec3(-r, -r, 0.0) * 0.7071);
+	return smoothstep(0.0, 1.0, c / 10.0);
 }
 
 /* 0 = still, 1 = at Max Speed. */
@@ -684,8 +709,11 @@ void main()
 			aa = max(fwidth(field) * 1.5, 0.008);
 		}
 		float puddleDist = ge_RainPuddle2.y;
-		/* Under a rain_shelter object (tunnel, bridge): dry, no puddles and no ripples. */
-		bool sheltered = !isBackground && rainSheltered(worldPos) > 0.5;
+		/* Under a rain_shelter object (tunnel, bridge): the ground effects fade out over a soft
+		 * edge, down to Under Shelter (0 = dry). */
+		float shelterCover = isBackground ? 0.0 : rainShelterSoft(worldPos);
+		float shelterKeep = mix(1.0, rainShelterGround(), shelterCover);
+		bool sheltered = shelterKeep < 0.001;
 		bool puddleHere = puddlesOn && !isBackground && !sheltered && camDist <= puddleDist && normal.z >= ge_RainPuddle2.z &&
 		    (ge_RainMaskFlags.z < 0.5 || rainMarked(texcoord, 4.0, viewZ));
 		float water = 0.0;
@@ -696,8 +724,8 @@ void main()
 			water = smoothstep(threshold, threshold + aa + 0.02, field);
 			wet = smoothstep(threshold - 0.14, threshold, field);
 			float fade = 1.0 - smoothstep(puddleDist * 0.75, puddleDist, camDist);
-			water *= fade;
-			wet *= fade;
+			water *= fade * shelterKeep;
+			wet *= fade * shelterKeep;
 		}
 
 		/* Ripples: height -> gradient -> perturbed Z-up normal, like a material normal map
@@ -719,7 +747,7 @@ void main()
 			                 rainRippleHeight(p + vec2(0.0, e), time, rippleRate) - h) / e;
 			N = normalize(vec3(-grad * 0.075 * ge_RainRippleNormal, 1.0));
 			float fadeOut = 1.0 - smoothstep(rippleRadius * 0.7, rippleRadius, camDist);
-			amount = rippleIntensity * 2.5 * fadeOut * (ripplePuddleOnly ? water : 1.0);
+			amount = rippleIntensity * 2.5 * fadeOut * (ripplePuddleOnly ? water : shelterKeep);
 		}
 
 		if (puddleHere) {

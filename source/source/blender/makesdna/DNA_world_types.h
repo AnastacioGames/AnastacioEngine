@@ -238,8 +238,9 @@ typedef struct World {
 	float vfog_dust, vfog_pad;
 	/* Chuva com velocidade: as gotas vem de encontro a camera quando ela anda (carro, nitro).
 	 * rain_velocity 0 desliga; rain_velocity_stretch alonga os riscos com a velocidade;
-	 * rain_velocity_max e a velocidade (m/s) em que o efeito chega ao maximo. */
-	float rain_velocity, rain_velocity_stretch, rain_velocity_max, rain_velocity_pad;
+	 * rain_velocity_max e a velocidade (m/s) em que o efeito chega ao maximo.
+	 * rain_shelter_ground: quanto das gotas/poças no chão fica sob um rain_shelter (0 = seco). */
+	float rain_velocity, rain_velocity_stretch, rain_velocity_max, rain_shelter_ground;
 
 	ListBase gpumaterial;		/* runtime */
 

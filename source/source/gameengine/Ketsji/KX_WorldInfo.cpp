@@ -281,6 +281,7 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	else if (std::strcmp(identifier, "weather.rain_velocity") == 0) world->rain_velocity = value;
 	else if (std::strcmp(identifier, "weather.rain_velocity_stretch") == 0) world->rain_velocity_stretch = value;
 	else if (std::strcmp(identifier, "weather.rain_velocity_max") == 0) world->rain_velocity_max = value;
+	else if (std::strcmp(identifier, "weather.rain_shelter_ground") == 0) world->rain_shelter_ground = value;
 	else if (std::strcmp(identifier, "weather.splash") == 0 && useBool) {
 		if (boolValue) world->weather_flag |= WO_WEATHER_RAIN_SPLASH; else world->weather_flag &= ~WO_WEATHER_RAIN_SPLASH;
 	}
@@ -473,7 +474,7 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 		{"ripple_size", &world->rain_ripple_size}, {"ripple_rate", &world->rain_ripple_rate},
 		{"splash_normal", &world->rain_splash_normal}, {"splash_min_up", &world->rain_splash_min_up}, {"rain_streak_width", &world->rain_streak_width},
 		{"rain_velocity", &world->rain_velocity}, {"rain_velocity_stretch", &world->rain_velocity_stretch},
-		{"rain_velocity_max", &world->rain_velocity_max},
+		{"rain_velocity_max", &world->rain_velocity_max}, {"rain_shelter_ground", &world->rain_shelter_ground},
 		{"splash_size", &world->rain_splash_size}, {"splash_rate", &world->rain_splash_rate},
 		{"splash_intensity", &world->rain_splash_intensity}, {"splash_distance", &world->rain_splash_distance},
 		{"puddle_amount", &world->rain_puddle_amount}, {"puddle_size", &world->rain_puddle_size},

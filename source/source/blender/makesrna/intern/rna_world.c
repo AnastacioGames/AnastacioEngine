@@ -1204,6 +1204,12 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Max Speed", "Camera speed (m/s) where the rain reaches the full speed effect (Classic style)");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "rain_shelter_ground", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 1.0f, 1, 2);
+	RNA_def_property_ui_text(prop, "Under Shelter", "Ripples and puddles left on the ground under a rain_shelter object, with a soft edge (0 = dry)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "use_rain_splash", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_SPLASH);
 	RNA_def_property_ui_text(prop, "Splash", "Drops bouncing up when the rain hits upward-facing surfaces and edges; only on objects with the game property splash_effect when any object has it");

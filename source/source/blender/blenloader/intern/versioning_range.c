@@ -675,6 +675,13 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_shelter_ground")) {
+    /* Gotas no chao sob rain_shelter: um resto bem fraco, como nos arquivos novos. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_shelter_ground = 0.05f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "foliage_distance")) {
     /* Files from before Foliage Optimization get the same wind distance as new materials. */
     LISTBASE_FOREACH (Material *, ma, &main->mat) {
