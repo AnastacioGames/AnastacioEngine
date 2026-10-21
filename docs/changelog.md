@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - GLSL Script: Choice em uniforms numéricos
+
+- Uniforms `int` e `float` do GLSL Script agora aceitam `@choice Rótulo=valor, ...` no comentário da declaração. O Node Editor mostra um menu com os rótulos e grava o valor inteiro explícito no socket; links continuam tendo precedência.
+- A anotação valida rótulos/valores repetidos, o limite de 32 opções, valores que um float representa com exatidão, `@default` e os limites `@min`/`@max`. Texto inválido volta ao campo numérico normal e valores antigos fora da lista mostram `Valor fora das opções`.
+- Adicionadas a cena `tools/debug/cenas/criar_cena_smart_node_choice.py` e o inspetor correspondente: cobrem um uniform legado, Choice local em `7` e Choice ligado, cujo valor local permanece `7`. A criação e reabertura em background passaram com o editor construído em 21/10/2026; falta o teste visual do menu e do material.
+
 ## 2026-10-20 - Player acha o jogo na própria pasta e pacote Universal
 
 - Ideia do Kitsuy (Discord). `GPG_Ghost`: aberto sem arquivo (ou com um caminho inexistente que não seja
