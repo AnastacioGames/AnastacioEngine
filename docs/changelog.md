@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Smart 2D Filter no atuador Custom Filter
+
+- O atuador 2D Filter > Custom Filter agora lista no Logic Editor os uniforms do Text anotados com `@min`, `@max`, `@default` ou `@choice`. Slider, menu Choice e campo numérico editam a Game Property de mesmo nome; o runtime não mudou.
+- Cada uniform tem o botão `+`, e `Create Missing Properties` (`LOGIC_OT_filter2d_property_add`) cria de uma vez as propriedades ausentes com o tipo e o `@default` declarados. Propriedades existentes de tipo incompatível são preservadas.
+- `bool`, vetores, matrizes e samplers aparecem como `Não editável nesta versão`: o runtime do filtro 2D só envia uniforms `int` e `float` a partir das Game Properties.
+- O leitor compartilhado `BLI_glsl_annotations` concentra as anotações GLSL e passou a ser usado tanto pelo Custom Filter quanto pelo nó GLSL Script. Os templates bloom, SSAO, SSGI e contorno já vêm anotados.
+- Adicionadas documentação, cena de teste, inspetor e sonda de runtime para o Smart 2D Filter; o plano também registra os critérios de revisão do parser, Choice, limites, propriedades incompatíveis e regressão do GLSL Script. O teste com janela foi aprovado; integrado no `main` pelo merge `fb94b489` (código `82654d8d`), sem push.
+
 ## 2026-10-21 - GLSL Script: Choice em uniforms numéricos
 
 - Uniforms `int` e `float` do GLSL Script agora aceitam `@choice Rótulo=valor, ...` no comentário da declaração. O Node Editor mostra um menu com os rótulos e grava o valor inteiro explícito no socket; links continuam tendo precedência.
