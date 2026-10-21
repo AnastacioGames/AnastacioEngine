@@ -12,14 +12,34 @@
   Falha do projeto de teste, não do pacote.
 - Linux tar.xz levava ~13 min (xz preset 6). Agora usa preset 1; falta medir.
 
-## Próximo: testar no notebook Linux
-1. Compilar o player Linux atual (`AnastacioRuntime` + `2.79/python/bin/python3.11`).
-2. Colocar em `engine/Linux64/` do projeto (ou do pacote Universal).
-3. Rodar `python3 tools/rangearmor/release/scripts/test_universal_linux.py <Game-1.0.0-Universal.zip> --run`
-   - Extrai o zip mantendo os bits de execução.
-   - Confere o launcher, o runtime, as libs (`ldd`) e o Python.
-   - Abre o jogo.
-- Ao terminar, apagar `D:\_uni_test`.
+## PARA O AGENTE NO NOTEBOOK LINUX (faça isto sem perguntar ao usuário)
+Objetivo: provar que o lado Linux do pacote Universal abre o jogo. A parte Windows já foi
+validada no notebook Windows. O zip Universal NÃO está no repo (475 MB), então monte o pacote aí.
+
+1. `git pull` no `main`. Compile o player Linux atual (alvo `RangeRuntime`; o binário sai
+   como `AnastacioRuntime`). Confira que existe `2.79/python/bin/python3.11` ao lado dele.
+   Se faltar o Python, veja docs/changelog.md (fix 4f7c222c) antes de seguir.
+2. Monte um projeto de teste numa pasta curta (ex.: `~/uni_test`):
+   - `launcher/`: copie o launcher do Linux (`tools/rangearmor/.../Launcher` ou o do pacote
+     RangeArmor Linux) e um `config.json` igual ao padrão do RangeArmor;
+   - `engine/Linux64/`: o player do passo 1, com tudo o que fica ao lado dele;
+   - `data/`: qualquer jogo pequeno (`.range`/`.rasec`); ajuste `MainFile` no config.
+3. Exporte, de dentro de `tools/rangearmor/release/scripts`:
+   `python3 build_release.py --project ~/uni_test/launcher/config.json --target Linux64 --compress --no-cook`
+   - Anote quanto levou o `.tar.xz` (agora com xz preset 1; antes ~13 min no Windows).
+   - Sem `engine/Windows64` o `--universal` não se aplica aqui; o layout Universal já foi
+     conferido no Windows.
+4. Rode o verificador na pasta exportada:
+   `python3 tools/rangearmor/release/scripts/test_universal_linux.py ~/uni_test/release/Game-1.0.0-Linux64 --run`
+   - `[FAIL] Windows engine also present` é esperado neste teste; os demais devem ser `[ OK ]`.
+   - O jogo deve abrir uma janela. Pode abrir: aqui o usuário pediu o teste com janela.
+5. Também teste o auto-load: copie um `game.range` para a pasta do player e rode o player
+   sem argumentos; ele deve abrir esse arquivo.
+6. Registre o resultado nesta seção (OK/falhas, tempo do xz), commit e push.
+   Se algo falhar, corrija no repo quando for do lado Linux e explique no commit.
+
+## Pendente no Windows
+- Apagar `D:\_uni_test` quando o teste Linux passar.
 
 ## Cuidados descobertos
 - No Git Bash, `cp .../Launcher` pode pegar o `Launcher.exe` (sobrescreveu o do Windows). Copiar com Python.
