@@ -87,6 +87,7 @@
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
 #include "KX_BatchGroup.h"
+#include "RAS_MeshUser.h"
 #include "KX_BlenderMaterial.h"
 #include "KX_BoneParentNodeRelationship.h"
 #include "KX_Camera.h"
@@ -3576,36 +3577,6 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 		}
 	}
 
-	// Static batch: active objects flagged use_static_batch are merged into one batch group
-	// (one draw per material). Only meshes that never move: a member that moves later is split
-	// out by RAS_MeshUser::SetMatrix. Deformed, destructible and physics-driven objects stay out.
-	{
-		std::vector<KX_GameObject *> batchObjects;
-		for (KX_GameObject *gameobj : objectlist) {
-			Object *blenderobj = gameobj->GetBlenderObject();
-			if (!(blenderobj->gameflag2 & OB_STATIC_BATCH) || !gameobj->GetMeshUser() || gameobj->GetDeformer()) {
-				continue;
-			}
-			if (blenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE)) {
-				continue;
-			}
-			if (blenderobj->body_type != OB_BODY_TYPE_STATIC && blenderobj->body_type != OB_BODY_TYPE_NO_COLLISION) {
-				continue;
-			}
-			batchObjects.push_back(gameobj);
-		}
-		if (batchObjects.size() > 1) {
-			KX_BatchGroup *batchGroup = new KX_BatchGroup();
-			batchGroup->MergeObjects(batchObjects);
-			if (batchGroup->GetObjects()->Empty()) {
-				delete batchGroup;
-			}
-			else {
-				batchGroup->SetReferenceObject(batchGroup->GetObjects()->GetFront());
-			}
-		}
-	}
-
 	// Convert logic bricks, sensors, controllers and actuators.
 	for (KX_GameObject *gameobj : logicbrick_conversionlist) {
 		Object *blenderobj = gameobj->GetBlenderObject();
@@ -3700,6 +3671,44 @@ static void BL_PrefetchMaterialImages(const std::vector<KX_BlenderMaterial *>& m
 		}
 	}
 	BKE_image_prefetch(images.data(), (int)images.size());
+}
+
+/* Static batch: active objects flagged use_static_batch are merged into one batch group
+ * (one draw per material). Only meshes that never move: a member that moves later is split
+ * out by RAS_MeshUser::SetMatrix. Deformed, destructible and physics-driven objects stay out.
+ * Runs after the dupli groups are instanced, so group instances (replicas) are batched too. */
+static void BL_StaticBatchObjects(EXP_ListValue<KX_GameObject> *objectlist)
+{
+	std::vector<KX_GameObject *> batchObjects;
+	for (KX_GameObject *gameobj : objectlist) {
+		Object *blenderobj = gameobj->GetBlenderObject();
+		if (!blenderobj || !(blenderobj->gameflag2 & OB_STATIC_BATCH) || !gameobj->GetMeshUser() ||
+		    gameobj->GetDeformer())
+		{
+			continue;
+		}
+		// Already merged by a previous conversion of this scene (LibLoad).
+		if (gameobj->GetMeshUser()->GetBatchGroup()) {
+			continue;
+		}
+		if (blenderobj->gameflag2 & (OB_DESTRUCTIBLE | OB_EXPLOSIVE | OB_DEFORMABLE)) {
+			continue;
+		}
+		if (blenderobj->body_type != OB_BODY_TYPE_STATIC && blenderobj->body_type != OB_BODY_TYPE_NO_COLLISION) {
+			continue;
+		}
+		batchObjects.push_back(gameobj);
+	}
+	if (batchObjects.size() > 1) {
+		KX_BatchGroup *batchGroup = new KX_BatchGroup();
+		batchGroup->MergeObjects(batchObjects);
+		if (batchGroup->GetObjects()->Empty()) {
+			delete batchGroup;
+		}
+		else {
+			batchGroup->SetReferenceObject(batchGroup->GetObjects()->GetFront());
+		}
+	}
 }
 
 void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sceneconverter)
@@ -3875,6 +3884,8 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 			kxscene->DupliGroupRecurse(gameobj, 0);
 		}
 	}
+
+	BL_StaticBatchObjects(objectlist);
 }
 
 void BL_ConvertCustomMouseCursor(KX_Scene *kxscene, Main *maggie, KX_KetsjiEngine *ketsjiEngine, const char *filepath)

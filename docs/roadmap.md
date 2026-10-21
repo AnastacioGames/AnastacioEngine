@@ -690,7 +690,8 @@ iOS fora do escopo.
   10 pilotos pelo menu (Range Trace, módulos `frames`, `shaders` e `profile`). Também aberto: upload
   lento de imagens (38 ms para 1024x512, leitura + mipmaps na CPU).
   Ver changelog de 2026-10-10.
-- **Static Batch (aberto):** objetos de grupos instanciados (dupli) não entram; falha parcial em
+- **Static Batch (aberto):** grupos instanciados (dupli) passaram a entrar em 2026-10-21 (falta conferir no
+  jogo real que nada some ou desloca); falha parcial em
   `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
   14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
