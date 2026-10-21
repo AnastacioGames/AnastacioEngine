@@ -3,7 +3,8 @@
 #   A camera fica parada embaixo do abrigo (foto 1), depois sai e anda a ~20 m/s
 #   para frente (foto 2), e confere getWeather() com os campos novos.
 # Uso:
-#   AnastacioEngine.exe -b --factory-startup --python criar_cena_chuva_velocidade.py -- <cena.range> <pasta_saida>
+#   AnastacioEngine.exe -b --factory-startup --python criar_cena_chuva_velocidade.py -- <cena.range> <pasta_saida> [interativo]
+#   Com 'interativo' a cena nao fecha: repete 3 s parado sob o abrigo e 5 s andando. Esc sai.
 import os
 import sys
 
@@ -12,6 +13,7 @@ import bpy
 argv = sys.argv[sys.argv.index("--") + 1:]
 out_path = os.path.abspath(argv[0])
 outdir = os.path.abspath(argv[1]).replace("\\", "/")
+interativo = len(argv) > 2 and argv[2] == "interativo"  # nao fecha: repete parado/andando
 os.makedirs(outdir, exist_ok=True)
 
 scene = bpy.context.scene
@@ -53,10 +55,19 @@ logic = bpy.data.texts.new("probe.py")
 logic.from_string("""import bge
 
 OUT = %r
+INTERATIVO = %r
 
 def tick(cont):
     own = cont.owner
     t = own['t'] = own.get('t', 0) + 1
+    if INTERATIVO:
+        # 3 s parado sob o abrigo, 5 s andando a ~20 m/s, volta ao inicio
+        c = t %% 480
+        if c == 0:
+            own.worldPosition.y = 0.0
+        elif c > 180:
+            own.worldPosition.y += 20.0 / 60.0
+        return
     if t == 90:
         bge.render.makeScreenshot(OUT + '/1_parado_abrigo.png')
     if t > 100:
@@ -77,7 +88,7 @@ def tick(cont):
                 if 'velocity' in k or 'rain' in k:
                     f.write('%%s=%%r\\n' %% (k, info[k]))
         bge.logic.endGame()
-""" % outdir)
+""" % (outdir, interativo))
 scene.objects.active = cam
 bpy.ops.logic.sensor_add(type='ALWAYS', object=cam.name)
 bpy.ops.logic.controller_add(type='PYTHON', object=cam.name)
