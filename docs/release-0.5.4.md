@@ -17,7 +17,7 @@ Estado em 2026-10-20. Notas em [release-notes-0.5.4.md](release-notes-0.5.4.md).
   `./engine/Linux64/AnastacioRuntime`; resto igual ao zip da 0.5.3.
 
 ```text
-3e0468d75649129211847c434dffd485bba7859588287b43f002c010bc302ee4  AnastacioEngine-0.5.4-windows-x64.zip
+78cf434ddbea8fad2d0a91b183f1c237d373927bc543186b2b98ef2ec89166d0  AnastacioEngine-0.5.4-windows-x64.zip
 5515dfa1e4099057a6c9d2cee3a737f44da518583232bef9e73b49ec7efb2235  RangeArmor-0.5.4-windows-x64.zip
 ```
 
@@ -27,3 +27,9 @@ Os pacotes Linux montados antes (`build-linux/dist/`) estão desatualizados: ref
 (`tools/linux/container-build.sh`, `VERSION=0.5.4`), RangeArmor Linux com `stage_rangearmor_linux.sh`
 (launchers do `RangeArmor-0.5.4-windows-x64.zip`), acrescentar as linhas no `SHA256SUMS.txt` da release e
 subir com `--clobber`. Depois atualizar as notas (Downloads) e o README.
+
+## Zip Windows refeito (2026-10-20, mesma noite)
+
+Painel Baked Lighting, addon Anastacio Ragdoll e dicas soltas estavam escritos em português no código
+(`63a1157e`); o addon Ragdoll passou a vir ativo (`66268bb6`). Zip da engine refeito e trocado na release com
+`--clobber` (hash acima atualizado); RangeArmor sem mudança.
