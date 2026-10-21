@@ -15,21 +15,23 @@ Os templates (`templates_glsl/filtro2d_*.glsl`) contornam isso com "valor 0 usa 
 
 Igual ao nó GLSL Script: o código descreve a interface. No painel do atuador Custom Filter, listar os uniforms
 do Text com as mesmas anotações (`@min @max @default @choice`) e desenhar cada um como campo/slider/menu,
-**editando a propriedade de jogo do objeto** (o transporte que o runtime já usa). Sem mudança no runtime nem no
-DNA: o valor continua salvo como propriedade de jogo.
+**editando a propriedade de jogo do objeto** (o transporte que o runtime usa). Sem mudança no DNA: o valor
+continua salvo como propriedade de jogo. O runtime encaminha propriedades Bool para uniforms `bool` pelo mesmo
+caminho de `int`.
 
 ## Contrato v1 (proposta — Codex revisa antes do código)
 
-- Uniforms de topo, tipo `float` ou `int`, nome sem prefixo `bgl_`. Outros tipos (bool, vec/sampler) são
-  ignorados nesta versão (listados como "não editável").
+- Uniforms de topo, tipo `float`, `int` ou `bool`, nome sem prefixo `bgl_`. Vetores, matrizes e samplers são
+  listados como "não editável nesta versão".
 - Anotações iguais às do GLSL Script: `@min`, `@max`, `@default`, `@choice Rótulo=int,...` com as mesmas regras
   de validação do Choice v1 (inválido → campo numérico comum).
 - Propriedade existente com o mesmo nome: o painel edita ela. Tipo diferente do uniform → mostrar aviso, não
   converter.
 - Propriedade ausente: mostrar o uniform com botão "+" (cria só aquela) e um botão "Create Missing" (cria todas),
-  com tipo `float`→Float, `int`→Int (`@choice` também) e valor `@default` (sem default: 0/primeira
-  opção). Nunca criar sozinho ao desenhar.
-- Choice: menu com os rótulos; valor fora da lista mostra "Valor fora das opções: n".
+  com tipo `float`→Float, `int`→Int (`@choice` também), `bool`→Bool e valor `@default` (sem default:
+  desligado/0/primeira opção). Nunca criar sozinho ao desenhar.
+- Choice: menu com os rótulos para `float` e `int`; Bool usa caixa de marcar. Valor fora da lista mostra
+  "Valor fora das opções: n".
 - `@min/@max` num float com os dois limites → slider. Fora dos limites o valor não é cortado (só o arrasto).
 - O parsing roda no redraw do Logic Editor só para atuadores Custom Filter abertos; o Text é pequeno. Se medir
   lento, cachear por `Text` + contador de edição.
@@ -40,10 +42,8 @@ Contrato aprovado com estes esclarecimentos para a implementação:
 
 - O nome precisa ser um identificador GLSL válido (primeiro caractere letra ou `_`; os demais letra, dígito ou
   `_`). A leitura não deve expor um campo de painel para uma declaração malformada.
-- `@choice` é um menu somente para `int` e `float`. `bool` fica como "Não editável nesta versão": hoje
-  `RAS_2DFilter` só envia Game Properties int/float para uniforms, portanto expor uma caixa Boolean exigiria
-  mudança de runtime e foge deste experimento. Para `int`, o valor inicial é inteiro; para `float`, ele
-  permanece float.
+- `@choice` é um menu somente para `int` e `float`; Bool usa caixa de marcar e seu `@default` liga a property
+  quando for diferente de zero. Para `int`, o valor inicial é inteiro; para `float`, ele permanece float.
 - `@min`/`@max` são um slider somente de `float`. Se ambos estiverem presentes, `min <= max` é obrigatório;
   anotações inválidas não bloqueiam o shader e caem no campo numérico comum.
 - Vetores, matrizes e samplers aparecem em uma linha de aviso "Não editável nesta versão", em vez de sumirem:
@@ -55,15 +55,15 @@ Contrato aprovado com estes esclarecimentos para a implementação:
 
 Antes de aprovar o código C, confirmar estes pontos na implementação:
 
-1. `logic_filter2d_uniforms` separa uniforms editáveis (`float`/`int`) dos demais. O painel mostra os
-   demais, inclusive `bool`, como não editáveis e o operador jamais cria uma Game Property para eles.
+1. `logic_filter2d_uniforms` separa uniforms editáveis (`float`/`int`/`bool`) dos demais. O painel mostra Bool
+   como caixa de marcar e o operador cria `GPROP_BOOL`; vetores, matrizes e samplers permanecem não editáveis.
 2. A criação de uma property só aceita um `@default` escalar válido para o tipo; em especial, um int não
    arredonda silenciosamente um default fracionário.
 3. Um par `@min/@max` invertido não cria slider. O mesmo critério precisa preservar o comportamento do GLSL
    Script depois da extração do parser compartilhado.
 4. A leitura exige identificador GLSL válido e não converte nem recria property preexistente de tipo diferente.
-5. A regressão do Choice do GLSL Script, a cena Smart 2D Filter e a compilação GLSL no player precisam passar
-   antes do teste visual.
+5. A regressão do Choice do GLSL Script, a cena Smart 2D Filter (incluindo Bool) e a compilação GLSL no player
+   precisam passar antes do teste visual.
 
 ## Código comum (o "segundo consumidor" que justifica extrair)
 

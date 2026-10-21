@@ -6,6 +6,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Smart 2D Filter: uniforms Bool
+
+- `RAS_2DFilter` agora encaminha Game Properties Bool para uniforms `bool` com `glUniform1i`, como já fazia para Int. O painel Smart do atuador Custom Filter cria Bool a partir de `@default` diferente de zero e mostra-o como caixa de marcar; `@choice` continua reservado a Float e Int.
+- A cena e o inspetor do Smart 2D Filter agora mantêm `u_enabled` como propriedade Bool ligada. O shader inverte a cor quando ela é desligada, para que a alternância seja observável no teste visual. Validação em jogo confirmou o pixel vermelho/azul e a inversão das cores dos cubos.
+
 ## 2026-10-21 - Smart 2D Filter no atuador Custom Filter
 
 - O atuador 2D Filter > Custom Filter agora lista no Logic Editor os uniforms do Text anotados com `@min`, `@max`, `@default` ou `@choice`. Slider, menu Choice e campo numérico editam a Game Property de mesmo nome; o runtime não mudou.
