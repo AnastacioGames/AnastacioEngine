@@ -74,6 +74,35 @@ Posição no mundo: `bgl_InverseViewMatrix * vec4(viewPos, 1.0)`. UV no quadro a
   quantidade errada de valores, `ValueError`. Os `setUniform1f`... antigos continuam funcionando, mas se perdem
   numa recompilação.
 
+### Painel Smart no atuador Custom Filter
+
+No **Logic Editor**, escolha **Actuator > 2D Filter > Custom Filter** e selecione um Text GLSL. O painel lê os
+uniforms de topo `float`, `int` e `bool` que não começam com `bgl_`; ele não muda o runtime nem cria property
+enquanto desenha. Cada campo controla a Game Property do **mesmo objeto do atuador**, que continua sendo o
+transporte usado pelo filtro em jogo.
+
+```glsl
+uniform float u_radius; // @min 0 @max 20 @default 2.0
+uniform int u_mode;     // @choice Linear=2, Smooth=7, Step=12 @default 7
+uniform bool u_enabled; // @default 1
+```
+
+- Uma property existente, com o tipo certo, é editada pelo painel. `float` com `@min` e `@max` usa slider;
+  `int` continua campo numérico e `bool`, checkbox.
+- Se faltar a property, o botão **+** cria apenas aquele campo. **Create Missing Properties** cria todos os
+  campos ausentes com o tipo e `@default` do shader; sem default usa zero, ou a primeira opção de Choice.
+- `@choice` vale para `float` e `int`. O menu grava o valor declarado, não a posição da opção. Valores antigos
+  fora da lista permanecem e o painel mostra `Valor fora das opções: n`.
+- Se a property tiver outro tipo, o painel mostra o aviso e não a converte. Vetores, matrizes e samplers são
+  identificados como não editáveis nesta primeira versão; continue usando `filter.setUniform()` para eles.
+- A anotação fica no comentário final da própria declaração. Choice segue as regras do GLSL Script: no máximo
+  32 opções, rótulos e valores únicos, valores inteiros representáveis exatamente e `@default` presente na lista.
+  Anotação inválida volta ao campo numérico comum e não impede a compilação do shader.
+
+Os quatro modelos em **Text Editor > Templates > 2D Filters (GLSL)** já trazem defaults e faixas úteis para
+Bloom, SSAO, SSGI e contorno. Eles preservam a compatibilidade com cenas anteriores: nenhuma property é criada
+automaticamente e o valor zero ainda ativa o fallback que cada shader já possuía.
+
 ## Erros e recompilação
 
 - Erro de compilação de um filtro custom sai no console com o nome do Text (ou `addFilter(n)`) e as linhas
