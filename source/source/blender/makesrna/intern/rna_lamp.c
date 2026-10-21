@@ -186,6 +186,24 @@ static void rna_Lamp_draw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poin
 	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
 }
 
+/* Frustum Size chega ao shader como uniform dinâmico e a winmat é refeita a cada desenho,
+ * então só a amostragem PCF suave sem cascatas (samplesize = soft / frustum, constante no
+ * shader) precisa recompilar. Nos outros casos basta redesenhar: recompilar todos os
+ * materiais a cada passo do arraste deixava o campo muito lento. */
+static void rna_Lamp_shadow_frustum_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	Lamp *la = ptr->id.data;
+	const bool use_csm = (la->type == LA_SUN && la->shadow_cascade_count != 0);
+	const bool soft_pcf = (la->samp > 1 && la->soft >= 0.01f && la->shadow_filter != LA_SHADOW_FILTER_NONE);
+
+	if (soft_pcf && !use_csm) {
+		rna_Lamp_draw_update(bmain, scene, ptr);
+		return;
+	}
+
+	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
+}
+
 static void rna_Lamp_sky_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	Lamp *la = ptr->id.data;
@@ -1070,7 +1088,7 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "shadow_frustum_size");
 	RNA_def_property_ui_range(prop, 0.001, 100.0, 2, 1);
 	RNA_def_property_ui_text(prop, "Frustum Size", "Size of the frustum used for creating the shadow map");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_shadow_frustum_update");
 	
 	prop = RNA_def_property(srna, "shadow_blend", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "spotblend");
