@@ -460,6 +460,14 @@ static void create_properties(PythonComponent *pycomp, PyObject *cls)
 
 		bool found = false;
 		for (PythonComponentProperty *propit = pycomp->properties.first; propit; propit = propit->next) {
+			/* A text field that became Object/Scene keeps the name typed before
+			 * (all three store it in strval). */
+			if (STREQ(propit->name, cprop->name) && propit->type == CPROP_TYPE_STRING &&
+			    ELEM(cprop->type, CPROP_TYPE_OBJECT, CPROP_TYPE_SCENE) && propit->strval[0])
+			{
+				BLI_strncpy(cprop->strval, propit->strval, sizeof(cprop->strval));
+				break;
+			}
 			if ((strcmp(propit->name, cprop->name) == 0) && propit->type == cprop->type) {
 				/* We never reuse a enum property because we don't know if one of the
 				 * enum value was modified and it easier to just copy the current item
@@ -639,6 +647,24 @@ static bool load_component(PythonComponent *pc, ReportList *reports, Main *maggi
 		else {
 			PyErr_Print();
 		}
+	}
+	/* Module-level code may touch the game API (Range.logic.globalDict, events.WKEY...).
+	 * Give "Range.logic" etc. as attributes and let unknown names return a harmless
+	 * object, same as range_component_editor's own fake Range. */
+	{
+		static const char *subnames[] = {"logic", "events", "render", "constraints", "application",
+		                                 "imgui", "network", "audio", "texture", NULL};
+		for (int i = 0; subnames[i]; i++) {
+			Py_INCREF(rangesubmod);
+			PyModule_AddObject(rangemod, subnames[i], rangesubmod);
+		}
+		PyObject *rce = PyImport_ImportModule("range_component_editor");
+		PyObject *fake = rce ? PyObject_GetAttrString(rce, "fake_module_getattr") : NULL;
+		if (fake) {
+			PyModule_AddObject(rangesubmod, "__getattr__", fake); /* steals the reference */
+		}
+		Py_XDECREF(rce);
+		PyErr_Clear();
 	}
 
 	// Try to load up the module

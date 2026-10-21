@@ -80,6 +80,13 @@ class _Anything:
         return False
 
 
+def fake_module_getattr(name):
+    """Module __getattr__ for the C loader's fake Range submodules (python_component.c)."""
+    if name.startswith("__"):
+        raise AttributeError(name)
+    return _Anything()
+
+
 class _FakeSubmodule(ModuleType):
     def __getattr__(self, name):
         if name.startswith("__"):
