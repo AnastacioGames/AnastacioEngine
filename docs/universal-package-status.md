@@ -46,7 +46,10 @@ validada no notebook Windows. O zip Universal NÃO está no repo (475 MB), entã
 - Auto-load OK: `game.range` ao lado do player, player sem argumentos -> "no game file given, loading .../game.range" e janela.
 - Falha encontrada (aberta): o template `Example Game.rasec` do RangeArmor 0.5.4 não carrega no player 0.5.4
   ("loading ... failed:" com mensagem vazia), gzip ou descompactado. `.range` normais carregam.
-  No teste usei a demo Destruction como `data/game.rasec`. Investigar se é o template ou o leitor.
+  No teste usei a demo Destruction como `data/game.rasec`.
+  CORRIGIDO no Windows: a chave do .rasec embute a versão (template salvo na 1.5, engine 1.6).
+  O leitor (readfile.c) agora aceita 1.6 e 1.5; Example Game.rasec abre no player Windows.
+  Linux: recompilar o player e confirmar.
 - Obs.: após falha de carga, o player tenta ler o próprio executável (checagem de jogo embutido) e imprime o usage; a mensagem confunde.
 
 ## Pendente no Windows

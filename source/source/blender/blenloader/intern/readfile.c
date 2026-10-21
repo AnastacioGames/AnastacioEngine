@@ -1172,18 +1172,26 @@ FileData *blo_openblenderfile(const char *filepath, ReportList *reports)
 
 		if (G.canOpenProtectedFile) {
 			char key[303];
-			sprintf(key, "d43d6c30-db11-417b-bf60-c8685c9311bd69ad9683-d89b-4d82-837c-f5cd2e106a38b54c60aa-9a35-4106-9d4f-d08ed4526831%s%.1d%.1d%s",
-				"RANGE-ENGINE", RANGE_VERSION, RANGE_SUBVERSION, "2fd68263-8ca7-4d17-a4dd-18fd9446eb59dd4a199f-d16b-4f28-85ba-898456042ff583ed679a-fb33-4268-b981-9e6a4603fff621a89f43-68d9-4ed5-9ee8-3424baaf15925fd40d87-8a59-4458-b154-1dc150443817");
 			const int key_size = sizeof(key) - 1;
 			const int byteArray = 500;
 			char buffer[1024];
+			/* The key embeds the engine version. Accept the current one and 1.5,
+			 * so protected files saved by older editors still load. */
+			const int key_versions[][2] = {{RANGE_VERSION, RANGE_SUBVERSION}, {1, 5}};
+			bool has_key = false;
 
 			// Find the position of key in the buffer...
 			gzseek(gzfile, (byteArray / 2 + SIZEOFBLENDERHEADER), SEEK_SET);
 			gzread(gzfile, buffer, key_size);
 
+			for (int k = 0; k < ARRAY_SIZE(key_versions) && !has_key; k++) {
+				sprintf(key, "d43d6c30-db11-417b-bf60-c8685c9311bd69ad9683-d89b-4d82-837c-f5cd2e106a38b54c60aa-9a35-4106-9d4f-d08ed4526831%s%.1d%.1d%s",
+					"RANGE-ENGINE", key_versions[k][0], key_versions[k][1], "2fd68263-8ca7-4d17-a4dd-18fd9446eb59dd4a199f-d16b-4f28-85ba-898456042ff583ed679a-fb33-4268-b981-9e6a4603fff621a89f43-68d9-4ed5-9ee8-3424baaf15925fd40d87-8a59-4458-b154-1dc150443817");
+				has_key = memcmp(buffer, key, key_size) == 0;
+			}
+
 			// Check if has security...
-			if (memcmp(buffer, key, key_size) == 0) {
+			if (has_key) {
 				//printf("RangeArmor Encryption Detected\n");
 				gzseek(gzfile, 0, SEEK_SET);
 				gzread(gzfile, buffer, key_size + byteArray + SIZEOFBLENDERHEADER);
