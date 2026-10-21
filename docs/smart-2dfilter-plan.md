@@ -20,14 +20,14 @@ DNA: o valor continua salvo como propriedade de jogo.
 
 ## Contrato v1 (proposta — Codex revisa antes do código)
 
-- Uniforms de topo, tipo `float`, `int` ou `bool`, nome sem prefixo `bgl_`. Outros tipos (vec/sampler) são
+- Uniforms de topo, tipo `float` ou `int`, nome sem prefixo `bgl_`. Outros tipos (bool, vec/sampler) são
   ignorados nesta versão (listados como "não editável").
 - Anotações iguais às do GLSL Script: `@min`, `@max`, `@default`, `@choice Rótulo=int,...` com as mesmas regras
   de validação do Choice v1 (inválido → campo numérico comum).
 - Propriedade existente com o mesmo nome: o painel edita ela. Tipo diferente do uniform → mostrar aviso, não
   converter.
 - Propriedade ausente: mostrar o uniform com botão "+" (cria só aquela) e um botão "Create Missing" (cria todas),
-  com tipo `float`→Float, `int`→Int (`@choice` também), `bool`→Boolean e valor `@default` (sem default: 0/primeira
+  com tipo `float`→Float, `int`→Int (`@choice` também) e valor `@default` (sem default: 0/primeira
   opção). Nunca criar sozinho ao desenhar.
 - Choice: menu com os rótulos; valor fora da lista mostra "Valor fora das opções: n".
 - `@min/@max` num float com os dois limites → slider. Fora dos limites o valor não é cortado (só o arrasto).
@@ -40,9 +40,10 @@ Contrato aprovado com estes esclarecimentos para a implementação:
 
 - O nome precisa ser um identificador GLSL válido (primeiro caractere letra ou `_`; os demais letra, dígito ou
   `_`). A leitura não deve expor um campo de painel para uma declaração malformada.
-- `@choice` é um menu somente para `int` e `float`; `bool` é uma caixa de seleção. Para `bool`, `@default`
-  aceita somente `0` ou `1`; outro valor invalida o default e usa `0`. Para `int`, o valor inicial é inteiro;
-  para `float`, ele permanece float.
+- `@choice` é um menu somente para `int` e `float`. `bool` fica como "Não editável nesta versão": hoje
+  `RAS_2DFilter` só envia Game Properties int/float para uniforms, portanto expor uma caixa Boolean exigiria
+  mudança de runtime e foge deste experimento. Para `int`, o valor inicial é inteiro; para `float`, ele
+  permanece float.
 - `@min`/`@max` são um slider somente de `float`. Se ambos estiverem presentes, `min <= max` é obrigatório;
   anotações inválidas não bloqueiam o shader e caem no campo numérico comum.
 - Vetores, matrizes e samplers aparecem em uma linha de aviso "Não editável nesta versão", em vez de sumirem:
