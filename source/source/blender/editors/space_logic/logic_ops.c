@@ -29,8 +29,14 @@
 #include "DNA_actuator_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_python_component_types.h"
+#include "DNA_property_types.h"
+#include "DNA_text_types.h"
+
+#include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
+#include "BLI_glsl_annotations.h"
+#include "BLI_math.h"
 #include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 
@@ -40,6 +46,8 @@
 #include "BKE_main.h"
 #include "BKE_sca.h"
 #include "BKE_python_component.h"
+#include "BKE_property.h"
+#include "BKE_text.h"
 
 #include "ED_logic.h"
 #include "ED_object.h"
@@ -515,6 +523,122 @@ static void LOGIC_OT_actuator_remove(wmOperatorType *ot)
 	/* flags */
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
 	edit_actuator_properties(ot);
+}
+
+/* ************* Custom 2D Filter uniforms ************* */
+
+/* RAS_2DFilter only sends int and float game properties to uniforms. */
+int logic_filter2d_prop_type(const char *glsltype)
+{
+	if (STREQ(glsltype, "float")) return GPROP_FLOAT;
+	if (STREQ(glsltype, "int")) return GPROP_INT;
+	return -1;
+}
+
+int logic_filter2d_uniforms(Text *text, GLSLUniform *r_uniforms, char **r_code)
+{
+	GLSLUniform all[LOGIC_FILTER2D_MAX_UNIFORMS];
+	int tot = 0;
+
+	*r_code = text ? txt_to_buf(text) : NULL;
+	if (!*r_code) {
+		return 0;
+	}
+	const int totall = BLI_glsl_uniforms_find(*r_code, all, LOGIC_FILTER2D_MAX_UNIFORMS);
+	for (int i = 0; i < totall; i++) {
+		if (!STRPREFIX(all[i].name, "bgl_")) {
+			r_uniforms[tot++] = all[i];
+		}
+	}
+	return tot;
+}
+
+float logic_filter2d_default(const GLSLUniform *uni, int type)
+{
+	char choice[BLI_GLSL_CHOICE_BUF];
+	float choice_default;
+
+	if (BLI_glsl_choice_build(&uni->ann, choice, &choice_default)) {
+		return choice_default;
+	}
+	/* Only one scalar, and a whole number for an int (never rounded). */
+	if (uni->ann.totdefault != 1 || (type == GPROP_INT && uni->ann.def[0] != floorf(uni->ann.def[0]))) {
+		return 0.0f;
+	}
+	return uni->ann.def[0];
+}
+
+static void filter2d_property_create(Object *ob, const GLSLUniform *uni)
+{
+	const int type = logic_filter2d_prop_type(uni->type);
+	const float value = logic_filter2d_default(uni, type);
+
+	bProperty *prop = BKE_bproperty_new(type);
+	BLI_strncpy(prop->name, uni->name, sizeof(prop->name));
+	if (type == GPROP_FLOAT) {
+		*((float *)&prop->data) = value;
+	}
+	else {
+		prop->data = (int)value;
+	}
+	BLI_addtail(&ob->prop, prop);
+}
+
+static int filter2d_property_add_exec(bContext *C, wmOperator *op)
+{
+	Object *ob = NULL;
+	bActuator *act = edit_actuator_property_get(C, op, &ob);
+	char only[MAX_NAME];
+	GLSLUniform uniforms[LOGIC_FILTER2D_MAX_UNIFORMS];
+	char *code;
+	int added = 0;
+
+	if (!act || act->type != ACT_2DFILTER) {
+		return OPERATOR_CANCELLED;
+	}
+	RNA_string_get(op->ptr, "uniform", only);
+
+	const int tot = logic_filter2d_uniforms(((bTwoDFilterActuator *)act->data)->text, uniforms, &code);
+	for (int i = 0; i < tot; i++) {
+		if ((only[0] && !STREQ(only, uniforms[i].name)) || logic_filter2d_prop_type(uniforms[i].type) == -1 ||
+		    BKE_bproperty_object_get(ob, uniforms[i].name))
+		{
+			continue;
+		}
+		filter2d_property_create(ob, &uniforms[i]);
+		added++;
+	}
+	MEM_SAFE_FREE(code);
+
+	if (!added) {
+		return OPERATOR_CANCELLED;
+	}
+	WM_event_add_notifier(C, NC_LOGIC, NULL);
+	return OPERATOR_FINISHED;
+}
+
+static int filter2d_property_add_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	if (edit_actuator_invoke_properties(C, op)) {
+		return filter2d_property_add_exec(C, op);
+	}
+	return OPERATOR_CANCELLED;
+}
+
+static void LOGIC_OT_filter2d_property_add(wmOperatorType *ot)
+{
+	ot->name = "Add Filter Property";
+	ot->description = "Create the game property that feeds a uniform of the Custom 2D Filter, "
+	                  "with the type and @default of the shader (all missing ones when no uniform is given)";
+	ot->idname = "LOGIC_OT_filter2d_property_add";
+
+	ot->invoke = filter2d_property_add_invoke;
+	ot->exec = filter2d_property_add_exec;
+	ot->poll = edit_actuator_poll;
+
+	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO | OPTYPE_INTERNAL;
+	edit_actuator_properties(ot);
+	RNA_def_string(ot->srna, "uniform", NULL, MAX_NAME, "Uniform", "Name of the uniform, empty for all missing ones");
 }
 
 static int actuator_add_exec(bContext *C, wmOperator *op)
@@ -1189,6 +1313,7 @@ void ED_operatortypes_logic(void)
 	WM_operatortype_append(LOGIC_OT_controller_add);
 	WM_operatortype_append(LOGIC_OT_controller_move);
 	WM_operatortype_append(LOGIC_OT_actuator_remove);
+	WM_operatortype_append(LOGIC_OT_filter2d_property_add);
 	WM_operatortype_append(LOGIC_OT_actuator_add);
 	WM_operatortype_append(LOGIC_OT_actuator_move);
 	WM_operatortype_append(LOGIC_OT_actuator_then);

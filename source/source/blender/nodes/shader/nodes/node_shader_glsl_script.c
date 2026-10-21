@@ -59,6 +59,8 @@
 
 #include "BLI_dynstr.h"
 
+#include "BLI_glsl_annotations.h"
+
 #include "BKE_idprop.h"
 #include "BKE_text.h"
 
@@ -66,26 +68,15 @@
 
 #define SCRIPT_MAX_PARAMS 64
 
-#define SCRIPT_CHOICE_MAX_ITEMS 32
-#define SCRIPT_CHOICE_MAX_LABEL 64
-/* Biggest integer a float holds exactly. */
-#define SCRIPT_CHOICE_LIMIT 16777216
-#define SCRIPT_CHOICE_BUF (SCRIPT_CHOICE_MAX_ITEMS * (SCRIPT_CHOICE_MAX_LABEL + 10))
-
 typedef struct ScriptParam {
 	char glsltype[16];
 	char name[64];
 	bool output;
 	int socktype;
-	/* "uniform <type> u_<name>;" instead of a parameter of main, with its optional annotations. */
+	/* "uniform <type> u_<name>;" instead of a parameter of main, with its optional annotations
+	 * (ann.choice points inside the code buffer). */
 	bool uniform;
-	bool has_min, has_max;
-	float min, max;
-	int totdefault;
-	float def[4];
-	/* Text after "@choice" inside the code buffer; choicelen -1 when "@choice" appears twice. */
-	const char *choice;
-	int choicelen;
+	GLSLAnnotations ann;
 } ScriptParam;
 
 static bool script_ident_char(char c)
@@ -196,68 +187,6 @@ static int script_parse(const char *code, ScriptParam *params)
 	return -1;
 }
 
-/* "@min 0 @max 2 @default 0.5" in the comment that ends the line of a uniform. */
-static void script_parse_annotations(const char *p, ScriptParam *param)
-{
-	while (*p == ' ' || *p == '\t') {
-		p++;
-	}
-	if (!(p[0] == '/' && p[1] == '/')) {
-		return;
-	}
-	while (*p && *p != '\n') {
-		if (*p == '@') {
-			char word[16];
-			char *end;
-			p = script_read_ident(p + 1, word, sizeof(word));
-			if (STREQ(word, "min") || STREQ(word, "max")) {
-				const float value = (float)strtod(p, &end);
-				if (end != p) {
-					if (word[1] == 'i') {
-						param->min = value;
-						param->has_min = true;
-					}
-					else {
-						param->max = value;
-						param->has_max = true;
-					}
-					p = end;
-				}
-			}
-			else if (STREQ(word, "default")) {
-				param->totdefault = 0;
-				while (param->totdefault < 4) {
-					while (*p == ' ' || *p == '\t' || *p == ',' || *p == '(') {
-						p++;
-					}
-					const float value = (float)strtod(p, &end);
-					if (end == p) {
-						break;
-					}
-					param->def[param->totdefault++] = value;
-					p = end;
-				}
-			}
-			else if (STREQ(word, "choice")) {
-				const char *start = p;
-				while (*p && *p != '\n' && *p != '@') {
-					p++;
-				}
-				if (param->choice) {
-					param->choicelen = -1;
-				}
-				else {
-					param->choice = start;
-					param->choicelen = (int)(p - start);
-				}
-			}
-		}
-		else {
-			p++;
-		}
-	}
-}
-
 /* Top level "uniform <type> u_<name>" declarations, added after the tot parameters of main. With
  * blank the word "uniform" is erased from code: the name becomes a global that the wrapper fills
  * from the socket, which may be linked to other nodes. */
@@ -310,7 +239,7 @@ static int script_parse_uniforms(char *code, ScriptParam *params, int tot, bool 
 			q++;
 		}
 		if (*q == ';') {
-			script_parse_annotations(q + 1, param);
+			BLI_glsl_annotations_parse(q + 1, &param->ann);
 		}
 		if (blank) {
 			memset(start, ' ', 7);
@@ -351,7 +280,7 @@ static int script_read(bNode *node, ScriptParam *params, char **r_code)
 /* A float uniform with both limits is drawn as a slider. */
 static int script_socket_subtype(const ScriptParam *param)
 {
-	return (param->uniform && param->socktype == SOCK_FLOAT && param->has_min && param->has_max) ? PROP_FACTOR :
+	return (param->uniform && param->socktype == SOCK_FLOAT && param->ann.has_min && param->ann.has_max) ? PROP_FACTOR :
 	                                                                                               PROP_NONE;
 }
 
@@ -371,116 +300,10 @@ static bNodeSocket *script_find_socket(ListBase *sockets, const ScriptParam *par
 	return NULL;
 }
 
-static void script_trim(const char **r_start, const char **r_end)
+/* "@choice" of an int/float uniform, see BLI_glsl_choice_build. */
+static bool script_choice_build(const ScriptParam *param, char r_buf[BLI_GLSL_CHOICE_BUF], float *r_default)
 {
-	while (*r_start < *r_end && (**r_start == ' ' || **r_start == '\t' || **r_start == '\r')) {
-		(*r_start)++;
-	}
-	while (*r_end > *r_start && ((*r_end)[-1] == ' ' || (*r_end)[-1] == '\t' || (*r_end)[-1] == '\r')) {
-		(*r_end)--;
-	}
-}
-
-/* Decimal integer in [-SCRIPT_CHOICE_LIMIT, SCRIPT_CHOICE_LIMIT], nothing else. */
-static bool script_choice_value(const char *p, const char *end, int *r_value)
-{
-	bool negative = false;
-	long long value = 0;
-
-	if (p < end && (*p == '-' || *p == '+')) {
-		negative = (*p == '-');
-		p++;
-	}
-	if (p == end) {
-		return false;
-	}
-	for (; p < end; p++) {
-		if (*p < '0' || *p > '9') {
-			return false;
-		}
-		value = value * 10 + (*p - '0');
-		if (value > SCRIPT_CHOICE_LIMIT) {
-			return false;
-		}
-	}
-	*r_value = (int)(negative ? -value : value);
-	return true;
-}
-
-/* "@choice A=0, B = 7" of an int/float uniform -> "A=0,B=7" in r_buf and the value of a new
- * socket (@default, else the first option). False, and the socket stays a plain number, when:
- * no option, more than SCRIPT_CHOICE_MAX_ITEMS, an empty or too long label, a value that is not a
- * plain integer within SCRIPT_CHOICE_LIMIT, a repeated label or value, a @default that is not one
- * of the values, or an option outside @min/@max. */
-static bool script_choice_build(const ScriptParam *param, char r_buf[SCRIPT_CHOICE_BUF], float *r_default)
-{
-	char labels[SCRIPT_CHOICE_MAX_ITEMS][SCRIPT_CHOICE_MAX_LABEL];
-	int values[SCRIPT_CHOICE_MAX_ITEMS];
-	int tot = 0;
-
-	if (!param->uniform || param->socktype != SOCK_FLOAT || !param->choice || param->choicelen <= 0) {
-		return false;
-	}
-
-	const char *end = param->choice + param->choicelen;
-	for (const char *p = param->choice; p <= end; tot++) {
-		const char *comma = memchr(p, ',', end - p);
-		if (!comma) {
-			comma = end;
-		}
-		const char *eq = memchr(p, '=', comma - p);
-		if (!eq || tot == SCRIPT_CHOICE_MAX_ITEMS) {
-			return false;
-		}
-
-		const char *label = p, *label_end = eq;
-		script_trim(&label, &label_end);
-		const int len = (int)(label_end - label);
-		if (len == 0 || len >= SCRIPT_CHOICE_MAX_LABEL) {
-			return false;
-		}
-		memcpy(labels[tot], label, len);
-		labels[tot][len] = '\0';
-
-		const char *value = eq + 1, *value_end = comma;
-		script_trim(&value, &value_end);
-		if (!script_choice_value(value, value_end, &values[tot])) {
-			return false;
-		}
-
-		for (int i = 0; i < tot; i++) {
-			if (values[i] == values[tot] || STREQ(labels[i], labels[tot])) {
-				return false;
-			}
-		}
-		p = comma + 1;
-	}
-
-	float def = (float)values[0];
-	if (param->totdefault) {
-		bool found = false;
-		for (int i = 0; i < tot; i++) {
-			found |= ((float)values[i] == param->def[0]);
-		}
-		if (param->totdefault != 1 || !found) {
-			return false;
-		}
-		def = param->def[0];
-	}
-
-	for (int i = 0; i < tot; i++) {
-		if ((param->has_min && values[i] < param->min) || (param->has_max && values[i] > param->max)) {
-			return false;
-		}
-	}
-
-	r_buf[0] = '\0';
-	for (int i = 0; i < tot; i++) {
-		const size_t used = strlen(r_buf);
-		BLI_snprintf(r_buf + used, SCRIPT_CHOICE_BUF - used, "%s%s=%d", i ? "," : "", labels[i], values[i]);
-	}
-	*r_default = def;
-	return true;
+	return param->uniform && param->socktype == SOCK_FLOAT && BLI_glsl_choice_build(&param->ann, r_buf, r_default);
 }
 
 /* Stores the options for the menu of drawnode.c, or removes them (choice NULL). */
@@ -510,16 +333,16 @@ static void script_socket_choice(bNodeSocket *sock, const char *choice)
 static void script_socket_uniform(bNodeSocket *sock, const ScriptParam *param, bool is_new,
                                   const float *choice_default)
 {
-	const float min = param->has_min ? param->min : -FLT_MAX;
-	const float max = param->has_max ? param->max : FLT_MAX;
+	const float min = param->ann.has_min ? param->ann.min : -FLT_MAX;
+	const float max = param->ann.has_max ? param->ann.max : FLT_MAX;
 	float def[4] = {0.0f, 0.0f, 0.0f, 1.0f};
 
 	for (int i = 0; i < 4; i++) {
-		if (i < param->totdefault) {
-			def[i] = param->def[i];
+		if (i < param->ann.totdefault) {
+			def[i] = param->ann.def[i];
 		}
-		else if (param->totdefault == 1 && i < 3) {
-			def[i] = param->def[0];
+		else if (param->ann.totdefault == 1 && i < 3) {
+			def[i] = param->ann.def[0];
 		}
 	}
 
@@ -530,7 +353,7 @@ static void script_socket_uniform(bNodeSocket *sock, const ScriptParam *param, b
 		if (is_new && choice_default) {
 			dval->value = *choice_default;
 		}
-		else if (is_new && param->totdefault) {
+		else if (is_new && param->ann.totdefault) {
 			dval->value = def[0];
 		}
 		CLAMP(dval->value, min, max);
@@ -539,13 +362,13 @@ static void script_socket_uniform(bNodeSocket *sock, const ScriptParam *param, b
 		bNodeSocketValueVector *dval = sock->default_value;
 		dval->min = min;
 		dval->max = max;
-		if (is_new && param->totdefault) {
+		if (is_new && param->ann.totdefault) {
 			copy_v3_v3(dval->value, def);
 		}
 	}
 	else if (sock->type == SOCK_RGBA) {
 		bNodeSocketValueRGBA *dval = sock->default_value;
-		if (is_new && param->totdefault) {
+		if (is_new && param->ann.totdefault) {
 			copy_v4_v4(dval->value, def);
 		}
 	}
@@ -592,7 +415,7 @@ static void node_shader_update_glsl_script(bNodeTree *ntree, bNode *node)
 				                           script_socket_subtype(&params[i]), params[i].name, params[i].name);
 			}
 			if (params[i].uniform) {
-				char choice[SCRIPT_CHOICE_BUF];
+				char choice[BLI_GLSL_CHOICE_BUF];
 				float choice_default;
 				const bool has_choice = script_choice_build(&params[i], choice, &choice_default);
 				script_socket_uniform(sock, &params[i], is_new, has_choice ? &choice_default : NULL);

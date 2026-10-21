@@ -70,6 +70,7 @@ set(SRC
 	intern/endian_switch.c
 	intern/fileops.c
 	intern/fnmatch.c
+	intern/glsl_annotations.c
 	intern/freetypefont.c
 	intern/graph.c
 	intern/gsqueue.c
@@ -155,6 +156,7 @@ set(SRC
 	BLI_fileops.h
 	BLI_fileops_types.h
 	BLI_fnmatch.h
+	BLI_glsl_annotations.h
 	BLI_ghash.h
 	BLI_graph.h
 	BLI_gsqueue.h

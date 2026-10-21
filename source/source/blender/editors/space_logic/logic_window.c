@@ -44,8 +44,10 @@
 #include "BLI_string_utils.h"
 #include "BLI_utildefines.h"
 #include "BLI_math.h"
+#include "BLI_glsl_annotations.h"
 
 #include "BKE_action.h"
+#include "BKE_property.h"
 #include "BKE_context.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
@@ -1996,6 +1998,126 @@ static void draw_actuator_edit_object(uiLayout *layout, PointerRNA *ptr, bContex
 	}
 }
 
+/* Menu of a "@choice" uniform: one row button per option on the game property value. */
+static uiBlock *filter2d_choice_menu(bContext *C, ARegion *ar, void *arg)
+{
+	PointerRNA *pptr = arg;
+	const char *items = (const char *)(pptr + 1);
+	uiBlock *block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
+	char label[BLI_GLSL_CHOICE_MAX_LABEL];
+	int value, y = 0;
+
+	UI_block_flag_enable(block, UI_BLOCK_MOVEMOUSE_QUIT);
+	while (BLI_glsl_choice_next(&items, label, sizeof(label), &value)) {
+		uiDefButR(block, UI_BTYPE_ROW, 0, label, 0, y, UI_UNIT_X * 6, UI_UNIT_Y,
+		          pptr, "value", 0, 0.0f, (float)value, 0, 0, "");
+		y -= UI_UNIT_Y;
+	}
+	UI_block_bounds_set_normal(block, 6);
+	UI_block_direction_set(block, UI_DIR_DOWN);
+	return block;
+}
+
+static void filter2d_choice_draw(uiLayout *row, PointerRNA *pptr, const bProperty *prop,
+                                 const char *name, const char *choice)
+{
+	const float current = (prop->type == GPROP_FLOAT) ? *((const float *)&prop->data) : (float)prop->data;
+	const char *items = choice;
+	char label[BLI_GLSL_CHOICE_MAX_LABEL], text[256];
+	int value;
+	bool found = false;
+
+	while (!found && BLI_glsl_choice_next(&items, label, sizeof(label), &value)) {
+		found = ((float)value == current);
+	}
+	if (found) {
+		BLI_snprintf(text, sizeof(text), "%s: %s", name, label);
+	}
+	else {
+		BLI_snprintf(text, sizeof(text), "%s: Valor fora das op\xc3\xa7\xc3\xb5" "es: %g", name, current);
+	}
+
+	/* The menu gets the pointer and a copy of the options in one block, freed with the button. */
+	const size_t len = strlen(choice) + 1;
+	PointerRNA *arg = MEM_mallocN(sizeof(PointerRNA) + len, __func__);
+	*arg = *pptr;
+	memcpy(arg + 1, choice, len);
+	uiDefBlockButN(uiLayoutGetBlock(row), filter2d_choice_menu, arg, text, 0, 0,
+	               UI_UNIT_X * 10, UI_UNIT_Y, TIP_("Options of @choice in the filter"));
+}
+
+/* Uniforms of the Custom Filter Text, drawn from their annotations and stored in the game
+ * properties of the same name (what RAS_2DFilter reads when the game runs). */
+static void draw_filter2d_uniforms(uiLayout *layout, PointerRNA *ptr)
+{
+	bActuator *act = ptr->data;
+	Object *ob = ptr->id.data;
+	bTwoDFilterActuator *fa = act->data;
+	GLSLUniform uniforms[LOGIC_FILTER2D_MAX_UNIFORMS];
+	char *code;
+	bool missing = false;
+
+	const int tot = logic_filter2d_uniforms(fa->text, uniforms, &code);
+	if (tot == 0) {
+		MEM_SAFE_FREE(code);
+		return;
+	}
+
+	uiLayout *col = uiLayoutColumn(layout, true);
+	uiLayoutSetContextPointer(col, "actuator", ptr);
+	for (int i = 0; i < tot; i++) {
+		const GLSLUniform *uni = &uniforms[i];
+		uiLayout *row = uiLayoutRow(col, true);
+
+		if (logic_filter2d_prop_type(uni->type) == -1) {
+			char text[256];
+			BLI_snprintf(text, sizeof(text), "%s (%s): %s", uni->name, uni->type,
+			             "N\xc3\xa3o edit\xc3\xa1vel nesta vers\xc3\xa3o");
+			uiItemL(row, text, ICON_INFO);
+			continue;
+		}
+
+		bProperty *prop = BKE_bproperty_object_get(ob, uni->name);
+		if (!prop) {
+			PointerRNA opptr;
+			missing = true;
+			uiItemL(row, uni->name, ICON_NONE);
+			uiItemFullO(row, "LOGIC_OT_filter2d_property_add", "", ICON_ZOOMIN, NULL,
+			            WM_OP_INVOKE_DEFAULT, 0, &opptr);
+			RNA_string_set(&opptr, "uniform", uni->name);
+			continue;
+		}
+		if (prop->type != logic_filter2d_prop_type(uni->type)) {
+			char text[256];
+			BLI_snprintf(text, sizeof(text), "%s: %s", uni->name,
+			             "tipo da propriedade difere do shader");
+			uiItemL(row, text, ICON_ERROR);
+			continue;
+		}
+
+		PointerRNA pptr;
+		char choice[BLI_GLSL_CHOICE_BUF];
+		float choice_default;
+		RNA_pointer_create(&ob->id, &RNA_GameProperty, prop, &pptr);
+
+		if (BLI_glsl_choice_build(&uni->ann, choice, &choice_default)) {
+			filter2d_choice_draw(row, &pptr, prop, uni->name, choice);
+		}
+		else if (prop->type == GPROP_FLOAT && uni->ann.has_min && uni->ann.has_max && uni->ann.min <= uni->ann.max) {
+			uiDefButR(uiLayoutGetBlock(row), UI_BTYPE_NUM_SLIDER, 0, uni->name, 0, 0, UI_UNIT_X * 10, UI_UNIT_Y,
+			          &pptr, "value", 0, uni->ann.min, uni->ann.max, 0, 3, NULL);
+		}
+		else {
+			uiItemR(row, &pptr, "value", 0, uni->name, ICON_NONE);
+		}
+	}
+	MEM_freeN(code);
+
+	if (missing) {
+		uiItemO(col, IFACE_("Create Missing Properties"), ICON_ZOOMIN, "LOGIC_OT_filter2d_property_add");
+	}
+}
+
 static void draw_actuator_filter_2d(uiLayout *layout, PointerRNA *ptr)
 {
 	uiLayout *row, *split;
@@ -2006,6 +2128,7 @@ static void draw_actuator_filter_2d(uiLayout *layout, PointerRNA *ptr)
 			uiItemR(layout, ptr, "filter_pass", 0, NULL, ICON_NONE);
 			uiItemR(layout, ptr, "glsl_shader", 0, NULL, ICON_NONE);
 			uiItemR(layout, ptr, "use_mipmap", 0, NULL, ICON_NONE);
+			draw_filter2d_uniforms(layout, ptr);
 			break;
 		case ACT_2DFILTER_MOTIONBLUR:
 			split=uiLayoutSplit(layout, 0.75f, true);

@@ -35,6 +35,16 @@ struct wmOperatorType;
 struct ARegion *logic_has_buttons_region(struct ScrArea *sa);
 
 /* logic_ops.c */
+struct GLSLUniform;
+struct Text;
+#define LOGIC_FILTER2D_MAX_UNIFORMS 64
+/* Top level uniforms of a Custom 2D Filter Text, without the bgl_* ones the engine fills.
+ * *r_code must be freed with MEM_freeN (uniform choice annotations point into it). */
+int logic_filter2d_uniforms(struct Text *text, struct GLSLUniform *r_uniforms, char **r_code);
+/* Game property type (GPROP_INT/GPROP_FLOAT) feeding a uniform type, -1 when not editable. */
+int logic_filter2d_prop_type(const char *glsltype);
+/* Value of a new property: @choice default, else a valid scalar @default, else 0. */
+float logic_filter2d_default(const struct GLSLUniform *uni, int type);
 
 /* logic_buttons.c */
 void LOGIC_OT_properties(struct wmOperatorType *ot);

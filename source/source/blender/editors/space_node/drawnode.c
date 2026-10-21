@@ -34,6 +34,8 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_glsl_annotations.h"
+
 #include "BKE_context.h"
 #include "BKE_curve.h"
 #include "BKE_idprop.h"
@@ -3184,19 +3186,6 @@ static const char *node_script_choice_items(bNodeSocket *sock)
 	return prop ? IDP_String(prop) : NULL;
 }
 
-static bool node_script_choice_next(const char **p, char *r_label, int labelsize, int *r_value)
-{
-	const char *eq = strchr(*p, '=');
-	if (!**p || !eq) {
-		return false;
-	}
-	BLI_strncpy(r_label, *p, MIN2(labelsize, (int)(eq - *p) + 1));
-	*r_value = atoi(eq + 1);
-	const char *comma = strchr(eq, ',');
-	*p = comma ? comma + 1 : eq + strlen(eq);
-	return true;
-}
-
 static uiBlock *node_script_choice_menu(bContext *C, ARegion *ar, void *arg)
 {
 	PointerRNA *ptr = arg;
@@ -3206,7 +3195,7 @@ static uiBlock *node_script_choice_menu(bContext *C, ARegion *ar, void *arg)
 	int value, y = 0;
 
 	UI_block_flag_enable(block, UI_BLOCK_MOVEMOUSE_QUIT);
-	while (items && node_script_choice_next(&items, label, sizeof(label), &value)) {
+	while (items && BLI_glsl_choice_next(&items, label, sizeof(label), &value)) {
 		/* A row button sets the socket to its max, the option value. */
 		uiDefButR(block, UI_BTYPE_ROW, 0, label, 0, y, UI_UNIT_X * 6, UI_UNIT_Y,
 		          ptr, "default_value", 0, 0.0f, (float)value, 0, 0, "");
@@ -3230,7 +3219,7 @@ static bool node_script_choice_draw(uiLayout *layout, PointerRNA *ptr, const cha
 	char label[64], name[256];
 	int value;
 	bool found = false;
-	while (!found && node_script_choice_next(&items, label, sizeof(label), &value)) {
+	while (!found && BLI_glsl_choice_next(&items, label, sizeof(label), &value)) {
 		found = ((float)value == current);
 	}
 	if (found) {
