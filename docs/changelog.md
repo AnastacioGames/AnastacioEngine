@@ -6,6 +6,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Cook com destino acentuado
+
+- `CcdCookedData` lia `ANASTACIO_COOK` com `getenv`, que no Windows devolve o código de página ANSI, enquanto `BLI_fopen` espera UTF-8: destino com caractere fora do ASCII falhava ao gravar. Agora lê com `_wgetenv` e converte para UTF-8. Testado no runtime com pasta `coção ç` e destino `saída_é.cooked` (exit 0, arquivo gravado).
+
 ## 2026-10-21 - Giro extra de osso por Python (setBoneRotationOffset)
 
 - `BL_ArmatureObject` ganha `setBoneRotationOffset(osso, rot)` (euler XYZ em radianos ou quaternion w x y z, no espaço local do osso) e `clearBoneRotationOffset(osso=None)`. O giro é aplicado em `KX_Scene::UpdateAnimPoseTask`, depois das actions e antes do skinning; antes disso, editar `channels` pelo Python era apagado pela action no frame seguinte, porque as animações rodam antes da lógica.

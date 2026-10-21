@@ -69,7 +69,7 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
   Windows atualizado passaram em cena controlada e pacote extraído. Pendente: jogo real,
   Linux/outra GPU e migração dos runtimes dos projetos antigos; [plano](rangearmor-update-plan.md).
   Cópia da instalação real, Cook e execução pelo player copiado passaram em caminho com
-  espaço/acento. Aberto: codificação de destinos não ASCII em `ANASTACIO_COOK` direto no runtime.
+  espaço/acento. Destino não ASCII em `ANASTACIO_COOK` corrigido (lido em UTF-16 no Windows, 2026-10-21).
   Painel Rust recompilado com tratamento de exit code; 26 testes e abertura/fechamento
   passaram. Exportação pela GUI e diagnóstico de falha passaram em cena controlada;
   export comprimido pela GUI também passou, com execução do ZIP extraído e uso do cache.

@@ -14,6 +14,16 @@
 #include <mutex>
 #include <utility>
 
+#ifdef _WIN32
+#  ifndef WIN32_LEAN_AND_MEAN
+#    define WIN32_LEAN_AND_MEAN
+#  endif
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#endif
+
 extern "C" {
 #  include "BLI_fileops.h"
 #  include "BLI_string.h"
@@ -22,6 +32,27 @@ extern "C" {
 
 namespace CcdCookedData
 {
+/// Cook target as UTF-8 (BLI_fopen expects UTF-8; Windows getenv returns the ANSI code page).
+static std::string CookTargetPath()
+{
+#ifdef _WIN32
+	const wchar_t *wide = _wgetenv(L"ANASTACIO_COOK");
+	if (!wide || !wide[0]) {
+		return std::string();
+	}
+	const int size = WideCharToMultiByte(CP_UTF8, 0, wide, -1, nullptr, 0, nullptr, nullptr);
+	if (size <= 1) {
+		return std::string();
+	}
+	std::string result(size - 1, char(0));
+	WideCharToMultiByte(CP_UTF8, 0, wide, -1, &result[0], size, nullptr, nullptr);
+	return result;
+#else
+	const char *path = getenv("ANASTACIO_COOK");
+	return path ? std::string(path) : std::string();
+#endif
+}
+
 static const char magic[8] = {'A', 'N', 'A', 'C', 'O', 'O', 'K', '2'};
 static const uint32_t kindHull = 1;
 static const uint32_t kindShader = 2;
@@ -235,8 +266,8 @@ void Open(const std::string& mainFile, unsigned long long deviceKey)
 	}
 
 	// Cook button: the game runs from a temporary copy and writes a clean file next to the real .blend.
-	const char *cookPath = getenv("ANASTACIO_COOK");
-	if (cookPath && cookPath[0]) {
+	const std::string cookPath = CookTargetPath();
+	if (!cookPath.empty()) {
 		filePath = cookPath;
 		record = cooking = true;
 		return;
