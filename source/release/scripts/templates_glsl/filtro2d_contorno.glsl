@@ -11,9 +11,9 @@ uniform vec2 bgl_Resolution;
 uniform mat4 bgl_InverseProjectionMatrix;
 
 uniform vec3 u_color;        // cor da linha (padrao preto)
-uniform float u_thickness;   // espessura em pixels (padrao 1.0)
-uniform float u_depthEdge;   // sensibilidade a profundidade (padrao 0.05 = 5% da distancia)
-uniform float u_normalEdge;  // sensibilidade a normal (padrao 0.4)
+uniform float u_thickness;   // @min 0 @max 8 @default 1.0 — espessura em pixels
+uniform float u_depthEdge;   // @min 0 @max 1 @default 0.05 — sensibilidade a profundidade
+uniform float u_normalEdge;  // @min 0 @max 1 @default 0.4 — sensibilidade a normal
 
 in vec2 texCoordVarying;
 out vec4 fragColor;

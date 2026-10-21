@@ -8,9 +8,9 @@
 uniform sampler2D bgl_RenderedTexture;
 uniform vec2 bgl_Resolution;
 
-uniform float u_threshold;  // brilho minimo que espalha (padrao 0.8)
-uniform float u_intensity;  // forca (padrao 0.6)
-uniform float u_radius;     // raio em pixels (padrao 12)
+uniform float u_threshold;  // @min 0 @max 4 @default 0.8 — brilho minimo que espalha
+uniform float u_intensity;  // @min 0 @max 5 @default 0.6 — forca
+uniform float u_radius;     // @min 0 @max 64 @default 12 — raio em pixels
 
 in vec2 texCoordVarying;
 out vec4 fragColor;

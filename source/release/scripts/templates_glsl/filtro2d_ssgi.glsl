@@ -19,9 +19,9 @@ uniform mat4 bgl_InverseProjectionMatrix;
 uniform mat4 bgl_InverseViewMatrix;
 uniform mat4 bgl_PreviousViewProjectionMatrix;
 
-uniform float u_radius;     // raio em unidades do mundo (padrao 2.0)
-uniform float u_intensity;  // forca da luz indireta (padrao 1.0)
-uniform float u_temporal;   // 0..0.95, peso do quadro anterior (padrao 0.8)
+uniform float u_radius;     // @min 0 @max 20 @default 2.0 — raio em unidades do mundo
+uniform float u_intensity;  // @min 0 @max 4 @default 1.0 — forca da luz indireta
+uniform float u_temporal;   // @min 0 @max 0.95 @default 0.8 — peso do quadro anterior
 
 in vec2 texCoordVarying;
 out vec4 fragColor;

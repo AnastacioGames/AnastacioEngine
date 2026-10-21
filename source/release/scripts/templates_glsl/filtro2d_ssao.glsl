@@ -15,8 +15,8 @@ uniform vec2 bgl_Resolution;
 uniform mat4 bgl_ProjectionMatrix;
 uniform mat4 bgl_InverseProjectionMatrix;
 
-uniform float u_radius;     // raio em unidades do mundo (padrao 0.5)
-uniform float u_intensity;  // forca (padrao 1.0)
+uniform float u_radius;     // @min 0 @max 10 @default 0.5 — raio em unidades do mundo
+uniform float u_intensity;  // @min 0 @max 3 @default 1.0 — forca
 
 in vec2 texCoordVarying;
 out vec4 fragColor;
