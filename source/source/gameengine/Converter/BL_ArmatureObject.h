@@ -36,6 +36,9 @@
 #include "BL_ArmatureConstraint.h"
 #include "BL_ArmatureChannel.h"
 
+#include <map>
+#include <string>
+
 struct bArmature;
 struct Bone;
 struct bPose;
@@ -70,6 +73,18 @@ protected:
 	/// a periodic full update so a frozen AABB can never hide the armature from view forever.
 	unsigned short m_cullSkipFrames;
 
+	/// Extra rotation per bone (Python setBoneRotationOffset), applied after the actions and
+	/// before the skinning. base/written let a frame without an action on the bone undo the
+	/// previous offset instead of stacking it.
+	struct BoneRotationOffset {
+		float offset[4];
+		float base[4];
+		float written[4];
+		bool hasWritten;
+	};
+	std::map<std::string, BoneRotationOffset> m_boneRotOffsets;
+	bool m_boneRotOffsetsDirty;
+
 public:
 	BL_ArmatureObject(void *sgReplicationInfo,
 	                  SG_Callbacks callbacks,
@@ -94,6 +109,8 @@ public:
 	void BlendInPose(bPose *blend_pose, float weight, short mode);
 
 	bool UpdateTimestep(double curtime);
+	/// Applies the Python bone rotation offsets on top of the action pose (animation pass).
+	void ApplyBoneRotationOffsets(double curtime);
 
 	Object *GetArmatureObject();
 	Object *GetOrigArmatureObject();
@@ -133,6 +150,8 @@ public:
 	static PyObject *pyattr_get_channels(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	EXP_PYMETHOD_DOC_NOARGS(BL_ArmatureObject, update);
 	EXP_PYMETHOD_DOC_NOARGS(BL_ArmatureObject, draw);
+	EXP_PYMETHOD_DOC_VARARGS(BL_ArmatureObject, setBoneRotationOffset);
+	EXP_PYMETHOD_DOC_VARARGS(BL_ArmatureObject, clearBoneRotationOffset);
 
 #endif  /* WITH_PYTHON */
 };

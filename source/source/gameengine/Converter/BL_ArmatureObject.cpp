@@ -211,7 +211,8 @@ BL_ArmatureObject::BL_ArmatureObject(void *sgReplicationInfo,
 	m_lastframe(0.0),
 	m_drawDebug(false),
 	m_lastapplyframe(0.0),
-	m_cullSkipFrames(0)
+	m_cullSkipFrames(0),
+	m_boneRotOffsetsDirty(false)
 {
 	m_controlledConstraints = new EXP_ListValue<BL_ArmatureConstraint>();
 
@@ -436,6 +437,69 @@ void BL_ArmatureObject::ApplyPose() // TODO: bouger dans SetPoseByAction ?
 	}
 }
 
+static void pchan_get_quat(const bPoseChannel *pchan, float r_quat[4])
+{
+	if (pchan->rotmode == ROT_MODE_QUAT) {
+		normalize_qt_qt(r_quat, pchan->quat);
+	}
+	else if (pchan->rotmode == ROT_MODE_AXISANGLE) {
+		axis_angle_to_quat(r_quat, pchan->rotAxis, pchan->rotAngle);
+	}
+	else {
+		eulO_to_quat(r_quat, pchan->eul, pchan->rotmode);
+	}
+}
+
+static void pchan_set_quat(bPoseChannel *pchan, const float quat[4])
+{
+	if (pchan->rotmode == ROT_MODE_QUAT) {
+		copy_qt_qt(pchan->quat, quat);
+	}
+	else if (pchan->rotmode == ROT_MODE_AXISANGLE) {
+		quat_to_axis_angle(pchan->rotAxis, &pchan->rotAngle, quat);
+	}
+	else {
+		quat_to_eulO(pchan->eul, pchan->rotmode, quat);
+	}
+}
+
+void BL_ArmatureObject::ApplyBoneRotationOffsets(double curtime)
+{
+	if (m_boneRotOffsets.empty() && !m_boneRotOffsetsDirty) {
+		return;
+	}
+	bool changed = m_boneRotOffsetsDirty;
+	m_boneRotOffsetsDirty = false;
+
+	for (std::pair<const std::string, BoneRotationOffset>& item : m_boneRotOffsets) {
+		bPoseChannel *pchan = BKE_pose_channel_find_name(m_objArma->pose, item.first.c_str());
+		if (!pchan) {
+			continue;
+		}
+		BoneRotationOffset& o = item.second;
+		float cur[4];
+		pchan_get_quat(pchan, cur);
+		// The channel still holds what we wrote: no action touched it, keep the old base.
+		if (!(o.hasWritten && equals_v4v4(cur, o.written))) {
+			copy_qt_qt(o.base, cur);
+		}
+		float out[4];
+		mul_qt_qtqt(out, o.base, o.offset);
+		pchan_set_quat(pchan, out);
+		float readback[4];
+		pchan_get_quat(pchan, readback);
+		if (!o.hasWritten || !equals_v4v4(readback, o.written)) {
+			changed = true;
+		}
+		copy_qt_qt(o.written, readback);
+		o.hasWritten = true;
+	}
+
+	if (changed) {
+		UpdateTimestep(curtime);
+	}
+}
+
 void BL_ArmatureObject::SetPoseByAction(bAction *action, float localtime)
 {
 	PointerRNA ptrrna;
@@ -615,6 +679,8 @@ PyTypeObject BL_ArmatureObject::Type = {
 PyMethodDef BL_ArmatureObject::Methods[] = {
 	EXP_PYMETHODTABLE_NOARGS(BL_ArmatureObject, update),
 	EXP_PYMETHODTABLE_NOARGS(BL_ArmatureObject, draw),
+	EXP_PYMETHODTABLE(BL_ArmatureObject, setBoneRotationOffset),
+	EXP_PYMETHODTABLE(BL_ArmatureObject, clearBoneRotationOffset),
 	{nullptr, nullptr} //Sentinel
 };
 
@@ -653,6 +719,79 @@ EXP_PYMETHODDEF_DOC_NOARGS(BL_ArmatureObject, draw,
 	/* Armature bones are updated later, so we only set to true a flag
 	 * to request a debug draw later in ApplyPose after updating bones. */
 	m_drawDebug = true;
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC_VARARGS(BL_ArmatureObject, setBoneRotationOffset,
+                            "setBoneRotationOffset(bone, rotation)\n"
+                            "Extra rotation for a bone on top of the playing actions, in the bone's local space.\n"
+                            "rotation: euler XYZ (3 floats, radians) or quaternion (4 floats, w x y z).\n"
+                            "Stays until clearBoneRotationOffset().\n")
+{
+	const char *name;
+	PyObject *pyrot;
+	if (!PyArg_ParseTuple(args, "sO:setBoneRotationOffset", &name, &pyrot)) {
+		return nullptr;
+	}
+	if (!BKE_pose_channel_find_name(m_objArma->pose, name)) {
+		PyErr_Format(PyExc_ValueError, "setBoneRotationOffset: bone '%s' not found", name);
+		return nullptr;
+	}
+	PyObject *seq = PySequence_Fast(pyrot, "setBoneRotationOffset: rotation must be a sequence");
+	if (!seq) {
+		return nullptr;
+	}
+	const Py_ssize_t n = PySequence_Fast_GET_SIZE(seq);
+	float v[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	if (n != 3 && n != 4) {
+		Py_DECREF(seq);
+		PyErr_SetString(PyExc_ValueError, "setBoneRotationOffset: rotation needs 3 (euler) or 4 (quaternion) values");
+		return nullptr;
+	}
+	for (Py_ssize_t i = 0; i < n; ++i) {
+		v[i] = (float)PyFloat_AsDouble(PySequence_Fast_GET_ITEM(seq, i));
+	}
+	Py_DECREF(seq);
+	if (PyErr_Occurred()) {
+		return nullptr;
+	}
+
+	BoneRotationOffset& o = m_boneRotOffsets[name];
+	if (n == 3) {
+		eul_to_quat(o.offset, v);
+	}
+	else {
+		normalize_qt_qt(o.offset, v);
+	}
+	m_boneRotOffsetsDirty = true;
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC_VARARGS(BL_ArmatureObject, clearBoneRotationOffset,
+                            "clearBoneRotationOffset(bone=None)\n"
+                            "Removes the extra rotation of one bone, or of all bones.\n")
+{
+	const char *name = nullptr;
+	if (!PyArg_ParseTuple(args, "|z:clearBoneRotationOffset", &name)) {
+		return nullptr;
+	}
+	for (std::map<std::string, BoneRotationOffset>::iterator it = m_boneRotOffsets.begin(); it != m_boneRotOffsets.end();) {
+		if (name && it->first != name) {
+			++it;
+			continue;
+		}
+		// No action rewrites the bone: put back the pose it had before the offset.
+		bPoseChannel *pchan = BKE_pose_channel_find_name(m_objArma->pose, it->first.c_str());
+		if (pchan && it->second.hasWritten) {
+			float cur[4];
+			pchan_get_quat(pchan, cur);
+			if (equals_v4v4(cur, it->second.written)) {
+				pchan_set_quat(pchan, it->second.base);
+			}
+		}
+		it = m_boneRotOffsets.erase(it);
+	}
+	m_boneRotOffsetsDirty = true;
 	Py_RETURN_NONE;
 }
 

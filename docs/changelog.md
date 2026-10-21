@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Giro extra de osso por Python (setBoneRotationOffset)
+
+- `BL_ArmatureObject` ganha `setBoneRotationOffset(osso, rot)` (euler XYZ em radianos ou quaternion w x y z, no espaço local do osso) e `clearBoneRotationOffset(osso=None)`. O giro é aplicado em `KX_Scene::UpdateAnimPoseTask`, depois das actions e antes do skinning; antes disso, editar `channels` pelo Python era apagado pela action no frame seguinte, porque as animações rodam antes da lógica.
+- Guarda a pose base e o valor escrito: se nenhuma action reescreveu o osso no frame, o giro não acumula. `clear` devolve a pose base.
+- Uso: `Camera_LR.py` do RolimaRacer vira a cabeça do piloto junto com a câmera de olhar para os lados/trás. Build `RangeEngine`/`RangeRuntime` OK; ainda sem teste com janela.
+
 ## 2026-10-21 - Feedback visual do vácuo no RolimaRacer
 
 - `Speed_lines_FX.py` do jogo em `D:/ProjetoRolimaRacer` acrescenta risquinhos nas bordas da tela com transição suave, reutilizando os passes existentes. `camera_effect.py` abre o FOV em aproximadamente 3 graus, com prioridade do nitro.
