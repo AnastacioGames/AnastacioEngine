@@ -5,17 +5,20 @@
 - `build_release.py --universal`, botão "Universal (Win + Linux)" no Panel, Export 1 Click com `--universal`.
 - 12 testes do exportador OK; Panel compilado e instalado em `build/bin/rangearmor`.
 
-## Teste real em andamento
-- Projeto de teste montado em `D:\_uni_test`:
-  - `engine/Windows64`: runtime do `build/bin`.
-  - `engine/Linux64`: RangeRuntime do pacote 0.5.1 (`build/release-linux-inspect`).
-  - `data/Example Game.rasec` vem de `D:\tutorial`.
-- Próximo comando (rodar dentro de `build/bin/rangearmor/release/scripts`):
-  `..\..\..\2.79\python\bin\python.exe build_release.py --project D:/_uni_test/launcher/config.json --target All --compress --universal --no-cook`
-- Depois:
-  1. conferir a pasta e o zip `Game-1.0.0-Universal`;
-  2. no WSL (Ubuntu), extrair o zip e conferir os bits de execução do `launcher/Launcher` e do `engine/Linux64/RangeRuntime`;
-  3. rodar o launcher.
+## Teste real (2026-10-21)
+- Exportação Universal OK em `D:\_uni_test` (pasta + zip, `Game.exe` e `Game` lado a lado).
+- WSL: bits de execução preservados no zip (launcher e runtime).
+- Não abriu no Linux porque o runtime de teste (0.5.1) não tem `2.79/python/bin/python3.11`.
+  Falha do projeto de teste, não do pacote.
+- Linux tar.xz levava ~13 min (xz preset 6). Agora usa preset 1; falta medir.
+
+## Próximo: testar no notebook Linux
+1. Compilar o player Linux atual (`AnastacioRuntime` + `2.79/python/bin/python3.11`).
+2. Colocar em `engine/Linux64/` do projeto (ou do pacote Universal).
+3. Rodar `python3 tools/rangearmor/release/scripts/test_universal_linux.py <Game-1.0.0-Universal.zip> --run`
+   - Extrai o zip mantendo os bits de execução.
+   - Confere o launcher, o runtime, as libs (`ldd`) e o Python.
+   - Abre o jogo.
 - Ao terminar, apagar `D:\_uni_test`.
 
 ## Cuidados descobertos

@@ -115,7 +115,8 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
                             with open(str(file), "rb") as source:
                                 output.writestr(info, source.read())
             else:
-                with tarfile.open(str(archive), "w:xz") as output:
+                with tarfile.open(str(archive), "w:xz", preset=1) as output:  # preset 6 took ~13 min
+
                     output.add(str(stage), arcname=destination.name)
         previous = None
         if destination.exists():
