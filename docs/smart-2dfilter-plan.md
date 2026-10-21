@@ -65,6 +65,19 @@ Antes de aprovar o código C, confirmar estes pontos na implementação:
 5. A regressão do Choice do GLSL Script, a cena Smart 2D Filter (incluindo Bool) e a compilação GLSL no player
    precisam passar antes do teste visual.
 
+### Extensão: Object como uniform (2026-10-21)
+
+- `@object` em uniform de topo `vec2`, `vec3` ou `vec4` cria uma Game Property String e um seletor de objeto no
+  painel. Vetor sem a anotação permanece não editável.
+- A String guarda o nome do alvo. O shader recebe `xy` como posição de tela, `z` como distância à câmera e `w`
+  como visibilidade (1 quando o alvo existe e está à frente da câmera); alvo ausente ou atrás envia
+  `(-1, -1, 0, 0)`, limitado ao número de componentes do vector.
+- A cena `criar_cena_smart_2dfilter_object.py` deixa um halo amarelo seguir o cubo vermelho
+  `ObjectUniformTarget`, que se move em jogo. O inspetor correspondente cobre a anotação, a String, o filtro e o
+  controlador de movimento.
+- Revisão pendente do código C: a descoberta do tipo GLSL do Object uniform não pode chamar
+  `GetActiveUniforms()` por quadro. O tipo deve ser cacheado ao compilar ou recompilar o shader.
+
 ## Código comum (o "segundo consumidor" que justifica extrair)
 
 `source/blender/blenkernel/BKE_glsl_uniforms.h` + `intern/glsl_uniforms.c`: leitura dos uniforms de topo e das

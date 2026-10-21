@@ -6,6 +6,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Smart 2D Filter: Object como uniform
+
+- Uniforms `vec2`, `vec3` e `vec4` anotados com `@object` recebem uma Game Property String e um seletor de objeto no painel do Custom Filter. A cada quadro, o shader recebe a posição do alvo na tela (`xy`), a distância à câmera (`z`) e a visibilidade (`w`); alvo ausente ou atrás da câmera fica inválido. Vetores sem `@object` permanecem não editáveis.
+- Adicionadas a cena visual `criar_cena_smart_2dfilter_object.py` e seu inspetor: o halo amarelo segue o cubo vermelho em movimento. O teste de jogo comparou três posições contra `getScreenPosition` e confirmou `w=0` atrás da câmera.
+
 ## 2026-10-21 - Smart 2D Filter: uniforms Bool
 
 - `RAS_2DFilter` agora encaminha Game Properties Bool para uniforms `bool` com `glUniform1i`, como já fazia para Int. O painel Smart do atuador Custom Filter cria Bool a partir de `@default` diferente de zero e mostra-o como caixa de marcar; `@choice` continua reservado a Float e Int.

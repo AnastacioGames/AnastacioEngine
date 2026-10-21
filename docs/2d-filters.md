@@ -86,6 +86,7 @@ transporte usado pelo filtro em jogo.
 uniform float u_radius; // @min 0 @max 20 @default 2.0
 uniform int u_mode;     // @choice Linear=2, Smooth=7, Step=12 @default 7
 uniform bool u_enabled; // @default 1
+uniform vec4 u_target;  // @object
 ```
 
 - Uma property existente, com o tipo certo, é editada pelo painel. `float` com `@min` e `@max` usa slider;
@@ -100,6 +101,21 @@ uniform bool u_enabled; // @default 1
 - A anotação fica no comentário final da própria declaração. Choice segue as regras do GLSL Script: no máximo
   32 opções, rótulos e valores únicos, valores inteiros representáveis exatamente e `@default` presente na lista.
   Anotação inválida volta ao campo numérico comum e não impede a compilação do shader.
+
+#### Objeto como uniform
+
+`@object` torna um uniform `vec2`, `vec3` ou `vec4` num seletor de objeto. A Game Property correspondente é uma
+String com o nome do objeto escolhido; o runtime calcula a projeção a cada quadro. Um vetor sem essa anotação
+continua não editável no painel.
+
+```glsl
+uniform vec4 u_target; // @object
+```
+
+- `x` e `y` são a posição na tela, de 0 a 1. Para objeto atrás da câmera, ambos são `-1`.
+- `z` é a distância à câmera; `w` vale 1 quando o objeto existe e está à frente da câmera, ou 0 quando não
+  existe ou está atrás. `vec2` recebe só `xy`; `vec3`, `xyz`; `vec4`, `xyzw`.
+- O botão **+** cria a String vazia se faltar a property. Escolha o alvo no seletor de objeto do painel.
 
 Os quatro modelos em **Text Editor > Templates > 2D Filters (GLSL)** já trazem defaults e faixas úteis para
 Bloom, SSAO, SSGI e contorno. Eles preservam a compatibilidade com cenas anteriores: nenhuma property é criada
