@@ -4293,7 +4293,20 @@ bool BLO_write_file(
 
 	if (write_flags & G_FILE_RELATIVE_REMAP) {
 		/* note, making relative to something OTHER then G_MAIN->name */
-		BKE_bpath_relative_convert(mainvar, filepath, NULL);
+#ifdef WIN32
+		/* Saving to another drive (e.g. a temp copy on C: of a project on D:):
+		 * no path can be relative, so keep the absolute paths made above
+		 * instead of printing one warning per file. */
+		if (G.relbase_valid && filepath[1] == ':' && mainvar->name[1] == ':' &&
+		    tolower(filepath[0]) != tolower(mainvar->name[0]))
+		{
+			/* paths are already absolute */
+		}
+		else
+#endif
+		{
+			BKE_bpath_relative_convert(mainvar, filepath, NULL);
+		}
 	}
 
 	/* actual file writing */
