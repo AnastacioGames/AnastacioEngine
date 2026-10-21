@@ -112,3 +112,56 @@ class FLOWMENU_OT_register_component(Operator):
 
         self.report({"INFO"}, tip_("Component '%s' is already added.") % str(register_component).split(".")[1])
         return {"FINISHED"}
+
+
+class FLOWMENU_OT_reload_selected_class(Operator):
+    """Reload only the class selected in Existing Components, on every object that uses it"""
+    bl_label = "Reload Selected Class"
+    bl_idname = "wm.flowmenu_reload_selected_class"
+
+    @classmethod
+    def poll(cls, context):
+        wm = context.window_manager
+        return (len(wm.collection_modules) > wm.collection_modules_active
+                and len(wm.collection_classes) > wm.collection_classes_active)
+
+    def execute(self, context):
+        from .component_reload_new import _reload_component_with_retry
+
+        wm = context.window_manager
+        scene = context.scene
+        dict_modules = get_modules_in_range(scene)
+        dict_modules.update(get_modules(set_scripts_dir(), force_refresh=True))
+
+        module_select = wm.collection_modules[wm.collection_modules_active].value
+        class_select = wm.collection_classes[wm.collection_classes_active].value
+        target = _resolve_component(dict_modules.get(module_select, {}), class_select)
+        if target is None:
+            self.report({"ERROR"},
+                        tip_("Component list is stale or ambiguous; refresh the module/class list and choose again."))
+            return {"CANCELLED"}
+
+        act = scene.objects.active
+        count = failed = 0
+        for obj in scene.objects:
+            if not hasattr(obj, "game") or not obj.game.components:
+                continue
+            names = ["{}.{}".format(c.module, c.name) for c in obj.game.components]
+            if target not in names:
+                continue
+            # Os operadores de componente agem no objeto ativo.
+            scene.objects.active = obj
+            ok, err = _reload_component_with_retry(names.index(target), target, attempts=3)
+            if ok:
+                count += 1
+            else:
+                failed += 1
+                print("[!] Reload failed in object '{}': {} | {}".format(obj.name, target, err))
+        scene.objects.active = act
+
+        if failed:
+            self.report({"WARNING"}, tip_("Reloaded %s in %d objects, %d failed (see console).")
+                        % (target, count, failed))
+        else:
+            self.report({"INFO"}, tip_("Reloaded %s in %d objects.") % (target, count))
+        return {"FINISHED"}

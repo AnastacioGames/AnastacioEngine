@@ -13,7 +13,7 @@ from .ui_lists.game_components import FLOWMENU_UL_game_components
 from .ui_lists.sensors import FLOWMENU_UL_sensors
 
 from .operators.create_component import FLOWMENU_OT_create_component
-from .operators.register_component import FLOWMENU_OT_register_component
+from .operators.register_component import FLOWMENU_OT_register_component, FLOWMENU_OT_reload_selected_class
 from .operators.component_reload_new import (
     FLOWMENU_OT_python_component_reload_new,
     FLOWMENU_OT_reload_all_components,
@@ -84,6 +84,7 @@ classes = [
     FLOWMENU_UL_sensors,
     FLOWMENU_OT_create_component,
     FLOWMENU_OT_register_component,
+    FLOWMENU_OT_reload_selected_class,
     FLOWMENU_OT_python_component_reload_new,
     FLOWMENU_OT_reload_all_components,
     FLOWMENU_OT_refresh_components_list,

@@ -86,6 +86,14 @@ class CUSTOM_PT_game_existing_components(PropertyPanel, Panel):
             col_classes.label(text="Module empty")
         else:
             col_classes.label(text="Select a Module")
+
+        # Recarrega só a classe escolhida acima, em todos os objetos que a usam.
+        if len(wm.collection_classes) > wm.collection_classes_active:
+            cls_name = wm.collection_classes[wm.collection_classes_active].value
+            col = box.column(align=True)
+            col.label(text="Update this script on every object that uses it:", icon="INFO")
+            col.operator("wm.flowmenu_reload_selected_class",
+                         text="Reload '%s' in All Objects" % cls_name, icon="RECOVER_LAST")
             
 # ==============================================================================
 # PAINEL CUSTOMIZADO: OBJECT'S COMPONENTS
