@@ -54,59 +54,83 @@ def build(data, args):
     if use_cooked:
         prepare_cooked.prepare(data)
     for target, suffix, launcher, engine, destination in inputs:
-        with tempfile.TemporaryDirectory(prefix=".rangearmor-stage-", dir=str(release)) as temp:
-            stage = Path(temp) / destination.name
-            stage.mkdir()
-            exclusions = ['*.export-tmp', '*.cooked.tmp']
-            if not use_cooked:
-                exclusions.append('*.cooked')
-            shutil.copytree(str(project / "data"), str(stage / "data"),
-                            ignore=shutil.ignore_patterns(*exclusions))
-            (stage / "launcher").mkdir()
-            shutil.copy2(str(data["ProjectFile"]), str(stage / "launcher/config.json"))
+        _deliver(release, destination, [(target, suffix, launcher, engine)], data, project,
+                 use_cooked, args.get("--compress") and (".zip" if target == "Windows64" else ".tar.xz"))
+        print("> Build successful:", target, destination)
+    # Universal: one folder with the Windows and Linux players side by side.
+    # The launcher picks Engine<platform> from config.json for the OS it runs on.
+    if args.get("--universal") and len(inputs) > 1:
+        name = "-".join([common.formatFileName(data["GameName"], spaces=False), version, "Universal"])
+        destination = release / name
+        _deliver(release, destination, [entry[:4] for entry in inputs], data, project,
+                 use_cooked, args.get("--compress") and ".zip")
+        print("> Build successful: Universal", destination)
+
+
+def _deliver(release, destination, targets, data, project, use_cooked, archive_ext):
+    with tempfile.TemporaryDirectory(prefix=".rangearmor-stage-", dir=str(release)) as temp:
+        stage = Path(temp) / destination.name
+        stage.mkdir()
+        exclusions = ['*.export-tmp', '*.cooked.tmp']
+        if not use_cooked:
+            exclusions.append('*.cooked')
+        shutil.copytree(str(project / "data"), str(stage / "data"),
+                        ignore=shutil.ignore_patterns(*exclusions))
+        (stage / "launcher").mkdir()
+        shutil.copy2(str(data["ProjectFile"]), str(stage / "launcher/config.json"))
+        delivered_config = stage / 'launcher/config.json'
+        config = None
+        for target, suffix, launcher, engine in targets:
             # Only the delivery adopts the executable actually copied. The
             # author's config and custom paths remain untouched.
             if data.get('Engine' + target):
-                delivered_config = stage / 'launcher/config.json'
-                config = json.loads(delivered_config.read_text(encoding='utf-8'))
                 effective_runtime = data['EngineExecutables'][target]
                 if effective_runtime.parent.resolve() != engine.resolve():
                     raise RuntimeError('Runtime executable must be inside engine/' + target)
+                if config is None:
+                    config = json.loads(delivered_config.read_text(encoding='utf-8'))
                 config['Engine' + target] = './engine/' + target + '/' + effective_runtime.name
-                delivered_config.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding='utf-8')
             game_launcher = stage / (common.formatFileName(data["GameName"]) + suffix)
             shutil.copy2(str(launcher), str(game_launcher))
             if not suffix:
                 game_launcher.chmod(game_launcher.stat().st_mode | 0o111)
             shutil.copytree(str(engine), str(stage / "engine" / target))
-            archive = None
-            if args.get("--compress"):
-                extension = ".zip" if target == "Windows64" else ".tar.xz"
-                archive = Path(temp) / (destination.name + extension)
-                if extension == ".zip":
-                    with zipfile.ZipFile(str(archive), "w", zipfile.ZIP_DEFLATED) as output:
-                        for file in stage.rglob("*"):
-                            if file.is_file():
-                                output.write(str(file), file.relative_to(stage.parent).as_posix())
-                else:
-                    with tarfile.open(str(archive), "w:xz") as output:
-                        output.add(str(stage), arcname=destination.name)
-            previous = None
-            if destination.exists():
-                previous = Path(tempfile.mkdtemp(prefix=destination.name + ".previous-", dir=str(release)))
-                os.replace(str(destination), str(previous / destination.name))
-            try:
-                os.replace(str(stage), str(destination))
-            except OSError:
-                if previous is not None:
-                    os.replace(str(previous / destination.name), str(destination))
-                raise
-            if archive is not None:
-                os.replace(str(archive), str(release / archive.name))
+        if config is not None:
+            delivered_config.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding='utf-8')
+        archive = None
+        if archive_ext:
+            archive = Path(temp) / (destination.name + archive_ext)
+            if archive_ext == ".zip":
+                with zipfile.ZipFile(str(archive), "w", zipfile.ZIP_DEFLATED) as output:
+                    for file in stage.rglob("*"):
+                        if file.is_file():
+                            info = zipfile.ZipInfo.from_file(str(file), file.relative_to(stage.parent).as_posix())
+                            info.compress_type = zipfile.ZIP_DEFLATED
+                            relative = file.relative_to(stage)
+                            # Zips made on Windows lose the Linux executable bit;
+                            # keep it for the Linux launcher and the Linux runtime folder.
+                            if (relative.parts[:2] == ("engine", "Linux64") or
+                                    (len(relative.parts) == 1 and not file.suffix)):
+                                info.external_attr = (0o100755 << 16)
+                            with open(str(file), "rb") as source:
+                                output.writestr(info, source.read())
+            else:
+                with tarfile.open(str(archive), "w:xz") as output:
+                    output.add(str(stage), arcname=destination.name)
+        previous = None
+        if destination.exists():
+            previous = Path(tempfile.mkdtemp(prefix=destination.name + ".previous-", dir=str(release)))
+            os.replace(str(destination), str(previous / destination.name))
+        try:
+            os.replace(str(stage), str(destination))
+        except OSError:
             if previous is not None:
-                print("> Previous delivery preserved:", previous)
-            print("> Build successful:", target, destination)
-
+                os.replace(str(previous / destination.name), str(destination))
+            raise
+        if archive is not None:
+            os.replace(str(archive), str(release / archive.name))
+        if previous is not None:
+            print("> Previous delivery preserved:", previous)
 
 if __name__ == "__main__":
     try:

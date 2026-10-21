@@ -6,6 +6,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-20 - Player acha o jogo na própria pasta e pacote Universal
+
+- Ideia do Kitsuy (Discord). `GPG_Ghost`: aberto sem arquivo (ou com um caminho inexistente que não seja
+  `.range`/`.blend`), o player sem jogo embutido procura `<nome do player>.range` ao lado dele e depois
+  `game.range`. `MeuJogo.exe` e o `MeuJogo` do Linux usam o mesmo `MeuJogo.range`; o `.cooked` vem junto.
+  Runtimes exportados com o jogo dentro e o caminho criptografado não mudaram.
+- RangeArmor `build_release.py --universal`: além dos pacotes por plataforma, gera `<Jogo>-<versão>-Universal`
+  com os dois launchers, `engine/Windows64` e `engine/Linux64`; o launcher já escolhe `Engine<plataforma>` pelo
+  sistema. O zip mantém o bit de execução do launcher Linux e de `engine/Linux64`. Botão
+  "Universal (Win + Linux)" no Panel; o Export 1 Click passa `--universal` (sem efeito com uma plataforma só).
+- Testes: `tools/tests/test_rangearmor_release.py` (12 OK); player testado sem janela com `game.range` e
+  `<player>.range`. Falta abrir o pacote Universal no Linux.
+
 ## 2026-10-20 - Crash do player em driver de vídeo antigo
 
 - Relato do Discord (0.5.3, Intel HD antiga): `EXCEPTION_ACCESS_VIOLATION` em `ig7icd64.dll` durante o aquecimento

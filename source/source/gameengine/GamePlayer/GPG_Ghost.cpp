@@ -607,6 +607,36 @@ static void get_filename(int argc, char **argv, char *filename)
 #endif // !_APPLE
 }
 
+/* A bare player opened without a game (e.g. double-clicked) looks for one next to itself:
+ * "<player name>.range" first (MyGame.exe and the Linux MyGame both find MyGame.range),
+ * then "game.range". Lets one folder ship a single game file for several players. */
+static bool find_game_next_to_player(char *filename)
+{
+	const char *program_path = BKE_appdir_program_path();
+	const char *program_dir = BKE_appdir_program_dir();
+	char candidate[FILE_MAX];
+
+	BLI_join_dirfile(candidate, sizeof(candidate), program_dir, BLI_path_basename(program_path));
+	if (BLI_path_extension_check(candidate, ".exe")) {
+		BLI_path_extension_replace(candidate, sizeof(candidate), ".range");
+	}
+	else {
+		const size_t len = strlen(candidate);
+		BLI_strncpy(candidate + len, ".range", sizeof(candidate) - len);
+	}
+
+	if (!BLI_is_file(candidate)) {
+		BLI_join_dirfile(candidate, sizeof(candidate), program_dir, "game.range");
+		if (!BLI_is_file(candidate)) {
+			return false;
+		}
+	}
+
+	BLI_strncpy(filename, candidate, FILE_MAX);
+	CM_Message("no game file given, loading " << filename);
+	return true;
+}
+
 static BlendFileData *load_game_data(const char *progname, char *filename = nullptr)
 {
 	ReportList reports;
@@ -1520,6 +1550,18 @@ int main(int argc,
 #else
 				get_filename(argc_py_clamped, argv, filename);
 #endif
+				/* No game embedded and no usable file argument (none, or the last argument was an
+				 * option value): fall back to a game next to the player. An explicit .range/.blend
+				 * that does not exist still fails with its own error. */
+				if (isBlenderPlayer &&
+				    (!filename[0] ||
+				     (!BLI_is_file(filename) &&
+				      !BLI_path_extension_check_n(filename, ".range", ".blend", NULL))))
+				{
+					if (!find_game_next_to_player(filename)) {
+						filename[0] = '\0';
+					}
+				}
 				if (filename[0]) {
 					BLI_path_cwd(filename, sizeof(filename));
 				}

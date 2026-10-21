@@ -379,6 +379,15 @@ fn tasks_tab(
                     *task = spawn_task(project, error, "Export All Platforms", "build_release.py", args);
                 }
                 ui.add_space(6.0);
+                // One folder with both players; the launcher picks the runtime for the OS.
+                if gated_button(ui, idle, python_valid, python_tooltip, Some(Tab::Paths), tab, "Universal (Win + Linux)", status) {
+                    let mut args = vec!["--target".to_owned(), "All".to_owned(), "--universal".to_owned()];
+                    if project.data.export_compress {
+                        args.push("--compress".to_owned());
+                    }
+                    *task = spawn_task(project, error, "Export Universal", "build_release.py", args);
+                }
+                ui.add_space(6.0);
                 if ui
                     .checkbox(&mut project.data.export_compress, "Compress targets after export")
                     .changed()

@@ -58,6 +58,34 @@ class ReleaseSafety(unittest.TestCase):
         self.assertFalse((self.destination / 'engine/Windows64/RangeRuntime.exe').exists())
         self.assertEqual(config_path.read_text(encoding='utf-8'), original)
 
+    def test_universal_package_has_both_players_and_linux_exec_bits(self):
+        (self.root / 'engine/Linux64').mkdir(parents=True)
+        (self.root / 'engine/Linux64/AnastacioRuntime').write_bytes(b'linux runtime')
+        (self.root / 'launcher/Launcher').write_bytes(b'linux launcher')
+        config_path = self.root / 'launcher/config.json'
+        config_path.write_text(json.dumps({
+            'GameName': 'Game', 'Version': '1', 'MainFile': 'Game.rasec', 'DataSource': './data',
+            'EngineWindows64': './engine/Windows64/RangeRuntime.exe',
+            'EngineLinux64': './engine/Linux64/AnastacioRuntime'}), encoding='utf-8')
+        data = release.common.getProjectData(str(config_path))
+        release.build(data, {'--target': 'All', '--compress': True, '--universal': True, '--no-cook': True})
+        universal = self.root / 'release/Game-1-Universal'
+        for name in ['Game.exe', 'Game', 'data/Game.rasec', 'engine/Windows64/RangeRuntime.exe',
+                     'engine/Linux64/AnastacioRuntime']:
+            self.assertTrue((universal / name).is_file(), name)
+        delivered = json.loads((universal / 'launcher/config.json').read_text(encoding='utf-8'))
+        self.assertEqual(delivered['EngineLinux64'], './engine/Linux64/AnastacioRuntime')
+        self.assertEqual(delivered['EngineWindows64'], './engine/Windows64/RangeRuntime.exe')
+        with zipfile.ZipFile(str(self.root / 'release/Game-1-Universal.zip')) as archive:
+            modes = {info.filename: info.external_attr >> 16 for info in archive.infolist()}
+        self.assertEqual(modes['Game-1-Universal/Game'] & 0o111, 0o111)
+        self.assertEqual(modes['Game-1-Universal/engine/Linux64/AnastacioRuntime'] & 0o111, 0o111)
+        self.assertTrue((self.root / 'release/Game-1-Linux64').is_dir())
+
+    def test_universal_skipped_with_single_platform(self):
+        release.build(self.data, {'--target': 'All', '--universal': True, '--no-cook': True})
+        self.assertFalse((self.root / 'release/Game-1-Universal').exists())
+
     def test_new_config_accepts_legacy_installation_and_preserves_custom_paths(self):
         runtime = self.root / 'engine/Windows64/RangeRuntime.exe'
         configured = runtime.with_name('AnastacioRuntime.exe')

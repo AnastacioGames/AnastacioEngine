@@ -3111,7 +3111,7 @@ class WM_OT_one_click_export_rangearmor(Operator):
                 )
             wm.progress_update(3)
 
-            args = [python_exe, build_script, "--project", config_path, "--target", "All", "--compress"]
+            args = [python_exe, build_script, "--project", config_path, "--target", "All", "--compress", "--universal"]
             export_settings = getattr(context.scene, 'rangearmor_export', None)
             if export_settings is not None and not export_settings.cook_before_export:
                 args.append('--no-cook')
