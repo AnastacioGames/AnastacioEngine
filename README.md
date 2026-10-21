@@ -14,20 +14,42 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.5.3](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.3)** (Windows e Linux)
+Versão atual: **[AnastacioEngine 0.5.4](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.4)** (Windows; Linux em breve, use a 0.5.3 até lá)
 
 | Pacote | Conteúdo |
 |---|---|
-| [Windows x64 (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/AnastacioEngine-0.5.3-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
-| [Linux x86_64 (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/AnastacioEngine-0.5.3-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. |
-| [RangeArmor 0.5.3 Windows](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-windows-x64.zip) · [Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-linux-x86_64.tar.xz) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
-| [SHA-256 dos pacotes acima](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/SHA256SUMS.txt) | Hashes para conferir o download. |
+| [Windows x64 (0.5.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/AnastacioEngine-0.5.4-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
+| [Linux x86_64 (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/AnastacioEngine-0.5.3-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. A 0.5.4 para Linux sai em breve. |
+| [RangeArmor 0.5.4 Windows](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/RangeArmor-0.5.4-windows-x64.zip) · [Linux (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-linux-x86_64.tar.xz) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
+| [SHA-256 dos pacotes 0.5.4](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/SHA256SUMS.txt) | Hashes para conferir o download. |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `AnastacioEngine` (Linux).
 Para rodar um jogo exportado, use `AnastacioRuntime.exe` (Windows) ou `AnastacioRuntime` (Linux). Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
 No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
+
+## Novidades da 0.5.4
+
+- **Smart Components:** campos tipados com `Range.args` (Float/Int com limites e dica, Bool, Text, Choice,
+  Color, Object, ObjectList, Point, Scene, Header), avisos e desenhos na viewport, classe `Editor` opcional e o
+  **Smart Component Wizard**, que cria components prontos a partir de receitas (Perseguidor, Patrulha,
+  Coletável, Spawner, Porta, Vida, Câmera seguidora e outras).
+- **Logic Bricks espertos:** painel **Brick Inspector** lista o que está errado (alvo faltando, propriedade que
+  não existe, brick sem ligação…), desenho do Near/Radar/Ray na viewport e presets novos (Mouse Look, Shoot,
+  Turret, Pause Key…).
+- **Idiomas no jogo (`Range.locale`):** tabela de traduções, painel Game Languages em passos, prévia na viewport
+  e componente Language Button. Guia em [docs/idiomas.md](docs/idiomas.md).
+- **Gravação de tela com som:** Window ▸ Record Screen (Ctrl+Alt+F3) ou botão Rec grava o editor e o jogo em
+  MP4, inclusive o Standalone.
+- **Materiais no modo Game:** Shadows Only (shadow catcher), Fresnel na transparência, Z Offset e Shadow Casting
+  Alpha.
+- **Correções:** crash em placas de vídeo antigas na primeira abertura do jogo, janela de crash com o caminho
+  certo dos arquivos, Export Web e Export 1 Click no Linux, timer de 1 ms no Windows e menos travadas no começo
+  do jogo.
+- **Traduções:** toda a interface nova em português, espanhol e russo.
+
+Lista completa em [docs/release-notes-0.5.4.md](docs/release-notes-0.5.4.md).
 
 ## Novidades da 0.5.3
 
