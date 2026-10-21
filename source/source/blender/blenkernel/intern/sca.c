@@ -828,7 +828,11 @@ void BKE_sca_logic_copy(Object *ob_new, const Object *ob, const int flag)
 	for (bSensor *sens = ob_new->sensors.first; sens; sens = sens->next) {
 		if (sens->flag & SENS_NEW) {
 			for (int a = 0; a < sens->totlinks; a++) {
-				if (sens->links[a] && sens->links[a]->mynew) {
+				/* Only relink to a copy made just now: a link to another object's controller keeps a stale
+				 * mynew (the Logic Editor stores the owner Object there), which is not a controller. */
+				if (sens->links[a] && sens->links[a]->mynew &&
+				    BLI_findindex(&ob_new->controllers, sens->links[a]->mynew) >= 0)
+				{
 					sens->links[a] = sens->links[a]->mynew;
 				}
 			}
@@ -838,7 +842,9 @@ void BKE_sca_logic_copy(Object *ob_new, const Object *ob, const int flag)
 	for (bController *cont = ob_new->controllers.first; cont; cont = cont->next) {
 		if (cont->flag & CONT_NEW) {
 			for (int a = 0; a < cont->totlinks; a++) {
-				if (cont->links[a] && cont->links[a]->mynew) {
+				if (cont->links[a] && cont->links[a]->mynew &&
+				    BLI_findindex(&ob_new->actuators, cont->links[a]->mynew) >= 0)
+				{
 					cont->links[a] = cont->links[a]->mynew;
 				}
 			}

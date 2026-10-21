@@ -6,6 +6,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Crash do Logic Editor com o jogo rodando (armaduras)
+
+- Causa provável dos crashes em `logic_buttons` (dumps editor/medir2/pacing): o jogo copia cada armadura para o `G.main` (`BL_ArmatureObject`, `BKE_object_copy`). `BKE_sca_logic_copy` religava os links da cópia por `mynew` sem conferir o destino; num sensor ligado a controlador de outro objeto, esse `mynew` é o Object que o Logic Editor guarda ali (`set_sca_ob`), e o link virava um Object tratado como controlador. Agora só religa quando o `mynew` é um brick da própria cópia. Compilado; falta reproduzir com janela (jogo com armadura + Logic Editor aberto).
+
 ## 2026-10-21 - Cook com destino acentuado
 
 - `CcdCookedData` lia `ANASTACIO_COOK` com `getenv`, que no Windows devolve o código de página ANSI, enquanto `BLI_fopen` espera UTF-8: destino com caractere fora do ASCII falhava ao gravar. Agora lê com `_wgetenv` e converte para UTF-8. Testado no runtime com pasta `coção ç` e destino `saída_é.cooked` (exit 0, arquivo gravado).
