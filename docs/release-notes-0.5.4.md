@@ -109,5 +109,5 @@ russo.
 
 - `AnastacioEngine-0.5.4-windows-x64.zip`: editor e runtime para Windows.
 - `RangeArmor-0.5.4-windows-x64.zip`: painel de exportação (Windows); exporta jogos para Windows e Linux.
-- `AnastacioEngine-0.5.4-linux-x86_64.tar.xz`: editor e runtime para Linux, com as bibliotecas incluídas.
-- `RangeArmor-0.5.4-linux-x86_64.tar.xz`: painel de exportação para Linux; exporta jogos para Linux e Windows.
+- Linux (`AnastacioEngine-0.5.4-linux-x86_64.tar.xz` e `RangeArmor-0.5.4-linux-x86_64.tar.xz`): em breve
+  nesta mesma página.
