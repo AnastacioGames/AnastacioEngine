@@ -38,6 +38,17 @@ validada no notebook Windows. O zip Universal NÃO está no repo (475 MB), entã
 6. Registre o resultado nesta seção (OK/falhas, tempo do xz), commit e push.
    Se algo falhar, corrija no repo quando for do lado Linux e explique no commit.
 
+## Resultado no notebook Linux (2026-10-21)
+- Player 0.5.4 compilado no container (`tools/linux/container-build.sh`); pacote tem `2.79/python/bin/python3.11`.
+- Export Linux64 com `--compress --no-cook`: 53 s no total, incluindo o `.tar.xz` (335 MB) com xz preset 1.
+- `test_universal_linux.py --run`: todos `[ OK ]`, exceto `[FAIL] Windows engine also present` (esperado).
+  O jogo abriu janela 640x480 pelo launcher `Game`.
+- Auto-load OK: `game.range` ao lado do player, player sem argumentos -> "no game file given, loading .../game.range" e janela.
+- Falha encontrada (aberta): o template `Example Game.rasec` do RangeArmor 0.5.4 não carrega no player 0.5.4
+  ("loading ... failed:" com mensagem vazia), gzip ou descompactado. `.range` normais carregam.
+  No teste usei a demo Destruction como `data/game.rasec`. Investigar se é o template ou o leitor.
+- Obs.: após falha de carga, o player tenta ler o próprio executável (checagem de jogo embutido) e imprime o usage; a mensagem confunde.
+
 ## Pendente no Windows
 - Apagar `D:\_uni_test` quando o teste Linux passar.
 
