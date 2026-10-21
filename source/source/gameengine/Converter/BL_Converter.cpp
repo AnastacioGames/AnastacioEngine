@@ -99,6 +99,7 @@ extern "C" {
 #  include "BKE_scene.h" // BKE_scene_add, BKE_scene_base_add
 #  include "BKE_lamp.h" // BKE_lamp_add
 #  include "DNA_lamp_types.h"
+#  include "GPU_material.h"
 #  include "BKE_object.h" // BKE_object_to_mat4, BKE_object_free_derived_caches
 #  include "BKE_armature.h" // BKE_armature_from_object, BKE_armature_find_bone_name
 #  include "DNA_armature_types.h"
@@ -668,6 +669,13 @@ Object *BL_Converter::GetFlashLamp(Scene *blenderscene)
 	ob->restrictflag |= OB_RESTRICT_SELECT;
 	BKE_scene_base_add(blenderscene, ob);
 	m_flashLamps[blenderscene] = ob;
+	/* In the editor the materials were already compiled for the viewport without this lamp and
+	 * the game reuses those shaders: drop them so they compile again with the flash lamp. */
+	for (Material *ma = (Material *)m_maggie->mat.first; ma; ma = (Material *)ma->id.next) {
+		GPU_material_free(&ma->gpumaterial);
+		GPU_material_free(&ma->gpumaterialinstancing);
+		GPU_material_free(&ma->gpumaterialskinning);
+	}
 	return ob;
 }
 
