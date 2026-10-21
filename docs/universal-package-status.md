@@ -49,7 +49,10 @@ validada no notebook Windows. O zip Universal NÃO está no repo (475 MB), entã
   No teste usei a demo Destruction como `data/game.rasec`.
   CORRIGIDO no Windows: a chave do .rasec embute a versão (template salvo na 1.5, engine 1.6).
   O leitor (readfile.c) agora aceita 1.6 e 1.5; Example Game.rasec abre no player Windows.
-  Linux: recompilar o player e confirmar.
+  Linux (2026-10-21, 1a8490da): CONFIRMADO, Example Game.rasec abre janela no player 0.5.4 Linux.
+  Novo ponto (aberto): o script do template faz `import range` / `from range.render import ...` (API 1.5);
+  a engine só registra `bge` (KX_PythonInit.cpp), então dá "No module named 'range'" e o
+  PlayerCollision não roda. Opções: alias `range` -> `bge` no player, ou atualizar o template.
 - Obs.: após falha de carga, o player tenta ler o próprio executável (checagem de jogo embutido) e imprime o usage; a mensagem confunde.
 
 ## Pendente no Windows
