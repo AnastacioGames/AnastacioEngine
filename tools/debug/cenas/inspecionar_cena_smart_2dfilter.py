@@ -32,12 +32,15 @@ for line in required:
 
 props = camera.game.properties
 existing = props.get("u_existing")
+enabled = props.get("u_enabled")
 wrong = props.get("u_wrong")
 if existing is None or existing.type != 'FLOAT' or abs(existing.value - 0.75) > 0.0001:
     raise RuntimeError("existing float property changed")
+if enabled is None or enabled.type != 'BOOL' or not enabled.value:
+    raise RuntimeError("existing bool property changed")
 if wrong is None or wrong.type != 'STRING' or wrong.value != "keep-me":
     raise RuntimeError("wrong-type property changed")
-for name in ("u_missing", "u_mode", "u_enabled", "u_tint"):
+for name in ("u_missing", "u_mode", "u_tint"):
     if props.get(name) is not None:
         raise RuntimeError("property must stay absent before Create Missing: %s" % name)
 
@@ -52,7 +55,7 @@ with open(out_path, "w") as handle:
     handle.write("scene=%s engine=%s\n" % (scene.name, scene.render.engine))
     handle.write("camera=%s actuator=%s text=%s pass=%d\n" %
                  (camera.name, actuator.name, text.name, actuator.filter_pass))
-    handle.write("existing=%s:%s wrong=%s:%s\n" %
-                 (existing.type, existing.value, wrong.type, wrong.value))
-    handle.write("missing=u_missing,u_mode,u_enabled,u_tint\n")
+    handle.write("existing=%s:%s enabled=%s:%s wrong=%s:%s\n" %
+                 (existing.type, existing.value, enabled.type, enabled.value, wrong.type, wrong.value))
+    handle.write("missing=u_missing,u_mode,u_tint\n")
     handle.write("runtime_probe=%s\n" % probe_controller.module)

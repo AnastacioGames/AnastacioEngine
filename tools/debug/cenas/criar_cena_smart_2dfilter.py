@@ -4,7 +4,8 @@
 #   AnastacioEngine.exe -b --factory-startup --python criar_cena_smart_2dfilter.py -- saida.range
 #
 # A cena deixa de proposito propriedades ausentes e uma com tipo errado: o painel deve
-# oferecer '+' / 'Create Missing', sem alterar nenhuma delas durante o redraw.
+# oferecer '+' / 'Create Missing', sem alterar nenhuma delas durante o redraw. O Bool
+# existente permite conferir a caixa de marcar e a inversao visivel do filtro.
 import sys
 import bpy
 from mathutils import Vector
@@ -39,8 +40,8 @@ void main()
 {
     vec4 color = texture(bgl_RenderedTexture, texCoordVarying);
     float mode = (u_mode == 2) ? 0.25 : ((u_mode == 7) ? 0.6 : 1.0);
-    float enabled = u_enabled ? 1.0 : 0.0;
-    fragColor = vec4(color.rgb * (u_existing + u_missing * 0.0 + mode * 0.0 + enabled * 0.0), color.a);
+    vec3 adjusted = color.rgb * (u_existing + u_missing * 0.0 + mode * 0.0);
+    fragColor = vec4(u_enabled ? adjusted : 1.0 - adjusted, color.a);
 }
 '''
 text = bpy.data.texts.new("smart_2dfilter_panel.glsl")
@@ -67,8 +68,9 @@ camera.data.lens = 32
 camera.rotation_euler = (Vector((0.0, 0.0, 1.0)) - camera.location).to_track_quat('-Z', 'Y').to_euler()
 scene.camera = camera
 
-# Existente correto, ausentes que o operador deve criar, e tipo errado que ele nao pode converter.
+# Existentes corretos, ausentes que o operador deve criar, e tipo errado que ele nao pode converter.
 game_property(camera, "u_existing", 'FLOAT', 0.75)
+game_property(camera, "u_enabled", 'BOOL', True)
 game_property(camera, "u_wrong", 'STRING', "keep-me")
 
 bpy.ops.logic.sensor_add(type='ALWAYS', object=camera.name)
