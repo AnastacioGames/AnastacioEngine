@@ -35,6 +35,7 @@
 #include "KX_Scene.h"
 #include "KX_GameObject.h"
 #include "KX_Globals.h"
+#include "KX_EngineProfiler.h"
 #include "DNA_camera_types.h"
 #include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
 #include "BLI_utildefines.h"
@@ -69,10 +70,40 @@ extern "C" {
 	extern char datatoc_RAS_CameraLens2DFilter_glsl[];
 }
 
+/// RANGE_PROFILE: GPU time of every filter pass ("filter.rain", "filter.vfog"...);
+/// "filter.prepare" is what runs before the first pass (rain masks, Camera FX update).
+static void kx_profile_filter_pass(int pass)
+{
+	if (!KX_EngineProfiler::Enabled()) {
+		return;
+	}
+	static int ids[257] = {0};
+	const int slot = (pass < 0) ? 256 : std::min(pass, 255);
+	if (!ids[slot]) {
+		static const char *const names[] = {
+			"ssgi", "ssgi_image", "ssr", "ssr_blur", "ssao", "bloom", "bloom", "bloom", "bloom", "bloom",
+			"bloom", "bloom", "bloom", "lightscatter", "lightscatter", "fxaa", "tonemap", "rain", "clouds",
+			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens"};
+		static std::string storage[257];
+		if (pass < 0) {
+			storage[slot] = "filter.prepare";
+		}
+		else if (pass < (int)(sizeof(names) / sizeof(names[0]))) {
+			storage[slot] = std::string("filter.") + names[pass];
+		}
+		else {
+			storage[slot] = "filter.custom" + std::to_string(pass);
+		}
+		ids[slot] = KX_EngineProfiler::Register(storage[slot].c_str());
+	}
+	KX_EngineProfiler::GpuStamp(ids[slot]);
+}
+
 KX_2DFilterManager::KX_2DFilterManager(RAS_ICanvas *canvas, BuildInFilters filters) :
 	RAS_2DFilterManager(filters), m_canvas(canvas),
 	m_useGrain(filters.useGrain), m_grainStrength(filters.grain_strength), m_sceneFilters(filters)
 {
+	ProfilePassHook = kx_profile_filter_pass;
 	/* This location doesn't seem very good to me but it works fine here, we need to generate the KX_2DFilter to have offscreen and not RAS_* */
 	/* Only for Range legacy, the code can be deprecated after Range 2.0+ */
 	EnsureBloomFilters(filters);
