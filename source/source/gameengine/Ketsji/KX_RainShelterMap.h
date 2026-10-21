@@ -57,6 +57,8 @@ public:
 	 */
 	bool Render(KX_Scene *scene, double time, const mt::vec3& camPos, float area[4]);
 	unsigned int GetTexture() const;
+	/// After Render(): a shelter is right above the camera (its box covers the camera from above).
+	bool IsCameraCovered() const;
 	/// Drops a deleted object before its pointer dangles.
 	void RemoveObject(KX_GameObject *gameobj);
 
@@ -83,6 +85,7 @@ private:
 	std::vector<Draw> m_drawnItems;
 	float m_drawnCenter[2];
 	bool m_valid;
+	bool m_cameraCovered;
 	double m_nextScan;
 
 	unsigned int m_program;

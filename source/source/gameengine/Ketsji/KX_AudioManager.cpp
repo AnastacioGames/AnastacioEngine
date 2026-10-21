@@ -53,6 +53,9 @@ typedef float sample_t;
 
 /// Seconds without a report from a scene before the area reverb is dropped.
 static const double REVERB_TIMEOUT = 0.5;
+/// Rain loops under a rain_shelter: volume, and seconds to go from the open to it.
+static const float RAIN_COVERED_GAIN = 0.35f;
+static const float RAIN_COVER_FADE = 0.6f;
 
 struct KX_AudioManager::Sound
 {
@@ -140,7 +143,10 @@ KX_AudioManager::KX_AudioManager(bool enabled)
 	m_pendingInfluence(0.0f),
 	m_pendingValid(false),
 	m_rainTime(0.0),
-	m_rainPlaying(false)
+	m_rainPlaying(false),
+	m_rainOpenReport(false),
+	m_rainCoveredReport(false),
+	m_rainCoverGain(1.0f)
 {
 }
 
@@ -538,6 +544,22 @@ void KX_AudioManager::Update()
 		}
 	}
 
+	// Under a roof the rain is heard quieter; any camera in the open (split screen) keeps it full.
+	{
+		const float target = (m_rainCoveredReport && !m_rainOpenReport) ? RAIN_COVERED_GAIN : 1.0f;
+		const float step = dt / RAIN_COVER_FADE;
+		m_rainCoverGain = (target < m_rainCoverGain) ? std::max(target, m_rainCoverGain - step) :
+		                                               std::min(target, m_rainCoverGain + step);
+		m_rainOpenReport = m_rainCoveredReport = false;
+		for (std::unique_ptr<Module>& module : m_modules) {
+			for (Voice& voice : module->voices) {
+				if (voice.rain) {
+					voice.gain = m_rainCoverGain;
+				}
+			}
+		}
+	}
+
 	for (std::unique_ptr<Module>& module : m_modules) {
 		UpdateModule(*module, dt);
 	}
@@ -882,9 +904,10 @@ void KX_AudioManager::PlayEventDelayed(int event, float gain, float delay)
 	m_delayedEvents.push_back({PIL_check_seconds_timer() + delay, event, gain});
 }
 
-void KX_AudioManager::ReportRain()
+void KX_AudioManager::ReportRain(bool covered)
 {
 	m_rainTime = PIL_check_seconds_timer();
+	(covered ? m_rainCoveredReport : m_rainOpenReport) = true;
 	if (m_rainPlaying) {
 		return;
 	}
@@ -897,7 +920,7 @@ void KX_AudioManager::ReportRain()
 		}
 		for (unsigned int i = 0, size = module->sounds.size(); i < size; ++i) {
 			if (module->sounds[i].event == WO_SOUND_EVENT_RAIN) {
-				StartOneShot(*module, i, 1.0f, true, 2.0f);
+				StartOneShot(*module, i, m_rainCoverGain, true, 2.0f);
 			}
 		}
 	}

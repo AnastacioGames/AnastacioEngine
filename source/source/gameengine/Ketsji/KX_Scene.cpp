@@ -2895,7 +2895,8 @@ void KX_Scene::UpdateRainLightning(double time)
 	if (world && (world->weather_flag & WO_WEATHER_RAIN) && !(world->weather_sound_mute & WO_WEATHER_RAIN)) {
 		KX_AudioManager *audio = KX_GetActiveEngine() ? KX_GetActiveEngine()->GetAudioManager() : nullptr;
 		if (audio) {
-			audio->ReportRain();
+			// The camera under a rain_shelter (seen by the last rain render): quieter rain.
+			audio->ReportRain(m_rainShelterMap && m_rainShelterMap->IsCameraCovered());
 		}
 	}
 	if (!m_rainLightning) {

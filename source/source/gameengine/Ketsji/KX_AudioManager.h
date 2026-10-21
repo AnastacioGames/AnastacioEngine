@@ -96,7 +96,8 @@ public:
 	/// PlayEvent after  delay seconds (e.g. the thunder after the flash, sound travels slower).
 	void PlayEventDelayed(int event, float gain, float delay);
 	/// A scene with World > Rain on, every frame: the Rain sounds loop while some scene reports.
-	void ReportRain();
+	/// \param covered The camera is under a rain_shelter: the rain is heard quieter.
+	void ReportRain(bool covered = false);
 
 private:
 	struct Sound;
@@ -142,6 +143,11 @@ private:
 	std::vector<std::pair<const Module *, int> > m_lastEvent;
 	double m_rainTime;
 	bool m_rainPlaying;
+	/// Since the last Update(): some camera reported the rain in the open / under a shelter.
+	bool m_rainOpenReport;
+	bool m_rainCoveredReport;
+	/// Rain loop volume, 1 in the open, lower under a shelter (eased).
+	float m_rainCoverGain;
 
 	struct DelayedEvent {
 		double time;

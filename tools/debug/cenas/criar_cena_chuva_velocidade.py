@@ -2,6 +2,7 @@
 #   Piso grande, telhado "Abrigo" (propriedade rain_shelter) sobre a origem.
 #   A camera fica parada embaixo do abrigo (foto 1), depois sai e anda a ~20 m/s
 #   para frente (foto 2), e confere getWeather() com os campos novos.
+#   Som de chuva no Effects: sob o abrigo ele fica mais baixo.
 # Uso:
 #   AnastacioEngine.exe -b --factory-startup --python criar_cena_chuva_velocidade.py -- <cena.range> <pasta_saida> [interativo]
 #   Com 'interativo' a cena nao fecha: repete 3 s parado sob o abrigo e 5 s andando. Esc sai.
@@ -30,6 +31,15 @@ w.rain_intensity = 0.9
 w.rain_velocity = 1.0
 w.rain_velocity_stretch = 1.0
 w.rain_velocity_max = 25.0
+
+# Som da chuva (World Sound > Effects, evento Rain): abaixa sob o abrigo.
+import shutil
+here = os.path.dirname(os.path.abspath(__file__))
+wav = os.path.normpath(os.path.join(here, "..", "..", "..", "source", "release", "datafiles", "sounds", "effects", "chuva.wav"))
+shutil.copy(wav, os.path.join(os.path.dirname(out_path), "chuva.wav"))
+effects = world.sound_modules.new("Effects", type='EFFECTS')
+entry = effects.sounds.new("chuva", filepath="//chuva.wav")
+entry.event = 'RAIN'
 
 bpy.ops.mesh.primitive_plane_add(radius=200, location=(0, 0, 0))
 bpy.context.active_object.name = "Piso"

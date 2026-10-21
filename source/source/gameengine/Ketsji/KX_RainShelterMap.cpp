@@ -26,6 +26,9 @@
  */
 
 #include "KX_RainShelterMap.h"
+
+#include <cfloat>
+
 #include "KX_Scene.h"
 #include "KX_GameObject.h"
 #include "KX_Mesh.h"
@@ -86,6 +89,7 @@ KX_RainShelterMap::KX_RainShelterMap()
 	:m_drawnCenter{0.0f, 0.0f},
 	m_valid(false),
 	m_nextScan(0.0),
+	m_cameraCovered(false),
 	m_program(0),
 	m_vao(0),
 	m_fbo(0),
@@ -115,6 +119,11 @@ KX_RainShelterMap::~KX_RainShelterMap()
 	if (m_program) {
 		glDeleteProgram(m_program);
 	}
+}
+
+bool KX_RainShelterMap::IsCameraCovered() const
+{
+	return m_cameraCovered;
 }
 
 unsigned int KX_RainShelterMap::GetTexture() const
@@ -283,6 +292,7 @@ bool KX_RainShelterMap::EnsureGL()
 bool KX_RainShelterMap::Render(KX_Scene *scene, double time, const mt::vec3& camPos, float area[4])
 {
 	area[0] = area[1] = area[2] = area[3] = 0.0f;
+	m_cameraCovered = false;
 	if (time >= m_nextScan || time + kScanInterval < m_nextScan) {
 		m_nextScan = time + kScanInterval;
 		RefreshTargets(scene);
@@ -310,6 +320,24 @@ bool KX_RainShelterMap::Render(KX_Scene *scene, double time, const mt::vec3& cam
 		const mt::vec3 center = gameobj->NodeGetWorldTransform() * box.GetCenter();
 		if (std::fabs(center.x - cx) - radius > kHalfExtent || std::fabs(center.y - cy) - radius > kHalfExtent) {
 			continue;
+		}
+		// Camera under this shelter: inside its world box seen from above, below its top.
+		if (!m_cameraCovered) {
+			const mt::mat3x4 trans = gameobj->NodeGetWorldTransform();
+			const mt::vec3& bmin = box.GetMin();
+			const mt::vec3& bmax = box.GetMax();
+			mt::vec3 wmin(FLT_MAX, FLT_MAX, FLT_MAX);
+			mt::vec3 wmax(-FLT_MAX, -FLT_MAX, -FLT_MAX);
+			for (int i = 0; i < 8; ++i) {
+				const mt::vec3 corner((i & 1) ? bmax.x : bmin.x, (i & 2) ? bmax.y : bmin.y, (i & 4) ? bmax.z : bmin.z);
+				const mt::vec3 p = trans * corner;
+				for (int k = 0; k < 3; ++k) {
+					wmin[k] = std::min(wmin[k], p[k]);
+					wmax[k] = std::max(wmax[k], p[k]);
+				}
+			}
+			m_cameraCovered = camPos.x >= wmin.x && camPos.x <= wmax.x &&
+			                  camPos.y >= wmin.y && camPos.y <= wmax.y && camPos.z <= wmax.z;
 		}
 		Draw item;
 		item.gameobj = gameobj;
