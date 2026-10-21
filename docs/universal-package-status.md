@@ -58,7 +58,9 @@ validada no notebook Windows. O zip Universal NÃO está no repo (475 MB), entã
 
 ## Windows (2026-10-21, c4156b7b)
 - Revisado o apelido `range`; player Windows compilado: Example Game.rasec roda 10 s sem erro de Python.
-- Obs.: após falha de carga, o player tenta ler o próprio executável (checagem de jogo embutido) e imprime o usage; a mensagem confunde.
+- Mensagens de falha de carga resolvidas em 1bd11b79. Linux confirmou: arquivo inexistente ->
+  "game file not found"; arquivo inválido -> "could not load game file ..." com o motivo; sem usage.
+  Example Game.rasec e auto-load de `game.range` continuam abrindo janela; sem argumentos mostra o usage.
 
 ## Pendente no Windows
 - Apagar `D:\_uni_test` quando o teste Linux passar.
