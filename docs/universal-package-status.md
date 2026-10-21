@@ -63,7 +63,7 @@ validada no notebook Windows. O zip Universal NÃO está no repo (475 MB), entã
   Example Game.rasec e auto-load de `game.range` continuam abrindo janela; sem argumentos mostra o usage.
 
 ## Pendente no Windows
-- Apagar `D:\_uni_test` quando o teste Linux passar.
+- Nada. `D:\_uni_test` apagado pelo usuário (2026-10-21).
 
 ## Cuidados descobertos
 - No Git Bash, `cp .../Launcher` pode pegar o `Launcher.exe` (sobrescreveu o do Windows). Copiar com Python.
