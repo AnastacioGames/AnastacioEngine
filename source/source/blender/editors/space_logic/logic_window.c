@@ -2100,7 +2100,7 @@ static void draw_filter2d_uniforms(uiLayout *layout, PointerRNA *ptr)
 		float choice_default;
 		RNA_pointer_create(&ob->id, &RNA_GameProperty, prop, &pptr);
 
-		if (BLI_glsl_choice_build(&uni->ann, choice, &choice_default)) {
+		if (prop->type != GPROP_BOOL && BLI_glsl_choice_build(&uni->ann, choice, &choice_default)) {
 			filter2d_choice_draw(row, &pptr, prop, uni->name, choice);
 		}
 		else if (prop->type == GPROP_FLOAT && uni->ann.has_min && uni->ann.has_max && uni->ann.min <= uni->ann.max) {

@@ -935,6 +935,7 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 
 		switch (property->GetValueType()) {
 			case VALUE_INT_TYPE:
+			case VALUE_BOOL_TYPE: /* uniform bool is set with glUniform1i. */
 			{
 				SetUniform(uniformLoc, (int)property->GetNumber());
 				break;

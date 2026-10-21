@@ -527,11 +527,12 @@ static void LOGIC_OT_actuator_remove(wmOperatorType *ot)
 
 /* ************* Custom 2D Filter uniforms ************* */
 
-/* RAS_2DFilter only sends int and float game properties to uniforms. */
+/* RAS_2DFilter sends int, float and bool game properties to uniforms. */
 int logic_filter2d_prop_type(const char *glsltype)
 {
 	if (STREQ(glsltype, "float")) return GPROP_FLOAT;
 	if (STREQ(glsltype, "int")) return GPROP_INT;
+	if (STREQ(glsltype, "bool")) return GPROP_BOOL;
 	return -1;
 }
 
@@ -558,6 +559,10 @@ float logic_filter2d_default(const GLSLUniform *uni, int type)
 	char choice[BLI_GLSL_CHOICE_BUF];
 	float choice_default;
 
+	if (type == GPROP_BOOL) {
+		/* @default 1 / true-ish number turns it on; anything else is off. */
+		return (uni->ann.totdefault == 1 && uni->ann.def[0] != 0.0f) ? 1.0f : 0.0f;
+	}
 	if (BLI_glsl_choice_build(&uni->ann, choice, &choice_default)) {
 		return choice_default;
 	}
