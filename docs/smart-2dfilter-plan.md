@@ -51,6 +51,20 @@ Contrato aprovado com estes esclarecimentos para a implementação:
 - O painel não cria nem altera properties durante o redraw. `+` e `Create Missing` são as únicas ações de criação;
   elas preservam properties existentes, inclusive valor fora de Choice e tipo incompatível.
 
+### Critérios da revisão do diff C
+
+Antes de aprovar o código C, confirmar estes pontos na implementação:
+
+1. `logic_filter2d_uniforms` separa uniforms editáveis (`float`/`int`) dos demais. O painel mostra os
+   demais, inclusive `bool`, como não editáveis e o operador jamais cria uma Game Property para eles.
+2. A criação de uma property só aceita um `@default` escalar válido para o tipo; em especial, um int não
+   arredonda silenciosamente um default fracionário.
+3. Um par `@min/@max` invertido não cria slider. O mesmo critério precisa preservar o comportamento do GLSL
+   Script depois da extração do parser compartilhado.
+4. A leitura exige identificador GLSL válido e não converte nem recria property preexistente de tipo diferente.
+5. A regressão do Choice do GLSL Script, a cena Smart 2D Filter e a compilação GLSL no player precisam passar
+   antes do teste visual.
+
 ## Código comum (o "segundo consumidor" que justifica extrair)
 
 `source/blender/blenkernel/BKE_glsl_uniforms.h` + `intern/glsl_uniforms.c`: leitura dos uniforms de topo e das
