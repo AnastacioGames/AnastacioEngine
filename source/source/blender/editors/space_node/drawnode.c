@@ -32,8 +32,11 @@
 #include "DNA_userdef_types.h"
 #include "DNA_text_types.h"
 
+#include "MEM_guardedalloc.h"
+
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_idprop.h"
 #include "BKE_image.h"
 #include "BKE_main.h"
 #include "BKE_node.h"
@@ -3173,6 +3176,77 @@ static void node_file_output_socket_draw(bContext *C, uiLayout *layout, PointerR
 	}
 }
 
+/* Options of a GLSL Script "@choice" uniform, "Label=value,..." (node_shader_glsl_script.c). */
+static const char *node_script_choice_items(bNodeSocket *sock)
+{
+	IDProperty *prop = sock->prop ?
+	        IDP_GetPropertyTypeFromGroup(sock->prop, SH_NODE_GLSL_SCRIPT_CHOICE, IDP_STRING) : NULL;
+	return prop ? IDP_String(prop) : NULL;
+}
+
+static bool node_script_choice_next(const char **p, char *r_label, int labelsize, int *r_value)
+{
+	const char *eq = strchr(*p, '=');
+	if (!**p || !eq) {
+		return false;
+	}
+	BLI_strncpy(r_label, *p, MIN2(labelsize, (int)(eq - *p) + 1));
+	*r_value = atoi(eq + 1);
+	const char *comma = strchr(eq, ',');
+	*p = comma ? comma + 1 : eq + strlen(eq);
+	return true;
+}
+
+static uiBlock *node_script_choice_menu(bContext *C, ARegion *ar, void *arg)
+{
+	PointerRNA *ptr = arg;
+	const char *items = node_script_choice_items(ptr->data);
+	uiBlock *block = UI_block_begin(C, ar, __func__, UI_EMBOSS);
+	char label[64];
+	int value, y = 0;
+
+	UI_block_flag_enable(block, UI_BLOCK_MOVEMOUSE_QUIT);
+	while (items && node_script_choice_next(&items, label, sizeof(label), &value)) {
+		/* A row button sets the socket to its max, the option value. */
+		uiDefButR(block, UI_BTYPE_ROW, 0, label, 0, y, UI_UNIT_X * 6, UI_UNIT_Y,
+		          ptr, "default_value", 0, 0.0f, (float)value, 0, 0, "");
+		y -= UI_UNIT_Y;
+	}
+	UI_block_bounds_set_normal(block, 6);
+	UI_block_direction_set(block, UI_DIR_DOWN);
+	return block;
+}
+
+/* Menu with the option names instead of the number field; false when the socket has no options. */
+static bool node_script_choice_draw(uiLayout *layout, PointerRNA *ptr, const char *text)
+{
+	bNodeSocket *sock = ptr->data;
+	const char *items = node_script_choice_items(sock);
+	if (!items) {
+		return false;
+	}
+
+	const float current = ((bNodeSocketValueFloat *)sock->default_value)->value;
+	char label[64], name[256];
+	int value;
+	bool found = false;
+	while (!found && node_script_choice_next(&items, label, sizeof(label), &value)) {
+		found = ((float)value == current);
+	}
+	if (found) {
+		BLI_snprintf(name, sizeof(name), "%s: %s", text, label);
+	}
+	else {
+		BLI_snprintf(name, sizeof(name), "%s: Valor fora das op\xc3\xa7\xc3\xb5" "es: %g", text, current);
+	}
+
+	PointerRNA *args = MEM_mallocN(sizeof(*args), __func__);
+	*args = *ptr;
+	uiDefBlockButN(uiLayoutGetBlock(layout), node_script_choice_menu, args, name, 0, 0,
+	               UI_UNIT_X * 6, UI_UNIT_Y, TIP_("Options of @choice in the script"));
+	return true;
+}
+
 static void std_node_socket_draw(bContext *C, uiLayout *layout, PointerRNA *ptr, PointerRNA *node_ptr, const char *text)
 {
 	bNode *node = node_ptr->data;
@@ -3188,6 +3262,10 @@ static void std_node_socket_draw(bContext *C, uiLayout *layout, PointerRNA *ptr,
 
 	if ((sock->in_out == SOCK_OUT) || (sock->flag & SOCK_IN_USE) || (sock->flag & SOCK_HIDE_VALUE)) {
 		node_socket_button_label(C, layout, ptr, node_ptr, text);
+		return;
+	}
+
+	if (type == SOCK_FLOAT && node->type == SH_NODE_GLSL_SCRIPT && node_script_choice_draw(layout, ptr, text)) {
 		return;
 	}
 

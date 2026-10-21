@@ -43,6 +43,13 @@
  * While the socket is not linked the value is a real uniform, sent on every draw
  * (KX_BlenderMaterial.setScriptUniform changes it in the game without compiling). TIME is the time
  * of the game, without a Time node.
+ *
+ * An int or float uniform may list named options, drawn as a menu in the node:
+ *
+ *   uniform int u_mode;  // @choice Linear=0, Smooth=1, Step=2 @default 1
+ *
+ * The socket stays a number holding the option value. Any broken rule (see script_choice_build)
+ * leaves the plain number field.
  */
 
 #include <float.h>
@@ -52,11 +59,18 @@
 
 #include "BLI_dynstr.h"
 
+#include "BKE_idprop.h"
 #include "BKE_text.h"
 
 #include "DNA_text_types.h"
 
 #define SCRIPT_MAX_PARAMS 64
+
+#define SCRIPT_CHOICE_MAX_ITEMS 32
+#define SCRIPT_CHOICE_MAX_LABEL 64
+/* Biggest integer a float holds exactly. */
+#define SCRIPT_CHOICE_LIMIT 16777216
+#define SCRIPT_CHOICE_BUF (SCRIPT_CHOICE_MAX_ITEMS * (SCRIPT_CHOICE_MAX_LABEL + 10))
 
 typedef struct ScriptParam {
 	char glsltype[16];
@@ -69,6 +83,9 @@ typedef struct ScriptParam {
 	float min, max;
 	int totdefault;
 	float def[4];
+	/* Text after "@choice" inside the code buffer; choicelen -1 when "@choice" appears twice. */
+	const char *choice;
+	int choicelen;
 } ScriptParam;
 
 static bool script_ident_char(char c)
@@ -221,6 +238,19 @@ static void script_parse_annotations(const char *p, ScriptParam *param)
 					p = end;
 				}
 			}
+			else if (STREQ(word, "choice")) {
+				const char *start = p;
+				while (*p && *p != '\n' && *p != '@') {
+					p++;
+				}
+				if (param->choice) {
+					param->choicelen = -1;
+				}
+				else {
+					param->choice = start;
+					param->choicelen = (int)(p - start);
+				}
+			}
 		}
 		else {
 			p++;
@@ -341,8 +371,144 @@ static bNodeSocket *script_find_socket(ListBase *sockets, const ScriptParam *par
 	return NULL;
 }
 
-/* Limits of a uniform socket follow the annotations; the value only when the socket is new. */
-static void script_socket_uniform(bNodeSocket *sock, const ScriptParam *param, bool is_new)
+static void script_trim(const char **r_start, const char **r_end)
+{
+	while (*r_start < *r_end && (**r_start == ' ' || **r_start == '\t' || **r_start == '\r')) {
+		(*r_start)++;
+	}
+	while (*r_end > *r_start && ((*r_end)[-1] == ' ' || (*r_end)[-1] == '\t' || (*r_end)[-1] == '\r')) {
+		(*r_end)--;
+	}
+}
+
+/* Decimal integer in [-SCRIPT_CHOICE_LIMIT, SCRIPT_CHOICE_LIMIT], nothing else. */
+static bool script_choice_value(const char *p, const char *end, int *r_value)
+{
+	bool negative = false;
+	long long value = 0;
+
+	if (p < end && (*p == '-' || *p == '+')) {
+		negative = (*p == '-');
+		p++;
+	}
+	if (p == end) {
+		return false;
+	}
+	for (; p < end; p++) {
+		if (*p < '0' || *p > '9') {
+			return false;
+		}
+		value = value * 10 + (*p - '0');
+		if (value > SCRIPT_CHOICE_LIMIT) {
+			return false;
+		}
+	}
+	*r_value = (int)(negative ? -value : value);
+	return true;
+}
+
+/* "@choice A=0, B = 7" of an int/float uniform -> "A=0,B=7" in r_buf and the value of a new
+ * socket (@default, else the first option). False, and the socket stays a plain number, when:
+ * no option, more than SCRIPT_CHOICE_MAX_ITEMS, an empty or too long label, a value that is not a
+ * plain integer within SCRIPT_CHOICE_LIMIT, a repeated label or value, a @default that is not one
+ * of the values, or an option outside @min/@max. */
+static bool script_choice_build(const ScriptParam *param, char r_buf[SCRIPT_CHOICE_BUF], float *r_default)
+{
+	char labels[SCRIPT_CHOICE_MAX_ITEMS][SCRIPT_CHOICE_MAX_LABEL];
+	int values[SCRIPT_CHOICE_MAX_ITEMS];
+	int tot = 0;
+
+	if (!param->uniform || param->socktype != SOCK_FLOAT || !param->choice || param->choicelen <= 0) {
+		return false;
+	}
+
+	const char *end = param->choice + param->choicelen;
+	for (const char *p = param->choice; p <= end; tot++) {
+		const char *comma = memchr(p, ',', end - p);
+		if (!comma) {
+			comma = end;
+		}
+		const char *eq = memchr(p, '=', comma - p);
+		if (!eq || tot == SCRIPT_CHOICE_MAX_ITEMS) {
+			return false;
+		}
+
+		const char *label = p, *label_end = eq;
+		script_trim(&label, &label_end);
+		const int len = (int)(label_end - label);
+		if (len == 0 || len >= SCRIPT_CHOICE_MAX_LABEL) {
+			return false;
+		}
+		memcpy(labels[tot], label, len);
+		labels[tot][len] = '\0';
+
+		const char *value = eq + 1, *value_end = comma;
+		script_trim(&value, &value_end);
+		if (!script_choice_value(value, value_end, &values[tot])) {
+			return false;
+		}
+
+		for (int i = 0; i < tot; i++) {
+			if (values[i] == values[tot] || STREQ(labels[i], labels[tot])) {
+				return false;
+			}
+		}
+		p = comma + 1;
+	}
+
+	float def = (float)values[0];
+	if (param->totdefault) {
+		bool found = false;
+		for (int i = 0; i < tot; i++) {
+			found |= ((float)values[i] == param->def[0]);
+		}
+		if (param->totdefault != 1 || !found) {
+			return false;
+		}
+		def = param->def[0];
+	}
+
+	for (int i = 0; i < tot; i++) {
+		if ((param->has_min && values[i] < param->min) || (param->has_max && values[i] > param->max)) {
+			return false;
+		}
+	}
+
+	r_buf[0] = '\0';
+	for (int i = 0; i < tot; i++) {
+		const size_t used = strlen(r_buf);
+		BLI_snprintf(r_buf + used, SCRIPT_CHOICE_BUF - used, "%s%s=%d", i ? "," : "", labels[i], values[i]);
+	}
+	*r_default = def;
+	return true;
+}
+
+/* Stores the options for the menu of drawnode.c, or removes them (choice NULL). */
+static void script_socket_choice(bNodeSocket *sock, const char *choice)
+{
+	IDProperty *old = sock->prop ?
+	        IDP_GetPropertyTypeFromGroup(sock->prop, SH_NODE_GLSL_SCRIPT_CHOICE, IDP_STRING) : NULL;
+
+	if (!choice) {
+		if (old) {
+			IDP_FreeFromGroup(sock->prop, old);
+		}
+		return;
+	}
+	if (old && STREQ(IDP_String(old), choice)) {
+		return;
+	}
+	if (!sock->prop) {
+		IDPropertyTemplate val = {0};
+		sock->prop = IDP_New(IDP_GROUP, &val, "RNA_NodeSocket");
+	}
+	IDP_ReplaceInGroup(sock->prop, IDP_NewString(choice, SH_NODE_GLSL_SCRIPT_CHOICE, (int)strlen(choice) + 1));
+}
+
+/* Limits of a uniform socket follow the annotations; the value only when the socket is new.
+ * choice_default, when not NULL, is the value of a new socket with "@choice". */
+static void script_socket_uniform(bNodeSocket *sock, const ScriptParam *param, bool is_new,
+                                  const float *choice_default)
 {
 	const float min = param->has_min ? param->min : -FLT_MAX;
 	const float max = param->has_max ? param->max : FLT_MAX;
@@ -361,7 +527,10 @@ static void script_socket_uniform(bNodeSocket *sock, const ScriptParam *param, b
 		bNodeSocketValueFloat *dval = sock->default_value;
 		dval->min = min;
 		dval->max = max;
-		if (is_new && param->totdefault) {
+		if (is_new && choice_default) {
+			dval->value = *choice_default;
+		}
+		else if (is_new && param->totdefault) {
 			dval->value = def[0];
 		}
 		CLAMP(dval->value, min, max);
@@ -386,9 +555,12 @@ static void script_socket_uniform(bNodeSocket *sock, const ScriptParam *param, b
 static void node_shader_update_glsl_script(bNodeTree *ntree, bNode *node)
 {
 	ScriptParam params[SCRIPT_MAX_PARAMS];
-	int tot = script_read(node, params, NULL);
+	char *code = NULL;
+	/* The code stays alive: params[].choice points into it. */
+	int tot = script_read(node, params, &code);
 	if (tot < 0) {
 		/* No valid main (yet): keep the sockets, the user may be typing. */
+		MEM_SAFE_FREE(code);
 		return;
 	}
 
@@ -420,13 +592,18 @@ static void node_shader_update_glsl_script(bNodeTree *ntree, bNode *node)
 				                           script_socket_subtype(&params[i]), params[i].name, params[i].name);
 			}
 			if (params[i].uniform) {
-				script_socket_uniform(sock, &params[i], is_new);
+				char choice[SCRIPT_CHOICE_BUF];
+				float choice_default;
+				const bool has_choice = script_choice_build(&params[i], choice, &choice_default);
+				script_socket_uniform(sock, &params[i], is_new, has_choice ? &choice_default : NULL);
+				script_socket_choice(sock, has_choice ? choice : NULL);
 			}
 			/* Same order as the parameters. */
 			BLI_remlink(sockets, sock);
 			BLI_addtail(sockets, sock);
 		}
 	}
+	MEM_freeN(code);
 }
 
 static const char *script_socket_glsl(int socktype)

@@ -797,6 +797,8 @@ struct ShadeResult;
 #define SH_NODE_OUTPUT_ATTACHMENT 1003
 #define SH_NODE_DAMAGE			1004
 #define SH_NODE_GLSL_SCRIPT		1005
+/* String IDProperty on a GLSL Script uniform socket with "@choice": "Label=value,Label=value". */
+#define SH_NODE_GLSL_SCRIPT_CHOICE	"range_choice"
 #define SH_NODE_FUR_SHELLS		1006
 #define SH_NODE_OUTLINE			1007
 #define SH_NODE_VERTEX_WIND		1008
