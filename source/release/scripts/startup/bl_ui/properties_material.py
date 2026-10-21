@@ -633,7 +633,7 @@ class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
             col = layout.column()
             col.label(text="Script Uniforms:")
             for node, sock in uniforms:
-                row = col.split(percentage=0.4)
+                row = col.split(factor=0.4)
                 row.label(text="%s (%s)" % (sock.name, node.script.name if node.script else node.name))
                 row.prop(sock, "default_value", text="")
 

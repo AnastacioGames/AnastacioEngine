@@ -3139,6 +3139,14 @@ static void lib_verify_nodetree(Main *main, int UNUSED(open))
 	/* make update calls where necessary */
 	{
 		FOREACH_NODETREE_BEGIN(main, ntree, id) {
+			/* GLSL Script "@choice" options are rebuilt from the Text, they may be missing in
+			 * files saved by older versions (values and links are kept by the update). */
+			for (bNode *node = ntree->nodes.first; node; node = node->next) {
+				if (node->type == SH_NODE_GLSL_SCRIPT && node->id) {
+					node->update |= NODE_UPDATE;
+					ntree->update |= NTREE_UPDATE_NODES;
+				}
+			}
 			/* make an update call for the tree */
 			ntreeUpdateTree(main, ntree);
 		} FOREACH_NODETREE_END;
