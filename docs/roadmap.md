@@ -691,8 +691,8 @@ iOS fora do escopo.
   lento de imagens (38 ms para 1024x512, leitura + mipmaps na CPU).
   Ver changelog de 2026-10-10.
 - **Static Batch (aberto):** grupos instanciados (dupli) passaram a entrar em 2026-10-21 (falta conferir no
-  jogo real que nada some ou desloca); falha parcial em
-  `SplitMeshSlot` e `static_cast` sem grupos só RAS seguem como riscos conhecidos.
+  jogo real que nada some ou desloca); falha parcial no merge/split corrigida em 2026-10-21;
+  `static_cast` sem grupos só RAS segue como risco conhecido.
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
   14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
   na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"

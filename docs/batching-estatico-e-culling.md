@@ -31,7 +31,8 @@ script Python e tinha falhas de ciclo de vida.
 | desligado | ~707 | ~2.513 | ~2.628 |
 | ligado (antes da correção 2) | ~512 | ~1.170 | ~1.860 |
 
-Riscos conhecidos: falha parcial em `SplitMeshSlot` deixa `m_batchGroup` setado; os
+Riscos conhecidos: (falha parcial em merge/split corrigida em 2026-10-21: o merge desfaz os
+slots já unidos e o split separa todos e sempre solta o grupo); os
 `static_cast` para `KX_BatchGroup`/`KX_ClientObjectInfo` assumem que não existem grupos
 só RAS; shaders que usam coordenadas locais/Object Info passam a ver o objeto de referência.
 

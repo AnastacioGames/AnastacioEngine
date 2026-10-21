@@ -6,6 +6,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Static Batch: merge/split parcial
+
+- `RAS_BatchGroup::MergeMeshUser`: se um material do objeto não pode ser unido (formato diferente), os slots já unidos voltam para o mesh original; antes ficavam desenhados pelo batch sem o objeto pertencer a ele. `SplitMeshUser`: separa todos os slots mesmo que um falhe e sempre solta o grupo; antes parava no meio com o objeto ainda marcado como batched. Teste com grupos instanciados: 10 no batch; mover um objeto deixa 9 e o movido fora.
+
 ## 2026-10-21 - Explosive > Light Flash (clarão de luz na explosão)
 
 - Opção nova `use_light_flash` (Python `useLightFlash`) no painel Explosive, ao lado de Sound; também vale no efeito de quebra do Destructible. Flag `EXPLOSIVE_LIGHT_FLASH` (1 << 8), sem mudar a struct.

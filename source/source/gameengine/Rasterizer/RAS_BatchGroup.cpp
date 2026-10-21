@@ -167,6 +167,14 @@ bool RAS_BatchGroup::MergeMeshUser(RAS_MeshUser *meshUser, const mt::mat4& mat)
 		}
 
 		if (!MergeMeshSlot(batch, meshSlot, mat)) {
+			// Put back the slots already merged: a half merged mesh user would draw some of its
+			// materials from the batch without belonging to it.
+			for (RAS_MeshSlot& merged : meshUser->GetMeshSlots()) {
+				if (&merged == &meshSlot) {
+					break;
+				}
+				SplitMeshSlot(merged);
+			}
 			return false;
 		}
 	}
@@ -178,9 +186,12 @@ bool RAS_BatchGroup::MergeMeshUser(RAS_MeshUser *meshUser, const mt::mat4& mat)
 
 bool RAS_BatchGroup::SplitMeshUser(RAS_MeshUser *meshUser)
 {
+	// Split every slot even if one fails, and always let the mesh user go: stopping halfway left it
+	// marked as batched with the remaining slots still drawn from the batch.
+	bool ok = true;
 	for (RAS_MeshSlot& meshSlot : meshUser->GetMeshSlots()) {
-		if (!SplitMeshSlot(meshSlot)) {
-			return false;
+		if (meshSlot.m_batchPartIndex != -1 && !SplitMeshSlot(meshSlot)) {
+			ok = false;
 		}
 	}
 
@@ -189,7 +200,7 @@ bool RAS_BatchGroup::SplitMeshUser(RAS_MeshUser *meshUser)
 	// Deference batch groups by setting it to nullptr.
 	meshUser->SetBatchGroup(nullptr);
 
-	return true;
+	return ok;
 }
 
 void RAS_BatchGroup::Destruct()
