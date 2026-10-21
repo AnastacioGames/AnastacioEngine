@@ -1616,8 +1616,8 @@ def _update_specular_tint(self, context):
 
 bpy.types.Material.ae_use_specular_tint = bpy.props.BoolProperty(
     name="Tint Specular",
-    description="Tinge o brilho especular do runtime com uma cor, em vez de branco puro "
-                 "(util sem textura, onde nao ha influencia de Specular Color)",
+    description="Tints the runtime specular highlight with a color instead of pure white "
+                 "(useful without textures, where Specular Color has no influence)",
     default=False,
     update=_update_specular_tint,
 )

@@ -3056,7 +3056,7 @@ class LOGIC_OT_convert_to_component(Operator):
 
     disable_originals: BoolProperty(
         name="Disable Converted Bricks",
-        description="Desativa os bricks convertidos para nao rodarem junto com o componente",
+        description="Disables the converted bricks so they do not run alongside the component",
         default=True,
     )
     mode: EnumProperty(
@@ -3072,7 +3072,7 @@ class LOGIC_OT_convert_to_component(Operator):
     )
     module_name: StringProperty(
         name="Module",
-        description="Nome do texto .py gerado (vazio = <objeto>_logic)",
+        description="Name of the generated .py text (empty = <object>_logic)",
     )
 
     @classmethod
@@ -3104,7 +3104,7 @@ class LOGIC_OT_convert_to_component(Operator):
         if component and not already:
             ret = bpy.ops.logic.python_component_register(component_name=import_name)
             if 'FINISHED' not in ret:
-                self.report({'ERROR'}, "Codigo gerado em %s, mas o registro do componente falhou" % filename)
+                self.report({'ERROR'}, "Code generated in %s, but registering the component failed" % filename)
                 return {'CANCELLED'}
 
         if self.disable_originals:

@@ -49,7 +49,7 @@ RGBM_RANGE = 8.0
 MODE_INDIRECT = 'INDIRECT'
 MODE_AO = 'AO'
 MODE_STATIC = 'STATIC'
-REASON_EXCLUDED = "Excluído do bake"
+REASON_EXCLUDED = "Excluded from bake"
 
 # Cycles units -> game units, measured with a light-only DIFFUSE bake of a white plane:
 # Sun strength 1 gives 1/pi, a point light with "Constant" falloff strength 1 gives 1/(4 pi^2),
@@ -79,19 +79,19 @@ def clear_light_volume(scene):
 def lightmap_exclusion_reason(scene, ob):
     """One reason an object will not receive the *next* scene lightmap bake."""
     if ob.type != 'MESH' or not ob.data.polygons:
-        return "Não é uma malha com faces"
+        return "Not a mesh with faces"
     if ob.hide_render:
-        return "Oculto na renderização"
+        return "Hidden in render"
     if not any(ob.layers[i] and scene.layers[i] for i in range(20)):
-        return "Fora das camadas ativas da cena"
+        return "Outside the active scene layers"
     if ob.game.physics_type not in {'STATIC', 'NO_COLLISION', 'OCCLUDER', 'NAVMESH'}:
-        return "Física dinâmica (use Static para gerar o bake)"
+        return "Dynamic physics (use Static to bake)"
     if ob.game.controllers:
-        return "Possui controladores lógicos"
+        return "Has logic controllers"
     if not ob.ae_lightmap_include:
         return REASON_EXCLUDED
     if not any(slot.material and slot.material.use_nodes for slot in ob.material_slots):
-        return "Requer um material com nós"
+        return "Requires a node material"
     return None
 
 
@@ -598,7 +598,7 @@ def encode_rgbm(pixels, alpha_mask):
 class SCENE_OT_lightmap_bake(Operator):
     """Bake lighting for the static meshes into one automatic atlas used by Game PBR materials"""
     bl_idname = "scene.ae_lightmap_bake"
-    bl_label = "Gerar Bake da Cena"
+    bl_label = "Bake Scene"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -612,7 +612,7 @@ class SCENE_OT_lightmap_bake(Operator):
         mode = settings.mode
         objects = lightmap_objects(scene)
         if not objects:
-            self.report({'WARNING'}, "Nenhuma malha estática com material de nós para gerar o bake")
+            self.report({'WARNING'}, "No static mesh with a node material to bake")
             return {'CANCELLED'}
         import addon_utils
         addon_utils.enable("cycles", default_set=False)
@@ -686,8 +686,8 @@ class SCENE_OT_lightmap_bake(Operator):
                         kwargs['pass_filter'] = passes
                     result_status = bpy.ops.object.bake(**kwargs)  # the active UV layer is "Lightmap"
                     if result_status != {'FINISHED'}:
-                        raise RuntimeError("O bake do Cycles falhou; nenhum lightmap foi salvo. "
-                                           "Se a GPU estava ativa, desative-a e gere o bake na CPU.")
+                        raise RuntimeError("The Cycles bake failed; no lightmap was saved. "
+                                           "If the GPU was enabled, disable it and bake on the CPU.")
                     result = np.array(work.pixels[:], dtype=np.float32)
                 finally:
                     for mat, node, active in nodes:
@@ -705,7 +705,7 @@ class SCENE_OT_lightmap_bake(Operator):
                 return bake_target(passes, lightmap_target, percent, status)
 
             if mode == MODE_AO:
-                total = bake_target(None, lightmap_target, 8, "Gerando oclusão de ambiente", 'AO')
+                total = bake_target(None, lightmap_target, 8, "Baking ambient occlusion", 'AO')
                 total = total.reshape(-1, 4).copy()
                 # Cycles' AO pass is a linear visibility factor. Keep it grayscale; Strength is an
                 # artistic blend from unoccluded (1) to the measured result.
@@ -724,7 +724,7 @@ class SCENE_OT_lightmap_bake(Operator):
                         volume_passes.append(bake_target(
                             {'INDIRECT'}, probe_target, 8, "Gerando luz indireta (volume de luz)"))
                     total = bake_target(
-                        {'DIRECT', 'INDIRECT'}, lightmap_target, 20, "Gerando iluminação estática e sombras")
+                        {'DIRECT', 'INDIRECT'}, lightmap_target, 20, "Baking static lighting and shadows")
                     total = total.reshape(-1, 4).copy()
 
                     # DIRECT is additive. Removing the pass with lamps hidden keeps lamp direct light
@@ -737,7 +737,7 @@ class SCENE_OT_lightmap_bake(Operator):
                                 {'DIRECT'}, probe_target, 55, "Gerando luz do Mundo (volume de luz)"))
                     else:
                         world_direct = bake_target(
-                            {'DIRECT'}, lightmap_target, 55, "Removendo luz do Mundo do bake estático")
+                            {'DIRECT'}, lightmap_target, 55, "Removing World light from the static bake")
                         total[:, :3] = np.maximum(
                             0.0, total[:, :3] - world_direct.reshape(-1, 4)[:, :3])
                     for ob in lamps:
@@ -766,7 +766,7 @@ class SCENE_OT_lightmap_bake(Operator):
             mask[corners.reshape(-1)] = 0.0
             atlas_coverage = 100.0 * float(np.count_nonzero(mask > 0.5)) / float(size * size)
             # fill the gutters before denoising so OIDN does not pull black into the chart borders
-            bake_progress(80, "Reduzindo ruído" if settings.use_denoise else "Preenchendo margens")
+            bake_progress(80, "Denoising" if settings.use_denoise else "Filling margins")
             pad = max(4, settings.margin * 2)
             total[mask <= 0.5, :3] = 0.0
             total, grown = dilate(total, mask, size, pad, corners)
@@ -860,12 +860,12 @@ class SCENE_OT_lightmap_bake(Operator):
         # recompile the game materials with the new texture
         tag_lightmap_materials()
         mode_names = {
-            MODE_INDIRECT: "Indireta + Sombras Dinâmicas",
-            MODE_AO: "Oclusão de Ambiente",
-            MODE_STATIC: "Iluminação Estática + Sombras",
+            MODE_INDIRECT: "Indirect + Dynamic Shadows",
+            MODE_AO: "Ambient Occlusion",
+            MODE_STATIC: "Static Lighting + Shadows",
         }
-        mode_name = mode_names.get(mode, "Iluminação Pré-calculada")
-        self.report({'INFO'}, "%s gerada: %d objetos, %dx%d" % (mode_name, len(objects), size, size))
+        mode_name = mode_names.get(mode, "Baked Lighting")
+        self.report({'INFO'}, "%s baked: %d objects, %dx%d" % (mode_name, len(objects), size, size))
         return {'FINISHED'}
 
 
@@ -873,7 +873,7 @@ class SCENE_OT_lightmap_clear(Operator):
     """Remove the baked lightmap (image and "Lightmap" UV layers); materials go back to the probe/World """ \
         """ambient"""
     bl_idname = "scene.ae_lightmap_clear"
-    bl_label = "Limpar Lightmap"
+    bl_label = "Clear Lightmap"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -899,50 +899,50 @@ class SCENE_OT_lightmap_clear(Operator):
 
 class AnastacioLightmapSettings(bpy.types.PropertyGroup):
     mode: EnumProperty(
-        name="Modo do Bake",
-        description="Resultado de iluminação que será gerado no próximo bake",
-        items=((MODE_INDIRECT, "Indireta + Sombras Dinâmicas",
-                "Gera luz indireta e do Mundo; luzes e sombras diretas continuam dinâmicas"),
-               (MODE_AO, "Oclusão de Ambiente",
-                "Gera oclusão de contato e aplica somente na iluminação difusa ambiente"),
-               (MODE_STATIC, "Iluminação Estática + Sombras",
-                "Gera iluminação difusa direta e indireta, com sombras, para objetos estáticos")),
+        name="Bake Mode",
+        description="Lighting result produced by the next bake",
+        items=((MODE_INDIRECT, "Indirect + Dynamic Shadows",
+                "Bakes indirect and World light; direct lights and shadows stay dynamic"),
+               (MODE_AO, "Ambient Occlusion",
+                "Bakes contact occlusion and applies it only to ambient diffuse lighting"),
+               (MODE_STATIC, "Static Lighting + Shadows",
+                "Bakes direct and indirect diffuse lighting, with shadows, for static objects")),
         default=MODE_INDIRECT)
     resolution: EnumProperty(
         name="Resolution",
-        description="Tamanho do atlas de lightmap (uma textura para toda a cena)",
+        description="Lightmap atlas size (one texture for the whole scene)",
         items=(('256', "256", ""), ('512', "512", ""), ('1024', "1024", ""), ('2048', "2048", ""), ('4096', "4096", "")),
         default='1024')
     use_denoise: BoolProperty(
-        name="Reduzir Ruído", description="Suaviza o ruído dentro de cada ilha (permite usar menos amostras)",
+        name="Denoise", description="Smooths noise inside each island (allows fewer samples)",
         default=True)
     use_gpu: BoolProperty(
-        name="GPU", description="Gera o bake na placa de vídeo (CUDA/OpenCL) quando o Cycles encontra uma; "
-        "normalmente é mais rápido que a CPU", default=True)
+        name="GPU", description="Bakes on the graphics card (CUDA/OpenCL) when Cycles finds one; "
+        "usually faster than the CPU", default=True)
     samples: IntProperty(
-        name="Amostras", description="Amostras do Cycles por texel (mais = menos ruído, bake mais lento)",
+        name="Samples", description="Cycles samples per texel (more = less noise, slower bake)",
         default=80, min=8, max=8192)
     margin: IntProperty(
-        name="Margem", description="Pixels que estendem as ilhas geradas (evita linhas escuras)",
+        name="Margin", description="Pixels that extend the baked islands (avoids dark seams)",
         default=4, min=0, max=32)
     ao_distance: FloatProperty(
-        name="Distância", description="Distância máxima no mundo pesquisada para a oclusão de ambiente",
+        name="Distance", description="Maximum world distance searched for ambient occlusion",
         default=3.0, min=0.01, max=1000.0, soft_max=50.0, subtype='DISTANCE', unit='LENGTH')
     ao_strength: FloatProperty(
-        name="Intensidade", description="Quantidade de oclusão de ambiente gerada (1 é fisicamente neutro)",
+        name="Strength", description="Amount of baked ambient occlusion (1 is physically neutral)",
         default=1.0, min=0.0, max=2.0, soft_max=1.0)
     use_world: BoolProperty(
-        name="Luz do Mundo",
-        description="Também gera o céu/Mundo e malhas emissivas (o lightmap substitui a iluminação difusa "
-                    "da probe/Mundo no jogo)",
+        name="World Light",
+        description="Also bakes the sky/World and emissive meshes (the lightmap replaces the probe/World "
+                    "diffuse lighting in game)",
         default=True)
     use_volume: BoolProperty(
-        name="Volume de Luz",
-        description="Também gera uma grade de probes de luz para iluminar objetos móveis (fora do lightmap) "
-                    "com a mesma luz rebatida",
+        name="Light Volume",
+        description="Also bakes a grid of light probes that lights moving objects (outside the lightmap) "
+                    "with the same bounced light",
         default=True)
     volume_spacing: FloatProperty(
-        name="Espaçamento das Probes", description="Distância entre as probes do volume de luz",
+        name="Probe Spacing", description="Distance between the light volume probes",
         default=1.0, min=0.1, max=100.0, subtype='DISTANCE', unit='LENGTH')
 
 
@@ -955,33 +955,33 @@ classes = (
 
 def register_props():
     bpy.types.Object.ae_lightmap_scale = FloatProperty(
-        name="Escala do Lightmap",
-        description="Densidade de texels deste objeto no atlas de lightmap (2 = duas vezes mais nítido, 0,5 = metade)",
+        name="Lightmap Scale",
+        description="Texel density of this object in the lightmap atlas (2 = twice as sharp, 0.5 = half)",
         default=1.0, min=0.05, max=16.0, soft_min=0.1, soft_max=8.0)
     bpy.types.Object.ae_lightmap_include = BoolProperty(
-        name="Receber Iluminação Pré-calculada",
-        description="Recebe o próximo lightmap quando elegível; malhas estáticas excluídas ainda podem projetar sombras geradas",
+        name="Receive Baked Lighting",
+        description="Receives the next lightmap when eligible; excluded static meshes can still cast baked shadows",
         get=get_lightmap_include, set=set_lightmap_include)
     bpy.types.Scene.ae_lightmap_settings = bpy.props.PointerProperty(type=AnastacioLightmapSettings)
     # Plain scene properties: read by name from C (node_shader_gpu_lightmap).
     bpy.types.Scene.ae_lightmap = StringProperty(
-        name="Imagem do Lightmap", description="Atlas de lightmap gerado usado pelos materiais PBR do jogo")
+        name="Lightmap Image", description="Baked lightmap atlas used by the game PBR materials")
     bpy.types.Scene.ae_lightmap_use = BoolProperty(
-        name="Usar Lightmap",
-        description="Ilumina as malhas estáticas com o lightmap gerado (funciona em Desktop, Web e Android)",
+        name="Use Lightmap",
+        description="Lights static meshes with the baked lightmap (works on Desktop, Web and Android)",
         default=False, update=tag_lightmap_materials)
     bpy.types.Scene.ae_lightmap_mode = StringProperty(
-        name="Modo da Iluminação Pré-calculada",
-        description="Modo armazenado no lightmap atual; mudar o Modo do Bake não o altera",
+        name="Baked Lighting Mode",
+        description="Mode stored in the current lightmap; changing Bake Mode does not change it",
         default=MODE_INDIRECT, options={'HIDDEN'})
     bpy.types.Scene.ae_lightmap_atlas_coverage = FloatProperty(
-        name="Cobertura do Atlas", description="Porcentagem de pixels da imagem cobertos pelas ilhas UV geradas",
+        name="Atlas Coverage", description="Percentage of image pixels covered by the baked UV islands",
         default=-1.0, min=-1.0, max=100.0, options={'HIDDEN'})
     bpy.types.Scene.ae_lightvol = StringProperty(
-        name="Imagem do Volume de Luz", description="Volume de luz gerado (cubo ambiente por probe) para objetos móveis")
+        name="Light Volume Image", description="Baked light volume (ambient cube per probe) for moving objects")
     bpy.types.Scene.ae_lightvol_use = BoolProperty(
-        name="Usar Volume de Luz",
-        description="Ilumina os objetos móveis com o volume de luz gerado (6 leituras de textura por pixel)",
+        name="Use Light Volume",
+        description="Lights moving objects with the baked light volume (6 texture reads per pixel)",
         default=False, update=tag_lightmap_materials)
     bpy.types.WindowManager.ae_bake_progress = FloatProperty(
         name="Bake Progress", subtype='PERCENTAGE', min=0.0, max=100.0, options={'SKIP_SAVE'})

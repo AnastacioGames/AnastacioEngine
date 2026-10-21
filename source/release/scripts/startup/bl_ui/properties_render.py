@@ -494,7 +494,7 @@ class RENDER_PT_bake(RenderButtonsPanel, Panel):
         layout = layout.box()
 
         if rd.engine == 'BLENDER_GAME':
-            layout.label(text="Para iluminação do jogo, use Iluminação Pré-calculada acima", icon='INFO')
+            layout.label(text="For game lighting, use Baked Lighting above", icon='INFO')
 
         layout.operator("object.bake_image", icon='RENDER_STILL')
         

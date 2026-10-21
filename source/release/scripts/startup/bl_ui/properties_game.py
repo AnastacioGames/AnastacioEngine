@@ -1460,7 +1460,7 @@ class RENDER_PT_game_ssgi(RenderButtonsPanel, Panel):
 
 
 class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
-    bl_label = "Iluminação Pré-calculada"
+    bl_label = "Baked Lighting"
     COMPAT_ENGINES = {'BLENDER_GAME'}
     ae_category = 'GRAPHICS'
 
@@ -1479,39 +1479,39 @@ class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
         is_static = settings.mode == 'STATIC'
 
         if not scene.game_settings.use_shading_nodes:
-            layout.label(text="Requer nós de sombreamento PBR (painel Shading)", icon='INFO')
+            layout.label(text="Requires PBR shading nodes (Shading panel)", icon='INFO')
 
         if scene.ae_lightmap:
             current_names = {
-                'INDIRECT': "Indireta + Sombras Dinâmicas",
-                'AO': "Oclusão de Ambiente",
-                'STATIC': "Iluminação Estática + Sombras",
+                'INDIRECT': "Indirect + Dynamic Shadows",
+                'AO': "Ambient Occlusion",
+                'STATIC': "Static Lighting + Shadows",
             }
             row = layout.row()
-            row.label(text="Atual: " + current_names.get(scene.ae_lightmap_mode,
-                                                          "Indireta + Sombras Dinâmicas"),
+            row.label(text=iface_("Current: %s") % iface_(current_names.get(scene.ae_lightmap_mode,
+                                                                         "Indirect + Dynamic Shadows")),
                       icon='FILE_TICK')
-            row.prop(scene, "ae_lightmap_use", text="Usar no Jogo")
+            row.prop(scene, "ae_lightmap_use", text="Use in Game")
 
-        layout.prop(settings, "mode", text="Modo do Bake")
+        layout.prop(settings, "mode", text="Mode")
         if is_static:
-            layout.label(text="Sol e sombras estáticas são gerados", icon='INFO')
-            layout.label(text="Mover uma luz ou objeto exige um novo bake")
+            layout.label(text="Sun and static shadows are baked", icon='INFO')
+            layout.label(text="Moving a light or object requires a new bake")
 
         box = layout.box()
-        box.label(text="Receptores do Bake", icon='OBJECT_DATA')
+        box.label(text="Bake Receivers", icon='OBJECT_DATA')
         included = lightmap_objects(scene)
         excluded = lightmap_excluded_counts(scene)
-        box.label(text="Próximo bake: %d receptores, %d excluídos" %
+        box.label(text="Next bake: %d receivers, %d excluded" %
                   (len(included), sum(excluded.values())))
         for reason, count in sorted(excluded.items()):
-            box.label(text="%d: %s" % (count, reason), icon='INFO')
+            box.label(text="%d: %s" % (count, iface_(reason)), icon='INFO')
         ob = context.object
         if ob and ob.type == 'MESH':
-            box.prop(ob, "ae_lightmap_include", text="Gerar iluminação em %s" % ob.name)
+            box.prop(ob, "ae_lightmap_include", text=iface_("Bake Lighting on %s") % ob.name)
             reason = lightmap_exclusion_reason(scene, ob)
             if reason and reason != REASON_EXCLUDED:
-                box.label(text="Ativo: " + reason, icon='ERROR')
+                box.label(text=iface_("Active: %s") % iface_(reason), icon='ERROR')
 
         box = layout.box()
         box.label(text="Lightmap", icon="IMAGE_DATA")
@@ -1530,31 +1530,31 @@ class RENDER_PT_game_baked_lighting(RenderButtonsPanel, Panel):
         if scene.ae_lightmap:
             box.label(text="Image: " + scene.ae_lightmap, icon='FILE_IMAGE')
             if scene.ae_lightmap_atlas_coverage >= 0.0:
-                box.label(text="Cobertura do atlas: %.1f%% dos pixels gerados" %
+                box.label(text="Atlas coverage: %.1f%% of pixels baked" %
                           scene.ae_lightmap_atlas_coverage)
 
         if not is_ao:
             box = layout.box()
             row = box.row()
-            row.label(text="Objetos Móveis", icon="SNAP_VOLUME")
-            row.prop(settings, "use_volume", text="Gerar Volume de Luz")
+            row.label(text="Moving Objects", icon="SNAP_VOLUME")
+            row.prop(settings, "use_volume", text="Bake Light Volume")
             if settings.use_volume:
                 box.prop(settings, "volume_spacing")
             if scene.ae_lightvol:
-                box.prop(scene, "ae_lightvol_use", text="Usar no Jogo")
+                box.prop(scene, "ae_lightvol_use", text="Use in Game")
 
         box = layout.box()
-        box.label(text="Avançado", icon='PREFERENCES')
+        box.label(text="Advanced", icon='PREFERENCES')
         box.prop(settings, "margin")
         if ob and ob.type == 'MESH' and hasattr(ob, "ae_lightmap_scale"):
-            box.prop(ob, "ae_lightmap_scale", text="Escala (" + ob.name + ")")
+            box.prop(ob, "ae_lightmap_scale", text=iface_("Scale (%s)") % ob.name)
 
         row = layout.row()
         row.scale_y = 1.3
         row.operator("scene.ae_lightmap_bake", icon='RENDER_STILL')
         row = layout.row()
         row.enabled = bool(scene.ae_lightmap)
-        row.operator("scene.ae_lightmap_clear", text="Limpar Iluminação Pré-calculada", icon='X')
+        row.operator("scene.ae_lightmap_clear", text="Clear Baked Lighting", icon='X')
 
 
 class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
@@ -1572,7 +1572,7 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
         layout.label(text="Post Processing Shaders:", icon="RENDER_STILL")
 
         row = layout.row(align=True)
-        row.prop(scenefx_settings, "show_expanded_ssao", text="Oclusão de Ambiente", emboss=True)
+        row.prop(scenefx_settings, "show_expanded_ssao", text="Ambient Occlusion", emboss=True)
         row.prop(scenefx_settings, "render_editor_ssao", text="", icon="RESTRICT_RENDER_OFF", emboss=True)
         row.prop(scenefx_settings, "use_ssao", text="")
         
