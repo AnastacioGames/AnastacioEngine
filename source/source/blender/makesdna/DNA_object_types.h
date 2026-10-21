@@ -346,6 +346,12 @@ typedef struct RangeExplosiveSettings {
 	struct Object *mark;
 	float mark_size;       /* multiplier of the size preset (0 = 1) */
 	float mark_life;       /* seconds, 0 = stays */
+	/* Light Flash (EXPLOSIVE_LIGHT_FLASH). flash_strength == 0: not set yet (older files), the light
+	 * uses the style color and strength; filled with those the first time Light Flash is enabled. */
+	float flash_color[3];
+	float flash_strength;  /* multiplier of the size preset */
+	float flash_duration;  /* multiplier of the size preset */
+	float _pad_flash;
 } RangeExplosiveSettings;
 
 /* Native pre-fractured destruction (opt-in via gameflag2 & OB_DESTRUCTIBLE). On a strong enough

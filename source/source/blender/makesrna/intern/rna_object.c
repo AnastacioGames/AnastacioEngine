@@ -439,6 +439,29 @@ static void rna_RangeExplosiveSettings_mark_set(PointerRNA *ptr, PointerRNA valu
 	id_us_plus((ID *)es->mark);
 }
 
+/* Light of each EXPLOSIVE_STYLE_* (Fire, Electric, Concrete, Water) and its strength; same table as
+ * KX_Scene::FlashExplosionLight uses for files where flash_strength is still 0. */
+static const float rna_explosive_flash_style[4][4] = {
+	{1.0f, 0.5f, 0.18f, 1.0f}, {0.45f, 0.7f, 1.0f, 1.0f}, {1.0f, 0.62f, 0.32f, 0.45f}, {0.7f, 0.85f, 1.0f, 0.25f}};
+
+static void rna_RangeExplosiveSettings_use_light_flash_set(PointerRNA *ptr, bool value)
+{
+	RangeExplosiveSettings *es = ptr->data;
+
+	if (value) {
+		es->flags |= EXPLOSIVE_LIGHT_FLASH;
+		if (es->flash_strength == 0.0f) {
+			const float *style = rna_explosive_flash_style[CLAMPIS(es->particle_style, 0, 3)];
+			copy_v3_v3(es->flash_color, style);
+			es->flash_strength = style[3];
+			es->flash_duration = 1.0f;
+		}
+	}
+	else {
+		es->flags &= ~EXPLOSIVE_LIGHT_FLASH;
+	}
+}
+
 static void rna_RangeExplosiveSettings_use_ground_mark_set(PointerRNA *ptr, bool value)
 {
 	RangeExplosiveSettings *es = ptr->data;
@@ -3258,9 +3281,31 @@ static void rna_def_object_explosive(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_light_flash", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", EXPLOSIVE_LIGHT_FLASH);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_RangeExplosiveSettings_use_light_flash_set");
 	RNA_def_property_ui_text(prop, "Light Flash",
 	                         "A point light flashes at the blast, lighting the ground and walls around it "
 	                         "(the scene gets one extra light while it runs)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "flash_color", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "flash_color");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Flash Color", "Color of the Light Flash");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "flash_strength", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "flash_strength");
+	RNA_def_property_range(prop, 0.0f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.05f, 4.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Flash Strength", "How bright the Light Flash is, relative to the size preset");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "flash_duration", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "flash_duration");
+	RNA_def_property_range(prop, 0.1f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.2f, 4.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Flash Duration", "How long the Light Flash lasts, relative to the size preset");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
 	prop = RNA_def_property(srna, "use_ground_mark", PROP_BOOLEAN, PROP_NONE);

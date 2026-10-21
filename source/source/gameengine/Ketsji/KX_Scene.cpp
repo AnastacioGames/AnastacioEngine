@@ -3007,8 +3007,16 @@ void KX_Scene::FlashExplosionLight(const mt::vec3 &position, const RangeExplosiv
 	static const float kLightColor[4][4] = {
 		{1.0f, 0.5f, 0.18f, 1.0f}, {0.45f, 0.7f, 1.0f, 1.0f}, {1.0f, 0.62f, 0.32f, 0.45f}, {0.7f, 0.85f, 1.0f, 0.25f}};
 	mt::vec3 color(kLightColor[style][0], kLightColor[style][1], kLightColor[style][2]);
-	// A user color tints the light by the same ratio as the fireball.
-	if (settings.flags & EXPLOSIVE_PARTICLE_COLORS) {
+	float strength = kLightColor[style][3];
+	float duration = 1.0f;
+	// Set in the panel (flash_strength > 0): the user's color, strength and duration.
+	if (settings.flash_strength > 0.0f) {
+		color = mt::vec3(settings.flash_color[0], settings.flash_color[1], settings.flash_color[2]);
+		strength = settings.flash_strength;
+		duration = std::max(settings.flash_duration, 0.1f);
+	}
+	// Older files: a user fire color tints the light by the same ratio as the fireball.
+	else if (settings.flags & EXPLOSIVE_PARTICLE_COLORS) {
 		for (int i = 0; i < 3; ++i) {
 			color[i] *= settings.fire_color[i] / std::max(layers[0].color[i], 0.01f);
 		}
@@ -3022,8 +3030,8 @@ void KX_Scene::FlashExplosionLight(const mt::vec3 &position, const RangeExplosiv
 	light->m_color = color;
 	// Reach grows with the blast: the radius of the explosion when set, else the size preset.
 	light->m_distance = std::max(settings.radius * 2.0f, 8.0f * scale);
-	m_flashEnergy = 2.5f * std::sqrt(scale) * kLightColor[style][3];
-	m_flashLife = 0.3f + 0.25f * scale;
+	m_flashEnergy = 2.5f * std::sqrt(scale) * strength;
+	m_flashLife = (0.3f + 0.25f * scale) * duration;
 	m_flashAge = 0.0f;
 	// Lift it into the fireball so the floor around is lit, not one hot spot under it.
 	m_flashLight->NodeSetWorldPosition(position + mt::vec3(0.0f, 0.0f, 1.0f * scale + 0.5f));
