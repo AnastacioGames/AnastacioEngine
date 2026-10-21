@@ -45,6 +45,7 @@ void main()
 '''
 text = bpy.data.texts.new("smart_2dfilter_panel.glsl")
 text.from_string(code)
+runtime_log = out_path + ".runtime.txt"
 
 
 def game_property(obj, name, kind, value):
@@ -82,6 +83,37 @@ actuator.filter_pass = 5
 actuator.glsl_shader = text
 sensor.link(controller)
 actuator.link(controller)
+
+# A sonda valida no player que o Custom Filter foi ativado e o GLSL compilou.
+# Ela encerra sozinha; o arquivo ao lado da cena é evidência do teste automatizado.
+probe = bpy.data.texts.new("smart_2dfilter_runtime_probe.py")
+probe.write('''import bge
+
+LOG = %r
+
+def tick(cont):
+    own = cont.owner
+    if "started" not in own:
+        own["started"] = bge.logic.getRealTime()
+        return
+    if bge.logic.getRealTime() - own["started"] < 1.0:
+        return
+    scene = bge.logic.getCurrentScene()
+    flt = scene.filterManager.getFilter(5)
+    with open(LOG, "w") as handle:
+        handle.write("filter=%%s\\n" %% bool(flt))
+        handle.write("compile_log=%%r\\n" %% (flt.compileLog if flt else "missing"))
+        handle.write("uniforms=%%s\\n" %% (sorted(flt.activeUniforms) if flt else []))
+    bge.logic.endGame()
+''' % runtime_log)
+bpy.ops.logic.sensor_add(type='ALWAYS', object=camera.name)
+probe_sensor = camera.game.sensors[-1]
+probe_sensor.use_pulse_true_level = True
+bpy.ops.logic.controller_add(type='PYTHON', object=camera.name)
+probe_controller = camera.game.controllers[-1]
+probe_controller.mode = 'MODULE'
+probe_controller.module = 'smart_2dfilter_runtime_probe.tick'
+probe_sensor.link(probe_controller)
 
 # Geometria simples e contrastante para o teste visual posterior.
 for index, color in enumerate(((0.9, 0.18, 0.05), (0.05, 0.65, 0.95), (0.25, 0.95, 0.35))):
