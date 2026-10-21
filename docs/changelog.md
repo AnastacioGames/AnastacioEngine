@@ -10,6 +10,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 - Uniforms `vec2`, `vec3` e `vec4` anotados com `@object` recebem uma Game Property String e um seletor de objeto no painel do Custom Filter. A cada quadro, o shader recebe a posição do alvo na tela (`xy`), a distância à câmera (`z`) e a visibilidade (`w`); alvo ausente ou atrás da câmera fica inválido. Vetores sem `@object` permanecem não editáveis.
 - Adicionadas a cena visual `criar_cena_smart_2dfilter_object.py` e seu inspetor: o halo amarelo segue o cubo vermelho em movimento. O teste de jogo comparou três posições contra `getScreenPosition` e confirmou `w=0` atrás da câmera.
+- Sliders Float do painel Smart passam a usar o armazenamento direto da Game Property com os limites `@min` e `@max` do shader. Antes, o botão RNA substituía esses limites pelo intervalo genérico da property e permitia valores como `300000` ao arrastar.
 
 ## 2026-10-21 - Smart 2D Filter: uniforms Bool
 
