@@ -3564,6 +3564,9 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			KX_NavMeshObject *navmesh = static_cast<KX_NavMeshObject *>(gameobj);
 			navmesh->SetVisible(false, true);
 		}
+		// Inactive-layer objects are templates for Add Object: their GPU particle emitters must
+		// not update or draw. Replicas register themselves in KX_Scene::AddNodeReplicaObject.
+		kxscene->RemoveGpuParticleObject(gameobj);
 	}
 
 	// Native destruction: only active objects, replicas register in KX_Scene::AddNodeReplicaObject.
