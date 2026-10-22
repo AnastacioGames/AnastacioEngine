@@ -318,6 +318,7 @@ class INFO_MT_game_performance(Menu):
     def draw(self, context):
         layout = self.layout
         layout.operator("game.performance_report", text="Play and Measure", icon='PLAY')
+        layout.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
         layout.separator()
         layout.operator("game.performance_report_last", icon='TEXT')
         layout.operator("game.performance_reports_folder", icon='FILE_FOLDER')
