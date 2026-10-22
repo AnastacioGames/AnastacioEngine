@@ -995,7 +995,17 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 		const float time = (float)m_engine->GetFrameTime();
 		filterManager->SetFrameTime(time);
 
+		// Rain turned on at runtime (world.setWeather('rain', True)) in a scene that loaded without it:
+		// build the pass now (one shader compile); every value below is refreshed from the World.
+		const World *rainWorld = scene->GetBlenderScene()->world;
+		const bool rainOn = rainWorld && (rainWorld->weather_flag & WO_WEATHER_RAIN);
+		if (rainOn && !filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_RAIN, true)) {
+			BuildInFilters rainFilters = {};
+			rainFilters.useRain = true;
+			filterManager->EnsureRainFilters(rainFilters);
+		}
 		if (RAS_2DFilter *rain = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_RAIN, true)) {
+			rain->SetEnabled(rainOn);
 			BuildInFilters *rainParams = rain->GetBuildInFilters();
 			rainParams->rain_time = time;
 			// Every rain value is a uniform and can change at runtime (world.setWeather, or the
