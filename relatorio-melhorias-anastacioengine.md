@@ -147,6 +147,13 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ### Performance
 
+- **Preparar texturas DDS:** conversor BC1/BC3 e mipmaps em imbuf/RNA, selecao em Game >
+  Performance e derivados em `textures_dds/`. Export desktop usa copias packed; editor/Web conservam
+  originais. Build editor/player, regressao incluindo PREMUL, upload comprimido e fallback passaram.
+  Usuario confirmou o alpha da textura de teste. Benchmark e Linux/iGPU pendentes.
+  Contrato e limites no [plano](docs/plano-texturas-dds.md).
+
+
 - **RA5:** materiais sem slots ativos no passe deixam de validar texturas e atualizar
   luzes. Reativacao prepara o material antes de gerar a arvore de desenho. Editor/player
   e comparacao no runtime passaram: 25 preparacoes -> 1 com um cubo desenhado,

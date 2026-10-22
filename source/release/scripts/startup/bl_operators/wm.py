@@ -2758,9 +2758,15 @@ def _rangearmor_write_export_preset(context):
     rasec_name = os.path.splitext(os.path.basename(filepath))[0] + ".rasec"
     rasec_path = os.path.join(data_dir, rasec_name)
     export_settings = getattr(context.scene, "rangearmor_export", None)
-    with export_debug_overlays_off(export_settings is not None and export_settings.keep_debug_overlays):
-        saved = bpy.ops.wm.save_as_mainfile_protected(
-            'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+    from bl_operators.anastacio_prepare_textures import export_prepared_textures
+    try:
+        with export_prepared_textures(), export_debug_overlays_off(
+                export_settings is not None and export_settings.keep_debug_overlays):
+            saved = bpy.ops.wm.save_as_mainfile_protected(
+                'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+    except (OSError, RuntimeError, ValueError) as error:
+        print("Export: prepared textures could not be saved:", error)
+        return False
     if 'FINISHED' not in saved or not os.path.isfile(rasec_path):
         return False
     config_data["MainFile"] = rasec_name

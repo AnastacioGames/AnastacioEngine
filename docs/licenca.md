@@ -11,3 +11,6 @@ deve afirmar que todo o repositório é exclusivamente `GPL-3.0-only`.
 Dependências, fontes e outros recursos de terceiros possuem avisos próprios nos respectivos diretórios.
 Antes de publicar uma distribuição, escolha e declare de forma explícita a versão aplicável ao fork e
 confira os avisos que precisam acompanhar o pacote. Este resumo não substitui os textos legais.
+
+O conversor de DDS usa [rgbcx](../source/extern/rgbcx/README.anastacio.md), sob a alternativa MIT.
+O aviso [rgbcx-license.txt](../source/release/text/rgbcx-license.txt) acompanha a instala??o e o export de runtime.

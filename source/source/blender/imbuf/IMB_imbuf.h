@@ -393,6 +393,9 @@ void IMB_scaleImBuf_threaded(struct ImBuf *ibuf, unsigned int newx, unsigned int
  * \attention Defined in writeimage.c
  */
 short IMB_saveiff(struct ImBuf *ibuf, const char *filepath, int flags);
+/* Export a copy as BC1/BC3 DDS: format 0=AUTO, 1=BC1, 3=BC3. POT byte images only. */
+bool IMB_dds_write_dxt(const struct ImBuf *ibuf, const char *path, int format,
+                       int max_size, int quality, bool srgb);
 bool IMB_prepare_write_ImBuf(const bool isfloat, struct ImBuf *ibuf);
 
 /**

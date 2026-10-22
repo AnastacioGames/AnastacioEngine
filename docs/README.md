@@ -22,6 +22,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ## Estado atual
 
+- [Preparar texturas DDS](plano-texturas-dds.md): derivados BC1/BC3, sele??o no editor, cache e export desktop preservando originais.
+
 - [Ragdoll: análise e plano](ragdoll-modernization-plan.md): fonte do addon, auditoria dos scripts
   do RolimaRacer, prévia de colisores e núcleo comum para personagem livre ou vinculado a veículo.
   [Guia da autoria](ragdoll-authoring.md): painel de prévia, ajustes por osso e limites da primeira entrega.

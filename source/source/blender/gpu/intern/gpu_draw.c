@@ -1073,7 +1073,9 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 	width = ibuf->x;
 	height = ibuf->y;
 
-	if (GLEW_EXT_texture_compression_s3tc) {
+	/* Diagnostic opt-out for fallback validation and performance comparisons. */
+	const char *disable_s3tc = getenv("ANASTACIO_NO_S3TC");
+	if (GLEW_EXT_texture_compression_s3tc && !(disable_s3tc && disable_s3tc[0] == '1')) {
 		if (ibuf->dds_data.fourcc == FOURCC_DXT1)
 			format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
 		else if (ibuf->dds_data.fourcc == FOURCC_DXT3)
