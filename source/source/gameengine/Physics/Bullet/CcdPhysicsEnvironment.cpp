@@ -1052,6 +1052,12 @@ void CcdPhysicsEnvironment::SimulationSubtickCallback(btScalar timeStep)
 //changed here 5-9-2025
 void CcdPhysicsEnvironment::ProceedDeltaTime(double timeStep, double interval)
 {
+	// Time Scale 0 (pause): no step. Drop the forces applied this frame so they do not pile up
+	// and fire all at once on resume, and leave bodies where they are.
+	if (!(timeStep > 0.0)) {
+		m_dynamicsWorld->clearForces();
+		return;
+	}
 	//std::set<CcdPhysicsController *>::iterator it;
 	m_callbackCounter.clear();
 	unsigned short i;
@@ -1123,6 +1129,12 @@ void CcdPhysicsEnvironment::SynchronizeActiveMotionStates()
 
 void CcdPhysicsEnvironment::ProceedDeltaTimeCar(double timeStep, double interval)
 {
+	// Time Scale 0 (pause): no step. Drop the forces applied this frame so they do not pile up
+	// and fire all at once on resume, and leave bodies where they are.
+	if (!(timeStep > 0.0)) {
+		m_dynamicsWorld->clearForces();
+		return;
+	}
 	std::set<CcdPhysicsController *>::iterator it;
 	m_callbackCounter.clear();
 	int i;
