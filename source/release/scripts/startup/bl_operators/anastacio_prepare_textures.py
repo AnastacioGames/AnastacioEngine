@@ -350,13 +350,18 @@ class GAME_OT_prepare_textures(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text='Originals stay editable. Desktop exports embed the prepared DDS copies.')
-        layout.template_list('ANASTACIO_UL_prepared_textures', '', self, 'entries', self, 'active_index', rows=10)
-        layout.prop(self, 'max_size')
-        layout.prop(self, 'quality')
-        layout.label(text='Expected texture VRAM: BC1 ~1/8, BC3 ~1/4 at equal resolution, with mipmaps.')
-        layout.label(text='Escape cancels between images; completed textures remain prepared.')
-        layout.operator('game.revert_prepared_textures', text='Revert All Prepared Textures', icon='LOOP_BACK')
+        box = layout.box()
+        box.label(text='Images')
+        box.label(text='Originals stay editable. Desktop exports embed the prepared DDS copies.', icon='INFO')
+        box.template_list('ANASTACIO_UL_prepared_textures', '', self, 'entries', self, 'active_index', rows=10)
+        box = layout.box()
+        box.label(text='Settings')
+        box.prop(self, 'max_size')
+        box.prop(self, 'quality')
+        box = layout.box()
+        box.label(text='Expected texture VRAM: BC1 ~1/8, BC3 ~1/4 at equal resolution, with mipmaps.')
+        box.label(text='Escape cancels between images; completed textures remain prepared.')
+        box.operator('game.revert_prepared_textures', text='Revert All Prepared Textures', icon='LOOP_BACK')
 
     active_index: IntProperty(default=0)
 

@@ -438,19 +438,24 @@ class GAME_OT_prepare_audio(Operator):
 
     def draw(self, context):
         layout = self.layout
-        layout.label(text='Audio originals stay unchanged; prepared files are used during desktop export.')
-        layout.template_list('ANASTACIO_UL_prepared_audio', '', self, 'entries',
-                             self, 'active_index', rows=6)
+        box = layout.box()
+        box.label(text='Sounds')
+        box.label(text='Audio originals stay unchanged; prepared files are used during desktop export.', icon='INFO')
+        box.template_list('ANASTACIO_UL_prepared_audio', '', self, 'entries',
+                          self, 'active_index', rows=6)
         if self.entries:
             item = self.entries[min(self.active_index, len(self.entries) - 1)]
             box = layout.box()
+            box.label(text='Selected Sound')
             box.label(text=item.path, icon='FILE_SOUND')
             box.label(text=item.usage)
             box.label(text=item.cache_policy)
             if item.reason:
                 box.label(text=item.reason, icon='ERROR')
-        layout.prop(self, 'ffmpeg_path')
-        layout.label(text='An installed Vorbis encoder is required. Short sounds keep their original format.')
+        box = layout.box()
+        box.label(text='Encoder')
+        box.prop(self, 'ffmpeg_path')
+        box.label(text='An installed Vorbis encoder is required. Short sounds keep their original format.')
 
     def execute(self, context):
         try:
