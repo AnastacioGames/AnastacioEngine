@@ -683,8 +683,9 @@ iOS fora do escopo.
   Abertos: picos longos no swap, inicialmente observados ao voltar do ragdoll; a rodada
   instrumentada de 2026-10-14 teve seis quedas sem SPIKE próximo e duas pausas entre
   quedas, sem causa identificada. Conferir novamente após correção dos scripts, com
-  10 pilotos pelo menu (Range Trace, módulos `frames`, `shaders` e `profile`). Também aberto: upload
-  lento de imagens (38 ms para 1024x512, leitura + mipmaps na CPU).
+  10 pilotos pelo menu (Range Trace, módulos `frames`, `shaders` e `profile`). Upload de imagens
+  (38 ms para 1024x512): conferido em 2026-10-22, o player liga mipmap na GPU (`GPU_set_gpu_mipmapping`
+  em `GPG_Ghost.cpp`), então o custo é a leitura do PNG, e desde 2026-10-10 isso cai no load, não no jogo.
   Ver changelog de 2026-10-10.
 - **Static Batch (aberto):** grupos instanciados (dupli) passaram a entrar em 2026-10-21 (aceito pelo usuário
   com janela no mesmo dia); falha parcial no merge/split corrigida em 2026-10-21;
