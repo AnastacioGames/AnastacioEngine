@@ -387,6 +387,11 @@ void KX_FontObject::BuildAtlasQuads()
 	m_atlasQuads.clear();
 	m_atlasMin = mt::vec2(FLT_MAX);
 	m_atlasMax = mt::vec2(-FLT_MAX);
+	/* Aligned on the ink of the letters, like the BLF text, not on the cells: they carry the padding
+	 * and the empty space above and below each letter, which moved every aligned text. */
+	const float (*ink)[4] = BKE_text_atlas_ink(m_atlasCurve);
+	mt::vec2 inkMin(FLT_MAX);
+	mt::vec2 inkMax(-FLT_MAX);
 
 	for (unsigned short i = 0, count = m_texts.size(); i < count; ++i) {
 		const std::string& line = m_texts[i];
@@ -412,12 +417,23 @@ void KX_FontObject::BuildAtlasQuads()
 				x0, top, g.u0, g.v1,
 			};
 			m_atlasQuads.insert(m_atlasQuads.end(), quad, quad + 16);
+			if (ink && ink[it->second][2] >= ink[it->second][0]) {
+				const float *box = ink[it->second];
+				inkMin.x = std::min(inkMin.x, x0 + box[0] * s);
+				inkMin.y = std::min(inkMin.y, y0 + box[1] * s);
+				inkMax.x = std::max(inkMax.x, x0 + box[2] * s);
+				inkMax.y = std::max(inkMax.y, y0 + box[3] * s);
+			}
 			pen += g.advance * s;
 		}
 		m_atlasMin.x = std::min(m_atlasMin.x, 0.0f);
 		m_atlasMax.x = std::max(m_atlasMax.x, pen);
 		m_atlasMin.y = std::min(m_atlasMin.y, top - cell);
 		m_atlasMax.y = std::max(m_atlasMax.y, top);
+	}
+	if (inkMax.x >= inkMin.x) {
+		m_atlasMin = inkMin;
+		m_atlasMax = inkMax;
 	}
 }
 

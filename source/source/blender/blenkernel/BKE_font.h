@@ -96,6 +96,11 @@ void BKE_vfont_clipboard_get(
         wchar_t **r_text_buf, struct CharInfo **r_info_buf,
         size_t *r_len_utf8, size_t *r_len_wchar);
 
+/* Ink box of each bitmap atlas glyph (cu->atlas_glyphs order), in atlas pixels from the bottom-left
+ * of its cell: x0, y0, x1, y1; x1 < x0 for a glyph without ink (space). Read from the atlas image
+ * once and cached. NULL when the image has no pixels: callers keep the whole cell. */
+const float (*BKE_text_atlas_ink(struct Curve *cu))[4];
+
 #ifdef __cplusplus
 }
 #endif

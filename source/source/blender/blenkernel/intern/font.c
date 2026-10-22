@@ -38,6 +38,8 @@
 #include "BLI_string.h"
 #include "BLI_string_utf8.h"
 #include "BLI_math.h"
+
+#include <limits.h>
 #include "BLI_threads.h"
 #include "BLI_vfontdata.h"
 
@@ -53,6 +55,10 @@
 #include "BKE_main.h"
 #include "BKE_anim.h"
 #include "BKE_curve.h"
+#include "BKE_image.h"
+
+#include "DNA_image_types.h"
+#include "IMB_imbuf_types.h"
 
 static ThreadRWMutex vfont_rwlock = BLI_RWLOCK_INITIALIZER;
 
@@ -1420,6 +1426,98 @@ void BKE_vfont_clipboard_get(
 	if (r_len_utf8) {
 		*r_len_utf8 = g_vfont_clipboard.len_utf8;
 	}
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
+/** 
+ame Bitmap atlas ink
+ * \{ */
+
+typedef struct TextAtlasInkCache {
+	const Image *ima;
+	const void *pixels;
+	const TextAtlasGlyph *glyphs;
+	int count;
+	float (*ink)[4];
+} TextAtlasInkCache;
+
+/* Texts share a few atlases: a small ring of entries, never freed (plain malloc, out of the guarded allocator). */
+#define TEXT_ATLAS_INK_CACHE 32
+static TextAtlasInkCache g_atlas_ink[TEXT_ATLAS_INK_CACHE];
+static int g_atlas_ink_next = 0;
+
+static float text_atlas_alpha(const ImBuf *ibuf, int x, int y)
+{
+	const size_t i = (size_t)y * ibuf->x + x;
+	return ibuf->rect_float ? ibuf->rect_float[i * 4 + 3] : ((const unsigned char *)ibuf->rect)[i * 4 + 3] / 255.0f;
+}
+
+const float (*BKE_text_atlas_ink(Curve *cu))[4]
+{
+	if (cu->atlas_image == NULL || cu->atlas_glyphs == NULL || cu->atlas_count <= 0) {
+		return NULL;
+	}
+
+	void *lock;
+	ImBuf *ibuf = BKE_image_acquire_ibuf(cu->atlas_image, NULL, &lock);
+	if (ibuf == NULL || (ibuf->rect == NULL && ibuf->rect_float == NULL)) {
+		BKE_image_release_ibuf(cu->atlas_image, ibuf, lock);
+		return NULL;
+	}
+	const void *pixels = ibuf->rect_float ? (const void *)ibuf->rect_float : (const void *)ibuf->rect;
+
+	for (int i = 0; i < TEXT_ATLAS_INK_CACHE; i++) {
+		const TextAtlasInkCache *entry = &g_atlas_ink[i];
+		if (entry->ink && entry->ima == cu->atlas_image && entry->pixels == pixels &&
+		    entry->glyphs == cu->atlas_glyphs && entry->count == cu->atlas_count)
+		{
+			BKE_image_release_ibuf(cu->atlas_image, ibuf, lock);
+			return (const float (*)[4])entry->ink;
+		}
+	}
+
+	float (*ink)[4] = malloc(sizeof(float[4]) * cu->atlas_count);
+	const float threshold = 0.1f;
+	for (int g = 0; g < cu->atlas_count; g++) {
+		const TextAtlasGlyph *glyph = &cu->atlas_glyphs[g];
+		const int cx = (int)floorf(glyph->u0 * ibuf->x + 0.5f), cy = (int)floorf(glyph->v0 * ibuf->y + 0.5f);
+		const int ex = min_ii((int)floorf(glyph->u1 * ibuf->x + 0.5f), ibuf->x);
+		const int ey = min_ii((int)floorf(glyph->v1 * ibuf->y + 0.5f), ibuf->y);
+		int x0 = INT_MAX, y0 = INT_MAX, x1 = INT_MIN, y1 = INT_MIN;
+		for (int y = max_ii(cy, 0); y < ey; y++) {
+			for (int x = max_ii(cx, 0); x < ex; x++) {
+				if (text_atlas_alpha(ibuf, x, y) > threshold) {
+					x0 = min_ii(x0, x);
+					x1 = max_ii(x1, x);
+					y0 = min_ii(y0, y);
+					y1 = max_ii(y1, y);
+				}
+			}
+		}
+		if (x1 < x0) {
+			ink[g][0] = ink[g][1] = 0.0f;
+			ink[g][2] = ink[g][3] = -1.0f;
+		}
+		else {
+			ink[g][0] = (float)(x0 - cx);
+			ink[g][1] = (float)(y0 - cy);
+			ink[g][2] = (float)(x1 + 1 - cx);
+			ink[g][3] = (float)(y1 + 1 - cy);
+		}
+	}
+	BKE_image_release_ibuf(cu->atlas_image, ibuf, lock);
+
+	TextAtlasInkCache *entry = &g_atlas_ink[g_atlas_ink_next];
+	g_atlas_ink_next = (g_atlas_ink_next + 1) % TEXT_ATLAS_INK_CACHE;
+	free(entry->ink);
+	entry->ima = cu->atlas_image;
+	entry->pixels = pixels;
+	entry->glyphs = cu->atlas_glyphs;
+	entry->count = cu->atlas_count;
+	entry->ink = ink;
+	return (const float (*)[4])ink;
 }
 
 /** \} */

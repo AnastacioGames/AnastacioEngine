@@ -5412,6 +5412,9 @@ static bool draw_game_text_atlas(Curve *cu, const char **lines, const size_t *le
 	const float baseline = cu->atlas_baseline * s;
 	const float line_spacing = cu->fsize * cu->linedist;
 	float min[2] = {FLT_MAX, FLT_MAX}, max[2] = {-FLT_MAX, -FLT_MAX};
+	/* aligned on the ink of the letters, as KX_FontObject::BuildAtlasQuads */
+	const float (*ink)[4] = BKE_text_atlas_ink(cu);
+	float ink_min[2] = {FLT_MAX, FLT_MAX}, ink_max[2] = {-FLT_MAX, -FLT_MAX};
 
 	/* first pass: bounds, for the alignment */
 	for (int i = 0; i < totline; i++) {
@@ -5420,19 +5423,30 @@ static bool draw_game_text_atlas(Curve *cu, const char **lines, const size_t *le
 		size_t index = 0;
 		while (index < lens[i]) {
 			const unsigned int code = BLI_str_utf8_as_unicode_step(lines[i], &index);
-			const TextAtlasGlyph *g = NULL;
+			int found = -1;
 			for (int k = 0; k < cu->atlas_count; k++) {
 				if ((unsigned int)cu->atlas_glyphs[k].code == code) {
-					g = &cu->atlas_glyphs[k];
+					found = k;
 					break;
 				}
 			}
-			pen += g ? g->advance * s : cell * 0.5f;
+			if (found >= 0 && ink && ink[found][2] >= ink[found][0]) {
+				const float x0 = pen - pad, y0 = top - cell;
+				ink_min[0] = min_ff(ink_min[0], x0 + ink[found][0] * s);
+				ink_min[1] = min_ff(ink_min[1], y0 + ink[found][1] * s);
+				ink_max[0] = max_ff(ink_max[0], x0 + ink[found][2] * s);
+				ink_max[1] = max_ff(ink_max[1], y0 + ink[found][3] * s);
+			}
+			pen += (found >= 0) ? cu->atlas_glyphs[found].advance * s : cell * 0.5f;
 		}
 		min[0] = min_ff(min[0], 0.0f);
 		max[0] = max_ff(max[0], pen);
 		min[1] = min_ff(min[1], top - cell);
 		max[1] = max_ff(max[1], top);
+	}
+	if (ink_max[0] >= ink_min[0]) {
+		copy_v2_v2(min, ink_min);
+		copy_v2_v2(max, ink_max);
 	}
 
 	float offset[2] = {cu->xof, cu->yof};
