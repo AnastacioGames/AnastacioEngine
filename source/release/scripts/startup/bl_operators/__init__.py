@@ -38,6 +38,7 @@ _modules = [
     "anastacio_performance_report",
     "anastacio_scene_doctor",
     "anastacio_lod_auto",
+    "anastacio_collision_proxy",
     "anastacio_explosive",
     "anastacio_lightmap",
     "anastacio_ssgi",
