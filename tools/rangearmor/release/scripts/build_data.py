@@ -13,7 +13,7 @@ def main():
     print("Started game package data build")
 
     if data:
-        _compressDataFile(data, data["CurPath"] / data["DataSource"], data["CurPath"] / data["DataFile"])
+        _compressDataFile(data, data["CurPath"] / data.get('PreparedDataSource', data["DataSource"]), data["CurPath"] / data["DataFile"])
 
 
 def _compressDataFile(data, sourcePath, dataFile):
@@ -54,6 +54,8 @@ def _compressDataFile(data, sourcePath, dataFile):
                 pathToMatch = _file.as_posix().replace(sourcePath.as_posix(), "")
 
                 for pattern in data["Ignore"]:
+                    if data.get('PreparedDataSource') and pattern in ('*.range', '*.blend'):
+                        continue  # Prepared LibLoad copies belong to the delivery.
                     if isIgnoredScript or fnmatchcase(pathToMatch, pattern):
                         ignore = True
                         if _file.is_file():

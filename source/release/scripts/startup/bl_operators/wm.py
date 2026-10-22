@@ -2758,23 +2758,45 @@ def _rangearmor_write_export_preset(context):
     rasec_name = os.path.splitext(os.path.basename(filepath))[0] + ".rasec"
     rasec_path = os.path.join(data_dir, rasec_name)
     export_settings = getattr(context.scene, "rangearmor_export", None)
-    from bl_operators.anastacio_prepare_textures import export_prepared_textures
+    from bl_operators import anastacio_export_assets as assets
+    prepared_data_source = None
+    pointer_path = os.path.join(project_dir, '.anastacio-export', 'current.json')
+    def publish_prepared_pointer():
+        if prepared_data_source:
+            partial = pointer_path + '.tmp'
+            with open(partial, 'w', encoding='utf-8') as stream:
+                json.dump({'source': prepared_data_source, 'main': rasec_name}, stream)
+            os.replace(partial, pointer_path)
+        elif os.path.isfile(pointer_path):
+            os.remove(pointer_path)
     try:
-        with export_prepared_textures(), export_debug_overlays_off(
-                export_settings is not None and export_settings.keep_debug_overlays):
-            saved = bpy.ops.wm.save_as_mainfile_protected(
-                'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+        if assets.enabled():
+            import tempfile
+            staging_parent = os.path.join(project_dir, '.anastacio-export')
+            os.makedirs(staging_parent, exist_ok=True)
+            stage = tempfile.mkdtemp(prefix='prepared-', dir=staging_parent)
+            prepared_data = os.path.join(stage, 'data')
+            result = assets.build_export_tree(prepared_data, protected_main=True,
+                keep_debug_overlays=export_settings is not None and export_settings.keep_debug_overlays)
+            rasec_name = result['main']
+            prepared_data_source = os.path.relpath(prepared_data, project_dir).replace(os.sep, '/')
+        else:
+            with export_debug_overlays_off(export_settings is not None and export_settings.keep_debug_overlays):
+                saved = bpy.ops.wm.save_as_mainfile_protected(
+                    'EXEC_DEFAULT', filepath=rasec_path, check_existing=False, copy=True)
+            if 'FINISHED' not in saved or not os.path.isfile(rasec_path):
+                return False
     except (OSError, RuntimeError, ValueError) as error:
-        print("Export: prepared textures could not be saved:", error)
-        return False
-    if 'FINISHED' not in saved or not os.path.isfile(rasec_path):
+        print('Export: asset preparation failed:', error)
         return False
     config_data["MainFile"] = rasec_name
+    config_data.pop('PreparedDataSource', None)
 
     if export_settings is None:
         try:
             with open(config_path, "w", encoding="utf-8") as config_file:
                 json.dump(config_data, config_file, indent="\t")
+            publish_prepared_pointer()
         except OSError:
             return False
         return True
@@ -2793,6 +2815,7 @@ def _rangearmor_write_export_preset(context):
     try:
         with open(config_path, "w", encoding="utf-8") as config_file:
             json.dump(config_data, config_file, indent="\t")
+        publish_prepared_pointer()
     except OSError:
         return False
     return True

@@ -42,6 +42,31 @@ class ReleaseSafety(unittest.TestCase):
         self.assertEqual((self.destination / 'previous.txt').read_text(), 'known good')
         self.assertFalse(list((self.root / 'release').glob('*.zip')))
 
+    def test_prepared_copy_is_delivered_without_authoring_assets(self):
+        prepared = self.root / '.anastacio-export/prepared-test/data'
+        (prepared / 'levels').mkdir(parents=True)
+        (prepared / 'Game.rasec').write_bytes(b'prepared audio')
+        (prepared / 'levels/library.range').write_bytes(b'prepared library')
+        config_path = self.root / 'launcher/config.json'
+        original = json.dumps({'DataSource': './data', 'PreparedDataSource':
+                               '.anastacio-export/prepared-test/data'})
+        config_path.write_text(original, encoding='utf-8')
+        self.data['PreparedDataSource'] = '.anastacio-export/prepared-test/data'
+        release.build(self.data, {'--target': 'All', '--no-cook': True})
+        self.assertEqual((self.destination / 'data/Game.rasec').read_bytes(), b'prepared audio')
+        self.assertTrue((self.destination / 'data/levels/library.range').is_file())
+        self.assertEqual((self.root / 'data/Game.rasec').read_bytes(), b'test fixture')
+        self.assertEqual(config_path.read_text(encoding='utf-8'), original)
+        delivered = json.loads((self.destination / 'launcher/config.json').read_text(encoding='utf-8'))
+        self.assertEqual(delivered['DataSource'], './data')
+        self.assertNotIn('PreparedDataSource', delivered)
+
+    def test_prepared_copy_cannot_escape_project(self):
+        self.data['PreparedDataSource'] = '../outside'
+        with self.assertRaises(RuntimeError):
+            release.build(self.data, {'--target': 'All', '--no-cook': True})
+        self.assertEqual((self.destination / 'previous.txt').read_text(), 'known good')
+
     def test_legacy_config_exports_new_runtime_without_changing_author_config(self):
         old = self.root / 'engine/Windows64/RangeRuntime.exe'
         old.rename(old.with_name('AnastacioRuntime.exe'))

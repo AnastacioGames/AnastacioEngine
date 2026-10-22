@@ -83,6 +83,15 @@ def getProjectData(projectFile=None):
         data["CurPath"] = curPath
         data["Quote"] = '"' if platform.system() == "Windows" else "'"
         data["EngineExecutables"] = engineExecutables
+        pointer = curPath / '.anastacio-export/current.json'
+        if pointer.is_file():
+            prepared = _loads(pointer.read_text(encoding='utf-8'))
+            source = (curPath / prepared['source']).resolve()
+            if curPath.resolve() not in source.parents or not source.is_dir():
+                raise RuntimeError('Prepared export assets must exist inside the project')
+            if prepared['main'] != data.get('MainFile'):
+                raise RuntimeError('Prepared export assets do not match MainFile; export again from the editor')
+            data['PreparedDataSource'] = prepared['source']
         
     else:
         print("X Could not get project data")
