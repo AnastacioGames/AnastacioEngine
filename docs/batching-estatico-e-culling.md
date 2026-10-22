@@ -34,7 +34,7 @@ script Python e tinha falhas de ciclo de vida.
 Riscos conhecidos: (falha parcial em merge/split corrigida em 2026-10-21: o merge desfaz os
 slots já unidos e o split separa todos e sempre solta o grupo); os
 `static_cast` para `KX_BatchGroup`/`KX_ClientObjectInfo` assumem que não existem grupos
-só RAS; shaders que usam coordenadas locais/Object Info passam a ver o objeto de referência.
+só RAS (garantido desde 2026-10-22: o construtor de `RAS_BatchGroup` é protegido); shaders que usam coordenadas locais/Object Info passam a ver o objeto de referência.
 
 ## 2. Culling DBVT refazendo trabalho todo frame → `98f54d7f`
 

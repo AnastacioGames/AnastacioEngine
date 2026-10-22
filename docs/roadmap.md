@@ -538,10 +538,6 @@ iOS fora do escopo.
   correção isolada e teste.
   Reauditoria concluída em 2026-09-24: os 26 itens têm correção ou descarte registrado; a única validação
   ainda manual é GPU-001, que requer uma sessão interativa já aberta para testar `gl_load()`.
-- **Loop de tempo (perguntas ao Kitsuy, 2026-09-26)**: (1) em `KX_KetsjiEngine::FrameOver()`, o ramo de
-  `m_overframetime < 0` usa `m_deltaTime` (passo lógico) onde o resto usa `m_deltatime` (tempo real): erro de
-  digitação herdado ou intencional? Não mudar sem a resposta. (2) `m_timeUnderRate` é `long`: com Max Logic
-  Frames = 5 a 60 Hz a conta dá ~0,02 e vira `sleep_for(0ms)`, o loop gira sem dormir. É intencional?
 - **Release**: antes da próxima distribuição, declarar se o fork sai como GPLv2-or-later ou GPLv3 e incluir o
   arquivo de licença correspondente na raiz/pacote.
 - **Metaball no jogo (futuro, sem pressa)**: hoje o conversor (`BL_BlenderDataConversion.cpp`) ignora
@@ -692,7 +688,7 @@ iOS fora do escopo.
   Ver changelog de 2026-10-10.
 - **Static Batch (aberto):** grupos instanciados (dupli) passaram a entrar em 2026-10-21 (aceito pelo usuário
   com janela no mesmo dia); falha parcial no merge/split corrigida em 2026-10-21;
-  `static_cast` sem grupos só RAS segue como risco conhecido.
+  grupo só RAS ficou impossível (construtor protegido, 2026-10-22).
 - Culling de sombra com occlusion: em `benchmark.range` (1920x1080, 2026-09-28) `ShadowCulling` custa
   14.3ms (60% do frame; ~13 passadas: 10 Spots + Sun em cascata, occlusion res 128). Com occlusion desligado
   na cena: 0.3ms e FPS 41→59.5 (A/B repetido 2x). `MainRender` é só ~0.5ms (o antigo "MainRender alto"

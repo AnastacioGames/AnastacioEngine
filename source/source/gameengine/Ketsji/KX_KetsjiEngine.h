@@ -262,7 +262,7 @@ private:
 
 	double m_sleeptime;
 
-	long m_timeUnderRate;
+	double m_timeUnderRate;
 
 	/// maximum number of consecutive logic frame
 	int m_maxLogicFrame;
@@ -364,6 +364,8 @@ private:
 	 * total pause duration not set.
 	 */
 	void UpdateSleepTime();
+	/// One catch-up sleep of UpdateSleepTime(), capped at the time still owed for the frame.
+	void SleepUnderRate();
 	/// Headless server: sleeps until the next logic frame is due (the catch-up loop alone would spin).
 	void ServerSleep();
 

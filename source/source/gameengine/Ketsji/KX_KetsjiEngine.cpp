@@ -238,7 +238,7 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_deltatime(0.0f),
 	m_framestep(0.0f),
 	m_sleeptime(0.0f),
-	m_timeUnderRate(0.0f),
+	m_timeUnderRate(0.0),
 	m_maxLogicFrame(5),
 	m_useFixedTimestep(false),
 	m_simAccumulator(0.0),
@@ -892,6 +892,19 @@ void KX_KetsjiEngine::ServerSleep()
 	}
 }
 
+void KX_KetsjiEngine::SleepUnderRate()
+{
+	/* m_timeUnderRate is in seconds; it used to be cast to whole milliseconds, so the usual ~0.02 became
+	 * sleep(0) and the catch-up loop spun on a full core. Sleep in microseconds, never past the time still
+	 * owed for this frame (minus a margin the loop then spins). */
+	const double owed = m_timestep - m_deltatime + m_overframetime - 0.0005;
+	const double wait = std::min(m_timeUnderRate, owed);
+	if (wait > 0.0) {
+		std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+	}
+	ClockTiming();
+}
+
 void KX_KetsjiEngine::UpdateSleepTime()
 {
 	m_logger.StartLog(tc_outside);
@@ -921,8 +934,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 				if (m_timeUnderRate < 1e-6) {
 					m_timeUnderRate = 1e-6;
 				}
-				std::this_thread::sleep_for(std::chrono::milliseconds((long)(m_timeUnderRate)));
-				ClockTiming();
+				SleepUnderRate();
 			}
 			else if (m_timestep > (m_deltatime * 1.2)) {
 				m_sleeptime += 4.0;
@@ -930,8 +942,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 				if (m_timeUnderRate < 1e-6) {
 					m_timeUnderRate = 1e-6;
 				}
-				std::this_thread::sleep_for(std::chrono::milliseconds((long)(m_timeUnderRate)));
-				ClockTiming();
+				SleepUnderRate();
 			}
 			else {
 				m_sleeptime += 40.0;
@@ -939,8 +950,7 @@ void KX_KetsjiEngine::UpdateSleepTime()
 				if (m_timeUnderRate < 1e-6) {
 					m_timeUnderRate = 1e-6;
 				}
-				std::this_thread::sleep_for(std::chrono::milliseconds((long)(m_timeUnderRate)));
-				ClockTiming();
+				SleepUnderRate();
 			}
 		}
 		// Caught up: clear the accumulated logic-frame overtime.
@@ -1158,7 +1168,7 @@ void KX_KetsjiEngine::FrameOver()
 	}
 	if (m_overframetime < 0.0) {
 		if (m_timestep < (m_deltatime - m_overframetime)) {
-			m_overframetime = (m_timestep - m_deltaTime + m_overframetime + 6e-6);
+			m_overframetime = (m_timestep - m_deltatime + m_overframetime + 6e-6);
 		}
 		else {
 			m_overframetime = 0.0;

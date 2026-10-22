@@ -76,8 +76,11 @@ private:
 	 */
 	bool SplitMeshSlot(RAS_MeshSlot& slot);
 
-public:
+protected:
+	// Only KX_BatchGroup creates groups; callers static_cast GetBatchGroup() to it, so no RAS-only group may exist.
 	RAS_BatchGroup();
+
+public:
 	virtual ~RAS_BatchGroup();
 
 	/// Notice the batch group that it is used by one more mesh user.
