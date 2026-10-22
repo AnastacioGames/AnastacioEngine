@@ -34,6 +34,7 @@
  */
 
 #include "KX_Speaker.h"
+#include "CM_Trace.h"
 
 #include "DNA_object_types.h"
 
@@ -180,6 +181,9 @@ void KX_Speaker::play()
   if (!m_playback) {
     AUD_Device *device = AUD_Device_getCurrent();
     m_handle = AUD_Device_play(device, sound, false);
+    if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+      CM_TraceEvent("sound", "\"name\":" + CM_TraceStr(GetName()) + ",\"from\":\"speaker\"");
+    }
     AUD_Device_free(device);
   }
   else {

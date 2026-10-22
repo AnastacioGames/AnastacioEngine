@@ -23,6 +23,7 @@
  */
 
 #include "KX_AudioManager.h"
+#include "CM_Trace.h"
 
 #ifdef WITH_AUDASPACE
 typedef float sample_t;
@@ -275,6 +276,9 @@ bool KX_AudioManager::StartVoice(Module& module, int soundIndex, float fade)
 		AUD_Device *device = AUD_Device_getCurrent();
 		if (device) {
 			handle = AUD_Device_play(device, sound.sound, false);
+			if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+				CM_TraceEvent("sound", "\"name\":" + CM_TraceStr(BLI_path_basename(sound.path.c_str())) + ",\"from\":\"world\"");
+			}
 			AUD_Device_free(device);
 		}
 	}
@@ -813,6 +817,9 @@ bool KX_AudioManager::StartOneShot(Module& module, int soundIndex, float gain, b
 		AUD_Device *device = AUD_Device_getCurrent();
 		if (device) {
 			handle = AUD_Device_play(device, sound.sound, false);
+			if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+				CM_TraceEvent("sound", "\"name\":" + CM_TraceStr(BLI_path_basename(sound.path.c_str())) + ",\"from\":\"world\"");
+			}
 			AUD_Device_free(device);
 		}
 	}

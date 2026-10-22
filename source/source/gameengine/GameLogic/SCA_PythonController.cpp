@@ -47,6 +47,7 @@ extern "C" {
 }
 
 #include "CM_Message.h"
+#include "CM_Trace.h"
 
 // initialize static member variables
 SCA_PythonController *SCA_PythonController::m_sCurrentController = nullptr;
@@ -342,6 +343,8 @@ bool SCA_PythonController::Import()
 void SCA_PythonController::Trigger(SCA_LogicManager *logicmgr)
 {
 	m_sCurrentController = this;
+	const std::string traceName = CM_TraceOn(CM_TRACE_SCRIPTS) ? "controller " + m_scriptName : std::string();
+	CM_TraceScriptScope traceScope(traceName);
 
 	PyObject *excdict =      nullptr;
 	PyObject *resultobj =    nullptr;

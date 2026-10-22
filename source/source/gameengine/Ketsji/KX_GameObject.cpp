@@ -39,6 +39,7 @@
 #include <cstring>
 
 #include "CM_WorkCounters.h"
+#include "CM_Trace.h"
 #include "KX_GameObject.h"
 #include "KX_RuntimePropertyRegistry.h"
 #include "KX_PythonComponent.h"
@@ -2645,7 +2646,14 @@ void KX_GameObject::UpdateComponents()
 		}
 		for (KX_PythonComponent *comp : m_components) {
 			if (comp->GetActiveState()) {
-				comp->Update();
+				if (CM_TraceOn(CM_TRACE_SCRIPTS)) {
+					const std::string name = "component " + comp->GetName();
+					CM_TraceScriptScope scope(name);
+					comp->Update();
+				}
+				else {
+					comp->Update();
+				}
 			}
 		}
 	}

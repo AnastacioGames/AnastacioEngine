@@ -44,6 +44,10 @@ enum CM_TraceModule {
 	CM_TRACE_SECTOR = 1 << 3,
 	/// Update work counters of each frame (CM_WorkCounters.h) and draw calls; RANGE_AUDIT_TRANSFORMS adds per object.
 	CM_TRACE_WORK = 1 << 4,
+	/// Time of each Python component (by class) and Python controller (by script) per frame.
+	CM_TRACE_SCRIPTS = 1 << 5,
+	/// Process memory every second, sounds started and scenes added/removed.
+	CM_TRACE_RUNTIME = 1 << 6,
 };
 
 /// Bit mask of the modules on; 0 when RANGE_TRACE is unset.
@@ -64,6 +68,26 @@ void CM_TraceEvent(const char *event, const std::string& fields);
 
 /// JSON string literal (quoted and escaped).
 std::string CM_TraceStr(const std::string& text);
+
+/// CM_TRACE_SCRIPTS: adds the time of one script call to this frame (main thread only).
+void CM_TraceScriptAdd(const std::string& name, double ms);
+/// CM_TRACE_SCRIPTS: writes the "scripts" event of the frame that ended and clears the sums.
+void CM_TraceScriptsFlush();
+
+/// Times a script call for CM_TRACE_SCRIPTS (costs one test when the module is off).
+class CM_TraceScriptScope
+{
+public:
+	CM_TraceScriptScope(const std::string& name);
+	~CM_TraceScriptScope();
+
+private:
+	const std::string *m_name;
+	double m_start;
+};
+
+/// CM_TRACE_RUNTIME: writes a "memory" event (process memory in MB) at most once per second.
+void CM_TraceMemorySample();
 
 /// Marks the end of a game run (the editor may start another one in the same file).
 void CM_TraceEnd();

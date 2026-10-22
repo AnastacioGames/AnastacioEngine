@@ -35,6 +35,7 @@
 
 
 #include "KX_SoundActuator.h"
+#include "CM_Trace.h"
 
 #ifdef WITH_AUDASPACE
 typedef float sample_t;
@@ -133,6 +134,9 @@ void KX_SoundActuator::play()
 
 	AUD_Device *device = AUD_Device_getCurrent();
 	m_handle = AUD_Device_play(device, sound, false);
+	if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+		CM_TraceEvent("sound", "\"name\":" + CM_TraceStr(GetName()) + ",\"from\":\"actuator\"");
+	}
 	AUD_Device_free(device);
 
 	// in case of pingpong, we have to free the sound

@@ -66,7 +66,7 @@ class GAME_OT_performance_report(Operator):
 
         env = dict(os.environ,
                    RANGE_TRACE=self._folder,
-                   RANGE_TRACE_MODULES="load,usage,frames,work",
+                   RANGE_TRACE_MODULES="load,usage,frames,work,scripts,runtime",
                    RANGE_SHADER_LOG=os.path.join(self._folder, "shaders.txt"))
         self._process = subprocess.Popen([runtime, game], env=env, cwd=os.path.dirname(game))
 

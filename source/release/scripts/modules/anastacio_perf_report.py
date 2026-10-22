@@ -115,11 +115,28 @@ def analyze(events):
         elif e['ev'] == 'image' and e['ms'] >= 1:
             loads[e['f']].append('%s %s (%.0f ms)' % (_('image'), e['name'], e['ms']))
 
+    script_frames = {e['f']: e['c'] for e in events if e['ev'] == 'scripts'}
+    script_tot = defaultdict(lambda: [0.0, 0, 0.0, 0])  # ms, calls, worst frame ms, frames with it
+    for f, c in script_frames.items():
+        if f <= load_end:
+            continue
+        for name, (ms, calls) in c.items():
+            t = script_tot[name]
+            t[0] += ms
+            t[1] += calls
+            t[2] = max(t[2], ms)
+            t[3] += 1
+    nplay = max(len(play), 1)
+    scripts = sorted(((n, v[0] / nplay, v[2], v[1], v[0]) for n, v in script_tot.items()), key=lambda r: r[1], reverse=True)
+
     spikes = []
     for fr in sorted(play, key=_cost, reverse=True):
         if _cost(fr) <= limit:
             break
+        sc = script_frames.get(fr['f'], {})
+        top_script = max(sc.items(), key=lambda x: x[1][0]) if sc else None
         spikes.append(dict(f=fr['f'], t=fr['t'], ms=_cost(fr), cats=_top(fr['c']),
+                           script=(top_script[0], top_script[1][0]) if top_script and top_script[1][0] >= 1.0 else None,
                            loads=loads.get(fr['f'], []) + loads.get(fr['f'] - 1, [])))
 
     # Average time per profiler category during play.
@@ -198,7 +215,20 @@ def analyze(events):
             v = sorted(e.get(k, 0) for e in work)
             work_rows.append((k, _median(v), _percentile(v, 0.95), v[-1]))
 
-    return dict(session=session, play=play, load_end=load_end, startup_s=startup_s, median=median, limit=limit, spikes=spikes, categories=categories,
+    memory = [(e['t'], e['mb']) for e in events if e['ev'] == 'memory']
+    sounds = defaultdict(lambda: [0, '', 0.0])
+    for e in events:
+        if e['ev'] == 'sound':
+            snd = sounds[e['name']]
+            snd[0] += 1
+            snd[1] = e.get('from', '')
+            snd[2] = snd[2] or e['t']
+    marks = [(e['t'], e['ev'], e['scene']) for e in events if e['ev'] in ('scene_add', 'scene_remove')]
+    marks += [(e['t'], 'sound', e['name']) for e in events if e['ev'] == 'sound']
+    return dict(session=session, play=play, load_end=load_end, startup_s=startup_s, scripts=scripts,
+                memory=memory, sounds=sorted(sounds.items(), key=lambda x: x[1][0], reverse=True), marks=marks,
+                has_runtime='runtime' in session.get('modules', []),
+                has_scripts='scripts' in session.get('modules', []), median=median, limit=limit, spikes=spikes, categories=categories,
                 p95=_percentile(costs, 0.95), p99=_percentile(costs, 0.99), worst=max(costs) if costs else 0.0,
                 scenes=[e for e in events if e['ev'] == 'scene_load'],
                 scene_shaders={e['scene']: e for e in events if e['ev'] == 'load_shaders'},
@@ -281,6 +311,13 @@ def _chart(a):
                     % (w, y(ms), y(ms), y(ms) - 3, label) for ms, label in ((1000 / 60, '60 FPS'), (1000 / 30, '30 FPS')))
     dots = ''.join('<circle cx="%.1f" cy="%.1f" r="3.5" class="spike"><title>%.1f ms @ %.1f s</title></circle>'
                    % (x(s['t']), y(s['ms']), s['ms'], s['t']) for s in a['spikes'][:200])
+    labels = {'scene_add': _('scene added'), 'scene_remove': _('scene removed'), 'sound': _('sound')}
+    for t, kind, name in a.get('marks', [])[:400]:
+        if t0 <= t <= t1:
+            cls = 'msnd' if kind == 'sound' else 'mscn'
+            dots += ('<line x1="%.1f" x2="%.1f" y1="%d" y2="%d" class="%s"><title>%s: %s @ %.1f s</title></line>'
+                     % (x(t), x(t), h - (8 if kind == 'sound' else 0), h if kind == 'sound' else 0, cls,
+                        _esc(labels[kind]), _esc(name), t))
     return ('<svg viewBox="0 0 %d %d" preserveAspectRatio="none" class="chart">%s<polyline points="%s" class="line"/>%s</svg>'
             % (w, h, lines, pts, dots))
 
@@ -322,6 +359,17 @@ def advice(a, shader_items):
             if share >= 0.2 and name in CATEGORY_ADVICE:
                 out.append(('bad' if share >= 0.35 else 'warn',
                             _('%s takes %d%% of the frame (%.1f ms).') % (name, share * 100, ms) + ' ' + _(CATEGORY_ADVICE[name])))
+    for name, avg, worst, _calls, _total in a['scripts'][:3]:
+        if avg >= 1.0:
+            out.append(('bad' if avg >= 3.0 else 'warn',
+                        _('Script "%s" takes %.1f ms per frame on average (worst frame %.0f ms). '
+                          'Avoid work every frame: cache lookups, run it every few frames or only when something changes.')
+                        % (name, avg, worst)))
+    script_spikes = [sp for sp in a['spikes'] if sp.get('script')]
+    if script_spikes:
+        sp = script_spikes[0]
+        out.append(('warn', _('Script "%s" took %.0f ms in one frame at %.1f s (a spike). Look for a loop or a load in it.')
+                    % (sp['script'][0], sp['script'][1], sp['t'])))
     if a['late']:
         kind, name, ms, _f, t = a['late'][0]
         out.append(('bad' if ms >= 50 else 'warn',
@@ -330,7 +378,7 @@ def advice(a, shader_items):
     if shader_items:
         out.append(('warn', _('%d shaders or images were prepared during play (slowest %.0f ms). '
                               'Cook the game (Cook button) so compiled shaders are kept.') % (len(shader_items), shader_items[0][2])))
-    quiet = [sp for sp in a['spikes'] if not sp['loads']]
+    quiet = [sp for sp in a['spikes'] if not sp['loads'] and not sp.get('script')]
     if quiet:
         top = quiet[0]
         part = top['cats'][0][0] if top['cats'] else '?'
@@ -341,6 +389,11 @@ def advice(a, shader_items):
         if tris >= 10000 or len(a['never']) >= 20:
             out.append(('warn', _('%d objects (%d triangles) were loaded but never seen by the camera. '
                                   'If they are not needed, remove them or set Load Mode to On Demand.') % (len(a['never']), tris)))
+    grow, base = memory_growth(a)
+    if base and grow > max(100.0, base * 0.3):
+        out.append(('warn', _('Memory grew %.0f MB during play (from %.0f MB). If it keeps growing in longer runs, '
+                              'something is created and never freed (objects added without being ended, sounds, images).')
+                    % (grow, base)))
     if not out:
         out.append(('good', _('Nothing to fix in this run: the frame time is even and nothing loads during play.')))
     order = {'bad': 0, 'warn': 1, 'good': 2}
@@ -391,6 +444,27 @@ def _compare(prev, now):
     return name, rows
 
 
+def _memory_chart(a):
+    mem = a['memory']
+    if len(mem) < 2:
+        return ''
+    w, h = 1000, 90
+    t0, t1 = mem[0][0], max(mem[-1][0], mem[0][0] + 0.001)
+    lo = min(mb for _t, mb in mem)
+    hi = max(mb for _t, mb in mem)
+    span = max(hi - lo, 1.0)
+    pts = ' '.join('%.1f,%.1f' % ((t - t0) / (t1 - t0) * w, h - 4 - (mb - lo) / span * (h - 8)) for t, mb in mem)
+    return ('<svg viewBox="0 0 %d %d" preserveAspectRatio="none" class="chart mem"><polyline points="%s" class="memline"/></svg>'
+            '<p class="note">%s</p>' % (w, h, pts, _esc(_('Process memory: %.0f MB at the start, %.0f MB at the peak, %.0f MB at the end.')
+                                                         % (mem[0][1], hi, mem[-1][1]))))
+
+
+def memory_growth(a):
+    """MB gained from the end of start-up to the end of the run (a steady climb may be a leak)."""
+    mem = [mb for t, mb in a['memory'] if t >= a['startup_s']]
+    return (mem[-1] - mem[0], mem[0]) if len(mem) >= 10 else (0.0, 0.0)
+
+
 CSS = """
 :root{--bg:#f6f7f9;--card:#fff;--fg:#1d2330;--mut:#667085;--line:#e3e6eb;--good:#1a7f37;--warn:#b26b00;--bad:#c62828;--acc:#3b6fd8}
 @media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d2128;--fg:#e6e8eb;--mut:#98a2b3;--line:#2c323b;--good:#4cc76b;--warn:#f0a83a;--bad:#ff6b6b;--acc:#7aa2ff}}
@@ -407,6 +481,8 @@ table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:5px 8px;
 th{color:var(--mut);font-weight:600;font-size:12px}td:first-child{white-space:nowrap}td.barcell{width:55%}.n{text-align:right;font-variant-numeric:tabular-nums}
 .chart{width:100%;height:180px}.line{fill:none;stroke:var(--acc);stroke-width:1}.ref{stroke:var(--mut);stroke-dasharray:4 4;stroke-width:.6}
 .lbl{fill:var(--mut);font-size:10px}.spike{fill:var(--bad)}
+.mscn{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:3 3}.msnd{stroke:var(--good);stroke-width:2}
+.chart.mem{height:90px}.memline{fill:none;stroke:var(--warn);stroke-width:1.5}
 .bar{height:10px;background:var(--acc);border-radius:4px;min-width:2px}
 .ok,.vgood{color:var(--good)}.vwarn{color:var(--warn);font-weight:600}.vbad{color:var(--bad);font-weight:700}.vmut{color:var(--mut)}
 .bar.warn{background:var(--warn)}.bar.bad{background:var(--bad)}.bar.good{background:var(--good)}
@@ -457,21 +533,38 @@ def write_html(folder, title=None):
 
     w.append('<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>'
              % (_esc(_('Frame time')), _chart(a),
-                _esc(_('Lower is better. Red dots are spikes: frames much slower than the rest (hover for details).'))))
+                _esc(_('Lower is better. Red dots are spikes: frames much slower than the rest. '
+                       'Orange dashed lines: scenes added or removed; green ticks at the bottom: sounds (hover for details).'))))
+    if a['has_runtime'] and a['memory']:
+        w.append('<h2>%s</h2><div class="card">%s</div>' % (_esc(_('Memory')), _memory_chart(a)))
 
     if a['categories']:
         total = sum(v for _k, v in a['categories']) or 1.0
         rows = [(k, Markup('<div class="bar %s" style="width:%.0f%%"></div>'
-                           % (_level(v / total, 0.2, 0.35), v / a['categories'][0][1] * 100)),
-                 _colored('%.2f' % v, _level(v / total, 0.2, 0.35))) for k, v in a['categories'][:15]]
+                           % (_level(v, 2.0, 5.0), v / a['categories'][0][1] * 100)),
+                 _colored('%.2f' % v, _level(v, 2.0, 5.0))) for k, v in a['categories'][:15]]
         w.append('<h2>%s</h2><div class="card">%s</div>' % (_esc(_('Where the frame time goes (average)')),
                                                             _table((_('Part'), '', 'ms'), rows, numeric=(2,))))
+
+    if a['has_scripts']:
+        w.append('<h2>%s</h2><div class="card">' % _esc(_('Scripts')))
+        if a['scripts']:
+            rows = [(n, _colored('%.2f' % avg, _level(avg, 1.0, 3.0)), _colored('%.1f' % worst, _level(worst, 5.0, 16.0)),
+                     calls, '%.0f' % total) for n, avg, worst, calls, total in a['scripts']]
+            w.append(_table((_('Script'), _('ms per frame'), _('Worst frame ms'), _('Calls'), _('Total ms')), rows,
+                            numeric=(1, 2, 3, 4)))
+            w.append('<p class="note">%s</p>' % _esc(_('Python components (by class) and Python controllers (by script or module). '
+                                                      'Calls under 0.02 ms in a frame are not counted.')))
+        else:
+            w.append('<p class="ok">%s</p>' % _esc(_('No script took noticeable time.')))
+        w.append('</div>')
 
     w.append('<h2>%s</h2><div class="card">' % _esc(_('Spikes')))
     if a['spikes']:
         rows = [('%.1f s' % s['t'], s['f'], _colored('%.0f' % s['ms'], _level(s['ms'], 50, 100)), ', '.join('%s %.0f' % c for c in s['cats']),
-                 '; '.join(s['loads']) or '-') for s in a['spikes']]
-        w.append(_table((_('Time'), _('Frame'), 'ms', _('Slowest parts'), _('Loading at that moment')), rows, numeric=(1, 2)))
+                 ('%s %.0f ms' % s['script']) if s.get('script') else '-', '; '.join(s['loads']) or '-') for s in a['spikes']]
+        w.append(_table((_('Time'), _('Frame'), 'ms', _('Slowest parts'), _('Heaviest script'), _('Loading at that moment')),
+                        rows, numeric=(1, 2)))
     else:
         w.append('<p class="ok">%s</p>' % _esc(_('No spikes: the frame time stays even.')))
     w.append('</div>')
@@ -516,6 +609,17 @@ def write_html(folder, title=None):
         if a['shadow_only']:
             w.append('<p class="note">%s %s</p>' % (_esc(_('Only drawn in shadows:')),
                                                     _esc(', '.join(o['name'] for o in a['shadow_only'][:30]))))
+        w.append('</div>')
+
+    if a['has_runtime']:
+        w.append('<h2>%s</h2><div class="card">' % _esc(_('Sounds')))
+        if a['sounds']:
+            w.append(_table((_('Sound'), _('From'), _('Times played'), _('First at')),
+                            [(n, v[1], v[0], '%.1f s' % v[2]) for n, v in a['sounds']], numeric=(2,)))
+            w.append('<p class="note">%s</p>' % _esc(_('Sounds started by the Sound actuator, speakers and World Sound. '
+                                                      'Sounds played directly with the aud module are not listed.')))
+        else:
+            w.append('<p class="mut">%s</p>' % _esc(_('No sound was started by the engine in this run.')))
         w.append('</div>')
 
     if a['work']:

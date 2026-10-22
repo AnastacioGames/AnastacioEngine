@@ -25,6 +25,7 @@
  */
 
 #include "KX_SceneScheduler.h"
+#include "CM_Trace.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_EngineProfiler.h"
 #include "KX_Scene.h"
@@ -74,6 +75,9 @@ KX_Scene *KX_SceneScheduler::CreateScene(const std::string& scenename)
 
 void KX_SceneScheduler::AddScene(KX_Scene *scene)
 {
+	if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+		CM_TraceEvent("scene_add", "\"scene\":" + CM_TraceStr(scene->GetName()));
+	}
 	m_engine->GetScenes()->Add(CM_AddRef(scene));
 	PostProcessScene(scene);
 }
@@ -93,6 +97,9 @@ void KX_SceneScheduler::PostProcessScene(KX_Scene *scene)
 
 void KX_SceneScheduler::DestructScene(KX_Scene *scene)
 {
+	if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+		CM_TraceEvent("scene_remove", "\"scene\":" + CM_TraceStr(scene->GetName()));
+	}
 	scene->RunOnRemoveCallbacks();
 	// Multiplayer: the session lets go of the scene's objects (and follows a replacement).
 	if (KX_NetworkManager *network = m_engine->GetNetworkManager()) {

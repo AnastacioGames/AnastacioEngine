@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Performance Report (Game > Performance)
+
+- Ferramenta genérica da engine para qualquer jogo, ideia vinda do Range Trace (que segue sendo do RolimaRacer). Ver [performance-report.md](performance-report.md).
+- Módulos novos do `CM_Trace`: `scripts` (`CM_TraceScriptScope` em `KX_GameObject::UpdateComponents` e `SCA_PythonController::Trigger`, evento `scripts` por frame) e `runtime` (`memory` a cada segundo, `sound` em `KX_AudioManager`/`KX_SoundActuator`/`KX_Speaker`, `scene_add`/`scene_remove` em `KX_SceneScheduler`).
+- Correção ao usar no jogo do usuário: rodar da pasta do próprio jogo (antes a cópia em pasta temporária quebrava caminhos relativos).
+
 ## 2026-10-21 - Testes com janela e sombra colorida mais suave
 
 - Usuário testou com janela (`debug-logs/testes_2026-10-21/ABRIR_TESTES.bat`): crash do Logic Editor com armaduras não se repetiu (30 s, cópias a cada 0,5 s) e Static Batch com grupos instanciados aparece certo, inclusive ao mover uma peça.

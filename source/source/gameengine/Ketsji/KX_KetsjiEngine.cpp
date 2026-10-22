@@ -678,6 +678,13 @@ bool KX_KetsjiEngine::NextFrame()
 {
 	if (CM_TraceModules()) {
 		static long traceFrame = 0;
+		// Scripts of the frame that just ended, before the frame number moves on.
+		if (CM_TraceOn(CM_TRACE_SCRIPTS)) {
+			CM_TraceScriptsFlush();
+		}
+		if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+			CM_TraceMemorySample();
+		}
 		CM_TraceSetFrame(++traceFrame);
 	}
 #ifndef __EMSCRIPTEN__

@@ -29,6 +29,20 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <map>
+
+#ifdef _WIN32
+#  ifndef NOMINMAX
+#    define NOMINMAX
+#  endif
+#  include <windows.h>
+#  ifndef PSAPI_VERSION
+#    define PSAPI_VERSION 2 /* GetProcessMemoryInfo from kernel32, no psapi.lib */
+#  endif
+#  include <psapi.h>
+#else
+#  include <unistd.h>
+#endif
 #include <mutex>
 #include <sstream>
 
@@ -43,6 +57,8 @@ const struct {
 	{"frames", CM_TRACE_FRAMES},
 	{"sector", CM_TRACE_SECTOR},
 	{"work", CM_TRACE_WORK},
+	{"scripts", CM_TRACE_SCRIPTS},
+	{"runtime", CM_TRACE_RUNTIME},
 };
 
 struct TraceState
@@ -133,6 +149,93 @@ void CM_TraceEvent(const char *event, const std::string& fields)
 	        event, fields.empty() ? "" : ",", fields.c_str());
 	// Flushed per event so a crash keeps the log; events are rare (load and first uses).
 	fflush(trace.file);
+}
+
+namespace {
+/// Script time of the current frame: name -> (ms, calls). Scripts run on the main thread.
+std::map<std::string, std::pair<double, int>>& ScriptSums()
+{
+	static std::map<std::string, std::pair<double, int>> sums;
+	return sums;
+}
+
+double TraceNowMs()
+{
+	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now().time_since_epoch()).count();
+}
+}  // namespace
+
+void CM_TraceScriptAdd(const std::string& name, double ms)
+{
+	std::pair<double, int>& sum = ScriptSums()[name];
+	sum.first += ms;
+	sum.second++;
+}
+
+void CM_TraceScriptsFlush()
+{
+	std::map<std::string, std::pair<double, int>>& sums = ScriptSums();
+	if (sums.empty()) {
+		return;
+	}
+	std::string fields = "\"c\":{";
+	bool first = true;
+	char buf[64];
+	for (const auto& item : sums) {
+		// Below 0.02 ms per frame it is noise; the report sums the frames for the session totals.
+		if (item.second.first < 0.02) {
+			continue;
+		}
+		snprintf(buf, sizeof(buf), ":[%.3f,%d]", item.second.first, item.second.second);
+		fields += (first ? "" : ",") + CM_TraceStr(item.first) + buf;
+		first = false;
+	}
+	sums.clear();
+	if (!first) {
+		CM_TraceEvent("scripts", fields + "}");
+	}
+}
+
+void CM_TraceMemorySample()
+{
+	static double last = -1.0;
+	const double now = TraceNowMs();
+	if (last >= 0.0 && now - last < 1000.0) {
+		return;
+	}
+	last = now;
+	double mb = 0.0;
+#ifdef _WIN32
+	PROCESS_MEMORY_COUNTERS counters;
+	if (GetProcessMemoryInfo(GetCurrentProcess(), &counters, sizeof(counters))) {
+		mb = counters.WorkingSetSize / (1024.0 * 1024.0);
+	}
+#else
+	FILE *statm = fopen("/proc/self/statm", "r");
+	if (statm) {
+		long pages = 0, resident = 0;
+		if (fscanf(statm, "%ld %ld", &pages, &resident) == 2) {
+			mb = resident * (double)sysconf(_SC_PAGESIZE) / (1024.0 * 1024.0);
+		}
+		fclose(statm);
+	}
+#endif
+	char buf[48];
+	snprintf(buf, sizeof(buf), "\"mb\":%.1f", mb);
+	CM_TraceEvent("memory", buf);
+}
+
+CM_TraceScriptScope::CM_TraceScriptScope(const std::string& name)
+    :m_name(CM_TraceOn(CM_TRACE_SCRIPTS) ? &name : nullptr),
+    m_start(m_name ? TraceNowMs() : 0.0)
+{
+}
+
+CM_TraceScriptScope::~CM_TraceScriptScope()
+{
+	if (m_name) {
+		CM_TraceScriptAdd(*m_name, TraceNowMs() - m_start);
+	}
 }
 
 std::string CM_TraceStr(const std::string& text)
