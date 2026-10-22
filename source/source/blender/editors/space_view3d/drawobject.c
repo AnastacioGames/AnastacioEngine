@@ -5386,7 +5386,8 @@ static int draw_game_text_font_id(Main *bmain, VFont *vfont)
 /**
  * "Preview Game Text" with a Bitmap Atlas: same layout as KX_FontObject::BuildAtlasQuads,
  * ApplyTextAlignment and RAS_OpenGLRasterizer::RenderTextAtlas3D.
- * eturn false when the atlas can't be used (falls back to the BLF preview).
+ * 
+eturn false when the atlas can't be used (falls back to the BLF preview).
  */
 static bool draw_game_text_atlas(Curve *cu, const char **lines, const size_t *lens, int totline,
                                  const float color[4])
@@ -5451,8 +5452,9 @@ static bool draw_game_text_atlas(Curve *cu, const char **lines, const size_t *le
 
 	float offset[2] = {cu->xof, cu->yof};
 	if (cu->spacemode != CU_ALIGN_X_LEFT || cu->align_y != CU_ALIGN_Y_TOP_BASELINE) {
-		const float bmin[2] = {min[0] + cu->xof, min[1] + cu->yof};
-		const float bmax[2] = {max[0] + cu->xof, max[1] + cu->yof};
+		/* offset scaled by the Size in the bounds, like KX_FontObject::GetTextAabb */
+		const float bmin[2] = {min[0] + cu->xof * cu->fsize, min[1] + cu->yof * cu->fsize};
+		const float bmax[2] = {max[0] + cu->xof * cu->fsize, max[1] + cu->yof * cu->fsize};
 		switch (cu->spacemode) {
 			case CU_ALIGN_X_MIDDLE: offset[0] -= ((bmin[0] + bmax[0]) - cu->xof) / 2.0f; break;
 			case CU_ALIGN_X_RIGHT:  offset[0] -= bmax[0] - cu->xof; break;

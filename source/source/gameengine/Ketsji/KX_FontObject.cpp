@@ -535,8 +535,10 @@ void KX_FontObject::GetTextAabb(mt::vec2& min, mt::vec2& max)
 		if (m_atlasQuads.empty() && !m_texts.empty()) {
 			BuildAtlasQuads();
 		}
-		min = m_atlasMin + mt::vec2(m_text_offset.x, m_text_offset.y);
-		max = m_atlasMax + mt::vec2(m_text_offset.x, m_text_offset.y);
+		/* Offset scaled by the Size, as the BLF bounds below: a text with Size != 1 and an
+		 * Offset must keep its place when the atlas is turned on. */
+		min = m_atlasMin + mt::vec2(m_text_offset.x, m_text_offset.y) * m_fsize;
+		max = m_atlasMax + mt::vec2(m_text_offset.x, m_text_offset.y) * m_fsize;
 		return;
 	}
 
