@@ -13,6 +13,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `savePreset` falhava com máscara de raio 0xFFFF (16 bits gravados como short negativo); agora grava/lê 0-65535. `savePreset`/`loadPreset` pelo Python passam a incluir o bloco `engine` (torque, RPM, câmbio), como o Vehicle Lab.
 - Teste: `tools/debug/cenas/veiculo_runtime/` (carro a-a7r do GT2 + chão; contato True nas 4 rodas, carro sobe 18 cm ao mudar a suspensão, preset restaura o torque).
 - `world.setWeather('rain', True)` agora funciona numa cena que abriu sem chuva: o passe é criado na hora (uma compilação) e segue o liga/desliga do World a cada quadro (antes, desligar não tirava o passe). Teste: `chuva_runtime.py` (capturas antes/com/depois; antes = depois).
+- Mesmo para nuvens (inclui Sky Layers e Volumetric Clouds, que dividem o passe) e lens flare: `world.setWeather('clouds'/'lens_flare', True)` cria o passe na hora numa cena que abriu sem eles; desligar tira o passe. A névoa volumétrica já fazia isso (KX_Scene). Teste: `ceu_runtime.py`.
 - Em aberto: rodas deslocadas com `vehicle_com_offset` (correção muda jogos existentes).
 
 ## 2026-10-22 - Shader do céu no aquecimento; travadas do RolimaRacer medidas

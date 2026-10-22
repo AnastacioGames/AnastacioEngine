@@ -949,7 +949,33 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 		// Camera FX (focus DOF, speed/directional blur, cat eye lens) of the active camera.
 		filterManager->UpdateCameraFX(scene->GetActiveCamera(), m_engine->GetClockTime());
 	}
-	RAS_2DFilter *flareFilter = filterManager ? filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_LENSFLARE, true) : nullptr;
+	// Clouds (also Sky Layers / Volumetric Clouds, same pass) and Lens Flare turned on at runtime
+	// (world.setWeather) in a scene that loaded without them: build the pass now (one shader compile),
+	// then follow the World flags every frame. Values are refreshed from the World further below.
+	if (filterManager) {
+		const World *fxWorld = scene->GetBlenderScene()->world;
+		const bool cloudsOn = fxWorld && ((fxWorld->weather_flag & WO_WEATHER_CLOUDS) ||
+		                                  (fxWorld->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ||
+		                                  (fxWorld->vcloud_flag & WO_VCLOUDS_ENABLE));
+		const bool flareOn = fxWorld && (fxWorld->weather_flag & WO_WEATHER_LENSFLARE);
+		if (cloudsOn && !filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_CLOUDS, true)) {
+			BuildInFilters f = {};
+			f.useClouds = true;
+			filterManager->EnsureCloudsFilters(f);
+		}
+		if (flareOn && !filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_LENSFLARE, true)) {
+			BuildInFilters f = {};
+			f.useLensFlare = true;
+			filterManager->EnsureLensFlareFilters(f);
+		}
+		if (RAS_2DFilter *clouds = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_CLOUDS, true)) {
+			clouds->SetEnabled(cloudsOn);
+		}
+		if (RAS_2DFilter *flare = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_LENSFLARE, true)) {
+			flare->SetEnabled(flareOn);
+		}
+	}
+	RAS_2DFilter *flareFilter = filterManager ?filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_LENSFLARE, true) : nullptr;
 
 	float sunPos[2] = {0.5f, 0.0f};
 	if (scene->GetUseLightScatter() || flareFilter) {
