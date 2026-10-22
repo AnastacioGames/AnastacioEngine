@@ -160,6 +160,12 @@ public:
 	{
 	}
 
+	// LibLoad merge: the vehicle moves to the destination world.
+	void SetDynamicsWorld(btDynamicsWorld *world)
+	{
+		m_dynamicsWorld = world;
+	}
+
 	virtual void *castRay(const btVector3& from, const btVector3& to, btVehicleRaycasterResult& result)
 	{
 		//	RayResultCallback& resultCallback;
@@ -229,6 +235,11 @@ public:
 	btRaycastVehicle *GetVehicle()
 	{
 		return m_vehicle;
+	}
+
+	BlenderVehicleRaycaster *GetRaycaster()
+	{
+		return m_raycaster;
 	}
 
 	PHY_IPhysicsController *GetChassis()
@@ -806,6 +817,22 @@ void CcdPhysicsEnvironment::RemoveVehicle(WrapperVehicle *vehicle, bool free)
 	if (free) {
 		CM_ListRemoveIfFound(m_wrapperVehicles, vehicle);
 		delete vehicle;
+	}
+}
+
+void CcdPhysicsEnvironment::MoveVehicles(CcdPhysicsController *ctrl, CcdPhysicsEnvironment *dest)
+{
+	for (std::vector<WrapperVehicle *>::iterator it = m_wrapperVehicles.begin(); it != m_wrapperVehicles.end(); ) {
+		WrapperVehicle *vehicle = *it;
+		if (vehicle->GetChassis() != ctrl) {
+			++it;
+			continue;
+		}
+		m_dynamicsWorld->removeVehicle(vehicle->GetVehicle());
+		vehicle->GetRaycaster()->SetDynamicsWorld(dest->m_dynamicsWorld);
+		dest->m_dynamicsWorld->addVehicle(vehicle->GetVehicle());
+		dest->m_wrapperVehicles.push_back(vehicle);
+		it = m_wrapperVehicles.erase(it);
 	}
 }
 

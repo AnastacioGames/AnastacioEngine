@@ -1348,6 +1348,8 @@ void CcdPhysicsController::SetPhysicsEnvironment(class PHY_IPhysicsEnvironment *
 		// since the environment is changing, we must also move the controler to the
 		// new environment. Note that we don't handle sensor explicitly: this
 		// function can be called on sensor but only when they are not registered
+		// Keep the native vehicle: removing the chassis would destroy it.
+		m_cci.m_physicsEnv->MoveVehicles(this, physicsEnv);
 		if (m_cci.m_physicsEnv->RemoveCcdPhysicsController(this, true)) {
 			physicsEnv->AddCcdPhysicsController(this);
 

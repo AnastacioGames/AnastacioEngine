@@ -63,6 +63,7 @@ int Ccd_FindClosestNode(btSoftBody *sb, const btVector3& worldPoint);
 class CcdPhysicsEnvironment : public PHY_IPhysicsEnvironment, public mt::SimdClassAllocator
 {
 	friend class CcdOverlapFilterCallBack;
+	friend class CcdPhysicsController; // MoveVehicles on LibLoad merge
 	btVector3 m_gravity;
 
 	/// Removes the constraint and his references from the owner and the target.
@@ -71,6 +72,8 @@ class CcdPhysicsEnvironment : public PHY_IPhysicsEnvironment, public mt::SimdCla
 	void RemoveVehicle(WrapperVehicle *vehicle, bool free);
 	/// Remove vehicle wrapper used by a physics controller used as chassis.
 	void RemoveVehicle(CcdPhysicsController *ctrl, bool free);
+	/// Moves the vehicles of this chassis to another environment (LibLoad merge).
+	void MoveVehicles(CcdPhysicsController *ctrl, CcdPhysicsEnvironment *dest);
 	/// Restore the constraint if the owner and target are presents.
 	void RestoreConstraint(CcdPhysicsController *ctrl, btTypedConstraint *con);
 
