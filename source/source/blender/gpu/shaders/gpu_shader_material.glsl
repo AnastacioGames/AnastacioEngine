@@ -4017,7 +4017,9 @@ void shadow_color_output(vec4 surface, vec3 base, float alpha, float glow, float
 		return;
 	}
 	float a = clamp((alpha < 0.0) ? surface.a : alpha, 0.0, 1.0);
-	vec3 trans = mix(vec3(1.0), clamp(base, 0.0, 1.0), min(a * 1.5, 1.0)) * (1.0 - smoothstep(0.9, 1.0, a));
+	/* The tint follows the glass alpha (half transparent = half tinted) and the glass also dims the
+	 * light a little: a pure color at full light looked painted on, not seen through glass. */
+	vec3 trans = mix(vec3(1.0), clamp(base, 0.0, 1.0), a) * (1.0 - 0.35 * a) * (1.0 - smoothstep(0.9, 1.0, a));
 	/* Glow: the target is half float, the light let through may exceed the unshadowed light. */
 	result = vec4(trans * (1.0 + max(glow, 0.0)), gl_FragCoord.z);
 }
