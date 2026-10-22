@@ -165,6 +165,7 @@ class INFO_MT_editor_menus(Menu):
 
         if rd.use_game_engine:
             layout.menu("INFO_MT_game")
+            layout.menu("INFO_MT_game_performance")
         else:
             layout.menu("INFO_MT_render")
 
@@ -330,9 +331,6 @@ class INFO_MT_game(Menu):
 
         gs = context.scene.game_settings
 
-        layout.menu("INFO_MT_game_performance", icon='SORTTIME')
-
-        layout.separator(factor=1)
         layout.label(text="Overlays")
         layout.prop(gs, "show_framerate_profile", text="Show Profile")
         layout.prop(gs, "show_render_queries")
