@@ -1140,6 +1140,11 @@ void* DirectDrawSurface::readData(uint &rsize)
 		header_size += 20; // sizeof(DDSHeader10);
 	}
 
+	if (stream.size <= header_size) {
+		rsize = 0;
+		return NULL;
+	}
+
 	uint size = stream.size - header_size;
 	rsize = size;
 

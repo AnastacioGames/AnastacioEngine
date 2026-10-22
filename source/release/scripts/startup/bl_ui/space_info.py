@@ -317,6 +317,9 @@ class INFO_MT_game_performance(Menu):
 
     def draw(self, context):
         layout = self.layout
+        layout.operator("game.prepare_textures", text="Prepare Textures (DDS)...", icon='IMAGE_DATA')
+        layout.operator("game.revert_prepared_textures", icon='LOOP_BACK')
+        layout.separator()
         layout.operator("game.performance_report", text="Play and Measure", icon='PLAY')
         layout.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
         layout.operator("game.lod_generate_batch", icon='MOD_DECIM')

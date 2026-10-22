@@ -26,6 +26,50 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `check_docs.py`: 65 erros e 118 avisos existentes nos mapas/referencias, mesmos totais anteriores;
   mapas nao alterados. Pendentes contatos no jogo real e medicao em cena com candidatos elegiveis.
 
+## 2026-10-22 - DDS: aceite visual da textura de teste
+
+- Usuario confirmou a textura com metade transparente e metade opaca. Build final e regressao
+  incluindo PREMUL passaram; pendencias historicas de link abaixo foram resolvidas.
+- Ainda pendentes: visual no jogo real, benchmarks RolimaRacer/iGPU e execucao Linux.
+
+## 2026-10-22 - DDS: valida??o final Windows
+
+- Usu?rio fechou o editor; build final RangeEngine/RangeRuntime passou.
+- Regress?o completa passou, incluindo PREMUL: `build/dds-validation/native-final.log`, marcador DDS_API_VALIDATED, exit code 0. O erro DDS no log ? o teste negativo NPOT esperado.
+- Bloqueio de link resolvido. Visual real, benchmark e Linux/iGPU continuam pendentes.
+
+## 2026-10-22 - Prepara??o de texturas DDS (branch)
+
+- Branch `feat/preparar-texturas-dds`, ap?s revis?o do plano do Claude. rgbcx v1.12 vendorizado na
+  revis?o `f66c2e489b07138f2673a2fb3d27c1aa1d565c48`, licen?a MIT inclu?da na instala??o/export runtime.
+- Gravador imbuf C++/API C/RNA `Image.save_dds`: AUTO BC1/BC3, mipmaps completos, redu??o POT,
+  filtro de cor em luz linear ponderado por alpha, sem alterar o buffer original.
+- Menu Performance, lista com estimativas e sele??o, qualidade/tamanho, progresso/cancelamento entre
+  imagens e revers?o das configura??es. Normal/data/RGBM/fontes/NPOT/multiview/tiles ficam fora.
+- Derivados publicados atomicamente, hash de fonte efetiva/op??es/interpreta??o/encoder e hash do DDS.
+  Snapshot da fonte impede converter o buffer antigo do editor ap?s edi??o externa. Cache obsoleto
+  bloqueia o export. RangeArmor/runtime usam remapeamento tempor?rio para c?pias packed, com restaura??o.
+- Build inicial editor/player passou (448 passos); API RGB/RGBA, orienta??o, alpha, redu??o, cache e
+  restaura??o ap?s falha passaram. Player confirmou formatos GL 33777/33779, mip 1 de 64 pixels para
+  fonte 128, `compressed=1` e GL error 0. `ANASTACIO_NO_S3TC=1`: RGBA8/32856, `compressed=0`, GL error 0.
+  Export `.range` reaberto com DDS packed, sem os originais substitu?dos; `.rasec` executou no fallback.
+- Inspe??o somente leitura do RolimaRacer: 191 imagens, 38 eleg?veis com pol?tica conservadora.
+  Corrigida a classifica??o para n?o interpretar aliases volume/part?culas do RNA como usos de superf?cie.
+- Identificado que imbuf byte j? normaliza fontes PREMUL para straight. Ajuste final exporta DDS straight
+  para alinhar blocos comprimidos e fallback. Player recompilado; link do editor falhou com LNK1104
+  porque `AnastacioEngine.exe` est? aberto pelo usu?rio. Solicitado fechamento; n?o foi encerrado ? for?a.
+- Doze testes existentes do staging RangeArmor passaram. `check_docs.py`: 65 erros e 118 avisos pr?vios
+  nos mapas/refer?ncias; os mapas n?o foram alterados nesta branch.
+- Regress?o Python ampliada passou (exceto o caso nativo PREMUL, que depende do link final): filtro
+  sRGB num?rico, arquivo externo alterado com buffer antigo, DDS corrompido, pixels dirty, falha de
+  publica??o e restaura??o de fake user. Testes reais dos saves RangeArmor e runtime passaram.
+- Runtime empacotado em ZIP de 144.167.748 bytes, extra?do e executado com a pasta das fontes de teste
+  temporariamente renomeada: DXT1/DXT5, mipmaps e GL error 0. Licen?a rgbcx e `blender.crt/` presentes.
+- Uma checagem de processo mal formatada pareceu indicar fechamento do editor; segunda tentativa de link
+  repetiu LNK1104. Confirmado PID 29600 ativo, sem novas tentativas enquanto o execut?vel permanecer aberto.
+- Pendente: link do editor/teste PREMUL, visual e benchmark RolimaRacer/iGPU, execu??o Linux.
+  Sem altera??o do jogo original ou expans?o do `.cooked`. Procedimento em `docs/plano-texturas-dds.md`.
+
 ## 2026-10-22 - Veículo nativo: ajustes em tempo real pelo Python (pedidos do GT2)
 
 - Novos: `gameOb.setVehicleMaxTorque/setVehicleMaxRPM/setVehicleGearRatios` e `vehicle.setSuspensionRestLength(valor, roda)` / `vehicle.setWheelRadius(valor, roda)` (aplicados no próximo passo da física pela fila de comandos).

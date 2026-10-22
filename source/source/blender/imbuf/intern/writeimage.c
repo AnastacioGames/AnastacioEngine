@@ -37,6 +37,22 @@
 #include "IMB_colormanagement.h"
 #include "IMB_colormanagement_intern.h"
 
+#ifdef WITH_DDS
+#include "dds/dds_api.h"
+#endif
+
+bool IMB_dds_write_dxt(const ImBuf *ibuf, const char *path, int format,
+                       int max_size, int quality, bool srgb)
+{
+#ifdef WITH_DDS
+    return imb_dds_write_dxt(ibuf, path, format, max_size, quality, srgb);
+#else
+    (void)ibuf; (void)path; (void)format; (void)max_size;
+    (void)quality; (void)srgb;
+    return false;
+#endif
+}
+
 static bool prepare_write_imbuf(const ImFileType *type, ImBuf *ibuf)
 {
 	return IMB_prepare_write_ImBuf((type->flag & IM_FTYPE_FLOAT), ibuf);

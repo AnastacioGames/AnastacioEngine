@@ -155,6 +155,12 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   central; formas redondas usam escalas compativeis com a Bullet. Testes background passaram (26 objetos,
   nove sugestoes, fix/revert e reabertura). Auditoria das 30 cenas do RolimaRacer nao sugeriu substituicoes
   e confirmou hash intacto. Ganho de fisica e contatos no jogo real ainda nao medidos.
+- **Preparar texturas DDS:** conversor BC1/BC3 e mipmaps em imbuf/RNA, selecao em Game >
+  Performance e derivados em `textures_dds/`. Export desktop usa copias packed; editor/Web conservam
+  originais. Build editor/player, regressao incluindo PREMUL, upload comprimido e fallback passaram.
+  Usuario confirmou o alpha da textura de teste. Benchmark e Linux/iGPU pendentes.
+  Contrato e limites no [plano](docs/plano-texturas-dds.md).
+
 
 - **RA5:** materiais sem slots ativos no passe deixam de validar texturas e atualizar
   luzes. Reativacao prepara o material antes de gerar a arvore de desenho. Editor/player

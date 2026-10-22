@@ -161,6 +161,9 @@ struct ImBuf *IMB_makeSingleUser(struct ImBuf *ibuf);
  */
 struct ImBuf *IMB_dupImBuf(const struct ImBuf *ibuf1);
 
+/* A DDS loaded with IB_dds_blocks has no pixels until asked: decode them from the blocks. */
+bool IMB_dds_ensure_rect(struct ImBuf *ibuf);
+
 /**
  *
  * \attention Defined in allocimbuf.c
@@ -393,6 +396,9 @@ void IMB_scaleImBuf_threaded(struct ImBuf *ibuf, unsigned int newx, unsigned int
  * \attention Defined in writeimage.c
  */
 short IMB_saveiff(struct ImBuf *ibuf, const char *filepath, int flags);
+/* Export a copy as BC1/BC3 DDS: format 0=AUTO, 1=BC1, 3=BC3. POT byte images only. */
+bool IMB_dds_write_dxt(const struct ImBuf *ibuf, const char *path, int format,
+                       int max_size, int quality, bool srgb);
 bool IMB_prepare_write_ImBuf(const bool isfloat, struct ImBuf *ibuf);
 
 /**

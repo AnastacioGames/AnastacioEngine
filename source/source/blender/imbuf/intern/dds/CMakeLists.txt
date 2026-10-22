@@ -57,6 +57,7 @@ set(SRC
 	Image.cpp
 	Stream.cpp
 	dds_api.cpp
+	dds_write.cpp
 )
 
 set(LIB

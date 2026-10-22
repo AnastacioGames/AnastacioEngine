@@ -37,6 +37,10 @@
 
 #include "imbuf.h"
 
+#ifdef WITH_DDS
+#  include "dds/dds_api.h"
+#endif
+
 #include "MEM_guardedalloc.h"
 
 #include "BLI_utildefines.h"
@@ -502,6 +506,19 @@ bool IMB_initImBuf(struct ImBuf *ibuf,
 	return true;
 }
 
+bool IMB_dds_ensure_rect(ImBuf *ibuf)
+{
+	if (ibuf == NULL) {
+		return false;
+	}
+#ifdef WITH_DDS
+	if (ibuf->rect == NULL && ibuf->rect_float == NULL && ibuf->dds_data.data != NULL) {
+		return imb_dds_decode_rect(ibuf);
+	}
+#endif
+	return ibuf->rect != NULL || ibuf->rect_float != NULL;
+}
+
 /* does no zbuffers? */
 ImBuf *IMB_dupImBuf(const ImBuf *ibuf1)
 {
@@ -510,6 +527,9 @@ ImBuf *IMB_dupImBuf(const ImBuf *ibuf1)
 	int a, x, y;
 
 	if (ibuf1 == NULL) return NULL;
+
+	/* the copy holds pixels, not the compressed blocks */
+	IMB_dds_ensure_rect((ImBuf *)ibuf1);
 
 	if (ibuf1->rect) flags |= IB_rect;
 	if (ibuf1->rect_float) flags |= IB_rectfloat;
@@ -557,6 +577,8 @@ ImBuf *IMB_dupImBuf(const ImBuf *ibuf1)
 	for (a = 0; a < IMB_MIPMAP_LEVELS; a++)
 		tbuf.mipmap[a] = NULL;
 	tbuf.dds_data.data = NULL;
+	tbuf.dds_data.size = 0;
+	tbuf.dds_data.nummipmaps = 0;
 
 	/* set malloc flag */
 	tbuf.mall               = ibuf2->mall;

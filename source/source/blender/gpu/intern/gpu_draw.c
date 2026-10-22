@@ -655,11 +655,16 @@ int GPU_verify_image(
 	/* RANGE_SHADER_LOG: time an upload from here, as the image file may also be read now. */
 	const double log_start_time = (GPU_profile_log_enabled() || GPU_profile_image_hook) ? PIL_check_seconds_timer() : 0.0;
 
-	/* check if we have a valid image buffer */
-	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
+	/* check if we have a valid image buffer; a DDS may come as blocks only, without pixels */
+	ImBuf *ibuf = BKE_image_acquire_ibuf_compressed(ima, iuser, NULL);
 
 	if (ibuf == NULL)
 		return 0;
+
+	/* only a plain 2D texture is uploaded from the blocks; tiles and cube maps copy pixels */
+	if (GTS.tilemode || textarget != GL_TEXTURE_2D) {
+		IMB_dds_ensure_rect(ibuf);
+	}
 
 	if (ibuf->rect_float) {
 		if (U.use_16bit_textures) {
@@ -1073,7 +1078,9 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 	width = ibuf->x;
 	height = ibuf->y;
 
-	if (GLEW_EXT_texture_compression_s3tc) {
+	/* Diagnostic opt-out for fallback validation and performance comparisons. */
+	const char *disable_s3tc = getenv("ANASTACIO_NO_S3TC");
+	if (GLEW_EXT_texture_compression_s3tc && !(disable_s3tc && disable_s3tc[0] == '1')) {
 		if (ibuf->dds_data.fourcc == FOURCC_DXT1)
 			format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
 		else if (ibuf->dds_data.fourcc == FOURCC_DXT3)
@@ -1092,8 +1099,9 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 		return false;
 	}
 
-	/* a header with DDSD_MIPMAPCOUNT and a count of 0 would upload nothing */
-	if (ibuf->dds_data.nummipmaps == 0) {
+	/* a header with DDSD_MIPMAPCOUNT and a count of 0 would upload nothing; a copy of the
+	 * ImBuf keeps the DDS type but not the blocks */
+	if (ibuf->dds_data.nummipmaps == 0 || ibuf->dds_data.data == NULL) {
 		return false;
 	}
 
@@ -1160,6 +1168,10 @@ void GPU_create_gl_tex_compressed(
 
 	if (textarget == GL_TEXTURE_2D && GPU_upload_dxt_texture(ibuf) == 0) {
 		glDeleteTextures(1, (GLuint *)bind);
+		/* no S3TC (or ANASTACIO_NO_S3TC): decode the blocks kept at load */
+		if (pix == NULL && IMB_dds_ensure_rect(ibuf)) {
+			pix = ibuf->rect;
+		}
 		GPU_create_gl_tex(bind, pix, NULL, x, y, textarget, mipmap, 0, ima);
 	}
 #endif

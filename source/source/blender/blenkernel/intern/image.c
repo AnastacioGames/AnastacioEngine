@@ -962,6 +962,9 @@ static uintptr_t image_mem_size(Image *image)
 			if (ibuf->rect) {
 				size += MEM_allocN_len(ibuf->rect);
 			}
+			if (ibuf->dds_data.data) {
+				size += ibuf->dds_data.size;
+			}
 			if (ibuf->rect_float) {
 				size += MEM_allocN_len(ibuf->rect_float);
 			}
@@ -3164,6 +3167,13 @@ static void image_initialize_after_load(Image *ima, ImBuf *ibuf)
 
 }
 
+/* DXT DDS images load as their compressed blocks: the GPU uploads them as they are and
+ * image_acquire_ibuf() decodes the pixels for every other caller. Fields need pixels at load. */
+static int imbuf_dds_flags_for_image(Image *ima)
+{
+	return (ima->flag & IMA_FIELDS) ? 0 : IB_dds_blocks;
+}
+
 static int imbuf_alpha_flags_for_image(Image *ima)
 {
 	int flag = 0;
@@ -3515,7 +3525,7 @@ static void image_prefetch_decode(void *__restrict userdata, const int i, const 
 		if (imapf->packedfile) {
 			item->ibuf = IMB_ibImageFromMemory(
 			        (unsigned char *)imapf->packedfile->data, imapf->packedfile->size,
-			        IB_rect | IB_multilayer | imbuf_alpha_flags_for_image(ima),
+			        IB_rect | IB_multilayer | imbuf_alpha_flags_for_image(ima) | imbuf_dds_flags_for_image(ima),
 			        ima->colorspace_settings.name, "<packed data>");
 		}
 	}
@@ -3524,7 +3534,8 @@ static void image_prefetch_decode(void *__restrict userdata, const int i, const 
 		ImageUser iuser_t = {NULL};
 		iuser_t.framenr = ima->lastframe;
 		BKE_image_user_file_path(&iuser_t, ima, filepath);
-		item->ibuf = IMB_loadiffname(filepath, IB_rect | IB_multilayer | IB_metadata | imbuf_alpha_flags_for_image(ima),
+		item->ibuf = IMB_loadiffname(filepath, IB_rect | IB_multilayer | IB_metadata | imbuf_alpha_flags_for_image(ima) |
+		                             imbuf_dds_flags_for_image(ima),
 		                             ima->colorspace_settings.name);
 	}
 }
@@ -3583,7 +3594,7 @@ static ImBuf *load_image_single(
 		ImagePackedFile *imapf;
 
 		flag = IB_rect | IB_multilayer;
-		flag |= imbuf_alpha_flags_for_image(ima);
+		flag |= imbuf_alpha_flags_for_image(ima) | imbuf_dds_flags_for_image(ima);
 
 		imapf = BLI_findlink(&ima->packedfiles, view_id);
 		if (view_id == 0 && (ibuf = image_prefetch_take(ima))) {
@@ -3599,7 +3610,7 @@ static ImBuf *load_image_single(
 		ImageUser iuser_t;
 
 		flag = IB_rect | IB_multilayer | IB_metadata;
-		flag |= imbuf_alpha_flags_for_image(ima);
+		flag |= imbuf_alpha_flags_for_image(ima) | imbuf_dds_flags_for_image(ima);
 
 		/* get the correct filepath */
 		BKE_image_user_frame_calc(iuser, cfra, 0);
@@ -4093,6 +4104,9 @@ BLI_INLINE bool image_quick_test(Image *ima, ImageUser *iuser)
  *
  * not thread-safe, so callee should worry about thread locks
  */
+/* Set by BKE_image_acquire_ibuf_compressed(), under image_spin. */
+static bool image_acquire_compressed = false;
+
 static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 {
 	ImBuf *ibuf = NULL;
@@ -4177,6 +4191,11 @@ static ImBuf *image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 		}
 	}
 
+	/* a DDS kept as blocks: everyone but the GPU upload gets pixels */
+	if (ibuf != NULL && !image_acquire_compressed) {
+		IMB_dds_ensure_rect(ibuf);
+	}
+
 	BKE_image_tag_time(ima);
 
 	return ibuf;
@@ -4196,6 +4215,23 @@ ImBuf *BKE_image_acquire_ibuf(Image *ima, ImageUser *iuser, void **r_lock)
 	BLI_spin_lock(&image_spin);
 
 	ibuf = image_acquire_ibuf(ima, iuser, r_lock);
+
+	BLI_spin_unlock(&image_spin);
+
+	return ibuf;
+}
+
+/* Like BKE_image_acquire_ibuf(), but a DDS loaded as blocks may come without pixels
+ * (ibuf->rect NULL): for the GPU upload, which calls IMB_dds_ensure_rect() if it falls back. */
+ImBuf *BKE_image_acquire_ibuf_compressed(Image *ima, ImageUser *iuser, void **r_lock)
+{
+	ImBuf *ibuf;
+
+	BLI_spin_lock(&image_spin);
+
+	image_acquire_compressed = true;
+	ibuf = image_acquire_ibuf(ima, iuser, r_lock);
+	image_acquire_compressed = false;
 
 	BLI_spin_unlock(&image_spin);
 
@@ -4677,6 +4713,8 @@ void BKE_image_file_format_set(Image *image, int ftype, const ImbFormatOptions *
 
 		while (!IMB_moviecacheIter_done(iter)) {
 			ImBuf *ibuf = IMB_moviecacheIter_getImBuf(iter);
+			/* leaving DDS: the pixels are what gets saved and drawn from now on */
+			IMB_dds_ensure_rect(ibuf);
 			ibuf->ftype = ftype;
 			ibuf->foptions = *options;
 			IMB_moviecacheIter_step(iter);
@@ -4720,6 +4758,7 @@ ImBuf *BKE_image_get_ibuf_with_name(Image *image, const char *name)
 			ImBuf *current_ibuf = IMB_moviecacheIter_getImBuf(iter);
 			if (STREQ(current_ibuf->name, name)) {
 				ibuf = current_ibuf;
+				IMB_dds_ensure_rect(ibuf);
 				IMB_refImBuf(ibuf);
 				break;
 			}
@@ -4750,6 +4789,7 @@ ImBuf *BKE_image_get_first_ibuf(Image *image)
 
 		while (!IMB_moviecacheIter_done(iter)) {
 			ibuf = IMB_moviecacheIter_getImBuf(iter);
+			IMB_dds_ensure_rect(ibuf);
 			IMB_refImBuf(ibuf);
 			break;
 		}

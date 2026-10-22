@@ -113,21 +113,25 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
     tempdir = tempfile.mkdtemp()
     blend_path = os.path.join(tempdir, bpy.path.clean_name(output_path))
     from bl_operators.wm import export_debug_overlays_off
-    with export_debug_overlays_off(keep_debug_overlays):
-        bpy.ops.wm.save_as_mainfile(filepath=blend_path,
-                                    relative_remap=True,
-                                    compress=False,
-                                    copy=True,
-                                    )
-
-    # Get the blend data
-    blend_file = open(blend_path, 'rb')
-    blend_d = blend_file.read()
-    blend_file.close()
-
-    # Get rid of the tmp blend, we're done with it
-    os.remove(blend_path)
-    os.rmdir(tempdir)
+    from bl_operators.anastacio_prepare_textures import export_prepared_textures
+    try:
+        with export_prepared_textures(), export_debug_overlays_off(keep_debug_overlays):
+            saved = bpy.ops.wm.save_as_mainfile(filepath=blend_path,
+                                              relative_remap=True,
+                                              compress=False,
+                                              copy=True)
+        if 'FINISHED' not in saved:
+            report({'ERROR'}, "Runtime scene could not be saved")
+            return False
+        with open(blend_path, 'rb') as blend_file:
+            blend_d = blend_file.read()
+    except (OSError, RuntimeError, ValueError) as error:
+        report({'ERROR'}, "Runtime export failed: %s" % error)
+        return False
+    finally:
+        if os.path.isfile(blend_path):
+            os.remove(blend_path)
+        os.rmdir(tempdir)
 
     # Create a new file for the bundled runtime
     output = open(output_path, 'wb')
@@ -178,6 +182,11 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
             report({'ERROR'}, "Bundled Python directory not found")
             return False
         print("done")
+
+    # Third-party notices must accompany the compiled DDS encoder in the player.
+    dds_license = os.path.join(blender_dir, "rgbcx-license.txt")
+    if os.path.isfile(dds_license):
+        shutil.copy2(dds_license, os.path.join(runtime_dir, "rgbcx-license.txt"))
 
     # Copy DLLs
     if copy_dlls:

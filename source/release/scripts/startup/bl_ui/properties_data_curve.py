@@ -677,6 +677,7 @@ class DATA_PT_game_text_atlas(GameTextPanel, Panel):
         box.label(text="Bitmap Atlas:", icon="IMAGE_DATA")
         col = box.column()
         col.active = text.use_bitmap_atlas
+        col.operator_menu_enum("font.text_atlas_use_existing", "source", text="Use Atlas from Project", icon='IMAGE_DATA')
         col.operator("font.text_atlas_generate", text="Generate from Font", icon='FILE_FONT')
         col.prop(text, "atlas_image")
         image = text.atlas_image
