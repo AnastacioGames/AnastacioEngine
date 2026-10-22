@@ -11,7 +11,9 @@ from common import resolve_runtime
 
 def prepare(data):
     project = data['CurPath'].resolve()
-    data_dir = (project / 'data').resolve()
+    data_dir = (project / data.get('PreparedDataSource', 'data')).resolve()
+    if project not in data_dir.parents:
+        raise RuntimeError('Prepared assets must stay inside the project')
     main = (data_dir / data['MainFile']).resolve()
     if data_dir not in main.parents or not main.is_file():
         raise RuntimeError('MainFile must exist inside data/: ' + str(main))

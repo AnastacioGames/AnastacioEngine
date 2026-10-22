@@ -113,21 +113,35 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
     tempdir = tempfile.mkdtemp()
     blend_path = os.path.join(tempdir, bpy.path.clean_name(output_path))
     from bl_operators.wm import export_debug_overlays_off
-    with export_debug_overlays_off(keep_debug_overlays):
-        bpy.ops.wm.save_as_mainfile(filepath=blend_path,
-                                    relative_remap=True,
-                                    compress=False,
-                                    copy=True,
-                                    )
-
-    # Get the blend data
-    blend_file = open(blend_path, 'rb')
-    blend_d = blend_file.read()
-    blend_file.close()
-
-    # Get rid of the tmp blend, we're done with it
-    os.remove(blend_path)
-    os.rmdir(tempdir)
+    from bl_operators import anastacio_export_assets as assets
+    try:
+        if assets.enabled():
+            runtime_dir = os.path.dirname(os.path.abspath(output_path))
+            source_dir = os.path.dirname(os.path.realpath(bpy.data.filepath))
+            if assets._inside(runtime_dir, source_dir) or assets._inside(source_dir, runtime_dir):
+                raise ValueError('Export prepared assets into a separate folder outside the source asset directory')
+            tree = os.path.join(tempdir, 'data')
+            prepared = assets.build_export_tree(tree, keep_debug_overlays=keep_debug_overlays)
+            blend_path = os.path.join(tree, prepared['main'])
+            with open(blend_path, 'rb') as blend_file:
+                blend_d = blend_file.read()
+            # The main scene lives in the runtime; LibLoad files retain their paths.
+            os.remove(blend_path)
+            os.makedirs(runtime_dir, exist_ok=True)
+            shutil.copytree(tree, runtime_dir, dirs_exist_ok=True)
+        else:
+            with export_debug_overlays_off(keep_debug_overlays):
+                saved = bpy.ops.wm.save_as_mainfile(filepath=blend_path,
+                    relative_remap=True, compress=False, copy=True)
+            if 'FINISHED' not in saved:
+                raise RuntimeError('Runtime scene could not be saved')
+            with open(blend_path, 'rb') as blend_file:
+                blend_d = blend_file.read()
+    except (OSError, RuntimeError, ValueError) as error:
+        report({'ERROR'}, 'Runtime export failed: %s' % error)
+        return False
+    finally:
+        shutil.rmtree(tempdir)
 
     # Create a new file for the bundled runtime
     output = open(output_path, 'wb')
@@ -151,7 +165,8 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
 
     # Cooked conversion data recorded while playing the .blend ("<blend>.cooked"): the runtime reads
     # "<runtime>.cooked" next to itself.
-    cooked_src = os.path.splitext(bpy.data.filepath)[0] + ".cooked" if bpy.data.filepath else ""
+    cooked_src = (os.path.splitext(bpy.data.filepath)[0] + ".cooked"
+                  if bpy.data.filepath and not assets.enabled() else "")
     cooked_dst = os.path.splitext(output_path)[0] + ".cooked"
     if os.path.isfile(cooked_src):
         shutil.copy2(cooked_src, cooked_dst)

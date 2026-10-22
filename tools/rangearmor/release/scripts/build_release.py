@@ -78,12 +78,19 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
         exclusions = ['*.export-tmp', '*.cooked.tmp']
         if not use_cooked:
             exclusions.append('*.cooked')
-        shutil.copytree(str(project / "data"), str(stage / "data"),
+        asset_source = (project / data.get('PreparedDataSource', 'data')).resolve()
+        if project not in asset_source.parents or not asset_source.is_dir():
+            raise RuntimeError('Prepared assets must exist inside the project')
+        shutil.copytree(str(asset_source), str(stage / "data"),
                         ignore=shutil.ignore_patterns(*exclusions))
         (stage / "launcher").mkdir()
         shutil.copy2(str(data["ProjectFile"]), str(stage / "launcher/config.json"))
         delivered_config = stage / 'launcher/config.json'
         config = None
+        if data.get('PreparedDataSource'):
+            config = json.loads(delivered_config.read_text(encoding='utf-8'))
+            config.pop('PreparedDataSource', None)
+            config['DataSource'] = './data'
         for target, suffix, launcher, engine in targets:
             # Only the delivery adopts the executable actually copied. The
             # author's config and custom paths remain untouched.

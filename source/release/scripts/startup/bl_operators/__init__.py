@@ -36,6 +36,7 @@ _modules = [
     "image",
     "anastacio_cook",
     "anastacio_performance_report",
+    "anastacio_prepare_audio",
     "anastacio_scene_doctor",
     "anastacio_lod_auto",
     "anastacio_collision_proxy",
