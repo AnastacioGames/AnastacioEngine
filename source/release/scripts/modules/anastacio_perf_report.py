@@ -278,7 +278,7 @@ def _table(headers, rows, numeric=()):
     out += ['<th%s>%s</th>' % (' class="n"' if i in numeric else '', _esc(h)) for i, h in enumerate(headers)]
     out.append('</tr>')
     for r in rows[:MAX_ROWS]:
-        out.append('<tr>' + ''.join('<td%s>%s</td>' % (' class="n"' if i in numeric else (' class="barcell"' if isinstance(c, Markup) and 'class="bar' in c else ''),
+        out.append('<tr>' + ''.join('<td%s>%s</td>' % (' class="n"' if i in numeric else (' class="barcell"' if isinstance(c, Markup) and 'class="bar ' in c else ''),
                                                          c if isinstance(c, Markup) else _esc(c))
                                     for i, c in enumerate(r)) + '</tr>')
     out.append('</table>')
@@ -463,6 +463,19 @@ def _memory_chart(a):
                                                          % (mem[0][1], hi, mem[-1][1]))))
 
 
+# Per frame counters: (worth a look, fix first). Unknown counters stay neutral.
+WORK_LIMITS = {
+    'draws': (800, 2000), 'matBinds': (300, 800), 'lightBinds': (200, 600), 'passUniforms': (3000, 10000),
+    'syncs': (60, 200), 'bounds': (200, 1000), 'matrices': (500, 2000), 'nodes': (500, 2000),
+    'instancing': (500, 2000), 'notifies': (100, 500),
+}
+
+
+def _work_level(name, value):
+    limits = WORK_LIMITS.get(name)
+    return _level(value, *limits) if limits else 'mut'
+
+
 def memory_growth(a):
     """MB gained from the end of start-up to the end of the run (a steady climb may be a leak)."""
     mem = [mb for t, mb in a['memory'] if t >= a['startup_s']]
@@ -527,6 +540,11 @@ td:first-child{white-space:nowrap}td.barcell{width:55%}.n{text-align:right;font-
 .adv li.bad{border-left-color:var(--bad);background:var(--badbg)}
 .legend{font-size:12px;color:var(--mut);margin-top:10px;display:flex;gap:14px}
 .legend b{font-weight:600}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:8px;vertical-align:middle;background:var(--mut)}
+.dot.good{background:var(--good)}.dot.warn{background:var(--warn)}.dot.bad{background:var(--bad)}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11px;background:var(--card2);border:1px solid var(--line)}
+.chip.speaker{color:var(--acc);border-color:var(--acc)}.chip.actuator{color:var(--acc2);border-color:var(--acc2)}
+.chip.world{color:var(--good);border-color:var(--good)}
 footer{margin-top:36px;color:var(--mut);font-size:12px;word-break:break-all}
 """
 
@@ -634,8 +652,13 @@ def write_html(folder, title=None):
         rows = []
         for e in a['scenes']:
             sh = a['scene_shaders'].get(e['scene'], {})
-            rows.append((e['scene'], '%.0f' % e['ms'], '%.0f' % sh.get('textures_ms', 0), '%.0f' % sh.get('shaders_ms', 0),
-                         e.get('objects', '-'), '%.1f s' % e['t']))
+            tex, shd = sh.get('textures_ms', 0), sh.get('shaders_ms', 0)
+            total = e['ms'] + tex + shd
+            late = e['f'] > a['load_end']
+            rows.append((Markup('<span class="dot %s"></span>%s' % (_level(total, 50, 200), _esc(e['scene']))),
+                         _colored('%.0f' % e['ms'], _level(e['ms'], 50, 200)), _colored('%.0f' % tex, _level(tex, 50, 200)),
+                         _colored('%.0f' % shd, _level(shd, 50, 200)), e.get('objects', '-'),
+                         _colored('%.1f s' % e['t'], 'warn' if late else 'mut')))
         w.append('<h2>%s</h2><div class="card">%s</div>'
                  % (_esc(_('Scene loading')), _table((_('Scene'), _('Convert ms'), _('Textures ms'), _('Shaders ms'),
                                                       _('Objects'), _('At')), rows, numeric=(1, 2, 3, 4))))
@@ -644,7 +667,8 @@ def write_html(folder, title=None):
         w.append('<h2>%s</h2><div class="card">' % _esc(_('Loaded but never drawn')))
         if a['never']:
             w.append(_table((_('Object'), _('Scene'), _('Triangles')),
-                            [(o['name'], o['scene'], a['tris'](o)) for o in a['never']], numeric=(2,)))
+                            [(o['name'], _colored(o['scene'], 'mut'), _colored(a['tris'](o), _level(a['tris'](o), 1000, 5000)))
+                             for o in a['never']], numeric=(2,)))
             if a['unused_imgs']:
                 w.append('<p>%s %s</p>' % (_esc(_('Images only used by them:')), _esc(', '.join(a['unused_imgs'][:20]))))
             w.append('<p class="note">%s</p>' % _esc(_('Never seen by the camera in this run. If they are never needed, '
@@ -660,7 +684,9 @@ def write_html(folder, title=None):
         w.append('<h2>%s</h2><div class="card">' % _esc(_('Sounds')))
         if a['sounds']:
             w.append(_table((_('Sound'), _('From'), _('Times played'), _('First at')),
-                            [(n, v[1], v[0], '%.1f s' % v[2]) for n, v in a['sounds']], numeric=(2,)))
+                            [(n, Markup('<span class="chip %s">%s</span>' % (_esc(v[1]), _esc(v[1]))),
+                              _colored(v[0], _level(v[0], 50, 500)), _colored('%.1f s' % v[2], 'mut')) for n, v in a['sounds']],
+                            numeric=(2,)))
             w.append('<p class="note">%s</p>' % _esc(_('Sounds started by the Sound actuator, speakers and World Sound. '
                                                       'Sounds played directly with the aud module are not listed.')))
         else:
@@ -670,7 +696,9 @@ def write_html(folder, title=None):
     if a['work']:
         w.append('<h2>%s</h2><div class="card">%s</div>'
                  % (_esc(_('Work per frame')), _table((_('Counter'), _('Typical'), '95%', _('Max')),
-                                                      [(k, '%g' % m, '%g' % p, '%g' % mx) for k, m, p, mx in a['work']],
+                                                      [(Markup('<span class="dot %s"></span>%s' % (_work_level(k, p), _esc(k))),
+                                                        _colored('%g' % m, _work_level(k, m)), _colored('%g' % p, _work_level(k, p)),
+                                                        _colored('%g' % mx, _work_level(k, mx))) for k, m, p, mx in a['work']],
                                                       numeric=(1, 2, 3))))
 
     w.append('<footer>%s %s</footer></main></body></html>' % (_esc(_('Raw data:')), _esc(os.path.join(folder, 'trace.jsonl'))))
