@@ -105,11 +105,15 @@ Aberto:
   Tangentes cozidas também (2026-10-08): malha do teste 32 → 4 ms. Sem mínimo de loops: 200 malhas de 112 loops 45 → 21 ms. Normais e BVH de física cozidas: 200 malhas de 8 064 loops 1 820 → 259 ms. Falta conferir num jogo real. Jogo exportado guarda os shaders num cache do
   usuário e aquece todos na primeira abertura em cada GPU/driver, com tela de texto (sem barra de progresso).
 - Texturas (2026-10-03): PNG decodificados em paralelo, 80 imagens 2048² 2,2 s → 0,7 s. O resto é upload
-  serial na GPU. [Preparar texturas DDS](plano-texturas-dds.md), em branch: derivados fora do `.cooked`,
+  serial na GPU. [Preparar texturas DDS](plano-texturas-dds.md), no main: derivados fora do `.cooked`,
   upload BC1/BC3 e fallback RGBA8 passaram no player em cena controlada. Build final do editor/player,
   regressao completa incluindo PREMUL e conferencia visual da textura alpha pelo usuario passaram.
   Pendente: visual no jogo real, load/VRAM no RolimaRacer/iGPU e execucao Linux.
-  O loader DDS ainda descomprime o nivel base na CPU.
+  Marco 4 no main (2026-10-22): DXT POT carrega so os blocos, sem RGBA na CPU; pixels decodificados
+  sob demanda (Python, pintura, VideoTexture, fallback sem S3TC). Falta medir load/RAM/VRAM contra PNG.
+- Preparar Audio (2026-10-22, no main): OGG Vorbis q5/q4 por encoder externo (FFmpeg com libvorbis),
+  streaming dos longos. Export runtime/RangeArmor monta copias de todos os `.range` da pasta (LibLoad
+  incluso) com DDS e audio. Falta ouvir no jogo, LibLoad em gameplay e medir pacote real do RolimaRacer.
 - Tela de loading do LibLoad (2026-10-03): `asynchronous=True` agora tem progresso real (conversão por
   objeto, depois texturas e shaders um a um) e o merge se espalha em frames de ~8 ms. Falta o usuário testar
   num jogo real; a abertura/link do arquivo ainda é síncrona. Luz nova recompila a cena uma vez só depois

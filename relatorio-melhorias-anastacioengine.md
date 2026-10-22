@@ -160,6 +160,11 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   originais. Build editor/player, regressao incluindo PREMUL, upload comprimido e fallback passaram.
   Usuario confirmou o alpha da textura de teste. Benchmark e Linux/iGPU pendentes.
   Contrato e limites no [plano](docs/plano-texturas-dds.md).
+  Marco 4: DXT POT fica so em blocos comprimidos; pixels decodificados sob demanda. Textura desatualizada
+  exporta o original com aviso.
+- **Preparar Audio:** OGG Vorbis q5/q4 por encoder externo (FFmpeg/libvorbis, nao incluido); streaming
+  acima de 25 s. Export runtime/RangeArmor monta copias de todos os `.range` da pasta do projeto
+  (LibLoad) em background; bibliotecas fora da pasta sao recusadas e assets soltos sao mantidos.
 
 
 - **RA5:** materiais sem slots ativos no passe deixam de validar texturas e atualizar

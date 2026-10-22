@@ -6,6 +6,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+
+## 2026-10-22 - Merge: DDS Marco 4, Preparar Audio e export compartilhado
+
+- `main` recebeu `feat/preparar-texturas-dds`, `feat/dds-marco4` e `feat/preparar-audio` (sem push).
+- Marco 4: flag `IB_dds_blocks`; DXT 2D POT carrega so os blocos (sem `rect`). `IMB_dds_ensure_rect`
+  decodifica sob demanda no acquire comum; `BKE_image_acquire_ibuf_compressed` serve so a GPU.
+  DDS truncado limita os mipmaps aos niveis presentes; fallback sem S3TC decodifica na hora.
+- Preparar Audio (Codex): Vorbis q5 musica, q4 ambiente/efeitos, acima de 25 s ou WAV >= 1 MiB; encoder
+  externo (libsndfile local nao grava Vorbis). `anastacio_export_assets.py` substitui o contexto
+  exclusivo do DDS nos exportadores: workers em background, copias de toda a arvore de `.range`.
+- Revisao: dialogo Prepare Textures estima DXT1/DXT5 pela profundidade (antes lia todos os pixels);
+  `color_usage()` uma vez por export; textura preparada desatualizada exporta o original com aviso.
+- Testes: AUDIO_EXPORTERS_OK repetido apos as ultimas correcoes; 14 testes RangeArmor e testes de
+  audio/pacote limpo do Codex em `build/audio-export-validation/`.
 ## 2026-10-22 - Scene Doctor: colisao simplificada, fase 1
 
 - Nova `rule_collision_primitive` em RULES: volumes via bmesh e escala mundial, Box/Sphere/Cylinder/
