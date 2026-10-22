@@ -53,15 +53,22 @@ class Issue:
         return "%s:%s" % (self.rule, self.key)
 
 
-# Last run: issues shown in the panel, and the ones the user chose to ignore during this session.
+# Last run: issues shown in the panel, the ones the user chose to ignore during this session, and the
+# fixes applied (title, revert function) so they can be undone one by one.
 _issues = []
 _ignored = set()
+_applied = []
 _last_scene = ""
 
 
 def _scene_objects(scene):
+    """Every object of the scene: inactive layers hold what AddObject spawns during the game."""
+    return list(scene.objects)
+
+
+def _active_objects(scene, objects):
     layers = scene.layers
-    return [ob for ob in scene.objects if any(a and b for a, b in zip(ob.layers, layers))]
+    return [ob for ob in objects if any(a and b for a, b in zip(ob.layers, layers))]
 
 
 def _mesh_tris(mesh):
@@ -94,13 +101,13 @@ def _node_images(tree, images, visited):
 def _scene_images(objects):
     """Images reached by the materials of the given objects: texture slots and node trees."""
     images = {}
-    visited = set()
     for ob in objects:
         for slot in ob.material_slots:
             ma = slot.material
             if ma is None:
                 continue
             found = set()
+            visited = set()
             for tslot in ma.texture_slots:
                 if tslot and tslot.texture and getattr(tslot.texture, "image", None) is not None:
                     found.add(tslot.texture.image)
@@ -112,7 +119,8 @@ def _scene_images(objects):
 
 
 def _has_logic(ob):
-    return bool(ob.game.actuators) or any(c.type == 'PYTHON' for c in ob.game.controllers)
+    game = ob.game
+    return bool(game.actuators) or bool(game.components) or any(c.type == 'PYTHON' for c in game.controllers)
 
 
 def _is_animated(ob):
@@ -192,33 +200,51 @@ def _static_batch_candidate(ob):
         return False
     if ob.data.shape_keys is not None:
         return False
+    # A LoD switch replaces the mesh of a batched object; keep them apart until that is handled.
+    if len(ob.lod_levels) > 1:
+        return False
     return True
 
 
 def rule_static_batch(scene, objects):
-    candidates = [ob for ob in objects if _static_batch_candidate(ob)]
+    active = _active_objects(scene, objects)
+    candidates = [ob for ob in active if _static_batch_candidate(ob)]
     safe = [ob for ob in candidates if not _has_logic(ob)]
     with_logic = [ob for ob in candidates if _has_logic(ob)]
-    batched = sum(1 for ob in objects if ob.type == 'MESH' and ob.use_static_batch)
-    if len(safe) + batched < 2:
+    batched = sum(1 for ob in active if ob.type == 'MESH' and ob.use_static_batch)
+    if not safe or len(safe) + batched < 2:
         return []
-    if not safe:
-        return []
-    materials = {s.material for ob in safe for s in ob.material_slots if s.material}
 
-    def fix():
-        for ob in safe:
-            ob.use_static_batch = True
+    groups = {}
+    for ob in safe:
+        ma = next((slot.material for slot in ob.material_slots if slot.material), None)
+        groups.setdefault(ma.name if ma else "(no material)", []).append(ob)
 
-    detail = ("They never move: Static Batch draws them together, one draw per material "
-              "(%d material(s) here) instead of one per object." % max(1, len(materials)))
+    issues = []
+    for name, obs in sorted(groups.items(), key=lambda g: -len(g[1])):
+        if len(obs) < 2:
+            continue  # one object per material: the batch would not save a draw call
+        def fix(obs=obs):
+            for ob in obs:
+                ob.use_static_batch = True
+
+            def revert():
+                for ob in obs:
+                    ob.use_static_batch = False
+            return revert
+        detail = ("They never move: Static Batch draws them together in one draw call instead of %d. "
+                  "Check that no script moves them before fixing." % len(obs))
+        issues.append(Issue(
+            "static_batch", name, 'MEDIUM' if len(obs) >= 10 else 'LOW',
+            "%d static object(s) with %s outside the Static Batch" % (len(obs), name), detail,
+            sorted(obs, key=lambda o: o.name), fix))
     if with_logic:
-        detail += (" %d other static object(s) have logic bricks or scripts and were left out; mark "
-                   "them by hand if they never move." % len(with_logic))
-    return [Issue(
-        "static_batch", "all", 'HIGH' if len(safe) >= 50 else 'MEDIUM',
-        "%d static object(s) outside the Static Batch" % len(safe), detail,
-        sorted(safe, key=lambda o: o.name), fix)]
+        issues.append(Issue(
+            "static_batch_logic", "all", 'LOW',
+            "%d static object(s) with logic left out of the Static Batch" % len(with_logic),
+            "They have logic bricks, scripts or components. Mark them by hand only if they never move.",
+            sorted(with_logic, key=lambda o: o.name)))
+    return issues
 
 
 def rule_physics_shapes(scene, objects):
@@ -228,9 +254,13 @@ def rule_physics_shapes(scene, objects):
             continue
         game = ob.game
         trimesh = game.use_collision_bounds and game.collision_bounds_type == 'TRIANGLE_MESH'
-        if game.physics_type in {'DYNAMIC', 'RIGID_BODY'} and trimesh:
+        if game.physics_type in {'DYNAMIC', 'RIGID_BODY', 'SOFT_BODY', 'CHARACTER'} and trimesh:
             def fix(ob=ob):
                 ob.game.collision_bounds_type = 'CONVEX_HULL'
+
+                def revert():
+                    ob.game.collision_bounds_type = 'TRIANGLE_MESH'
+                return revert
             issues.append(Issue(
                 "physics_moving_trimesh", ob.name, 'HIGH',
                 "%s moves with Triangle Mesh collision" % ob.name,
@@ -252,8 +282,12 @@ def rule_shadows(scene, objects):
     for ob in shadowed:
         size = ob.data.shadow_buffer_size
         if size > SHADOW_BUFFER_MAX:
-            def fix(lamp=ob.data):
+            def fix(lamp=ob.data, size=size):
                 lamp.shadow_buffer_size = SHADOW_BUFFER_MAX
+
+                def revert():
+                    lamp.shadow_buffer_size = size
+                return revert
             issues.append(Issue(
                 "shadow_big", ob.name, 'MEDIUM',
                 "%s has a %d shadow buffer" % (ob.name, size),
@@ -281,16 +315,21 @@ def _sound_bytes(sound):
 def rule_sounds(scene, objects):
     issues = []
     for sound in bpy.data.sounds:
-        if sound.users == 0:
+        if sound.users - int(sound.use_fake_user) <= 0:
             continue
         size = _sound_bytes(sound)
         if size >= SOUND_STREAM_BYTES and sound.use_memory_cache:
             def fix(sound=sound):
                 sound.use_memory_cache = False
+
+                def revert():
+                    sound.use_memory_cache = True
+                return revert
             issues.append(Issue(
                 "sound_cached", sound.name, 'MEDIUM',
                 "Sound %s (%.1f MB) is fully loaded in memory" % (sound.name, size / 1048576),
-                "Long music or ambience plays fine streamed from the file, without holding it in memory.",
+                "Long music or ambience can play streamed from the file instead of held in memory "
+                "(decoding then costs some CPU while playing). Takes effect after the file is reopened.",
                 fix=fix))
         elif size >= SOUND_BIG_BYTES and sound.filepath.lower().endswith(".wav"):
             issues.append(Issue(
@@ -341,7 +380,7 @@ def diagnose(scene):
         try:
             issues.extend(rule(scene, objects))
         except Exception as ex:
-            issues.append(Issue(rule.__name__, "error", 'LOW', "Check %s failed: %s" % (rule.__name__, ex)))
+            issues.append(Issue(rule.__name__, "error", 'HIGH', "Check %s failed: %s" % (rule.__name__, ex)))
     issues.sort(key=lambda i: (SEVERITY_ORDER[i.severity], i.rule, i.key))
     return issues
 
@@ -441,8 +480,32 @@ class GAME_OT_scene_doctor_fix(Operator):
         issue = _issue_at(self.index)
         if issue is None or issue.fix is None:
             return {'CANCELLED'}
-        issue.fix()
+        revert = issue.fix()
+        if revert is not None:
+            _applied.append((issue.title, revert))
         self.report({'INFO'}, "Fixed: %s" % issue.title)
+        _run(context)
+        return {'FINISHED'}
+
+
+class GAME_OT_scene_doctor_revert(Operator):
+    """Undo this fix"""
+    bl_idname = "game.scene_doctor_revert"
+    bl_label = "Revert"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    index: IntProperty(options={'HIDDEN'})
+
+    def execute(self, context):
+        if not 0 <= self.index < len(_applied):
+            return {'CANCELLED'}
+        title, revert = _applied.pop(self.index)
+        try:
+            revert()
+        except ReferenceError:
+            self.report({'WARNING'}, "Could not revert, the data no longer exists: %s" % title)
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Reverted: %s" % title)
         _run(context)
         return {'FINISHED'}
 
@@ -475,6 +538,14 @@ class SCENE_PT_scene_doctor(Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator("game.scene_doctor", text="Check Scene", icon='VIEWZOOM')
+
+        if _applied:
+            box = layout.box()
+            box.label(text="Applied fixes")
+            for index, (title, _revert) in enumerate(_applied):
+                row = box.row(align=True)
+                row.label(text=title, icon='FILE_TICK')
+                row.operator("game.scene_doctor_revert", text="Revert").index = index
 
         if _last_scene != context.scene.name:
             layout.label(text="Not checked yet")
@@ -517,6 +588,7 @@ classes = (
     GAME_OT_scene_doctor,
     GAME_OT_scene_doctor_select,
     GAME_OT_scene_doctor_fix,
+    GAME_OT_scene_doctor_revert,
     GAME_OT_scene_doctor_ignore,
     SCENE_PT_scene_doctor,
 )
