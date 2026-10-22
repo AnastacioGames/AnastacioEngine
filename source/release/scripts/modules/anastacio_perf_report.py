@@ -138,7 +138,8 @@ def analyze(events):
         top_script = max(sc.items(), key=lambda x: x[1][0]) if sc else None
         spikes.append(dict(f=fr['f'], t=fr['t'], ms=_cost(fr), cats=_top(fr['c']),
                            script=(top_script[0], top_script[1][0]) if top_script and top_script[1][0] >= 1.0 else None,
-                           loads=loads.get(fr['f'], []) + loads.get(fr['f'] - 1, [])))
+                           loads=loads.get(fr['f'], []) + loads.get(fr['f'] - 1, []),
+                           allcats=_top(fr['c'], 12), scripts=sorted(((n, v[0], v[1]) for n, v in sc.items()), key=lambda r: r[1], reverse=True)[:10]))
 
     # Average time per profiler category during play.
     cat_sum = defaultdict(float)
@@ -155,6 +156,9 @@ def analyze(events):
     images = {}
     for e in events:
         if e['ev'] == 'mesh':
+            # Mesh materials come with the ID prefix ("MAStone"; a bare "MA" is no material),
+            # material events without it.
+            e['materials'] = [m[2:] if m.startswith('MA') else m for m in e.get('materials', []) if m != 'MA']
             meshes.setdefault(e['name'], e)
         elif e['ev'] == 'material':
             materials.setdefault(e['name'], e)
@@ -194,6 +198,24 @@ def analyze(events):
     used_imgs = {i for mat in used_mats for i in materials.get(mat, {}).get('images', [])}
     unused_imgs = sorted(({i for mat in unused_mats for i in materials.get(mat, {}).get('images', [])} - used_imgs),
                          key=lambda i: _image_mb(images[i]) if i in images else 0, reverse=True)
+
+    # Heaviest objects: triangles, materials and texture memory per object, and where it was drawn.
+    heavy = []
+    for o in with_mesh.values():
+        mats = sorted({mat for m in o['meshes'] for mat in meshes.get(m, {}).get('materials', [])})
+        imgs = {i for mat in mats for i in materials.get(mat, {}).get('images', []) if i in images}
+        if not has_usage:
+            drawn = None
+        elif o['name'] in seen['camera']:
+            drawn = 'camera'
+        elif o['name'] in seen['shadow']:
+            drawn = 'shadow'
+        else:
+            drawn = 'never'
+        heavy.append(dict(name=o['name'], scene=o['scene'], tris=tris(o), mats=len(mats),
+                          tex_mb=sum(_image_mb(images[i]) for i in imgs), drawn=drawn,
+                          static_batch=o.get('static_batch', False)))
+    heavy.sort(key=lambda h: (h['tris'], h['tex_mb']), reverse=True)
 
     # Loading during play (after the first frames): stalls the game.
     late = []
@@ -235,7 +257,7 @@ def analyze(events):
                 scene_shaders={e['scene']: e for e in events if e['ev'] == 'load_shaders'},
                 has_usage=has_usage, never=never, shadow_only=shadow_only, tris=tris,
                 unused_meshes=unused_meshes, unused_mats=unused_mats, unused_imgs=unused_imgs, images=images,
-                meshes=meshes, late=late, work=work_rows,
+                meshes=meshes, heavy=heavy, late=late, work=work_rows,
                 duration=events[-1]['t'] if events else 0.0)
 
 
@@ -274,14 +296,14 @@ def _level(value, warn, bad):
 
 
 def _table(headers, rows, numeric=()):
-    out = ['<table><tr>']
+    out = ['<div class="tscroll"><table><tr>']
     out += ['<th%s>%s</th>' % (' class="n"' if i in numeric else '', _esc(h)) for i, h in enumerate(headers)]
     out.append('</tr>')
     for r in rows[:MAX_ROWS]:
         out.append('<tr>' + ''.join('<td%s>%s</td>' % (' class="n"' if i in numeric else (' class="barcell"' if isinstance(c, Markup) and 'class="bar ' in c else ''),
                                                          c if isinstance(c, Markup) else _esc(c))
                                     for i, c in enumerate(r)) + '</tr>')
-    out.append('</table>')
+    out.append('</table></div>')
     if len(rows) > MAX_ROWS:
         out.append('<p class="note">%s</p>' % _esc(_('%d more not shown') % (len(rows) - MAX_ROWS)))
     return ''.join(out)
@@ -310,8 +332,10 @@ def _chart(a):
     pts = ' '.join('%.1f,%.1f' % (x(fr['t']), y(_cost(fr))) for fr in play[::step])
     lines = ''.join('<line x1="0" x2="%d" y1="%.1f" y2="%.1f" class="ref"/><text x="4" y="%.1f" class="lbl">%s</text>'
                     % (w, y(ms), y(ms), y(ms) - 3, label) for ms, label in ((1000 / 60, '60 FPS'), (1000 / 30, '30 FPS')))
-    dots = ''.join('<circle cx="%.1f" cy="%.1f" r="3.5" class="spike"><title>%.1f ms @ %.1f s</title></circle>'
-                   % (x(s['t']), y(s['ms']), s['ms'], s['t']) for s in a['spikes'][:200])
+    # Each spike is clickable (a wider invisible circle makes it easy to hit) and opens its frame below the chart.
+    dots = ''.join('<g class="spk" onclick="showFrame(%d)"><circle cx="%.1f" cy="%.1f" r="9" class="hit"/>'
+                   '<circle cx="%.1f" cy="%.1f" r="3.5" class="spike"/><title>%.1f ms @ %.1f s</title></g>'
+                   % (i, x(s['t']), y(s['ms']), x(s['t']), y(s['ms']), s['ms'], s['t']) for i, s in enumerate(a['spikes'][:200]))
     labels = {'scene_add': _('scene added'), 'scene_remove': _('scene removed'), 'sound': _('sound')}
     for t, kind, name in a.get('marks', [])[:400]:
         if t0 <= t <= t1:
@@ -324,6 +348,24 @@ def _chart(a):
     area = '<polygon points="%s,%d %s %s,%d" class="area"/>' % (first, h, pts, last, h)
     return ('<svg viewBox="0 0 %d %d" preserveAspectRatio="none" class="chart">%s%s<polyline points="%s" class="line"/>%s</svg>'
             % (w, h, lines, area, pts, dots))
+
+
+def _frame_details(a):
+    """Hidden detail of each spike frame, shown by clicking its dot in the chart."""
+    out = ['<div id="framebox" class="framebox" hidden></div>']
+    for i, s in enumerate(a['spikes'][:200]):
+        top = s['allcats'][0][1] if s['allcats'] else 1.0
+        cats = _table((_('Part'), '', 'ms'), [(k, Markup('<div class="bar %s" style="width:%.0f%%"></div>' % (_level(v, 5.0, 15.0), v / (top or 1) * 100)),
+                                               _colored('%.1f' % v, _level(v, 5.0, 15.0))) for k, v in s['allcats']], numeric=(2,))
+        scripts = (_table((_('Script'), 'ms', _('Calls')), [(n, '%.1f' % ms, c) for n, ms, c in s['scripts']], numeric=(1, 2))
+                   if s['scripts'] else '<p class="mut">%s</p>' % _esc(_('No script took noticeable time.')))
+        loads = ('<ul class="loads">%s</ul>' % ''.join('<li>%s</li>' % _esc(l) for l in s['loads'])
+                 if s['loads'] else '<p class="mut">%s</p>' % _esc(_('Nothing loaded in this frame.')))
+        out.append('<template id="frame%d"><div class="fhead"><b>%s</b><button class="fclose" onclick="showFrame(-1)">&times;</button></div>'
+                   '<div class="fgrid"><div><h3>%s</h3>%s</div><div><h3>%s</h3>%s<h3>%s</h3>%s</div></div></template>'
+                   % (i, _esc(_('Frame %d at %.1f s: %.0f ms') % (s['f'], s['t'], s['ms'])),
+                      _esc(_('Slowest parts')), cats, _esc(_('Scripts')), scripts, _esc(_('Loading at that moment')), loads))
+    return ''.join(out)
 
 
 # Advice per profiler category: what usually makes it heavy.
@@ -403,6 +445,22 @@ def advice(a, shader_items):
     order = {'bad': 0, 'warn': 1, 'good': 2}
     out.sort(key=lambda x: order[x[0]])
     return out
+
+
+def _heavy_hint(h):
+    """What to reduce on one object, most useful first."""
+    out = []
+    if h['drawn'] == 'never':
+        out.append(_('never drawn: remove it or use On Demand'))
+    elif h['drawn'] == 'shadow':
+        out.append(_('only in shadows: a simpler mesh can cast them'))
+    if h['tris'] >= 20000:
+        out.append(_('many triangles: Decimate or a lighter version'))
+    if h['tex_mb'] >= 32:
+        out.append(_('large textures: reduce their size'))
+    if h['mats'] >= 4 and not h['static_batch']:
+        out.append(_('many materials: each one is drawn apart, merge them or use Static Batch'))
+    return '; '.join(out)
 
 
 def summary(a, shader_items):
@@ -487,6 +545,8 @@ THEME_JS = """
 function toggleTheme(){var r=document.documentElement,cur=r.getAttribute('data-theme');
 if(!cur){cur=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
 var next=cur==='dark'?'light':'dark';r.setAttribute('data-theme',next);try{localStorage.setItem('perfTheme',next);}catch(e){}}
+function showFrame(i){var b=document.getElementById('framebox'),t=document.getElementById('frame'+i);if(!b)return;
+if(!t){b.hidden=true;b.innerHTML='';return;}b.innerHTML=t.innerHTML;b.hidden=false;b.scrollIntoView({block:'nearest'});}
 """
 
 
@@ -522,12 +582,17 @@ h2{font-size:16px;margin:30px 0 10px;scroll-margin-top:60px}
 .kpi.warn{border-top-color:var(--warn)}.kpi.warn b{color:var(--warn)}
 .kpi.bad{border-top-color:var(--bad)}.kpi.bad b{color:var(--bad)}
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;overflow-x:auto;box-shadow:var(--shadow)}
-table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+.tscroll{max-height:460px;overflow:auto}table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
 tr:last-child td{border-bottom:0}tbody tr:hover td,tr:hover td{background:var(--card2)}
-th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+th{position:sticky;top:0;background:var(--card);z-index:1;color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
 td:first-child{white-space:nowrap}td.barcell{width:55%}.n{text-align:right;font-variant-numeric:tabular-nums}
 .chart{width:100%;height:190px;display:block}.line{fill:none;stroke:var(--acc);stroke-width:1.2}.area{fill:var(--acc);opacity:.10}
 .ref{stroke:var(--mut);stroke-dasharray:4 4;stroke-width:.6}.lbl{fill:var(--mut);font-size:10px}.spike{fill:var(--bad);stroke:var(--card);stroke-width:1}
+.spk{cursor:pointer}.hit{fill:transparent}.spk:hover .spike{r:5}
+.framebox{margin-top:12px;border-top:1px solid var(--line);padding-top:10px}.fhead{display:flex;justify-content:space-between;align-items:center}
+.fclose{border:0;background:var(--card2);color:var(--fg);border-radius:999px;width:28px;height:28px;cursor:pointer;font-size:16px}
+.fgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.framebox h3{font-size:13px;margin:10px 0 4px;color:var(--mut)}
+.loads{margin:0;padding-left:18px}
 .mscn{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:3 3}.msnd{stroke:var(--good);stroke-width:2}
 .chart.mem{height:90px}.memline{fill:none;stroke:var(--warn);stroke-width:1.6}
 .bar{height:10px;background:var(--acc);border-radius:6px;min-width:3px}
@@ -595,9 +660,10 @@ def write_html(folder, title=None):
                     _esc(_('Previous report: %s. Runs differ in what you played, so compare similar sessions.') % name)))
 
     w.append('<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>'
-             % (_esc(_('Frame time')), _chart(a),
+             % (_esc(_('Frame time')), _chart(a) + _frame_details(a),
                 _esc(_('Lower is better. Red dots are spikes: frames much slower than the rest. '
-                       'Orange dashed lines: scenes added or removed; green ticks at the bottom: sounds (hover for details).'))))
+                       'Orange dashed lines: scenes added or removed; green ticks at the bottom: sounds (hover for details). '
+                       'Click a red dot to see that frame.'))))
     if a['has_runtime'] and a['memory']:
         w.append('<h2>%s</h2><div class="card">%s</div>' % (_esc(_('Memory')), _memory_chart(a)))
 
@@ -662,6 +728,21 @@ def write_html(folder, title=None):
         w.append('<h2>%s</h2><div class="card">%s</div>'
                  % (_esc(_('Scene loading')), _table((_('Scene'), _('Convert ms'), _('Textures ms'), _('Shaders ms'),
                                                       _('Objects'), _('At')), rows, numeric=(1, 2, 3, 4))))
+
+    if a['heavy']:
+        drawn = {'camera': ('good', _('camera')), 'shadow': ('warn', _('shadow only')), 'never': ('bad', _('never'))}
+        rows = []
+        for h in a['heavy']:
+            lv, label = drawn.get(h['drawn'], ('mut', '-'))
+            rows.append((h['name'], _colored(h['scene'], 'mut'), _colored(h['tris'], _level(h['tris'], 5000, 20000)),
+                         _colored(h['mats'], _level(h['mats'], 4, 8)),
+                         _colored('%.1f' % h['tex_mb'], _level(h['tex_mb'], 16, 64)), _colored(label, lv),
+                         _colored(_heavy_hint(h), 'mut')))
+        w.append('<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>'
+                 % (_esc(_('Heaviest objects')),
+                    _table((_('Object'), _('Scene'), _('Triangles'), _('Materials'), _('Textures MB'), _('Drawn'), _('What to reduce')),
+                           rows, numeric=(2, 3, 4)),
+                    _esc(_('Sorted by triangles. Texture memory counts each image the object uses, even when shared with others.'))))
 
     if a['has_usage']:
         w.append('<h2>%s</h2><div class="card">' % _esc(_('Loaded but never drawn')))
