@@ -15,6 +15,7 @@ Generic for any game. Usable without Blender: python anastacio_perf_report.py <f
 
 import html
 import json
+import re
 import os
 import sys
 from collections import defaultdict
@@ -318,8 +319,11 @@ def _chart(a):
             dots += ('<line x1="%.1f" x2="%.1f" y1="%d" y2="%d" class="%s"><title>%s: %s @ %.1f s</title></line>'
                      % (x(t), x(t), h - (8 if kind == 'sound' else 0), h if kind == 'sound' else 0, cls,
                         _esc(labels[kind]), _esc(name), t))
-    return ('<svg viewBox="0 0 %d %d" preserveAspectRatio="none" class="chart">%s<polyline points="%s" class="line"/>%s</svg>'
-            % (w, h, lines, pts, dots))
+    first = pts.split(' ', 1)[0].split(',')[0]
+    last = pts.rsplit(' ', 1)[-1].split(',')[0]
+    area = '<polygon points="%s,%d %s %s,%d" class="area"/>' % (first, h, pts, last, h)
+    return ('<svg viewBox="0 0 %d %d" preserveAspectRatio="none" class="chart">%s%s<polyline points="%s" class="line"/>%s</svg>'
+            % (w, h, lines, area, pts, dots))
 
 
 # Advice per profiler category: what usually makes it heavy.
@@ -465,30 +469,65 @@ def memory_growth(a):
     return (mem[-1] - mem[0], mem[0]) if len(mem) >= 10 else (0.0, 0.0)
 
 
+THEME_JS = """
+(function(){try{var t=localStorage.getItem('perfTheme');if(t)document.documentElement.setAttribute('data-theme',t);}catch(e){}})();
+function toggleTheme(){var r=document.documentElement,cur=r.getAttribute('data-theme');
+if(!cur){cur=window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+var next=cur==='dark'?'light':'dark';r.setAttribute('data-theme',next);try{localStorage.setItem('perfTheme',next);}catch(e){}}
+"""
+
+
 CSS = """
-:root{--bg:#f6f7f9;--card:#fff;--fg:#1d2330;--mut:#667085;--line:#e3e6eb;--good:#1a7f37;--warn:#b26b00;--bad:#c62828;--acc:#3b6fd8}
-@media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d2128;--fg:#e6e8eb;--mut:#98a2b3;--line:#2c323b;--good:#4cc76b;--warn:#f0a83a;--bad:#ff6b6b;--acc:#7aa2ff}}
-body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,Segoe UI,sans-serif}
-main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
-h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:28px 0 8px}
-.mut,.note{color:var(--mut)}.note{font-size:12px}
-.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:16px}
-.kpi{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:10px 12px;border-left:4px solid var(--line)}
-.kpi b{display:block;font-size:20px}.kpi span{color:var(--mut);font-size:12px}
-.good{border-left-color:var(--good)}.warn{border-left-color:var(--warn)}.bad{border-left-color:var(--bad)}
-.card{background:var(--card);border:1px solid var(--line);border-radius:8px;padding:12px;overflow-x:auto}
-table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);vertical-align:top}
-th{color:var(--mut);font-weight:600;font-size:12px}td:first-child{white-space:nowrap}td.barcell{width:55%}.n{text-align:right;font-variant-numeric:tabular-nums}
-.chart{width:100%;height:180px}.line{fill:none;stroke:var(--acc);stroke-width:1}.ref{stroke:var(--mut);stroke-dasharray:4 4;stroke-width:.6}
-.lbl{fill:var(--mut);font-size:10px}.spike{fill:var(--bad)}
+:root{--bg:#f4f6fa;--card:#ffffff;--card2:#f7f8fb;--fg:#162033;--mut:#5d6b82;--line:#e2e7ef;
+--good:#17924a;--warn:#c27a00;--bad:#d7263d;--acc:#3466e0;--acc2:#7c4dff;--shadow:0 1px 2px rgba(16,24,40,.06),0 4px 14px rgba(16,24,40,.06);
+--goodbg:rgba(23,146,74,.10);--warnbg:rgba(194,122,0,.12);--badbg:rgba(215,38,61,.10)}
+:root[data-theme="dark"]{--bg:#0f1218;--card:#181c24;--card2:#1e232d;--fg:#e8ebf1;--mut:#94a0b4;--line:#2a313d;
+--good:#4cd07d;--warn:#ffb547;--bad:#ff6b7d;--acc:#7aa2ff;--acc2:#b39dff;--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.25);
+--goodbg:rgba(76,208,125,.12);--warnbg:rgba(255,181,71,.12);--badbg:rgba(255,107,125,.12)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1218;--card:#181c24;--card2:#1e232d;--fg:#e8ebf1;--mut:#94a0b4;--line:#2a313d;
+--good:#4cd07d;--warn:#ffb547;--bad:#ff6b7d;--acc:#7aa2ff;--acc2:#b39dff;--shadow:0 1px 2px rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.25);
+--goodbg:rgba(76,208,125,.12);--warnbg:rgba(255,181,71,.12);--badbg:rgba(255,107,125,.12)}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif}
+main{max-width:1120px;margin:0 auto;padding:0 16px 64px}
+.hero{background:linear-gradient(120deg,var(--acc),var(--acc2));color:#fff;border-radius:0 0 18px 18px;padding:26px 24px 22px;margin:0 -16px 0;box-shadow:var(--shadow);position:relative}
+.hero h1{font-size:24px;margin:0;letter-spacing:.2px}.hero .sub{opacity:.9;margin-top:4px;font-size:13px}
+.verdict{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.18);font-weight:600}
+.verdict i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.verdict.good i{background:#5cf09a}.verdict.warn i{background:#ffd27a}.verdict.bad i{background:#ff9aa8}
+.theme{position:absolute;top:18px;right:18px;border:0;border-radius:999px;padding:7px 12px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;font:inherit}
+.theme:hover{background:rgba(255,255,255,.3)}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line)}
+nav a{color:var(--mut);text-decoration:none;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
+nav a:hover{color:var(--fg);border-color:var(--acc)}
+h2{font-size:16px;margin:30px 0 10px;scroll-margin-top:60px}
+.mut,.note{color:var(--mut)}.note{font-size:12px;margin:8px 0 0}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:18px}
+.kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);border-top:4px solid var(--line)}
+.kpi b{display:block;font-size:24px;line-height:1.2}.kpi span{color:var(--mut);font-size:12px}
+.kpi.good{border-top-color:var(--good)}.kpi.good b{color:var(--good)}
+.kpi.warn{border-top-color:var(--warn)}.kpi.warn b{color:var(--warn)}
+.kpi.bad{border-top-color:var(--bad)}.kpi.bad b{color:var(--bad)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;overflow-x:auto;box-shadow:var(--shadow)}
+table{border-collapse:collapse;width:100%}th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}tbody tr:hover td,tr:hover td{background:var(--card2)}
+th{color:var(--mut);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+td:first-child{white-space:nowrap}td.barcell{width:55%}.n{text-align:right;font-variant-numeric:tabular-nums}
+.chart{width:100%;height:190px;display:block}.line{fill:none;stroke:var(--acc);stroke-width:1.2}.area{fill:var(--acc);opacity:.10}
+.ref{stroke:var(--mut);stroke-dasharray:4 4;stroke-width:.6}.lbl{fill:var(--mut);font-size:10px}.spike{fill:var(--bad);stroke:var(--card);stroke-width:1}
 .mscn{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:3 3}.msnd{stroke:var(--good);stroke-width:2}
-.chart.mem{height:90px}.memline{fill:none;stroke:var(--warn);stroke-width:1.5}
-.bar{height:10px;background:var(--acc);border-radius:4px;min-width:2px}
-.ok,.vgood{color:var(--good)}.vwarn{color:var(--warn);font-weight:600}.vbad{color:var(--bad);font-weight:700}.vmut{color:var(--mut)}
+.chart.mem{height:90px}.memline{fill:none;stroke:var(--warn);stroke-width:1.6}
+.bar{height:10px;background:var(--acc);border-radius:6px;min-width:3px}
 .bar.warn{background:var(--warn)}.bar.bad{background:var(--bad)}.bar.good{background:var(--good)}
-.adv{list-style:none;padding:0;margin:0}.adv li{padding:8px 10px;border-left:4px solid var(--line);margin:6px 0;background:var(--bg);border-radius:4px}
-.adv li.good{border-left-color:var(--good)}.adv li.warn{border-left-color:var(--warn)}.adv li.bad{border-left-color:var(--bad)}
-.legend{font-size:12px;color:var(--mut);margin-top:6px}.legend b{font-weight:600}
+.ok,.vgood{color:var(--good)}.vwarn{color:var(--warn);font-weight:600}.vbad{color:var(--bad);font-weight:700}.vmut{color:var(--mut)}
+.adv{list-style:none;padding:0;margin:0}
+.adv li{padding:10px 12px;border-left:4px solid var(--line);margin:8px 0;border-radius:8px;background:var(--card2)}
+.adv li:first-child{margin-top:0}.adv li:last-child{margin-bottom:0}
+.adv li.good{border-left-color:var(--good);background:var(--goodbg)}.adv li.warn{border-left-color:var(--warn);background:var(--warnbg)}
+.adv li.bad{border-left-color:var(--bad);background:var(--badbg)}
+.legend{font-size:12px;color:var(--mut);margin-top:10px;display:flex;gap:14px}
+.legend b{font-weight:600}
+footer{margin-top:36px;color:var(--mut);font-size:12px;word-break:break-all}
 """
 
 
@@ -501,10 +540,16 @@ def write_html(folder, title=None):
 
     w = []
     w.append('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
-    w.append('<title>%s</title><style>%s</style></head><body><main>' % (_esc(_('Performance Report')), CSS))
-    w.append('<h1>%s</h1><div class="mut">%s &middot; %.1f s &middot; %d %s &middot; %s</div>'
-             % (_esc(_('Performance Report')), _esc(os.path.basename(game)), a['duration'], len(a['play']), _esc(_('frames')),
-                _esc(_('start-up (not counted): %.1f s') % a['startup_s'])))
+    w.append('<title>%s</title><style>%s</style><script>%s</script></head><body><main>' % (_esc(_('Performance Report')), CSS, THEME_JS))
+    tips = advice(a, shader_items)
+    worst_level = tips[0][0] if tips else 'good'
+    verdict = {'good': _('Runs smoothly'), 'warn': _('Some things worth a look'), 'bad': _('Needs work')}[worst_level]
+    w.append('<header class="hero"><button class="theme" onclick="toggleTheme()" title="%s">&#9680;</button>'
+             '<h1>%s</h1><div class="sub">%s &middot; %.1f s &middot; %d %s &middot; %s</div>'
+             '<div class="verdict %s"><i></i>%s</div></header><!--NAV-->'
+             % (_esc(_('Light / dark theme')), _esc(_('Performance Report')), _esc(os.path.basename(game)), a['duration'],
+                len(a['play']), _esc(_('frames')), _esc(_('start-up (not counted): %.1f s') % a['startup_s']),
+                worst_level, _esc(verdict)))
 
     kpis = [
         (_('Typical FPS'), '%.0f' % fps, _level(a['median'], 1000 / 55, 1000 / 30)),
@@ -513,7 +558,7 @@ def write_html(folder, title=None):
         (_('Worst frame'), '%.0f ms' % a['worst'], _level(a['worst'], 50, 100)),
         (_('Spikes'), '%d' % len(a['spikes']), _level(len(a['spikes']), 1, 10)),
         (_('Loads during play'), '%d' % len(a['late']), _level(len(a['late']), 1, 5)),
-        (_('Objects never drawn'), '%d' % len(a['never']) if a['has_usage'] else '-', _level(len(a['never']), 1, 20)),
+        (_('Objects never drawn'), '%d' % len(a['never']) if a['has_usage'] else '-', _level(len(a['never']), 1, 1000)),
     ]
     w.append('<div class="kpis">' + ''.join('<div class="kpi %s"><b>%s</b><span>%s</span></div>' % (lvl, _esc(v), _esc(k))
                                              for k, v, lvl in kpis) + '</div>')
@@ -521,7 +566,7 @@ def write_html(folder, title=None):
     w.append('<div class="legend"><b class="vgood">&#9632; %s</b> &nbsp; <b class="vwarn">&#9632; %s</b> &nbsp; <b class="vbad">&#9632; %s</b></div>'
              % (_esc(_('good')), _esc(_('worth a look')), _esc(_('fix first'))))
     w.append('<h2>%s</h2><div class="card"><ul class="adv">%s</ul></div>'
-             % (_esc(_('What to do')), ''.join('<li class="%s">%s</li>' % (lvl, _esc(t)) for lvl, t in advice(a, shader_items))))
+             % (_esc(_('What to do')), ''.join('<li class="%s">%s</li>' % (lvl, _esc(t)) for lvl, t in tips)))
 
     now = summary(a, shader_items)
     prev = previous_summary(folder)
@@ -628,7 +673,18 @@ def write_html(folder, title=None):
                                                       [(k, '%g' % m, '%g' % p, '%g' % mx) for k, m, p, mx in a['work']],
                                                       numeric=(1, 2, 3))))
 
-    w.append('<p class="note">%s %s</p></main></body></html>' % (_esc(_('Raw data:')), _esc(os.path.join(folder, 'trace.jsonl'))))
+    w.append('<footer>%s %s</footer></main></body></html>' % (_esc(_('Raw data:')), _esc(os.path.join(folder, 'trace.jsonl'))))
+    page = ''.join(w)
+    # Anchors on the section titles and the navigation bar under the header.
+    links = []
+
+    def anchor(m):
+        links.append(m.group(1))
+        return '<h2 id="s%d">%s</h2>' % (len(links), m.group(1))
+    page = re.sub(r'<h2>(.*?)</h2>', anchor, page)
+    nav = '<nav>' + ''.join('<a href="#s%d">%s</a>' % (i + 1, t) for i, t in enumerate(links)) + '</nav>'
+    page = page.replace('<!--NAV-->', nav, 1)
+    w = [page]
     with open(os.path.join(folder, 'summary.json'), 'w', encoding='utf-8') as f:
         json.dump(now, f)
     out = os.path.join(folder, 'report.html')

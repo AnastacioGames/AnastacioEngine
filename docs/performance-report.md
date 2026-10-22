@@ -21,4 +21,7 @@ usando o mesmo motor de gravação (`CM_Trace`).
   scripts, picos (com script mais pesado e cargas do momento), cargas durante o jogo, shaders, carregamento por
   cena, carregado mas nunca desenhado, sons e contadores por frame.
 - A inicialização (até 60 frames seguidos sem pico) aparece no topo e não conta nos números.
-- Pendente: traduções pt_BR/es/ru dos textos (já passam por `pgettext_iface`).
+- Visual: cabeçalho com veredito (roda liso / vale olhar / precisa de ajustes), barra de navegação fixa entre seções,
+  tema claro e escuro (segue o sistema; botão no canto alterna e lembra a escolha no navegador).
+- Traduções pt_BR/es/ru em `modules/range_web/translations_perf.py` (es/ru pedem revisão nativa); o relatório sai
+  no idioma da interface do editor.
