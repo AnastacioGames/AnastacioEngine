@@ -219,12 +219,13 @@ def _record(image):
         return {}
 
 
-def prepared_path(image):
+def prepared_path(image, colors=None):
     record = _record(image)
     if record.get('version') != VERSION:
         raise ValueError('Prepare textures again (cache version changed)')
-    if skip_reason(image):
-        raise ValueError(skip_reason(image))
+    reason = skip_reason(image, colors)
+    if reason:
+        raise ValueError(reason)
     if _source_hash(image, record['options']) != record['fingerprint']:
         raise ValueError('Source or settings changed: prepare textures again')
     path = bpy.path.abspath(record['path'])
@@ -242,14 +243,17 @@ def export_prepared_textures():
     Linked libraries and external LibLoad files must be prepared/exported separately.
     """
     swaps = []
+    colors = color_usage()
     try:
         for original in list(bpy.data.images):
             if KEY not in original or original.library:
                 continue
             try:
-                path = prepared_path(original)
+                path = prepared_path(original, colors)
             except (OSError, ValueError, KeyError, TypeError) as error:
-                raise RuntimeError('Prepared texture %s is stale: %s' % (original.name, error))
+                # A stale texture keeps its original in the export instead of stopping it.
+                print('Export: %s keeps its original image (%s)' % (original.name, error))
+                continue
             # Fresh load avoids inheriting PNG packed bytes or old pixel buffers.
             image = bpy.data.images.load(path, check_existing=False)
             name, fake = original.name, original.use_fake_user
@@ -338,10 +342,9 @@ class GAME_OT_prepare_textures(Operator):
             if reason:
                 entry.status = reason
             else:
-                import numpy as np
                 entry.width, entry.height = image.size
-                pixels = np.asarray(image.pixels[:], dtype=np.float32)
-                entry.format = 'DXT5' if np.any(pixels[3::4] < 1.0) else 'DXT1'
+                # Estimate only: reading every pixel is too slow here, save_dds(AUTO) decides.
+                entry.format = 'DXT5' if image.depth == 32 and image.use_alpha else 'DXT1'
                 entry.status = '(Prepared)' if KEY in image else ''
         return context.window_manager.invoke_props_dialog(self, width=820)
 

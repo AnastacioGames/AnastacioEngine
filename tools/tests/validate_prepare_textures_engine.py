@@ -128,17 +128,15 @@ try:
 finally:
     dds.dds_info = old_info
 assert image[dds.KEY] == record and dds.prepared_path(image) == cached
-# Modified derivatives are rejected before any original gets remapped.
+# A modified derivative is left out: the export keeps the original image.
 with open(cached, 'rb') as stream:
     original_dds = stream.read()
 try:
     with open(cached, 'ab') as stream:
         stream.write(b'corruption')
-    try:
-        with dds.export_prepared_textures():
-            raise AssertionError('Corrupted cache accepted')
-    except RuntimeError:
-        pass
+    kept = image.name
+    with dds.export_prepared_textures():
+        assert bpy.data.images[kept] == image, 'Corrupted cache accepted'
 finally:
     with open(cached, 'wb') as stream:
         stream.write(original_dds)

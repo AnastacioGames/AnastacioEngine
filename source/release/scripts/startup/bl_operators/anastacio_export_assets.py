@@ -179,10 +179,11 @@ def _worker(jobpath):
     if options['textures']:
         if not textures:
             raise RuntimeError('DDS export support is missing from this installation')
+        colors = textures.color_usage()
         for image in list(bpy.data.images):
             if image.library:
                 continue
-            if textures.KEY not in image and not textures.skip_reason(image):
+            if textures.KEY not in image and not textures.skip_reason(image, colors):
                 textures.prepare_image(image, **options['textures'])
     if options['audio']:
         # Preparation modifies only this worker's in-memory copy, including LibLoad files.

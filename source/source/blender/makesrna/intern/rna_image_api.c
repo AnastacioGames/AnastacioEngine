@@ -110,18 +110,18 @@ static void rna_Image_save_render(Image *image, bContext *C, ReportList *reports
 }
 
 static void rna_Image_save_dds(Image *image, Main *bmain, ReportList *reports,
-                               const char *filepath, int format, int max_size, int quality, bool srgb)
+							   const char *filepath, int format, int max_size, int quality, bool srgb)
 {
-    char path[FILE_MAX];
-    BLI_strncpy(path, filepath, sizeof(path));
-    BLI_path_abs(path, ID_BLEND_PATH(bmain, &image->id));
-    void *lock;
-    ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
-    if (!IMB_dds_write_dxt(ibuf, path, format, max_size, quality, srgb)) {
-        BKE_report(reports, RPT_ERROR, "DDS export failed: requires a byte, power-of-two image, "
-                   "a writable destination and DDS build support; DXT1 requires opaque alpha");
-    }
-    BKE_image_release_ibuf(image, ibuf, lock);
+	char path[FILE_MAX];
+	BLI_strncpy(path, filepath, sizeof(path));
+	BLI_path_abs(path, ID_BLEND_PATH(bmain, &image->id));
+	void *lock;
+	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
+	if (!IMB_dds_write_dxt(ibuf, path, format, max_size, quality, srgb)) {
+		BKE_report(reports, RPT_ERROR, "DDS export failed: requires a byte, power-of-two image, "
+				   "a writable destination and DDS build support; DXT1 requires opaque alpha");
+	}
+	BKE_image_release_ibuf(image, ibuf, lock);
 }
 
 static void rna_Image_save(Image *image, Main *bmain, bContext *C, ReportList *reports)
@@ -328,21 +328,21 @@ void RNA_api_image(StructRNA *srna)
 	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
 	RNA_def_pointer(func, "scene", "Scene", "", "Scene to take image parameters from");
 
-    static const EnumPropertyItem dds_formats[] = {
-        {0, "AUTO", 0, "Automatic", "BC1 for opaque images, BC3 for alpha"},
-        {1, "DXT1", 0, "DXT1 / BC1", "Opaque images only"},
-        {3, "DXT5", 0, "DXT5 / BC3", "Color and alpha"},
-        {0, NULL, 0, NULL, NULL}
-    };
-    func = RNA_def_function(srna, "save_dds", "rna_Image_save_dds");
-    RNA_def_function_ui_description(func, "Export a copy as compressed DDS with mipmaps, preserving the original image");
-    RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_REPORTS);
-    parm = RNA_def_string_file_path(func, "filepath", NULL, FILE_MAX, "File Path", "Destination path");
-    RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
-    RNA_def_enum(func, "format", dds_formats, 0, "Format", "Compression format");
-    RNA_def_int(func, "max_size", 2048, 0, 16384, "Maximum Size", "Zero keeps original dimensions", 0, 16384);
-    RNA_def_int(func, "quality", 10, 0, 18, "Quality", "Encoder effort", 0, 18);
-    RNA_def_boolean(func, "srgb", true, "sRGB", "Filter color in linear light; disable for data maps");
+	static const EnumPropertyItem dds_formats[] = {
+		{0, "AUTO", 0, "Automatic", "BC1 for opaque images, BC3 for alpha"},
+		{1, "DXT1", 0, "DXT1 / BC1", "Opaque images only"},
+		{3, "DXT5", 0, "DXT5 / BC3", "Color and alpha"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	func = RNA_def_function(srna, "save_dds", "rna_Image_save_dds");
+	RNA_def_function_ui_description(func, "Export a copy as compressed DDS with mipmaps, preserving the original image");
+	RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_REPORTS);
+	parm = RNA_def_string_file_path(func, "filepath", NULL, FILE_MAX, "File Path", "Destination path");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_enum(func, "format", dds_formats, 0, "Format", "Compression format");
+	RNA_def_int(func, "max_size", 2048, 0, 16384, "Maximum Size", "Zero keeps original dimensions", 0, 16384);
+	RNA_def_int(func, "quality", 10, 0, 18, "Quality", "Encoder effort", 0, 18);
+	RNA_def_boolean(func, "srgb", true, "sRGB", "Filter color in linear light; disable for data maps");
 
 	func = RNA_def_function(srna, "save", "rna_Image_save");
 	RNA_def_function_ui_description(func, "Save image to its source path");
