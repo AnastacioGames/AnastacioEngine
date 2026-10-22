@@ -276,6 +276,152 @@ def rule_physics_shapes(scene, objects):
     return issues
 
 
+# Primitive suggestions intentionally use closed, undeformed, single-shell meshes only.
+COLLISION_PRIMITIVE_MIN_FIT = 0.85
+
+
+def _collision_primitive_excluded(ob):
+    if (ob.type != 'MESH' or ob.data is None or ob.library or ob.data.library or
+            ob.mode != 'OBJECT' or ob.data.shape_keys or
+            any(m.show_viewport or m.show_render for m in ob.modifiers)):
+        return True
+    game = ob.game
+    if (game.physics_type not in {'STATIC', 'DYNAMIC', 'RIGID_BODY'} or
+            not game.use_collision_bounds or
+            game.collision_bounds_type not in {'TRIANGLE_MESH', 'CONVEX_HULL'} or
+            game.use_collision_compound or
+            getattr(game, 'collision_bound', None)):
+        return True
+    # Native chassis, wrappers/components and their children must retain authored collision.
+    owner = ob
+    while owner is not None:
+        settings = owner.game
+        if (getattr(settings, 'is_vehicle', False) or
+                getattr(settings, 'use_destruction', False) or
+                settings.physics_type in {'CHARACTER', 'SOFT_BODY'} or
+                settings.use_collision_compound or
+                getattr(owner, 'vehicle_wheels', ())):
+            return True
+        identifiers = [('%s.%s' % (getattr(c, 'module', ''), c.name)).lower()
+                       for c in settings.components]
+        identifiers.extend(('%s.%s' % (c.name, getattr(c, 'module', ''))).lower()
+                           for c in settings.controllers if c.type == 'PYTHON')
+        if any('vehicle' in name or 'destruct' in name for name in identifiers):
+            return True
+        owner = owner.parent
+    return False
+
+
+def _collision_primitive_vehicle_parts():
+    return {wheel.object for owner in bpy.data.objects
+            for wheel in getattr(owner, 'vehicle_wheels', ()) if wheel.object is not None}
+
+
+def _collision_primitive_fit(ob, vehicle_parts=None):
+    """Return (type, volume fit), or None. Never changes the mesh or its settings."""
+    import bmesh
+    import math
+
+    if vehicle_parts is None:
+        vehicle_parts = _collision_primitive_vehicle_parts()
+    if ob in vehicle_parts or _collision_primitive_excluded(ob):
+        return None
+    # Column lengths include parent scale; shear is not representable by these shapes.
+    basis = ob.matrix_world.to_3x3()
+    scales = [basis.col[i].length for i in range(3)]
+    if any(not math.isfinite(s) or s < 1e-8 for s in scales):
+        return None
+    if any(abs(basis.col[i].dot(basis.col[j])) > 1e-5 * scales[i] * scales[j]
+           for i, j in ((0, 1), (0, 2), (1, 2))):
+        return None
+    bm = bmesh.new()
+    try:
+        bm.from_mesh(ob.data)
+        if (not bm.faces or not bm.verts or
+                any(not e.is_manifold for e in bm.edges) or
+                any(not v.link_edges for v in bm.verts)):
+            return None
+        # Disconnected/overlapping shells can fake a good fill ratio.
+        reached = {next(iter(bm.verts))}
+        pending = list(reached)
+        while pending:
+            for edge in pending.pop().link_edges:
+                for vertex in edge.verts:
+                    if vertex not in reached:
+                        reached.add(vertex)
+                        pending.append(vertex)
+        if len(reached) != len(bm.verts):
+            return None
+        bmesh.ops.recalc_face_normals(bm, faces=list(bm.faces))
+        volume = abs(bm.calc_volume(signed=True)) * scales[0] * scales[1] * scales[2]
+        raw = [tuple(v.co) for v in bm.verts]
+    finally:
+        bm.free()
+    lo = [min(v[i] for v in raw) for i in range(3)]
+    hi = [max(v[i] for v in raw) for i in range(3)]
+    center = [(a + b) * 0.5 for a, b in zip(lo, hi)]
+    dimensions = [(hi[i] - lo[i]) * scales[i] for i in range(3)]
+    if (not math.isfinite(volume) or volume <= 0 or
+            any(not math.isfinite(d) or d < 1e-8 for d in dimensions)):
+        return None
+    x, y, z = dimensions
+    points = [tuple((v[i] - center[i]) * scales[i] for i in range(3)) for v in raw]
+    candidates = [('BOX', x * y * z)]
+    tolerance = 1.00002  # floating-point containment, not a shape-fitting allowance
+    uniform = max(scales) - min(scales) <= max(scales) * 1e-5
+    radius = max(dimensions) * 0.5
+    # Sphere stays centered at the origin in this engine and uses the authored radius.
+    if (uniform and max(abs(center[i] * scales[i]) for i in range(3)) <= radius * 1e-5 and
+            abs(ob.game.radius * scales[0] - radius) <= radius * 1e-5 and
+            all(sum(a * a for a in p) <= radius * radius * tolerance for p in points)):
+        candidates.append(('SPHERE', 4.0 / 3.0 * math.pi * radius ** 3))
+    # Bullet Z cylinder permits elliptical scaling, but only circular XY fits are considered here.
+    radial = max(x, y) * 0.5
+    if abs(scales[0] - scales[1]) <= max(scales[:2]) * 1e-5:
+        if all(p[0] ** 2 + p[1] ** 2 <= radial ** 2 * tolerance for p in points):
+            candidates.append(('CYLINDER', math.pi * radial ** 2 * z))
+        height = max(z - 2.0 * radial, 0.0)
+        if (uniform and z > 2.0 * radial * (1.0 + 1e-5) and
+                all(p[0] ** 2 + p[1] ** 2 + max(abs(p[2]) - height * 0.5, 0.0) ** 2
+                    <= radial ** 2 * tolerance for p in points)):
+            candidates.append(('CAPSULE', math.pi * radial ** 2 * height +
+                               4.0 / 3.0 * math.pi * radial ** 3))
+    fits = [(shape, volume / shape_volume) for shape, shape_volume in candidates
+            if COLLISION_PRIMITIVE_MIN_FIT <= volume / shape_volume <= 1.00002]
+    return max(fits, key=lambda item: item[1]) if fits else None
+
+
+def rule_collision_primitive(scene, objects):
+    issues = []
+    vehicle_parts = _collision_primitive_vehicle_parts()
+    for ob in objects:
+        fit = _collision_primitive_fit(ob, vehicle_parts)
+        if fit is None:
+            continue
+        shape, ratio = fit
+
+        def fix(ob=ob, shape=shape):
+            # Recheck after diagnosis: another fix, edit or vehicle marker may have intervened.
+            current = _collision_primitive_fit(ob)
+            if current is None or current[0] != shape:
+                raise ValueError('Collision suggestion is stale; run Scene Doctor again')
+            previous = ob.game.collision_bounds_type
+            ob.game.collision_bounds_type = shape
+
+            def revert():
+                ob.game.collision_bounds_type = previous
+            return revert
+
+        issues.append(Issue(
+            'collision_primitive', ob.name,
+            'LOW' if ob.game.physics_type == 'STATIC' else 'MEDIUM',
+            '%s: use %s collision (%.1f%% fit)' % (ob.name, shape, ratio * 100.0),
+            'Closed mesh occupies %.1f%% of the enclosing primitive. Changes only the collision '
+            'shape; review contacts and clearance after applying. Revert restores the previous shape.'
+            % (ratio * 100.0), [ob], fix))
+    return issues
+
+
 def rule_shadows(scene, objects):
     issues = []
     shadowed = [ob for ob in objects if ob.type == 'LAMP' and getattr(ob.data, "use_shadow", False)]
@@ -367,6 +513,7 @@ RULES = (
     rule_heavy_meshes,
     rule_static_batch,
     rule_physics_shapes,
+    rule_collision_primitive,
     rule_shadows,
     rule_sounds,
     rule_scripts_every_frame,

@@ -13,6 +13,14 @@ editor novo passaram após corrigir falso positivo no diagnóstico de shaders. A
 de teste em aparelho. Exportação pela GUI RangeArmor passou em cena controlada; jogo real permanece pendente.
 Evidências e limites no [plano de renomeação](executable-rename-plan.md).
 
+## Scene Doctor: colisao simplificada (fase 1)
+
+- Regra Python implementada e validada em background: formas primitivas com encaixe >=85%, fix/revert
+  e exclusoes conservadoras. Detalhes no relatorio de melhorias.
+- Pendente: conferir contatos/folgas e medir custo de fisica em um jogo com objetos elegiveis.
+  As 30 cenas do RolimaRacer auditadas nao tiveram sugestoes; o arquivo permaneceu intacto.
+- Proxy de colisao e mudancas no `.cooked` continuam fora desta fase.
+
 ## Sumário
 
 - [Atlas de materiais](#atlas-de-materiais)

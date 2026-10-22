@@ -147,6 +147,15 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 
 ### Performance
 
+- **Scene Doctor: colisao simplificada (fase 1):** `rule_collision_primitive` sugere Box, Sphere,
+  Cylinder ou Capsule Z para Triangle Mesh/Convex Hull em STATIC/DYNAMIC/RIGID_BODY quando a malha
+  fechada ocupa pelo menos 85% da forma que a envolve. Fix altera somente o tipo e permite revert.
+  Fora: veiculos/wrappers/rodas e filhos, personagens, Soft Body, destrutiveis, proxies, compostos,
+  malhas abertas/desconectadas, deformadas ou vinculadas. Sphere exige raio existente correto e origem
+  central; formas redondas usam escalas compativeis com a Bullet. Testes background passaram (26 objetos,
+  nove sugestoes, fix/revert e reabertura). Auditoria das 30 cenas do RolimaRacer nao sugeriu substituicoes
+  e confirmou hash intacto. Ganho de fisica e contatos no jogo real ainda nao medidos.
+
 - **RA5:** materiais sem slots ativos no passe deixam de validar texturas e atualizar
   luzes. Reativacao prepara o material antes de gerar a arvore de desenho. Editor/player
   e comparacao no runtime passaram: 25 preparacoes -> 1 com um cubo desenhado,

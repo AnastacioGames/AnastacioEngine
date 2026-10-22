@@ -6,6 +6,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-22 - Scene Doctor: colisao simplificada, fase 1
+
+- Nova `rule_collision_primitive` em RULES: volumes via bmesh e escala mundial, Box/Sphere/Cylinder/
+  Capsule Z, limite de 85%, contencao dos vertices e escolha do melhor encaixe. Analise nao altera dados.
+- Somente STATIC/DYNAMIC/RIGID_BODY com bounds Triangle Mesh/Convex Hull. Exclui veiculos nativos e
+  wrappers/componentes (inclusive NativeVehicle do Rolima), rodas/filhos, CHARACTER, Soft Body,
+  destrutiveis, compostos/proxies, malhas abertas/desconectadas, modificadores, shape keys e linked.
+- Sphere usa `game.radius` na engine, portanto so e sugerida se o raio existente ja corresponder ao
+  limite da geometria e a origem estiver centralizada; o fix nao altera raio, escala nem vertices.
+  Sphere/Capsule exigem escala uniforme; Cylinder exige escala XY uniforme; shear fica fora.
+- Fix revalida a sugestao e captura o tipo atual; revert restaura Triangle Mesh ou Convex Hull.
+  Severidade LOW em estaticos, MEDIUM nos corpos moveis.
+- `tools/tests/validate_scene_doctor_collision.py`: background, 26 objetos, nove sugestoes corretas,
+  malha L recusada, exclusoes, diagnose, fix/revert, sugestao obsoleta e reabertura passaram, exit 0.
+  Artefatos locais em `D:/AnastacioEngine/build/collision-primitive-validation/`.
+- RolimaRacer: 30 cenas analisadas sem salvar, zero sugestoes; SHA256 antes/depois identico.
+  Nao foi aberta janela de jogo. Script sincronizado em build/bin/2.79/scripts; sem mudancas C++/export.
+- `check_docs.py`: 65 erros e 118 avisos existentes nos mapas/referencias, mesmos totais anteriores;
+  mapas nao alterados. Pendentes contatos no jogo real e medicao em cena com candidatos elegiveis.
+
 ## 2026-10-22 - Veículo nativo: ajustes em tempo real pelo Python (pedidos do GT2)
 
 - Novos: `gameOb.setVehicleMaxTorque/setVehicleMaxRPM/setVehicleGearRatios` e `vehicle.setSuspensionRestLength(valor, roda)` / `vehicle.setWheelRadius(valor, roda)` (aplicados no próximo passo da física pela fila de comandos).
