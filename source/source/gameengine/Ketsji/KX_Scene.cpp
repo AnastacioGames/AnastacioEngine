@@ -399,6 +399,8 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_lastCullingTotalObjects(0),
 	m_lastCullingTestedObjects(0),
 	m_lastCullingVisibleObjects(0),
+	// RANGE_NO_FIRST_DRAW_ALL=1 turns it off, to compare in a trace.
+	m_drawAllPending(!getenv("RANGE_NO_FIRST_DRAW_ALL")),
 	m_lastLightsTotal(0),
 	m_lastLightsShadowUpdated(0),
 	m_lastShadowPasses(0),
@@ -2035,7 +2037,11 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, RA
 {
 	std::vector<KX_GameObject *> objects;
 	objects.reserve(m_renderlist->GetCount());
-	if (!cam->GetFrustumCulling()) {
+	const bool drawAll = m_drawAllPending && !is_shadowbuf;
+	if (drawAll) {
+		m_drawAllPending = false;
+	}
+	if (drawAll || !cam->GetFrustumCulling()) {
 		for (KX_GameObject *gameobj : m_renderlist) {
 			if (!gameobj->Renderable(layer)) {
 				continue;

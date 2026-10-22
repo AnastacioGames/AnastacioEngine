@@ -308,6 +308,11 @@ private:
 	int m_lastCullingTestedObjects;
 	int m_lastCullingVisibleObjects;
 
+	/** The first camera pass of the scene skips the frustum test and draws every renderable object
+	 * (off-screen ones are clipped by the GPU). The driver builds a shader variant at the first draw
+	 * that uses it; that frame is behind the loading screen, not mid-game when the object comes into view. */
+	bool m_drawAllPending;
+
 	/** Per-object culling data gathered once for all shadow passes of a frame (see
 	 * BeginShadowCulling). Reading it back from the objects costs several cache misses per
 	 * object, and with point lights and cascades that was repeated for every pass. */

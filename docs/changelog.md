@@ -19,6 +19,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Loop de tempo sem passo fixo e sem vsync: `UpdateSleepTime` calculava a espera em segundos (~0,02) e a passava como milissegundos inteiros, então dormia 0 ms e girava um núcleo inteiro. Agora `SleepUnderRate` dorme em microssegundos, limitado ao tempo que falta no quadro (`m_timeUnderRate` virou `double`). Também em `FrameOver`, o ramo de atraso negativo usava `m_deltaTime` (passo lógico) onde o resto usa `m_deltatime` (tempo real); trocado. Teste `criar_cena_loop_sleep.py` (60 Hz, 10 s): antes 60,3 FPS e 106% de CPU; depois 59,5 FPS e 7%.
 - Static Batch: o construtor de `RAS_BatchGroup` ficou protegido; só `KX_BatchGroup` cria grupos, então os `static_cast` de `GetBatchGroup()` para ele são garantidos pelo compilador.
 
+## 2026-10-22 - 1º desenho da cena sem frustum
+
+- Traces frios do RolimaRacer (3 rodadas): duas travadas de 600-1000 ms no swap no meio da corrida, sempre 3 quadros depois de um objeto entrar na câmera pela 1ª vez (`nuvem`, faíscas). O programa já vinha do aquecimento, mas o driver AMD monta a variante final no 1º draw call que a usa.
+- Agora a 1ª passada de câmera de cada cena (`KX_Scene::m_drawAllPending`) pula o frustum e manda todo objeto renderizável para o desenho; os que estão fora da tela são recortados pela GPU, sem mudança na imagem. Esse quadro fica atrás da tela de Loading. `RANGE_NO_FIRST_DRAW_ALL=1` desliga, para comparar. Teste: `tools/debug/cenas/criar_cena_first_draw_all.py`.
+- Não cobre objetos de camada inativa adicionados depois (`addObject`) nem níveis de LoD ainda não usados. O quadro de 742 ms da rodada quente não teve objeto novo na tela e segue sem causa.
+
 ## 2026-10-22 - Shader do céu no aquecimento; travadas do RolimaRacer medidas
 
 - O shader do World (céu por nós ou Blend/Paper/Real) só era compilado no primeiro desenho da cena. Agora entra no passo 0 do aquecimento, junto da Camera FX: enviado ao driver no prefetch paralelo (`GPU_material_world_prefetch`) e montado antes do fim do load (`KX_WorldInfo::PrefetchShader/PrepareShader`), no addScene assíncrono e no normal. RolimaRacer com cache vazio (`RANGE_SHADER_SALT`): `WOWorld.001` saiu do 1º desenho (1,1 s) e foi montado no Loading em 3 ms; Loading 34,5 → 32,7 s.
