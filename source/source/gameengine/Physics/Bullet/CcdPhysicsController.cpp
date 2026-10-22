@@ -665,6 +665,14 @@ public:
 	}
 };
 
+mt::vec3 CcdPhysicsController::GetCenterOfMassOffset() const
+{
+	if (m_bulletMotionState) {
+		return ToMt(static_cast<BlenderBulletMotionState *>(m_bulletMotionState)->GetComOffset());
+	}
+	return mt::zero3;
+}
+
 void CcdPhysicsController::SetCenterOfMassOffset(const mt::vec3& localOffset)
 {
 	if (m_bulletMotionState) {

@@ -706,6 +706,8 @@ public:
 	 * for that shift when syncing with Bullet.
 	 */
 	virtual void SetCenterOfMassOffset(const mt::vec3& localOffset);
+	/// The offset set by SetCenterOfMassOffset (zero when none).
+	mt::vec3 GetCenterOfMassOffset() const;
 
 	CcdShapeConstructionInfo *GetShapeInfo()
 	{

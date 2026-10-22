@@ -260,7 +260,11 @@ public:
 	                      float wheelRadius,
 	                      bool hasSteering)
 	{
-		btWheelInfo& info = m_vehicle->addWheel(ToBullet(connectionPoint), ToBullet(downDirection.Normalized()),
+		// connectionPoint is measured from the object origin, but Bullet places it from the body
+		// origin, which vehicle_com_offset moves away from the object origin. Undo that shift so
+		// the wheels stay where they are in the model. The config keeps the object-origin value.
+		const mt::vec3 comOffset = m_chassis ? static_cast<CcdPhysicsController *>(m_chassis)->GetCenterOfMassOffset() : mt::zero3;
+		btWheelInfo& info = m_vehicle->addWheel(ToBullet(connectionPoint - comOffset), ToBullet(downDirection.Normalized()),
 		                                        ToBullet(axleDirection.Normalized()), suspensionRestLength, wheelRadius, gTuning, hasSteering);
 		info.m_clientInfo = motionState;
 
