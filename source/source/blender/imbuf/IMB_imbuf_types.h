@@ -248,6 +248,7 @@ typedef struct ImBuf {
 #define IB_ignore_alpha		(1 << 14)  /* ignore alpha on load and substitute it with 1.0f */
 #define IB_thumbnail		(1 << 15)
 #define IB_multiview		(1 << 16)
+#define IB_dds_blocks		(1 << 17)  /* DXT DDS: keep only the compressed blocks, decode pixels on demand */
 
 /** \} */
 

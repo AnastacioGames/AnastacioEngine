@@ -161,6 +161,9 @@ struct ImBuf *IMB_makeSingleUser(struct ImBuf *ibuf);
  */
 struct ImBuf *IMB_dupImBuf(const struct ImBuf *ibuf1);
 
+/* A DDS loaded with IB_dds_blocks has no pixels until asked: decode them from the blocks. */
+bool IMB_dds_ensure_rect(struct ImBuf *ibuf);
+
 /**
  *
  * \attention Defined in allocimbuf.c

@@ -32,6 +32,7 @@ int           imb_is_a_dds(const unsigned char *mem); /* use only first 32 bytes
 int  	      imb_save_dds(struct ImBuf *ibuf, const char *name, int flags);
 bool imb_dds_write_dxt(const struct ImBuf *ibuf, const char *path, int format,
                        int max_size, int quality, bool srgb);
+bool imb_dds_decode_rect(struct ImBuf *ibuf);
 struct ImBuf *imb_load_dds(const unsigned char *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE]);
 
 #ifdef __cplusplus

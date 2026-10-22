@@ -28,8 +28,11 @@ extern "C" {
 #include <Stream.h>
 #include <DirectDrawSurface.h>
 #include <FlipDXT.h>
+#include <BlockDXT.h>
+#include <ColorBlock.h>
 #include <stdio.h> // printf
 #include <fstream>
+#include <string.h> // memcpy
 
 #if defined (WIN32)
 #include "utfconv.h"
@@ -81,6 +84,178 @@ int imb_is_a_dds(const unsigned char *mem) // note: use at most first 32 bytes
 	return(1);
 }
 
+static bool dds_is_dxt(unsigned int fourcc)
+{
+	return fourcc == FOURCC_DXT1 || fourcc == FOURCC_DXT3 || fourcc == FOURCC_DXT5;
+}
+
+static unsigned int dds_block_size(unsigned int fourcc)
+{
+	return (fourcc == FOURCC_DXT1) ? 8 : 16;
+}
+
+static bool dds_is_pot(unsigned int n)
+{
+	return n && (n & (n - 1)) == 0;
+}
+
+/* How many mipmap levels of the chain are fully inside the data, so a truncated file never
+ * makes the GPU upload read past the buffer. */
+static unsigned int dds_levels_present(unsigned int width, unsigned int height, unsigned int count,
+                                       unsigned int blocksize, unsigned int datasize)
+{
+	unsigned int offset = 0, levels = 0;
+	for (unsigned int i = 0; i < count && (width || height); i++) {
+		width = MAX2(width, 1u);
+		height = MAX2(height, 1u);
+		const unsigned int size = ((width + 3) / 4) * ((height + 3) / 4) * blocksize;
+		if (size > datasize - offset || offset > datasize) {
+			break;
+		}
+		offset += size;
+		levels++;
+		width >>= 1;
+		height >>= 1;
+	}
+	return levels;
+}
+
+/* Whether the first level has a texel that is not opaque, read from the blocks without decoding
+ * the colors. Matches the alpha the full decode would produce. */
+static bool dds_blocks_have_alpha(const unsigned char *data, unsigned int width, unsigned int height,
+                                  unsigned int fourcc)
+{
+	const unsigned int blocks = ((width + 3) / 4) * ((height + 3) / 4);
+	for (unsigned int i = 0; i < blocks; i++) {
+		if (fourcc == FOURCC_DXT1) {
+			BlockDXT1 block;
+			memcpy(&block, data + i * 8, sizeof(block));
+			if (block.col0.u <= block.col1.u) {
+				/* three color mode: index 3 is transparent black */
+				for (unsigned int k = 0; k < 16; k++) {
+					if (((block.indices >> (2 * k)) & 3) == 3) {
+						return true;
+					}
+				}
+			}
+		}
+		else if (fourcc == FOURCC_DXT3) {
+			const unsigned char *alpha = data + i * 16;
+			for (unsigned int k = 0; k < 8; k++) {
+				if (alpha[k] != 0xff) {
+					return true;
+				}
+			}
+		}
+		else {
+			AlphaBlockDXT5 alpha;
+			memcpy(&alpha, data + i * 16, sizeof(alpha));
+			uint8 palette[8], index[16];
+			alpha.evaluatePalette(palette);
+			alpha.indices(index);
+			for (unsigned int k = 0; k < 16; k++) {
+				if (palette[index[k]] != 0xff) {
+					return true;
+				}
+			}
+		}
+	}
+	return false;
+}
+
+/* The blocks are already flipped (FlipDXTCImage), so decoding them in order gives the bottom-up
+ * rows ImBuf expects. */
+bool imb_dds_decode_rect(struct ImBuf *ibuf)
+{
+	const unsigned int fourcc = ibuf->dds_data.fourcc;
+	if (ibuf->rect) {
+		return true;
+	}
+	if (ibuf->dds_data.data == NULL || !dds_is_dxt(fourcc)) {
+		return false;
+	}
+	const unsigned int width = ibuf->x, height = ibuf->y;
+	const unsigned int blocksize = dds_block_size(fourcc);
+	if (dds_levels_present(width, height, 1, blocksize, ibuf->dds_data.size) == 0) {
+		return false;
+	}
+	if (!imb_addrectImBuf(ibuf)) {
+		return false;
+	}
+
+	unsigned char *rect = (unsigned char *)ibuf->rect;
+	const unsigned int bw = (width + 3) / 4, bh = (height + 3) / 4;
+	const unsigned char *src = ibuf->dds_data.data;
+	for (unsigned int by = 0; by < bh; by++) {
+		for (unsigned int bx = 0; bx < bw; bx++, src += blocksize) {
+			ColorBlock block;
+			if (fourcc == FOURCC_DXT1) {
+				BlockDXT1 dxt;
+				memcpy(&dxt, src, sizeof(dxt));
+				dxt.decodeBlock(&block);
+			}
+			else if (fourcc == FOURCC_DXT3) {
+				BlockDXT3 dxt;
+				memcpy(&dxt, src, sizeof(dxt));
+				dxt.decodeBlock(&block);
+			}
+			else {
+				BlockDXT5 dxt;
+				memcpy(&dxt, src, sizeof(dxt));
+				dxt.decodeBlock(&block);
+			}
+			for (unsigned int y = 0; y < MIN2(4u, height - 4 * by); y++) {
+				unsigned char *row = rect + 4 * ((size_t)(4 * by + y) * width + 4 * bx);
+				for (unsigned int x = 0; x < MIN2(4u, width - 4 * bx); x++) {
+					const Color32 c = block.color(x, y);
+					row[4 * x + 0] = c.r;
+					row[4 * x + 1] = c.g;
+					row[4 * x + 2] = c.b;
+					row[4 * x + 3] = c.a;
+				}
+			}
+		}
+	}
+	return true;
+}
+
+/* IB_dds_blocks: a DXT1/3/5 2D texture, power of two, keeps only its blocks. Pixels are decoded
+ * later by IMB_dds_ensure_rect() if anything asks for them (fallback upload, paint, Python). */
+static struct ImBuf *dds_load_blocks_only(DirectDrawSurface &dds)
+{
+	const unsigned int fourcc = dds.fourCC();
+	const unsigned int width = dds.width(), height = dds.height();
+	unsigned int datasize = 0;
+	unsigned char *data = (unsigned char *)dds.readData(datasize);
+	if (data == NULL) {
+		return NULL;
+	}
+	const unsigned int levels = dds_levels_present(width, height, dds.mipmapCount(),
+	                                               dds_block_size(fourcc), datasize);
+	if (levels == 0) {
+		free(data);
+		return NULL;
+	}
+	if (levels < dds.mipmapCount()) {
+		printf("DDS: truncated, %u of %u mipmap levels present
+", levels, dds.mipmapCount());
+	}
+
+	const unsigned char planes = dds_blocks_have_alpha(data, width, height, fourcc) ? 32 : 24;
+	ImBuf *ibuf = IMB_allocImBuf(width, height, planes, 0);
+	if (ibuf == NULL) {
+		free(data);
+		return NULL;
+	}
+	FlipDXTCImage(width, height, levels, fourcc, data);
+	ibuf->ftype = IMB_FTYPE_DDS;
+	ibuf->dds_data.fourcc = fourcc;
+	ibuf->dds_data.nummipmaps = levels;
+	ibuf->dds_data.data = data;
+	ibuf->dds_data.size = datasize;
+	return ibuf;
+}
+
 struct ImBuf *imb_load_dds(const unsigned char *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE])
 {
 	struct ImBuf *ibuf = NULL;
@@ -120,6 +295,16 @@ struct ImBuf *imb_load_dds(const unsigned char *mem, size_t size, int flags, cha
 	if ((dds.width() > 65535) || (dds.height() > 65535)) {
 		printf("DDS: dimensions too large\n");
 		return(0);
+	}
+
+	if ((flags & IB_dds_blocks) && !(flags & (IB_test | IB_ignore_alpha | IB_alphamode_premul)) &&
+	    dds_is_dxt(dds.fourCC()) && dds.isTexture2D() && dds_is_pot(dds.width()) && dds_is_pot(dds.height()))
+	{
+		ibuf = dds_load_blocks_only(dds);
+		if (ibuf) {
+			return ibuf;
+		}
+		/* truncated or out of memory: the full decode below reports it */
 	}
 
 	/* convert DDS into ImBuf */
@@ -163,9 +348,19 @@ struct ImBuf *imb_load_dds(const unsigned char *mem, size_t size, int flags, cha
 
 		if (ibuf->dds_data.fourcc != FOURCC_DDS) {
 			ibuf->dds_data.data = (unsigned char *)dds.readData(ibuf->dds_data.size);
+			ibuf->dds_data.nummipmaps = 0;
+			if (ibuf->dds_data.data && dds_is_dxt(dds.fourCC())) {
+				/* a truncated chain uploads only the levels it has */
+				ibuf->dds_data.nummipmaps = dds_levels_present(
+				        dds.width(), dds.height(), dds.mipmapCount(), dds_block_size(dds.fourCC()),
+				        ibuf->dds_data.size);
+			}
 
 			/* flip compressed texture */
-			FlipDXTCImage(dds.width(), dds.height(), dds.mipmapCount(), dds.fourCC(), ibuf->dds_data.data);
+			if (ibuf->dds_data.nummipmaps) {
+				FlipDXTCImage(dds.width(), dds.height(), ibuf->dds_data.nummipmaps, dds.fourCC(),
+				              ibuf->dds_data.data);
+			}
 		}
 		else {
 			ibuf->dds_data.data = NULL;
