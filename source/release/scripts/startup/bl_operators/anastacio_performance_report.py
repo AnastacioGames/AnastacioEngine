@@ -30,7 +30,7 @@ class GAME_OT_performance_report(Operator):
     _process = None
     _timer = None
     _folder = ""
-    _tempdir = ""
+    _tempfile = ""
 
     @classmethod
     def poll(cls, context):
@@ -50,19 +50,25 @@ class GAME_OT_performance_report(Operator):
         self._folder = os.path.join(reports_dir(), "%s-%s" % (bpy.path.clean_name(name), time.strftime("%Y%m%d-%H%M%S")))
         os.makedirs(self._folder, exist_ok=True)
 
-        # The game runs from a copy, so unsaved changes are measured too and the file is left untouched.
-        self._tempdir = tempfile.mkdtemp(prefix="anastacio_report_")
-        copy = os.path.join(self._tempdir, os.path.basename(bpy.data.filepath) or "game.range")
-        saved = bpy.ops.wm.save_as_mainfile(filepath=copy, copy=True, relative_remap=True, compress=False)
-        if 'FINISHED' not in saved:
-            self.report({'ERROR'}, "Could not save the scene to measure")
-            return {'CANCELLED'}
+        # Saved scene: run the file itself, so paths relative to the game folder (LibLoad, scripts,
+        # sounds) work. Unsaved changes: a copy in the same folder, removed when the game closes.
+        self._tempfile = ""
+        if bpy.data.filepath and not bpy.data.is_dirty:
+            game = bpy.data.filepath
+        else:
+            folder = os.path.dirname(bpy.data.filepath) if bpy.data.filepath else tempfile.gettempdir()
+            game = os.path.join(folder, "_performance_report_%d.range" % os.getpid())
+            saved = bpy.ops.wm.save_as_mainfile(filepath=game, copy=True, relative_remap=True, compress=False)
+            if 'FINISHED' not in saved:
+                self.report({'ERROR'}, "Could not save the scene to measure")
+                return {'CANCELLED'}
+            self._tempfile = game
 
         env = dict(os.environ,
                    RANGE_TRACE=self._folder,
                    RANGE_TRACE_MODULES="load,usage,frames,work",
                    RANGE_SHADER_LOG=os.path.join(self._folder, "shaders.txt"))
-        self._process = subprocess.Popen([runtime, copy], env=env, cwd=os.path.dirname(copy))
+        self._process = subprocess.Popen([runtime, game], env=env, cwd=os.path.dirname(game))
 
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.5, window=context.window)
@@ -74,8 +80,12 @@ class GAME_OT_performance_report(Operator):
         if event.type != 'TIMER' or self._process.poll() is None:
             return {'PASS_THROUGH'}
         context.window_manager.event_timer_remove(self._timer)
-        import shutil
-        shutil.rmtree(self._tempdir, ignore_errors=True)
+        if self._tempfile:
+            for path in (self._tempfile, self._tempfile + "1"):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
 
         if not os.path.isfile(os.path.join(self._folder, "trace.jsonl")):
             self.report({'ERROR'}, "The game wrote no trace (exit code %d)" % self._process.returncode)
