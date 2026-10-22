@@ -533,6 +533,52 @@ class FONT_OT_text_atlas_copy_to_selected(Operator):
         return {'FINISHED'}
 
 
+_existing_items = []  # enum items must stay referenced while the menu is open
+
+
+def _existing_atlas_items(self, context):
+    """One entry per atlas image already used by a text in this .range (any scene)."""
+    cur = _text_curve(context)
+    seen = set()
+    items = []
+    for cu in bpy.data.curves:
+        if cu == cur or not hasattr(cu, "atlas_glyph_count") or cu.atlas_glyph_count == 0:
+            continue
+        key = cu.atlas_image.name if cu.atlas_image else cu.name
+        if key in seen:
+            continue
+        seen.add(key)
+        label = "%s  (%s, %d glyphs, %d px)" % (key, cu.name, cu.atlas_glyph_count, cu.atlas_size)
+        items.append((cu.name, label, "Use the atlas of text '%s'" % cu.name, 'IMAGE_DATA', len(items)))
+    if not items:
+        items.append(('NONE', "No other atlas in this project", "", 'INFO', 0))
+    _existing_items[:] = items
+    return _existing_items
+
+
+class FONT_OT_text_atlas_use_existing(Operator):
+    """Use an atlas already in this project (from any scene): same image, glyphs and settings, no file needed"""
+    bl_idname = "font.text_atlas_use_existing"
+    bl_label = "Use Project Atlas"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_property = "source"
+
+    source = EnumProperty(name="Atlas", items=_existing_atlas_items)
+
+    @classmethod
+    def poll(cls, context):
+        return _text_curve(context) is not None
+
+    def execute(self, context):
+        src = bpy.data.curves.get(self.source)
+        if src is None or src.atlas_glyph_count == 0:
+            self.report({'WARNING'}, "No other atlas in this project")
+            return {'CANCELLED'}
+        _copy_atlas(src, _text_curve(context))
+        self.report({'INFO'}, "Bitmap atlas of '%s' in use" % src.name)
+        return {'FINISHED'}
+
+
 class FONT_OT_text_preview_copy_to_selected(Operator):
     """Give this text's viewport preview settings (Preview Game Text, Hide Original Text, """         """Text Color) to all selected text objects"""
     bl_idname = "font.text_preview_copy_to_selected"
@@ -620,6 +666,7 @@ class FONT_OT_text_atlas_open_folder(Operator):
 classes = (
     FONT_OT_text_preview_copy_to_selected,
     FONT_OT_text_atlas_copy_to_selected,
+    FONT_OT_text_atlas_use_existing,
     FONT_OT_text_atlas_show_json,
     FONT_OT_text_atlas_open_folder,
     FONT_OT_text_atlas_generate,
