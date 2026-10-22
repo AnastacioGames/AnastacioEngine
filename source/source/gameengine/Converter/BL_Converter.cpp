@@ -723,12 +723,16 @@ bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsi
 	UniquePtrList<KX_BlenderMaterial>& materials = m_sceneSlots[scene].m_materials;
 	KX_2DFilterManager *filters = scene->Get2DFilterManager();
 	UseSceneWorld(scene);
-	// Step 0 is the Camera FX passes, built here instead of at the first frame that uses them.
+	KX_WorldInfo *world = scene->GetWorldInfo();
+	// Step 0 is the Camera FX passes and the world (sky) shader, built here instead of at the first frame drawn.
 	return step_shaders((unsigned int)materials.size() + 1, next, sent, deadline,
 	                    [&](unsigned int i) {
 		if (i == 0) {
 			if (filters) {
 				filters->PrefetchCameraFX(scene);
+			}
+			if (world) {
+				world->PrefetchShader();
 			}
 		}
 		else {
@@ -739,6 +743,9 @@ bool BL_Converter::CompileSceneShaders(KX_Scene *scene, unsigned int& next, unsi
 		if (i == 0) {
 			if (filters) {
 				filters->PrepareCameraFX(scene);
+			}
+			if (world) {
+				world->PrepareShader();
 			}
 		}
 		else {
@@ -1771,14 +1778,23 @@ void BL_Converter::MergeScene(KX_Scene *to, const BL_SceneConverter& converter, 
 void BL_Converter::ReloadShaders(KX_Scene *scene)
 {
 	KX_2DFilterManager *filters = scene->Get2DFilterManager();
-	if (filters && parallel_shaders()) {
+	KX_WorldInfo *world = scene->GetWorldInfo();
+	if (parallel_shaders()) {
 		GPU_shader_prefetch_begin();
-		filters->PrefetchCameraFX(scene);
+		if (filters) {
+			filters->PrefetchCameraFX(scene);
+		}
+		if (world) {
+			world->PrefetchShader();
+		}
 		GPU_shader_prefetch_end();
 	}
 	prefetch_shaders(m_sceneSlots[scene].m_materials);
 	if (filters) {
 		filters->PrepareCameraFX(scene);
+	}
+	if (world) {
+		world->PrepareShader();
 	}
 	for (std::unique_ptr<KX_BlenderMaterial>& mat : m_sceneSlots[scene].m_materials) {
 		mat->ReloadMaterial();

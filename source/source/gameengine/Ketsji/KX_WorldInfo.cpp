@@ -633,18 +633,37 @@ void KX_WorldInfo::UpdateWorldSettings(RAS_Rasterizer *rasty)
 	}
 }
 
+bool KX_WorldInfo::UsesWorldShader() const
+{
+	/* A node World (Sky Texture, Environment...) only shows through the world material. */
+	const bool node_world = BKE_scene_use_new_shading_nodes(m_scene) && m_scene->world->nodetree &&
+	                        m_scene->world->use_nodes;
+	return node_world || (m_scene->world->skytype & (WO_SKYBLEND | WO_SKYPAPER | WO_SKYREAL));
+}
+
+void KX_WorldInfo::PrefetchShader()
+{
+	if (m_hasworld && !m_skyDirty && UsesWorldShader()) {
+		GPU_material_world_prefetch(m_scene, m_scene->world);
+	}
+}
+
+void KX_WorldInfo::PrepareShader()
+{
+	if (m_hasworld && !m_skyDirty && UsesWorldShader()) {
+		GPU_material_world(m_scene, m_scene->world);
+	}
+}
+
 void KX_WorldInfo::RenderBackground(RAS_Rasterizer *rasty)
 {
 	if (m_hasworld) {
-		/* A node World (Sky Texture, Environment...) only shows through the world material. */
-		const bool node_world = BKE_scene_use_new_shading_nodes(m_scene) && m_scene->world->nodetree &&
-		                        m_scene->world->use_nodes;
 		if (m_skyDirty) {
 			// Sky type, stars, aurora and atmosphere are compiled into the world shader.
 			GPU_material_free(&m_scene->world->gpumaterial);
 			m_skyDirty = false;
 		}
-		if (node_world || (m_scene->world->skytype & (WO_SKYBLEND | WO_SKYPAPER | WO_SKYREAL))) {
+		if (UsesWorldShader()) {
 			GPUMaterial *gpumat = GPU_material_world(m_scene, m_scene->world);
 
 			static float texcofac[4] = { 0.0f, 0.0f, 1.0f, 1.0f };

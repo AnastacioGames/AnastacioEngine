@@ -6,6 +6,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-22 - Shader do céu no aquecimento; travadas do RolimaRacer medidas
+
+- O shader do World (céu por nós ou Blend/Paper/Real) só era compilado no primeiro desenho da cena. Agora entra no passo 0 do aquecimento, junto da Camera FX: enviado ao driver no prefetch paralelo (`GPU_material_world_prefetch`) e montado antes do fim do load (`KX_WorldInfo::PrefetchShader/PrepareShader`), no addScene assíncrono e no normal. RolimaRacer com cache vazio (`RANGE_SHADER_SALT`): `WOWorld.001` saiu do 1º desenho (1,1 s) e foi montado no Loading em 3 ms; Loading 34,5 → 32,7 s.
+- Medições (Range Trace, Modo IA + trilho, 25-40 s): cache quente, Loading sai aos 6 s e a corrida fica limpa (mediana ~15 ms); cache vazio, todos os picos (1º desenho ~8 s no driver AMD, filtros 2D do SparksFX/OutlineFilter ~3,6 s no swap) ficam atrás da tela de Loading. Um quadro esporádico de 742 ms no swap (GPU ~14 ms) apareceu em 1 de 3 rodadas quentes.
+- RolimaRacer (jogo): `Speed_FX` com Preload/Keep aplicado no `.range` real; carros da IA voando corrigidos no `ia_car.py` (freio de giro do magic assist passava do ponto em carros de inércia pequena).
+
 ## 2026-10-21 - Performance Report (Game > Performance)
 
 - Ferramenta genérica da engine para qualquer jogo, ideia vinda do Range Trace (que segue sendo do RolimaRacer). Ver [performance-report.md](performance-report.md).

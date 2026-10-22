@@ -4498,6 +4498,31 @@ GPUMaterial *GPU_material_world(struct Scene *scene, struct World *wo)
 	return mat;
 }
 
+/* GPU_material_prefetch for the world shader: built in an empty list only to send its program. */
+void GPU_material_world_prefetch(struct Scene *scene, struct World *wo)
+{
+	for (LinkData *link = wo->gpumaterial.first; link; link = link->next) {
+		if (((GPUMaterial *)link->data)->scene == scene) {
+			return;
+		}
+	}
+	ListBase kept = wo->gpumaterial;
+	BLI_listbase_clear(&wo->gpumaterial);
+	GPU_material_world(scene, wo);
+	for (LinkData *link = wo->gpumaterial.first; link; link = link->next) {
+		GPUMaterial *material = link->data;
+		if (material->pass) {
+			GPU_pass_free(material->pass);
+		}
+		BLI_freelistN(&material->lamps);
+		BLI_freelistN(&material->script_uniforms);
+		MEM_SAFE_FREE(material->error_log);
+		MEM_freeN(material);
+	}
+	BLI_freelistN(&wo->gpumaterial);
+	wo->gpumaterial = kept;
+}
+
 
 bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn, GPUNodeLink *rough,
                             GPUNodeLink **r_mirror, GPUNodeLink **r_diffuse)

@@ -146,6 +146,11 @@ public:
 	bool SetWeatherRuntimeProperty(const char *identifier, float value, bool boolValue, bool useBool);
 	bool GetWeatherRuntimeProperty(const char *identifier, float &value, bool &isBool);
 	void RenderBackground(RAS_Rasterizer *rasty);
+	bool UsesWorldShader() const;
+	/// Sends the world shader to the driver (GPU_shader_prefetch pass), when the background uses one.
+	void PrefetchShader();
+	/// Builds the world shader now instead of at the first frame drawn.
+	void PrepareShader();
 
 #ifdef WITH_PYTHON
 	/* shared World Properties dict (own.scene.world["key"]), values that don't convert to EXP_Value */

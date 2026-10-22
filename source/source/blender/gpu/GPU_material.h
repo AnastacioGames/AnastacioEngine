@@ -326,6 +326,8 @@ GPUNodeLink *GPU_material_builtin(GPUMaterial *mat, GPUBuiltin builtin);
 
 /* High level functions to create and use GPU materials */
 GPUMaterial *GPU_material_world(struct Scene *scene, struct World *wo);
+/* Sends the world program to the driver during a GPU_shader_prefetch pass, only when it isn't built yet. */
+void GPU_material_world_prefetch(struct Scene *scene, struct World *wo);
 
 /* Sends the material program to the driver during a GPU_shader_prefetch pass (see GPU_shader.h). */
 void GPU_material_prefetch(struct Scene *scene, struct Material *ma, bool is_instancing, bool is_skinning);
