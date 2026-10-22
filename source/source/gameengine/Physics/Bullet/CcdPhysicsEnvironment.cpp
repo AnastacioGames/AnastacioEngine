@@ -830,7 +830,8 @@ void CcdPhysicsEnvironment::MoveVehicles(CcdPhysicsController *ctrl, CcdPhysicsE
 		}
 		m_dynamicsWorld->removeVehicle(vehicle->GetVehicle());
 		vehicle->GetRaycaster()->SetDynamicsWorld(dest->m_dynamicsWorld);
-		dest->m_dynamicsWorld->addVehicle(vehicle->GetVehicle());
+		// Only listed: dest->AddCcdPhysicsController(chassis) adds it to the world.
+		// Adding it here too left a second copy that kept running after the vehicle was freed.
 		dest->m_wrapperVehicles.push_back(vehicle);
 		it = m_wrapperVehicles.erase(it);
 	}
@@ -883,6 +884,9 @@ bool CcdPhysicsEnvironment::RemoveCcdPhysicsController(CcdPhysicsController *ctr
 {
 	// if the physics controller is already removed we do nothing
 	if (!m_controllers.erase(ctrl)) {
+		// The chassis may own a vehicle without being registered here (moved by a LibLoad
+		// merge or suspended): drop it so the world never steps a vehicle on a freed body.
+		RemoveVehicle(ctrl, freeConstraints);
 		return false;
 	}
 
