@@ -319,10 +319,11 @@ class INFO_MT_game_performance(Menu):
         layout = self.layout
         layout.operator("game.prepare_textures", text="Prepare Textures (DDS)...", icon='IMAGE_DATA')
         layout.operator("game.revert_prepared_textures", icon='LOOP_BACK')
+        layout.operator("game.prepare_audio", text="Prepare Audio...", icon='SOUND')
         layout.separator()
         layout.operator("game.performance_report", text="Play and Measure", icon='PLAY')
-        layout.operator("game.prepare_audio", text="Prepare Audio...", icon='SOUND')
         layout.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
+        layout.separator()
         layout.operator("game.lod_generate_batch", icon='MOD_DECIM')
         layout.operator("game.lod_clear_generated", icon='X')
         layout.operator("game.collision_proxy_generate", icon='MOD_PHYSICS')

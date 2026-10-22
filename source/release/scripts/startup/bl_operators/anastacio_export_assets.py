@@ -211,8 +211,13 @@ def _worker(jobpath):
         for image in bpy.data.images:
             if not image.library and image.source == 'FILE' and not image.packed_file:
                 image.pack()
+        # Swapped-out originals keep a stale user count with no pointer left to them; without
+        # this they would be packed into the copy next to their derivative.
+        for idblock in list(bpy.data.sounds) + list(bpy.data.images):
+            if idblock.name.startswith(('__anastacio_audio_source__', '__anastacio_dds_source__')):
+                idblock.user_clear()
         for sound in bpy.data.sounds:
-            if not sound.library and not sound.packed_file:
+            if not sound.library and not sound.packed_file and sound.users:
                 sound.pack()
         save = bpy.ops.wm.save_as_mainfile_protected if job['protected'] else bpy.ops.wm.save_as_mainfile
         with _without_save_handlers():

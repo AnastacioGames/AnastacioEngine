@@ -18,6 +18,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   exclusivo do DDS nos exportadores: workers em background, copias de toda a arvore de `.range`.
 - Revisao: dialogo Prepare Textures estima DXT1/DXT5 pela profundidade (antes lia todos os pixels);
   `color_usage()` uma vez por export; textura preparada desatualizada exporta o original com aviso.
+- LibLoad em jogo (headless, `Game.exe --server`, originais escondidos): biblioteca exportada carrega,
+  objetos entram e o Sound actuator da biblioteca toca o OGG. Corrigido: o som original trocado ficava
+  com um usuario fantasma e ia empacotado (WAV) junto do OGG na copia exportada.
 - Testes: AUDIO_EXPORTERS_OK repetido apos as ultimas correcoes; 14 testes RangeArmor e testes de
   audio/pacote limpo do Codex em `build/audio-export-validation/`.
 ## 2026-10-22 - Scene Doctor: colisao simplificada, fase 1
