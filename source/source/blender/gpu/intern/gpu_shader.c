@@ -1018,6 +1018,8 @@ bool GPU_profile_log_enabled(void)
 }
 
 void (*GPU_profile_image_hook)(const char *name, int w, int h, bool mipmap, double ms) = NULL;
+const char *GPU_crash_material = NULL;
+char GPU_crash_device[256] = "";
 
 void GPU_profile_log_image(const char *name, int w, int h, bool mipmap, double ms)
 {

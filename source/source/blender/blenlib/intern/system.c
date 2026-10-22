@@ -123,9 +123,25 @@ void BLI_system_backtrace(FILE *fp)
 	symbolinfo->SizeOfStruct = sizeof(SYMBOL_INFO);
 
 	for (i = 0; i < nframes; i++) {
+		symbolinfo->Name[0] = '\0';
+		symbolinfo->Address = 0;
 		SymFromAddr(process, (DWORD64)(stack[i]), 0, symbolinfo);
 
-		fprintf(fp, "%u: %s - 0x%0X\n", nframes - i - 1, symbolinfo->Name, symbolinfo->Address);
+		/* Without the PDB next to the exe the name is only the nearest export (often wrong):
+		 * module + offset lets the developer resolve the line with the PDB of that build. */
+		HMODULE module = NULL;
+		char modulepath[MAX_PATH] = "?";
+		if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+		                       (LPCSTR)stack[i], &module))
+		{
+			GetModuleFileNameA(module, modulepath, MAX_PATH);
+		}
+		const char *modulename = strrchr(modulepath, '\\');
+		modulename = modulename ? modulename + 1 : modulepath;
+
+		fprintf(fp, "%u: %s - 0x%llX [%s+0x%llX]\n", nframes - i - 1, symbolinfo->Name,
+		        (unsigned long long)symbolinfo->Address, modulename,
+		        (unsigned long long)((char *)stack[i] - (char *)module));
 	}
 
 	MEM_freeN(symbolinfo);

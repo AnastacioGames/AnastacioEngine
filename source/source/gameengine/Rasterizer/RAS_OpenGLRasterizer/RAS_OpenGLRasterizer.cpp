@@ -665,6 +665,8 @@ void RAS_OpenGLRasterizer::PrintHardwareInfo(bool fullInfo)
 {
 	CM_Message("Range Engine - Hardware Info");
 	CM_Message(termcolor::yellow << "Using Device: " << glGetString(GL_VENDOR) << " - " << glGetString(GL_RENDERER));
+	snprintf(GPU_crash_device, sizeof(GPU_crash_device), "%s - %s - GL %s", (const char *)glGetString(GL_VENDOR),
+	             (const char *)glGetString(GL_RENDERER), (const char *)glGetString(GL_VERSION));
 	CM_Message(termcolor::green << "OpenGL Supported: " << glGetString(GL_VERSION) 
 			<< termcolor::white << " - " << "Shading language: " << glGetString(GL_SHADING_LANGUAGE_VERSION));
 	// Note: this used to print "GLEW_VERSION_MAJOR"/"GLEW_VERSION", which are the GLEW

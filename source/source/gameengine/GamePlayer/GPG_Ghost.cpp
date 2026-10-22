@@ -99,6 +99,7 @@ extern char datatoc_roboto_mono_medium_ttf[];
 
 #include "GPU_init_exit.h"
 #include "GPU_draw.h"
+#include "GPU_shader.h"
 
 #include "KX_Globals.h"
 #include "KX_PythonInit.h"
@@ -729,6 +730,11 @@ static void crashFilePath(char *fname, size_t maxlen)
 	}
 }
 
+#ifdef WIN32
+/// Exception being handled (set by windowsExceptionHandler), written at the top of the crash file.
+static EXCEPTION_POINTERS *g_crashException = nullptr;
+#endif
+
 static void writeCrashFile()
 {
 	FILE *fp;
@@ -755,6 +761,28 @@ static void writeCrashFile()
 		        fname, errno ? strerror(errno) : "Unknown error opening file");
 	}
 	else {
+		fputs(header, fp);
+#ifdef WIN32
+		if (g_crashException) {
+			const EXCEPTION_RECORD *record = g_crashException->ExceptionRecord;
+			char modulepath[MAX_PATH] = "?";
+			HMODULE module = NULL;
+			if (GetModuleHandleExA(GET_MODULE_HANDLE_EX_FLAG_FROM_ADDRESS | GET_MODULE_HANDLE_EX_FLAG_UNCHANGED_REFCOUNT,
+			                       (LPCSTR)record->ExceptionAddress, &module))
+			{
+				GetModuleFileNameA(module, modulepath, MAX_PATH);
+			}
+			fprintf(fp, "# exception 0x%08lX at %s+0x%llX\n", (unsigned long)record->ExceptionCode,
+			        BLI_path_basename(modulepath),
+			        (unsigned long long)((char *)record->ExceptionAddress - (char *)module));
+			if (record->ExceptionCode == EXCEPTION_ACCESS_VIOLATION && record->NumberParameters >= 2) {
+				fprintf(fp, "# %s address 0x%llX\n", record->ExceptionInformation[0] ? "writing" : "reading",
+				        (unsigned long long)record->ExceptionInformation[1]);
+			}
+		}
+#endif
+		fprintf(fp, "# gpu: %s\n", GPU_crash_device[0] ? GPU_crash_device : "(not initialized)");
+		fprintf(fp, "# last material: %s\n", GPU_crash_material ? GPU_crash_material : "(none)");
 		sigHandleCrashBacktrace(fp);
 
 		fclose(fp);
@@ -900,6 +928,7 @@ LONG WINAPI windowsExceptionHandler(EXCEPTION_POINTERS *ExceptionInfo)
 
 		/* Always write the crash backtrace (blender.crash.txt / <file>.crash.txt
 		 * in the temp dir), even in Release/NDEBUG builds. */
+		g_crashException = ExceptionInfo;
 		writeCrashFile();
 	}
 

@@ -6,6 +6,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Relatório de crash útil sem PDB
+
+- Os `.crash.txt` do Discord (Intel HD 4000, driver 10.18.10.4242) só traziam o símbolo exportado mais próximo (nomes errados, como `initGameTypesPythonBinding`) e nenhum deslocamento; o cabeçalho montado em `writeCrashFile` nunca era escrito e endereço/módulo da exceção iam só para o console.
+- Agora o arquivo começa com versão, código e local da exceção (`módulo+offset`), endereço lido/escrito, GPU/driver/versão GL (`GPU_crash_device`) e o último material ligado (`GPU_crash_material`, posto em `GPU_material_bind`); cada linha do backtrace ganha `[módulo+offset]`, que se resolve com o PDB do build publicado. Testado com crash forçado (`ctypes.c_int.from_address(8)`).
+
 ## 2026-10-21 - Static Batch: merge/split parcial
 
 - `RAS_BatchGroup::MergeMeshUser`: se um material do objeto não pode ser unido (formato diferente), os slots já unidos voltam para o mesh original; antes ficavam desenhados pelo batch sem o objeto pertencer a ele. `SplitMeshUser`: separa todos os slots mesmo que um falhe e sempre solta o grupo; antes parava no meio com o objeto ainda marcado como batched. Teste com grupos instanciados: 10 no batch; mover um objeto deixa 9 e o movido fora.

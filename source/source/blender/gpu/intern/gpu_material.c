@@ -917,6 +917,7 @@ void GPU_material_bind(
 {
 	if (material->pass) {
 		GPUShader *shader = GPU_pass_shader(material->pass);
+		GPU_crash_material = material->ma ? material->ma->id.name + 2 : "(world/default)";
 
 		SceneRenderLayer *srl = scenelock ? BLI_findlink(&material->scene->r.layers, material->scene->r.actlay) : NULL;
 
