@@ -163,13 +163,24 @@ def rule_textures(scene, objects):
     return issues
 
 
+def _lod_auto():
+    from bl_operators import anastacio_lod_auto
+    return anastacio_lod_auto
+
+
+def _collision_proxy():
+    from bl_operators import anastacio_collision_proxy
+    return anastacio_collision_proxy
+
+
 def rule_heavy_meshes(scene, objects):
     issues = []
     seen = {}
     for ob in objects:
         if ob.type != 'MESH' or ob.data is None:
             continue
-        if len(ob.lod_levels) > 1:
+        # Objects with LoD, and the hidden levels themselves, are already handled.
+        if len(ob.lod_levels) > 1 or _lod_auto().TAG in ob:
             continue
         mesh = ob.data
         if mesh not in seen:
@@ -180,9 +191,23 @@ def rule_heavy_meshes(scene, objects):
         detail = "No LoD levels; it is drawn with all triangles at any distance."
         if _subsurf_levels(ob):
             detail += " Subdivision Surface multiplies the mesh at game start."
+        lod = _lod_auto()
+        reason = lod._skip_reason(ob)
+        fix = None
+        if reason is None:
+            detail += " Fix generates LoD levels (Generate LODs)."
+
+            def fix(ob=ob):
+                lod.generate(bpy.context.scene, [ob])
+
+                def revert():
+                    lod.clear_generated(bpy.context.scene, ob)
+                return revert
+        else:
+            detail += " Generate LODs leaves it out (%s)." % reason
         issues.append(Issue(
             "mesh_heavy", ob.name, 'HIGH' if tris >= MESH_HUGE_TRIS else 'MEDIUM',
-            "%s has about %d triangles" % (ob.name, tris), detail, [ob]))
+            "%s has about %d triangles" % (ob.name, tris), detail, [ob], fix))
     return issues
 
 
@@ -269,10 +294,26 @@ def rule_physics_shapes(scene, objects):
         elif game.physics_type == 'STATIC' and (trimesh or not game.use_collision_bounds):
             tris = _mesh_tris(ob.data) * (4 ** _subsurf_levels(ob))
             if tris >= STATIC_TRIMESH_DENSE_TRIS:
+                proxy = _collision_proxy()
+                reason = proxy.skip_reason(scene, ob)
+                detail = "A simpler invisible collision mesh (or a box) would make physics cheaper."
+                fix = None
+                if reason is None:
+                    detail += " Fix makes a decimated collision proxy; scripts that compare the hit object by name see %s_COL." % ob.name
+
+                    def fix(ob=ob):
+                        proxy.make_proxy(bpy.context.scene, ob)
+
+                        def revert():
+                            proxy.clear(bpy.context.scene, ob)
+                        return revert
+                elif reason not in {"is a proxy", "has a proxy"}:
+                    detail += " Collision proxies leave it out (%s)." % reason
+                if reason in {"is a proxy", "has a proxy"}:
+                    continue
                 issues.append(Issue(
                     "physics_dense_static", ob.name, 'LOW',
-                    "%s collides with all its %d triangles" % (ob.name, tris),
-                    "A simpler invisible collision mesh (or a box) would make physics cheaper.", [ob]))
+                    "%s collides with all its %d triangles" % (ob.name, tris), detail, [ob], fix))
     return issues
 
 
