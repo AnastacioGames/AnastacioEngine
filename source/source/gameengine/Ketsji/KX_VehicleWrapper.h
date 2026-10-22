@@ -8,6 +8,7 @@
 
 #include "EXP_Value.h"
 class PHY_IVehicle;
+class KX_GameObject;
 
 ///Python interface to physics vehicles (primarily 4-wheel cars and 2wheel bikes)
 class	KX_VehicleWrapper : public EXP_Value
@@ -48,6 +49,9 @@ public:
 	EXP_PYMETHOD_VARARGS(KX_VehicleWrapper,SetSuspensionCompression);
 	
 	EXP_PYMETHOD_VARARGS(KX_VehicleWrapper,SetRollInfluence);
+	EXP_PYMETHOD_VARARGS(KX_VehicleWrapper,SetSuspensionRestLength);
+	EXP_PYMETHOD_VARARGS(KX_VehicleWrapper,SetWheelRadius);
+	PyObject *QueueWheelParam(PyObject *args, int paramId, const char *name);
 
 	EXP_PYMETHOD_VARARGS(KX_VehicleWrapper,GetCurrentSpeedKmh);
 	EXP_PYMETHOD_VARARGS(KX_VehicleWrapper,GetCurrentSpeedMps);
@@ -70,6 +74,7 @@ public:
 
 private:
 	static void OnVehicleInvalidated(void *client);
+	KX_GameObject *GetChassisGameObject() const;
 
 	PHY_IVehicle*			 m_vehicle;
 };

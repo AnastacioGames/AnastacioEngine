@@ -27,6 +27,8 @@
 #include "PHY_IVehicle.h"
 #include "KX_PyMath.h"
 #include "KX_GameObject.h"
+#include "KX_ClientObjectInfo.h"
+#include "PHY_IPhysicsController.h"
 #include "KX_MotionState.h"
 #include "KX_Globals.h"
 #include "PHY_IPhysicsEnvironment.h"
@@ -520,8 +522,12 @@ PyObject *KX_VehicleWrapper::PySavePreset(PyObject *args)
 	}
 	KX_VehiclePreset preset;
 	std::string error;
-	if (!KX_CaptureVehiclePreset(m_vehicle, &preset, &error) ||
-	    !KX_SaveVehiclePresetAtomic(path, preset, &error)) {
+	if (!KX_CaptureVehiclePreset(m_vehicle, &preset, &error)) {
+		PyErr_SetString(PyExc_ValueError, error.c_str());
+		return nullptr;
+	}
+	KX_CaptureVehicleEngine(GetChassisGameObject(), &preset);
+	if (!KX_SaveVehiclePresetAtomic(path, preset, &error)) {
 		PyErr_SetString(PyExc_ValueError, error.c_str());
 		return nullptr;
 	}
@@ -542,7 +548,46 @@ PyObject *KX_VehicleWrapper::PyLoadPreset(PyObject *args)
 		PyErr_SetString(PyExc_ValueError, error.c_str());
 		return nullptr;
 	}
+	KX_ApplyVehicleEngine(GetChassisGameObject(), preset);
 	Py_RETURN_NONE;
+}
+
+KX_GameObject *KX_VehicleWrapper::GetChassisGameObject() const
+{
+	PHY_IPhysicsController *controller = m_vehicle ? m_vehicle->GetChassisController() : nullptr;
+	KX_ClientObjectInfo *info = controller ? static_cast<KX_ClientObjectInfo *>(controller->GetNewClientInfo()) : nullptr;
+	return info ? info->m_gameobject : nullptr;
+}
+
+PyObject *KX_VehicleWrapper::QueueWheelParam(PyObject *args, int paramId, const char *name)
+{
+	float value;
+	int wheelIndex;
+	VEHICLE_VALID_CHECK_OR_RETURN(name);
+	if (!PyArg_ParseTuple(args, "fi", &value, &wheelIndex)) {
+		return nullptr;
+	}
+	WHEEL_INDEX_CHECK_OR_RETURN(wheelIndex, name);
+	if (!std::isfinite(value) || value <= 0.0f) {
+		PyErr_Format(PyExc_ValueError, "%s(value, wheelIndex): value must be a positive number", name);
+		return nullptr;
+	}
+	PHY_VehicleParameterCommand cmd;
+	cmd.id = (PHY_VehicleParameterId)paramId;
+	cmd.wheelIndex = wheelIndex;
+	cmd.value = value;
+	m_vehicle->QueueParameterCommand(cmd);
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_VehicleWrapper::PySetSuspensionRestLength(PyObject *args)
+{
+	return QueueWheelParam(args, PHY_VEHICLE_PARAM_SUSPENSION_REST_LENGTH, "setSuspensionRestLength");
+}
+
+PyObject *KX_VehicleWrapper::PySetWheelRadius(PyObject *args)
+{
+	return QueueWheelParam(args, PHY_VEHICLE_PARAM_WHEEL_RADIUS, "setWheelRadius");
 }
 
 PyObject *KX_VehicleWrapper::PyRebuildPreset(PyObject *args)
@@ -694,6 +739,8 @@ PyMethodDef KX_VehicleWrapper::Methods[] = {
 	{"setSuspensionDamping", (PyCFunction)KX_VehicleWrapper::sPySetSuspensionDamping, METH_VARARGS},
 	{"setSuspensionCompression", (PyCFunction)KX_VehicleWrapper::sPySetSuspensionCompression, METH_VARARGS},
 	{"setRollInfluence", (PyCFunction)KX_VehicleWrapper::sPySetRollInfluence, METH_VARARGS},
+	{"setSuspensionRestLength", (PyCFunction)KX_VehicleWrapper::sPySetSuspensionRestLength, METH_VARARGS},
+	{"setWheelRadius", (PyCFunction)KX_VehicleWrapper::sPySetWheelRadius, METH_VARARGS},
 	{"getCurrentSpeedKmh", (PyCFunction)KX_VehicleWrapper::sPyGetCurrentSpeedKmh, METH_VARARGS},
 	{"getCurrentSpeedMps", (PyCFunction)KX_VehicleWrapper::sPyGetCurrentSpeedMps, METH_VARARGS},
 	{"getForwardVector", (PyCFunction)KX_VehicleWrapper::sPyGetForwardVector, METH_VARARGS},

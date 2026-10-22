@@ -6,6 +6,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-22 - Veículo nativo: ajustes em tempo real pelo Python (pedidos do GT2)
+
+- Novos: `gameOb.setVehicleMaxTorque/setVehicleMaxRPM/setVehicleGearRatios` e `vehicle.setSuspensionRestLength(valor, roda)` / `vehicle.setWheelRadius(valor, roda)` (aplicados no próximo passo da física pela fila de comandos).
+- `getWheelState()['isInContact']` voltava sempre False: o sync das rodas chamava `updateWheelTransform`, que zera o contato da Bullet. O valor do raycast do passo agora é preservado.
+- `savePreset` falhava com máscara de raio 0xFFFF (16 bits gravados como short negativo); agora grava/lê 0-65535. `savePreset`/`loadPreset` pelo Python passam a incluir o bloco `engine` (torque, RPM, câmbio), como o Vehicle Lab.
+- Teste: `tools/debug/cenas/veiculo_runtime/` (carro a-a7r do GT2 + chão; contato True nas 4 rodas, carro sobe 18 cm ao mudar a suspensão, preset restaura o torque).
+- Em aberto: rodas deslocadas com `vehicle_com_offset` (correção muda jogos existentes) e chuva ligada em runtime numa pista sem chuva.
+
 ## 2026-10-22 - Shader do céu no aquecimento; travadas do RolimaRacer medidas
 
 - O shader do World (céu por nós ou Blend/Paper/Real) só era compilado no primeiro desenho da cena. Agora entra no passo 0 do aquecimento, junto da Camera FX: enviado ao driver no prefetch paralelo (`GPU_material_world_prefetch`) e montado antes do fim do load (`KX_WorldInfo::PrefetchShader/PrepareShader`), no addScene assíncrono e no normal. RolimaRacer com cache vazio (`RANGE_SHADER_SALT`): `WOWorld.001` saiu do 1º desenho (1,1 s) e foi montado no Loading em 3 ms; Loading 34,5 → 32,7 s.

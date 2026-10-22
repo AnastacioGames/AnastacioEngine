@@ -292,7 +292,11 @@ public:
 		for (i = 0; i < numWheels; i++) {
 			btWheelInfo& info = m_vehicle->getWheelInfo(i);
 			PHY_IMotionState *motionState = (PHY_IMotionState *)info.m_clientInfo;
+			// updateWheelTransform -> updateWheelTransformsWS clears m_isInContact; keep the
+			// value from this step's raycast so getWheelState() reports real ground contact.
+			const bool inContact = info.m_raycastInfo.m_isInContact;
 			m_vehicle->updateWheelTransform(i, false);
+			info.m_raycastInfo.m_isInContact = inContact;
 			const btTransform trans = m_vehicle->getWheelInfo(i).m_worldTransform;
 			motionState->SetWorldOrientation(ToMt(trans.getBasis()));
 			motionState->SetWorldPosition(ToMt(trans.getOrigin()));

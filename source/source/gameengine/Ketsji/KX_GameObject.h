@@ -1226,6 +1226,9 @@ public:
 	EXP_PYMETHOD_NOARGS(KX_GameObject,GetVehicleMaxRPM);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,GetVehicleGearRatios);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,GetVehicleGearboxType);
+	EXP_PYMETHOD_O(KX_GameObject,SetVehicleMaxTorque);
+	EXP_PYMETHOD_O(KX_GameObject,SetVehicleMaxRPM);
+	EXP_PYMETHOD_O(KX_GameObject,SetVehicleGearRatios);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,GetPropertyNames);
 	EXP_PYMETHOD(KX_GameObject,ReplaceMesh);
 	EXP_PYMETHOD_NOARGS(KX_GameObject,EndObject);

@@ -37,6 +37,7 @@
 #endif
 
 #include <cstring>
+#include <cmath>
 
 #include "CM_WorkCounters.h"
 #include "CM_Trace.h"
@@ -3072,6 +3073,9 @@ PyMethodDef KX_GameObject::Methods[] = {
 	{"getVehicleMaxRPM", (PyCFunction)KX_GameObject::sPyGetVehicleMaxRPM, METH_NOARGS},
 	{"getVehicleGearRatios", (PyCFunction)KX_GameObject::sPyGetVehicleGearRatios, METH_NOARGS},
 	{"getVehicleGearboxType", (PyCFunction)KX_GameObject::sPyGetVehicleGearboxType, METH_NOARGS},
+	{"setVehicleMaxTorque", (PyCFunction)KX_GameObject::sPySetVehicleMaxTorque, METH_O},
+	{"setVehicleMaxRPM", (PyCFunction)KX_GameObject::sPySetVehicleMaxRPM, METH_O},
+	{"setVehicleGearRatios", (PyCFunction)KX_GameObject::sPySetVehicleGearRatios, METH_O},
 	{"getPropertyNames", (PyCFunction)KX_GameObject::sPyGetPropertyNames, METH_NOARGS},
 	{"replaceMesh", (PyCFunction)KX_GameObject::sPyReplaceMesh, METH_VARARGS | METH_KEYWORDS},
 	{"endObject", (PyCFunction)KX_GameObject::sPyEndObject, METH_NOARGS},
@@ -6289,6 +6293,64 @@ PyObject *KX_GameObject::PyGetVehicleGearRatios()
 PyObject *KX_GameObject::PyGetVehicleGearboxType()
 {
 	return PyLong_FromLong(m_vehicleGearboxType);
+}
+
+static bool py_vehicle_float(PyObject *value, const char *name, float *out)
+{
+	const double v = PyFloat_AsDouble(value);
+	if (PyErr_Occurred()) {
+		return false;
+	}
+	if (!std::isfinite(v) || v < 0.0) {
+		PyErr_Format(PyExc_ValueError, "gameOb.%s(value): value must be a finite number >= 0", name);
+		return false;
+	}
+	*out = (float)v;
+	return true;
+}
+
+PyObject *KX_GameObject::PySetVehicleMaxTorque(PyObject *value)
+{
+	float v;
+	if (!py_vehicle_float(value, "setVehicleMaxTorque", &v)) {
+		return nullptr;
+	}
+	SetVehicleMaxTorque(v);
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_GameObject::PySetVehicleMaxRPM(PyObject *value)
+{
+	float v;
+	if (!py_vehicle_float(value, "setVehicleMaxRPM", &v)) {
+		return nullptr;
+	}
+	SetVehicleMaxRPM(v);
+	Py_RETURN_NONE;
+}
+
+PyObject *KX_GameObject::PySetVehicleGearRatios(PyObject *value)
+{
+	PyObject *seq = PySequence_Fast(value, "gameOb.setVehicleGearRatios(ratios): expected a list of numbers");
+	if (!seq) {
+		return nullptr;
+	}
+	std::vector<float> ratios;
+	const Py_ssize_t n = PySequence_Fast_GET_SIZE(seq);
+	for (Py_ssize_t i = 0; i < n; i++) {
+		const double r = PyFloat_AsDouble(PySequence_Fast_GET_ITEM(seq, i));
+		if (PyErr_Occurred() || !std::isfinite(r)) {
+			Py_DECREF(seq);
+			if (!PyErr_Occurred()) {
+				PyErr_SetString(PyExc_ValueError, "gameOb.setVehicleGearRatios(ratios): ratios must be finite numbers");
+			}
+			return nullptr;
+		}
+		ratios.push_back((float)r);
+	}
+	Py_DECREF(seq);
+	SetVehicleGearRatios(ratios);
+	Py_RETURN_NONE;
 }
 
 PyObject *KX_GameObject::PyGetPropertyNames()

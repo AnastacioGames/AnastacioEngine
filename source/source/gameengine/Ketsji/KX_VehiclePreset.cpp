@@ -267,7 +267,7 @@ bool KX_ParseVehiclePreset(const std::string &jsonText, KX_VehiclePreset *out, s
   }
 
   int rayCastMask = 1;
-  if (ok && !GetIntInRange(root, "rayCastMask", 0, 32767, &rayCastMask, &localError)) {
+  if (ok && !GetIntInRange(root, "rayCastMask", 0, 65535, &rayCastMask, &localError)) {
     ok = false;
   }
   else if (ok) {
@@ -364,7 +364,7 @@ std::string KX_SerializeVehiclePreset(const KX_VehiclePreset &preset)
   cJSON_AddNumberToObject(coordSys, "forward", preset.forwardIndex);
   cJSON_AddItemToObject(root, "coordinateSystem", coordSys);
 
-  cJSON_AddNumberToObject(root, "rayCastMask", preset.rayCastMask);
+  cJSON_AddNumberToObject(root, "rayCastMask", (unsigned short)preset.rayCastMask);
 
   cJSON *wheelsArr = cJSON_CreateArray();
   for (const KX_VehiclePresetWheel &wheel : preset.wheels) {
