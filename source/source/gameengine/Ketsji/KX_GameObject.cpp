@@ -1530,6 +1530,22 @@ KX_LodManager *KX_GameObject::GetLodManager() const
 	return m_lodManager;
 }
 
+void KX_GameObject::ShowLodLevel(int level)
+{
+	if (!m_lodManager || m_lodManager->GetLevelCount() == 0) {
+		return;
+	}
+	const unsigned int index = std::min((unsigned int)level, m_lodManager->GetLevelCount() - 1);
+	const KX_LodLevel& lodLevel = m_lodManager->GetLevel(index);
+	KX_Mesh *mesh = lodLevel.GetMesh();
+	if ((lodLevel.GetFlag() & KX_LodLevel::USE_INVISIBLE) || !mesh || mesh == m_meshes.front()) {
+		return;
+	}
+	m_wantsImpostorAtlasDeformer = (lodLevel.GetFlag() & KX_LodLevel::USE_ATLAS) != 0;
+	ReplaceMesh(mesh, true, false);
+	m_currentAtlasCell = -1;
+}
+
 void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lodfactor)
 {
 	if (!m_lodManager) {

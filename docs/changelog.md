@@ -21,9 +21,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 ## 2026-10-22 - 1º desenho da cena sem frustum
 
-- Traces frios do RolimaRacer (3 rodadas): duas travadas de 600-1000 ms no swap no meio da corrida, sempre 3 quadros depois de um objeto entrar na câmera pela 1ª vez (`nuvem`, faíscas). O programa já vinha do aquecimento, mas o driver AMD monta a variante final no 1º draw call que a usa.
-- Agora a 1ª passada de câmera de cada cena (`KX_Scene::m_drawAllPending`) pula o frustum e manda todo objeto renderizável para o desenho; os que estão fora da tela são recortados pela GPU, sem mudança na imagem. Esse quadro fica atrás da tela de Loading. `RANGE_NO_FIRST_DRAW_ALL=1` desliga, para comparar. Teste: `tools/debug/cenas/criar_cena_first_draw_all.py`.
-- Não cobre objetos de camada inativa adicionados depois (`addObject`) nem níveis de LoD ainda não usados. O quadro de 742 ms da rodada quente não teve objeto novo na tela e segue sem causa.
+- Traces frios do RolimaRacer: travadas de 600-1000 ms no swap no meio da corrida, poucos quadros depois de algo ser desenhado pela 1ª vez (`nuvem` entrando na câmera, `agua.001` na sombra, níveis 1-2 de LoD dos carros/pilotos ~2 s depois da largada). O programa já vinha do aquecimento, mas o driver AMD monta a variante final no 1º draw call que a usa.
+- Agora as 3 primeiras passadas de câmera de cada cena (`KX_Scene::m_drawAllPasses`) pulam o frustum e mandam todo objeto renderizável para o desenho, cada uma forçando um nível de LoD (`KX_GameObject::ShowLodLevel`); a 1ª passada de sombras também pula o teste. Fora da tela a GPU recorta, e esses quadros ficam atrás da tela de Loading. `RANGE_NO_FIRST_DRAW_ALL=1` desliga. Teste: `tools/debug/cenas/criar_cena_first_draw_all.py`.
+- RolimaRacer frio (Modo IA + trilho, 2 rodadas): corrida sem nenhum quadro acima de 50 ms depois da largada (antes: 2-4 travadas de ~650 ms); Loading igual (~36 s).
+- Não cobre objetos de camada inativa adicionados depois (`addObject`). O quadro de 742 ms de uma rodada quente não teve nada novo na tela e segue sem causa.
 
 ## 2026-10-22 - Shader do céu no aquecimento; travadas do RolimaRacer medidas
 

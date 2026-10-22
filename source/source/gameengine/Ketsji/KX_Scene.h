@@ -310,8 +310,13 @@ private:
 
 	/** The first camera pass of the scene skips the frustum test and draws every renderable object
 	 * (off-screen ones are clipped by the GPU). The driver builds a shader variant at the first draw
-	 * that uses it; that frame is behind the loading screen, not mid-game when the object comes into view. */
-	bool m_drawAllPending;
+	 * that uses it; that frame is behind the loading screen, not mid-game when the object comes into view.
+	 * One pass per LoD level (see m_lodWarmLevel), so the lower levels' meshes are drawn too. */
+	int m_drawAllPasses;
+	/// LoD level forced on every object by UpdateObjectLods() in the current draw-all pass, -1 when off.
+	int m_lodWarmLevel;
+	/// Same for the shadow passes: every pass of the first frame that draws shadows takes all objects.
+	bool m_shadowDrawAllPending;
 
 	/** Per-object culling data gathered once for all shadow passes of a frame (see
 	 * BeginShadowCulling). Reading it back from the objects costs several cache misses per

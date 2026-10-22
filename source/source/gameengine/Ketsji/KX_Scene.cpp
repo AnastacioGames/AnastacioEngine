@@ -374,6 +374,9 @@ SG_Callbacks KX_Scene::m_callbacks = SG_Callbacks(
 	KX_Scene::KX_ScenegraphUpdateFunc,
 	KX_Scene::KX_ScenegraphRescheduleFunc);
 
+/// Camera passes of a new scene drawn without frustum culling, one per LoD level (0, 1, 2).
+static const int firstDrawAllPasses = 3;
+
 KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
                    const std::string& sceneName,
                    Scene *scene,
@@ -400,7 +403,9 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_lastCullingTestedObjects(0),
 	m_lastCullingVisibleObjects(0),
 	// RANGE_NO_FIRST_DRAW_ALL=1 turns it off, to compare in a trace.
-	m_drawAllPending(!getenv("RANGE_NO_FIRST_DRAW_ALL")),
+	m_drawAllPasses(getenv("RANGE_NO_FIRST_DRAW_ALL") ? 0 : firstDrawAllPasses),
+	m_lodWarmLevel(-1),
+	m_shadowDrawAllPending(m_drawAllPasses > 0),
 	m_lastLightsTotal(0),
 	m_lastLightsShadowUpdated(0),
 	m_lastShadowPasses(0),
@@ -2037,9 +2042,13 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, RA
 {
 	std::vector<KX_GameObject *> objects;
 	objects.reserve(m_renderlist->GetCount());
-	const bool drawAll = m_drawAllPending && !is_shadowbuf;
+	const bool drawAll = m_drawAllPasses > 0 && !is_shadowbuf;
 	if (drawAll) {
-		m_drawAllPending = false;
+		m_lodWarmLevel = firstDrawAllPasses - m_drawAllPasses;
+		--m_drawAllPasses;
+	}
+	else if (!is_shadowbuf) {
+		m_lodWarmLevel = -1;
 	}
 	if (drawAll || !cam->GetFrustumCulling()) {
 		for (KX_GameObject *gameobj : m_renderlist) {
@@ -2108,6 +2117,10 @@ const std::vector<KX_Scene::ShadowCullEntry>& KX_Scene::GetShadowCullSnapshot()
 
 void KX_Scene::EndShadowCulling()
 {
+	// The snapshot is built by the first shadow pass, so a frame without one keeps the flag.
+	if (m_shadowCullCacheValid) {
+		m_shadowDrawAllPending = false;
+	}
 	m_shadowCullScope = false;
 	m_shadowCullCacheValid = false;
 	m_shadowCullCache.clear();
@@ -2145,6 +2158,10 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 		objects.reserve(m_shadowCullCache.size());
 		for (const ShadowCullEntry& entry : m_shadowCullCache) {
 			if (layer != 0 && !(entry.m_layer & layer)) {
+				continue;
+			}
+			if (m_shadowDrawAllPending) {
+				objects.push_back(entry.m_object);
 				continue;
 			}
 			const SG_Frustum::TestType sphereTest = frustum.SphereInsideFrustum(entry.m_center, entry.m_radius);
@@ -2843,6 +2860,13 @@ void KX_Scene::UpdateObjectLods(KX_Camera *cam, const std::vector<KX_GameObject 
 {
 	const mt::vec3& cam_pos = cam->NodeGetWorldPosition();
 	const float lodfactor = cam->GetLodDistanceFactor();
+
+	if (m_lodWarmLevel >= 0) {
+		for (KX_GameObject *gameobj : objects) {
+			gameobj->ShowLodLevel(m_lodWarmLevel);
+		}
+		return;
+	}
 
 	for (KX_GameObject *gameobj : objects) {
 		gameobj->UpdateLod(this, cam_pos, lodfactor);

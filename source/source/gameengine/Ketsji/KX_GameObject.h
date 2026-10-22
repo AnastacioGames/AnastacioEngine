@@ -934,6 +934,9 @@ public:
 	 * Updates the current lod level based on distance from camera.
 	 */
 	void UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lodfactor);
+	/// Shows the mesh of one lod level (the last one past the count), ignoring the distance.
+	/// For the first passes of a scene; the next UpdateLod() puts the right level back.
+	void ShowLodLevel(int level);
 
 	void SetAnimationEventManager(KX_AnimationEventManager *AnimationEventManager);
 	/// Get current animation event manager.

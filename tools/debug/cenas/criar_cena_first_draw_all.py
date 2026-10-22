@@ -1,6 +1,6 @@
 # Cena de teste do 1o desenho completo: no 1o quadro da cena todo objeto renderizavel passa no culling da
 # camera (o driver monta a variante do shader atras do Loading); depois o frustum volta a cortar.
-# Um cubo fica atras da camera: culled False depois do 1o desenho, True depois do 2o.
+# Sao 3 passadas (uma por nivel de LoD). Um cubo fica atras da camera: culled False depois do 1o desenho, True depois do 4o.
 # Uso: AnastacioEngine.exe -b -P criar_cena_first_draw_all.py -- <pasta de saida>
 # Depois: AnastacioRuntime.exe <pasta>/first_draw_all.range ; resultado em <pasta>/first_draw_all_result.txt
 # Com RANGE_NO_FIRST_DRAW_ALL=1 o cubo ja sai cortado no 1o desenho.
@@ -32,7 +32,7 @@ behind = own.scene.objects["Behind"]
 # A logica do quadro N le o culled que o desenho do quadro N-1 deixou.
 if own["n"] == 1:
     own["first"] = behind.culled
-elif own["n"] == 3:
+elif own["n"] == 5:
     with open(os.path.join(Range.logic.expandPath("//"), "first_draw_all_result.txt"), "w") as f:
         f.write("culled_apos_1o_desenho %s culled_depois %s\\n" % (own["first"], behind.culled))
     Range.logic.endGame()
