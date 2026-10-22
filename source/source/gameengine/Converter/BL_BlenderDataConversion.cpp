@@ -3699,6 +3699,12 @@ static void BL_StaticBatchObjects(EXP_ListValue<KX_GameObject> *objectlist)
 		if (blenderobj->body_type != OB_BODY_TYPE_STATIC && blenderobj->body_type != OB_BODY_TYPE_NO_COLLISION) {
 			continue;
 		}
+		/* A LoD switch replaces the mesh and splits the object out of the batch, rebuilding the merged
+		 * arrays during the game. Objects with LoD levels keep their own draw. */
+		KX_LodManager *lodManager = gameobj->GetLodManager();
+		if (lodManager && lodManager->GetLevelCount() > 1) {
+			continue;
+		}
 		batchObjects.push_back(gameobj);
 	}
 	if (batchObjects.size() > 1) {
