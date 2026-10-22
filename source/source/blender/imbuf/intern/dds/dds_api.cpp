@@ -237,8 +237,7 @@ static struct ImBuf *dds_load_blocks_only(DirectDrawSurface &dds)
 		return NULL;
 	}
 	if (levels < dds.mipmapCount()) {
-		printf("DDS: truncated, %u of %u mipmap levels present
-", levels, dds.mipmapCount());
+		printf("DDS: truncated, %u of %u mipmap levels present\n", levels, dds.mipmapCount());
 	}
 
 	const unsigned char planes = dds_blocks_have_alpha(data, width, height, fourcc) ? 32 : 24;
