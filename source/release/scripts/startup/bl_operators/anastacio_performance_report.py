@@ -111,7 +111,25 @@ class GAME_OT_performance_reports_folder(Operator):
         return {'FINISHED'}
 
 
+class GAME_OT_performance_report_last(Operator):
+    """Open the most recent performance report"""
+    bl_idname = "game.performance_report_last"
+    bl_label = "Open Last Report"
+
+    def execute(self, context):
+        folder = reports_dir()
+        reports = [os.path.join(folder, n, "report.html") for n in os.listdir(folder)]
+        reports = [r for r in reports if os.path.isfile(r)]
+        if not reports:
+            self.report({'WARNING'}, "No performance report yet: use Play and Measure")
+            return {'CANCELLED'}
+        last = max(reports, key=os.path.getmtime)
+        bpy.ops.wm.url_open(url="file:///" + last.replace("\\", "/"))
+        return {'FINISHED'}
+
+
 classes = (
     GAME_OT_performance_report,
+    GAME_OT_performance_report_last,
     GAME_OT_performance_reports_folder,
 )

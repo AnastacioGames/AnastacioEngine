@@ -311,6 +311,17 @@ class INFO_MT_file_previews(Menu):
         layout.operator("wm.previews_batch_clear")
 
 
+class INFO_MT_game_performance(Menu):
+    bl_label = "Performance"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("game.performance_report", text="Play and Measure", icon='PLAY')
+        layout.separator()
+        layout.operator("game.performance_report_last", icon='TEXT')
+        layout.operator("game.performance_reports_folder", icon='FILE_FOLDER')
+
+
 class INFO_MT_game(Menu):
     bl_label = "Game"
 
@@ -319,6 +330,9 @@ class INFO_MT_game(Menu):
 
         gs = context.scene.game_settings
 
+        layout.menu("INFO_MT_game_performance", icon='SORTTIME')
+
+        layout.separator(factor=1)
         layout.label(text="Overlays")
         layout.prop(gs, "show_framerate_profile", text="Show Profile")
         layout.prop(gs, "show_render_queries")
@@ -326,8 +340,6 @@ class INFO_MT_game(Menu):
 
         layout.separator(factor=1)
         layout.label(text="Debug")
-        layout.operator("game.performance_report", icon='SORTTIME')
-        layout.operator("game.performance_reports_folder", icon='FILE_FOLDER')
         layout.prop(gs, "show_debug_mode", text="Debug Mode")
         layout.prop(gs, "show_console")
         layout.prop(gs, "use_python_console", text="Python Console")
@@ -463,6 +475,7 @@ classes = (
     INFO_MT_file_external_data,
     INFO_MT_file_previews,
     INFO_MT_game,
+    INFO_MT_game_performance,
     INFO_MT_game_show_debug,
     INFO_MT_render,
     INFO_MT_opengl_render,

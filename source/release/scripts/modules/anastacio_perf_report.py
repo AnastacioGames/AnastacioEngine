@@ -21,6 +21,8 @@ from collections import defaultdict
 
 # The first frames finish loading the start scene: they are "load", not gameplay.
 LOAD_FRAMES = 5
+# The start-up ends when the game has run this many frames in a row without a spike.
+STABLE_FRAMES = 60
 # A spike: above SPIKE_FACTOR x the median frame and above 1/30 s.
 SPIKE_FACTOR = 2.0
 SPIKE_MIN_MS = 1000.0 / 30.0
@@ -80,10 +82,24 @@ def _image_mb(ev):
 def analyze(events):
     session = next((e for e in events if e['ev'] == 'session'), {})
     frames = {e['f']: e for e in events if e['ev'] == 'frame'}
-    play = [fr for f, fr in sorted(frames.items()) if f > LOAD_FRAMES]
+    ordered = [fr for f, fr in sorted(frames.items()) if f > LOAD_FRAMES]
+    median = _median([_cost(fr) for fr in ordered])
+    limit = max(SPIKE_FACTOR * median, SPIKE_MIN_MS)
+    # Start-up: everything before the first STABLE_FRAMES frames in a row under the spike limit
+    # (the start scene and its first loads); spikes there are loading, not gameplay.
+    start = 0
+    run = 0
+    for i, fr in enumerate(ordered):
+        run = run + 1 if _cost(fr) <= limit else 0
+        if run >= STABLE_FRAMES:
+            start = i - run + 1
+            break
+    load_end = ordered[start]['f'] - 1 if ordered else LOAD_FRAMES
+    play = ordered[start:]
     costs = [_cost(fr) for fr in play]
     median = _median(costs)
     limit = max(SPIKE_FACTOR * median, SPIKE_MIN_MS)
+    startup_s = play[0]['t'] if play else 0.0
 
     # What loaded at each frame, to explain spikes.
     loads = defaultdict(list)
@@ -164,25 +180,25 @@ def analyze(events):
     # Loading during play (after the first frames): stalls the game.
     late = []
     for e in events:
-        if e['f'] <= LOAD_FRAMES:
+        if e['f'] <= load_end:
             continue
         if e['ev'] == 'convert_object':
             late.append((_('On Demand object'), e['name'], e['ms'], e['f'], e['t']))
         elif e['ev'] == 'scene_load' and not e['scene'].startswith('..'):
             late.append((_('LibLoad') if e.get('libload') else _('Scene'), e['scene'], e['ms'], e['f'], e['t']))
     for e in images.values():
-        if e['f'] > LOAD_FRAMES:
+        if e['f'] > load_end:
             late.append((_('Image upload'), e['name'], e['ms'], e['f'], e['t']))
     late.sort(key=lambda x: x[2], reverse=True)
 
-    work = [e for e in events if e['ev'] == 'work' and e['f'] > LOAD_FRAMES]
+    work = [e for e in events if e['ev'] == 'work' and e['f'] > load_end]
     work_rows = []
     if work:
         for k in sorted({k for e in work for k in e if k not in ('t', 'f', 'ev')}):
             v = sorted(e.get(k, 0) for e in work)
             work_rows.append((k, _median(v), _percentile(v, 0.95), v[-1]))
 
-    return dict(session=session, play=play, median=median, limit=limit, spikes=spikes, categories=categories,
+    return dict(session=session, play=play, load_end=load_end, startup_s=startup_s, median=median, limit=limit, spikes=spikes, categories=categories,
                 p95=_percentile(costs, 0.95), p99=_percentile(costs, 0.99), worst=max(costs) if costs else 0.0,
                 scenes=[e for e in events if e['ev'] == 'scene_load'],
                 scene_shaders={e['scene']: e for e in events if e['ev'] == 'load_shaders'},
@@ -192,7 +208,7 @@ def analyze(events):
                 duration=events[-1]['t'] if events else 0.0)
 
 
-def read_shader_log(folder):
+def read_shader_log(folder, load_end=LOAD_FRAMES):
     """shaders.txt (RANGE_SHADER_LOG): compilations and image uploads during play, slowest first."""
     path = os.path.join(folder, 'shaders.txt')
     if not os.path.isfile(path):
@@ -209,7 +225,7 @@ def read_shader_log(folder):
             except (ValueError, IndexError):
                 continue
             kind = parts[3]
-            if frame > LOAD_FRAMES and kind != 'prefetch' and ms >= 1.0:
+            if frame > load_end and kind != 'prefetch' and ms >= 1.0:
                 name = ' '.join(parts[5:]) if kind == 'image' else parts[-1]
                 items.append((kind, name or '-', ms, frame))
     items.sort(key=lambda x: x[2], reverse=True)
@@ -231,7 +247,7 @@ def _table(headers, rows, numeric=()):
     out += ['<th%s>%s</th>' % (' class="n"' if i in numeric else '', _esc(h)) for i, h in enumerate(headers)]
     out.append('</tr>')
     for r in rows[:MAX_ROWS]:
-        out.append('<tr>' + ''.join('<td%s>%s</td>' % (' class="n"' if i in numeric else (' class="barcell"' if isinstance(c, Markup) else ''),
+        out.append('<tr>' + ''.join('<td%s>%s</td>' % (' class="n"' if i in numeric else (' class="barcell"' if isinstance(c, Markup) and 'class="bar' in c else ''),
                                                          c if isinstance(c, Markup) else _esc(c))
                                     for i, c in enumerate(r)) + '</tr>')
     out.append('</table>')
@@ -269,6 +285,112 @@ def _chart(a):
             % (w, h, lines, pts, dots))
 
 
+# Advice per profiler category: what usually makes it heavy.
+CATEGORY_ADVICE = {
+    'Physics': 'Fewer dynamic bodies, simpler collision shapes (box/sphere/convex hull instead of triangle mesh), or a lower physics step rate.',
+    'Components': 'Python components: avoid work every frame (use timers or run every N frames).',
+    'Logic': 'Logic bricks and Python controllers: reduce Always sensors in pulse mode and scripts that run every frame.',
+    'Actuators': 'Many actuators firing every frame (motion, property, message): fire them only when something changes.',
+    'MainRender': 'Rendering: fewer draw calls (Static Batch for objects that do not move), fewer materials, lower geometry far away.',
+    'Shadows': 'Shadows: fewer lamps with shadows, smaller shadow maps, Shadow Culling, or fewer cascades on the Sun.',
+    'Skinning': 'Skinned characters: GPU Skinning, fewer bones, lower polygon meshes for characters far away.',
+    'Animations': 'Animations: fewer armatures playing at once, or Half Animations for characters far away.',
+    'Filters2D': '2D filters run on every pixel: fewer filters or a lower Dynamic Resolution.',
+    'GPU Latency': 'The CPU waits for the graphics card: the GPU is the limit (resolution, anti-aliasing, effects, shadows).',
+    'ParticleUpdate': 'Particles: fewer emitters or fewer particles per emitter.',
+    'Overhead': 'Engine housekeeping, usually loading: see Loading during play.',
+}
+
+
+def _colored(text, level):
+    """A value colored by how bad it is (good / warn / bad)."""
+    return Markup('<span class="v%s">%s</span>' % (level, _esc(text)))
+
+
+def _ms_level(ms):
+    return _level(ms, 1000.0 / 60.0, 1000.0 / 30.0)
+
+
+def advice(a, shader_items):
+    """Plain recommendations, most important first: (level, text)."""
+    out = []
+    frame_budget = 1000.0 / 60.0
+    if a['median'] > frame_budget and a['categories']:
+        total = sum(v for _k, v in a['categories']) or 1.0
+        for name, ms in a['categories'][:3]:
+            share = ms / total
+            if share >= 0.2 and name in CATEGORY_ADVICE:
+                out.append(('bad' if share >= 0.35 else 'warn',
+                            _('%s takes %d%% of the frame (%.1f ms).') % (name, share * 100, ms) + ' ' + _(CATEGORY_ADVICE[name])))
+    if a['late']:
+        kind, name, ms, _f, t = a['late'][0]
+        out.append(('bad' if ms >= 50 else 'warn',
+                    _('%d things loaded during play; the slowest is %s "%s" (%.0f ms at %.1f s). '
+                      'Preload them (Load Mode, Preload) or load them behind a loading screen.') % (len(a['late']), kind, name, ms, t)))
+    if shader_items:
+        out.append(('warn', _('%d shaders or images were prepared during play (slowest %.0f ms). '
+                              'Cook the game (Cook button) so compiled shaders are kept.') % (len(shader_items), shader_items[0][2])))
+    quiet = [sp for sp in a['spikes'] if not sp['loads']]
+    if quiet:
+        top = quiet[0]
+        part = top['cats'][0][0] if top['cats'] else '?'
+        out.append(('warn', _('%d spikes without any loading; the worst (%.0f ms at %.1f s) is mostly %s. '
+                              'Check scripts or effects that start at that moment.') % (len(quiet), top['ms'], top['t'], part)))
+    if a['has_usage'] and a['never']:
+        tris = sum(a['tris'](o) for o in a['never'])
+        if tris >= 10000 or len(a['never']) >= 20:
+            out.append(('warn', _('%d objects (%d triangles) were loaded but never seen by the camera. '
+                                  'If they are not needed, remove them or set Load Mode to On Demand.') % (len(a['never']), tris)))
+    if not out:
+        out.append(('good', _('Nothing to fix in this run: the frame time is even and nothing loads during play.')))
+    order = {'bad': 0, 'warn': 1, 'good': 2}
+    out.sort(key=lambda x: order[x[0]])
+    return out
+
+
+def summary(a, shader_items):
+    return dict(median=a['median'], p95=a['p95'], worst=a['worst'], spikes=len(a['spikes']), late=len(a['late']),
+                shaders=len(shader_items), never=len(a['never']), duration=a['duration'],
+                categories=dict(a['categories'][:10]))
+
+
+def previous_summary(folder):
+    """summary.json of the last earlier report of the same game (folders <game>-<date>-<time>)."""
+    parent, name = os.path.split(os.path.normpath(folder))
+    game = name.rsplit('-', 2)[0]
+    try:
+        older = sorted(n for n in os.listdir(parent) if n.rsplit('-', 2)[0] == game and n < name)
+    except OSError:
+        return None
+    for n in reversed(older):
+        path = os.path.join(parent, n, 'summary.json')
+        if os.path.isfile(path):
+            try:
+                with open(path, encoding='utf-8') as f:
+                    return n, json.load(f)
+            except (OSError, ValueError):
+                pass
+    return None
+
+
+def _compare(prev, now):
+    name, old = prev
+    rows = []
+    for key, label, fmt in (('median', _('Median frame'), '%.1f ms'), ('p95', _('95% of frames under'), '%.1f ms'),
+                            ('worst', _('Worst frame'), '%.0f ms'), ('spikes', _('Spikes'), '%d'),
+                            ('late', _('Loads during play'), '%d'), ('shaders', _('Shaders prepared during play'), '%d'),
+                            ('never', _('Objects never drawn'), '%d')):
+        if key not in old:
+            continue
+        a, b = old[key], now[key]
+        if abs(b - a) < (0.5 if isinstance(b, float) else 1):
+            tag = _colored(_('same'), 'mut')
+        else:
+            tag = _colored(_('better') if b < a else _('worse'), 'good' if b < a else 'bad')
+        rows.append((label, fmt % a, fmt % b, tag))
+    return name, rows
+
+
 CSS = """
 :root{--bg:#f6f7f9;--card:#fff;--fg:#1d2330;--mut:#667085;--line:#e3e6eb;--good:#1a7f37;--warn:#b26b00;--bad:#c62828;--acc:#3b6fd8}
 @media (prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1d2128;--fg:#e6e8eb;--mut:#98a2b3;--line:#2c323b;--good:#4cc76b;--warn:#f0a83a;--bad:#ff6b6b;--acc:#7aa2ff}}
@@ -286,22 +408,27 @@ th{color:var(--mut);font-weight:600;font-size:12px}td:first-child{white-space:no
 .chart{width:100%;height:180px}.line{fill:none;stroke:var(--acc);stroke-width:1}.ref{stroke:var(--mut);stroke-dasharray:4 4;stroke-width:.6}
 .lbl{fill:var(--mut);font-size:10px}.spike{fill:var(--bad)}
 .bar{height:10px;background:var(--acc);border-radius:4px;min-width:2px}
-.ok{color:var(--good)}
+.ok,.vgood{color:var(--good)}.vwarn{color:var(--warn);font-weight:600}.vbad{color:var(--bad);font-weight:700}.vmut{color:var(--mut)}
+.bar.warn{background:var(--warn)}.bar.bad{background:var(--bad)}.bar.good{background:var(--good)}
+.adv{list-style:none;padding:0;margin:0}.adv li{padding:8px 10px;border-left:4px solid var(--line);margin:6px 0;background:var(--bg);border-radius:4px}
+.adv li.good{border-left-color:var(--good)}.adv li.warn{border-left-color:var(--warn)}.adv li.bad{border-left-color:var(--bad)}
+.legend{font-size:12px;color:var(--mut);margin-top:6px}.legend b{font-weight:600}
 """
 
 
 def write_html(folder, title=None):
     events = read_events(os.path.join(folder, 'trace.jsonl'))
     a = analyze(events)
-    shader_items = read_shader_log(folder)
+    shader_items = read_shader_log(folder, a['load_end'])
     game = title or a['session'].get('file') or os.path.basename(folder)
     fps = 1000.0 / a['median'] if a['median'] > 0 else 0.0
 
     w = []
     w.append('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
     w.append('<title>%s</title><style>%s</style></head><body><main>' % (_esc(_('Performance Report')), CSS))
-    w.append('<h1>%s</h1><div class="mut">%s &middot; %.1f s &middot; %d %s</div>'
-             % (_esc(_('Performance Report')), _esc(os.path.basename(game)), a['duration'], len(a['play']), _esc(_('frames'))))
+    w.append('<h1>%s</h1><div class="mut">%s &middot; %.1f s &middot; %d %s &middot; %s</div>'
+             % (_esc(_('Performance Report')), _esc(os.path.basename(game)), a['duration'], len(a['play']), _esc(_('frames')),
+                _esc(_('start-up (not counted): %.1f s') % a['startup_s'])))
 
     kpis = [
         (_('Typical FPS'), '%.0f' % fps, _level(a['median'], 1000 / 55, 1000 / 30)),
@@ -315,20 +442,34 @@ def write_html(folder, title=None):
     w.append('<div class="kpis">' + ''.join('<div class="kpi %s"><b>%s</b><span>%s</span></div>' % (lvl, _esc(v), _esc(k))
                                              for k, v, lvl in kpis) + '</div>')
 
+    w.append('<div class="legend"><b class="vgood">&#9632; %s</b> &nbsp; <b class="vwarn">&#9632; %s</b> &nbsp; <b class="vbad">&#9632; %s</b></div>'
+             % (_esc(_('good')), _esc(_('worth a look')), _esc(_('fix first'))))
+    w.append('<h2>%s</h2><div class="card"><ul class="adv">%s</ul></div>'
+             % (_esc(_('What to do')), ''.join('<li class="%s">%s</li>' % (lvl, _esc(t)) for lvl, t in advice(a, shader_items))))
+
+    now = summary(a, shader_items)
+    prev = previous_summary(folder)
+    if prev:
+        name, rows = _compare(prev, now)
+        w.append('<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>'
+                 % (_esc(_('Compared with the previous run')), _table((_('Measure'), _('Before'), _('Now'), ''), rows, numeric=(1, 2)),
+                    _esc(_('Previous report: %s. Runs differ in what you played, so compare similar sessions.') % name)))
+
     w.append('<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>'
              % (_esc(_('Frame time')), _chart(a),
                 _esc(_('Lower is better. Red dots are spikes: frames much slower than the rest (hover for details).'))))
 
     if a['categories']:
         total = sum(v for _k, v in a['categories']) or 1.0
-        rows = [(k, Markup('<div class="bar" style="width:%.0f%%"></div>' % (v / a['categories'][0][1] * 100)), '%.2f' % v)
-                for k, v in a['categories'][:15]]
+        rows = [(k, Markup('<div class="bar %s" style="width:%.0f%%"></div>'
+                           % (_level(v / total, 0.2, 0.35), v / a['categories'][0][1] * 100)),
+                 _colored('%.2f' % v, _level(v / total, 0.2, 0.35))) for k, v in a['categories'][:15]]
         w.append('<h2>%s</h2><div class="card">%s</div>' % (_esc(_('Where the frame time goes (average)')),
                                                             _table((_('Part'), '', 'ms'), rows, numeric=(2,))))
 
     w.append('<h2>%s</h2><div class="card">' % _esc(_('Spikes')))
     if a['spikes']:
-        rows = [('%.1f s' % s['t'], s['f'], '%.0f' % s['ms'], ', '.join('%s %.0f' % c for c in s['cats']),
+        rows = [('%.1f s' % s['t'], s['f'], _colored('%.0f' % s['ms'], _level(s['ms'], 50, 100)), ', '.join('%s %.0f' % c for c in s['cats']),
                  '; '.join(s['loads']) or '-') for s in a['spikes']]
         w.append(_table((_('Time'), _('Frame'), 'ms', _('Slowest parts'), _('Loading at that moment')), rows, numeric=(1, 2)))
     else:
@@ -338,7 +479,7 @@ def write_html(folder, title=None):
     w.append('<h2>%s</h2><div class="card">' % _esc(_('Loading during play')))
     if a['late']:
         w.append(_table((_('What'), _('Name'), 'ms', _('Frame'), _('Time')),
-                        [(k, n, '%.0f' % ms, f, '%.1f s' % t) for k, n, ms, f, t in a['late']], numeric=(2, 3)))
+                        [(k, n, _colored('%.0f' % ms, _level(ms, 10, 50)), f, '%.1f s' % t) for k, n, ms, f, t in a['late']], numeric=(2, 3)))
         w.append('<p class="note">%s</p>' % _esc(_('Each of these stalls the game while it loads. Preload them or load them behind a loading screen.')))
     else:
         w.append('<p class="ok">%s</p>' % _esc(_('Nothing loaded during play.')))
@@ -347,7 +488,7 @@ def write_html(folder, title=None):
     if shader_items:
         w.append('<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>'
                  % (_esc(_('Shaders and images prepared during play')),
-                    _table((_('Kind'), _('Name'), 'ms', _('Frame')), [(k, n, '%.1f' % ms, f) for k, n, ms, f in shader_items],
+                    _table((_('Kind'), _('Name'), 'ms', _('Frame')), [(k, n, _colored('%.1f' % ms, _level(ms, 10, 50)), f) for k, n, ms, f in shader_items],
                            numeric=(2, 3)),
                     _esc(_('First use of a material or image after the start. Cooking the game (Cook button) keeps compiled shaders.'))))
 
@@ -384,6 +525,8 @@ def write_html(folder, title=None):
                                                       numeric=(1, 2, 3))))
 
     w.append('<p class="note">%s %s</p></main></body></html>' % (_esc(_('Raw data:')), _esc(os.path.join(folder, 'trace.jsonl'))))
+    with open(os.path.join(folder, 'summary.json'), 'w', encoding='utf-8') as f:
+        json.dump(now, f)
     out = os.path.join(folder, 'report.html')
     with open(out, 'w', encoding='utf-8') as f:
         f.write(''.join(w))
