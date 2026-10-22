@@ -6,6 +6,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
+## 2026-10-21 - Testes com janela e sombra colorida mais suave
+
+- Usuário testou com janela (`debug-logs/testes_2026-10-21/ABRIR_TESTES.bat`): crash do Logic Editor com armaduras não se repetiu (30 s, cópias a cada 0,5 s) e Static Batch com grupos instanciados aparece certo, inclusive ao mover uma peça.
+- Vitral com Sun em cascatas: a mancha aparece no chão, mas saturada demais. `shadow_color_output` tingia por completo a partir de alpha 0,66 (`a * 1.5`); agora a tinta segue o alpha do vidro e a luz que passa escurece até 35% (`mix(1, cor, a) * (1 - 0.35 a)`). Aceito pelo usuário pela comparação antes/depois.
+
 ## 2026-10-21 - Relatório de crash útil sem PDB
 
 - Os `.crash.txt` do Discord (Intel HD 4000, driver 10.18.10.4242) só traziam o símbolo exportado mais próximo (nomes errados, como `initGameTypesPythonBinding`) e nenhum deslocamento; o cabeçalho montado em `writeCrashFile` nunca era escrito e endereço/módulo da exceção iam só para o console.
