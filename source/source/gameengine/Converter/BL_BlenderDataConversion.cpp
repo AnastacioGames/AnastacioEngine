@@ -156,6 +156,7 @@ extern "C" {
 #include "DNA_camera_types.h"
 #include "DNA_constraint_types.h"
 #include "DNA_curve_types.h"
+#include "BKE_font.h"
 #include "DNA_controller_types.h"
 #include "DNA_group_types.h"
 #include "DNA_image_types.h"
@@ -3649,12 +3650,13 @@ static void BL_CollectNodeImages(bNodeTree *ntree, std::vector<Image *>& images,
 }
 
 /// Decodes the images of the materials in parallel (BKE_image_prefetch); see the texture loop below.
-static void BL_PrefetchMaterialImages(const std::vector<KX_BlenderMaterial *>& materials)
+static void BL_PrefetchMaterialImages(const std::vector<KX_BlenderMaterial *>& materials,
+                                      const std::vector<Image *>& extraImages)
 {
 	if (getenv("RANGE_NO_IMAGE_PREFETCH")) {
 		return;
 	}
-	std::vector<Image *> images;
+	std::vector<Image *> images = extraImages;
 	std::vector<bNodeTree *> visited;
 	for (KX_BlenderMaterial *kxmat : materials) {
 		Material *ma = kxmat->GetBlenderMaterial();
@@ -3742,10 +3744,28 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		}
 	}
 
+	/* Bitmap atlases of the texts: decoded with the material images and kept in the image cache, with the
+	 * ink of their letters. Otherwise the first frame showing the text read the PNG (146 ms, RolimaRacer menu). */
+	std::vector<Curve *> atlasCurves;
+	std::vector<Image *> atlasImages;
+	for (KX_GameObject *gameobj : sumolist) {
+		Object *blenderobj = gameobj->GetBlenderObject();
+		Curve *cu = (blenderobj && blenderobj->type == OB_FONT) ? (Curve *)blenderobj->data : nullptr;
+		if (cu && (cu->flag & CU_BITMAP_ATLAS) && cu->atlas_image &&
+		    std::find(atlasCurves.begin(), atlasCurves.end(), cu) == atlasCurves.end())
+		{
+			atlasCurves.push_back(cu);
+			atlasImages.push_back(cu->atlas_image);
+		}
+	}
+
 	// Init textures for all materials. Their images are decoded in parallel first, the GPU upload stays serial.
-	BL_PrefetchMaterialImages(sceneconverter.GetMaterials());
+	BL_PrefetchMaterialImages(sceneconverter.GetMaterials(), atlasImages);
 	for (KX_BlenderMaterial *mat : sceneconverter.GetMaterials()) {
 		mat->InitTextures();
+	}
+	for (Curve *cu : atlasCurves) {
+		BKE_text_atlas_ink(cu);
 	}
 	BKE_image_prefetch_clear();
 

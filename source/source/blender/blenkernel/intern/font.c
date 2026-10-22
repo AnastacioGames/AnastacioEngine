@@ -1438,7 +1438,7 @@ ame Bitmap atlas ink
 typedef struct TextAtlasInkCache {
 	const Image *ima;
 	const void *pixels;
-	const TextAtlasGlyph *glyphs;
+	TextAtlasGlyph *glyphs; /* copy: texts sharing an atlas each hold their own glyph array */
 	int count;
 	float (*ink)[4];
 } TextAtlasInkCache;
@@ -1447,6 +1447,8 @@ typedef struct TextAtlasInkCache {
 #define TEXT_ATLAS_INK_CACHE 32
 static TextAtlasInkCache g_atlas_ink[TEXT_ATLAS_INK_CACHE];
 static int g_atlas_ink_next = 0;
+/* Async scene loads fill it from a worker while the main thread draws. */
+static ThreadMutex g_atlas_ink_lock = BLI_MUTEX_INITIALIZER;
 
 static float text_atlas_alpha(const ImBuf *ibuf, int x, int y)
 {
@@ -1460,10 +1462,12 @@ const float (*BKE_text_atlas_ink(Curve *cu))[4]
 		return NULL;
 	}
 
+	BLI_mutex_lock(&g_atlas_ink_lock);
 	void *lock;
 	ImBuf *ibuf = BKE_image_acquire_ibuf(cu->atlas_image, NULL, &lock);
 	if (ibuf == NULL || (ibuf->rect == NULL && ibuf->rect_float == NULL)) {
 		BKE_image_release_ibuf(cu->atlas_image, ibuf, lock);
+		BLI_mutex_unlock(&g_atlas_ink_lock);
 		return NULL;
 	}
 	const void *pixels = ibuf->rect_float ? (const void *)ibuf->rect_float : (const void *)ibuf->rect;
@@ -1471,9 +1475,11 @@ const float (*BKE_text_atlas_ink(Curve *cu))[4]
 	for (int i = 0; i < TEXT_ATLAS_INK_CACHE; i++) {
 		const TextAtlasInkCache *entry = &g_atlas_ink[i];
 		if (entry->ink && entry->ima == cu->atlas_image && entry->pixels == pixels &&
-		    entry->glyphs == cu->atlas_glyphs && entry->count == cu->atlas_count)
+		    entry->count == cu->atlas_count &&
+		    memcmp(entry->glyphs, cu->atlas_glyphs, sizeof(TextAtlasGlyph) * cu->atlas_count) == 0)
 		{
 			BKE_image_release_ibuf(cu->atlas_image, ibuf, lock);
+			BLI_mutex_unlock(&g_atlas_ink_lock);
 			return (const float (*)[4])entry->ink;
 		}
 	}
@@ -1512,11 +1518,14 @@ const float (*BKE_text_atlas_ink(Curve *cu))[4]
 	TextAtlasInkCache *entry = &g_atlas_ink[g_atlas_ink_next];
 	g_atlas_ink_next = (g_atlas_ink_next + 1) % TEXT_ATLAS_INK_CACHE;
 	free(entry->ink);
+	free(entry->glyphs);
 	entry->ima = cu->atlas_image;
 	entry->pixels = pixels;
-	entry->glyphs = cu->atlas_glyphs;
+	entry->glyphs = malloc(sizeof(TextAtlasGlyph) * cu->atlas_count);
+	memcpy(entry->glyphs, cu->atlas_glyphs, sizeof(TextAtlasGlyph) * cu->atlas_count);
 	entry->count = cu->atlas_count;
 	entry->ink = ink;
+	BLI_mutex_unlock(&g_atlas_ink_lock);
 	return (const float (*)[4])ink;
 }
 
