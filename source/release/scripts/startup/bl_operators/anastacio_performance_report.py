@@ -1,0 +1,107 @@
+# ##### BEGIN GPL LICENSE BLOCK #####
+#
+#  This program is free software; you can redistribute it and/or
+#  modify it under the terms of the GNU General Public License
+#  as published by the Free Software Foundation; either version 2
+#  of the License, or (at your option) any later version.
+#
+# ##### END GPL LICENSE BLOCK #####
+
+"""Game > Performance Report: runs the open scene in the game player with the trace on and, when the
+game is closed, writes a report (frame time, spikes, loading during play, what was never drawn) and
+opens it in the browser."""
+
+import os
+import time
+
+import bpy
+from bpy.types import Operator
+
+
+def reports_dir():
+    return bpy.utils.user_resource('DATAFILES', path="performance_reports", create=True)
+
+
+class GAME_OT_performance_report(Operator):
+    """Play the game in the player and write a performance report when it is closed"""
+    bl_idname = "game.performance_report"
+    bl_label = "Performance Report"
+
+    _process = None
+    _timer = None
+    _folder = ""
+    _tempdir = ""
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene is not None
+
+    def execute(self, context):
+        import subprocess
+        import tempfile
+        from bl_operators.anastacio_cook import _runtime_path
+
+        runtime = _runtime_path()
+        if not os.path.isfile(runtime):
+            self.report({'ERROR'}, "Game runtime not found: %s" % runtime)
+            return {'CANCELLED'}
+
+        name = bpy.path.display_name_from_filepath(bpy.data.filepath) or "untitled"
+        self._folder = os.path.join(reports_dir(), "%s-%s" % (bpy.path.clean_name(name), time.strftime("%Y%m%d-%H%M%S")))
+        os.makedirs(self._folder, exist_ok=True)
+
+        # The game runs from a copy, so unsaved changes are measured too and the file is left untouched.
+        self._tempdir = tempfile.mkdtemp(prefix="anastacio_report_")
+        copy = os.path.join(self._tempdir, os.path.basename(bpy.data.filepath) or "game.range")
+        saved = bpy.ops.wm.save_as_mainfile(filepath=copy, copy=True, relative_remap=True, compress=False)
+        if 'FINISHED' not in saved:
+            self.report({'ERROR'}, "Could not save the scene to measure")
+            return {'CANCELLED'}
+
+        env = dict(os.environ,
+                   RANGE_TRACE=self._folder,
+                   RANGE_TRACE_MODULES="load,usage,frames,work",
+                   RANGE_SHADER_LOG=os.path.join(self._folder, "shaders.txt"))
+        self._process = subprocess.Popen([runtime, copy], env=env, cwd=os.path.dirname(copy))
+
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(0.5, window=context.window)
+        wm.modal_handler_add(self)
+        self.report({'INFO'}, "Play the game, then close it to see the report")
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type != 'TIMER' or self._process.poll() is None:
+            return {'PASS_THROUGH'}
+        context.window_manager.event_timer_remove(self._timer)
+        import shutil
+        shutil.rmtree(self._tempdir, ignore_errors=True)
+
+        if not os.path.isfile(os.path.join(self._folder, "trace.jsonl")):
+            self.report({'ERROR'}, "The game wrote no trace (exit code %d)" % self._process.returncode)
+            return {'CANCELLED'}
+        try:
+            import anastacio_perf_report
+            report = anastacio_perf_report.write_html(self._folder, title=bpy.data.filepath)
+        except Exception as ex:
+            self.report({'ERROR'}, "Could not write the report: %s" % ex)
+            return {'CANCELLED'}
+        bpy.ops.wm.url_open(url="file:///" + report.replace("\\", "/"))
+        self.report({'INFO'}, "Performance report: %s" % report)
+        return {'FINISHED'}
+
+
+class GAME_OT_performance_reports_folder(Operator):
+    """Open the folder with the performance reports"""
+    bl_idname = "game.performance_reports_folder"
+    bl_label = "Open Reports Folder"
+
+    def execute(self, context):
+        bpy.ops.wm.path_open(filepath=reports_dir())
+        return {'FINISHED'}
+
+
+classes = (
+    GAME_OT_performance_report,
+    GAME_OT_performance_reports_folder,
+)

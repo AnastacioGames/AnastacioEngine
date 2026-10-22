@@ -326,6 +326,8 @@ class INFO_MT_game(Menu):
 
         layout.separator(factor=1)
         layout.label(text="Debug")
+        layout.operator("game.performance_report", icon='SORTTIME')
+        layout.operator("game.performance_reports_folder", icon='FILE_FOLDER')
         layout.prop(gs, "show_debug_mode", text="Debug Mode")
         layout.prop(gs, "show_console")
         layout.prop(gs, "use_python_console", text="Python Console")
