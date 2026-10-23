@@ -136,7 +136,7 @@ Regras:
 | **F4** | Demais sensores e actuators por tabela, priorizando os mais usados no RolimaRacer. Nó Rodar Python | Baixo, mas é volume | Não |
 | **F5** | Depuração: nomes ligando nó e brick na janela F4/F5, pausar no disparo pelo nó. Investigar destaque do nó ativo no Node Editor durante o jogo | Médio | Talvez (só leitura) |
 | **F6** | Destaque dos nós que dispararam (feito, seção 19) | Baixo | Sim (só leitura) |
-| **F7** | Avaliar, só com caso real: ver bricks existentes como árvore (importação), pinos de dado, runtime próprio | — | — |
+| **F7** | Importação feita (2026-10-23): **Import Bricks** no painel N vira sensores/actuators em nós, And/Or/Nand/Nor em portas (Nand/Nor = porta + Not), Python Module em Run Python, estados em Frames; o que não tem nó equivalente (Expression, Xor, Python Script, brick com campo fora do nó) fica como brick. Teste `tools/tests/logic_tree/f7_import_test.py` (18/18 + 4/4 no runtime). Pinos de dado e runtime próprio seguem só com caso real | — | — |
 
 **F0, o que precisa ser provado antes da F1:**
 1. **Estados:** se o usuário também tem bricks com estados no mesmo objeto, os estados da árvore usam os mesmos

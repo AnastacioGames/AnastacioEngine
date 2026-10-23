@@ -1265,6 +1265,234 @@ def _draw_recipes(_item, layout, context):
         layout.operator(RANGE_OT_logic_tree_recipe.bl_idname, text=label).recipe = ident
 
 
+# ---------------------------------------------------------------- F7: importar bricks existentes
+
+GATE_OF = {'LOGIC_AND': ("RangeLogicAnd", False), 'LOGIC_OR': ("RangeLogicOr", False),
+           'LOGIC_NAND': ("RangeLogicAnd", True), 'LOGIC_NOR': ("RangeLogicOr", True)}
+_SKIP_PROPS = {"rna_type", "name", "type", "show_expanded", "pin", "active", "group",
+               "debug_intensity", "use_tap_active"}
+
+
+def _same(a, b):
+    try:
+        if hasattr(a, "__len__") and not isinstance(a, str):
+            return all(abs(x - y) < 1e-6 if isinstance(x, float) else x == y for x, y in zip(a, b))
+        if isinstance(a, float):
+            return abs(a - b) < 1e-6
+        return a == b
+    except TypeError:
+        return a == b
+
+
+def _values(brick):
+    vals = {}
+    for p in brick.bl_rna.properties:
+        if p.identifier in _SKIP_PROPS or p.is_readonly:
+            continue
+        try:
+            v = getattr(brick, p.identifier)
+        except Exception:
+            continue
+        vals[p.identifier] = tuple(v) if hasattr(v, "__len__") and not isinstance(v, str) else v
+    return vals
+
+
+def _fits(cls, brick):
+    """O nó cls guarda tudo deste brick?  Copia só os campos do nó num brick novo do mesmo
+    tipo e compara: campos que dividem memória (value/object_property) se resolvem sozinhos."""
+    if cls.brick_type != brick.type:
+        return False
+    for k, v in cls.fixed.items():
+        if not _same(getattr(brick, k), v):
+            return False
+    kind = cls.kind
+    ob = brick.id_data
+    getattr(bpy.ops.logic, kind + "_add")(_ops(ob), type=brick.type, name="__fits__", object=ob.name)
+    tmp = getattr(ob.game, kind + "s")[-1]
+    try:
+        for k, v in cls.fixed.items():
+            setattr(tmp, k, v)
+        for f in tuple(cls.main) + tuple(cls.extra):
+            try:
+                setattr(tmp, f, getattr(brick, f))
+            except (AttributeError, TypeError, ValueError):
+                pass
+        want, got = _values(brick), _values(tmp)
+        return all(k in got and _same(v, got[k]) for k, v in want.items())
+    finally:
+        getattr(bpy.ops.logic, kind + "_remove")(_ops(ob), **{kind: tmp.name, "object": ob.name})
+
+
+def _node_class(brick, kind):
+    pool = TRIGGER_NODES if kind == "sensor" else ACTION_NODES
+    # o mais específico primeiro (com valores fixos), o "all modes" por último
+    for cls in sorted((c for c in pool if issubclass(c, BrickNode) and c.kind == kind),
+                      key=lambda c: (-len(c.fixed), len(c.main) + len(c.extra))):
+        if _fits(cls, brick):
+            return cls
+    return None
+
+
+def import_bricks(ob, tree=None, remove=True):
+    """Transforma os bricks do usuário (fora da Logic Tree) em nós.  Controllers que não cabem
+    (Expression, Xor, Python em modo Script, brick sem nó equivalente) ficam como bricks.
+    Devolve (árvore, nº de controllers importados, avisos)."""
+    game = ob.game
+    rec = _record(ob)
+    mine = {k: set(rec.get(k, ())) for k in ("sensors", "controllers", "actuators")}
+    ctrls = [c for c in game.controllers if c.name not in mine["controllers"]]
+    warnings, plan_ok = [], []
+    for c in ctrls:
+        sens = [s for s in game.sensors if s.name not in mine["sensors"]
+                and any(x.name == c.name for x in s.controllers)]
+        acts = [a for a in c.actuators if a.name not in mine["actuators"]]
+        why = ""
+        if c.type == 'PYTHON' and (c.mode != 'MODULE' or "." not in c.module):
+            why = "Python em modo Script"
+        elif c.type not in GATE_OF and c.type != 'PYTHON':
+            why = c.type.replace("LOGIC_", "").title()
+        elif not sens:
+            why = "sem sensor"
+        elif c.type == 'PYTHON' and acts:
+            why = "Python com actuators"
+        if not why:
+            for b, kind in [(s, "sensor") for s in sens] + [(a, "actuator") for a in acts]:
+                if _node_class(b, kind) is None:
+                    why = "%s \"%s\" sem nó equivalente" % (b.type.title(), b.name)
+                    break
+        if why:
+            warnings.append("%s: ficou como brick (%s)" % (c.name, why))
+            continue
+        plan_ok.append((c, sens, acts))
+    if not plan_ok:
+        return tree, 0, warnings
+
+    if tree is None:
+        tree = ob.logic_tree or bpy.data.node_groups.new(ob.name + " Logic", TREE_ID)
+    ob.logic_tree = tree
+
+    # estados: com mais de um em uso, cada estado vira um Frame de Estado
+    states = sorted({c.states for c, _s, _a in plan_ok})
+    frames = {}
+    if len(states) > 1:
+        for i, st in enumerate(states):
+            f = tree.nodes.new("NodeFrame")
+            f.range_logic_state = True
+            f.label = game.state_names[st - 1].name or "State %d" % st
+            f.range_logic_initial = game.states_initial[st - 1]
+            f.location = (i * 1100.0, 0.0)
+            frames[st] = f
+
+    def make(cls, brick):
+        node = tree.nodes.new(cls.bl_idname)
+        node.label = brick.name
+        for f in node.fields():
+            try:
+                v = getattr(brick, f)
+                if not _same(v, getattr(node, f)):
+                    setattr(node, f, v)
+            except (AttributeError, TypeError, ValueError):
+                pass
+        return node
+
+    made, rows = {}, {}
+
+    def place(node, st, col):
+        frame = frames.get(st)
+        row = rows.setdefault((st, col), 0)
+        rows[(st, col)] = row + 1
+        x0 = frame.location.x if frame else 0.0
+        if frame:
+            node.parent = frame
+        node.location = (x0 + col * 330.0, -row * 220.0)
+
+    for c, sens, acts in plan_ok:
+        st = c.states
+        outs = []
+        for s in sens:
+            key = ("sensor", s.name, st)
+            if key not in made:
+                made[key] = make(_node_class(s, "sensor"), s)
+                place(made[key], st, 0)
+            outs.append(made[key].outputs[0])
+        if c.type == 'PYTHON':
+            py = tree.nodes.new(RunPythonNode.bl_idname)
+            py.label, py.module, py.use_debug = c.name, c.module, c.use_debug
+            place(py, st, 2)
+            for o in outs:
+                tree.links.new(o, py.inputs[0])
+            continue
+        gate_id, negate = GATE_OF[c.type]
+        src = outs[0]
+        if len(outs) > 1:
+            # a porta tem 3 entradas: com mais sensores, a próxima porta recebe a anterior + 2
+            pending = list(outs)
+            src = None
+            while pending:
+                gate = tree.nodes.new(gate_id)
+                place(gate, st, 1)
+                take = [src] if src is not None else []
+                take += pending[:3 - len(take)]
+                pending = pending[3 - (1 if src is not None else 0):]
+                for sock, o in zip(gate.inputs, take):
+                    tree.links.new(o, sock)
+                src = gate.outputs[0]
+        if negate:
+            n = tree.nodes.new("RangeLogicNot")
+            place(n, st, 1)
+            tree.links.new(src, n.inputs[0])
+            src = n.outputs[0]
+        for a in acts:
+            key = ("actuator", a.name, st)
+            if key not in made:
+                made[key] = make(_node_class(a, "actuator"), a)
+                place(made[key], st, 2)
+            tree.links.new(src, made[key].inputs[0])
+
+    if remove:
+        done = {c.name for c, _s, _a in plan_ok}
+        kept = [c for c in game.controllers if c.name not in done]
+        busy_s = {s.name for s in game.sensors if any(x.name not in done for x in s.controllers)}
+        busy_a = {a.name for c in kept for a in c.actuators}
+        names = {"sensor": {s.name for _c, ss, _a in plan_ok for s in ss} - busy_s,
+                 "controller": done,
+                 "actuator": {a.name for _c, _s, aa in plan_ok for a in aa} - busy_a}
+        for kind, group in names.items():
+            for name in group:
+                getattr(bpy.ops.logic, kind + "_remove")(_ops(ob), **{kind: name, "object": ob.name})
+    return tree, len(plan_ok), warnings
+
+
+class RANGE_OT_logic_tree_import(Operator):
+    """Turn the logic bricks of the active object into Logic Tree nodes (the ones without a node stay as bricks)"""
+    bl_idname = "logic.range_logic_tree_import"
+    bl_label = "Import Bricks"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None and context.object.library is None
+
+    def execute(self, context):
+        ob = context.object
+        tree, n, warnings = import_bricks(ob)
+        for w in warnings:
+            self.report({'WARNING'}, w)
+        if not n:
+            self.report({'INFO'}, "Nenhum brick para importar")
+            return {'CANCELLED'}
+        errors = compile_object(ob)
+        for err in errors:
+            self.report({'WARNING'}, err)
+        for area in context.screen.areas:
+            if area.type == "NODE_EDITOR":
+                area.spaces.active.tree_type = TREE_ID
+                area.spaces.active.node_tree = tree
+        self.report({'INFO'}, "Logic Tree: %d controller(s) importado(s), %d ficaram como brick"
+                    % (n, len(warnings)))
+        return {'FINISHED'}
+
+
 # ---------------------------------------------------------------- editor
 
 class RANGE_OT_logic_tree_compile(Operator):
@@ -1335,6 +1563,9 @@ class NODE_PT_range_logic_tree(Panel):
         if context.object is not None:
             layout.label("Objeto ativo:")
             _draw_object_field(layout, context)
+            if any(c.name not in _record(context.object).get("controllers", ())
+                   for c in context.object.game.controllers):
+                layout.operator(RANGE_OT_logic_tree_import.bl_idname, icon="IMPORT")
         node = tree.nodes.active
         if any("range_logic_fired" in n for n in tree.nodes):
             row = layout.row()
@@ -1394,7 +1625,7 @@ CATEGORIES = [
 
 CLASSES = (LogicTree, PulseSocket) + TRIGGER_NODES + GATE_NODES + ACTION_NODES + (
     RANGE_OT_logic_tree_compile, RANGE_OT_logic_tree_new, RANGE_OT_logic_tree_recipe,
-    RANGE_OT_logic_tree_clear_highlight, NODE_PT_range_logic_tree)
+    RANGE_OT_logic_tree_clear_highlight, RANGE_OT_logic_tree_import, NODE_PT_range_logic_tree)
 
 
 def register():
