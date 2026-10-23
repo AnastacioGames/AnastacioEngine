@@ -88,9 +88,9 @@ def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL", color=None, s
     if style["shadow"]:
         off = max(1.0, h * 0.08)
         _color(bgl, (0.0, 0.0, 0.0, 0.35))
-        _rounded_polygon(bgl, bgl.GL_POLYGON, x + off, y - off, w, h, radius)
+        _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x + off, y - off, w, h, radius)
     _color(bgl, color)
-    _rounded_polygon(bgl, bgl.GL_POLYGON, x, y, w, h, radius)
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x, y, w, h, radius)
     border = style["border"] * h
     if state == "SELECTED":
         border = max(border, 2.0)
@@ -151,7 +151,7 @@ def draw_bar(bgl, data, frac, x, y, w, h):
     bgl.glEnable(bgl.GL_BLEND)
     bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
     _color(bgl, data["bg"])
-    _rounded_polygon(bgl, bgl.GL_POLYGON, x, y, w, h, radius)
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x, y, w, h, radius)
     if frac <= 0.0:
         return
     # Barra vazia = cor Low, cheia = cor Fill.
@@ -170,7 +170,7 @@ def draw_bar(bgl, data, frac, x, y, w, h):
         fy += fh * (1.0 - frac)
         fh *= frac
     _color(bgl, color)
-    _rounded_polygon(bgl, bgl.GL_POLYGON, fx, fy, fw, fh, max(0.0, radius - pad))
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, fx, fy, fw, fh, max(0.0, radius - pad))
 
 
 def draw_label(bgl, blf, data, text, x, y, w, h):
@@ -225,7 +225,7 @@ def draw_panel(bgl, data, x, y, w, h):
     radius = data["radius"] * min(w, h) * 0.5
     _blend(bgl)
     _color(bgl, data["color"])
-    _rounded_polygon(bgl, bgl.GL_POLYGON, x, y, w, h, radius)
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x, y, w, h, radius)
     border = data["border"] * min(w, h)
     if border > 0.0:
         bgl.glLineWidth(max(1.0, border))
@@ -302,11 +302,11 @@ def draw_toggle(bgl, blf, data, on, x, y, w, h, hover=False):
         color = _mix(color, (1.0, 1.0, 1.0, color[3]), 0.2)
     radius = data["radius"] * box * 0.5
     _color(bgl, color)
-    _rounded_polygon(bgl, bgl.GL_POLYGON, bx, by, box, box, radius)
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, bx, by, box, box, radius)
     if on:
         pad = box * 0.22
         _color(bgl, data["on_color"])
-        _rounded_polygon(bgl, bgl.GL_POLYGON, bx + pad, by + pad, box - 2 * pad, box - 2 * pad,
+        _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, bx + pad, by + pad, box - 2 * pad, box - 2 * pad,
                          max(0.0, radius - pad))
     if data["text"]:
         _text(bgl, blf, data["text"], data["text_color"], h * data["text_size"],
@@ -321,16 +321,16 @@ def draw_slider(bgl, blf, data, frac, values, x, y, w, h, hover=False):
     tx0, tx1 = x + knob * 0.5, x + w - knob * 0.5
     ty = y + (h - track) * 0.5
     _color(bgl, data["bg"])
-    _rounded_polygon(bgl, bgl.GL_POLYGON, tx0, ty, tx1 - tx0, track, track * 0.5)
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, tx0, ty, tx1 - tx0, track, track * 0.5)
     kx = tx0 + (tx1 - tx0) * frac
     if frac > 0.0:
         _color(bgl, data["fill"])
-        _rounded_polygon(bgl, bgl.GL_POLYGON, tx0, ty, kx - tx0, track, track * 0.5)
+        _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, tx0, ty, kx - tx0, track, track * 0.5)
     color = data["knob"]
     if hover:
         color = _mix(color, (1.0, 1.0, 1.0, color[3]), 0.3)
     _color(bgl, color)
-    _rounded_polygon(bgl, bgl.GL_POLYGON, kx - knob * 0.5, y + (h - knob) * 0.5, knob, knob, knob * 0.5)
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, kx - knob * 0.5, y + (h - knob) * 0.5, knob, knob, knob * 0.5)
 
 
 def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False):

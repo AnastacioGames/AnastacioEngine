@@ -33,6 +33,22 @@
 
 #include "bgl.h"
 
+#ifdef __EMSCRIPTEN__
+/* LEGACY_GL_EMULATION implements immediate mode in JS, but only links the functions that C code
+ * names directly; nothing else calls these, so the GLEW pointers stay NULL and bgl exposed None.
+ * Call the emulation by name instead (the UI Tree runtime draws with them). */
+#  undef glBegin
+#  undef glEnd
+#  undef glOrtho
+#  undef glVertex2f
+#  undef glTexCoord2f
+void glBegin(GLenum mode);
+void glEnd(void);
+void glOrtho(GLdouble left, GLdouble right, GLdouble bottom, GLdouble top, GLdouble near_val, GLdouble far_val);
+void glVertex2f(GLfloat x, GLfloat y);
+void glTexCoord2f(GLfloat s, GLfloat t);
+#endif
+
 
 /* -------------------------------------------------------------------- */
 

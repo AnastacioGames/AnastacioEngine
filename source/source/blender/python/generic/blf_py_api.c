@@ -32,6 +32,30 @@
 
 #include "python_utildefines.h"
 
+#ifdef __EMSCRIPTEN__
+#  include <emscripten.h>
+#  include "GPU_glew.h"
+#  include "BLI_math_matrix.h"
+
+/* WebGL BLF draws with its own shader and takes matrix and color from BLF_draw_state(), which
+ * only the rasterizer sets. From Python, use what bgl set on the legacy GL emulation instead. */
+EM_JS(void, blf_py_web_color, (float *r_color), {
+	var col = GLImmediate.clientColor;
+	if (col) HEAPF32.set(col, r_color >> 2);
+});
+
+static void blf_py_web_draw_state(void)
+{
+	float proj[4][4], view[4][4], viewproj[4][4];
+	float color[4] = {1.0f, 1.0f, 1.0f, 1.0f};
+	glGetFloatv(GL_PROJECTION_MATRIX, (float *)proj);
+	glGetFloatv(GL_MODELVIEW_MATRIX, (float *)view);
+	mul_m4_m4m4(viewproj, proj, view);
+	blf_py_web_color(color);
+	BLF_draw_state((const float *)viewproj, color);
+}
+#endif
+
 
 PyDoc_STRVAR(py_blf_position_doc,
 ".. function:: position(fontid, x, y, z)\n"
@@ -153,6 +177,9 @@ static PyObject *py_blf_draw(PyObject *UNUSED(self), PyObject *args)
 	if (!PyArg_ParseTuple(args, "is#:blf.draw", &fontid, &text, &text_length))
 		return NULL;
 
+#ifdef __EMSCRIPTEN__
+	blf_py_web_draw_state();
+#endif
 	BLF_draw(fontid, text, (unsigned int)text_length);
 
 	Py_RETURN_NONE;

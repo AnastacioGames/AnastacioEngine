@@ -65,8 +65,13 @@ Limites conhecidos do protótipo:
   Um HUD por jogador: cada widget pode ler as propriedades de um Object diferente.
 
 Ainda falta:
-- **Web/Android:** o player Web roda Python, mas o desenho usa `glBegin` (modo imediato), que
-  não existe em WebGL/GLES. Precisa de um caminho com VBO + shader (C++ no rasterizer ou módulo `gpu`).
+- ~~**Web/Android:**~~ Resolvido (2026-10-23) sem desenho novo: a emulação de GL legado do
+  Emscripten já faz `glBegin`/`glOrtho`, mas o `bgl` recebia ponteiros GLEW nulos (só linka o que
+  o C chama pelo nome) — `bgl.c` chama a emulação direto. `GL_POLYGON` virou `GL_TRIANGLE_FAN`
+  (a emulação não aceita POLYGON) e `blf.draw` do Python passa a usar as matrizes/cor do `bgl`.
+  Testado no Chrome headless: menu, hover, Opções com toggle/slider e texto. O Android usa o
+  mesmo pacote Web. Obs.: o runtime Web embute `release/scripts` no `.data`; mudou um módulo,
+  refaça o link.
 - **Runtime em C++** lendo a árvore direto do DNA: com o Bake automático deixou de ser urgente;
   passa a fazer sentido junto com o desenho novo da Web.
 

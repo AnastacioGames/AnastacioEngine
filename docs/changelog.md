@@ -7,6 +7,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - UI Tree na Web/Android
+
+- `bgl` na Web: `glBegin`, `glEnd`, `glOrtho`, `glVertex2f` e `glTexCoord2f` chamam a emulação de GL legado direto (os ponteiros GLEW ficavam nulos).
+- `blf.draw` do Python na Web usa a matriz e a cor atuais do `bgl`.
+- `range_ui_draw`: `GL_TRIANGLE_FAN` no lugar de `GL_POLYGON`.
+
 ## 2026-10-23 - Física: Start Asleep
 
 - Nova opção **Start Asleep** (`game.use_start_asleep`, `gameflag2 & OB_START_ASLEEP`) no painel Physics de
