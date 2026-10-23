@@ -439,9 +439,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 
 		/* Property Operators */
 
-		/* Copy Property Value
-		 * Paste Property Value */
-
+		/* Reset / Unset */
 		if (is_array_component) {
 			uiItemBooleanO(
 			        layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Reset All to Default Values"),
@@ -456,13 +454,16 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 		}
 		if (is_editable /*&& is_idprop*/ && is_set) {
 			uiItemO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Unset"),
-			        ICON_NONE, "UI_OT_unset_property_button");
+			        ICON_X, "UI_OT_unset_property_button");
 		}
 
+		uiItemS(layout);
+
+		/* Copy to selected objects */
 		if (is_array_component) {
 			uiItemBooleanO(
 			        layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy All To Selected"),
-			        ICON_NONE, "UI_OT_copy_to_selected_button", "all", true);
+			        ICON_COPYDOWN, "UI_OT_copy_to_selected_button", "all", true);
 			uiItemBooleanO(
 			        layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy Single To Selected"),
 			        ICON_NONE, "UI_OT_copy_to_selected_button", "all", false);
@@ -470,11 +471,16 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 		else {
 			uiItemBooleanO(
 			        layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy To Selected"),
-			        ICON_NONE, "UI_OT_copy_to_selected_button", "all", true);
+			        ICON_COPYDOWN, "UI_OT_copy_to_selected_button", "all", true);
 		}
 
-		uiItemO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy Data Path"),
-		        ICON_NONE, "UI_OT_copy_data_path_button");
+		uiItemS(layout);
+
+		/* Data path to clipboard */
+		uiItemBooleanO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy Data Path"),
+		        ICON_COPY_ID, "UI_OT_copy_data_path_button", "full_path", false);
+		uiItemBooleanO(layout, CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Copy Full Data Path"),
+		        ICON_NONE, "UI_OT_copy_data_path_button", "full_path", true);
 
 		uiItemS(layout);
 
@@ -559,7 +565,7 @@ bool ui_popup_context_menu_for_button(bContext *C, uiBut *but)
 			uiItemFullO(
 			        layout, "WM_OT_doc_view",
 			        CTX_IFACE_(BLT_I18NCONTEXT_OPERATOR_DEFAULT, "Online Python Reference"),
-			        ICON_NONE, NULL, WM_OP_EXEC_DEFAULT, 0, &ptr_props);
+			        ICON_SCRIPT, NULL, WM_OP_EXEC_DEFAULT, 0, &ptr_props);
 			RNA_string_set(&ptr_props, "doc_id", buf);
 
 			/* XXX inactive option, not for public! */

@@ -1027,18 +1027,13 @@ class WM_OT_doc_view_manual(Operator):
         url = self._lookup_rna_url(rna_id)
 
         if url is None:
-            self.report(
-                {'WARNING'},
-                "No reference available %r, "
-                "Update info in 'rna_manual_reference.py' "
-                "or callback to bpy.utils.manual_map()" %
-                self.doc_id
-            )
-            return {'CANCELLED'}
-        else:
-            import webbrowser
-            webbrowser.open(url)
-            return {'FINISHED'}
+            # No per-property manual page: fall back to the Anastacio docs site.
+            url = "https://anastaciogames.github.io/anastacio-docs/"
+            self.report({'INFO'}, "No manual page for %r, opening the Anastacio docs" % self.doc_id)
+
+        import webbrowser
+        webbrowser.open(url)
+        return {'FINISHED'}
 
 
 class WM_OT_doc_view(Operator):
@@ -1047,10 +1042,8 @@ class WM_OT_doc_view(Operator):
     bl_label = "View Documentation"
 
     doc_id: doc_id
-    if bpy.app.version_cycle == "release":
-        _prefix = ("https://docs.blender.org/api/current")
-    else:
-        _prefix = ("https://docs.blender.org/api/blender2.7")
+    # Editor (bpy) API matches Blender 2.80; "current" would point at the latest Blender.
+    _prefix = "https://docs.blender.org/api/2.80"
 
     def execute(self, context):
         url = _wm_doc_get_id(self.doc_id, do_url=True, url_prefix=self._prefix)

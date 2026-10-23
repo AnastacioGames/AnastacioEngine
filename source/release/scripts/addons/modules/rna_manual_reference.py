@@ -2,7 +2,7 @@
 
 import bpy
 
-url_manual_prefix = "https://docs.blender.org/manual/en/dev/"
+url_manual_prefix = "https://docs.blender.org/manual/en/2.80/"
 
 language = ""
 if bpy.context.user_preferences.system.use_international_fonts:
