@@ -4,7 +4,7 @@ Cada Screen (um Frame marcado com ui_screen) é uma tela do jogo; os nós
 Button dentro dele são os botões, na mesma posição relativa.  Frames comuns
 continuam servindo só para organizar.  As saídas do Button são eventos (mouse enter/exit,
 press, release, click) e se ligam a nós de ação.  "Bake UI" grava tudo no
-texto ui_tree_data.py, que o módulo range_ui_tree lê no runtime.
+texto ui_tree_data.py, que o módulo range_ui_runtime lê no runtime.
 """
 
 import bpy
@@ -234,7 +234,217 @@ class UILabelNode(UIHudNode, Node):
         return {}
 
 
-HUD_NODES = (UIProgressBarNode, UILabelNode)
+class UIPanelNode(UIHudNode, Node):
+    """Retângulo de fundo (atrás dos botões, caixa de diálogo...)."""
+    bl_idname = "RangeUIPanel"
+    bl_label = "Panel"
+
+    color = _color("Color", (0.05, 0.06, 0.08, 0.75))
+    radius = FloatProperty(name="Roundness", default=0.1, min=0.0, max=1.0, subtype="FACTOR")
+    border = FloatProperty(name="Border", default=0.0, min=0.0, max=0.1,
+                           description="Espessura da borda, em fração do menor lado")
+    border_color = _color("Border Color", (1.0, 1.0, 1.0, 0.5))
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.button_height = 200.0
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "color", text="")
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop(self, "button_height")
+        layout.prop(self, "color")
+        layout.prop(self, "radius", slider=True)
+        row = layout.row(align=True)
+        row.prop(self, "border")
+        row.prop(self, "border_color", text="")
+
+    def widget(self):
+        return {"kind": "PANEL", "color": tuple(self.color), "radius": self.radius,
+                "border": self.border, "border_color": tuple(self.border_color)}
+
+    def preview_values(self):
+        return {}
+
+
+class UIImageNode(UIHudNode, Node):
+    """Imagem (logo, ícone).  No jogo é lida do arquivo: use caminho
+    relativo (//) e não deixe a imagem só empacotada."""
+    bl_idname = "RangeUIImage"
+    bl_label = "Image"
+
+    image_name = StringProperty(name="Image")
+    tint = _color("Tint", (1.0, 1.0, 1.0, 1.0))
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.button_height = 100.0
+
+    def draw_buttons(self, context, layout):
+        layout.prop_search(self, "image_name", bpy.data, "images", text="")
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop_search(self, "image_name", bpy.data, "images")
+        layout.prop(self, "button_height")
+        layout.prop(self, "tint")
+        layout.operator(RANGE_OT_ui_tree_image_aspect.bl_idname, icon="IMAGE_COL")
+
+    def image(self):
+        return bpy.data.images.get(self.image_name) if self.image_name else None
+
+    def widget(self):
+        image = self.image()
+        return {"kind": "IMAGE", "path": image.filepath if image else "",
+                "tint": tuple(self.tint)}
+
+    def preview_values(self):
+        return {}
+
+
+class UIGaugeNode(UIHudNode, Node):
+    """Velocímetro circular ligado a uma propriedade."""
+    bl_idname = "RangeUIGauge"
+    bl_label = "Gauge"
+
+    prop_name = StringProperty(name="Property", default="velocidade")
+    min_value = FloatProperty(name="Min", default=0.0)
+    max_value = FloatProperty(name="Max", default=200.0)
+    arc = FloatProperty(name="Arc", default=270.0, min=30.0, max=360.0,
+                        description="Abertura do arco, em graus")
+    thickness = FloatProperty(name="Thickness", default=0.18, min=0.02, max=1.0, subtype="FACTOR")
+    bg_color = _color("Background", (0.0, 0.0, 0.0, 0.55))
+    fill_color = _color("Fill", (1.0, 0.55, 0.1, 1.0))
+    use_low_color = BoolProperty(name="Low Color", default=False)
+    low_color = _color("Low", (0.25, 0.85, 0.35, 1.0))
+    needle = BoolProperty(name="Needle", default=True)
+    needle_color = _color("Needle Color", (1.0, 1.0, 1.0, 1.0))
+    text_format = StringProperty(name="Format", default="{velocidade:.0f}")
+    text_color = _color("Text Color", (1.0, 1.0, 1.0, 1.0))
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.width = 160
+        self.button_height = 160.0
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects")
+        layout.prop(self, "prop_name")
+        row = layout.row(align=True)
+        row.prop(self, "min_value")
+        row.prop(self, "max_value")
+        layout.prop(self, "button_height")
+        layout.prop(self, "arc")
+        layout.prop(self, "thickness", slider=True)
+        col = layout.column(align=True)
+        col.prop(self, "bg_color")
+        col.prop(self, "fill_color")
+        row = layout.row(align=True)
+        row.prop(self, "use_low_color")
+        row.prop(self, "low_color", text="")
+        row = layout.row(align=True)
+        row.prop(self, "needle")
+        row.prop(self, "needle_color", text="")
+        layout.prop(self, "text_format")
+        layout.prop(self, "text_color")
+
+    def widget(self):
+        return {
+            "kind": "GAUGE", "property": self.prop_name,
+            "min": self.min_value, "max": self.max_value, "arc": self.arc,
+            "thickness": self.thickness, "bg": tuple(self.bg_color),
+            "fill": tuple(self.fill_color), "use_low": self.use_low_color,
+            "low": tuple(self.low_color), "needle": self.needle,
+            "needle_color": tuple(self.needle_color), "format": self.text_format,
+            "text_color": tuple(self.text_color),
+        }
+
+    def preview_values(self):
+        return {self.prop_name: self.min_value + 0.6 * (self.max_value - self.min_value)}
+
+
+class UIControlNode(UIHudNode):
+    """Controle que o jogador mexe e que grava numa propriedade de jogo;
+    a saída On Change dispara quando o valor muda."""
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.button_height = 30.0
+        self.outputs.new(UIEventSocket.bl_idname, "On Change")
+
+
+class UIToggleNode(UIControlNode, Node):
+    bl_idname = "RangeUIToggle"
+    bl_label = "Toggle"
+
+    prop_name = StringProperty(name="Property", default="som",
+                               description="Propriedade bool ligada/desligada pelo clique")
+    text = StringProperty(name="Text", default="Som")
+    color = _color("Color", (0.20, 0.22, 0.26, 0.90))
+    on_color = _color("On Color", (0.30, 0.65, 1.0, 1.0))
+    text_color = _color("Text Color", (1.0, 1.0, 1.0, 1.0))
+    radius = FloatProperty(name="Roundness", default=0.3, min=0.0, max=1.0, subtype="FACTOR")
+    text_size = FloatProperty(name="Text Size", default=0.6, min=0.1, max=1.0)
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "text", text="")
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects")
+        layout.prop(self, "prop_name")
+        layout.prop(self, "text")
+        layout.prop(self, "button_height")
+        col = layout.column(align=True)
+        for prop in ("color", "on_color", "text_color"):
+            col.prop(self, prop)
+        layout.prop(self, "radius", slider=True)
+        layout.prop(self, "text_size", slider=True)
+
+    def widget(self):
+        return {"kind": "TOGGLE", "property": self.prop_name, "text": self.text,
+                "color": tuple(self.color), "on_color": tuple(self.on_color),
+                "text_color": tuple(self.text_color), "radius": self.radius,
+                "text_size": self.text_size}
+
+    def preview_values(self):
+        return {self.prop_name: True}
+
+
+class UISliderNode(UIControlNode, Node):
+    bl_idname = "RangeUISlider"
+    bl_label = "Slider"
+
+    prop_name = StringProperty(name="Property", default="volume",
+                               description="Propriedade numérica ajustada ao arrastar")
+    min_value = FloatProperty(name="Min", default=0.0)
+    max_value = FloatProperty(name="Max", default=1.0)
+    bg_color = _color("Track", (0.0, 0.0, 0.0, 0.55))
+    fill_color = _color("Fill", (0.30, 0.65, 1.0, 1.0))
+    knob_color = _color("Knob", (0.9, 0.9, 0.95, 1.0))
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects")
+        layout.prop(self, "prop_name")
+        row = layout.row(align=True)
+        row.prop(self, "min_value")
+        row.prop(self, "max_value")
+        layout.prop(self, "button_height")
+        col = layout.column(align=True)
+        for prop in ("bg_color", "fill_color", "knob_color"):
+            col.prop(self, prop)
+
+    def widget(self):
+        return {"kind": "SLIDER", "property": self.prop_name,
+                "min": self.min_value, "max": self.max_value,
+                "bg": tuple(self.bg_color), "fill": tuple(self.fill_color),
+                "knob": tuple(self.knob_color)}
+
+    def preview_values(self):
+        return {self.prop_name: self.min_value + 0.5 * (self.max_value - self.min_value)}
+
+
+HUD_NODES = (UIProgressBarNode, UILabelNode, UIPanelNode, UIImageNode, UIGaugeNode,
+             UIToggleNode, UISliderNode)
 
 
 class UIActionNode(UINode):
@@ -321,8 +531,39 @@ class UISoundNode(UIActionNode, Node):
         return (self.filepath, self.volume)
 
 
+class UIAddPropertyNode(UIActionNode, Node):
+    bl_idname = "RangeUIAddProperty"
+    bl_label = "Add Property"
+    action = "ADD_PROP"
+
+    prop_name = StringProperty(name="Property", description="Propriedade numérica do dono do script")
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "prop_name", text="")
+        layout.prop(self, "value", text="+")
+
+    def payload(self):
+        return (self.prop_name, self.value)
+
+
+class UITogglePropertyNode(UIActionNode, Node):
+    bl_idname = "RangeUIToggleProperty"
+    bl_label = "Toggle Property"
+    action = "TOGGLE_PROP"
+    param_label = "Property"
+
+
+class UIRunPythonNode(UIActionNode, Node):
+    """Chama modulo.funcao(ui); ui.owner é o dono do script."""
+    bl_idname = "RangeUIRunPython"
+    bl_label = "Run Python"
+    action = "PYTHON"
+    param_label = "Function"
+
+
 ACTION_NODES = (UIPrintNode, UIMessageNode, UIScreenNode, UISceneNode, UIQuitNode,
-                UISoundNode, UISetPropertyNode)
+                UISoundNode, UISetPropertyNode, UIAddPropertyNode, UITogglePropertyNode,
+                UIRunPythonNode)
 
 
 def _abs_location(node):
@@ -375,6 +616,8 @@ def bake_tree(tree, scene):
                 data = node.widget()
                 data["rect"] = rect
                 data["object"] = node.object_name
+                if isinstance(node, UIControlNode):
+                    data["events"] = {s.name: _actions_for(s) for s in node.outputs if s.is_linked}
                 widgets.append(data)
                 continue
             if node.bl_idname != UIButtonNode.bl_idname:
@@ -387,7 +630,9 @@ def bake_tree(tree, scene):
                 "events": {s.name: _actions_for(s) for s in node.outputs if s.is_linked},
             })
         screens.append({"name": frame.label or frame.name, "location": (fx, fy),
-                        "hud": frame.ui_hud, "buttons": buttons, "widgets": widgets})
+                        "hud": frame.ui_hud, "buttons": buttons, "widgets": widgets,
+                        "fade": frame.ui_fade,
+                        "sounds": {"hover": frame.ui_hover_sound, "click": frame.ui_click_sound}})
     # A tela inicial é a Screen mais acima e à esquerda no editor.
     screens.sort(key=lambda s: (-s["location"][1], s["location"][0]))
     return {"tree": tree.name, "screens": screens}
@@ -415,6 +660,20 @@ class RANGE_OT_ui_tree_bake(Operator):
 def _active_frame(context):
     node = context.space_data.edit_tree.nodes.active
     return node if node is not None and _is_screen(node) else None
+
+
+class RANGE_OT_ui_tree_image_aspect(Operator):
+    """Ajusta a altura do widget para a proporção da imagem"""
+    bl_idname = "node.range_ui_tree_image_aspect"
+    bl_label = "Fit Image Aspect"
+
+    def execute(self, context):
+        node = context.active_node
+        image = node.image() if isinstance(node, UIImageNode) else None
+        if image is None or not image.size[0]:
+            return {'CANCELLED'}
+        node.button_height = node.width * image.size[1] / image.size[0]
+        return {'FINISHED'}
 
 
 class RANGE_OT_ui_tree_capture(Operator):
@@ -492,7 +751,13 @@ def _draw_previews():
         x, y = x * scale, y * scale - h
         if is_hud:
             # Prévia com valor de exemplo (barra em 70%, propriedades = 0).
-            range_ui_draw.draw_widget(bgl, blf, node.widget(), node.preview_values(), x, y, w, h)
+            bindcode = 0
+            if isinstance(node, UIImageNode):
+                image = node.image()
+                if image is not None and not image.gl_load():
+                    bindcode = image.bindcode[0]
+            range_ui_draw.draw_widget(bgl, blf, node.widget(), node.preview_values(),
+                                      x, y, w, h, bindcode=bindcode)
         else:
             state = tree.preview_state if node.select else "NORMAL"
             range_ui_draw.draw_button(bgl, blf, node.style(), node.text, x, y, w, h, state)
@@ -526,12 +791,17 @@ class UITreePanel:
             box = layout.box()
             box.label("Tela: %s" % (frame.label or frame.name))
             box.prop(frame, "ui_hud")
+            if not frame.ui_hud:
+                box.prop(frame, "ui_fade")
+                box.prop(frame, "ui_hover_sound", text="Hover")
+                box.prop(frame, "ui_click_sound", text="Click")
             box.prop_search(frame, "ui_backdrop", bpy.data, "images", text="")
             box.operator(RANGE_OT_ui_tree_capture.bl_idname, icon="RENDER_STILL")
         layout.label("Jogo: Always (pulso) + Python")
         layout.label("Module: range_ui_runtime.main")
         layout.label("Menu: propriedade ui_screen")
         layout.label("HUD: propriedade ui_hud (bool)")
+        layout.label("Teclado/controle: setas + Enter")
 
 
 class NODE_PT_range_ui_tree(UITreePanel, Panel):
@@ -559,16 +829,24 @@ CATEGORIES = [
             "ui_screen": "True", "ui_hud": "True", "label": "'HUD'", "width": "640.0",
             "shrink": "False"}),
         NodeItem(UIButtonNode.bl_idname),
+        NodeItem(UIToggleNode.bl_idname),
+        NodeItem(UISliderNode.bl_idname),
+        NodeItem(UIPanelNode.bl_idname),
+        NodeItem(UIImageNode.bl_idname),
+        NodeItem("NodeFrame"),
+    ]),
+    UICategory("RANGE_UI_HUD", "HUD", items=[
         NodeItem(UIProgressBarNode.bl_idname),
         NodeItem(UILabelNode.bl_idname),
-        NodeItem("NodeFrame"),
+        NodeItem(UIGaugeNode.bl_idname),
     ]),
     UICategory("RANGE_UI_ACTIONS", "Actions",
                items=[NodeItem(cls.bl_idname) for cls in ACTION_NODES]),
 ]
 
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
-    RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_capture, NODE_PT_range_ui_tree,
+    RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_image_aspect, RANGE_OT_ui_tree_capture,
+    NODE_PT_range_ui_tree,
     NODE_PT_range_ui_tree_tools)
 
 _draw_handles = []
@@ -583,6 +861,15 @@ def register():
         name="Screen", description="Na UI Tree, este Frame é uma tela do jogo (lido em drawnode.c)")
     bpy.types.NodeFrame.ui_hud = BoolProperty(
         name="HUD", description="Tela de HUD: fica sempre visível, por baixo do menu")
+    bpy.types.NodeFrame.ui_fade = FloatProperty(
+        name="Fade", default=0.15, min=0.0, max=3.0,
+        description="Tempo do fade ao mostrar/esconder esta tela, em segundos")
+    bpy.types.NodeFrame.ui_hover_sound = StringProperty(
+        name="Hover Sound", subtype="FILE_PATH",
+        description="Som padrão do mouse sobre qualquer botão desta tela")
+    bpy.types.NodeFrame.ui_click_sound = StringProperty(
+        name="Click Sound", subtype="FILE_PATH",
+        description="Som padrão do clique em qualquer botão desta tela")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
     space = bpy.types.SpaceNodeEditor
     _draw_handles.append(space.draw_handler_add(_draw_editor, (), "WINDOW", "PRE_VIEW"))
@@ -594,6 +881,9 @@ def unregister():
     del bpy.types.NodeFrame.ui_backdrop
     del bpy.types.NodeFrame.ui_screen
     del bpy.types.NodeFrame.ui_hud
+    del bpy.types.NodeFrame.ui_fade
+    del bpy.types.NodeFrame.ui_hover_sound
+    del bpy.types.NodeFrame.ui_click_sound
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)

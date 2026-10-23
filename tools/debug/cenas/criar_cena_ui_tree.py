@@ -10,6 +10,10 @@ HUD: tela "HUD" com vida e velocidade lidas das propriedades da câmera.
 Começa só com o menu; Jogar esconde o menu e liga o HUD (Set Property
 ui_hud).  D tira vida, R recupera, W/S (segurando) aceleram e freiam, J
 liga/desliga o HUD, M volta o menu.
+
+Também mostra: Panel atrás do menu, fade e sons padrão das telas, Toggle
+(som) e Slider (volume) em Opções, Gauge (velocímetro) no HUD e navegação
+por setas + Enter.
 """
 
 import sys
@@ -72,6 +76,15 @@ btn_opcoes = button(menu, "Opções", 220, -170)
 sair = button(menu, "Sair", 220, -220)
 voltar = button(opcoes, "Voltar", 220, -280)
 
+fundo = hud_widget(ui.UIPanelNode, menu, 200, -100, 240, 190)
+fundo.border = 0.01
+
+som = hud_widget(ui.UIToggleNode, opcoes, 200, -100, 240, 30)
+volume = hud_widget(ui.UISliderNode, opcoes, 200, -160, 240, 30)
+volume_txt = hud_widget(ui.UILabelNode, opcoes, 200, -195, 240, 24)
+volume_txt.text_format = "Volume {volume:.0%}"
+volume_txt.align = "CENTER"
+
 # Estilos variados para conferir a prévia e o jogo.
 jogar.shadow = True
 jogar.button_height = 48
@@ -86,14 +99,10 @@ voltar.align = "LEFT"
 vida_bar = hud_widget(ui.UIProgressBarNode, hud, 20, -20, 220, 24)
 vida_txt = hud_widget(ui.UILabelNode, hud, 20, -48, 220, 24)
 vida_txt.text_format = "Vida {vida:.0f}"
-vel_txt = hud_widget(ui.UILabelNode, hud, 420, -280, 200, 40)
-vel_txt.text_format = "{velocidade:.0f} km/h"
-vel_txt.align = "RIGHT"
-vel_bar = hud_widget(ui.UIProgressBarNode, hud, 420, -325, 200, 14)
-vel_bar.prop_name = "velocidade"
-vel_bar.max_value = 200.0
-vel_bar.use_low_color = False
-vel_bar.fill_color = (1.0, 0.55, 0.1, 1.0)
+gauge = hud_widget(ui.UIGaugeNode, hud, 480, -190, 140, 140)
+vel_txt = hud_widget(ui.UILabelNode, hud, 480, -330, 140, 24)
+vel_txt.text_format = "km/h"
+vel_txt.align = "CENTER"
 
 link(jogar, "On Enter", action(ui.UIPrintNode, "mouse entrou em Jogar", 800, 0))
 link(jogar, "On Click", action(ui.UIPrintNode, "clicou Jogar", 800, -100))
@@ -106,14 +115,13 @@ link(btn_opcoes, "On Click", action(ui.UIScreenNode, "Opcoes", 800, -200))
 link(sair, "On Click", action(ui.UIQuitNode, "", 800, -300))
 link(voltar, "On Click", action(ui.UIScreenNode, "Menu", 800, -600))
 
-# Um nó de som para cada evento, ligado em todos os botões.
-hover = action(ui.UISoundNode, "", 1100, -150)
-hover.filepath, hover.volume = "//sons/ui_hover.wav", 0.6
-click = action(ui.UISoundNode, "", 1100, -350)
-click.filepath = "//sons/ui_click.wav"
-for b in (jogar, btn_opcoes, sair, voltar):
-    link(b, "On Enter", hover)
-    link(b, "On Click", click)
+link(som, "On Change", action(ui.UIPrintNode, "som mudou", 800, -700))
+
+# Sons padrão de cada tela (sem ligar nós) e fade ao trocar.
+for screen in (menu, opcoes):
+    screen.ui_hover_sound = "//sons/ui_hover.wav"
+    screen.ui_click_sound = "//sons/ui_click.wav"
+    screen.ui_fade = 0.25
 
 data = ui.bake_tree(tree, bpy.context.scene)
 text = bpy.data.texts.new(ui.DATA_TEXT)
@@ -139,7 +147,8 @@ sensor.link(controller)
 bpy.ops.object.game_property_new(type="STRING", name="ui_screen")
 cam.game.properties["ui_screen"].value = "Menu"
 for prop, kind, value in (("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0),
-                          ("ui_hud", "BOOL", False)):
+                          ("ui_hud", "BOOL", False), ("som", "BOOL", True),
+                          ("volume", "FLOAT", 0.8)):
     bpy.ops.object.game_property_new(type=kind, name=prop)
     cam.game.properties[prop].value = value
 
