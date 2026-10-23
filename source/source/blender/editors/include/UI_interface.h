@@ -882,6 +882,9 @@ void UI_panel_label_offset(struct uiBlock *block, int *x, int *y);
 int                        UI_panels_content_ymin(struct ARegion *ar);
 int                        UI_panel_category_tabs_ymin(struct ARegion *ar);
 bool                       UI_panel_category_is_visible(struct ARegion *ar);
+bool                       UI_panel_category_is_horizontal(const struct ARegion *ar);
+int                        UI_panel_category_htabs_height(struct ARegion *ar);
+int                        UI_panel_category_icon(const char *idname);
 void                       UI_panel_category_add(struct ARegion *ar, const char *name);
 struct PanelCategoryDyn   *UI_panel_category_find(struct ARegion *ar, const char *idname);
 struct PanelCategoryStack *UI_panel_category_active_find(struct ARegion *ar, const char *idname);
@@ -1230,6 +1233,9 @@ void uiItemPopoverPanel_ptr(
         uiLayout *layout, struct bContext *C,
         struct PanelType *pt,
         const char *name, int icon);
+struct uiBut *uiDefPopoverCategoryBut(
+        uiBlock *block, struct PanelType *pt_first, const char *str, int x, int y, short width, short height,
+        const char *tip);
 void uiItemPopoverPanel(
         uiLayout *layout, struct bContext *C,
         const char *panelname,

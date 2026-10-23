@@ -168,6 +168,8 @@ static bool panel_active_animation_changed(ListBase *lb, Panel **pa_animation, b
 	return false;
 }
 
+static void ui_panel_category_offset(ARegion *ar, int align, int r_ofs[2]);
+
 static bool panels_need_realign(ScrArea *sa, ARegion *ar, Panel **pa_animate)
 {
 	*pa_animate = NULL;
@@ -186,6 +188,15 @@ static bool panels_need_realign(ScrArea *sa, ARegion *ar, Panel **pa_animate)
 	}
 	else if (sa->spacetype == SPACE_FILE && ar->regiontype == RGN_TYPE_CHANNELS) {
 		return true;
+	}
+
+	/* Category tabs changed side/size (horizontal tab bar wraps to more rows, toggled, ...). */
+	{
+		int tabs_ofs[2];
+		ui_panel_category_offset(ar, panel_aligned(sa, ar), tabs_ofs);
+		if (tabs_ofs[0] != ar->runtime.category_ofsx || tabs_ofs[1] != ar->runtime.category_ofsy) {
+			return true;
+		}
 	}
 
 	/* Detect if a panel was added or removed. */
@@ -931,7 +942,6 @@ static bool uiAlignPanelStep(ScrArea *sa, ARegion *ar, const float fac, const bo
 	int a, tot = 0;
 	bool done;
 	int align = panel_aligned(sa, ar);
-	bool has_category_tabs = UI_panel_category_is_visible(ar);
 
 	/* count active, not tabbed panels */
 	for (pa = ar->panels.first; pa; pa = pa->next)
@@ -981,10 +991,13 @@ static bool uiAlignPanelStep(ScrArea *sa, ARegion *ar, const float fac, const bo
 	ps->pa->ofsx = 0;
 	ps->pa->ofsy = -get_panel_size_y(ps->pa);
 
-	if (has_category_tabs) {
-		if (align == BUT_VERTICAL && ar->alignment != RGN_ALIGN_RIGHT) {
-			ps->pa->ofsx += UI_PANEL_CATEGORY_MARGIN_WIDTH;
-		}
+	{
+		int tabs_ofs[2];
+		ui_panel_category_offset(ar, align, tabs_ofs);
+		ps->pa->ofsx += tabs_ofs[0];
+		ps->pa->ofsy += tabs_ofs[1];
+		ar->runtime.category_ofsx = tabs_ofs[0];
+		ar->runtime.category_ofsy = tabs_ofs[1];
 	}
 
 	for (a = 0; a < tot - 1; a++, ps++) {
@@ -1776,6 +1789,190 @@ static void ui_panel_category_draw_tab(
 }
 
 
+bool UI_panel_category_is_horizontal(const ARegion *UNUSED(ar))
+{
+	return (U.uiflag2 & USER_HORIZONTAL_TABS) != 0;
+}
+
+/* Icon shown for a category in the horizontal tab bar, ICON_NONE shows the name instead. */
+int UI_panel_category_icon(const char *idname)
+{
+	static const struct { const char *name; int icon; } table[] = {
+		{"Tools", ICON_MODIFIER},
+		{"Create", ICON_MESH_CUBE},
+		{"Relations", ICON_LINKED},
+		{"Animation", ICON_ANIM},
+		{"Physics", ICON_PHYSICS},
+		{"Grease Pencil", ICON_GREASEPENCIL},
+		{"Options", ICON_PREFERENCES},
+		{"View", ICON_VIEWZOOM},
+		{"Item", ICON_OBJECT_DATA},
+		{"Shading / UVs", ICON_MATERIAL},
+		{"Modifiers", ICON_MODIFIER},
+		{"Layers", ICON_LAYER_USED},
+		{"Bookmarks", ICON_BOOKMARKS},
+		{"Filter", ICON_FILTER},
+		{"Mask", ICON_MOD_MASK},
+		{"Text", ICON_FILE_TEXT},
+		{"Strip", ICON_SEQUENCE},
+		{"Scopes", ICON_IMAGE_DATA},
+		{"Input", ICON_FORWARD},
+		{"Output", ICON_EXPORT},
+		{"Color", ICON_COLOR},
+		{"Texture", ICON_TEXTURE},
+		{"Vector", ICON_MANIPUL},
+		{"Converter", ICON_NODETREE},
+		{"Vertex", ICON_VERTEXSEL},
+		{"Geometry", ICON_MESH_DATA},
+		{"Script", ICON_SCRIPT},
+		{"Group", ICON_GROUP},
+		{"Presets", ICON_SETTINGS},
+		{"Game Engine", ICON_GAME},
+		{"Layout", ICON_SNAP_GRID},
+		{"Assets", ICON_PLUGIN},
+	};
+
+	for (int i = 0; i < ARRAY_SIZE(table); i++) {
+		if (STREQ(table[i].name, idname)) {
+			return table[i].icon;
+		}
+	}
+	return ICON_NONE;
+}
+
+/* Lay out the horizontal tab bar in region pixels (fills pc_dyn->rect); the active tab
+ * and tabs without an icon also show their name. Returns the bar height. */
+static int ui_panel_category_htabs_layout(ARegion *ar, const char *category_id_active)
+{
+	const uiFontStyle *fstyle = &UI_style_get()->widget;
+	const int pad = round_fl_to_int(3.0f * UI_DPI_FAC);
+	const int cell = round_fl_to_int(UI_UNIT_Y * 1.1f);
+	const int xstart = pad * 2;
+	const int xend = ar->winx - pad * 2;
+	int x = xstart;
+	int ytop = ar->winy - pad;
+	int ymin = ytop;
+
+	UI_fontstyle_set(fstyle);
+
+	for (PanelCategoryDyn *pc_dyn = ar->panels_category.first; pc_dyn; pc_dyn = pc_dyn->next) {
+		const int icon = UI_panel_category_icon(pc_dyn->idname);
+		const bool show_name = (icon == ICON_NONE) ||
+		                       (category_id_active && STREQ(pc_dyn->idname, category_id_active));
+		int w = (icon != ICON_NONE) ? cell : pad * 2;
+
+		if (show_name) {
+			w += BLF_width(fstyle->uifont_id, IFACE_(pc_dyn->idname), BLF_DRAW_STR_DUMMY_MAX) + pad * 2;
+		}
+		/* never wider than the region, the name is clipped on draw */
+		w = min_ii(w, max_ii(cell, xend - xstart));
+
+		if (x != xstart && x + w > xend) {
+			x = xstart;
+			ytop -= cell + pad;
+		}
+		BLI_rcti_init(&pc_dyn->rect, x, x + w, ytop - cell, ytop);
+		ymin = min_ii(ymin, ytop - cell);
+		x += w + pad;
+	}
+
+	return ar->winy - ymin + pad;
+}
+
+int UI_panel_category_htabs_height(ARegion *ar)
+{
+	if (!UI_panel_category_is_visible(ar) || !UI_panel_category_is_horizontal(ar)) {
+		return 0;
+	}
+	return ui_panel_category_htabs_layout(ar, UI_panel_category_active_get(ar, false));
+}
+
+/* Offset of the first panel (view space) leaving room for the category tabs. */
+static void ui_panel_category_offset(ARegion *ar, int align, int r_ofs[2])
+{
+	r_ofs[0] = r_ofs[1] = 0;
+	if (!UI_panel_category_is_visible(ar)) {
+		return;
+	}
+	if (UI_panel_category_is_horizontal(ar)) {
+		const float aspect = ar->uiblocks.first ? ((uiBlock *)ar->uiblocks.first)->aspect : 1.0f;
+		r_ofs[1] = -round_fl_to_int(UI_panel_category_htabs_height(ar) * aspect);
+	}
+	else if (align == BUT_VERTICAL && ar->alignment != RGN_ALIGN_RIGHT) {
+		r_ofs[0] = UI_PANEL_CATEGORY_MARGIN_WIDTH;
+	}
+}
+
+/* Horizontal icon tab bar along the top of the region, panels scroll beneath it. */
+static void ui_panel_category_draw_all_horizontal(ARegion *ar, const char *category_id_active)
+{
+	const uiFontStyle *fstyle = &UI_style_get()->widget;
+	const int fontid = fstyle->uifont_id;
+	const float dpi_fac = UI_DPI_FAC;
+	const int pad = round_fl_to_int(3.0f * dpi_fac);
+	const float radius = 4.0f * dpi_fac;
+	const int icon_size = round_fl_to_int(ICON_DEFAULT_HEIGHT * dpi_fac);
+	const bool is_floating = ar->overlap && ELEM(ar->regiontype, RGN_TYPE_UI, RGN_TYPE_TOOLS);
+	uchar theme_col_text[3], theme_col_text_hi[3];
+	uchar theme_col_tab_bg[4], theme_col_tab_active[3];
+	const int height = ui_panel_category_htabs_layout(ar, category_id_active);
+
+	UI_GetThemeColor3ubv(TH_TEXT, theme_col_text);
+	UI_GetThemeColor3ubv(TH_TEXT_HI, theme_col_text_hi);
+	UI_GetThemeColor4ubv(TH_TAB_BACK, theme_col_tab_bg);
+	UI_GetThemeColor3ubv(TH_TAB_ACTIVE, theme_col_tab_active);
+
+	glEnable(GL_BLEND);
+	if (is_floating) {
+		glColor4ubv(theme_col_tab_bg);
+		UI_draw_roundbox_corner_set(UI_CNR_ALL);
+		UI_draw_roundbox(0.0f, (float)(ar->winy - height), (float)ar->winx, (float)(ar->winy + 1), radius * 1.5f);
+	}
+	else {
+		glColor3ubv(theme_col_tab_bg);
+		glRecti(0, ar->winy - height, ar->winx, ar->winy + 1);
+	}
+
+	if (fstyle->kerning == 1) {
+		BLF_enable(fontid, BLF_KERNING_DEFAULT);
+	}
+
+	for (PanelCategoryDyn *pc_dyn = ar->panels_category.first; pc_dyn; pc_dyn = pc_dyn->next) {
+		const rcti *rct = &pc_dyn->rect;
+		const int cell = BLI_rcti_size_y(rct);
+		const bool is_active = STREQ(pc_dyn->idname, category_id_active);
+		const int icon = UI_panel_category_icon(pc_dyn->idname);
+		int text_x = rct->xmin + pad * 2;
+
+		if (is_active) {
+			glColor3ubv(theme_col_tab_active);
+			UI_draw_roundbox_corner_set(UI_CNR_ALL);
+			UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, radius);
+		}
+
+		if (icon != ICON_NONE) {
+			UI_icon_draw_aspect(rct->xmin + (cell - icon_size) * 0.5f, rct->ymin + (cell - icon_size) * 0.5f,
+			                    icon, 1.0f / dpi_fac, is_active ? 1.0f : 0.8f, NULL);
+			text_x = rct->xmin + cell;
+		}
+
+		if ((is_active || icon == ICON_NONE) && text_x < rct->xmax - pad) {
+			const char *name = IFACE_(pc_dyn->idname);
+			const size_t len = BLF_width_to_strlen(fontid, name, BLF_DRAW_STR_DUMMY_MAX,
+			                                       rct->xmax - text_x - pad, NULL);
+			glColor3ubv(is_active ? theme_col_text_hi : theme_col_text);
+			BLF_position(fontid, text_x, rct->ymin + (cell - BLF_height_max(fontid)) * 0.5f -
+			             BLF_descender(fontid), 0.0f);
+			BLF_draw(fontid, name, len);
+		}
+	}
+
+	if (fstyle->kerning == 1) {
+		BLF_disable(fontid, BLF_KERNING_DEFAULT);
+	}
+	glDisable(GL_BLEND);
+}
+
 /**
  * Draw vertical tabs on the outer side of the region,
  * one tab per category.
@@ -1808,6 +2005,11 @@ void UI_panel_category_draw_all(ARegion *ar, const char *category_id_active)
 	const int roundboxtype = is_right ? (UI_CNR_TOP_RIGHT | UI_CNR_BOTTOM_RIGHT) : (UI_CNR_TOP_LEFT | UI_CNR_BOTTOM_LEFT);
 	bool is_alpha;
 	bool do_scaletabs = false;
+
+	if (UI_panel_category_is_horizontal(ar)) {
+		ui_panel_category_draw_all_horizontal(ar, category_id_active);
+		return;
+	}
 #ifdef USE_FLAT_INACTIVE
 	bool is_active_prev = false;
 #endif
@@ -1984,7 +2186,9 @@ static int ui_handle_panel_category_cycling(const wmEvent *event, ARegion *ar, c
 {
 	const bool is_mousewheel = ELEM(event->type, WHEELUPMOUSE, WHEELDOWNMOUSE);
 	const rcti *tab_rect = &((PanelCategoryDyn *)ar->panels_category.first)->rect;
-	const bool inside_tabregion = (ar->alignment == RGN_ALIGN_RIGHT) ?
+	const bool inside_tabregion = UI_panel_category_is_horizontal(ar) ?
+	        (event->mval[1] >= UI_panel_category_tabs_ymin(ar)) :
+	        (ar->alignment == RGN_ALIGN_RIGHT) ?
 	        (event->mval[0] > tab_rect->xmin) : (event->mval[0] < tab_rect->xmax);
 
 	/* if mouse is inside non-tab region, ctrl key is required */

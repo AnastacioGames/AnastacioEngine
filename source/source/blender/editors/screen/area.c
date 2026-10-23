@@ -2183,7 +2183,9 @@ void ED_region_panels_layout_ex(
 		}
 		else {
 			category = UI_panel_category_active_get(ar, true);
-			margin_x = category_tabs_width;
+			if (!UI_panel_category_is_horizontal(ar)) {
+				margin_x = category_tabs_width;
+			}
 		}
 	}
 
@@ -2299,6 +2301,10 @@ bool ED_region_contains_xy(const ARegion *ar, const int event_xy[2])
 	const int margin = round_fl_to_int(4.0f * UI_DPI_FAC);
 	PanelCategoryDyn *pc_dyn = region->panels_category.first;
 
+	if (pc_dyn && UI_panel_category_is_horizontal(ar)) {
+		/* tab bar on top, panels below it */
+		return y >= min_ii(UI_panel_category_tabs_ymin(region), UI_panels_content_ymin(region)) - margin;
+	}
 	const bool on_tabs = pc_dyn && ((ar->alignment == RGN_ALIGN_RIGHT) ? (x >= pc_dyn->rect.xmin) :
 	                                                                    (x <= pc_dyn->rect.xmax));
 	if (on_tabs) {
@@ -2318,7 +2324,7 @@ void ED_region_panels_draw(const bContext *C, ARegion *ar)
 		const int content_ymin = UI_panels_content_ymin(ar);
 		const bool is_right = (ar->alignment == RGN_ALIGN_RIGHT);
 		int xmin = 0, xmax = BLI_rcti_size_x(&ar->winrct) + 1;
-		if (ar->runtime.category) {
+		if (ar->runtime.category && !UI_panel_category_is_horizontal(ar)) {
 			if (is_right) {
 				xmax -= round_fl_to_int(UI_PANEL_CATEGORY_MARGIN_WIDTH);
 			}
@@ -2370,7 +2376,7 @@ void ED_region_panels_draw(const bContext *C, ARegion *ar)
 	/* scrollers */
 	const rcti *mask = NULL;
 	rcti        mask_buf;
-	if (ar->runtime.category && (ar->alignment == RGN_ALIGN_RIGHT)) {
+	if (ar->runtime.category && (ar->alignment == RGN_ALIGN_RIGHT) && !UI_panel_category_is_horizontal(ar)) {
 		UI_view2d_mask_from_win(v2d, &mask_buf);
 		mask_buf.xmax -= UI_PANEL_CATEGORY_MARGIN_WIDTH;
 		mask = &mask_buf;

@@ -136,6 +136,9 @@ class NODE_HT_header(Header):
         row.operator("node.clipboard_copy", text="", icon='COPYDOWN')
         row.operator("node.clipboard_paste", text="", icon='PASTEDOWN')
 
+        # Category tabs of the tool shelf/sidebar as a horizontal icon bar
+        layout.prop(context.user_preferences.view, "use_horizontal_tabs", text="", icon='COLLAPSEMENU')
+
         layout.template_running_jobs()
 
 

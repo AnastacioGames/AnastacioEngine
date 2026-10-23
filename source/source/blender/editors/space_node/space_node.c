@@ -32,6 +32,10 @@
 #include "BLI_blenlib.h"
 #include "BLI_math.h"
 
+#include "BLT_translation.h"
+
+#include "DNA_userdef_types.h"
+
 #include "BKE_context.h"
 #include "BKE_library.h"
 #include "BKE_scene.h"
@@ -42,9 +46,13 @@
 #include "ED_node.h"
 #include "ED_render.h"
 #include "ED_screen.h"
+
+#include "BIF_gl.h"
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "UI_interface.h"
+#include "UI_interface_icons.h"
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
@@ -649,9 +657,117 @@ static void node_main_region_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_dropbox_handler(&ar->handlers, lb);
 }
 
+/* Tool shelf categories as a floating icon bar in the node area (Horizontal Tabs preference),
+ * each icon opens the panels of its category in a popover right below it. */
+static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
+{
+	ScrArea *sa = CTX_wm_area(C);
+	ARegionType *art = BKE_regiontype_from_id(sa->type, RGN_TYPE_TOOLS);
+
+	if (!(U.uiflag2 & USER_HORIZONTAL_TABS) || art == NULL) {
+		return;
+	}
+
+	/* tabs in registration order (as the shelf shows them), keeping the last panel type of each
+	 * category: the popover walks back from it */
+	PanelType *categories[64];
+	int categories_len = 0;
+	for (PanelType *pt = art->paneltypes.first; pt; pt = pt->next) {
+		if (pt->parent || pt->category[0] == '\0' || (pt->poll && !pt->poll((bContext *)C, pt))) {
+			continue;
+		}
+		bool found = false;
+		for (int i = 0; i < categories_len; i++) {
+			if (STREQ(categories[i]->category, pt->category)) {
+				categories[i] = pt;
+				found = true;
+				break;
+			}
+		}
+		if (!found && categories_len < ARRAY_SIZE(categories)) {
+			categories[categories_len++] = pt;
+		}
+	}
+	if (categories_len < 2) {
+		return;
+	}
+
+	const float dpi_fac = UI_DPI_FAC;
+	const int cell = round_fl_to_int(UI_UNIT_Y * 1.5f);
+	const int pad = round_fl_to_int(4.0f * dpi_fac);
+	const float icon_aspect = 1.0f / (dpi_fac * 1.35f);
+	const int icon_size = round_fl_to_int(ICON_DEFAULT_HEIGHT / icon_aspect);
+	rcti rect;
+	ED_region_visible_rect(ar, &rect);
+
+	/* one row along the top of the visible node area, wraps when it does not fit */
+	const int xstart = rect.xmin + UI_UNIT_X / 2;
+	const int xend = rect.xmax - UI_UNIT_X / 2;
+	const int ytop = rect.ymax - UI_UNIT_Y / 2;
+	int x = xstart, top = ytop, xmax_used = xstart;
+	struct { int icon; float x, y; } icons[ARRAY_SIZE(categories)];
+	int icons_len = 0;
+
+	uiBlock *block = UI_block_begin(C, ar, "node_tabs_bar", UI_EMBOSS);
+
+	for (int i = 0; i < categories_len; i++) {
+		const char *category = categories[i]->category;
+		const int icon = UI_panel_category_icon(category);
+		const char *name = IFACE_(category);
+		const int w = (icon != ICON_NONE) ? cell :
+		              UI_fontstyle_string_width(&UI_style_get()->widget, name) + pad * 4;
+
+		if (x != xstart && x + w > xend) {
+			x = xstart;
+			top -= cell;
+		}
+		uiDefPopoverCategoryBut(block, categories[i], (icon != ICON_NONE) ? "" : name,
+		                        x, top - cell, w, cell, name);
+		if (icon != ICON_NONE) {
+			icons[icons_len].icon = icon;
+			icons[icons_len].x = x + (w - icon_size) * 0.5f;
+			icons[icons_len].y = top - cell + (cell - icon_size) * 0.5f;
+			icons_len++;
+		}
+		x += w;
+		xmax_used = max_ii(xmax_used, x);
+	}
+	UI_block_end(C, block);
+
+	/* centered in the visible node area, so the popovers have room on both sides */
+	const int shift = max_ii(0, ((xend - xstart) - (xmax_used - xstart)) / 2);
+	UI_block_translate(block, shift, 0);
+	for (int i = 0; i < icons_len; i++) {
+		icons[i].x += shift;
+	}
+
+	/* opaque backdrop like the 3D View floating controls */
+	{
+		bTheme *btheme = UI_GetTheme();
+		unsigned char col[4];
+		copy_v4_v4_uchar(col, (unsigned char *)btheme->tui.wcol_tool.inner);
+		col[3] = 255;
+		glEnable(GL_BLEND);
+		glColor4ubv(col);
+		UI_draw_roundbox_corner_set(UI_CNR_ALL);
+		UI_draw_roundbox_gl_mode(GL_POLYGON, (float)(xstart + shift), (float)(top - cell), (float)(xmax_used + shift),
+		                         (float)ytop, 0.2f * U.widget_unit);
+		glDisable(GL_BLEND);
+	}
+	UI_block_draw(C, block);
+
+	/* bigger icons than the buttons would draw */
+	glEnable(GL_BLEND);
+	for (int i = 0; i < icons_len; i++) {
+		UI_icon_draw_aspect(icons[i].x, icons[i].y, icons[i].icon, icon_aspect, 1.0f, NULL);
+	}
+	glDisable(GL_BLEND);
+}
+
 static void node_main_region_draw(const bContext *C, ARegion *ar)
 {
 	drawnodespace(C, ar);
+	node_draw_tabs_bar(C, ar);
 }
 
 

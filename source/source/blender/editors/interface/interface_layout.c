@@ -2271,6 +2271,42 @@ void uiItemPopoverPanel_ptr(uiLayout *layout, bContext *UNUSED(C), PanelType *pt
 	but->type = UI_BTYPE_POPOVER;
 }
 
+/* Popover with every panel of a tab category, pt_first is the last panel type of the
+ * category in its region type list; drawn walking back, the order the tool shelf shows them. */
+static void ui_item_paneltype_category_func(bContext *C, uiLayout *layout, void *arg_pt)
+{
+	PanelType *pt_first = arg_pt;
+	bool first = true;
+
+	layout->root->block->flag ^= UI_BLOCK_IS_FLIP;
+
+	for (PanelType *pt = pt_first; pt; pt = pt->prev) {
+		if (pt->parent || !STREQ(pt->category, pt_first->category) || !STREQ(pt->context, pt_first->context)) {
+			continue;
+		}
+		if (pt->poll && !pt->poll(C, pt)) {
+			continue;
+		}
+		if (!first) {
+			uiItemS(layout);
+		}
+		first = false;
+		if (!(pt->flag & PNL_NO_HEADER)) {
+			uiItemL(layout, CTX_IFACE_(pt->translation_context, pt->label), ICON_NONE);
+		}
+		UI_paneltype_draw(C, pt, uiLayoutColumn(layout, false));
+	}
+}
+
+uiBut *uiDefPopoverCategoryBut(
+        uiBlock *block, PanelType *pt_first, const char *str, int x, int y, short width, short height,
+        const char *tip)
+{
+	uiBut *but = uiDefMenuBut(block, ui_item_paneltype_category_func, pt_first, str, x, y, width, height, tip);
+	but->type = UI_BTYPE_POPOVER;
+	return but;
+}
+
 void uiItemPopoverPanel(
         uiLayout *layout, bContext *C,
         const char *panel_type, const char *name, int icon)

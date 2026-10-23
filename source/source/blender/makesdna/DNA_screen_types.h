@@ -252,6 +252,8 @@ typedef struct ScrArea {
 typedef struct ARegion_Runtime {
 	/* Panel category to use between 'layout' and 'draw'. */
 	const char *category;
+	/* Panel offset applied for the category tabs on the last align (realign when it changes). */
+	int category_ofsx, category_ofsy;
 } ARegion_Runtime;
 
 typedef struct ARegion {

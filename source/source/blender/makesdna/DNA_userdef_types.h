@@ -746,6 +746,7 @@ typedef enum eUserpref_UI_Flag2 {
 	USER_REGION_OVERLAP			= (1 << 1),
 	USER_TRACKPAD_NATURAL		= (1 << 2),
 	USER_HIDE_PAINT_HINTS		= (1 << 3), /* negativo: prefs antigas mostram as dicas */
+	USER_HORIZONTAL_TABS		= (1 << 4), /* abas de categoria em faixa horizontal com ícones */
 } eUserpref_UI_Flag2;
 
 /* UserDef.app_flag */

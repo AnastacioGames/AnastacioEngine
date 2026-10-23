@@ -3663,6 +3663,12 @@ static void rna_def_userdef_view(BlenderRNA *brna)
 	                         "Show the main shortcuts at the bottom of the 3D View in sculpt and paint modes");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	prop = RNA_def_property(srna, "use_horizontal_tabs", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "uiflag2", USER_HORIZONTAL_TABS);
+	RNA_def_property_ui_text(prop, "Horizontal Tabs",
+	                         "Show the tool shelf and sidebar category tabs as a horizontal icon bar at the top");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	prop = RNA_def_property(srna, "show_splash", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "uiflag", USER_SPLASH_DISABLE);
 	RNA_def_property_ui_text(prop, "Show Splash", "Display splash screen on startup");
