@@ -20,6 +20,7 @@ Gauge o de baixo à direita em qualquer proporção de janela.  "Continuar" só
 liga com a propriedade tem_save (tecla C troca).
 """
 
+import os
 import sys
 
 import bpy
@@ -88,6 +89,9 @@ fundo.border = 0.01
 
 som = hud_widget(ui.UIToggleNode, opcoes, 200, -100, 240, 30)
 volume = hud_widget(ui.UISliderNode, opcoes, 200, -160, 240, 30)
+# Som e Volume mandam no volume geral do jogo (a chuva de fundo).
+som.audio = "SOUND"
+volume.audio = "VOLUME"
 volume_txt = hud_widget(ui.UILabelNode, opcoes, 200, -195, 240, 24)
 volume_txt.text_format = "Volume {volume:.0%}"
 volume_txt.align = "CENTER"
@@ -188,5 +192,17 @@ key_brick("S", "ADD", "velocidade", "-2", hold=True)
 key_brick("J", "TOGGLE", "ui_hud", "")
 key_brick("C", "TOGGLE", "tem_save", "")
 
-bpy.ops.wm.save_as_mainfile(filepath=out)
+# Chuva de fundo em loop, para ouvir o Som e o Volume das Opções.
+chuva = bpy.data.sounds.load(os.path.normpath(os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "../../../source/release/datafiles/sounds/effects/chuva.wav")))
+bpy.ops.logic.sensor_add(type="ALWAYS", object=cam.name)
+bpy.ops.logic.controller_add(type="LOGIC_AND", object=cam.name)
+bpy.ops.logic.actuator_add(type="SOUND", object=cam.name)
+snd_sensor, snd_ctrl, snd_act = cam.game.sensors[-1], cam.game.controllers[-1], cam.game.actuators[-1]
+snd_act.sound = chuva
+snd_act.mode = "LOOPEND"
+snd_sensor.link(snd_ctrl)
+snd_act.link(snd_ctrl)
+
+bpy.ops.wm.save_as_mainfile(filepath=out, relative_remap=True)
 print("UI_OK", out)

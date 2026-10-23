@@ -402,6 +402,9 @@ class UIToggleNode(UIControlNode, Node):
     text_color = _color("Text Color", (1.0, 1.0, 1.0, 1.0))
     radius = FloatProperty(name="Roundness", default=0.3, min=0.0, max=1.0, subtype="FACTOR")
     text_size = FloatProperty(name="Text Size", default=0.6, min=0.1, max=1.0)
+    audio = EnumProperty(name="Audio", default="NONE", items=(
+        ("NONE", "None", "Só grava a propriedade"),
+        ("SOUND", "Sound On/Off", "Ligado = som do jogo ligado; desligado = mudo")))
 
     def draw_buttons(self, context, layout):
         layout.prop(self, "text", text="")
@@ -410,6 +413,7 @@ class UIToggleNode(UIControlNode, Node):
         layout.prop_search(self, "object_name", context.scene, "objects")
         layout.prop(self, "prop_name")
         layout.prop(self, "text")
+        layout.prop(self, "audio")
         layout.prop(self, "button_height")
         col = layout.column(align=True)
         for prop in ("color", "on_color", "text_color"):
@@ -421,7 +425,7 @@ class UIToggleNode(UIControlNode, Node):
         return {"kind": "TOGGLE", "property": self.prop_name, "text": self.text,
                 "color": tuple(self.color), "on_color": tuple(self.on_color),
                 "text_color": tuple(self.text_color), "radius": self.radius,
-                "text_size": self.text_size}
+                "text_size": self.text_size, "audio": self.audio}
 
     def preview_values(self):
         return {self.prop_name: True}
@@ -438,6 +442,9 @@ class UISliderNode(UIControlNode, Node):
     bg_color = _color("Track", (0.0, 0.0, 0.0, 0.55))
     fill_color = _color("Fill", (0.30, 0.65, 1.0, 1.0))
     knob_color = _color("Knob", (0.9, 0.9, 0.95, 1.0))
+    audio = EnumProperty(name="Audio", default="NONE", items=(
+        ("NONE", "None", "Só grava a propriedade"),
+        ("VOLUME", "Master Volume", "O valor (entre Min e Max) vira o volume geral do jogo")))
 
     def draw_buttons_ext(self, context, layout):
         layout.prop_search(self, "object_name", context.scene, "objects")
@@ -445,6 +452,7 @@ class UISliderNode(UIControlNode, Node):
         row = layout.row(align=True)
         row.prop(self, "min_value")
         row.prop(self, "max_value")
+        layout.prop(self, "audio")
         layout.prop(self, "button_height")
         col = layout.column(align=True)
         for prop in ("bg_color", "fill_color", "knob_color"):
@@ -454,7 +462,7 @@ class UISliderNode(UIControlNode, Node):
         return {"kind": "SLIDER", "property": self.prop_name,
                 "min": self.min_value, "max": self.max_value,
                 "bg": tuple(self.bg_color), "fill": tuple(self.fill_color),
-                "knob": tuple(self.knob_color)}
+                "knob": tuple(self.knob_color), "audio": self.audio}
 
     def preview_values(self):
         return {self.prop_name: self.min_value + 0.5 * (self.max_value - self.min_value)}

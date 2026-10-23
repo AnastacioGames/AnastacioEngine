@@ -142,6 +142,9 @@ class UIRuntime:
         self.sounds = {}
         self.textures = {}
         self.last_draw = None
+        self.master_volume = None
+        self.audio_controls = [w for s in data["screens"] for w in s.get("widgets", ())
+                               if w.get("audio", "NONE") != "NONE"]
         self.scene.post_draw.append(self.draw)
         _instances.append(self)
 
@@ -176,6 +179,7 @@ class UIRuntime:
     # -- eventos -------------------------------------------------------------
 
     def update(self):
+        self.apply_audio()
         wanted = self.owner.get("ui_screen", "")
         if wanted != (self.active or ""):
             self.show(wanted)
@@ -385,6 +389,27 @@ class UIRuntime:
             print("[UI] Run Python: %r não encontrado (%s)" % (path, exc))
             return
         func(self)
+
+    def apply_audio(self):
+        """Toggle com Audio=Sound e Slider com Audio=Volume mandam no volume
+        geral do jogo (todos os sons, não só os da UI)."""
+        if not self.audio_controls:
+            return
+        volume = 1.0
+        for data in self.audio_controls:
+            obj = self.obj_for(data)
+            value = obj.get(data["property"]) if obj is not None else None
+            if value is None:
+                continue
+            if data["audio"] == "SOUND":
+                volume *= 1.0 if value else 0.0
+            else:
+                span = data["max"] - data["min"]
+                volume *= max(0.0, (value - data["min"]) / span) if span else 1.0
+        if volume != self.master_volume:
+            import aud
+            aud.Device().volume = volume
+            self.master_volume = volume
 
     def play_sound(self, path, volume):
         import aud

@@ -44,7 +44,8 @@ Limites conhecidos do protótipo:
 - **Barra flutuante:** painel UI Tree também na prateleira T (ícone na barra de abas).
 - **Animações nativas do botão:** Hover Scale, Press Scale, Anim Time (cor e escala suaves).
 - **Widgets:** Panel, Image (lida com `Range.texture` no jogo; Fit Image Aspect), Toggle e Slider
-  (gravam numa propriedade, saída On Change).
+  (gravam numa propriedade, saída On Change). Opção **Audio**: Toggle = Sound On/Off e
+  Slider = Master Volume mandam no volume geral do jogo (`aud.Device().volume`).
 - **HUD:** Progress Bar, Label, Gauge (velocímetro circular com ponteiro).
 - **Screen:** Fade (s) ao mostrar/esconder; sons padrão de Hover/Click sem ligar nós.
 - **Ações:** Set Property, Add Property, Toggle Property, Run Python (`modulo.funcao(ui)`).
