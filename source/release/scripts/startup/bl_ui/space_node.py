@@ -54,6 +54,12 @@ bpy.types.WindowManager.node_add_filter_out = bpy.props.BoolProperty(
     update=_node_add_filter_update("node_add_filter_out"),
 )
 
+bpy.types.WindowManager.node_add_search = bpy.props.StringProperty(
+    name="Search",
+    description="Show only the nodes whose name contains this text",
+    options={'TEXTEDIT_UPDATE'},
+)
+
 
 class NODE_HT_header(Header):
     bl_space_type = 'NODE_EDITOR'

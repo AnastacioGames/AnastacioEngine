@@ -247,6 +247,99 @@ class NODE_OT_add_search(NodeAddOperator, Operator):
         return {'CANCELLED'}
 
 
+class NODE_OT_add_linked(NodeAddOperator, Operator):
+    '''Add a node compatible with a dropped link and connect it'''
+    bl_idname = "node.add_linked"
+    bl_label = "Add Linked Node"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_property = "node_item"
+
+    _enum_item_hack = []
+    _items = []
+
+    node_name: StringProperty(name="Node", options={'SKIP_SAVE'})
+    socket_identifier: StringProperty(name="Socket", options={'SKIP_SAVE'})
+    from_output: BoolProperty(name="From Output", options={'SKIP_SAVE'})
+
+    def find_socket(self, context):
+        node = context.space_data.edit_tree.nodes.get(self.node_name)
+        if node is None:
+            return None
+        sockets = node.outputs if self.from_output else node.inputs
+        for sock in sockets:
+            if sock.identifier == self.socket_identifier:
+                return sock
+        return None
+
+    def node_enum_items(self, context):
+        enum_items = NODE_OT_add_linked._enum_item_hack
+        enum_items.clear()
+        for index, item in enumerate(NODE_OT_add_linked._items):
+            nodetype = getattr(bpy.types, item.nodetype, None)
+            description = nodetype.bl_rna.description if nodetype else ""
+            enum_items.append((str(index), item.label, description, index))
+        return enum_items
+
+    node_item: EnumProperty(
+        name="Node Type",
+        description="Node type",
+        items=NODE_OT_add_linked.node_enum_items,
+    )
+
+    def execute(self, context):
+        tree = context.space_data.edit_tree
+        sock = self.find_socket(context)
+        items = NODE_OT_add_linked._items
+        index = int(self.node_item) if self.node_item else -1
+        if sock is None or not (0 <= index < len(items)):
+            return {'CANCELLED'}
+        item = items[index]
+        self._enum_item_hack.clear()
+
+        for setting in item.settings.items():
+            ops = self.settings.add()
+            ops.name = setting[0]
+            ops.value = setting[1]
+        node = self.create_node(context, item.nodetype)
+
+        # new node beside the cursor, on the side the link comes from
+        if not self.from_output:
+            node.location.x -= node.width
+        node.location.y += 20
+
+        key = nodeitems_utils.socket_key(sock)
+        targets = node.inputs if self.from_output else node.outputs
+        for target in targets:
+            if target.enabled and nodeitems_utils.socket_key(target) == key:
+                if self.from_output:
+                    tree.links.new(sock, target)
+                else:
+                    tree.links.new(target, sock)
+                break
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        sock = self.find_socket(context)
+        if sock is None:
+            return {'CANCELLED'}
+        self.store_mouse_cursor(context, event)
+
+        tree = context.space_data.edit_tree
+        key = nodeitems_utils.socket_key(sock)
+        side = 0 if self.from_output else 1
+        items = NODE_OT_add_linked._items
+        items.clear()
+        for item in nodeitems_utils.node_items_iter(context):
+            if isinstance(item, nodeitems_utils.NodeItem):
+                types = nodeitems_utils.node_socket_types(tree, item.nodetype)
+                if key in types[side]:
+                    items.append(item)
+        if not items:
+            return {'CANCELLED'}
+        context.window_manager.invoke_search_popup(self)
+        return {'CANCELLED'}
+
+
 class NODE_OT_collapse_hide_unused_toggle(Operator):
     '''Toggle collapsed nodes and hide unused sockets'''
     bl_idname = "node.collapse_hide_unused_toggle"
@@ -938,6 +1031,7 @@ classes = (
     NODE_OT_shader_preset_add,
 
     NODE_OT_add_and_link_node,
+    NODE_OT_add_linked,
     NODE_OT_add_node,
     NODE_OT_add_search,
     NODE_OT_collapse_hide_unused_toggle,

@@ -92,6 +92,11 @@ def _node_socket_types(tree, nodetype):
     return types
 
 
+# public names for operators
+socket_key = _socket_key
+node_socket_types = _node_socket_types
+
+
 def _filter_test(context):
     # returns a test(item) for the current filter, or None to show everything
     wm = context.window_manager
@@ -210,21 +215,29 @@ def register_node_categories(identifier, cat_list):
     def draw_node_item(self, context):
         global _draw_icon
         layout = self.layout
+        _draw_icon = category_icon(self.category.identifier)
+        test = _filter_test(context)
+        search = ""
+        if isinstance(self, bpy.types.Panel):
+            wm = context.window_manager
+            if hasattr(wm, "node_add_search"):
+                layout.prop(wm, "node_add_search", text="", icon='VIEWZOOM')
+                search = wm.node_add_search.strip().lower()
         col = layout.column()
         if isinstance(self, bpy.types.Panel):
             # taller buttons in the shelf/popover, room for the socket dots
             col.scale_y = 1.4
-        _draw_icon = category_icon(self.category.identifier)
-        test = _filter_test(context)
         try:
             shown = 0
             for item in self.category.items(context):
                 if test is not None and not test(item):
                     continue
+                if search and search not in getattr(item, "label", "").lower():
+                    continue
                 item.draw(item, col, context)
                 shown += 1
-            if test is not None and shown == 0:
-                col.label("No compatible node")
+            if (test is not None or search) and shown == 0:
+                col.label("No matching node")
         finally:
             _draw_icon = 'NONE'
 

@@ -22,8 +22,28 @@ def _rounded_polygon(bgl, mode, x, y, w, h, r, steps=8):
     bgl.glEnd()
 
 
-def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL"):
-    """Desenha o botão com canto inferior esquerdo em (x, y), em pixels."""
+def state_target(style, state):
+    """Cor e escala que o botão busca em cada estado."""
+    if state == "PRESSED":
+        return style["press"], style.get("press_scale", 1.0)
+    if state == "HOVER":
+        return style["hover"], style.get("hover_scale", 1.0)
+    return style["color"], 1.0
+
+
+def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL", color=None, scale=None):
+    """Desenha o botão com canto inferior esquerdo em (x, y), em pixels.
+
+    color/scale substituem os do estado (o jogo passa os valores animados);
+    a escala cresce a partir do centro do botão."""
+    target_color, target_scale = state_target(style, state)
+    color = target_color if color is None else color
+    scale = target_scale if scale is None else scale
+    if scale != 1.0:
+        x -= w * (scale - 1.0) * 0.5
+        y -= h * (scale - 1.0) * 0.5
+        w *= scale
+        h *= scale
     radius = style["radius"] * min(w, h) * 0.5
     bgl.glEnable(bgl.GL_BLEND)
     bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
@@ -31,7 +51,6 @@ def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL"):
         off = max(1.0, h * 0.08)
         bgl.glColor4f(0.0, 0.0, 0.0, 0.35)
         _rounded_polygon(bgl, bgl.GL_POLYGON, x + off, y - off, w, h, radius)
-    color = {"HOVER": style["hover"], "PRESSED": style["press"]}.get(state, style["color"])
     bgl.glColor4f(*color)
     _rounded_polygon(bgl, bgl.GL_POLYGON, x, y, w, h, radius)
     border = style["border"] * h

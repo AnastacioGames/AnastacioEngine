@@ -16,6 +16,8 @@ propriedade "ui_hud" for verdadeira (padrão).  Os widgets de HUD leem as
 propriedades de jogo do objeto escolhido a cada frame.
 """
 
+import time
+
 import Range
 import range_ui_draw
 from Range import events, logic
@@ -26,6 +28,22 @@ class Button:
         self.data = data
         self.hover = False
         self.pressed = False
+        # Valores animados; seguem o alvo do estado (range_ui_draw.state_target).
+        self.color, self.scale = range_ui_draw.state_target(data["style"], "NORMAL")
+
+    @property
+    def state(self):
+        if self.pressed and self.hover:
+            return "PRESSED"
+        return "HOVER" if self.hover else "NORMAL"
+
+    def animate(self, dt):
+        color, scale = range_ui_draw.state_target(self.data["style"], self.state)
+        duration = self.data["style"].get("anim_time", 0.0)
+        # Aproximação exponencial: ~95% do caminho em anim_time segundos.
+        k = 1.0 if duration <= 0.0 else min(1.0, dt * 3.0 / duration)
+        self.color = tuple(c + (t - c) * k for c, t in zip(self.color, color))
+        self.scale += (scale - self.scale) * k
 
     def contains(self, mx, my):
         x, y, w, h = self.data["rect"]
@@ -46,6 +64,7 @@ class UIRuntime:
             owner["ui_hud"] = True
         self.active = None
         self.sounds = {}
+        self.last_draw = None
         self.scene.post_draw.append(self.draw)
 
     def show(self, name):
@@ -55,6 +74,7 @@ class UIRuntime:
             name = ""
         for button in self.screens.get(self.active, ()):
             button.hover = button.pressed = False
+            button.color, button.scale = range_ui_draw.state_target(button.data["style"], "NORMAL")
         self.active = name or None
         self.owner["ui_screen"] = name
         if self.active:
@@ -150,6 +170,9 @@ class UIRuntime:
             return
         import bgl
         import blf
+        now = time.perf_counter()
+        dt = 0.0 if self.last_draw is None else min(0.1, now - self.last_draw)
+        self.last_draw = now
         width = Range.render.getWindowWidth()
         height = Range.render.getWindowHeight()
         # O render deixa iluminação/shader ligados; sem isso as cores do
@@ -175,15 +198,11 @@ class UIRuntime:
         for button in self.screens.get(self.active, ()):
             data = button.data
             x, y, w, h = data["rect"]
-            if button.pressed and button.hover:
-                state = "PRESSED"
-            elif button.hover:
-                state = "HOVER"
-            else:
-                state = "NORMAL"
+            button.animate(dt)
             range_ui_draw.draw_button(bgl, blf, data["style"], data["text"],
                                       x * width, height - (y + h) * height,
-                                      w * width, h * height, state)
+                                      w * width, h * height, button.state,
+                                      button.color, button.scale)
         bgl.glEnable(bgl.GL_DEPTH_TEST)
         bgl.glMatrixMode(bgl.GL_PROJECTION)
         bgl.glPopMatrix()

@@ -98,6 +98,12 @@ class UIButtonNode(UIWidgetNode, Node):
     align = EnumProperty(name="Align", default="CENTER", items=(
         ("LEFT", "Left", ""), ("CENTER", "Center", ""), ("RIGHT", "Right", "")))
     shadow = BoolProperty(name="Shadow", default=False)
+    hover_scale = FloatProperty(name="Hover Scale", default=1.06, min=0.5, max=2.0,
+                                description="Escala do botão com o mouse em cima")
+    press_scale = FloatProperty(name="Press Scale", default=0.95, min=0.5, max=2.0,
+                                description="Escala do botão apertado (afunda)")
+    anim_time = FloatProperty(name="Anim Time", default=0.12, min=0.0, max=2.0,
+                              description="Duração da transição de cor e escala, em segundos (0 = instantâneo)")
 
     def init(self, context):
         UIWidgetNode.init(self, context)
@@ -120,6 +126,11 @@ class UIButtonNode(UIWidgetNode, Node):
         layout.prop(self, "text_size", slider=True)
         layout.row().prop(self, "align", expand=True)
         layout.prop(self, "shadow")
+        col = layout.column(align=True)
+        col.label("Animação:")
+        col.prop(self, "hover_scale")
+        col.prop(self, "press_scale")
+        col.prop(self, "anim_time")
 
     def style(self):
         return {
@@ -128,6 +139,8 @@ class UIButtonNode(UIWidgetNode, Node):
             "radius": self.radius, "border": self.border,
             "border_color": tuple(self.border_color), "text_size": self.text_size,
             "align": self.align, "shadow": self.shadow,
+            "hover_scale": self.hover_scale, "press_scale": self.press_scale,
+            "anim_time": self.anim_time,
         }
 
 
