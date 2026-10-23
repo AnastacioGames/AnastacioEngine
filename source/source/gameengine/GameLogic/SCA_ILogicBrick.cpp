@@ -141,6 +141,7 @@ PyMethodDef SCA_ILogicBrick::Methods[] = {
 
 PyAttributeDef SCA_ILogicBrick::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("owner",    SCA_ILogicBrick, pyattr_get_owner),
+	EXP_PYATTRIBUTE_RO_FUNCTION("fireCount", SCA_ILogicBrick, pyattr_get_fire_count),
 	EXP_PYATTRIBUTE_INT_RW("executePriority", 0, 100000, false, SCA_ILogicBrick, m_Execute_Priority),
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
@@ -174,6 +175,13 @@ PyObject *SCA_ILogicBrick::pyattr_get_owner(EXP_PyObjectPlus *self_v, const EXP_
 	}
 
 	Py_RETURN_NONE;
+}
+
+/* Times the brick fired: sensor went positive or actuator started (0 for controllers). */
+PyObject *SCA_ILogicBrick::pyattr_get_fire_count(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	SCA_ILogicBrick *self = static_cast<SCA_ILogicBrick *>(self_v);
+	return PyLong_FromUnsignedLong(self->GetFireCount());
 }
 
 #endif // WITH_PYTHON

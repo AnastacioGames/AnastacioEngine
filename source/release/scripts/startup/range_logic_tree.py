@@ -610,7 +610,7 @@ def _assign_states(ob, tree, rec):
     return out
 
 
-def compile_object(ob):
+def compile_object(ob, scene=None):
     """Gera os bricks da árvore do objeto.  Devolve a lista de erros."""
     if ob.library is not None:
         return ["%s: objeto de biblioteca, não compilado" % ob.name]
@@ -760,9 +760,18 @@ def compile_object(ob):
                     c.link(actuator=brick)
 
     # F5: pausar no disparo.  Só com o Debug Mode da cena ligado, para nunca ir num jogo final.
-    scene = next(iter(ob.users_scene), None)
+    # a cena pedida (compile_all no Play) quando o objeto está nela; senão a primeira que o usa
+    if not isinstance(scene, bpy.types.Scene) or ob.name not in scene.objects:
+        scene = next(iter(ob.users_scene), None)
     if scene is not None and scene.game_settings.show_debug_mode:
         every = sorted(set(loose) | tree_bits)
+        # F6: registro de disparos, lido pelo editor ao fim do jogo para destacar os nós
+        _ensure_trace_text()
+        trace = add("sensor", 'ALWAYS', "Logic Tree Trace")
+        for state in every:
+            c = add("controller", 'PYTHON', "Logic Tree Trace")
+            c.states, c.mode, c.module = state, 'MODULE', TRACE_MODULE + ".start"
+            c.link(sensor=trace)
         for node in [n for n in tree.nodes if getattr(n, "range_logic_break", False)]:
             if node in sensors:
                 pause = add("actuator", 'SCENE', "Pause: " + _label(node), node)
@@ -784,6 +793,132 @@ def compile_object(ob):
     return errors
 
 
+# ---------------------------------------------------------------- F6: destaque dos nós que dispararam
+
+TRACE_MODULE = "range_logic_trace"
+TRACE_FILE = "range_logic_trace.json"
+FIRED_COLOR = (0.2, 0.5, 0.25)
+TRACE_SOURCE = '''# Gerado pela Logic Tree (Debug Mode): ao fim do jogo grava quantas vezes cada brick
+# disparou (fireCount) para o editor destacar os nós.  Pode apagar; volta ao compilar.
+import json, os, tempfile
+import bge
+
+_owners = {}
+
+
+def _dump(scene):
+    path = os.path.join(tempfile.gettempdir(), "%s")
+    try:
+        data = json.load(open(path))
+    except Exception:
+        data = {}
+    for ob in list(_owners.pop(scene.name, ())):
+        try:
+            entry = data.setdefault(ob.name, {})
+            for kind, bricks in (("sensor", ob.sensors), ("actuator", ob.actuators)):
+                for b in bricks:
+                    key = "%%s:%%s" %% (kind, b.name)
+                    entry[key] = max(entry.get(key, 0), getattr(b, "fireCount", 0))
+        except SystemError:  # objeto já apagado
+            pass
+    with open(path, "w") as f:
+        json.dump(data, f)
+
+
+def start(cont):
+    scene = bge.logic.getCurrentScene()
+    obs = _owners.get(scene.name)
+    if obs is None:
+        obs = _owners[scene.name] = []
+        scene.onRemove.append(_dump)
+    if cont.owner not in obs:
+        obs.append(cont.owner)
+''' % TRACE_FILE
+
+
+def trace_path():
+    import os
+    import tempfile
+    return os.path.join(tempfile.gettempdir(), TRACE_FILE)
+
+
+def _ensure_trace_text():
+    name = TRACE_MODULE + ".py"
+    text = bpy.data.texts.get(name) or bpy.data.texts.new(name)
+    if text.as_string() != TRACE_SOURCE:
+        text.from_string(TRACE_SOURCE)
+
+
+def clear_highlight(tree=None):
+    for t in ([tree] if tree else [g for g in bpy.data.node_groups if g.bl_idname == TREE_ID]):
+        for node in t.nodes:
+            if "range_logic_fired" in node:
+                del node["range_logic_fired"]
+                node.use_custom_color = False
+                if isinstance(node, BrickNode):
+                    node.update()  # devolve o vermelho de erro, se houver
+
+
+def apply_trace(path=None):
+    """Lê o registro do último jogo e pinta de verde os nós cujos bricks dispararam.
+    Devolve {nome da árvore: nós destacados}."""
+    import os
+    path = path or trace_path()
+    if not os.path.exists(path):
+        return {}
+    try:
+        data = json.load(open(path))
+    except ValueError:
+        return {}
+    fired = {}
+    for ob in bpy.data.objects:
+        counts = data.get(ob.name)
+        tree = ob.logic_tree
+        if not counts or tree is None:
+            continue
+        for key, node_name in _record(ob).get("nodes", {}).items():
+            n = counts.get(key, 0)
+            node = tree.nodes.get(node_name)
+            if node is None or not n:
+                continue
+            node["range_logic_fired"] = max(node.get("range_logic_fired", 0), n)
+            fired.setdefault(tree.name, set()).add(node.name)
+    for tree_name, names in fired.items():
+        tree = bpy.data.node_groups[tree_name]
+        for name in names:
+            node = tree.nodes[name]
+            node.use_custom_color, node.color = True, FIRED_COLOR
+    return {k: sorted(v) for k, v in fired.items()}
+
+
+@bpy.app.handlers.persistent
+def _trace_pre(_scene):
+    import os
+    clear_highlight()
+    try:
+        os.remove(trace_path())
+    except OSError:
+        pass
+
+
+@bpy.app.handlers.persistent
+def _trace_post(_scene):
+    try:
+        apply_trace()
+    except Exception as exc:
+        print("[Logic Tree] destaque falhou: %s" % exc)
+
+
+class RANGE_OT_logic_tree_clear_highlight(Operator):
+    """Tira o destaque verde dos nós que dispararam no último jogo"""
+    bl_idname = "logic.range_logic_tree_clear_highlight"
+    bl_label = "Clear Highlight"
+
+    def execute(self, context):
+        clear_highlight()
+        return {'FINISHED'}
+
+
 def bricks_of_node(ob, node):
     """F5: bricks que um nó gerou neste objeto, como [(tipo, nome)]."""
     nodes = _record(ob).get("nodes", {})
@@ -801,7 +936,7 @@ def compile_all(scene=None):
     errors = []
     for ob in bpy.data.objects:
         if ob.logic_tree is not None or ob.logic_tree_record:
-            errors += compile_object(ob)
+            errors += compile_object(ob, scene)
     return errors
 
 
@@ -809,7 +944,7 @@ def compile_all(scene=None):
 def _auto_compile(_scene):
     """Compila ao apertar P e ao salvar (o export salva): o jogo nunca roda lógica velha."""
     try:
-        for err in compile_all():
+        for err in compile_all(_scene):
             print("[Logic Tree] %s" % err)
     except Exception as exc:  # compilação quebrada não pode impedir de jogar/salvar
         print("[Logic Tree] Compilação falhou: %s" % exc)
@@ -1045,8 +1180,14 @@ class NODE_PT_range_logic_tree(Panel):
             layout.label("Objeto ativo:")
             _draw_object_field(layout, context)
         node = tree.nodes.active
+        if any("range_logic_fired" in n for n in tree.nodes):
+            row = layout.row()
+            row.label("Verde: disparou no último jogo", icon="INFO")
+            row.operator(RANGE_OT_logic_tree_clear_highlight.bl_idname, text="", icon="X")
         if isinstance(node, BrickNode):
             box = layout.box()
+            if "range_logic_fired" in node:
+                box.label("Disparou %d vez(es) no último jogo" % node["range_logic_fired"])
             box.prop(node, "range_logic_break")
             if node.range_logic_break and not context.scene.game_settings.show_debug_mode:
                 box.label("Ligue o Debug Mode da cena", icon="INFO")
@@ -1054,6 +1195,8 @@ class NODE_PT_range_logic_tree(Panel):
             if ob is not None and ob.logic_tree == tree:
                 made = bricks_of_node(ob, node)
                 box.label("Bricks em %s:" % ob.name if made else "Ainda não compilado em %s" % ob.name)
+                if not made:
+                    box.label("(nó renomeado? aperte Compile)")
                 for kind, name in made:
                     icon = {"sensor": "TRIA_RIGHT", "controller": "DOT"}.get(kind, "TRIA_LEFT")
                     box.label(name, icon=icon)
@@ -1094,7 +1237,8 @@ CATEGORIES = [
 ]
 
 CLASSES = (LogicTree, PulseSocket) + TRIGGER_NODES + GATE_NODES + ACTION_NODES + (
-    RANGE_OT_logic_tree_compile, RANGE_OT_logic_tree_new, RANGE_OT_logic_tree_recipe, NODE_PT_range_logic_tree)
+    RANGE_OT_logic_tree_compile, RANGE_OT_logic_tree_new, RANGE_OT_logic_tree_recipe,
+    RANGE_OT_logic_tree_clear_highlight, NODE_PT_range_logic_tree)
 
 
 def register():
@@ -1115,9 +1259,15 @@ def register():
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
         if _auto_compile not in handlers:
             handlers.append(_auto_compile)
+    for handlers, fn in ((bpy.app.handlers.game_pre, _trace_pre), (bpy.app.handlers.game_post, _trace_post)):
+        if fn not in handlers:
+            handlers.append(fn)
 
 
 def unregister():
+    for handlers, fn in ((bpy.app.handlers.game_pre, _trace_pre), (bpy.app.handlers.game_post, _trace_post)):
+        if fn in handlers:
+            handlers.remove(fn)
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
         if _auto_compile in handlers:
             handlers.remove(_auto_compile)
