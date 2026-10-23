@@ -161,8 +161,8 @@ def prepare_image(image, max_size=2048, quality=10):
     fingerprint = _source_hash(image, options)
     folder = os.path.join(os.path.dirname(bpy.data.filepath), 'textures_dds')
     os.makedirs(folder, exist_ok=True)
-    name = bpy.path.clean_name(image.name)[:60] or 'image'
-    path = os.path.join(folder, '%s_%s.dds' % (name, fingerprint))
+    name = bpy.path.clean_name(image.name)[:40] or 'image'
+    path = os.path.join(folder, '%s_%s.dds' % (name, fingerprint[:24]))
     record = _record(image)
     valid = (record.get('fingerprint') == fingerprint and os.path.isfile(path) and
              record.get('dds_sha256') == _hash_file(path))

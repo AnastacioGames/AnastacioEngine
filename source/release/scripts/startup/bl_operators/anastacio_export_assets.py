@@ -201,7 +201,7 @@ def _worker(jobpath):
                                                        and not _inside(absolute, job['root'])):
                         os.makedirs(assets, exist_ok=True)
                         with open(absolute, 'rb') as source_stream:
-                            digest = hashlib.sha256(source_stream.read()).hexdigest()
+                            digest = hashlib.sha256(source_stream.read()).hexdigest()[:24]
                         target = os.path.join(assets, digest + os.path.splitext(absolute)[1])
                         shutil.copy2(absolute, target)
                         entry.filepath = target

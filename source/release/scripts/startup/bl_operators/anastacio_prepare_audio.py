@@ -285,7 +285,7 @@ def _prepare_audio(cache_dir=None):
         if row['action'] == 'KEEP':
             continue
         if row['action'] == 'CONVERT':
-            signature = hashlib.sha256(('%s:%s:q%d' % (VERSION, row['source_hash'], row['quality'])).encode('ascii')).hexdigest()
+            signature = hashlib.sha256(('%s:%s:q%d' % (VERSION, row['source_hash'], row['quality'])).encode('ascii')).hexdigest()[:24]
             path = os.path.join(cache_dir, signature + '.ogg')
             kind, target = targets[row['id']]
             if not (os.path.isfile(path) and verified.get(path) == _hash(path)):
