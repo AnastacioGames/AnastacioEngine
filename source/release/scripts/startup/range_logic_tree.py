@@ -1,4 +1,4 @@
-"""Logic Tree: lógica do jogo desenhada por nós, compilada em Logic Bricks nativos.
+﻿"""Logic Tree: lógica do jogo desenhada por nós, compilada em Logic Bricks nativos.
 
 Gatilhos viram sensores, portas E/Ou/Não viram um controller (And, Or ou Expression)
 e ações viram actuators.  A árvore é um datablock: vários objetos podem usar a mesma
@@ -910,7 +910,7 @@ def apply_trace(path=None):
 
 # ---------------------------------------------------------------- realce ao vivo (Highlight Active)
 
-LIVE_COLOR = (1.0, 0.72, 0.15)
+LIVE_COLOR = (1.0, 0.72, 0.18)  # a mesma do Logic Editor
 
 
 def _live_intensity(tree):
@@ -926,6 +926,22 @@ def _live_intensity(tree):
             v = brick.debug_intensity if brick is not None else 0.0
             if v > out.get(node_name, 0.0):
                 out[node_name] = v
+    if not out:
+        return out
+    # portas e reroutes não viram brick (entram na expressão do controller): acendem
+    # quando algo antes e algo depois delas acendeu, para o caminho não se partir
+    middle = [n for n in tree.nodes if not isinstance(n, BrickNode) and n.bl_idname != "NodeFrame"]
+    for _pass in range(len(middle)):
+        changed = False
+        for n in middle:
+            up = max([0.0] + [out.get(l.from_node.name, 0.0) for s in n.inputs for l in s.links])
+            down = max([0.0] + [out.get(l.to_node.name, 0.0) for s in n.outputs for l in s.links])
+            v = min(up, down)
+            if v > out.get(n.name, 0.0):
+                out[n.name] = v
+                changed = True
+        if not changed:
+            break
     return out
 
 
@@ -965,11 +981,12 @@ def _draw_live():
         return
     system = context.user_preferences.system
     dpi = system.pixel_size * system.dpi / 72.0
+    import time
+    phase = (time.perf_counter() * 1.5) % 1.0
     rects = {}
     bgl.glEnable(bgl.GL_BLEND)
     bgl.glEnable(bgl.GL_LINE_SMOOTH)
     # caminho: ligações cujos dois nós estão acesos
-    bgl.glLineWidth(4.0)
     for link in tree.links:
         a, b = link.from_node, link.to_node
         v = min(lit.get(a.name, 0.0), lit.get(b.name, 0.0))
@@ -980,14 +997,27 @@ def _draw_live():
         x0, y0 = ra[2], _socket_y(a, ra, link.from_socket, dpi)
         x1, y1 = rb[0], _socket_y(b, rb, link.to_socket, dpi)
         d = max(abs(x1 - x0) * 0.5, 30.0 * dpi)
-        bgl.glColor4f(LIVE_COLOR[0], LIVE_COLOR[1], LIVE_COLOR[2], v)
-        bgl.glBegin(bgl.GL_LINE_STRIP)
-        for i in range(25):
-            t = i / 24.0
+
+        def point(t):
             u = 1.0 - t
-            bgl.glVertex2f(u * u * u * x0 + 3 * u * u * t * (x0 + d) + 3 * u * t * t * (x1 - d) + t * t * t * x1,
-                           u * u * u * y0 + 3 * u * u * t * y0 + 3 * u * t * t * y1 + t * t * t * y1)
+            return (u * u * u * x0 + 3 * u * u * t * (x0 + d) + 3 * u * t * t * (x1 - d) + t * t * t * x1,
+                    u * u * u * y0 + 3 * u * u * t * y0 + 3 * u * t * t * y1 + t * t * t * y1)
+
+        pts = [point(i / 24.0) for i in range(25)]
+        # igual ao Logic Editor: brilho largo, fio aceso e o pulso correndo para a ação
+        for width, alpha in ((7.0, 0.25), (2.5, 1.0)):
+            bgl.glLineWidth(width * system.pixel_size)
+            bgl.glColor4f(LIVE_COLOR[0], LIVE_COLOR[1], LIVE_COLOR[2], alpha * v)
+            bgl.glBegin(bgl.GL_LINE_STRIP)
+            for p in pts:
+                bgl.glVertex2f(*p)
+            bgl.glEnd()
+        bgl.glPointSize(8.0 * system.pixel_size)
+        bgl.glColor4f(1.0, 0.95, 0.75, v)
+        bgl.glBegin(bgl.GL_POINTS)
+        bgl.glVertex2f(*point(phase))
         bgl.glEnd()
+        bgl.glPointSize(1.0)
     # nós acesos: moldura
     bgl.glLineWidth(3.0)
     for name, v in lit.items():
@@ -996,11 +1026,13 @@ def _draw_live():
             continue
         x0, y0, x1, y1 = rects.get(name) or _node_rect(node, dpi)
         pad = 3.0 * dpi
-        bgl.glColor4f(LIVE_COLOR[0], LIVE_COLOR[1], LIVE_COLOR[2], v)
-        bgl.glBegin(bgl.GL_LINE_LOOP)
-        for px, py in ((x0 - pad, y0 - pad), (x1 + pad, y0 - pad), (x1 + pad, y1 + pad), (x0 - pad, y1 + pad)):
-            bgl.glVertex2f(px, py)
-        bgl.glEnd()
+        corners = ((x0 - pad, y0 - pad), (x1 + pad, y0 - pad), (x1 + pad, y1 + pad), (x0 - pad, y1 + pad))
+        for mode, alpha in ((bgl.GL_QUADS, 0.12), (bgl.GL_LINE_LOOP, 1.0)):
+            bgl.glColor4f(LIVE_COLOR[0], LIVE_COLOR[1], LIVE_COLOR[2], alpha * v)
+            bgl.glBegin(mode)
+            for px, py in corners:
+                bgl.glVertex2f(px, py)
+            bgl.glEnd()
     bgl.glLineWidth(1.0)
     bgl.glDisable(bgl.GL_LINE_SMOOTH)
     bgl.glDisable(bgl.GL_BLEND)
