@@ -3885,6 +3885,10 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 			if (rbody && (blenderobject->gameflag & OB_COLLISION_RESPONSE) != 0) {
 				rbody->setActivationState(DISABLE_DEACTIVATION);
 			}
+			else if ((blenderobject->gameflag2 & OB_START_ASLEEP) != 0) {
+				// Bullet wakes the whole island when an awake body touches it.
+				rbody->setActivationState(ISLAND_SLEEPING);
+			}
 		}
 	}
 

@@ -7,6 +7,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Física: Start Asleep
+
+- Nova opção **Start Asleep** (`game.use_start_asleep`, `gameflag2 & OB_START_ASLEEP`) no painel Physics de
+  Dynamic/Rigid Body: o corpo começa em `ISLAND_SLEEPING` e o Bullet o acorda quando um corpo acordado
+  encosta. Caso de uso: centenas de cercas quebráveis sem tremer e sem sensores/scripts por peça.
+- Painel mostra aviso quando ligado; desativado se **No Sleeping** estiver marcado.
+- Build RangeEngine/RangeRuntime OK; falta teste com janela.
+
 ## 2026-10-22 - Veículos: primeiro controlador arcade reutilizável
 
 - Adicionado `AnastacioVehicleArcade` na demo, herdando o controlador nativo básico.

@@ -4876,6 +4876,11 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "GPU Particle Collider", "Include this object's depth in the Screen-Space collision pass for GPU particles");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	prop = RNA_def_property(srna, "use_start_asleep", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_START_ASLEEP);
+	RNA_def_property_ui_text(prop, "Start Asleep", "Start the game with this body asleep: it stays still and costs almost nothing until an awake body (e.g. a moving car) touches it, then it wakes up with normal physics (use for many breakable props like fences)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "use_static_batch", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_STATIC_BATCH);
 	RNA_def_property_ui_text(prop, "Static Batch", "Merge this mesh at game start with the other Static Batch objects of the scene, drawing them together in fewer draw calls (only for objects that never move; Static or No Collision physics)");

@@ -101,6 +101,8 @@ continuam síncronos por padrão. Tecla física e aparência real ainda precisam
 
 - GPU instancing com `RAS_InstancingBuffer` e `RAS_DisplayArrayBucket::RunInstancingNode`.
 - Batching estático com `RAS_BatchDisplayArray` e `RAS_BatchGroup`.
+- Start Asleep (2026-10-23): opção de física Dynamic/Rigid Body que começa o corpo dormindo; acorda ao
+  ser tocado por um corpo acordado (cercas/props quebráveis em massa, sem tremor nem lógica por peça).
 - Batching estático (2026-10-08): opção **Static Batch** por objeto (Static/No Collision) junta os
   marcados num `KX_BatchGroup` ao iniciar; membro que se move ou é destruído sai do grupo sozinho
   (`SetMatrix` compara a matriz). Culling DBVT só reenvia AABB quando a malha muda

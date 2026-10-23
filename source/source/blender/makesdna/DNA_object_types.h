@@ -1170,6 +1170,8 @@ enum {
 	OB_LIGHTNING                     = 1 << 17,
 	/* Merged at game start with the other flagged static meshes into one KX_BatchGroup. */
 	OB_STATIC_BATCH                  = 1 << 18,
+	/* Dynamic/Rigid Body starts asleep (no jitter, ~no cost) until an awake body touches it. */
+	OB_START_ASLEEP                  = 1 << 19,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };
