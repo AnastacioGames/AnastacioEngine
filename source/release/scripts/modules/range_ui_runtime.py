@@ -38,9 +38,18 @@ class Element:
         self.hover = False
         self.pressed = False
 
-    def contains(self, mx, my):
-        x, y, w, h = self.data["rect"]
-        return x <= mx <= x + w and y <= my <= y + h
+    def contains(self, screen, px, py, width, height):
+        """px, py em pixels, y de baixo."""
+        x, y, w, h = screen.place(self.data, width, height)
+        return x <= px <= x + w and y <= py <= y + h
+
+    def enabled(self, owner):
+        prop = self.data.get("enabled_prop")
+        return not prop or bool(owner.get(prop, False))
+
+    def selected(self, owner):
+        prop = self.data.get("selected_prop")
+        return bool(prop) and bool(owner.get(prop, False))
 
     def reset(self):
         self.hover = self.pressed = False
@@ -52,18 +61,21 @@ class Button(Element):
         # Valores animados; seguem o alvo do estado (range_ui_draw.state_target).
         self.color, self.scale = range_ui_draw.state_target(data["style"], "NORMAL")
 
-    @property
-    def state(self):
+    def state(self, owner):
+        if not self.enabled(owner):
+            return "DISABLED"
         if self.pressed and self.hover:
             return "PRESSED"
-        return "HOVER" if self.hover else "NORMAL"
+        if self.hover:
+            return "HOVER"
+        return "SELECTED" if self.selected(owner) else "NORMAL"
 
     def reset(self):
         super().reset()
         self.color, self.scale = range_ui_draw.state_target(self.data["style"], "NORMAL")
 
-    def animate(self, dt):
-        color, scale = range_ui_draw.state_target(self.data["style"], self.state)
+    def animate(self, dt, owner):
+        color, scale = range_ui_draw.state_target(self.data["style"], self.state(owner))
         duration = self.data["style"].get("anim_time", 0.0)
         # Aproximação exponencial: ~95% do caminho em anim_time segundos.
         k = 1.0 if duration <= 0.0 else min(1.0, dt * 3.0 / duration)
@@ -86,6 +98,8 @@ _DRAW_ORDER = {"PANEL": 0, "IMAGE": 1}
 class Screen:
     def __init__(self, data):
         self.name = data["name"]
+        self.mode = data.get("scale_mode", "STRETCH")
+        self.design = data.get("design", (640.0, 360.0))
         self.fade = data.get("fade", 0.0)
         self.sounds = data.get("sounds", {})
         self.buttons = [Button(b) for b in data["buttons"]]
@@ -101,12 +115,16 @@ class Screen:
         for element in self.focusables:
             element.reset()
 
+    def place(self, data, width, height):
+        return range_ui_draw.place(data["rect"], self.mode, self.design,
+                                   data.get("anchor", "CENTER"), width, height)
+
 
 class UIRuntime:
     def __init__(self, data, owner):
         menus = [s for s in data["screens"] if not s.get("hud")]
         self.screens = {s["name"]: Screen(s) for s in menus}
-        self.hud_widgets = [w for s in data["screens"] if s.get("hud") for w in s["widgets"]]
+        self.huds = [Screen(s) for s in data["screens"] if s.get("hud")]
         self.owner = owner
         self.scene = owner.scene
         if "ui_screen" not in owner:
@@ -168,15 +186,23 @@ class UIRuntime:
         if self.last_mouse is not None and (mx, my) != self.last_mouse:
             self.focus = None  # o mouse mexeu: volta a mandar o hover
         self.last_mouse = (mx, my)
+        width = Range.render.getWindowWidth()
+        height = Range.render.getWindowHeight()
+        px, py = mx * width, (1.0 - my) * height
         lmb = logic.mouse.inputs[events.LEFTMOUSE]
         nav_press, nav_release = self.navigate(screen)
 
         for element in list(screen.focusables):
+            if not element.enabled(self.owner):
+                if element.hover:
+                    self.fire(element, "On Exit", screen)
+                element.reset()
+                continue
             if self.focus is not None:
                 inside = element is self.focus
                 just_pressed, just_released = inside and nav_press, nav_release
             else:
-                inside = element.contains(mx, my)
+                inside = element.contains(screen, px, py, width, height)
                 just_pressed, just_released = lmb.activated, lmb.released
             if inside and not element.hover:
                 self.fire(element, "On Enter", screen)
@@ -188,7 +214,7 @@ class UIRuntime:
             if isinstance(element, Button):
                 self.update_button(element, screen, inside, just_pressed, just_released)
             else:
-                self.update_control(element, screen, inside, just_pressed, just_released, mx)
+                self.update_control(element, screen, inside, just_pressed, just_released, px)
             if self.screen is not screen:
                 return
 
@@ -204,7 +230,7 @@ class UIRuntime:
             if inside:
                 self.fire(button, "On Click", screen)
 
-    def update_control(self, control, screen, inside, just_pressed, just_released, mx):
+    def update_control(self, control, screen, inside, just_pressed, just_released, px):
         data = control.data
         if control.kind == "TOGGLE":
             if inside and just_pressed:
@@ -219,10 +245,11 @@ class UIRuntime:
         if just_released and self.dragging is control:
             self.dragging = None
         if self.dragging is control:
-            x, _, w, h = data["rect"]
+            x, _, w, h = screen.place(data, Range.render.getWindowWidth(),
+                                      Range.render.getWindowHeight())
             # O puxador anda dentro do trilho (meia bola de cada lado).
-            knob = h * Range.render.getWindowHeight() / max(1, Range.render.getWindowWidth()) * 0.8
-            frac = (mx - x - knob * 0.5) / max(1e-6, w - knob)
+            knob = h * 0.8
+            frac = (px - x - knob * 0.5) / max(1e-6, w - knob)
             self.set_slider(control, screen, frac)
 
     def set_slider(self, control, screen, frac):
@@ -275,7 +302,9 @@ class UIRuntime:
             release = release or (not pressed_now and getattr(self, "_joy_a", False))
             self._joy_a = pressed_now
 
-        items = screen.focusables
+        items = [e for e in screen.focusables if e.enabled(self.owner)]
+        if self.focus is not None and self.focus not in items:
+            self.focus = None
         if step and items:
             if self.focus not in items:
                 self.focus = items[0] if step > 0 else items[-1]
@@ -402,35 +431,30 @@ class UIRuntime:
         self.textures[path] = bindcode
         return bindcode
 
-    def draw_widgets(self, bgl, blf, widgets, width, height):
-        for data in widgets:
-            x, y, w, h = data["rect"]
+    def draw_widgets(self, bgl, blf, screen, width, height):
+        for data in screen.widgets:
+            x, y, w, h = screen.place(data, width, height)
             bindcode = self.texture(data["path"]) if data["kind"] == "IMAGE" and data["path"] else 0
             range_ui_draw.draw_widget(bgl, blf, data, self.widget_values(data),
-                                      x * width, height - (y + h) * height,
-                                      w * width, h * height, bindcode=bindcode)
+                                      x, y, w, h, bindcode=bindcode)
 
     def draw_screen(self, bgl, blf, screen, width, height, dt, animate):
-        self.draw_widgets(bgl, blf, screen.widgets, width, height)
+        self.draw_widgets(bgl, blf, screen, width, height)
         for control in screen.controls:
             data = control.data
-            x, y, w, h = data["rect"]
-            range_ui_draw.draw_widget(bgl, blf, data, self.widget_values(data),
-                                      x * width, height - (y + h) * height,
-                                      w * width, h * height,
+            x, y, w, h = screen.place(data, width, height)
+            range_ui_draw.draw_widget(bgl, blf, data, self.widget_values(data), x, y, w, h,
                                       hover=control.hover or self.dragging is control)
         for button in screen.buttons:
             data = button.data
-            x, y, w, h = data["rect"]
+            x, y, w, h = screen.place(data, width, height)
             if animate:
-                button.animate(dt)
-            range_ui_draw.draw_button(bgl, blf, data["style"], data["text"],
-                                      x * width, height - (y + h) * height,
-                                      w * width, h * height, button.state,
-                                      button.color, button.scale)
+                button.animate(dt, self.owner)
+            range_ui_draw.draw_button(bgl, blf, data["style"], data["text"], x, y, w, h,
+                                      button.state(self.owner), button.color, button.scale)
 
     def draw(self):
-        hud = self.hud_widgets if self.owner.get("ui_hud", True) else []
+        hud = self.huds if self.owner.get("ui_hud", True) else []
         screen = self.screen
         if screen is None and self.leaving is None and not hud:
             return
@@ -457,7 +481,8 @@ class UIRuntime:
         bgl.glLoadIdentity()
         bgl.glDisable(bgl.GL_DEPTH_TEST)
         range_ui_draw.set_alpha(1.0)
-        self.draw_widgets(bgl, blf, hud, width, height)
+        for hud_screen in hud:
+            self.draw_widgets(bgl, blf, hud_screen, width, height)
         if self.leaving is not None:
             self.leave_alpha -= dt / self.leaving.fade
             if self.leave_alpha <= 0.0:

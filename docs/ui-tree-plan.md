@@ -50,12 +50,15 @@ Limites conhecidos do protótipo:
 - **Ações:** Set Property, Add Property, Toggle Property, Run Python (`modulo.funcao(ui)`).
 - **Navegação:** setas/analógico mudam o foco, Enter/Espaço/botão A apertam, esquerda/direita
   mexem o Slider; o mouse mexendo devolve o controle ao hover.
+- **Escala e âncora:** cada Screen escolhe Stretch ou Keep Aspect; em Keep cada widget segue uma
+  das 9 âncoras (cantos, bordas, centro), editadas no painel UI Tree.
+- **Estados:** botão com Enabled If (cinza, sem eventos e fora do foco) e Selected If (destacado).
 - **API Python:** `range_ui_runtime.show(nome)`, `hide()`, `set_hud(bool)`, `get()`.
 - Integração com Logic Bricks: propriedades `ui_screen`/`ui_hud` e a ação Send Message
   (sensor Message).
 
-Ainda falta (precisa de C++ ou é etapa à parte): runtime em C++ sem Bake, ancoragem/modo de
-escala, HUD por viewport (split screen), estados disabled/selected, export Web/Android.
+Ainda falta (precisa de C++ ou é etapa à parte): runtime em C++ sem Bake, HUD por viewport
+(split screen), export Web/Android.
 
 ## Etapas do projeto de verdade (se o protótipo for aprovado)
 

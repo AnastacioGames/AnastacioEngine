@@ -22,6 +22,30 @@ def _color(bgl, c):
     bgl.glColor4f(c[0], c[1], c[2], c[3] * _alpha)
 
 
+ANCHOR_POINTS = {
+    "TOP_LEFT": (0.0, 0.0), "TOP": (0.5, 0.0), "TOP_RIGHT": (1.0, 0.0),
+    "LEFT": (0.0, 0.5), "CENTER": (0.5, 0.5), "RIGHT": (1.0, 0.5),
+    "BOTTOM_LEFT": (0.0, 1.0), "BOTTOM": (0.5, 1.0), "BOTTOM_RIGHT": (1.0, 1.0),
+}
+
+
+def place(rect, mode, design, anchor, width, height):
+    """Retângulo normalizado da tela (x, y do topo) -> pixels (x, y de baixo, w, h).
+
+    STRETCH estica tudo com a janela.  KEEP usa uma escala só (a menor das
+    duas), e o widget mantém a distância até o ponto âncora da janela."""
+    x, y, w, h = rect
+    if mode != "KEEP":
+        return x * width, height - (y + h) * height, w * width, h * height
+    dw, dh = design
+    s = min(width / dw, height / dh)
+    ax, ay = ANCHOR_POINTS.get(anchor, (0.5, 0.5))
+    px = (x - ax) * dw * s + ax * width
+    top = (y - ay) * dh * s + ay * height
+    pw, ph = w * dw * s, h * dh * s
+    return px, height - top - ph, pw, ph
+
+
 def _rounded_polygon(bgl, mode, x, y, w, h, r, steps=8):
     r = max(0.0, min(r, w * 0.5, h * 0.5))
     corners = ((x + w - r, y + h - r, 0), (x + r, y + h - r, 1),
@@ -38,7 +62,9 @@ def state_target(style, state):
     """Cor e escala que o botão busca em cada estado."""
     if state == "PRESSED":
         return style["press"], style.get("press_scale", 1.0)
-    if state == "HOVER":
+    if state == "DISABLED":
+        return style.get("disabled", style["color"]), 1.0
+    if state in ("HOVER", "SELECTED"):
         return style["hover"], style.get("hover_scale", 1.0)
     return style["color"], 1.0
 
@@ -66,6 +92,8 @@ def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL", color=None, s
     _color(bgl, color)
     _rounded_polygon(bgl, bgl.GL_POLYGON, x, y, w, h, radius)
     border = style["border"] * h
+    if state == "SELECTED":
+        border = max(border, 2.0)
     if border > 0.0:
         bgl.glLineWidth(max(1.0, border))
         _color(bgl, style["border_color"])

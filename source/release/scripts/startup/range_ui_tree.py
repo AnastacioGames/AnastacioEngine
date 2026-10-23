@@ -60,6 +60,11 @@ def _color(name, default):
                                min=0.0, max=1.0, default=default)
 
 
+# Ordem da grade 3x3 (como aparece no painel).
+ANCHORS = ("TOP_LEFT", "TOP", "TOP_RIGHT", "LEFT", "CENTER", "RIGHT",
+           "BOTTOM_LEFT", "BOTTOM", "BOTTOM_RIGHT")
+
+
 class UIWidgetNode(UINode):
     """Base dos widgets: o nó fica recolhido e serve de alça; o widget é a
     prévia desenhada embaixo dele, com largura = largura do nó e altura =
@@ -68,6 +73,10 @@ class UIWidgetNode(UINode):
 
     button_height = FloatProperty(name="Height", default=40.0, min=8.0, soft_max=200.0,
                                   description="Altura do widget (a largura é a do nó)")
+    anchor = EnumProperty(
+        name="Anchor", default="CENTER",
+        description="Ponto da janela que o widget segue quando a Screen mantém a proporção",
+        items=[(a, a.replace("_", " ").title(), "") for a in ANCHORS])
 
     def init(self, context):
         self.width = 200
@@ -98,6 +107,13 @@ class UIButtonNode(UIWidgetNode, Node):
     align = EnumProperty(name="Align", default="CENTER", items=(
         ("LEFT", "Left", ""), ("CENTER", "Center", ""), ("RIGHT", "Right", "")))
     shadow = BoolProperty(name="Shadow", default=False)
+    disabled_color = _color("Disabled", (0.25, 0.25, 0.25, 0.6))
+    enabled_prop = StringProperty(
+        name="Enabled If", description="Propriedade bool do dono do script; falsa = botão desligado "
+                                       "(cinza, sem eventos).  Vazio = sempre ligado")
+    selected_prop = StringProperty(
+        name="Selected If", description="Propriedade bool do dono do script; verdadeira = botão "
+                                        "destacado (ex.: opção escolhida)")
     hover_scale = FloatProperty(name="Hover Scale", default=1.06, min=0.5, max=2.0,
                                 description="Escala do botão com o mouse em cima")
     press_scale = FloatProperty(name="Press Scale", default=0.95, min=0.5, max=2.0,
@@ -139,6 +155,7 @@ class UIButtonNode(UIWidgetNode, Node):
             "radius": self.radius, "border": self.border,
             "border_color": tuple(self.border_color), "text_size": self.text_size,
             "align": self.align, "shadow": self.shadow,
+            "disabled": tuple(self.disabled_color),
             "hover_scale": self.hover_scale, "press_scale": self.press_scale,
             "anim_time": self.anim_time,
         }
@@ -616,6 +633,7 @@ def bake_tree(tree, scene):
                 data = node.widget()
                 data["rect"] = rect
                 data["object"] = node.object_name
+                data["anchor"] = node.anchor
                 if isinstance(node, UIControlNode):
                     data["events"] = {s.name: _actions_for(s) for s in node.outputs if s.is_linked}
                 widgets.append(data)
@@ -627,11 +645,15 @@ def bake_tree(tree, scene):
                 "text": node.text,
                 "rect": rect,
                 "style": node.style(),
+                "anchor": node.anchor,
+                "enabled_prop": node.enabled_prop,
+                "selected_prop": node.selected_prop,
                 "events": {s.name: _actions_for(s) for s in node.outputs if s.is_linked},
             })
         screens.append({"name": frame.label or frame.name, "location": (fx, fy),
                         "hud": frame.ui_hud, "buttons": buttons, "widgets": widgets,
-                        "fade": frame.ui_fade,
+                        "fade": frame.ui_fade, "scale_mode": frame.ui_scale_mode,
+                        "design": (fw, fh),
                         "sounds": {"hover": frame.ui_hover_sound, "click": frame.ui_click_sound}})
     # A tela inicial é a Screen mais acima e à esquerda no editor.
     screens.sort(key=lambda s: (-s["location"][1], s["location"][0]))
@@ -791,12 +813,29 @@ class UITreePanel:
             box = layout.box()
             box.label("Tela: %s" % (frame.label or frame.name))
             box.prop(frame, "ui_hud")
+            box.prop(frame, "ui_scale_mode", text="")
             if not frame.ui_hud:
                 box.prop(frame, "ui_fade")
                 box.prop(frame, "ui_hover_sound", text="Hover")
                 box.prop(frame, "ui_click_sound", text="Click")
             box.prop_search(frame, "ui_backdrop", bpy.data, "images", text="")
             box.operator(RANGE_OT_ui_tree_capture.bl_idname, icon="RENDER_STILL")
+        node = context.active_node
+        if isinstance(node, UIWidgetNode) and node.select:
+            box = layout.box()
+            box.label("Widget: %s" % node.bl_label)
+            box.label("Anchor:")
+            col = box.column(align=True)
+            for i in range(0, 9, 3):
+                row = col.row(align=True)
+                for anchor in ANCHORS[i:i + 3]:
+                    # TL, T, TR, L, C, R, BL, B, BR
+                    row.prop_enum(node, "anchor", anchor,
+                                  text="".join(part[0] for part in anchor.split("_")))
+            if isinstance(node, UIButtonNode):
+                box.prop(node, "enabled_prop")
+                box.prop(node, "selected_prop")
+                box.prop(node, "disabled_color")
         layout.label("Jogo: Always (pulso) + Python")
         layout.label("Module: range_ui_runtime.main")
         layout.label("Menu: propriedade ui_screen")
@@ -861,6 +900,11 @@ def register():
         name="Screen", description="Na UI Tree, este Frame é uma tela do jogo (lido em drawnode.c)")
     bpy.types.NodeFrame.ui_hud = BoolProperty(
         name="HUD", description="Tela de HUD: fica sempre visível, por baixo do menu")
+    bpy.types.NodeFrame.ui_scale_mode = EnumProperty(
+        name="Scale Mode", default="STRETCH",
+        description="Como a tela se adapta a uma janela com outra proporção",
+        items=(("STRETCH", "Stretch", "Estica junto com a janela (posições relativas)"),
+               ("KEEP", "Keep Aspect", "Mantém a proporção; cada widget segue a sua âncora")))
     bpy.types.NodeFrame.ui_fade = FloatProperty(
         name="Fade", default=0.15, min=0.0, max=3.0,
         description="Tempo do fade ao mostrar/esconder esta tela, em segundos")
@@ -882,6 +926,7 @@ def unregister():
     del bpy.types.NodeFrame.ui_screen
     del bpy.types.NodeFrame.ui_hud
     del bpy.types.NodeFrame.ui_fade
+    del bpy.types.NodeFrame.ui_scale_mode
     del bpy.types.NodeFrame.ui_hover_sound
     del bpy.types.NodeFrame.ui_click_sound
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")

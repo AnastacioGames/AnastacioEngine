@@ -14,6 +14,10 @@ liga/desliga o HUD, M volta o menu.
 Também mostra: Panel atrás do menu, fade e sons padrão das telas, Toggle
 (som) e Slider (volume) em Opções, Gauge (velocímetro) no HUD e navegação
 por setas + Enter.
+
+Menu e HUD usam Keep Aspect: a vida segue o canto de cima à esquerda e o
+Gauge o de baixo à direita em qualquer proporção de janela.  "Continuar" só
+liga com a propriedade tem_save (tecla C troca).
 """
 
 import sys
@@ -70,13 +74,16 @@ menu = frame("Menu", 0, 0)
 opcoes = frame("Opcoes", 0, -500)
 hud = frame("HUD", 0, 500)
 hud.ui_hud = True
+menu.ui_scale_mode = hud.ui_scale_mode = "KEEP"
 
 jogar = button(menu, "Jogar", 220, -120)
 btn_opcoes = button(menu, "Opções", 220, -170)
 sair = button(menu, "Sair", 220, -220)
+continuar = button(menu, "Continuar", 220, -270)
+continuar.enabled_prop = "tem_save"
 voltar = button(opcoes, "Voltar", 220, -280)
 
-fundo = hud_widget(ui.UIPanelNode, menu, 200, -100, 240, 190)
+fundo = hud_widget(ui.UIPanelNode, menu, 200, -100, 240, 230)
 fundo.border = 0.01
 
 som = hud_widget(ui.UIToggleNode, opcoes, 200, -100, 240, 30)
@@ -103,6 +110,10 @@ gauge = hud_widget(ui.UIGaugeNode, hud, 480, -190, 140, 140)
 vel_txt = hud_widget(ui.UILabelNode, hud, 480, -330, 140, 24)
 vel_txt.text_format = "km/h"
 vel_txt.align = "CENTER"
+for node in (vida_bar, vida_txt):
+    node.anchor = "TOP_LEFT"
+for node in (gauge, vel_txt):
+    node.anchor = "BOTTOM_RIGHT"
 
 link(jogar, "On Enter", action(ui.UIPrintNode, "mouse entrou em Jogar", 800, 0))
 link(jogar, "On Click", action(ui.UIPrintNode, "clicou Jogar", 800, -100))
@@ -148,7 +159,7 @@ bpy.ops.object.game_property_new(type="STRING", name="ui_screen")
 cam.game.properties["ui_screen"].value = "Menu"
 for prop, kind, value in (("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0),
                           ("ui_hud", "BOOL", False), ("som", "BOOL", True),
-                          ("volume", "FLOAT", 0.8)):
+                          ("volume", "FLOAT", 0.8), ("tem_save", "BOOL", False)):
     bpy.ops.object.game_property_new(type=kind, name=prop)
     cam.game.properties[prop].value = value
 
@@ -175,6 +186,7 @@ key_brick("R", "ASSIGN", "vida", "100")
 key_brick("W", "ADD", "velocidade", "2", hold=True)
 key_brick("S", "ADD", "velocidade", "-2", hold=True)
 key_brick("J", "TOGGLE", "ui_hud", "")
+key_brick("C", "TOGGLE", "tem_save", "")
 
 bpy.ops.wm.save_as_mainfile(filepath=out)
 print("UI_OK", out)
