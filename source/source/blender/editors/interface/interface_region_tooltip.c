@@ -471,6 +471,21 @@ static uiTooltipData *ui_tooltip_data_from_button(bContext *C, uiBut *but)
 		/* avoid overly verbose tips (eg, arrays of 20 layers), exact limit is arbitrary */
 		WM_operator_pystring_abbreviate(str, 32);
 
+		/* Recent files (splash, File menu): show the whole path of the file. */
+		if (STREQ(but->optype->idname, "WM_OT_open_mainfile")) {
+			char *filepath = RNA_string_get_alloc(opptr, "filepath", NULL, 0);
+			if (filepath && filepath[0]) {
+				uiTooltipField *field = text_field_add(
+				        data, &(uiTooltipFormat){
+				            .style = UI_TIP_STYLE_NORMAL,
+				            .color_id = UI_TIP_LC_VALUE,
+				            .is_pad = true,
+				        });
+				field->text = BLI_sprintfN(TIP_("Path: %s"), filepath);
+			}
+			MEM_SAFE_FREE(filepath);
+		}
+
 		/* operator info */
 		if ((U.flag & USER_TOOLTIPS_PYTHON) == 0) {
 			uiTooltipField *field = text_field_add(

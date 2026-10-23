@@ -180,12 +180,15 @@ class INFO_MT_editor_menus(Menu):
 
         if rd.use_game_engine:
             layout.menu("INFO_MT_game")
-            layout.menu("INFO_MT_game_performance")
         else:
             layout.menu("INFO_MT_render")
 
         layout.menu("INFO_MT_window")
         layout.menu("INFO_MT_help")
+
+        # A popover looks different from the menus: it goes after them.
+        if rd.use_game_engine:
+            layout.popover(panel="INFO_PT_game_performance", text="Performance")
 
 
 class INFO_MT_file(Menu):
@@ -327,30 +330,50 @@ class INFO_MT_file_previews(Menu):
         layout.operator("wm.previews_batch_clear")
 
 
-class INFO_MT_game_performance(Menu):
+class INFO_PT_game_performance(Panel):
+    bl_space_type = 'INFO'
+    bl_region_type = 'HEADER'
     bl_label = "Performance"
+    # Opens centered under the button, near the left window edge: keep it narrow.
+    bl_ui_units_x = 11
 
     def draw(self, context):
         layout = self.layout
+        layout.label(text="Performance", icon='TIME')
 
-        layout.label(text="Analyze")
-        layout.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
-        layout.operator("game.performance_report", text="Play and Measure", icon='PLAY')
-        layout.operator("game.performance_report_last", icon='TEXT')
-        layout.operator("game.performance_reports_folder", icon='FILE_FOLDER')
+        box = layout.box()
+        box.label(text="Analyze")
+        row = box.row(align=True)
+        row.scale_y = 1.3
+        row.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
+        row.operator("game.performance_report", text="Measure", icon='PLAY')
+        row = box.row(align=True)
+        row.operator("game.performance_report_last", text="Last", icon='TEXT')
+        row.operator("game.performance_reports_folder", text="Folder", icon='FILE_FOLDER')
+        box.label(text="What costs load, memory, frame.")
 
-        layout.separator(factor=1)
-        layout.label(text="Optimize Scene")
-        layout.operator("game.lod_generate_batch", icon='MOD_DECIM')
-        layout.operator("game.lod_clear_generated", icon='X')
-        layout.operator("game.collision_proxy_generate", icon='MOD_PHYSICS')
-        layout.operator("game.collision_proxy_clear", icon='X')
+        box = layout.box()
+        box.label(text="Optimize Scene")
+        row = box.row(align=True)
+        row.scale_y = 1.3
+        row.operator("game.lod_generate_batch", text="Generate LODs", icon='MOD_DECIM')
+        row.operator("game.lod_clear_generated", text="", icon='X')
+        row = box.row(align=True)
+        row.scale_y = 1.3
+        row.operator("game.collision_proxy_generate", text="Collision Proxies", icon='MOD_PHYSICS')
+        row.operator("game.collision_proxy_clear", text="", icon='X')
+        box.label(text="Lighter meshes and collision.")
 
-        layout.separator(factor=1)
-        layout.label(text="Prepare for Export")
-        layout.operator("game.prepare_textures", text="Prepare Textures (DDS)...", icon='IMAGE_DATA')
-        layout.operator("game.revert_prepared_textures", icon='LOOP_BACK')
-        layout.operator("game.prepare_audio", text="Prepare Audio...", icon='SOUND')
+        box = layout.box()
+        box.label(text="Prepare for Export")
+        row = box.row(align=True)
+        row.scale_y = 1.3
+        row.operator("game.prepare_textures", text="Textures (DDS)", icon='IMAGE_DATA')
+        row.operator("game.revert_prepared_textures", text="", icon='LOOP_BACK')
+        row = box.row(align=True)
+        row.scale_y = 1.3
+        row.operator("game.prepare_audio", text="Audio (OGG)", icon='SOUND')
+        box.label(text="Used on export; originals stay.")
 
 
 class INFO_MT_game(Menu):
@@ -358,28 +381,46 @@ class INFO_MT_game(Menu):
 
     def draw(self, context):
         layout = self.layout
-
         gs = context.scene.game_settings
 
-        layout.label(text="Start")
         layout.prop(gs, "use_auto_start")
-
         layout.separator(factor=1)
-        layout.label(text="Overlays")
+        layout.menu("INFO_MT_game_overlays", icon='INFO')
+        layout.menu("INFO_MT_game_visualization", icon='PHYSICS')
+        layout.menu("INFO_MT_game_debug", icon='CONSOLE')
+
+
+class INFO_MT_game_overlays(Menu):
+    bl_label = "Overlays"
+
+    def draw(self, context):
+        layout = self.layout
+        gs = context.scene.game_settings
         layout.prop(gs, "show_framerate_profile", text="Show Profile")
         layout.prop(gs, "show_render_queries")
         layout.prop(gs, "show_debug_properties")
 
-        layout.separator(factor=1)
-        layout.label(text="Visualization")
+
+class INFO_MT_game_visualization(Menu):
+    bl_label = "Visualization"
+
+    def draw(self, context):
+        layout = self.layout
+        gs = context.scene.game_settings
         layout.prop(gs, "show_physics_visualization", text="Physics")
         sub = layout.column()
         sub.active = gs.obstacle_simulation != 'NONE'
         sub.prop(gs, "show_obstacle_simulation", text="Obstacle Simulation")
+        layout.separator(factor=1)
         layout.menu("INFO_MT_game_show_debug")
 
-        layout.separator(factor=1)
-        layout.label(text="Debug")
+
+class INFO_MT_game_debug(Menu):
+    bl_label = "Debug"
+
+    def draw(self, context):
+        layout = self.layout
+        gs = context.scene.game_settings
         layout.prop(gs, "show_debug_mode", text="Debug Mode")
         layout.prop(gs, "show_console")
         layout.prop(gs, "use_python_console", text="Python Console")
@@ -472,23 +513,26 @@ class INFO_MT_help(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator(
-            "wm.url_open", text="RanGE - Python API", icon='HELP',
-        ).url = "https://rangeengine.tech/RangeDoc_Build/html/"
-        layout.separator(factor=1)
+        layout.operator("wm.splash_about", text="Anastacio Engine About", icon_value=_cube_icon())
+        layout.separator()
 
-        layout.operator(
-            "wm.url_open", text="RanGE - Website", icon='URL',
-        ).url = "https://rangeengine.tech"
-        
+        # Same links as the splash screen.
+        url = layout.operator("wm.url_open", text="Python API", icon='FILE_SCRIPT')
+        url.url = "https://anastaciogames.github.io/anastacio-docs/"
+        layout.operator("wm.url_open", text="GitHub", icon='URL').url = "https://github.com/AnastacioGames"
+        layout.operator("wm.url_open", text="Discord", icon='DISCORD').url = "https://discord.gg/AsbjKgh4E"
+        url = layout.operator("wm.url_open", text="Patreon Anastacio", icon='PATREON')
+        url.url = "https://www.patreon.com/cw/AnastacioEngine"
 
-        #layout.operator("wm.operator_cheat_sheet", icon='TEXT')
+        layout.separator()
+        layout.label(text="Range Engine")
+        layout.operator("wm.url_open", text="Range Website", icon='URL').url = "https://rangeengine.tech"
+        url = layout.operator("wm.url_open", text="Range Python API", icon='HELP')
+        url.url = "https://rangeengine.tech/RangeDoc_Build/html/"
+        layout.operator("wm.url_open", text="Patreon Range", icon='PATREON').url = "https://www.patreon.com/rangeengine"
+
+        layout.separator()
         layout.operator("wm.sysinfo", icon='TEXT')
-        
-        layout.separator(factor=1)
-        layout.operator("wm.splash_about", text="Anastacio Engine About", icon="BLENDER")
-        layout.separator(factor=1)
-        
 
         '''layout.operator("wm.splash", icon='BLENDER')'''
 
@@ -502,8 +546,11 @@ classes = (
     INFO_MT_file_export,
     INFO_MT_file_external_data,
     INFO_MT_file_previews,
+    INFO_PT_game_performance,
     INFO_MT_game,
-    INFO_MT_game_performance,
+    INFO_MT_game_overlays,
+    INFO_MT_game_visualization,
+    INFO_MT_game_debug,
     INFO_MT_game_show_debug,
     INFO_MT_render,
     INFO_MT_opengl_render,

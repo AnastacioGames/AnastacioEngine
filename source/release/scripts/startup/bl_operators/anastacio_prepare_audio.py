@@ -80,9 +80,10 @@ def _encode(source, target, quality):
     except RuntimeError as native_error:
         ffmpeg = os.environ.get('ANASTACIO_FFMPEG') or shutil.which('ffmpeg')
         if not ffmpeg or not os.path.isfile(ffmpeg):
-            raise RuntimeError('Vorbis quality encoder unavailable: provide libsndfile with '
-                               'Vorbis support or set ANASTACIO_FFMPEG to an installed ffmpeg. '
-                               + str(native_error))
+            # The native error lists every library path tried: console only, the report stays short.
+            print('Prepare Audio: libsndfile unavailable:', native_error)
+            raise RuntimeError('No Vorbis encoder found: pick an installed ffmpeg.exe (with libvorbis) '
+                               'in Vorbis Encoder, or set ANASTACIO_FFMPEG')
         flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
         process = subprocess.run([ffmpeg, '-nostdin', '-hide_banner', '-loglevel', 'error',
                                   '-y', '-i', source, '-vn', '-c:a', 'libvorbis', '-q:a',
@@ -259,10 +260,12 @@ def prepare_audio(cache_dir=None, encoder_path=None):
 
 def _prepare_audio(cache_dir=None):
     """Store preparation metadata only; never modify source files, paths or cache flags."""
-    probe_encoder()
     cache_dir = cache_dir or _cache_dir()
     os.makedirs(cache_dir, exist_ok=True)
     rows = inventory(cache_dir)
+    # The encoder is needed only when something is converted.
+    if any(row['action'] == 'CONVERT' for row in rows):
+        probe_encoder()
     try:
         previous = json.loads(bpy.context.scene.get(KEY, '{}'))
     except (ValueError, TypeError):
