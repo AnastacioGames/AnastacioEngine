@@ -3618,6 +3618,10 @@ static void ui_do_but_textedit(
 		/* only do live update when but flag request it (UI_BUT_TEXTEDIT_UPDATE). */
 		if (update && data->interactive) {
 			ui_apply_but(C, block, but, data, true);
+			/* popovers only rebuild on refresh: redo the block so live filters update */
+			if (block->handle && block->handle->can_refresh) {
+				ED_region_tag_refresh_ui(data->region);
+			}
 		}
 		else {
 			ui_but_update_edited(but);
