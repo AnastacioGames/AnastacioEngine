@@ -254,3 +254,13 @@ Regras propostas para a F1/F2:
   arquivo sujo" só foi provado em relação a esse caso; conferir no editor com janela (título sem `*`).
 - Os scripts tinham dois erros (formatação `%` no texto do driver e `bl_icon` obrigatório no NodeTree),
   corrigidos. Windows: rodar as mesmas provas é opcional, nada aqui depende de plataforma.
+
+## 14. F1 implementada (2026-10-23)
+
+Módulo `source/release/scripts/startup/range_logic_tree.py`; detalhes e achados no changelog. Testes:
+`f1_compile_test.py -- <pasta>` (bricks, erro de campo vazio, bricks do usuário intactos, recompilar e
+salvar/reabrir sem duplicar, árvore compartilhada, compilar sem objeto ativo) e, com o `.range` gerado,
+`AnastacioRuntime --server <pasta>/f1.range` + `f1_runtime_check.py <pasta>/f1.txt`. Fica para o teste com
+janela: menu Add, painel N, campo no cabeçalho do Logic Editor, nó pintado de vermelho com campo vazio e o teste
+dos 15 s. Diferenças do plano: a nota da árvore nova é um Frame com rótulo; grupos não têm estado recolhido
+no RNA, então o grupo aparece como os outros.

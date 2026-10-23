@@ -7,6 +7,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Logic Tree F1 (árvore, nós e compilador)
+
+- Novo `source/release/scripts/startup/range_logic_tree.py`: tipo de árvore "Logic Tree", `Object.logic_tree`
+  e `Object.logic_tree_record`. Nós Triggers (Always, Key, Mouse, Collision, Property, Message), Logic (And,
+  Or, Not) e Actions (Motion, Set Property, Add to Property, Sound, Remove Object, Wait), com campos copiados
+  do RNA dos bricks. Compila em `game_pre`/`save_pre` e pelo botão Compile (painel N e cabeçalho do Logic
+  Editor) no grupo `Tree: <nome>`; recompilar troca só os bricks registrados.
+- Regras: gatilho direto ou E/Ou só de gatilhos viram And/Or nativos; o resto vira um Expression com nomes ASCII;
+  várias entradas numa ação são um Ou; gatilho dentro de Não liga o pulso de nível falso (senão o controller não
+  roda com o gatilho parado em falso); controllers vão para cada estado inicial do objeto.
+- Achados: `PropertySensor.value_min` grava no mesmo campo de `value` (fica fora do nó); os operadores de
+  bricks exigem objeto ativo, então a compilação passa o objeto pelo contexto (salvar sem seleção funciona).
+- Testes `tools/tests/logic_tree/f1_compile_test.py` (13 provas no editor) e `f1_runtime_check.py` (5 regras,
+  0 diferenças em 118 ticks no `AnastacioRuntime --server`), Linux.
+
 ## 2026-10-23 - Plano da Logic Tree (lógica por nós)
 
 - Novo `docs/logic-tree-plan.md`: árvore de nós de lógica como complemento aos Logic Bricks. Proposta de compilar
