@@ -83,13 +83,13 @@ def step(cont):
     n = own.get("n", 0)
     a, b, c = SEQ[n] if n < len(SEQ) else (0, 0, 0)
     box["a"], box["b"], box["c"] = bool(a), bool(b), bool(c)
-    own["log"] = own.get("log", "") + "%%d %%d %%d %%d %%d %%d %%d %%d %%d\\n" %% (
+    own["log"] = own.get("log", "") + "%d %d %d %d %d %d %d %d %d\\n" % (
         n, a, b, c, box["ca"], box["ce_and"], box["co"], box["ce_or"], box["cx"])
     own["n"] = n + 1
     if n >= len(SEQ) + 4:
-        open(r"%s", "w").write("# tick a b c ca ce_and co ce_or cx\\n" + own["log"])
+        open(r"RES_PATH", "w").write("# tick a b c ca ce_and co ce_or cx\\n" + own["log"])
         bge.logic.endGame()
-''' % res
+'''.replace("RES_PATH", res)
 bpy.data.texts.new("drv.py").from_string(SRC)
 drv = empty("Driver")
 tick = add(drv, "sensor", "ALWAYS", "Tick", use_pulse_true_level=True)

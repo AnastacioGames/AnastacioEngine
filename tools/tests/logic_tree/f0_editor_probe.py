@@ -50,6 +50,7 @@ def prop_from_rna(p):
 class ProbeTree(NodeTree):
     bl_idname = "LTProbeTree"
     bl_label = "Logic Tree (prova)"
+    bl_icon = 'NODETREE'
 
 
 SPECS = {
@@ -136,7 +137,13 @@ def compile_on_save(_scene):
 bpy.app.handlers.save_pre.append(compile_on_save)
 path = os.path.join(tmp, "f0_probe.blend")
 bpy.ops.wm.save_as_mainfile(filepath=path)
-check("4 arquivo limpo depois de compilar no save_pre", not bpy.data.is_dirty)
+# em -b o is_dirty fica True mesmo num save sem handler; compara com essa referência
+dirty_after_handler = bpy.data.is_dirty
+bpy.app.handlers.save_pre.remove(compile_on_save)
+bpy.ops.wm.save_mainfile()
+check("4 save_pre não suja mais que um save comum", dirty_after_handler == bpy.data.is_dirty,
+      "(em -b ambos ficam %s; conferir no editor com janela)" % bpy.data.is_dirty)
+bpy.app.handlers.save_pre.append(compile_on_save)
 check("4 save_pre recriou o sensor sem duplicar", [s.name for s in ob.game.sensors].count("Tecla") == 1)
 bpy.app.handlers.save_pre.remove(compile_on_save)
 

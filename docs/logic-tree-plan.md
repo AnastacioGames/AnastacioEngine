@@ -240,3 +240,17 @@ Regras propostas para a F1/F2:
 - **Regras:** sensores citados numa expressão recebem nome ASCII seguro derivado do rótulo (ex.: "Tecla Espaço" →
   `Tecla_Espaco_3`), diferente das palavras reservadas e das propriedades do objeto. And ou Or simples continuam
   como controllers And/Or com o rótulo original; só a lógica com portas misturadas vira Expression.
+
+### 13.3 Provas rodadas no Linux (build headless, 2026-10-23)
+
+- **Expression (`f0_expression_scene.py` + `AnastacioRuntime --server`):** PASS. Em 118 ticks, And nativo e
+  `Sa AND Sb` somaram igual tick a tick (26 x 26); Or nativo e `Sa OR Sb` também (81 x 81).
+  `(Sa OR Sb) AND NOT Sc` bateu 117 de 117 com o valor esperado (atraso fixo de 2 ticks entre gravar a propriedade
+  e o actuator somar, o mesmo para todos os caminhos). Portas misturadas podem virar um Expression.
+- **Editor (`f0_editor_probe.py`):** PASS, 17 provas. Campos de Keyboard/Motion/Action gerados do RNA (enum,
+  vetor, ponteiro para Action) e copiados para os bricks; `Object.logic_tree` e o registro sobrevivem a
+  salvar/reabrir, cópia do objeto e append (a árvore vem junto); 20 objetos x 100 bricks: gerar 38 ms,
+  regenerar 69 ms. Ressalva: em `-b` o `is_dirty` fica True mesmo num save comum, então "o save_pre não deixa o
+  arquivo sujo" só foi provado em relação a esse caso; conferir no editor com janela (título sem `*`).
+- Os scripts tinham dois erros (formatação `%` no texto do driver e `bl_icon` obrigatório no NodeTree),
+  corrigidos. Windows: rodar as mesmas provas é opcional, nada aqui depende de plataforma.
