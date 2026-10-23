@@ -773,6 +773,157 @@ class RANGE_OT_ui_tree_capture(Operator):
         return {'FINISHED'}
 
 
+def add_template(tree, kind, origin=(0.0, 0.0)):
+    """Monta uma tela pronta na UI Tree: MENU = Menu (Jogar/Opções/Sair) +
+    Opcoes (Som, Volume, Voltar); HUD = vida e velocímetro.  Devolve os
+    Frames criados."""
+    ox, oy = origin
+
+    def frame(name, x, y, hud=False):
+        node = tree.nodes.new("NodeFrame")
+        node.name = node.label = name
+        node.ui_screen = True
+        node.ui_hud = hud
+        node.ui_scale_mode = "KEEP"
+        node.shrink = False
+        node.location = (ox + x, oy + y)
+        node.width, node.height = 640, 360
+        return node
+
+    def widget(cls, parent, x, y, width, height=None):
+        node = tree.nodes.new(cls.bl_idname)
+        node.parent = parent
+        node.location = (x, y)  # relativo ao Frame, y para baixo é negativo
+        node.width = width
+        if height is not None:
+            node.button_height = height
+        return node
+
+    def action(cls, value, x, y, *sources):
+        node = tree.nodes.new(cls.bl_idname)
+        node.value = value
+        node.location = (ox + x, oy + y)
+        for source, event in sources:
+            tree.links.new(source.outputs[event], node.inputs[0])
+        return node
+
+    if kind == "HUD":
+        hud = frame("HUD", 0, 0, hud=True)
+        bar = widget(UIProgressBarNode, hud, 20, -20, 220, 24)
+        life = widget(UILabelNode, hud, 20, -48, 220, 24)
+        life.text_format = "Vida {vida:.0f}"
+        gauge = widget(UIGaugeNode, hud, 480, -190, 140, 140)
+        unit = widget(UILabelNode, hud, 480, -330, 140, 24)
+        unit.text_format = "km/h"
+        unit.align = "CENTER"
+        for node in (bar, life):
+            node.anchor = "TOP_LEFT"
+        for node in (gauge, unit):
+            node.anchor = "BOTTOM_RIGHT"
+        return [hud]
+
+    menu = frame("Menu", 0, 0)
+    options = frame("Opcoes", 0, -500)
+    widget(UIPanelNode, menu, 200, -100, 240, 180).border = 0.01
+    play = widget(UIButtonNode, menu, 220, -120, 200)
+    play.text = "Jogar"
+    opt = widget(UIButtonNode, menu, 220, -170, 200)
+    opt.text = "Opções"
+    quit_ = widget(UIButtonNode, menu, 220, -220, 200)
+    quit_.text = "Sair"
+    sound = widget(UIToggleNode, options, 200, -100, 240, 30)
+    sound.audio = "SOUND"
+    volume = widget(UISliderNode, options, 200, -160, 240, 30)
+    volume.audio = "VOLUME"
+    label = widget(UILabelNode, options, 200, -195, 240, 24)
+    label.text_format = "Volume {volume:.0%}"
+    label.align = "CENTER"
+    back = widget(UIButtonNode, options, 220, -280, 200)
+    back.text = "Voltar"
+    for screen in (menu, options):
+        screen.ui_fade = 0.25
+    # Jogar esconde o menu e liga o HUD (se houver).
+    action(UIScreenNode, "", 800, 0, (play, "On Click"))
+    hud_on = action(UISetPropertyNode, "True", 800, -100, (play, "On Click"))
+    hud_on.prop_name = "ui_hud"
+    action(UIScreenNode, "Opcoes", 800, -200, (opt, "On Click"))
+    action(UIQuitNode, "", 800, -300, (quit_, "On Click"))
+    action(UIScreenNode, "Menu", 800, -600, (back, "On Click"))
+    return [menu, options]
+
+
+GAME_PROPS = (("ui_screen", "STRING", "Menu"), ("ui_hud", "BOOL", False),
+              ("som", "BOOL", True), ("volume", "FLOAT", 0.8),
+              ("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0))
+
+
+def setup_game_logic(obj):
+    """Always (pulso) + Python Module range_ui_runtime.main no objeto, e as
+    propriedades que o template usa.  Não repete o que já existe."""
+    game = obj.game
+    if not any(c.type == "PYTHON" and c.mode == "MODULE" and c.module == "range_ui_runtime.main"
+               for c in game.controllers):
+        bpy.ops.logic.sensor_add(type="ALWAYS", name="UI Tree", object=obj.name)
+        bpy.ops.logic.controller_add(type="PYTHON", name="UI Tree", object=obj.name)
+        sensor, controller = game.sensors[-1], game.controllers[-1]
+        sensor.use_pulse_true_level = True
+        controller.mode = "MODULE"
+        controller.module = "range_ui_runtime.main"
+        sensor.link(controller)
+    scene = bpy.context.scene
+    active = scene.objects.active
+    scene.objects.active = obj  # game_property_new age no objeto ativo
+    for name, kind, value in GAME_PROPS:
+        if name not in game.properties:
+            bpy.ops.object.game_property_new(type=kind, name=name)
+            game.properties[name].value = value
+    scene.objects.active = active
+
+
+class RANGE_OT_ui_tree_template(Operator):
+    """Adiciona telas prontas na UI Tree (menu com opções ou HUD)"""
+    bl_idname = "node.range_ui_tree_template"
+    bl_label = "Add Template"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    kind = EnumProperty(name="Template", items=(
+        ("MENU", "Menu + Options", "Menu Jogar/Opções/Sair e tela de opções com som e volume"),
+        ("HUD", "HUD", "Barra de vida e velocímetro")))
+
+    @classmethod
+    def poll(cls, context):
+        return RANGE_OT_ui_tree_bake.poll(context)
+
+    def execute(self, context):
+        tree = context.space_data.edit_tree
+        # Abaixo do que já existe, para não sobrepor.
+        bottom = min((n.location.y - n.height for n in tree.nodes if n.parent is None), default=0.0)
+        origin = (0.0, bottom - 150.0 if tree.nodes else 0.0)
+        for node in tree.nodes:
+            node.select = False
+        frames = add_template(tree, self.kind, origin)
+        tree.nodes.active = frames[0]
+        self.report({'INFO'}, "UI: %d tela(s) adicionada(s)" % len(frames))
+        return {'FINISHED'}
+
+
+class RANGE_OT_ui_tree_setup_logic(Operator):
+    """Liga a UI no jogo: Always + Python (range_ui_runtime.main) e as propriedades
+    ui_screen, ui_hud, som, volume, vida e velocidade na câmera da cena"""
+    bl_idname = "node.range_ui_tree_setup_logic"
+    bl_label = "Setup Game Logic"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        return context.scene.camera is not None
+
+    def execute(self, context):
+        setup_game_logic(context.scene.camera)
+        self.report({'INFO'}, "UI ligada na câmera %s" % context.scene.camera.name)
+        return {'FINISHED'}
+
+
 def _draw_backdrops():
     import bgl
     context = bpy.context
@@ -850,6 +1001,10 @@ class UITreePanel:
     def draw(self, context):
         layout = self.layout
         layout.operator(RANGE_OT_ui_tree_bake.bl_idname, icon="FILE_REFRESH")
+        row = layout.row(align=True)
+        row.operator(RANGE_OT_ui_tree_template.bl_idname, text="Menu", icon="ZOOMIN").kind = "MENU"
+        row.operator(RANGE_OT_ui_tree_template.bl_idname, text="HUD", icon="ZOOMIN").kind = "HUD"
+        layout.operator(RANGE_OT_ui_tree_setup_logic.bl_idname, icon="LOGIC")
         layout.row().prop(context.space_data.edit_tree, "preview_state", expand=True)
         frame = _active_frame(context)
         if frame is not None:
@@ -930,6 +1085,7 @@ CATEGORIES = [
 
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
     RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_image_aspect, RANGE_OT_ui_tree_capture,
+    RANGE_OT_ui_tree_template, RANGE_OT_ui_tree_setup_logic,
     NODE_PT_range_ui_tree,
     NODE_PT_range_ui_tree_tools)
 

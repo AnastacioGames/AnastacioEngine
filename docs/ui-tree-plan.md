@@ -83,4 +83,4 @@ Ainda falta:
 4. **Animações nativas do botão** (sem ligar nós): escala no hover, clique "afundando", fade de entrada/saída da tela, transição de cor suave.
 5. **Ações**: Tween, Set Property, Run Python, Show/Hide; sons padrão de hover/clique na própria Screen.
 6. **Integração**: sensor "UI Event" nos Logic Bricks, API `Range.ui`, navegação por gamepad e teclado.
-7. Export Web/Android, docs e template.
+7. ~~Export Web/Android, docs e template.~~ Feito (2026-10-23): guia em `ui-tree.md`, botões + Menu / + HUD / Setup Game Logic.
