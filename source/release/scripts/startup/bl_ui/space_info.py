@@ -17,8 +17,22 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
+import os
+
 import bpy
 from bpy.types import Header, Menu, Panel
+
+_header_icons = None
+
+
+def _cube_icon():
+    # Golden cube of the Anastacio Engine logo, next to the Blender icon in the header.
+    global _header_icons
+    if _header_icons is None:
+        import bpy.utils.previews
+        _header_icons = bpy.utils.previews.new()
+        _header_icons.load("cube", os.path.join(os.path.dirname(__file__), "icons", "anastacio_cube.png"), 'IMAGE')
+    return _header_icons["cube"].icon_id
 
 
 class INFO_HT_header(Header):
@@ -38,26 +52,12 @@ class INFO_HT_header(Header):
 
         if window.screen.show_fullscreen:
             layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
-        else:
-            if context.space_data.show_screen_selector:
-                row = layout.row(align=True)
-                if context.user_preferences.view.screen_selector == 'CLASSIC':
-                    layout.template_ID(window, "screen", new="screen.new", unlink="screen.delete")
-                else:
-                    row.template_screen_tabs()
-                    row.operator("screen.new", text="", icon='ZOOMIN')
-                    # Delete via right-click on a tab (context menu).
-            # Scene add/copy/delete moved into the Outliner header, next to
-            # the "Scenes" root (see OUTLINER_MT_scene_add in
-            # space_outliner.py). Deleting a scene is done via right-click
-            # on the scene entry in the Outliner.
-            if context.space_data.show_scene_selector:
-                layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
+        # Screen and scene selectors sit in the right corner (end of draw).
 
         wm = context.window_manager
         if wm.info_show_screen_recorder:
             # Left side, next to the menus, away from the window corner.
-            layout.separator(factor=1)
+            layout.separator(factor=4)
             row = layout.row(align=True)
             if not wm.is_screencast_running:
                 # While recording, the red "Recording mm:ss" button (running jobs) stops it.
@@ -67,7 +67,7 @@ class INFO_HT_header(Header):
         layout.separator_spacer()
 
         layout.operator("wm.splash", text="", icon='BLENDER', emboss=False)
-        layout.operator("wm.splash_about", text="Anastacio Engine - Custom Version", emboss=False)
+        layout.operator("wm.splash_about", text="Anastacio Engine - Custom Version", icon_value=_cube_icon(), emboss=False)
 
         layout.separator_spacer()
 
@@ -90,8 +90,6 @@ class INFO_HT_header(Header):
             row.label(bpy.app.autoexec_fail_message)
             return
 
-        layout.separator_spacer()
-
         layout.template_running_jobs()
         wm = context.window_manager
         if getattr(wm, "ae_bake_status", ""):  # Bake Lightmap (anastacio_lightmap.py)
@@ -99,6 +97,23 @@ class INFO_HT_header(Header):
             row.ui_units_x = 14
             row.prop(wm, "ae_bake_progress", text=wm.ae_bake_status, slider=True)
         layout.template_reports_banner()
+
+        if not window.screen.show_fullscreen:
+            layout.separator(factor=1)
+            if context.space_data.show_screen_selector:
+                row = layout.row(align=True)
+                if context.user_preferences.view.screen_selector == 'CLASSIC':
+                    layout.template_ID(window, "screen", new="screen.new", unlink="screen.delete")
+                else:
+                    row.template_screen_tabs()
+                    row.operator("screen.new", text="", icon='ZOOMIN')
+                    # Delete via right-click on a tab (context menu).
+            # Scene add/copy/delete moved into the Outliner header, next to
+            # the "Scenes" root (see OUTLINER_MT_scene_add in
+            # space_outliner.py). Deleting a scene is done via right-click
+            # on the scene entry in the Outliner.
+            if context.space_data.show_scene_selector:
+                layout.template_ID(context.screen, "scene", new="scene.new", unlink="scene.delete")
 
         layout.separator(factor=1)
 
@@ -317,20 +332,25 @@ class INFO_MT_game_performance(Menu):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator("game.prepare_textures", text="Prepare Textures (DDS)...", icon='IMAGE_DATA')
-        layout.operator("game.revert_prepared_textures", icon='LOOP_BACK')
-        layout.operator("game.prepare_audio", text="Prepare Audio...", icon='SOUND')
-        layout.separator()
-        layout.operator("game.performance_report", text="Play and Measure", icon='PLAY')
+
+        layout.label(text="Analyze")
         layout.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
-        layout.separator()
+        layout.operator("game.performance_report", text="Play and Measure", icon='PLAY')
+        layout.operator("game.performance_report_last", icon='TEXT')
+        layout.operator("game.performance_reports_folder", icon='FILE_FOLDER')
+
+        layout.separator(factor=1)
+        layout.label(text="Optimize Scene")
         layout.operator("game.lod_generate_batch", icon='MOD_DECIM')
         layout.operator("game.lod_clear_generated", icon='X')
         layout.operator("game.collision_proxy_generate", icon='MOD_PHYSICS')
         layout.operator("game.collision_proxy_clear", icon='X')
-        layout.separator()
-        layout.operator("game.performance_report_last", icon='TEXT')
-        layout.operator("game.performance_reports_folder", icon='FILE_FOLDER')
+
+        layout.separator(factor=1)
+        layout.label(text="Prepare for Export")
+        layout.operator("game.prepare_textures", text="Prepare Textures (DDS)...", icon='IMAGE_DATA')
+        layout.operator("game.revert_prepared_textures", icon='LOOP_BACK')
+        layout.operator("game.prepare_audio", text="Prepare Audio...", icon='SOUND')
 
 
 class INFO_MT_game(Menu):
@@ -341,17 +361,14 @@ class INFO_MT_game(Menu):
 
         gs = context.scene.game_settings
 
+        layout.label(text="Start")
+        layout.prop(gs, "use_auto_start")
+
+        layout.separator(factor=1)
         layout.label(text="Overlays")
         layout.prop(gs, "show_framerate_profile", text="Show Profile")
         layout.prop(gs, "show_render_queries")
         layout.prop(gs, "show_debug_properties")
-
-        layout.separator(factor=1)
-        layout.label(text="Debug")
-        layout.prop(gs, "show_debug_mode", text="Debug Mode")
-        layout.prop(gs, "show_console")
-        layout.prop(gs, "use_python_console", text="Python Console")
-        layout.prop(gs, "use_deprecation_warnings")
 
         layout.separator(factor=1)
         layout.label(text="Visualization")
@@ -361,9 +378,12 @@ class INFO_MT_game(Menu):
         sub.prop(gs, "show_obstacle_simulation", text="Obstacle Simulation")
         layout.menu("INFO_MT_game_show_debug")
 
-
         layout.separator(factor=1)
-        layout.prop(gs, "use_auto_start")
+        layout.label(text="Debug")
+        layout.prop(gs, "show_debug_mode", text="Debug Mode")
+        layout.prop(gs, "show_console")
+        layout.prop(gs, "use_python_console", text="Python Console")
+        layout.prop(gs, "use_deprecation_warnings")
 
 
 class INFO_MT_game_show_debug(Menu):
