@@ -28,6 +28,7 @@
 #include "DNA_node_types.h"
 #include "DNA_object_types.h"
 #include "DNA_space_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_userdef_types.h"
 #include "DNA_text_types.h"
@@ -332,11 +333,24 @@ static void node_draw_buttons_group(uiLayout *layout, bContext *C, PointerRNA *p
 	uiTemplateIDBrowse(layout, C, ptr, "node_tree", NULL, NULL, NULL, UI_TEMPLATE_ID_FILTER_ALL);
 }
 
+/* In a UI Tree (Python node tree of the 2D menu prototype) a frame marked with
+ * the "ui_screen" property is a game screen: fixed size with the game aspect,
+ * drawn as a border only.  Other frames keep the usual behavior. */
+static bool node_frame_is_ui_screen(const bNodeTree *ntree, const bNode *node)
+{
+	IDProperty *prop;
+
+	if (!STREQ(ntree->idname, "RangeUITree") || node->prop == NULL)
+		return false;
+	prop = IDP_GetPropertyFromGroup(node->prop, "ui_screen");
+	return prop && prop->type == IDP_INT && IDP_Int(prop);
+}
+
 /* XXX Does a bounding box update by iterating over all children.
  * Not ideal to do this in every draw call, but doing as transform callback doesn't work,
  * since the child node totr rects are not updated properly at that point.
  */
-static void node_draw_frame_prepare(const bContext *UNUSED(C), bNodeTree *ntree, bNode *node)
+static void node_draw_frame_prepare(const bContext *C, bNodeTree *ntree, bNode *node)
 {
 	const float margin = 1.5f * U.widget_unit;
 	NodeFrame *data = (NodeFrame *)node->storage;
@@ -345,12 +359,23 @@ static void node_draw_frame_prepare(const bContext *UNUSED(C), bNodeTree *ntree,
 	rctf rect, noderect;
 	float xmax, ymax;
 
+	if (node_frame_is_ui_screen(ntree, node)) {
+		Scene *scene = CTX_data_scene(C);
+		if (scene && scene->r.xsch > 0)
+			node->height = node->width * (float)scene->r.ysch / (float)scene->r.xsch;
+	}
+
 	/* init rect from current frame size */
 	node_to_view(node, node->offsetx, node->offsety, &rect.xmin, &rect.ymax);
 	node_to_view(node, node->offsetx + node->width, node->offsety - node->height, &rect.xmax, &rect.ymin);
 
 	/* frame can be resized manually only if shrinking is disabled or no children are attached */
 	data->flag |= NODE_FRAME_RESIZEABLE;
+	if (node_frame_is_ui_screen(ntree, node)) {
+		/* the screen does not grow to fit its buttons */
+		node->totr = rect;
+		return;
+	}
 	/* for shrinking bbox, initialize the rect from first child node */
 	bbinit = (data->flag & NODE_FRAME_SHRINK);
 	/* fit bounding box to all children */
@@ -485,18 +510,35 @@ static void node_draw_frame(const bContext *C, ARegion *ar, SpaceNode *snode,
 	UI_GetThemeColor4ubv(TH_NODE_FRAME, color);
 	alpha = (float)(color[3]) / 255.0f;
 
-	/* shadow */
-	node_draw_shadow(snode, node, BASIS_RAD, alpha);
+	if (node_frame_is_ui_screen(ntree, node)) {
+		/* border only, so the backdrop and the buttons stay visible */
+		if (node->flag & NODE_CUSTOM_COLOR)
+			glColor4f(node->color[0], node->color[1], node->color[2], 1.0f);
+		else
+			UI_ThemeColorShade(TH_NODE_FRAME, 20);  /* frame color, opaque */
+		glLineWidth(4.0f);
+		glBegin(GL_LINE_LOOP);
+		glVertex2f(rct->xmin, rct->ymin);
+		glVertex2f(rct->xmax, rct->ymin);
+		glVertex2f(rct->xmax, rct->ymax);
+		glVertex2f(rct->xmin, rct->ymax);
+		glEnd();
+		glLineWidth(1.0f);
+	}
+	else {
+		/* shadow */
+		node_draw_shadow(snode, node, BASIS_RAD, alpha);
 
-	/* body */
-	if (node->flag & NODE_CUSTOM_COLOR)
-		glColor4f(node->color[0], node->color[1], node->color[2], alpha);
-	else
-		UI_ThemeColor4(TH_NODE_FRAME);
-	glEnable(GL_BLEND);
-	UI_draw_roundbox_corner_set(UI_CNR_ALL);
-	UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD);
-	glDisable(GL_BLEND);
+		/* body */
+		if (node->flag & NODE_CUSTOM_COLOR)
+			glColor4f(node->color[0], node->color[1], node->color[2], alpha);
+		else
+			UI_ThemeColor4(TH_NODE_FRAME);
+		glEnable(GL_BLEND);
+		UI_draw_roundbox_corner_set(UI_CNR_ALL);
+		UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, BASIS_RAD);
+		glDisable(GL_BLEND);
+	}
 
 	/* outline active and selected emphasis */
 	if (node->flag & SELECT) {

@@ -2,8 +2,9 @@
 
     AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_ui_tree.py -- saida.range
 
-Monta duas telas (Frames "Menu" e "Opcoes") com botões ligados a ações,
-grava o Bake e liga Always + Python (range_ui_tree.main) na câmera.
+Monta duas telas (Screens "Menu" e "Opcoes") com botões ligados a ações,
+grava o Bake e liga Always + Python (range_ui_runtime.main) na câmera, com M/H
+mostrando e escondendo o menu pela propriedade ui_screen.
 """
 
 import sys
@@ -20,6 +21,7 @@ tree.use_fake_user = True
 def frame(name, x, y):
     node = tree.nodes.new("NodeFrame")
     node.name = node.label = name
+    node.ui_screen = True
     node.shrink = False
     node.location = (x, y)
     node.width, node.height = 640, 360  # 16:9
@@ -70,6 +72,15 @@ link(btn_opcoes, "On Click", action(ui.UIScreenNode, "Opcoes", 800, -200))
 link(sair, "On Click", action(ui.UIQuitNode, "", 800, -300))
 link(voltar, "On Click", action(ui.UIScreenNode, "Menu", 800, -600))
 
+# Um nó de som para cada evento, ligado em todos os botões.
+hover = action(ui.UISoundNode, "", 1100, -150)
+hover.filepath, hover.volume = "//sons/ui_hover.wav", 0.6
+click = action(ui.UISoundNode, "", 1100, -350)
+click.filepath = "//sons/ui_click.wav"
+for b in (jogar, btn_opcoes, sair, voltar):
+    link(b, "On Enter", hover)
+    link(b, "On Click", click)
+
 data = ui.bake_tree(tree, bpy.context.scene)
 text = bpy.data.texts.new(ui.DATA_TEXT)
 text.from_string("DATA = %r\n" % data)
@@ -86,8 +97,24 @@ bpy.ops.logic.controller_add(type="PYTHON", object=cam.name)
 sensor, controller = cam.game.sensors[-1], cam.game.controllers[-1]
 sensor.use_pulse_true_level = True
 controller.mode = "MODULE"
-controller.module = "range_ui_tree.main"
+controller.module = "range_ui_runtime.main"
 sensor.link(controller)
+
+# Liga/desliga pelos Logic Bricks: a propriedade ui_screen escolhe a tela
+# ("" esconde).  Tecla M mostra o Menu, H esconde.
+bpy.ops.object.game_property_new(type="STRING", name="ui_screen")
+cam.game.properties["ui_screen"].value = "Menu"
+for key, value in (("M", "Menu"), ("H", "")):
+    bpy.ops.logic.sensor_add(type="KEYBOARD", object=cam.name)
+    bpy.ops.logic.controller_add(type="LOGIC_AND", object=cam.name)
+    bpy.ops.logic.actuator_add(type="PROPERTY", object=cam.name)
+    key_sensor, and_ctrl, act = cam.game.sensors[-1], cam.game.controllers[-1], cam.game.actuators[-1]
+    key_sensor.key = key
+    act.mode = "ASSIGN"
+    act.property = "ui_screen"
+    act.value = '"%s"' % value
+    key_sensor.link(and_ctrl)
+    act.link(and_ctrl)
 
 bpy.ops.wm.save_as_mainfile(filepath=out)
 print("UI_OK", out)

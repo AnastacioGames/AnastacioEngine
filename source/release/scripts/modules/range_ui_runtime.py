@@ -1,10 +1,15 @@
 """Runtime da UI Tree (protótipo).
 
 Ligue um sensor Always (pulso ligado) a um controlador Python em modo Module:
-    range_ui_tree.main
+    range_ui_runtime.main
 
 Lê o texto ui_tree_data.py gravado por "Bake UI", desenha a tela ativa por
 cima do render (post_draw) e executa as ações ligadas a cada evento.
+
+A tela ativa é a propriedade de jogo "ui_screen" do dono do controlador:
+nome da tela para mostrar, texto vazio para esconder o menu.  Assim dá para
+ligar e desligar pelos Logic Bricks (atuador Property) ou por Python
+(own["ui_screen"] = "Menu").  Sem a propriedade, começa na primeira tela.
 """
 
 import Range
@@ -24,16 +29,36 @@ class Button:
 
 
 class UIRuntime:
-    def __init__(self, data, scene):
+    def __init__(self, data, owner):
         self.screens = {s["name"]: [Button(b) for b in s["buttons"]] for s in data["screens"]}
-        self.active = data["screens"][0]["name"] if data["screens"] else None
-        self.scene = scene
-        scene.post_draw.append(self.draw)
-        Range.render.showMouse(True)
+        self.owner = owner
+        self.scene = owner.scene
+        if "ui_screen" not in owner:
+            owner["ui_screen"] = data["screens"][0]["name"] if data["screens"] else ""
+        self.active = None
+        self.sounds = {}
+        self.scene.post_draw.append(self.draw)
+
+    def show(self, name):
+        """Troca a tela ativa; "" esconde o menu."""
+        if name and name not in self.screens:
+            print("[UI] tela não encontrada: %r" % name)
+            name = ""
+        for button in self.screens.get(self.active, ()):
+            button.hover = button.pressed = False
+        self.active = name or None
+        self.owner["ui_screen"] = name
+        if self.active:
+            Range.render.showMouse(True)
 
     # -- eventos -------------------------------------------------------------
 
     def update(self):
+        wanted = self.owner.get("ui_screen", "")
+        if wanted != (self.active or ""):
+            self.show(wanted)
+        if self.active is None:
+            return
         mx, my = logic.mouse.position  # 0-1, y a partir do topo
         lmb = logic.mouse.inputs[events.LEFTMOUSE]
         just_pressed, just_released = lmb.activated, lmb.released
@@ -62,20 +87,32 @@ class UIRuntime:
             elif action == "MESSAGE":
                 logic.sendMessage(value)
             elif action == "SCREEN":
-                if value in self.screens:
-                    for other in self.screens[self.active]:
-                        other.hover = other.pressed = False
-                    self.active = value
-                else:
-                    print("[UI] tela não encontrada: %r" % value)
+                self.show(value)
             elif action == "SCENE":
                 self.scene.replace(value)
             elif action == "QUIT":
                 logic.endGame()
+            elif action == "SOUND":
+                self.play_sound(*value)
+
+    def play_sound(self, path, volume):
+        import aud
+        sound = self.sounds.get(path)
+        if sound is None:
+            try:
+                sound = aud.Sound.file(logic.expandPath(path))
+            except Exception as exc:
+                print("[UI] som não carregou: %r (%s)" % (path, exc))
+                return
+            # Guarda decodificado: cliques seguidos não releem o arquivo.
+            sound = self.sounds[path] = sound.cache()
+        aud.Device().play(sound).volume = volume
 
     # -- desenho -------------------------------------------------------------
 
     def draw(self):
+        if self.active is None:
+            return
         import bgl
         import blf
         width = Range.render.getWindowWidth()
@@ -117,6 +154,6 @@ def main(cont):
             print("[UI] texto ui_tree_data.py não encontrado; use Bake UI no editor")
             owner["_ui_tree"] = False
             return
-        ui = owner["_ui_tree"] = UIRuntime(ui_tree_data.DATA, owner.scene)
+        ui = owner["_ui_tree"] = UIRuntime(ui_tree_data.DATA, owner)
     if ui:
         ui.update()

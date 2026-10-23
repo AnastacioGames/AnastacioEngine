@@ -1,7 +1,8 @@
 """UI Tree (protótipo): menus 2D montados no Node Editor.
 
-Cada Frame é uma tela do jogo; os nós Button dentro dele são os botões, na
-mesma posição relativa.  As saídas do Button são eventos (mouse enter/exit,
+Cada Screen (um Frame marcado com ui_screen) é uma tela do jogo; os nós
+Button dentro dele são os botões, na mesma posição relativa.  Frames comuns
+continuam servindo só para organizar.  As saídas do Button são eventos (mouse enter/exit,
 press, release, click) e se ligam a nós de ação.  "Bake UI" grava tudo no
 texto ui_tree_data.py, que o módulo range_ui_tree lê no runtime.
 """
@@ -129,11 +130,15 @@ class UIActionNode(UINode):
     value = StringProperty(name="Value")
 
     def init(self, context):
-        self.inputs.new(UIEventSocket.bl_idname, "Event")
+        # Vários botões podem disparar a mesma ação (ex.: um som de hover).
+        self.inputs.new(UIEventSocket.bl_idname, "Event").link_limit = 4095
 
     def draw_buttons(self, context, layout):
         if self.param_label:
             layout.prop(self, "value", text=self.param_label)
+
+    def payload(self):
+        return self.value
 
 
 class UIPrintNode(UIActionNode, Node):
@@ -154,7 +159,7 @@ class UIScreenNode(UIActionNode, Node):
     bl_idname = "RangeUIScreen"
     bl_label = "Go To Screen"
     action = "SCREEN"
-    param_label = "Frame"
+    param_label = "Screen"  # vazio esconde o menu
 
 
 class UISceneNode(UIActionNode, Node):
@@ -170,7 +175,25 @@ class UIQuitNode(UIActionNode, Node):
     action = "QUIT"
 
 
-ACTION_NODES = (UIPrintNode, UIMessageNode, UIScreenNode, UISceneNode, UIQuitNode)
+class UISoundNode(UIActionNode, Node):
+    bl_idname = "RangeUISound"
+    bl_label = "Play Sound"
+    action = "SOUND"
+
+    filepath = StringProperty(name="File", subtype="FILE_PATH",
+                              description="Som tocado no evento (// = pasta do .range)")
+    volume = FloatProperty(name="Volume", default=1.0, min=0.0, soft_max=2.0)
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "filepath", text="")
+        layout.prop(self, "volume")
+
+    def payload(self):
+        return (self.filepath, self.volume)
+
+
+ACTION_NODES = (UIPrintNode, UIMessageNode, UIScreenNode, UISceneNode, UIQuitNode,
+                UISoundNode)
 
 
 def _abs_location(node):
@@ -188,25 +211,27 @@ def _actions_for(socket):
     for link in socket.links:
         target = link.to_node
         if getattr(target, "action", None):
-            actions.append((target.action, target.value))
+            actions.append((target.action, target.payload()))
     return actions
+
+
+def _is_screen(node):
+    return node.bl_idname == "NodeFrame" and node.ui_screen
 
 
 def _canvas(frame, scene):
     """Retângulo da tela do jogo (x, y do topo, largura, altura), em unidades
-    da view.  O Frame sempre cresce para caber os filhos e guarda esse
-    deslocamento num campo que o Python não lê; por isso a tela fica ancorada
-    em frame.location, que não muda, com a proporção da resolução do jogo."""
+    da view.  O desenho do Frame em C (drawnode.c) faz o mesmo: Screen não
+    cresce com os filhos e a altura segue a proporção da resolução."""
     x, y = _abs_location(frame)
     render = scene.render
-    w = frame.ui_canvas_width
-    return x, y, w, w * render.resolution_y / render.resolution_x
+    return x, y, frame.width, frame.width * render.resolution_y / render.resolution_x
 
 
 def bake_tree(tree, scene):
     screens = []
     for frame in tree.nodes:
-        if frame.bl_idname != "NodeFrame":
+        if not _is_screen(frame):
             continue
         fx, fy, fw, fh = _canvas(frame, scene)
         buttons = []
@@ -224,7 +249,7 @@ def bake_tree(tree, scene):
             })
         screens.append({"name": frame.label or frame.name, "location": (fx, fy),
                         "buttons": buttons})
-    # A tela inicial é o Frame mais acima e à esquerda no editor.
+    # A tela inicial é a Screen mais acima e à esquerda no editor.
     screens.sort(key=lambda s: (-s["location"][1], s["location"][0]))
     return {"tree": tree.name, "screens": screens}
 
@@ -250,7 +275,7 @@ class RANGE_OT_ui_tree_bake(Operator):
 
 def _active_frame(context):
     node = context.space_data.edit_tree.nodes.active
-    return node if node is not None and node.bl_idname == "NodeFrame" else None
+    return node if node is not None and _is_screen(node) else None
 
 
 class RANGE_OT_ui_tree_capture(Operator):
@@ -294,7 +319,7 @@ def _draw_backdrops():
     # A vista do Node Editor está em unidades * escala da UI.
     scale = context.user_preferences.system.ui_scale  # U.dpi_fac
     for frame in tree.nodes:
-        if frame.bl_idname != "NodeFrame":
+        if not _is_screen(frame):
             continue
         x, y, w, h = (v * scale for v in _canvas(frame, context.scene))
         x0, x1, y0, y1 = x, x + w, y - h, y
@@ -309,30 +334,6 @@ def _draw_backdrops():
                 bgl.glVertex2f(px, py)
             bgl.glEnd()
             bgl.glDisable(bgl.GL_TEXTURE_2D)
-
-
-def _draw_canvas_outlines():
-    """Moldura da tela do jogo, por cima de tudo: o que estiver dentro dela
-    aparece no jogo, mesmo que o Frame tenha crescido."""
-    import bgl
-    context = bpy.context
-    tree = getattr(context.space_data, "edit_tree", None)
-    if tree is None or tree.bl_idname != UITree.bl_idname:
-        return
-    scale = context.user_preferences.system.ui_scale  # U.dpi_fac
-    for frame in tree.nodes:
-        if frame.bl_idname != "NodeFrame":
-            continue
-        x, y, w, h = (v * scale for v in _canvas(frame, context.scene))
-        x0, x1, y0, y1 = x, x + w, y - h, y
-        bgl.glEnable(bgl.GL_BLEND)
-        bgl.glColor4f(0.3, 0.9, 1.0, 0.9)
-        bgl.glLineWidth(2.0)
-        bgl.glBegin(bgl.GL_LINE_LOOP)
-        for px, py in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
-            bgl.glVertex2f(px, py)
-        bgl.glEnd()
-        bgl.glLineWidth(1.0)
 
 
 def _draw_previews():
@@ -381,11 +382,11 @@ class NODE_PT_range_ui_tree(Panel):
         if frame is not None:
             box = layout.box()
             box.label("Tela: %s" % (frame.label or frame.name))
-            box.prop(frame, "ui_canvas_width")
             box.prop_search(frame, "ui_backdrop", bpy.data, "images", text="")
             box.operator(RANGE_OT_ui_tree_capture.bl_idname, icon="RENDER_STILL")
         layout.label("Jogo: Always (pulso) + Python")
-        layout.label("Module: range_ui_tree.main")
+        layout.label("Module: range_ui_runtime.main")
+        layout.label("Liga/desliga: propriedade ui_screen")
 
 
 class UICategory(NodeCategory):
@@ -396,6 +397,8 @@ class UICategory(NodeCategory):
 
 CATEGORIES = [
     UICategory("RANGE_UI_WIDGETS", "Widgets", items=[
+        NodeItem("NodeFrame", label="Screen", settings={
+            "ui_screen": "True", "label": "'Screen'", "width": "640.0", "shrink": "False"}),
         NodeItem(UIButtonNode.bl_idname),
         NodeItem("NodeFrame"),
     ]),
@@ -414,20 +417,18 @@ def register():
         bpy.utils.register_class(cls)
     bpy.types.NodeFrame.ui_backdrop = StringProperty(
         name="Backdrop", description="Imagem de fundo desta tela no editor (não vai para o jogo)")
-    bpy.types.NodeFrame.ui_canvas_width = FloatProperty(
-        name="Screen Width", default=640.0, min=64.0, soft_max=4000.0,
-        description="Largura da tela do jogo no editor; a altura segue a proporção da resolução")
+    bpy.types.NodeFrame.ui_screen = BoolProperty(
+        name="Screen", description="Na UI Tree, este Frame é uma tela do jogo (lido em drawnode.c)")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
     space = bpy.types.SpaceNodeEditor
     _draw_handles.append(space.draw_handler_add(_draw_editor, (), "WINDOW", "PRE_VIEW"))
-    _draw_handles.append(space.draw_handler_add(_draw_canvas_outlines, (), "WINDOW", "POST_VIEW"))
 
 
 def unregister():
     while _draw_handles:
         bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handles.pop(), "WINDOW")
     del bpy.types.NodeFrame.ui_backdrop
-    del bpy.types.NodeFrame.ui_canvas_width
+    del bpy.types.NodeFrame.ui_screen
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
