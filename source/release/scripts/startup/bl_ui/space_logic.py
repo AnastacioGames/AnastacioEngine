@@ -223,12 +223,12 @@ class LOGIC_MT_logicbricks_add(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator_menu_enum("logic.sensor_add", "type", text="Sensor")
-        layout.operator_menu_enum("logic.controller_add", "type", text="Controller")
-        layout.operator_menu_enum("logic.actuator_add", "type", text="Actuator")
+        layout.operator_menu_enum("logic.sensor_add", "type", text="Sensor", icon='RESTRICT_VIEW_OFF')
+        layout.operator_menu_enum("logic.controller_add", "type", text="Controller", icon='GATE_AND')
+        layout.operator_menu_enum("logic.actuator_add", "type", text="Actuator", icon='PLAY')
 
         layout.separator()
-        layout.operator_menu_enum("logic.preset_add", "type", text="Preset")
+        layout.operator_menu_enum("logic.preset_add", "type", text="Preset", icon='LOGIC')
 
 
 class LOGIC_HT_header(Header):

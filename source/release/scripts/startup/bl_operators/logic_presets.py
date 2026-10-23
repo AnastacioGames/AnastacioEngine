@@ -248,33 +248,33 @@ class LOGIC_OT_preset_add(Operator):
     type = EnumProperty(
         name="Preset",
         items=(
-            ('WALK', "Walk (WASD)", "W and S move forward and back, A and D turn"),
-            ('JUMP', "Jump", "Space jumps while a ray below touches the ground (needs Dynamic physics)"),
-            ('CAMERA', "Follow Camera", "The scene camera follows the active object from behind"),
+            ('WALK', "Walk (WASD)", "W and S move forward and back, A and D turn", 'MAN_TRANS', 0),
+            ('JUMP', "Jump", "Space jumps while a ray below touches the ground (needs Dynamic physics)", 'TRIA_UP', 1),
+            ('CAMERA', "Follow Camera", "The scene camera follows the active object from behind", 'OUTLINER_OB_CAMERA', 2),
             ('COLLECT', "Collect Item", "The item disappears and sends the message \"collected\" "
-                                         "when an object with the property \"player\" touches it"),
+                                         "when an object with the property \"player\" touches it", 'SOLO_ON', 3),
             ('DOOR', "Door with Key", "E near an object with the property \"player\" toggles the "
                                        "property \"open\", which plays the door Action (choose it) "
-                                       "forward or back"),
+                                       "forward or back", 'KEY_HLT', 4),
             ('HEALTH', "Health and Damage", "Property \"health\" loses 10 when touching an object with "
-                                             "the property \"damage\", the object ends at zero"),
+                                             "the property \"damage\", the object ends at zero", 'GHOST_ENABLED', 5),
             ('CHASE', "Chase Enemy", "Follows the object with the property \"player\" when it comes "
-                                     "closer than 10 units (Steering, Seek)"),
+                                     "closer than 10 units (Steering, Seek)", 'POSE_HLT', 6),
             ('CHECKPOINT', "Checkpoint and Respawn", "Touching an object with the property \"checkpoint\" "
                                                      "saves the place, touching one with \"kill\" "
-                                                     "returns there (or to the start)"),
+                                                     "returns there (or to the start)", 'RECOVER_LAST', 7),
             ('BUTTON', "Menu Button", "Clicking the object opens a scene (choose it in Go To Scene), "
-                                      "the mouse cursor is shown"),
+                                      "the mouse cursor is shown", 'RESTRICT_SELECT_OFF', 8),
             ('PLATFORM', "Moving Platform", "Goes forth for 2 seconds and comes back, with two states "
-                                            "and the Wait actuator"),
-            ('MOUSE_LOOK', "Mouse Look", "The object turns with the mouse (Mouse actuator, Look)"),
+                                            "and the Wait actuator", 'LOOP_BACK', 9),
+            ('MOUSE_LOOK', "Mouse Look", "The object turns with the mouse (Mouse actuator, Look)", 'RESTRICT_VIEW_OFF', 10),
             ('SHOOT', "Shoot", "Left click adds the object of Add Object in front, fast (choose the "
-                               "bullet, it must be on a hidden layer)"),
+                               "bullet, it must be on a hidden layer)", 'FORCE_FORCE', 11),
             ('SPAWN_TIMER', "Spawn Every 2 Seconds", "Adds the object of Add Object every 2 seconds (choose "
-                                                     "it, it must be on a hidden layer)"),
+                                                     "it, it must be on a hidden layer)", 'TIME', 12),
             ('TURRET', "Turret", "Turns to the object with the property \"player\" when it enters a "
-                                 "60 degree radar of 15 units"),
-            ('PAUSE', "Pause Key", "P suspends the scene (an overlay scene can resume it)"),
+                                 "60 degree radar of 15 units", 'LAMP_SPOT', 13),
+            ('PAUSE', "Pause Key", "P suspends the scene (an overlay scene can resume it)", 'PAUSE', 14),
         ),
     )
 
