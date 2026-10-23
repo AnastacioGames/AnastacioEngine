@@ -380,6 +380,26 @@ TABLE = (
      'Во время записи игра, запущенная через Standalone, записывает своё окно в отдельное видео '
      '(<файл>_standalone_<дата>.mp4, та же папка и настройки)'),
     ('Billboard (impostor)', 'Billboard (impostor)', 'Billboard (impostor)', 'Билборд (импостор)'),
+    ('When this file is launched directly (double-click or command line), the game starts full window instead of '
+     'the editor, and closing the game closes the program. Needs Auto Run Python Scripts enabled. Opening the file '
+     'from inside the editor does not start it',
+     'Quando este arquivo é aberto direto (duplo clique ou linha de comando), o jogo começa em janela cheia em vez '
+     'do editor, e fechar o jogo fecha o programa. Precisa de Auto Run Python Scripts ligado. Abrir o arquivo de '
+     'dentro do editor não inicia o jogo',
+     'Cuando este archivo se abre directamente (doble clic o línea de comandos), el juego arranca a ventana completa '
+     'en lugar del editor, y cerrar el juego cierra el programa. Requiere Auto Run Python Scripts activado. Abrir el '
+     'archivo desde el editor no lo inicia',
+     'Если файл запущен напрямую (двойной щелчок или командная строка), игра стартует на всё окно вместо редактора, '
+     'а закрытие игры закрывает программу. Нужно включить Auto Run Python Scripts. Открытие файла из редактора '
+     'игру не запускает'),
+    ('Show icons in the Add Sensor, Controller and Actuator menus',
+     'Mostra ícones nos menus Adicionar Sensor, Controlador e Atuador',
+     'Muestra iconos en los menús Añadir Sensor, Controlador y Actuador',
+     'Показывать значки в меню добавления сенсоров, контроллеров и актуаторов'),
+    ('Ripples and puddles left on the ground under a rain_shelter object, with a soft edge (0 = dry)',
+     'Ondulações e poças deixadas no chão sob um objeto rain_shelter, com borda suave (0 = seco)',
+     'Ondas y charcos que quedan en el suelo bajo un objeto rain_shelter, con borde suave (0 = seco)',
+     'Рябь и лужи на земле под объектом rain_shelter, с мягким краем (0 = сухо)'),
 )
 
 PT_BR = {en: pt for en, pt, _es, _ru in TABLE if pt}
