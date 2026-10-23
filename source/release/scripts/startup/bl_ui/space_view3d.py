@@ -1359,6 +1359,8 @@ class INFO_MT_lamp_add(Menu):
 
         layout.operator_context = 'INVOKE_REGION_WIN'
         layout.operator_enum("object.lamp_add", "type")
+        layout.separator()
+        layout.operator("object.fake_lamp_gpu_add", text="Fake (GPU Particle)", icon='PARTICLES')
 
 
 class INFO_MT_camera_add(Menu):

@@ -568,7 +568,48 @@ class QuickFluid(Operator):
         return {'FINISHED'}
 
 
+class AddFakeLampGPU(Operator):
+    """Add a fake lamp: a single-vertex mesh showing one glowing GPU particle """         """(no real light, cheap for many lamps)"""
+    bl_idname = "object.fake_lamp_gpu_add"
+    bl_label = "Fake Lamp (GPU Particle)"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    color = FloatVectorProperty(
+        name="Color", subtype='COLOR', size=4, min=0.0, max=1.0,
+        default=(1.0, 0.85, 0.5, 1.0),
+    )
+    size = FloatProperty(name="Size", min=0.001, default=0.5)
+
+    def execute(self, context):
+        scene = context.scene
+        me = bpy.data.meshes.new("FakeLamp")
+        me.vertices.add(1)
+        me.update()
+        ob = bpy.data.objects.new("FakeLamp", me)
+        ob.location = scene.cursor_location
+        scene.objects.link(ob)
+        for o in context.selected_objects:
+            o.select = False
+        ob.select = True
+        scene.objects.active = ob
+
+        ob.use_gpu_particles = True
+        gp = ob.gpu_particles
+        gp.emit_from = 'VERTICES'
+        gp.particle_look = 'DEFAULT'
+        gp.particle_count = 1
+        gp.size = self.size
+        gp.end_size = self.size
+        gp.color = self.color
+        gp.end_color = self.color
+        gp.texture = ""
+        gp.blend_mode = 'ADDITIVE'
+        gp.billboard_mode = 'CAMERA_FACING'
+        return {'FINISHED'}
+
+
 classes = (
+    AddFakeLampGPU,
     QuickExplode,
     QuickFluid,
     QuickFur,
