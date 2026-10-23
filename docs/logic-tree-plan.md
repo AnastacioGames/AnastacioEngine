@@ -1,6 +1,6 @@
 # Logic Tree: lógica de jogo por nós
 
-Estado: **F0–F5 feitas (2026-10-23)**, decisões aprovadas (seção 11). Branch: `feat/logic-tree` (separada do main).
+Estado: **F0–F6 feitas (2026-10-23)**, decisões aprovadas (seção 11). Branch: `feat/logic-tree` (separada do main).
 
 ## 1. Objetivo e meta de sensação
 
@@ -135,7 +135,8 @@ Regras:
 | **F3** | Receitas: Andar WASD, Pular, Coletar Item, Vida e Dano, Porta com Tecla, Plataforma vai-e-volta. Árvore nova com nota | Baixo | Não |
 | **F4** | Demais sensores e actuators por tabela, priorizando os mais usados no RolimaRacer. Nó Rodar Python | Baixo, mas é volume | Não |
 | **F5** | Depuração: nomes ligando nó e brick na janela F4/F5, pausar no disparo pelo nó. Investigar destaque do nó ativo no Node Editor durante o jogo | Médio | Talvez (só leitura) |
-| **F6** | Avaliar, só com caso real: ver bricks existentes como árvore (importação), pinos de dado, runtime próprio | — | — |
+| **F6** | Destaque dos nós que dispararam (feito, seção 19) | Baixo | Sim (só leitura) |
+| **F7** | Avaliar, só com caso real: ver bricks existentes como árvore (importação), pinos de dado, runtime próprio | — | — |
 
 **F0, o que precisa ser provado antes da F1:**
 1. **Estados:** se o usuário também tem bricks com estados no mesmo objeto, os estados da árvore usam os mesmos
@@ -322,7 +323,10 @@ no RNA, então o grupo aparece como os outros.
   ("Pause: <nó>"): numa ação, ligado ao controller dela; num gatilho, com um And próprio em cada estado usado.
   Sem C++: a marca da janela de depuração (`KX_DebugMode::m_logicBreak`) só existe em runtime. Diferença: só a
   cena do objeto pausa (a marca da janela suspende todas); o botão de pausa da janela retoma. Com gatilho em
-  True Level, pausa de novo no tick seguinte, como um breakpoint.
+  True Level, pausa de novo no tick seguinte, como um breakpoint. Num gatilho que entra num Not, a pausa segue
+  o próprio sensor (quando ele fica positivo), não o ramo negado; para pausar no ramo, marque a ação.
+- Com o objeto em várias cenas, a cena da pausa e do Debug Mode é a que `compile_all(scene)` recebeu (a do P).
+- O registro é pelo nome do nó: renomear depois de compilar mostra "Ainda não compilado" até o próximo Compile.
 - **Destaque do nó ativo (investigação):** o jogo embutido (P) roda o laço do jogo dentro do laço do editor,
   então nenhum desenho ou timer Python do Node Editor roda durante o jogo. Destacar o nó exigiria C++: o
   `KX_DebugMode` já conta disparos por brick; bastaria o editor ler, ao voltar do jogo, um resumo por brick
@@ -335,3 +339,20 @@ no RNA, então o grupo aparece como os outros.
   `UI_panel_category_icon` (`interface_panel.c`), C, precisa do build do `RangeEngine`.
 - Fica para o teste com janela: ícones das abas; marcar "Pause When Fired" num nó, ligar Debug Mode, apertar P
   e ver o jogo parar; painel N listando os bricks.
+
+## 19. F6 implementada (2026-10-23): destaque dos nós que dispararam
+
+- Durante o jogo embutido o Node Editor não redesenha, então o destaque é **ao voltar do jogo**: verde nos nós
+  cujos bricks dispararam pelo menos uma vez, com a contagem no painel N ("Disparou N vez(es)") e o botão Clear
+  Highlight. O próximo P limpa o destaque.
+- C++ só de leitura: `SCA_ILogicBrick.fireCount` (Python), que lê os contadores do Logic Bricks 2.0 F5
+  (`GetRiseCount`/`GetStartCount`).
+- Só com o Debug Mode da cena: a compilação gera o texto `range_logic_trace.py` e um Always + controller Python
+  por estado ("Logic Tree Trace"). Ele registra o dono em `scene.onRemove`; ao fim do jogo grava
+  `%TEMP%/range_logic_trace.json`, que o `game_post` lê pelo registro nó↔brick da F5. Sem Debug Mode nada é gerado.
+- Teste `f6_highlight_test.py -- <pasta>` (7 provas: sem Debug Mode sem registro, controller e texto,
+  recompilar, cena certa com o objeto em duas cenas), `AnastacioRuntime --server <pasta>/f6.range` e
+  `f6_highlight_test.py -- <pasta> check` (6 provas: JSON gravado, contagens, nós que dispararam pintados, parados
+  sem cor, Clear). Precisa do runtime desta branch (`fireCount`).
+- Fica para o teste com janela: ligar Debug Mode, apertar P, jogar, sair com Esc e ver os nós verdes.
+- F7 (antiga F6): importação de bricks como árvore, pinos de dado e runtime próprio continuam só para caso real.

@@ -7,6 +7,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Logic Tree F6 (destaque dos nós que dispararam)
+
+- `SCA_ILogicBrick`: atributo Python `fireCount` (virtual `GetFireCount`: subidas do sensor, inícios do
+  actuator; 0 nos controllers).
+- `range_logic_tree.py`: com o Debug Mode da cena, a compilação cria o texto `range_logic_trace.py` e um par
+  Always + controller Python Module por estado. Ao remover a cena (fim do jogo), ele grava
+  `%TEMP%/range_logic_trace.json` com o `fireCount` dos bricks. O `game_post` pinta de verde os nós que
+  dispararam, e o painel N mostra a contagem e o botão Clear Highlight. O `game_pre` limpa o destaque.
+- Revisão da F5: `compile_object(ob, scene)` usa a cena de `compile_all` (objeto ligado em várias cenas); dica
+  de nó renomeado no painel N; pausa num gatilho segue o sensor sem o Not (documentado).
+- Teste `tools/tests/logic_tree/f6_highlight_test.py` (build + runtime + `check`).
+
 ## 2026-10-23 - Logic Tree F5 (depuração) e ícones das abas
 
 - `range_logic_tree.py`: o registro (`logic_tree_record`) guarda `nodes` (`"tipo:brick"` -> nó), com
