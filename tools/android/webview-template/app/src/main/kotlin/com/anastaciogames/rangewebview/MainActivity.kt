@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
+import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -84,6 +85,13 @@ class MainActivity : Activity() {
                 return true
             }
         }
+        // Quit Game do jogo (Module.onRangeQuit no index.html) fecha o app.
+        webView.addJavascriptInterface(object {
+            @JavascriptInterface
+            fun exit() {
+                runOnUiThread { finishAndRemoveTask() }
+            }
+        }, "RangeAndroid")
         setContentView(webView)
         hideSystemBars()
 
@@ -117,6 +125,15 @@ class MainActivity : Activity() {
         super.onResume()
         webView.onResume()
         webView.evaluateJavascript("window.rangeAppHidden&&window.rangeAppHidden(false)", null)
+    }
+
+    // Voltar vira a tecla Pause no jogo (a UI Tree abre o menu); quem fecha e o Sair do menu.
+    @Deprecated("Activity simples, sem OnBackPressedDispatcher")
+    override fun onBackPressed() {
+        webView.evaluateJavascript(
+            "(function(){function k(t){document.dispatchEvent(new KeyboardEvent(t," +
+                "{key:'Pause',code:'Pause',keyCode:19,which:19,bubbles:true}))}" +
+                "k('keydown');setTimeout(function(){k('keyup')},100)})()", null)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

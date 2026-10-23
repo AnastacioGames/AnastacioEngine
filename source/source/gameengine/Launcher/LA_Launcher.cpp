@@ -740,6 +740,11 @@ KX_ExitInfo LA_Launcher::EngineMainLoop()
 			self->m_emscriptenExitInfo = self->EngineNextFrame();
 			if (self->m_emscriptenExitInfo.m_code != KX_ExitInfo::NO_REQUEST) {
 				emscripten_cancel_main_loop();
+				/* Quit Game: avisa a página (index.html fecha o app no Android
+				 * ou mostra "jogo encerrado" no navegador). */
+				if (self->m_emscriptenExitInfo.m_code == KX_ExitInfo::QUIT_GAME) {
+					EM_ASM({ if (Module.onRangeQuit) Module.onRangeQuit(); });
+				}
 			}
 		},
 		this, 0, 1);
