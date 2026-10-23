@@ -1830,6 +1830,9 @@ int UI_panel_category_icon(const char *idname)
 		{"Game Engine", ICON_GAME},
 		{"Layout", ICON_SNAP_GRID},
 		{"Assets", ICON_PLUGIN},
+		{"UI Tree", ICON_SPLITSCREEN},
+		{"Widgets", ICON_UI},
+		{"Actions", ICON_LOGIC},
 	};
 
 	for (int i = 0; i < ARRAY_SIZE(table); i++) {

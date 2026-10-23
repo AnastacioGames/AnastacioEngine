@@ -496,9 +496,8 @@ def _draw_editor():
     _draw_previews()
 
 
-class NODE_PT_range_ui_tree(Panel):
+class UITreePanel:
     bl_space_type = "NODE_EDITOR"
-    bl_region_type = "UI"
     bl_label = "UI Tree"
 
     @classmethod
@@ -520,6 +519,17 @@ class NODE_PT_range_ui_tree(Panel):
         layout.label("Module: range_ui_runtime.main")
         layout.label("Menu: propriedade ui_screen")
         layout.label("HUD: propriedade ui_hud (bool)")
+
+
+class NODE_PT_range_ui_tree(UITreePanel, Panel):
+    bl_region_type = "UI"
+
+
+class NODE_PT_range_ui_tree_tools(UITreePanel, Panel):
+    """Mesmo painel na prateleira T: vira um botão da barra flutuante
+    (Horizontal Tabs, botão no cabeçalho)."""
+    bl_region_type = "TOOLS"
+    bl_category = "UI Tree"
 
 
 class UICategory(NodeCategory):
@@ -545,7 +555,8 @@ CATEGORIES = [
 ]
 
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
-    RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_capture, NODE_PT_range_ui_tree)
+    RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_capture, NODE_PT_range_ui_tree,
+    NODE_PT_range_ui_tree_tools)
 
 _draw_handles = []
 
