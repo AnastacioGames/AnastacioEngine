@@ -8,7 +8,8 @@ texto ui_tree_data.py, que o módulo range_ui_tree lê no runtime.
 
 import bpy
 import nodeitems_utils
-from bpy.props import FloatVectorProperty, StringProperty
+from bpy.props import (BoolProperty, EnumProperty, FloatProperty,
+                       FloatVectorProperty, StringProperty)
 from bpy.types import Node, NodeSocket, NodeTree, Operator, Panel
 from nodeitems_utils import NodeCategory, NodeItem
 
@@ -22,6 +23,18 @@ class UITree(NodeTree):
     bl_idname = "RangeUITree"
     bl_label = "UI Tree"
     bl_icon = "MENU_PANEL"
+
+    preview_state = EnumProperty(
+        name="Preview", default="NORMAL",
+        description="Estado mostrado nos botões selecionados no editor",
+        items=(("NORMAL", "Normal", ""), ("HOVER", "Hover", ""), ("PRESSED", "Pressed", "")),
+        update=lambda self, context: _redraw_node_editors(context))
+
+
+def _redraw_node_editors(context):
+    for area in context.screen.areas:
+        if area.type == "NODE_EDITOR":
+            area.tag_redraw()
 
 
 class UIEventSocket(NodeSocket):
@@ -47,17 +60,32 @@ def _color(name, default):
 
 
 class UIButtonNode(UINode, Node):
+    """O nó fica recolhido e serve de alça; o botão é a prévia desenhada
+    embaixo dele, com largura = largura do nó e altura = Height."""
     bl_idname = "RangeUIButton"
     bl_label = "Button"
 
     text = StringProperty(name="Text", default="Button")
+    button_height = FloatProperty(name="Height", default=40.0, min=8.0, soft_max=200.0,
+                           description="Altura do botão (a largura é a do nó)")
     color = _color("Color", (0.20, 0.22, 0.26, 0.90))
     hover_color = _color("Hover", (0.30, 0.45, 0.75, 0.95))
     press_color = _color("Pressed", (0.15, 0.30, 0.55, 1.0))
     text_color = _color("Text Color", (1.0, 1.0, 1.0, 1.0))
+    radius = FloatProperty(name="Roundness", default=1.0, min=0.0, max=1.0,
+                           subtype="FACTOR", description="0 = quadrado, 1 = cápsula")
+    border = FloatProperty(name="Border", default=0.0, min=0.0, max=0.3,
+                           description="Espessura da borda, em fração da altura")
+    border_color = _color("Border Color", (1.0, 1.0, 1.0, 0.8))
+    text_size = FloatProperty(name="Text Size", default=0.45, min=0.1, max=1.0,
+                              description="Tamanho do texto, em fração da altura")
+    align = EnumProperty(name="Align", default="CENTER", items=(
+        ("LEFT", "Left", ""), ("CENTER", "Center", ""), ("RIGHT", "Right", "")))
+    shadow = BoolProperty(name="Shadow", default=False)
 
     def init(self, context):
-        self.width = 160
+        self.width = 200
+        self.hide = True
         for name in EVENTS:
             self.outputs.new(UIEventSocket.bl_idname, name)
 
@@ -66,11 +94,30 @@ class UIButtonNode(UINode, Node):
 
     def draw_buttons_ext(self, context, layout):
         layout.prop(self, "text")
+        layout.prop(self, "button_height")
+        col = layout.column(align=True)
         for prop in ("color", "hover_color", "press_color", "text_color"):
-            layout.prop(self, prop)
+            col.prop(self, prop)
+        layout.prop(self, "radius", slider=True)
+        row = layout.row(align=True)
+        row.prop(self, "border")
+        row.prop(self, "border_color", text="")
+        layout.prop(self, "text_size", slider=True)
+        layout.row().prop(self, "align", expand=True)
+        layout.prop(self, "shadow")
 
     def draw_label(self):
-        return self.text or "Button"
+        # Recolhido, o nó é só a alça: sem texto para não cobrir a prévia.
+        return " " if self.hide else (self.text or "Button")
+
+    def style(self):
+        return {
+            "color": tuple(self.color), "hover": tuple(self.hover_color),
+            "press": tuple(self.press_color), "text_color": tuple(self.text_color),
+            "radius": self.radius, "border": self.border,
+            "border_color": tuple(self.border_color), "text_size": self.text_size,
+            "align": self.align, "shadow": self.shadow,
+        }
 
 
 class UIActionNode(UINode):
@@ -134,15 +181,6 @@ def _abs_location(node):
     return x, y
 
 
-def _node_size(node, default_height):
-    # dimensions vem em pixels de tela (com escala da UI); width em unidades
-    # da view.  Sem desenho (modo -b) dimensions fica zerado.
-    w, h = node.dimensions
-    if w > 0 and node.width > 0:
-        return node.width, h * node.width / w
-    return node.width, default_height
-
-
 def _actions_for(socket):
     actions = []
     for link in socket.links:
@@ -166,16 +204,12 @@ def bake_tree(tree):
             if node.bl_idname != UIButtonNode.bl_idname or node.parent != frame:
                 continue
             nx, ny = _abs_location(node)
-            w, h = _node_size(node, 30.0)
             buttons.append({
                 "name": node.name,
                 "text": node.text,
                 # Retângulo normalizado na tela: x da esquerda, y do topo.
-                "rect": ((nx - fx) / fw, (fy - ny) / fh, w / fw, h / fh),
-                "color": tuple(node.color),
-                "hover": tuple(node.hover_color),
-                "press": tuple(node.press_color),
-                "text_color": tuple(node.text_color),
+                "rect": ((nx - fx) / fw, (fy - ny) / fh, node.width / fw, node.button_height / fh),
+                "style": node.style(),
                 "events": {s.name: _actions_for(s) for s in node.outputs if s.is_linked},
             })
         screens.append({"name": frame.label or frame.name, "location": (fx, fy),
@@ -258,7 +292,7 @@ def _draw_backdrops():
         if image is None or image.gl_load():
             continue
         # A vista do Node Editor está em unidades * escala da UI.
-        scale = frame.dimensions.x / frame.width if frame.width > 0 and frame.dimensions.x > 0 else 1.0
+        scale = bpy.context.user_preferences.system.ui_scale  # U.dpi_fac
         x, y = _abs_location(frame)
         x0, y1 = x * scale, y * scale
         x1, y0 = x0 + frame.width * scale, y1 - frame.height * scale
@@ -273,6 +307,35 @@ def _draw_backdrops():
         bgl.glDisable(bgl.GL_TEXTURE_2D)
 
 
+def _draw_previews():
+    import bgl
+    import blf
+    import range_ui_draw
+    tree = getattr(bpy.context.space_data, "edit_tree", None)
+    if tree is None or tree.bl_idname != UITree.bl_idname:
+        return
+    for node in tree.nodes:
+        if node.bl_idname != UIButtonNode.bl_idname:
+            continue
+        scale = bpy.context.user_preferences.system.ui_scale  # U.dpi_fac
+        x, y = _abs_location(node)
+        w, h = node.width * scale, node.button_height * scale
+        x, y = x * scale, y * scale - h
+        state = tree.preview_state if node.select else "NORMAL"
+        range_ui_draw.draw_button(bgl, blf, node.style(), node.text, x, y, w, h, state)
+        if node.select:
+            bgl.glColor4f(1.0, 0.6, 0.2, 1.0)
+            bgl.glBegin(bgl.GL_LINE_LOOP)
+            for px, py in ((x, y), (x + w, y), (x + w, y + h), (x, y + h)):
+                bgl.glVertex2f(px, py)
+            bgl.glEnd()
+
+
+def _draw_editor():
+    _draw_backdrops()
+    _draw_previews()
+
+
 class NODE_PT_range_ui_tree(Panel):
     bl_space_type = "NODE_EDITOR"
     bl_region_type = "UI"
@@ -285,6 +348,7 @@ class NODE_PT_range_ui_tree(Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator(RANGE_OT_ui_tree_bake.bl_idname, icon="FILE_REFRESH")
+        layout.row().prop(context.space_data.edit_tree, "preview_state", expand=True)
         frame = _active_frame(context)
         if frame is not None:
             box = layout.box()
@@ -324,7 +388,7 @@ def register():
         name="Backdrop", description="Imagem de fundo desta tela no editor (não vai para o jogo)")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
     _draw_handle = bpy.types.SpaceNodeEditor.draw_handler_add(
-        _draw_backdrops, (), "WINDOW", "PRE_VIEW")
+        _draw_editor, (), "WINDOW", "PRE_VIEW")
 
 
 def unregister():

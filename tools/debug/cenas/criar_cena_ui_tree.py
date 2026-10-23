@@ -54,6 +54,16 @@ btn_opcoes = button(menu, "Opções", 220, -170)
 sair = button(menu, "Sair", 220, -220)
 voltar = button(opcoes, "Voltar", 220, -280)
 
+# Estilos variados para conferir a prévia e o jogo.
+jogar.shadow = True
+jogar.button_height = 48
+btn_opcoes.radius = 0.3
+btn_opcoes.border = 0.05
+sair.radius = 0.0
+sair.color = (0.55, 0.12, 0.12, 0.9)
+sair.hover_color = (0.8, 0.2, 0.2, 1.0)
+voltar.align = "LEFT"
+
 link(jogar, "On Enter", action(ui.UIPrintNode, "mouse entrou em Jogar", 800, 0))
 link(jogar, "On Click", action(ui.UIPrintNode, "clicou Jogar", 800, -100))
 link(btn_opcoes, "On Click", action(ui.UIScreenNode, "Opcoes", 800, -200))
