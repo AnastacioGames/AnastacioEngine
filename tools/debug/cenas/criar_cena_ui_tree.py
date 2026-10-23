@@ -70,7 +70,7 @@ link(btn_opcoes, "On Click", action(ui.UIScreenNode, "Opcoes", 800, -200))
 link(sair, "On Click", action(ui.UIQuitNode, "", 800, -300))
 link(voltar, "On Click", action(ui.UIScreenNode, "Menu", 800, -600))
 
-data = ui.bake_tree(tree)
+data = ui.bake_tree(tree, bpy.context.scene)
 text = bpy.data.texts.new(ui.DATA_TEXT)
 text.from_string("DATA = %r\n" % data)
 for screen in data["screens"]:

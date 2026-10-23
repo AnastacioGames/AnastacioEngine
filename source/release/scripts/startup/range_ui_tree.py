@@ -64,6 +64,7 @@ class UIButtonNode(UINode, Node):
     embaixo dele, com largura = largura do nó e altura = Height."""
     bl_idname = "RangeUIButton"
     bl_label = "Button"
+    bl_width_min = 20.0  # deixa a alça recolhida (width_hidden) estreita
 
     text = StringProperty(name="Text", default="Button")
     button_height = FloatProperty(name="Height", default=40.0, min=8.0, soft_max=200.0,
@@ -86,6 +87,7 @@ class UIButtonNode(UINode, Node):
     def init(self, context):
         self.width = 200
         self.hide = True
+        self.width_hidden = 20.0
         for name in EVENTS:
             self.outputs.new(UIEventSocket.bl_idname, name)
 
@@ -190,15 +192,23 @@ def _actions_for(socket):
     return actions
 
 
-def bake_tree(tree):
+def _canvas(frame, scene):
+    """Retângulo da tela do jogo (x, y do topo, largura, altura), em unidades
+    da view.  O Frame sempre cresce para caber os filhos e guarda esse
+    deslocamento num campo que o Python não lê; por isso a tela fica ancorada
+    em frame.location, que não muda, com a proporção da resolução do jogo."""
+    x, y = _abs_location(frame)
+    render = scene.render
+    w = frame.ui_canvas_width
+    return x, y, w, w * render.resolution_y / render.resolution_x
+
+
+def bake_tree(tree, scene):
     screens = []
     for frame in tree.nodes:
         if frame.bl_idname != "NodeFrame":
             continue
-        fx, fy = _abs_location(frame)
-        fw, fh = frame.width, frame.height
-        if fw <= 0 or fh <= 0:
-            continue
+        fx, fy, fw, fh = _canvas(frame, scene)
         buttons = []
         for node in tree.nodes:
             if node.bl_idname != UIButtonNode.bl_idname or node.parent != frame:
@@ -230,7 +240,7 @@ class RANGE_OT_ui_tree_bake(Operator):
         return tree is not None and tree.bl_idname == UITree.bl_idname
 
     def execute(self, context):
-        data = bake_tree(context.space_data.edit_tree)
+        data = bake_tree(context.space_data.edit_tree, context.scene)
         text = bpy.data.texts.get(DATA_TEXT) or bpy.data.texts.new(DATA_TEXT)
         text.from_string("# Gerado por Bake UI (UI Tree). Não editar.\nDATA = %r\n" % data)
         count = sum(len(s["buttons"]) for s in data["screens"])
@@ -272,39 +282,57 @@ class RANGE_OT_ui_tree_capture(Operator):
             image.reload()
         image.pack()
         frame.ui_backdrop = image.name
-        # Trava a proporção do Frame na do jogo: a imagem nunca distorce.
-        render = scene.render
-        frame.shrink = False
-        frame.height = frame.width * render.resolution_y / render.resolution_x
         return {'FINISHED'}
 
 
 def _draw_backdrops():
     import bgl
-    space = bpy.context.space_data
-    tree = getattr(space, "edit_tree", None)
+    context = bpy.context
+    tree = getattr(context.space_data, "edit_tree", None)
     if tree is None or tree.bl_idname != UITree.bl_idname:
         return
+    # A vista do Node Editor está em unidades * escala da UI.
+    scale = context.user_preferences.system.ui_scale  # U.dpi_fac
     for frame in tree.nodes:
-        if frame.bl_idname != "NodeFrame" or not frame.ui_backdrop:
+        if frame.bl_idname != "NodeFrame":
             continue
-        image = bpy.data.images.get(frame.ui_backdrop)
-        if image is None or image.gl_load():
+        x, y, w, h = (v * scale for v in _canvas(frame, context.scene))
+        x0, x1, y0, y1 = x, x + w, y - h, y
+        image = bpy.data.images.get(frame.ui_backdrop) if frame.ui_backdrop else None
+        if image is not None and not image.gl_load():
+            bgl.glEnable(bgl.GL_TEXTURE_2D)
+            bgl.glBindTexture(bgl.GL_TEXTURE_2D, image.bindcode[0])
+            bgl.glColor4f(1.0, 1.0, 1.0, 1.0)
+            bgl.glBegin(bgl.GL_QUADS)
+            for u, v, px, py in ((0, 0, x0, y0), (1, 0, x1, y0), (1, 1, x1, y1), (0, 1, x0, y1)):
+                bgl.glTexCoord2f(u, v)
+                bgl.glVertex2f(px, py)
+            bgl.glEnd()
+            bgl.glDisable(bgl.GL_TEXTURE_2D)
+
+
+def _draw_canvas_outlines():
+    """Moldura da tela do jogo, por cima de tudo: o que estiver dentro dela
+    aparece no jogo, mesmo que o Frame tenha crescido."""
+    import bgl
+    context = bpy.context
+    tree = getattr(context.space_data, "edit_tree", None)
+    if tree is None or tree.bl_idname != UITree.bl_idname:
+        return
+    scale = context.user_preferences.system.ui_scale  # U.dpi_fac
+    for frame in tree.nodes:
+        if frame.bl_idname != "NodeFrame":
             continue
-        # A vista do Node Editor está em unidades * escala da UI.
-        scale = bpy.context.user_preferences.system.ui_scale  # U.dpi_fac
-        x, y = _abs_location(frame)
-        x0, y1 = x * scale, y * scale
-        x1, y0 = x0 + frame.width * scale, y1 - frame.height * scale
-        bgl.glEnable(bgl.GL_TEXTURE_2D)
-        bgl.glBindTexture(bgl.GL_TEXTURE_2D, image.bindcode[0])
-        bgl.glColor4f(1.0, 1.0, 1.0, 1.0)
-        bgl.glBegin(bgl.GL_QUADS)
-        for u, v, px, py in ((0, 0, x0, y0), (1, 0, x1, y0), (1, 1, x1, y1), (0, 1, x0, y1)):
-            bgl.glTexCoord2f(u, v)
+        x, y, w, h = (v * scale for v in _canvas(frame, context.scene))
+        x0, x1, y0, y1 = x, x + w, y - h, y
+        bgl.glEnable(bgl.GL_BLEND)
+        bgl.glColor4f(0.3, 0.9, 1.0, 0.9)
+        bgl.glLineWidth(2.0)
+        bgl.glBegin(bgl.GL_LINE_LOOP)
+        for px, py in ((x0, y0), (x1, y0), (x1, y1), (x0, y1)):
             bgl.glVertex2f(px, py)
         bgl.glEnd()
-        bgl.glDisable(bgl.GL_TEXTURE_2D)
+        bgl.glLineWidth(1.0)
 
 
 def _draw_previews():
@@ -352,7 +380,8 @@ class NODE_PT_range_ui_tree(Panel):
         frame = _active_frame(context)
         if frame is not None:
             box = layout.box()
-            box.label("Fundo da tela: %s" % (frame.label or frame.name))
+            box.label("Tela: %s" % (frame.label or frame.name))
+            box.prop(frame, "ui_canvas_width")
             box.prop_search(frame, "ui_backdrop", bpy.data, "images", text="")
             box.operator(RANGE_OT_ui_tree_capture.bl_idname, icon="RENDER_STILL")
         layout.label("Jogo: Always (pulso) + Python")
@@ -377,23 +406,28 @@ CATEGORIES = [
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + ACTION_NODES + (
     RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_capture, NODE_PT_range_ui_tree)
 
-_draw_handle = None
+_draw_handles = []
 
 
 def register():
-    global _draw_handle
     for cls in CLASSES:
         bpy.utils.register_class(cls)
     bpy.types.NodeFrame.ui_backdrop = StringProperty(
         name="Backdrop", description="Imagem de fundo desta tela no editor (não vai para o jogo)")
+    bpy.types.NodeFrame.ui_canvas_width = FloatProperty(
+        name="Screen Width", default=640.0, min=64.0, soft_max=4000.0,
+        description="Largura da tela do jogo no editor; a altura segue a proporção da resolução")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
-    _draw_handle = bpy.types.SpaceNodeEditor.draw_handler_add(
-        _draw_editor, (), "WINDOW", "PRE_VIEW")
+    space = bpy.types.SpaceNodeEditor
+    _draw_handles.append(space.draw_handler_add(_draw_editor, (), "WINDOW", "PRE_VIEW"))
+    _draw_handles.append(space.draw_handler_add(_draw_canvas_outlines, (), "WINDOW", "POST_VIEW"))
 
 
 def unregister():
-    bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handle, "WINDOW")
+    while _draw_handles:
+        bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handles.pop(), "WINDOW")
     del bpy.types.NodeFrame.ui_backdrop
+    del bpy.types.NodeFrame.ui_canvas_width
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
