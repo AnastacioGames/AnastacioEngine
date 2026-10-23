@@ -818,6 +818,23 @@ def add_template(tree, kind, origin=(0.0, 0.0)):
             node.anchor = "TOP_LEFT"
         for node in (gauge, unit):
             node.anchor = "BOTTOM_RIGHT"
+        # Pause (embaixo no meio, bom para toque): volta ao menu e esconde o HUD.
+        pause = widget(UIButtonNode, hud, 296, -304, 48, 44)
+        pause.text = "II"
+        pause.anchor = "BOTTOM"
+        action(UIScreenNode, "Menu", 800, 0, (pause, "On Click"))
+        hud_off = action(UISetPropertyNode, "False", 800, -100, (pause, "On Click"))
+        hud_off.prop_name = "ui_hud"
+        # A e B: botões de ação comuns. Enquanto apertados, botao_a/botao_b
+        # ficam True; o script do jogo lê a propriedade.
+        for i, name in enumerate(("A", "B")):
+            button = widget(UIButtonNode, hud, 20 + i * 80, -292, 64, 56)
+            button.text = name
+            button.anchor = "BOTTOM_LEFT"
+            prop = "botao_" + name.lower()
+            down = action(UISetPropertyNode, "True", 800, -250 - i * 200, (button, "On Press"))
+            up = action(UISetPropertyNode, "False", 800, -350 - i * 200, (button, "On Release"))
+            down.prop_name = up.prop_name = prop
         return [hud]
 
     menu = frame("Menu", 0, 0)
@@ -852,7 +869,8 @@ def add_template(tree, kind, origin=(0.0, 0.0)):
 
 GAME_PROPS = (("ui_screen", "STRING", "Menu"), ("ui_hud", "BOOL", False),
               ("som", "BOOL", True), ("volume", "FLOAT", 0.8),
-              ("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0))
+              ("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0),
+              ("botao_a", "BOOL", False), ("botao_b", "BOOL", False))
 
 
 def setup_game_logic(obj):

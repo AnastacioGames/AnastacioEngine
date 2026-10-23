@@ -167,6 +167,24 @@ __PERF_SCRIPT__
   var CARDBOARD = __CARDBOARD__;  // --cardboard: botao VR sempre visivel, sem controle de toque
   var el = function (id) { return document.getElementById(id); };
   var debug = /[?&]debug=1/.test(location.search);
+  // ?report=1: grava o Performance Report (RANGE_TRACE) e manda ao serve.py do PC, que gera o report.html.
+  var report = /[?&]report=1/.test(location.search), REPORT_DIR = "/range_trace";
+  function sendReport() {
+    if (!report || !Module.FS) return;
+    var files = {};
+    ["trace.jsonl", "shaders.txt", "objects.txt"].forEach(function (n) {
+      try { files[n] = Module.FS.readFile(REPORT_DIR + "/" + n, { encoding: "utf8" }); } catch (e) {}
+    });
+    if (!files["trace.jsonl"]) return;
+    var body = JSON.stringify({ id: REPORT_ID, ua: navigator.userAgent, files: files });
+    fetch("__report", { method: "POST", body: body }).catch(function () {});
+  }
+  var REPORT_ID = new Date().toISOString().replace(/[:.]/g, "-");
+  if (report) {
+    setInterval(sendReport, 10000);
+    window.addEventListener("pagehide", sendReport);
+    document.addEventListener("visibilitychange", function () { if (document.hidden) sendReport(); });
+  }
   if (debug) document.body.classList.add("debug");
   function log(s) { if (debug) el("log").textContent += s + "\\n"; }
 
@@ -760,9 +778,9 @@ __PERF_SCRIPT__
     if (!ctx.rangeWatched) {
       ctx.rangeWatched = true;
       // O SDL chama resume() sozinho enquanto espera o primeiro gesto; escondido, volta a suspender.
-      ctx.addEventListener("statechange", function () { if (document.hidden && audioHeld) syncAudio(); });
+      ctx.addEventListener("statechange", function () { if ((document.hidden || appHidden) && audioHeld) syncAudio(); });
     }
-    if (document.hidden) {
+    if (document.hidden || appHidden) {
       if (ctx.state === "running") {
         audioHeld = true;
         ctx.suspend();
@@ -775,6 +793,9 @@ __PERF_SCRIPT__
     }
   }
   document.addEventListener("visibilitychange", syncAudio);
+  // O app Android (WebView) nem sempre dispara visibilitychange no onPause; ele avisa por aqui.
+  var appHidden = false;
+  window.rangeAppHidden = function (hidden) { appHidden = !!hidden; syncAudio(); };
 
   el("fs").addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", onFullscreenChange);
@@ -812,6 +833,12 @@ __PERF_SCRIPT__
       else if (t) el("status").textContent = t;
     },
     preRun: [function () {
+      if (report && window.ENV) {
+        try { Module.FS.mkdirTree(REPORT_DIR); } catch (e) {}
+        ENV.RANGE_TRACE = REPORT_DIR;
+        ENV.RANGE_TRACE_MODULES = "load,usage,frames,work,scripts,runtime";
+        ENV.RANGE_SHADER_LOG = REPORT_DIR + "/shaders.txt";
+      }
       Module.addRunDependency("game-files");
       var jobs = [fetchInto("game/" + GAME, GAME)];
       EXTRAS.forEach(function (n) { jobs.push(fetchInto("game/" + n, n)); });
@@ -819,6 +846,17 @@ __PERF_SCRIPT__
         Module.removeRunDependency("game-files");
       }).catch(function (e) { fail("Falha ao baixar arquivos do jogo: " + e.message); });
     }],
+    // Quit Game do jogo: no APK fecha a Activity; no navegador a pagina nao pode se fechar, entao avisa.
+    onRangeQuit: function () {
+      log("[event] jogo encerrado (Quit Game)");
+      sendReport();
+      if (window.RangeAndroid && window.RangeAndroid.exit) { window.RangeAndroid.exit(); return; }
+      el("progress").hidden = true;
+      el("play").hidden = true;
+      el("status").textContent = "Jogo encerrado. Recarregue a pagina para jogar de novo.";
+      el("overlay").hidden = false;
+      stopTouch();
+    },
     onRuntimeInitialized: function () {
       if (pf) pf.runtimeInitialized = true;
       log("[event] runtime inicializado");
@@ -1013,6 +1051,10 @@ import os
 import sys
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
+# Gerador do Performance Report (repo da engine); sem ele so os dados brutos ficam em reports/.
+REPORT_TOOL = os.environ.get("RANGE_REPORT_TOOL") or __REPORT_TOOL__
+if REPORT_TOOL and not os.path.isfile(REPORT_TOOL):
+    REPORT_TOOL = None
 
 
 class Handler(http.server.SimpleHTTPRequestHandler):
@@ -1027,6 +1069,25 @@ class Handler(http.server.SimpleHTTPRequestHandler):
     def end_headers(self):
         self.send_header("Cache-Control", "no-cache")
         super().end_headers()
+
+    def do_POST(self):
+        """?report=1: recebe o Performance Report do celular e gera reports/<id>/report.html."""
+        if self.path.split("?")[0].rstrip("/").endswith("__report"):
+            import json, re, subprocess
+            data = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+            folder = os.path.join(ROOT, "reports", re.sub(r"[^\w.-]", "_", data.get("id", "run")))
+            os.makedirs(folder, exist_ok=True)
+            for name, text in data.get("files", {}).items():
+                if name in ("trace.jsonl", "shaders.txt", "objects.txt"):
+                    with open(os.path.join(folder, name), "w", encoding="utf-8", newline="") as f:
+                        f.write(text)
+            with open(os.path.join(folder, "device.txt"), "w", encoding="utf-8") as f:
+                f.write(data.get("ua", ""))
+            if REPORT_TOOL:
+                subprocess.run([sys.executable, REPORT_TOOL, folder], capture_output=True)
+            print("[report] " + folder, flush=True)
+        self.send_response(204)
+        self.end_headers()
 
 
 port = int(sys.argv[1]) if len(sys.argv) > 1 else 8080  # 0 escolhe uma porta livre
@@ -1183,7 +1244,9 @@ def main():
             .replace("__WIDTH__", str(args.width))
             .replace("__HEIGHT__", str(args.height)))
     (tmp / "index.html").write_text(html, encoding="utf-8", newline="\n")
-    (tmp / "serve.py").write_text(SERVE_PY, encoding="utf-8", newline="\n")
+    report_tool = REPO_ROOT / "source" / "release" / "scripts" / "modules" / "anastacio_perf_report.py"
+    (tmp / "serve.py").write_text(SERVE_PY.replace("__REPORT_TOOL__", repr(str(report_tool))),
+                                  encoding="utf-8", newline="\n")
     (tmp / "HOSTING.md").write_text(HOSTING_MD, encoding="utf-8", newline="\n")
 
     files = {}

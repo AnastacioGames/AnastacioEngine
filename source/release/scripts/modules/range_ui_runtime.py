@@ -18,8 +18,13 @@ propriedades de jogo do objeto escolhido a cada frame.
 
 Navegação sem mouse: setas (ou analógico/direcional do controle) mudam o foco,
 Enter/Espaço (ou botão A) apertam, esquerda/direita mexem o Slider em foco.
+
+Voltar: Esc (se não for a tecla de sair do jogo) ou Pause, que é o que o botão
+Voltar do Android manda, abrem a primeira tela e escondem o HUD; numa outra
+tela, voltam para a primeira.
 """
 
+import sys
 import time
 
 import Range
@@ -142,8 +147,10 @@ class UIRuntime:
         self.last_stick = 0
         self.sounds = {}
         self.textures = {}
+        self.speeds = {}  # id(objeto) -> [tempo, posição, km/h]
         self.last_draw = None
         self.master_volume = None
+        self.first = menus[0]["name"] if menus else ""
         self.audio_controls = [w for s in data["screens"] for w in s.get("widgets", ())
                                if w.get("audio", "NONE") != "NONE"]
         self.scene.post_draw.append(self.draw)
@@ -184,9 +191,24 @@ class UIRuntime:
         wanted = self.owner.get("ui_screen", "")
         if wanted != (self.active or ""):
             self.show(wanted)
+        if self.first and self.back_pressed() and self.active != self.first:
+            if self.active is None:
+                self.owner["ui_hud"] = False
+            self.show(self.first)
         screen = self.screen
         if screen is None:
+            # Sem menu: botões do HUD (ex.: Pause) respondem ao mouse/toque.
+            if self.owner.get("ui_hud", True):
+                for hud in self.huds:
+                    if hud.focusables and not hud.camera:
+                        self.update_screen(hud, hud=True)
+                        if self.screen is not None:
+                            break
             return
+        self.update_screen(screen)
+
+    def update_screen(self, screen, hud=False):
+        current = self.screen
         mx, my = logic.mouse.position  # 0-1, y a partir do topo
         if self.last_mouse is not None and (mx, my) != self.last_mouse:
             self.focus = None  # o mouse mexeu: volta a mandar o hover
@@ -195,7 +217,7 @@ class UIRuntime:
         height = Range.render.getWindowHeight()
         px, py = mx * width, (1.0 - my) * height
         lmb = logic.mouse.inputs[events.LEFTMOUSE]
-        nav_press, nav_release = self.navigate(screen)
+        nav_press, nav_release = (False, False) if hud else self.navigate(screen)
 
         for element in list(screen.focusables):
             if not element.enabled(self.owner):
@@ -214,14 +236,21 @@ class UIRuntime:
             elif element.hover and not inside:
                 self.fire(element, "On Exit", screen)
             element.hover = inside
-            if self.screen is not screen:
+            if self.screen is not current:
                 return  # uma ação trocou de tela
             if isinstance(element, Button):
                 self.update_button(element, screen, inside, just_pressed, just_released)
             else:
                 self.update_control(element, screen, inside, just_pressed, just_released, px)
-            if self.screen is not screen:
+            if self.screen is not current:
                 return
+
+    def back_pressed(self):
+        keyboard = logic.keyboard.inputs
+        keys = [events.PAUSEKEY]
+        if logic.getExitKey() != events.ESCKEY:
+            keys.append(events.ESCKEY)
+        return any(keyboard[k].activated for k in keys)
 
     def update_button(self, button, screen, inside, just_pressed, just_released):
         if inside:
@@ -434,14 +463,28 @@ class UIRuntime:
         values = {prop: obj[prop] for prop in obj.getPropertyNames()}
         # Velocidade do objeto em km/h, sem script: Object = carro e o
         # velocímetro (prop "velocidade") já anda. Prop de mesmo nome ganha.
-        try:
-            speed = obj.worldLinearVelocity.length * 3.6
-        except Exception:
-            speed = 0.0
+        speed = self.speed_of(obj)
         values.setdefault("speed", speed)
         if obj is not self.owner:
             values.setdefault("velocidade", speed)
         return values
+
+    def speed_of(self, obj):
+        """km/h pelo quanto o objeto andou desde a última medida: vale para
+        física, Motion (loc/dLoc), parent e pulo.  Medido no máximo uma vez
+        por frame lógico e suavizado para não tremer."""
+        frame = logic.getFrameTime()
+        last = self.speeds.get(id(obj))
+        pos = obj.worldPosition.copy()
+        if last is None:
+            self.speeds[id(obj)] = [frame, pos, 0.0]
+            return 0.0
+        dt = frame - last[0]
+        if dt > 0.0:
+            raw = (pos - last[1]).length / dt * 3.6
+            last[2] += (raw - last[2]) * min(1.0, dt * 10.0)
+            last[0], last[1] = frame, pos
+        return last[2]
 
     def texture(self, path):
         """Textura GL da imagem (carregada uma vez com Range.texture)."""
@@ -516,7 +559,12 @@ class UIRuntime:
         height = Range.render.getWindowHeight()
         # O render deixa iluminação/shader ligados; sem isso as cores do
         # desenho imediato saem escurecidas.
-        bgl.glPushAttrib(bgl.GL_ALL_ATTRIB_BITS)
+        # Na Web a emulação de GL faz o glPushAttrib consultando todo o estado
+        # (~44 ms por frame no celular): lá só o que a UI mexe é guardado.
+        if WEB:
+            saved = [(cap, bgl.glIsEnabled(cap)) for cap in _WEB_CAPS(bgl)]
+        else:
+            bgl.glPushAttrib(bgl.GL_ALL_ATTRIB_BITS)
         bgl.glUseProgram(0)
         bgl.glDisable(bgl.GL_LIGHTING)
         bgl.glDisable(bgl.GL_TEXTURE_2D)
@@ -562,7 +610,20 @@ class UIRuntime:
         bgl.glPopMatrix()
         bgl.glMatrixMode(bgl.GL_MODELVIEW)
         bgl.glPopMatrix()
-        bgl.glPopAttrib()
+        if WEB:
+            for cap, on in saved:
+                (bgl.glEnable if on else bgl.glDisable)(cap)
+            bgl.glLineWidth(1.0)
+        else:
+            bgl.glPopAttrib()
+
+
+WEB = sys.platform == "emscripten"
+
+
+def _WEB_CAPS(bgl):
+    return (bgl.GL_LIGHTING, bgl.GL_TEXTURE_2D, bgl.GL_CULL_FACE, bgl.GL_DEPTH_TEST,
+            bgl.GL_BLEND, bgl.GL_SCISSOR_TEST)
 
 
 # -- API para scripts ---------------------------------------------------------
