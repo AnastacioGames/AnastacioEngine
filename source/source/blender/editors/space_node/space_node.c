@@ -705,17 +705,19 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 	const int xend = rect.xmax - UI_UNIT_X / 2;
 	const int ytop = rect.ymax - UI_UNIT_Y / 2;
 	int x = xstart, top = ytop, xmax_used = xstart;
-	struct { int icon; float x, y; } icons[ARRAY_SIZE(categories)];
+	const uiFontStyle *fstyle = &UI_style_get()->widget;
+	struct { int icon; float x, y; const char *name; } icons[ARRAY_SIZE(categories)];
 	int icons_len = 0;
 
 	uiBlock *block = UI_block_begin(C, ar, "node_tabs_bar", UI_EMBOSS);
 
+	/* icon + name: the icons alone were hard to tell apart */
 	for (int i = 0; i < categories_len; i++) {
 		const char *category = categories[i]->category;
 		const int icon = UI_panel_category_icon(category);
 		const char *name = IFACE_(category);
-		const int w = (icon != ICON_NONE) ? cell :
-		              UI_fontstyle_string_width(&UI_style_get()->widget, name) + pad * 4;
+		const int text_w = UI_fontstyle_string_width(fstyle, name);
+		const int w = (icon != ICON_NONE) ? cell + text_w + pad * 2 : text_w + pad * 4;
 
 		if (x != xstart && x + w > xend) {
 			x = xstart;
@@ -725,8 +727,9 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 		                        x, top - cell, w, cell, name);
 		if (icon != ICON_NONE) {
 			icons[icons_len].icon = icon;
-			icons[icons_len].x = x + (w - icon_size) * 0.5f;
+			icons[icons_len].x = x + (cell - icon_size) * 0.5f;
 			icons[icons_len].y = top - cell + (cell - icon_size) * 0.5f;
+			icons[icons_len].name = name;
 			icons_len++;
 		}
 		x += w;
@@ -762,6 +765,17 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 		UI_icon_draw_aspect(icons[i].x, icons[i].y, icons[i].icon, icon_aspect, 1.0f, NULL);
 	}
 	glDisable(GL_BLEND);
+	{
+		bTheme *btheme = UI_GetTheme();
+		glColor3ubv((unsigned char *)btheme->tui.wcol_tool.text);
+		for (int i = 0; i < icons_len; i++) {
+			/* back from the icon corner to the button corner (the rows may wrap) */
+			const float bx = icons[i].x - (cell - icon_size) * 0.5f;
+			const float by = icons[i].y - (cell - icon_size) * 0.5f;
+			UI_fontstyle_draw_simple(fstyle, bx + cell - pad, by + (cell - fstyle->points * UI_DPI_FAC) * 0.5f,
+			                         icons[i].name);
+		}
+	}
 }
 
 static void node_main_region_draw(const bContext *C, ARegion *ar)

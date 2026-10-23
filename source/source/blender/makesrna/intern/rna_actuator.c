@@ -71,6 +71,15 @@ static const EnumPropertyItem actuator_type_items[] = {
 
 #include "BKE_sca.h"
 
+#include "WM_api.h"
+
+/* Logic Tree: brilho do brick disparado no jogo embutido (0 apagado, 1 aceso). */
+static float rna_Actuator_debug_intensity_get(PointerRNA *ptr)
+{
+	return WM_logic_debug_intensity(ptr->data);
+}
+
+
 static StructRNA *rna_Actuator_refine(struct PointerRNA *ptr)
 {
 	bActuator *actuator = (bActuator *)ptr->data;
@@ -602,6 +611,12 @@ static void rna_def_actuator(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Actuator", "Actuator to apply actions in the game engine");
 	RNA_def_struct_sdna(srna, "bActuator");
 	RNA_def_struct_refine_func(srna, "rna_Actuator_refine");
+
+	prop = RNA_def_property(srna, "debug_intensity", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_float_funcs(prop, "rna_Actuator_debug_intensity_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Debug Intensity",
+	                         "How lit the brick is while the game runs in the editor (1 just fired, 0 off)");
 
 	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "");

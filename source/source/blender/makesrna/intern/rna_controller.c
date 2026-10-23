@@ -52,6 +52,15 @@ const EnumPropertyItem rna_enum_controller_type_items[] = {
 #include "BKE_sca.h"
 #include "DNA_actuator_types.h"
 
+#include "WM_api.h"
+
+/* Logic Tree: brilho do brick disparado no jogo embutido (0 apagado, 1 aceso). */
+static float rna_Controller_debug_intensity_get(PointerRNA *ptr)
+{
+	return WM_logic_debug_intensity(ptr->data);
+}
+
+
 const EnumPropertyItem *rna_Controller_type_itemf(bContext *C, PointerRNA *UNUSED(ptr),
                                                   PropertyRNA *UNUSED(prop), bool *r_free)
 {
@@ -212,6 +221,12 @@ void RNA_def_controller(BlenderRNA *brna)
 	                       "Game engine logic brick to process events, connecting sensors to actuators");
 
 	RNA_api_controller(srna);
+
+	prop = RNA_def_property(srna, "debug_intensity", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_float_funcs(prop, "rna_Controller_debug_intensity_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Debug Intensity",
+	                         "How lit the brick is while the game runs in the editor (1 just fired, 0 off)");
 
 	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "");

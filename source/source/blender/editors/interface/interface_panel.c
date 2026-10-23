@@ -1832,11 +1832,11 @@ int UI_panel_category_icon(const char *idname)
 		{"Assets", ICON_PLUGIN},
 		{"UI Tree", ICON_SPLITSCREEN},
 		{"Widgets", ICON_UI},
-		{"Actions", ICON_LOGIC},
-		/* Logic Tree (range_logic_tree.py) */
-		{"Triggers", ICON_HAND},
-		{"Logic", ICON_LOGIC},
-		{"Recipes", ICON_PACKAGE},
+		/* Logic Tree (range_logic_tree.py): same icons as the Logic Editor Add menu */
+		{"Triggers", ICON_RESTRICT_VIEW_OFF},
+		{"Logic", ICON_GATE_AND},
+		{"Actions", ICON_PLAY},
+		{"Recipes", ICON_LOGIC},
 		/* Range_Object_Pencil addon */
 		{"Mifth", ICON_CURVE_BEZCURVE},
 	};

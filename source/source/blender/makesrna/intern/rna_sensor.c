@@ -64,6 +64,15 @@ static const EnumPropertyItem sensor_type_items[] = {
 
 #include "BKE_sca.h"
 #include "BKE_context.h"
+
+#include "WM_api.h"
+
+/* Logic Tree: brilho do brick disparado no jogo embutido (0 apagado, 1 aceso). */
+static float rna_Sensor_debug_intensity_get(PointerRNA *ptr)
+{
+	return WM_logic_debug_intensity(ptr->data);
+}
+
 #include "DNA_controller_types.h"
 #include "DNA_space_types.h"
 
@@ -341,6 +350,12 @@ static void rna_def_sensor(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Sensor", "Game engine logic brick to detect events");
 	RNA_def_struct_sdna(srna, "bSensor");
 	RNA_def_struct_refine_func(srna, "rna_Sensor_refine");
+
+	prop = RNA_def_property(srna, "debug_intensity", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_float_funcs(prop, "rna_Sensor_debug_intensity_get", NULL, NULL);
+	RNA_def_property_ui_text(prop, "Debug Intensity",
+	                         "How lit the brick is while the game runs in the editor (1 just fired, 0 off)");
 
 	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
 	RNA_def_property_ui_text(prop, "Name", "Sensor name");

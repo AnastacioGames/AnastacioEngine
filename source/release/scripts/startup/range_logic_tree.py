@@ -31,6 +31,10 @@ class LogicTree(NodeTree):
     bl_label = "Logic Tree"
     bl_icon = "LOGIC"
 
+    show_highlight_active = BoolProperty(
+        name="Highlight Active", default=True,
+        description="While the game runs, light up the nodes and links that are firing")
+
 
 class PulseSocket(NodeSocket):
     bl_idname = "RangeLogicPulseSocket"
@@ -891,6 +895,113 @@ def apply_trace(path=None):
     return {k: sorted(v) for k, v in fired.items()}
 
 
+# ---------------------------------------------------------------- realce ao vivo (Highlight Active)
+
+LIVE_COLOR = (1.0, 0.72, 0.15)
+
+
+def _live_intensity(tree):
+    """{nome do nó: brilho 0..1} dos bricks que a árvore gerou e que dispararam agora."""
+    out = {}
+    for ob in bpy.data.objects:
+        if ob.logic_tree != tree:
+            continue
+        game = ob.game
+        for key, node_name in _record(ob).get("nodes", {}).items():
+            kind, _sep, name = key.partition(":")
+            brick = getattr(game, kind + "s").get(name)
+            v = brick.debug_intensity if brick is not None else 0.0
+            if v > out.get(node_name, 0.0):
+                out[node_name] = v
+    return out
+
+
+def _node_rect(node, dpi):
+    """(xmin, ymin, xmax, ymax) do nó em coordenadas da view."""
+    x, y = node.location
+    p = node.parent
+    while p is not None:
+        x, y = x + p.location.x, y + p.location.y
+        p = p.parent
+    x, y = x * dpi, y * dpi
+    w, h = node.dimensions
+    return x, y - h, x + w, y
+
+
+def _socket_y(node, rect, socket, dpi):
+    # aproxima o layout do node_update_basis: cabeçalho, saídas, botões, entradas embaixo
+    unit = 20.0 * dpi
+    if socket.is_output:
+        outs = [s for s in node.outputs if not s.hide]
+        i = outs.index(socket) if socket in outs else 0
+        return rect[3] - unit * (1.75 + i)
+    ins = [s for s in node.inputs if not s.hide]
+    i = ins.index(socket) if socket in ins else 0
+    return rect[1] + unit * 0.25 + unit * (len(ins) - i - 0.5)
+
+
+def _draw_live():
+    import bgl
+    context = bpy.context
+    space = context.space_data
+    tree = getattr(space, "edit_tree", None)
+    if tree is None or tree.bl_idname != TREE_ID or not tree.show_highlight_active:
+        return
+    lit = _live_intensity(tree)
+    if not any(v > 0.0 for v in lit.values()):
+        return
+    system = context.user_preferences.system
+    dpi = system.pixel_size * system.dpi / 72.0
+    rects = {}
+    bgl.glEnable(bgl.GL_BLEND)
+    bgl.glEnable(bgl.GL_LINE_SMOOTH)
+    # caminho: ligações cujos dois nós estão acesos
+    bgl.glLineWidth(4.0)
+    for link in tree.links:
+        a, b = link.from_node, link.to_node
+        v = min(lit.get(a.name, 0.0), lit.get(b.name, 0.0))
+        if v <= 0.0 or a.hide or b.hide:
+            continue
+        ra = rects.setdefault(a.name, _node_rect(a, dpi))
+        rb = rects.setdefault(b.name, _node_rect(b, dpi))
+        x0, y0 = ra[2], _socket_y(a, ra, link.from_socket, dpi)
+        x1, y1 = rb[0], _socket_y(b, rb, link.to_socket, dpi)
+        d = max(abs(x1 - x0) * 0.5, 30.0 * dpi)
+        bgl.glColor4f(LIVE_COLOR[0], LIVE_COLOR[1], LIVE_COLOR[2], v)
+        bgl.glBegin(bgl.GL_LINE_STRIP)
+        for i in range(25):
+            t = i / 24.0
+            u = 1.0 - t
+            bgl.glVertex2f(u * u * u * x0 + 3 * u * u * t * (x0 + d) + 3 * u * t * t * (x1 - d) + t * t * t * x1,
+                           u * u * u * y0 + 3 * u * u * t * y0 + 3 * u * t * t * y1 + t * t * t * y1)
+        bgl.glEnd()
+    # nós acesos: moldura
+    bgl.glLineWidth(3.0)
+    for name, v in lit.items():
+        node = tree.nodes.get(name)
+        if node is None or v <= 0.0:
+            continue
+        x0, y0, x1, y1 = rects.get(name) or _node_rect(node, dpi)
+        pad = 3.0 * dpi
+        bgl.glColor4f(LIVE_COLOR[0], LIVE_COLOR[1], LIVE_COLOR[2], v)
+        bgl.glBegin(bgl.GL_LINE_LOOP)
+        for px, py in ((x0 - pad, y0 - pad), (x1 + pad, y0 - pad), (x1 + pad, y1 + pad), (x0 - pad, y1 + pad)):
+            bgl.glVertex2f(px, py)
+        bgl.glEnd()
+    bgl.glLineWidth(1.0)
+    bgl.glDisable(bgl.GL_LINE_SMOOTH)
+    bgl.glDisable(bgl.GL_BLEND)
+
+
+def _node_header(self, context):
+    tree = getattr(context.space_data, "edit_tree", None)
+    if tree is not None and tree.bl_idname == TREE_ID:
+        self.layout.prop(tree, "show_highlight_active", text="Highlight Active", icon='LIGHTPAINT')
+
+
+_live_handle = None
+
+
 @bpy.app.handlers.persistent
 def _trace_pre(_scene):
     import os
@@ -1256,6 +1367,9 @@ def register():
         name="Initial State", description="Logic Tree: o objeto começa neste estado")
     nodeitems_utils.register_node_categories("RANGE_LOGIC_TREE", CATEGORIES)
     bpy.types.LOGIC_HT_header.append(_logic_header)
+    bpy.types.NODE_HT_header.append(_node_header)
+    global _live_handle
+    _live_handle = bpy.types.SpaceNodeEditor.draw_handler_add(_draw_live, (), 'WINDOW', 'POST_VIEW')
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
         if _auto_compile not in handlers:
             handlers.append(_auto_compile)
@@ -1271,6 +1385,11 @@ def unregister():
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
         if _auto_compile in handlers:
             handlers.remove(_auto_compile)
+    global _live_handle
+    if _live_handle is not None:
+        bpy.types.SpaceNodeEditor.draw_handler_remove(_live_handle, 'WINDOW')
+        _live_handle = None
+    bpy.types.NODE_HT_header.remove(_node_header)
     bpy.types.LOGIC_HT_header.remove(_logic_header)
     nodeitems_utils.unregister_node_categories("RANGE_LOGIC_TREE")
     del bpy.types.NodeFrame.range_logic_initial
