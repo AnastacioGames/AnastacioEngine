@@ -161,7 +161,7 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
                 yield "Marque ao menos uma roda como Drive para aplicar a força do motor."
             for other in obj.game.components:
                 if other.as_pointer() != comp.as_pointer() and other.name in {
-                        'VehiclePlayerComponent', 'NativeVehicle', 'NativeRolima'}:
+                        'VehiclePlayerComponent', 'AnastacioVehicleArcade', 'NativeVehicle', 'NativeRolima'}:
                     yield "Outro controlador de veículo está anexado: " + other.name
 
         def draw_ui(self, layout, obj, comp):

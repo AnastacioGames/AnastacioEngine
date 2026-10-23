@@ -7,6 +7,26 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-22 - Veículos: primeiro controlador arcade reutilizável
+
+- Adicionado `AnastacioVehicleArcade` na demo, herdando o controlador nativo básico.
+  Extraída LUT de redução de direção do RolimaRacer; cache só muda com parâmetro.
+  Interface `set_commands`/`clear_commands` para input externo, sem leitura de teclas
+  do jogo nem dependência de HUD/pontuação. Motor/câmbio/freios permanecem únicos.
+- Botão Add Arcade Component cria dependência básica e script arcade sem sobrescrever
+  arquivos existentes; recusa segundo controlador conhecido. Diagnóstico básico também
+  reconhece arcade. Template/demo conferidos por AST; instalação sincronizada.
+- `validar_vehicle_arcade.py`: 43 campos, salvar/reabrir, preservação de configuração,
+  botão real e bloqueio de duplicado. Player em força legada e torque 175 Nm/câmbio:
+  240 frames, cinco grupos de verificações PASS, inclusive quatro rodas em contato,
+  cache/ajuste live, limites/NaN dos comandos, aceleração, frenagem e telemetria.
+  Velocidade antes do freio ~12,1 / 22,5 km/h, sem alegar paridade de dirigibilidade.
+- Detector parado com render: cinco contadores de atualização zerados nos segundos 4–6,
+  encerramento com `# fim`. Selftest PASS; quatro suspeitos estáticos C++ preexistentes.
+  `check_docs.py`: os mesmos 65 erros nos mapas antigos e 118 avisos; diff sem whitespace.
+- Artefatos locais: `artifacts/vehicle-arcade-v2/`. RolimaRacer original não alterado.
+  V2 permanece aberta para demais assists e comparação no jogo real; nenhuma alteração C++.
+
 ## 2026-10-22 - Veículos: branch e primeiro lote Smart Component básico
 
 - Criada `feat/vehicle-smart-components`. Inspeção read-only de RolimaRacer.range:

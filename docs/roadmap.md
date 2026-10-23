@@ -435,6 +435,9 @@ tipados, diagnóstico e gizmos no básico; demo/template alinhados, 25 checagens
 de editor e smoke no player (força legada e torque/câmbio) PASS. V0 ganhou
 inventário dos cinco veículos salvos do RolimaRacer, sem alterar o jogo. Pendentes
 na V1: preparação com Undo/Redo e avaliação com janela; V0–V4 não estão fechadas.
+Início V2: controlador arcade com LUT de direção do RolimaRacer, comandos externos
+e botão próprio; editor e player força/torque PASS. Drift, boost, roll e
+estabilização ainda pendentes; jogo original preservado.
 
 ### Destruição e explosões
 

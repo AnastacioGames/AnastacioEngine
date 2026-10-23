@@ -187,7 +187,7 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
                 yield "Marque ao menos uma roda como Drive para aplicar a força do motor."
             for other in obj.game.components:
                 if other.as_pointer() != comp.as_pointer() and other.name in {
-                        'VehiclePlayerComponent', 'NativeVehicle', 'NativeRolima'}:
+                        'VehiclePlayerComponent', 'AnastacioVehicleArcade', 'NativeVehicle', 'NativeRolima'}:
                     yield "Outro controlador de veículo está anexado: " + other.name
 
         def draw_ui(self, layout, obj, comp):
@@ -868,11 +868,19 @@ class OBJECT_OT_vehicle_set_drive_type(Operator):
         return {'FINISHED'}
 
 
+VEHICLE_ARCADE_TEMPLATE = '# -*- coding: utf-8 -*-\n"""Controle arcade nativo. Anexe em lugar de VehiclePlayerComponent.\n\nRequer vehicle_player_component.py na mesma pasta/textos do projeto.\nPrimeira extração do RolimaRacer: direção por velocidade (km/h).\nMotor, freios e montagem continuam no controlador nativo; não cria veículo.\n"""\nfrom collections import OrderedDict\nimport math\nfrom Range.args import Float\nfrom vehicle_player_component import VehiclePlayerComponent\n\n\nclass AnastacioVehicleArcade(VehiclePlayerComponent):\n    args = OrderedDict(VehiclePlayerComponent.args)\n    args.update([\n        (\'C_Header /Arcade/AUTO\', True),\n        (\'Arcade Steering Reduction\', Float(0.7, min=0, max=1,\n            tip=\'Redução máxima da direção; usa a curva do RolimaRacer entre 20 e 120 km/h.\')),\n    ])\n\n    def start(self, args):\n        self._arcade_signature = None\n        self._commands = None\n        super().start(args)\n        if self._vehicle is not None:\n            self._refresh_arcade_curves()\n\n    def _refresh_arcade_curves(self):\n        signature = min(1.0, max(0.0, float(self._args[\'Arcade Steering Reduction\'])))\n        if signature == self._arcade_signature:\n            return\n        reduction = signature\n        factors = [min(1.0, max(0.0, (speed - 20.0) / 100.0))\n                   for speed in range(250)]\n        self._arcade_steer_lut = [1.0 - factor * reduction for factor in factors]\n        self._arcade_signature = signature\n\n    def update_args(self, args):\n        super().update_args(args)\n        if self._vehicle is not None:\n            self._refresh_arcade_curves()\n\n    def _arcade_speed_index(self):\n        return min(249, int(abs(self._vehicle.getCurrentSpeedKmh())))\n\n    def _speed_steering_factor(self):\n        return self._arcade_steer_lut[self._arcade_speed_index()]\n\n    def set_commands(self, throttle=0.0, steering=0.0, brake=0.0, handbrake=False):\n        """Comandos normalizados para IA/input por jogador; throttle negativo = ré.\n\n        Persistem até a próxima chamada. clear_commands devolve ao teclado/gamepad.\n        Sinal da direção segue o básico: +1 esquerda, -1 direita.\n        Freio 0..1 multiplica Brake Force; freio de mão usa Handbrake Force.\n        """\n        values = [float(throttle), float(steering), float(brake)]\n        if not all(math.isfinite(value) for value in values):\n            raise ValueError(\'Comandos devem ser finitos.\')\n        self._commands = (max(-1.0, min(1.0, values[0])),\n                          max(-1.0, min(1.0, values[1])),\n                          max(0.0, min(1.0, values[2])), bool(handbrake))\n\n    def clear_commands(self):\n        self._commands = None\n\n    def _read_input(self):\n        if self._commands is None:\n            return super()._read_input()\n        throttle, steering, brake, handbrake = self._commands\n        return (throttle, steering, brake * float(self._args[\'Brake Force\']),\n                float(self._args[\'Handbrake Force\']) if handbrake else 0.0)\n\n    def _gas_input(self):\n        if self._commands is not None:\n            return max(0.0, self._commands[0])\n        return super()._gas_input()\n\n    def _back_input(self):\n        if self._commands is not None:\n            return max(0.0, -self._commands[0])\n        return super()._back_input()\n\n    class Editor(VehiclePlayerComponent.Editor):\n        def warnings(self, obj, comp):\n            for warning in super().warnings(obj, comp):\n                yield warning\n            for other in obj.game.components:\n                if other.as_pointer() != comp.as_pointer() and other.name == \'AnastacioVehicleArcade\':\n                    yield \'Use apenas um controlador arcade por chassi.\'\n'
+
+
 class OBJECT_OT_vehicle_add_player_component(Operator):
     bl_idname = "object.vehicle_add_player_component"
     bl_label = "Add Vehicle Component"
     bl_description = ("Create scripts/vehicle_player_component.py if it doesn't exist yet, "
                        "and add it to this object's components")
+
+    controller = bpy.props.EnumProperty(
+        name="Controller", items=[('BASIC', "Basic", "Native vehicle controls"),
+                                  ('ARCADE', "Arcade", "Speed curve and external commands")],
+        default='BASIC')
 
     @classmethod
     def poll(cls, context):
@@ -886,6 +894,13 @@ class OBJECT_OT_vehicle_add_player_component(Operator):
             self.report({'ERROR'}, tip_("Save the .blend file before adding the component."))
             return {'CANCELLED'}
 
+        ob = context.active_object
+        if any(comp.name in {'VehiclePlayerComponent', 'AnastacioVehicleArcade',
+                             'NativeVehicle', 'NativeRolima'} for comp in ob.game.components):
+            self.report({'WARNING'}, "Remove the existing vehicle controller before adding another.")
+            return {'CANCELLED'}
+        module_name = 'anastacio_vehicle_arcade' if self.controller == 'ARCADE' else VEHICLE_COMPONENT_MODULE
+        class_name = 'AnastacioVehicleArcade' if self.controller == 'ARCADE' else VEHICLE_COMPONENT_CLASS
         scripts_dir = os.path.join(blend_dir, "scripts")
         filepath = os.path.join(scripts_dir, VEHICLE_COMPONENT_MODULE + ".py")
 
@@ -895,12 +910,17 @@ class OBJECT_OT_vehicle_add_player_component(Operator):
             if not os.path.exists(filepath):
                 with open(filepath, "w", encoding="utf-8") as fp:
                     fp.write(VEHICLE_COMPONENT_TEMPLATE)
+            if self.controller == 'ARCADE':
+                arcade_path = os.path.join(scripts_dir, module_name + '.py')
+                if not os.path.exists(arcade_path):
+                    with open(arcade_path, 'w', encoding='utf-8') as fp:
+                        fp.write(VEHICLE_ARCADE_TEMPLATE)
         except OSError as exc:
             self.report({'ERROR'}, tip_("Could not create component file: %s") % exc)
             return {'CANCELLED'}
 
         ob = context.active_object
-        full_name = "{}.{}".format(VEHICLE_COMPONENT_MODULE, VEHICLE_COMPONENT_CLASS)
+        full_name = "{}.{}".format(module_name, class_name)
         already_added = any("{}.{}".format(comp.module, comp.name) == full_name
                              for comp in ob.game.components)
         if already_added:
@@ -911,21 +931,24 @@ class OBJECT_OT_vehicle_add_player_component(Operator):
             sys.path.append(scripts_dir)
         try:
             importlib.invalidate_caches()
-            if VEHICLE_COMPONENT_MODULE in sys.modules:
-                importlib.reload(sys.modules[VEHICLE_COMPONENT_MODULE])
+            if module_name in sys.modules:
+                importlib.reload(sys.modules[module_name])
             else:
-                importlib.import_module(VEHICLE_COMPONENT_MODULE)
+                importlib.import_module(module_name)
         except Exception:
             pass
 
         try:
             bpy.ops.logic.python_component_register(component_name=full_name)
-        except Exception:
+        except Exception as exc:
+            if self.controller == 'ARCADE':
+                self.report({'ERROR'}, "Could not register Arcade component; check the scripts and Basic controller version: %s" % exc)
+                return {'CANCELLED'}
             try:
                 bpy.ops.logic.python_component_add()
                 new_comp = ob.game.components[-1]
-                new_comp.module = VEHICLE_COMPONENT_MODULE
-                new_comp.name = VEHICLE_COMPONENT_CLASS
+                new_comp.module = module_name
+                new_comp.name = class_name
             except Exception as exc:
                 self.report({'ERROR'}, tip_("Could not add component: %s") % exc)
                 return {'CANCELLED'}
@@ -1410,4 +1433,6 @@ class PHYSICS_PT_game_vehicle_component(VehicleSubPanel, Panel):
     bl_label = "Player Component"
 
     def draw_content(self, layout, ob):
-        not_live_layout(layout).operator("object.vehicle_add_player_component", text=not_live("Add Vehicle Component"), icon='PLUGIN')
+        row = not_live_layout(layout)
+        row.operator("object.vehicle_add_player_component", text=not_live("Add Vehicle Component"), icon='PLUGIN')
+        row.operator("object.vehicle_add_player_component", text=not_live("Add Arcade Component"), icon='PLUGIN').controller = 'ARCADE'

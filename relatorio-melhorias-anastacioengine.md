@@ -361,6 +361,10 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
 - `Create Project`, disponível no splash e em `File`, abre o navegador de pastas e cria uma estrutura pronta
   para o fluxo RangeArmor: `data/` com o `.range`, a cópia protegida `.rasec`, scripts e assets; pastas
   independentes de engine, launcher, ícones e builds em `release/`. Pastas existentes nunca são sobrescritas.
+- Controle arcade inicial: `anastacio_vehicle_arcade.AnastacioVehicleArcade` herda o básico,
+  acrescenta curva de direção por velocidade do RolimaRacer e comandos externos normalizados.
+  Botão próprio em Physics > Vehicle; não sobrescreve scripts existentes. Editor e player
+  força/torque testados. Drift, boost e estabilização seguem no plano de extração.
 - Objetos podem ser marcados nativamente como chassi de veículo (`game.is_vehicle`, DNA/RNA) com uma lista
   editável de rodas (`ob.vehicle_wheels`, com raio/suspensão/steering por roda), no painel "Vehicle" da aba
   Physics. Ao converter a cena, o próprio motor cria o `PHY_IVehicle`/`KX_VehicleWrapper` e as rodas

@@ -155,7 +155,37 @@ pasta de saída; sem esse argumento, executa as demais verificações.
 
 V0 segue aberta para baseline no jogo real, contrato e confirmação das instâncias.
 V1 segue aberta para preparação explícita com Undo/Redo e avaliação com janela.
-A extração dos assists avançados ainda não começou.
+A extração avançada começou pela curva de direção; drift, boost e demais assists continuam pendentes.
+
+## Segundo lote — início V2 (2026-10-22)
+
+`anastacio_vehicle_arcade.AnastacioVehicleArcade`, distribuído ao lado do básico,
+herda seu motor/freios/câmbio e usa o mesmo veículo nativo. O botão **Add Arcade
+Component** em Physics > Vehicle cria os dois scripts quando ausentes; arquivos
+existentes são preservados. Remova explicitamente o controlador anterior antes
+de adicionar outro. O botão recusa controladores conhecidos já presentes.
+
+Primeira extração: LUT de direção do RolimaRacer, 250 entradas inteiras em km/h,
+redução zero até 20 km/h e máxima a partir de 120 km/h. Ré usa velocidade absoluta.
+`Arcade Steering Reduction` é tipado; `Speed-Sensitive Steering` desliga a curva.
+LUT recalculada só quando o parâmetro muda, sem recriação por frame. A suavização
+continua sendo a do básico; isso não reproduz toda a direção do jogo original.
+
+Interface externa `set_commands(throttle, steering, brake, handbrake)`:
+acelerador/direção entre -1 e 1, freio entre 0 e 1; direção positiva vira à esquerda,
+acelerador negativo pede ré. Valores são limitados; NaN/infinito são recusados
+sem trocar o comando anterior. Comandos persistem; `clear_commands()` devolve
+controle ao teclado/gamepad. Pausa, ownership e atualização desses comandos
+pertencem ao adaptador do jogo. Não há novo sistema de input nem migração automática.
+
+Validador `tools/debug/cenas/validar_vehicle_arcade.py`: confere igualdade dos
+templates, 43 campos, preservação dos valores, salvar/reabrir e botão real.
+Player PASS em força e torque/câmbio: contato das quatro rodas, curva e mudança
+live, cache preservado quando outro campo muda, comandos limitados/NaN,
+aceleração/frenagem e telemetria. Artefatos em `artifacts/vehicle-arcade-v2/`.
+Sem compilação C++ e sem alteração do RolimaRacer. Roll por velocidade, drift,
+mini-turbo/nitro, downforce e estabilização ainda não foram extraídos; V2 permanece
+aberta, assim como a validação de dirigibilidade pelo usuário.
 
 ## Contrato proposto de integração
 
