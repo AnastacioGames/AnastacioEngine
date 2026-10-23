@@ -575,6 +575,8 @@ iOS fora do escopo.
   (cada nó vira um trecho de GLSL, como os nós de shader), começando por ~10 nós baratos (Blur leve, Glare,
   Color Balance, Vinheta, Mix, Curves...). Defocus pesado e Denoise ficam fora. Texture nodes no jogo: sem
   ganho (os nós de Shader já cobrem), no máximo um bake para imagem.
+  Referência ao implementar: o compositor de GPU do Blender 5 (`source/blender/compositor`, shaders GLSL por
+  nó), que já resolve em tempo real o que o compositor 2.79 faz em CPU; adaptar ao nosso GL e aos 2D Filters.
 
 ## Performance
 
