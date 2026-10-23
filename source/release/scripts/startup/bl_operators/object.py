@@ -1135,7 +1135,14 @@ class DestructionFragmentsGenerate(Operator):
     @staticmethod
     def _points_inside(src, count, rng):
         """Random cut points inside the mesh (falls back to the bounding box for open meshes)."""
+        import bmesh
         from mathutils import Vector
+        from mathutils.bvhtree import BVHTree
+        # BVH direto da malha: closest_point_on_mesh exige malha derivada, que falta fora das layers visiveis.
+        bm = bmesh.new()
+        bm.from_mesh(src.data)
+        tree = BVHTree.FromBMesh(bm)
+        bm.free()
         lo = Vector(tuple(min(v[i] for v in src.bound_box) for i in range(3)))
         hi = Vector(tuple(max(v[i] for v in src.bound_box) for i in range(3)))
         # Pontos colados na borda geram lascas finas: sorteia so em 90% da caixa.
@@ -1147,8 +1154,8 @@ class DestructionFragmentsGenerate(Operator):
         points = []
         for _ in range(count * 50):
             co = sample()
-            found, location, normal, _index = src.closest_point_on_mesh(co)
-            if found and (co - location).dot(normal) < 0.0:
+            location, normal, _index, _dist = tree.find_nearest(co)
+            if location is not None and (co - location).dot(normal) < 0.0:
                 points.append(co)
                 if len(points) == count:
                     return points
