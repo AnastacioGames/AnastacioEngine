@@ -375,6 +375,19 @@ class INFO_PT_game_performance(Panel):
         row.operator("game.prepare_audio", text="Audio (OGG)", icon='SOUND')
         box.label(text="Used on export; originals stay.")
 
+        # Dicas medidas num celular Android: o GPU do celular é o gargalo.
+        box = layout.box()
+        box.label(text="Web / Android", icon='WORLD')
+        world = context.scene.world
+        if world and world.sky_type == 'ATMOSPHERIC':
+            box.prop(world, "sky_quality")
+            if world.sky_quality == 'HIGH':
+                box.label(text="High sky is ~4x slower on phones.", icon='ERROR')
+        col = box.column(align=True)
+        col.label(text="Phone GPU is the limit: fewer")
+        col.label(text="full-screen effects and filters.")
+        col.label(text="Measure on the phone: ?report=1")
+
 
 class INFO_MT_game(Menu):
     bl_label = "Game"
