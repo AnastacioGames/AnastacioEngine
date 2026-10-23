@@ -204,6 +204,75 @@ class RANGE_OT_ui_tree_bake(Operator):
         return {'FINISHED'}
 
 
+def _active_frame(context):
+    node = context.space_data.edit_tree.nodes.active
+    return node if node is not None and node.bl_idname == "NodeFrame" else None
+
+
+class RANGE_OT_ui_tree_capture(Operator):
+    """Renderiza a câmera da cena e usa a imagem de fundo do Frame ativo"""
+    bl_idname = "node.range_ui_tree_capture"
+    bl_label = "Capture Camera"
+
+    @classmethod
+    def poll(cls, context):
+        return RANGE_OT_ui_tree_bake.poll(context) and _active_frame(context) is not None
+
+    def execute(self, context):
+        import os
+        frame = _active_frame(context)
+        scene = context.scene
+        if scene.camera is None:
+            self.report({'ERROR'}, "A cena não tem câmera")
+            return {'CANCELLED'}
+        bpy.ops.render.opengl()
+        path = os.path.join(bpy.app.tempdir, "ui_backdrop_%s.png" % bpy.path.clean_name(frame.name))
+        bpy.data.images["Render Result"].save_render(path)
+        name = "UI Backdrop %s" % frame.name
+        image = bpy.data.images.get(name)
+        if image is None:
+            image = bpy.data.images.load(path)
+            image.name = name
+        else:
+            image.filepath = path
+            image.reload()
+        image.pack()
+        frame.ui_backdrop = image.name
+        # Trava a proporção do Frame na do jogo: a imagem nunca distorce.
+        render = scene.render
+        frame.shrink = False
+        frame.height = frame.width * render.resolution_y / render.resolution_x
+        return {'FINISHED'}
+
+
+def _draw_backdrops():
+    import bgl
+    space = bpy.context.space_data
+    tree = getattr(space, "edit_tree", None)
+    if tree is None or tree.bl_idname != UITree.bl_idname:
+        return
+    for frame in tree.nodes:
+        if frame.bl_idname != "NodeFrame" or not frame.ui_backdrop:
+            continue
+        image = bpy.data.images.get(frame.ui_backdrop)
+        if image is None or image.gl_load():
+            continue
+        # A vista do Node Editor está em unidades * escala da UI.
+        scale = frame.dimensions.x / frame.width if frame.width > 0 and frame.dimensions.x > 0 else 1.0
+        x, y = _abs_location(frame)
+        x0, y1 = x * scale, y * scale
+        x1, y0 = x0 + frame.width * scale, y1 - frame.height * scale
+        bgl.glEnable(bgl.GL_TEXTURE_2D)
+        bgl.glBindTexture(bgl.GL_TEXTURE_2D, image.bindcode[0])
+        bgl.glColor4f(1.0, 1.0, 1.0, 1.0)
+        bgl.glBegin(bgl.GL_QUADS)
+        for u, v, px, py in ((0, 0, x0, y0), (1, 0, x1, y0), (1, 1, x1, y1), (0, 1, x0, y1)):
+            bgl.glTexCoord2f(u, v)
+            bgl.glVertex2f(px, py)
+        bgl.glEnd()
+        bgl.glDisable(bgl.GL_TEXTURE_2D)
+
+
 class NODE_PT_range_ui_tree(Panel):
     bl_space_type = "NODE_EDITOR"
     bl_region_type = "UI"
@@ -216,6 +285,12 @@ class NODE_PT_range_ui_tree(Panel):
     def draw(self, context):
         layout = self.layout
         layout.operator(RANGE_OT_ui_tree_bake.bl_idname, icon="FILE_REFRESH")
+        frame = _active_frame(context)
+        if frame is not None:
+            box = layout.box()
+            box.label("Fundo da tela: %s" % (frame.label or frame.name))
+            box.prop_search(frame, "ui_backdrop", bpy.data, "images", text="")
+            box.operator(RANGE_OT_ui_tree_capture.bl_idname, icon="RENDER_STILL")
         layout.label("Jogo: Always (pulso) + Python")
         layout.label("Module: range_ui_tree.main")
 
@@ -236,16 +311,25 @@ CATEGORIES = [
 ]
 
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + ACTION_NODES + (
-    RANGE_OT_ui_tree_bake, NODE_PT_range_ui_tree)
+    RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_capture, NODE_PT_range_ui_tree)
+
+_draw_handle = None
 
 
 def register():
+    global _draw_handle
     for cls in CLASSES:
         bpy.utils.register_class(cls)
+    bpy.types.NodeFrame.ui_backdrop = StringProperty(
+        name="Backdrop", description="Imagem de fundo desta tela no editor (não vai para o jogo)")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
+    _draw_handle = bpy.types.SpaceNodeEditor.draw_handler_add(
+        _draw_backdrops, (), "WINDOW", "PRE_VIEW")
 
 
 def unregister():
+    bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handle, "WINDOW")
+    del bpy.types.NodeFrame.ui_backdrop
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
