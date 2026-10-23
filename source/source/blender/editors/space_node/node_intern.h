@@ -51,6 +51,8 @@ typedef struct bNodeLinkDrag {
 	 */
 	ListBase links;
 	int in_out;
+	/* new link from a free socket (not detached links) */
+	bool is_new;
 } bNodeLinkDrag;
 
 /* space_node.c */

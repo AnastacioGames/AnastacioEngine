@@ -719,7 +719,36 @@ static int node_link_modal(bContext *C, wmOperator *op, const wmEvent *event)
 		case MIDDLEMOUSE:
 		{
 			if (event->val == KM_RELEASE) {
+				/* new link dropped on empty space: offer the compatible nodes */
+				char node_name[MAX_NAME] = "", sock_id[MAX_NAME] = "";
+				bool from_output = false;
+				if (event->type == LEFTMOUSE && nldrag->is_new && BLI_listbase_is_single(&nldrag->links)) {
+					bNodeLink *link = ((LinkData *)nldrag->links.first)->data;
+					if (link->fromsock && !link->tosock) {
+						BLI_strncpy(node_name, link->fromnode->name, sizeof(node_name));
+						BLI_strncpy(sock_id, link->fromsock->identifier, sizeof(sock_id));
+						from_output = true;
+					}
+					else if (link->tosock && !link->fromsock) {
+						BLI_strncpy(node_name, link->tonode->name, sizeof(node_name));
+						BLI_strncpy(sock_id, link->tosock->identifier, sizeof(sock_id));
+					}
+				}
+
 				node_link_exit(C, op, true);
+
+				if (node_name[0]) {
+					wmOperatorType *ot = WM_operatortype_find("NODE_OT_add_linked", true);
+					if (ot) {
+						PointerRNA ptr;
+						WM_operator_properties_create_ptr(&ptr, ot);
+						RNA_string_set(&ptr, "node_name", node_name);
+						RNA_string_set(&ptr, "socket_identifier", sock_id);
+						RNA_boolean_set(&ptr, "from_output", from_output);
+						WM_operator_name_call_ptr(C, ot, WM_OP_INVOKE_DEFAULT, &ptr);
+						WM_operator_properties_free(&ptr);
+					}
+				}
 
 				ED_area_headerprint(CTX_wm_area(C), NULL);
 				ED_region_tag_redraw(ar);
@@ -780,6 +809,7 @@ static bNodeLinkDrag *node_link_init(Main *bmain, SpaceNode *snode, float cursor
 			/* dragged links are fixed on output side */
 			nldrag->in_out = SOCK_OUT;
 			/* create a new link */
+			nldrag->is_new = true;
 			linkdata = MEM_callocN(sizeof(LinkData), "drag link op link data");
 			linkdata->data = oplink = MEM_callocN(sizeof(bNodeLink), "drag link op link");
 			oplink->fromnode = node;
@@ -828,6 +858,7 @@ static bNodeLinkDrag *node_link_init(Main *bmain, SpaceNode *snode, float cursor
 			/* dragged links are fixed on input side */
 			nldrag->in_out = SOCK_IN;
 			/* create a new link */
+			nldrag->is_new = true;
 			linkdata = MEM_callocN(sizeof(LinkData), "drag link op link data");
 			linkdata->data = oplink = MEM_callocN(sizeof(bNodeLink), "drag link op link");
 			oplink->tonode = node;
