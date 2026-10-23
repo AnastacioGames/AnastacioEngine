@@ -169,6 +169,10 @@ public:
 	{
 		return m_riseCount;
 	}
+	virtual unsigned int GetFireCount() const
+	{
+		return m_riseCount;
+	}
 
 	/// Get the previous state of the sensor: positive or negative.
 	bool GetPrevState();

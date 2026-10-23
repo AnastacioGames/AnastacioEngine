@@ -174,6 +174,10 @@ public:
 	{
 		return m_startCount;
 	}
+	virtual unsigned int GetFireCount() const
+	{
+		return m_startCount;
+	}
 };
 
 #endif  // __SCA_IACTUATOR_H__

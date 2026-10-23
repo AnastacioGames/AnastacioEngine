@@ -7,10 +7,90 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Logic Tree: Highlight Active ao vivo e abas com nome
+
+- Botão **Highlight Active** no cabeçalho da Logic Tree: com o jogo rodando no editor, nós que disparam ganham moldura, portas acendem pelo caminho e os fios brilham com o pulso correndo (como no Logic Editor). Brilho vem de `debug_intensity` (novo, só leitura) em Sensor/Controller/Actuator; `wm_event_system.c` redesenha áreas de nós da Logic Tree.
+- Barra de abas dos editores de nós mostra ícone + nome; abas da Logic Tree com os ícones do menu Add do Logic Editor.
+- Nós de brick: seção **More** recolhível mostra os demais campos (pulso, Skip, Tap, Invert) dentro do nó.
+
 ## 2026-10-23 - UI Tree: template e guia
 
 - Painel UI Tree: **+ Menu** (Menu/Opcoes com som e volume), **+ HUD** (vida e velocímetro) e **Setup Game Logic** (Always + `range_ui_runtime.main` e propriedades na câmera, sem duplicar).
 - Guia de uso em `docs/ui-tree.md`.
+
+## 2026-10-23 - Logic Tree F6 (destaque dos nós que dispararam)
+
+- `SCA_ILogicBrick`: atributo Python `fireCount` (virtual `GetFireCount`: subidas do sensor, inícios do
+  actuator; 0 nos controllers).
+- `range_logic_tree.py`: com o Debug Mode da cena, a compilação cria o texto `range_logic_trace.py` e um par
+  Always + controller Python Module por estado. Ao remover a cena (fim do jogo), ele grava
+  `%TEMP%/range_logic_trace.json` com o `fireCount` dos bricks. O `game_post` pinta de verde os nós que
+  dispararam, e o painel N mostra a contagem e o botão Clear Highlight. O `game_pre` limpa o destaque.
+- Revisão da F5: `compile_object(ob, scene)` usa a cena de `compile_all` (objeto ligado em várias cenas); dica
+  de nó renomeado no painel N; pausa num gatilho segue o sensor sem o Not (documentado).
+- Teste `tools/tests/logic_tree/f6_highlight_test.py` (build + runtime + `check`).
+
+## 2026-10-23 - Logic Tree F5 (depuração) e ícones das abas
+
+- `range_logic_tree.py`: o registro (`logic_tree_record`) guarda `nodes` (`"tipo:brick"` -> nó), com
+  `bricks_of_node()`/`node_of_brick()`; o painel N mostra os bricks que o nó ativo gerou no objeto ativo.
+  Opção "Pause When Fired" em gatilhos e ações (rótulo com `*`): com o Debug Mode da cena ligado, compila um
+  actuator Scene Suspend da própria cena ("Pause: <nó>"), ligado ao controller da ação ou a um And próprio do
+  gatilho. Sem Debug Mode nada é gerado. O botão de pausa da janela de depuração retoma.
+- `interface_panel.c` (`UI_panel_category_icon`): ícones para as abas Triggers (HAND), Logic (LOGIC), Recipes
+  (PACKAGE) e Mifth (CURVE_BEZCURVE). Compilado isolado (cl) no Windows; falta o build do executável.
+- Teste `tools/tests/logic_tree/f5_debug_test.py` (16 provas) e `f5_runtime_check.py` (a cena pausa no tick 21
+  enquanto outra cena continua), Windows. F1-F4 continuam passando.
+
+## 2026-10-23 - Logic Tree F4 (todos os bricks e Run Python)
+
+- `range_logic_tree.py`: nós para os demais sensores (Delay, Random, Radar, Movement, Joystick, Animation Event,
+  Actuator State, VR Head) e actuators (Camera Follow, Mouse Look, Edit Object, Property completo, Random Value,
+  Scene, Game, Parent, Visibility, Constraint, 2D Filter, Vibration, State), gerados do RNA. Nó Run Python vira
+  controller Python Module. Campos do painel N só vão ao brick quando alterados.
+- Teste `tools/tests/logic_tree/f4_nodes_test.py` (9 provas + runtime do Run Python), Linux.
+
+## 2026-10-23 - Logic Tree F3 (receitas)
+
+- `range_logic_tree.py`: menu Add > Recipes com 6 receitas (Walk WASD, Jump, Collect Item, Health and Damage,
+  Door with Key, Moving Platform) feitas de nós comuns num Frame, no cursor; cria as propriedades de jogo que
+  faltam. Nós novos: Ray, Near, Toggle Property, Send Message.
+- Testes `tools/tests/logic_tree/f3_recipes_test.py` (10 provas) e `f3_runtime_check.py`, Linux.
+
+## 2026-10-23 - Logic Tree F2 (Then, Frames de Estado, Go To State)
+
+- `range_logic_tree.py`: saída Then em Wait, Sound e nos nós novos Play Action, Steering e Video (sensor Actuator
+  Finished); Frame com "Logic State" vira um estado (nome em `state_names`, estado inicial, um bit por
+  controller); nó Go To State vira actuators State Remove + Add. O registro guarda nomes e bits iniciais
+  alterados e os desfaz ao recompilar. Erros novos: Then de ação sem gatilho, estado inexistente, Frames com o
+  mesmo nome.
+- Testes `tools/tests/logic_tree/f2_compile_test.py` (13 provas) e `f2_runtime_check.py` (plataforma vai-e-volta
+  no `AnastacioRuntime --server`, fases de 32 ticks), Linux.
+
+## 2026-10-23 - Logic Tree F1 (árvore, nós e compilador)
+
+- Novo `source/release/scripts/startup/range_logic_tree.py`: tipo de árvore "Logic Tree", `Object.logic_tree`
+  e `Object.logic_tree_record`. Nós Triggers (Always, Key, Mouse, Collision, Property, Message), Logic (And,
+  Or, Not) e Actions (Motion, Set Property, Add to Property, Sound, Remove Object, Wait), com campos copiados
+  do RNA dos bricks. Compila em `game_pre`/`save_pre` e pelo botão Compile (painel N e cabeçalho do Logic
+  Editor) no grupo `Tree: <nome>`; recompilar troca só os bricks registrados.
+- Regras: gatilho direto ou E/Ou só de gatilhos viram And/Or nativos; o resto vira um Expression com nomes ASCII;
+  várias entradas numa ação são um Ou; gatilho dentro de Não liga o pulso de nível falso (senão o controller não
+  roda com o gatilho parado em falso); controllers vão para cada estado inicial do objeto.
+- Achados: `PropertySensor.value_min` grava no mesmo campo de `value` (fica fora do nó); os operadores de
+  bricks exigem objeto ativo, então a compilação passa o objeto pelo contexto (salvar sem seleção funciona).
+- Testes `tools/tests/logic_tree/f1_compile_test.py` (13 provas no editor) e `f1_runtime_check.py` (5 regras,
+  0 diferenças em 118 ticks no `AnastacioRuntime --server`), Linux.
+
+## 2026-10-23 - Plano da Logic Tree (lógica por nós)
+
+- Novo `docs/logic-tree-plan.md`: árvore de nós de lógica como complemento aos Logic Bricks. Proposta de compilar
+  para bricks nativos (sem runtime novo; Web, janela de depuração e "To Python" herdados), comparada com gerar
+  Python, interpretar em runtime e runtime C++.
+- Levantamento do que se reaproveita: padrão e Bake automático da UI Tree, melhorias genéricas do Node Editor,
+  `_Bricks` dos presets, "Então"/Esperar/estados/grupos do Bricks 2.0 e `AND`/`OR`/`NOT`/`IF` do parser de
+  expressões (`InputParser.cpp`).
+- Só documentação (plano, roadmap, índice). Sem build.
 
 ## 2026-10-23 - UI Tree na Web/Android
 

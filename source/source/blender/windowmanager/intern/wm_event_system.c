@@ -630,7 +630,10 @@ static bool logic_debug_tag_areas(bool tag)
 		}
 		for (ScrArea *sa = win->screen->areabase.first; sa; sa = sa->next) {
 			const SpaceLogic *slogic = sa->spacedata.first;
-			if (sa->spacetype == SPACE_LOGIC && !(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF)) {
+			const bool logic_tree = sa->spacetype == SPACE_NODE &&
+			                        STREQ(((const SpaceNode *)sa->spacedata.first)->tree_idname, "RangeLogicTree");
+			if (logic_tree ||
+			    (sa->spacetype == SPACE_LOGIC && !(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF))) {
 				found = true;
 				if (tag) {
 					ED_area_tag_redraw(sa);

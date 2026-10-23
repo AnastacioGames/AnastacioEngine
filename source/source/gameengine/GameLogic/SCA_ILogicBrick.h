@@ -128,10 +128,14 @@ public:
 	virtual void		Replace_IScene(SCA_IScene *val) {}
 	virtual void		Replace_NetworkScene(KX_NetworkMessageScene *val) {}
 
+	/// Times the brick fired (sensor went positive, actuator started); 0 for controllers.
+	virtual unsigned int GetFireCount() const { return 0; }
+
 #ifdef WITH_PYTHON
 	// python methods
 	
 	static PyObject*	pyattr_get_owner(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_fire_count(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 
 	// check that attribute is a property
 	static int CheckProperty(EXP_PyObjectPlus *self, const PyAttributeDef *attrdef);
