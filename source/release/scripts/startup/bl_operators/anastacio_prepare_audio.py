@@ -12,6 +12,7 @@ import tempfile
 
 import aud
 import bpy
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import CollectionProperty, IntProperty, StringProperty
 from bpy.types import Operator, PropertyGroup, UIList
 
@@ -466,7 +467,7 @@ class GAME_OT_prepare_audio(Operator):
         except (OSError, ValueError, RuntimeError, aud.error) as error:
             self.report({'ERROR'}, str(error))
             return {'CANCELLED'}
-        self.report({'INFO'}, 'Prepared %d sounds; %d skipped; audio %.2f to %.2f MiB' %
+        self.report({'INFO'}, tip_('Prepared %d sounds; %d skipped; audio %.2f to %.2f MiB') %
                     (report['prepared'], report['skipped'], report['bytes_before'] / 1048576,
                      report['bytes_after'] / 1048576))
         return {'FINISHED'}

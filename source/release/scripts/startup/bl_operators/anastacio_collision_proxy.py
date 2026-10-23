@@ -20,6 +20,7 @@ The cooked file keys meshes by content, so the proxy is cooked like any other me
 "Clear Collision Proxies" deletes the proxies and restores the physics of the originals."""
 
 import bpy
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import EnumProperty
 from bpy.types import Operator
 
@@ -186,13 +187,13 @@ class GAME_OT_collision_proxy_generate(Operator):
         else:
             objects = candidates(scene)
         if not objects:
-            self.report({'WARNING'}, "No dense static Triangle Mesh to simplify")
+            self.report({'WARNING'}, tip_("No dense static Triangle Mesh to simplify"))
             return {'CANCELLED'}
         done, skipped = generate(scene, objects)
-        msg = "Collision proxies made for %d object(s)" % len(done)
+        msg = tip_("Collision proxies made for %d object(s)") % len(done)
         if skipped:
-            msg += "; left out %d: %s" % (len(skipped), ", ".join(
-                "%s (%s)" % (ob.name, reason) for ob, reason in skipped[:5]))
+            msg += tip_("; left out %d: %s") % (len(skipped), ", ".join(
+                "%s (%s)" % (ob.name, tip_(reason)) for ob, reason in skipped[:5]))
         self.report({'INFO'} if done else {'WARNING'}, msg)
         return {'FINISHED'} if done else {'CANCELLED'}
 
@@ -209,7 +210,7 @@ class GAME_OT_collision_proxy_clear(Operator):
         # A selected proxy stands for its original.
         originals = {scene.objects.get(ob[TAG], ob) if TAG in ob else ob for ob in objects}
         restored = sum(clear(scene, ob) for ob in originals)
-        self.report({'INFO'}, "Removed %d collision prox%s" % (restored, "y" if restored == 1 else "ies"))
+        self.report({'INFO'}, tip_("Removed %d collision proxy(ies)") % restored)
         return {'FINISHED'}
 
 

@@ -9,6 +9,7 @@ import struct
 import tempfile
 
 import bpy
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import BoolProperty, CollectionProperty, EnumProperty, IntProperty, StringProperty
 from bpy.types import Operator, PropertyGroup, UIList
 
@@ -370,7 +371,7 @@ class GAME_OT_prepare_textures(Operator):
         self._done = 0
         self._total = len(self._pending)
         if not self._pending:
-            self.report({'WARNING'}, 'No textures selected')
+            self.report({'WARNING'}, tip_('No textures selected'))
             return {'CANCELLED'}
         if bpy.app.background:
             for name in self._pending:
@@ -393,7 +394,7 @@ class GAME_OT_prepare_textures(Operator):
     def modal(self, context, event):
         if event.type == 'ESC':
             self._finish(context)
-            self.report({'INFO'}, 'Cancelled; %d textures prepared' % self._done)
+            self.report({'INFO'}, tip_('Cancelled; %d textures prepared') % self._done)
             return {'CANCELLED'}
         if event.type != 'TIMER':
             return {'RUNNING_MODAL'}
@@ -410,7 +411,7 @@ class GAME_OT_prepare_textures(Operator):
         context.window_manager.progress_update(self._done)
         if not self._pending:
             self._finish(context)
-            self.report({'INFO'}, '%d textures prepared. Save the project to keep export settings.' % self._done)
+            self.report({'INFO'}, tip_('%d textures prepared. Save the project to keep export settings.') % self._done)
             return {'FINISHED'}
         return {'RUNNING_MODAL'}
 
@@ -426,7 +427,7 @@ class GAME_OT_revert_prepared_textures(Operator):
             if not image.library and KEY in image:
                 del image[KEY]
                 count += 1
-        self.report({'INFO'}, '%d textures reverted; originals preserved' % count)
+        self.report({'INFO'}, tip_('%d textures reverted; originals preserved') % count)
         return {'FINISHED'}
 
 

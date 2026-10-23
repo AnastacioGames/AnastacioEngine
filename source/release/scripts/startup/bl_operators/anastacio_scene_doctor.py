@@ -20,6 +20,7 @@ import os
 import time
 
 import bpy
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import IntProperty
 from bpy.types import Operator, Panel
 
@@ -148,9 +149,9 @@ def rule_textures(scene, objects):
         if side > TEXTURE_BIG:
             issues.append(Issue(
                 "texture_big", image.name, 'HIGH' if side >= TEXTURE_HUGE else 'MEDIUM',
-                "Texture %s is %dx%d" % (image.name, w, h),
-                "About %.0f MB of video memory without compression. %d or less is usually enough "
-                "for game objects." % (_vram_mb(w, h), TEXTURE_BIG),
+                tip_("Texture %s is %dx%d") % (image.name, w, h),
+                tip_("About %.0f MB of video memory without compression. %d or less is usually enough "
+                     "for game objects.") % (_vram_mb(w, h), TEXTURE_BIG),
                 sorted(users, key=lambda o: o.name)))
         if not (_is_pot(w) and _is_pot(h)):
             npot.append(image)
@@ -158,8 +159,8 @@ def rule_textures(scene, objects):
         names = ", ".join(sorted(i.name for i in npot)[:8])
         issues.append(Issue(
             "texture_npot", "all", 'LOW',
-            "%d texture(s) with size not a power of two" % len(npot),
-            "They cannot be stored compressed (DDS) and some GPUs resize them at load: %s" % names))
+            tip_("%d texture(s) with size not a power of two") % len(npot),
+            tip_("They cannot be stored compressed (DDS) and some GPUs resize them at load: %s") % names))
     return issues
 
 
@@ -188,14 +189,14 @@ def rule_heavy_meshes(scene, objects):
         tris = seen[mesh] * (4 ** _subsurf_levels(ob))
         if tris < MESH_HEAVY_TRIS:
             continue
-        detail = "No LoD levels; it is drawn with all triangles at any distance."
+        detail = tip_("No LoD levels; it is drawn with all triangles at any distance.")
         if _subsurf_levels(ob):
-            detail += " Subdivision Surface multiplies the mesh at game start."
+            detail += " " + tip_("Subdivision Surface multiplies the mesh at game start.")
         lod = _lod_auto()
         reason = lod._skip_reason(ob)
         fix = None
         if reason is None:
-            detail += " Fix generates LoD levels (Generate LODs)."
+            detail += " " + tip_("Fix generates LoD levels (Generate LODs).")
 
             def fix(ob=ob):
                 lod.generate(bpy.context.scene, [ob])
@@ -204,10 +205,10 @@ def rule_heavy_meshes(scene, objects):
                     lod.clear_generated(bpy.context.scene, ob)
                 return revert
         else:
-            detail += " Generate LODs leaves it out (%s)." % reason
+            detail += " " + tip_("Generate LODs leaves it out (%s).") % tip_(reason)
         issues.append(Issue(
             "mesh_heavy", ob.name, 'HIGH' if tris >= MESH_HUGE_TRIS else 'MEDIUM',
-            "%s has about %d triangles" % (ob.name, tris), detail, [ob], fix))
+            tip_("%s has about %d triangles") % (ob.name, tris), detail, [ob], fix))
     return issues
 
 
@@ -257,17 +258,17 @@ def rule_static_batch(scene, objects):
                 for ob in obs:
                     ob.use_static_batch = False
             return revert
-        detail = ("They never move: Static Batch draws them together in one draw call instead of %d. "
-                  "Check that no script moves them before fixing." % len(obs))
+        detail = (tip_("They never move: Static Batch draws them together in one draw call instead of %d. "
+                       "Check that no script moves them before fixing.") % len(obs))
         issues.append(Issue(
             "static_batch", name, 'MEDIUM' if len(obs) >= 10 else 'LOW',
-            "%d static object(s) with %s outside the Static Batch" % (len(obs), name), detail,
+            tip_("%d static object(s) with %s outside the Static Batch") % (len(obs), name), detail,
             sorted(obs, key=lambda o: o.name), fix))
     if with_logic:
         issues.append(Issue(
             "static_batch_logic", "all", 'LOW',
-            "%d static object(s) with logic left out of the Static Batch" % len(with_logic),
-            "They have logic bricks, scripts or components. Mark them by hand only if they never move.",
+            tip_("%d static object(s) with logic left out of the Static Batch") % len(with_logic),
+            tip_("They have logic bricks, scripts or components. Mark them by hand only if they never move."),
             sorted(with_logic, key=lambda o: o.name)))
     return issues
 
@@ -288,18 +289,18 @@ def rule_physics_shapes(scene, objects):
                 return revert
             issues.append(Issue(
                 "physics_moving_trimesh", ob.name, 'HIGH',
-                "%s moves with Triangle Mesh collision" % ob.name,
-                "Triangle Mesh is meant for static scenery; on a moving body it is slow and collides "
-                "badly. Convex Hull keeps the shape close and is much cheaper.", [ob], fix))
+                tip_("%s moves with Triangle Mesh collision") % ob.name,
+                tip_("Triangle Mesh is meant for static scenery; on a moving body it is slow and collides "
+                     "badly. Convex Hull keeps the shape close and is much cheaper."), [ob], fix))
         elif game.physics_type == 'STATIC' and (trimesh or not game.use_collision_bounds):
             tris = _mesh_tris(ob.data) * (4 ** _subsurf_levels(ob))
             if tris >= STATIC_TRIMESH_DENSE_TRIS:
                 proxy = _collision_proxy()
                 reason = proxy.skip_reason(scene, ob)
-                detail = "A simpler invisible collision mesh (or a box) would make physics cheaper."
+                detail = tip_("A simpler invisible collision mesh (or a box) would make physics cheaper.")
                 fix = None
                 if reason is None:
-                    detail += " Fix makes a decimated collision proxy; scripts that compare the hit object by name see %s_COL." % ob.name
+                    detail += " " + tip_("Fix makes a decimated collision proxy; scripts that compare the hit object by name see %s_COL.") % ob.name
 
                     def fix(ob=ob):
                         proxy.make_proxy(bpy.context.scene, ob)
@@ -308,12 +309,12 @@ def rule_physics_shapes(scene, objects):
                             proxy.clear(bpy.context.scene, ob)
                         return revert
                 elif reason not in {"is a proxy", "has a proxy"}:
-                    detail += " Collision proxies leave it out (%s)." % reason
+                    detail += " " + tip_("Collision proxies leave it out (%s).") % tip_(reason)
                 if reason in {"is a proxy", "has a proxy"}:
                     continue
                 issues.append(Issue(
                     "physics_dense_static", ob.name, 'LOW',
-                    "%s collides with all its %d triangles" % (ob.name, tris), detail, [ob], fix))
+                    tip_("%s collides with all its %d triangles") % (ob.name, tris), detail, [ob], fix))
     return issues
 
 
@@ -456,9 +457,9 @@ def rule_collision_primitive(scene, objects):
         issues.append(Issue(
             'collision_primitive', ob.name,
             'LOW' if ob.game.physics_type == 'STATIC' else 'MEDIUM',
-            '%s: use %s collision (%.1f%% fit)' % (ob.name, shape, ratio * 100.0),
-            'Closed mesh occupies %.1f%% of the enclosing primitive. Changes only the collision '
-            'shape; review contacts and clearance after applying. Revert restores the previous shape.'
+            tip_('%s: use %s collision (%.1f%% fit)') % (ob.name, shape, ratio * 100.0),
+            tip_('Closed mesh occupies %.1f%% of the enclosing primitive. Changes only the collision '
+                 'shape; review contacts and clearance after applying. Revert restores the previous shape.')
             % (ratio * 100.0), [ob], fix))
     return issues
 
@@ -477,16 +478,16 @@ def rule_shadows(scene, objects):
                 return revert
             issues.append(Issue(
                 "shadow_big", ob.name, 'MEDIUM',
-                "%s has a %d shadow buffer" % (ob.name, size),
-                "Every frame the scene is drawn into it again; %d is usually sharp enough." % SHADOW_BUFFER_MAX,
+                tip_("%s has a %d shadow buffer") % (ob.name, size),
+                tip_("Every frame the scene is drawn into it again; %d is usually sharp enough.") % SHADOW_BUFFER_MAX,
                 [ob], fix))
     spots = [ob for ob in shadowed if ob.data.type in {'SPOT', 'POINT', 'AREA'}]
     if len(spots) > SHADOW_LAMPS_MANY:
         issues.append(Issue(
             "shadow_many", "all", 'MEDIUM',
-            "%d lamps cast shadows" % len(spots),
-            "Each shadow lamp draws the scene once more per frame. Keep shadows on the lamps that "
-            "matter and turn off the rest.", sorted(spots, key=lambda o: o.name)))
+            tip_("%d lamps cast shadows") % len(spots),
+            tip_("Each shadow lamp draws the scene once more per frame. Keep shadows on the lamps that "
+                 "matter and turn off the rest."), sorted(spots, key=lambda o: o.name)))
     return issues
 
 
@@ -514,15 +515,15 @@ def rule_sounds(scene, objects):
                 return revert
             issues.append(Issue(
                 "sound_cached", sound.name, 'MEDIUM',
-                "Sound %s (%.1f MB) is fully loaded in memory" % (sound.name, size / 1048576),
-                "Long music or ambience can play streamed from the file instead of held in memory "
-                "(decoding then costs some CPU while playing). Takes effect after the file is reopened.",
+                tip_("Sound %s (%.1f MB) is fully loaded in memory") % (sound.name, size / 1048576),
+                tip_("Long music or ambience can play streamed from the file instead of held in memory "
+                     "(decoding then costs some CPU while playing). Takes effect after the file is reopened."),
                 fix=fix))
         elif size >= SOUND_BIG_BYTES and sound.filepath.lower().endswith(".wav"):
             issues.append(Issue(
                 "sound_wav", sound.name, 'LOW',
-                "Sound %s is a %.1f MB WAV" % (sound.name, size / 1048576),
-                "OGG makes the game smaller and faster to load with no audible difference."))
+                tip_("Sound %s is a %.1f MB WAV") % (sound.name, size / 1048576),
+                tip_("OGG makes the game smaller and faster to load with no audible difference.")))
     return issues
 
 
@@ -544,9 +545,9 @@ def rule_scripts_every_frame(scene, objects):
         return []
     return [Issue(
         "scripts_every_frame", "all", 'LOW',
-        "%d object(s) run a script every frame" % len(busy),
-        "Always + True Level with Skip 0 runs the script 60 times a second. If it does not need to, "
-        "raise Skip or run it on an event.", sorted(busy, key=lambda o: o.name))]
+        tip_("%d object(s) run a script every frame") % len(busy),
+        tip_("Always + True Level with Skip 0 runs the script 60 times a second. If it does not need to, "
+             "raise Skip or run it on an event."), sorted(busy, key=lambda o: o.name))]
 
 
 RULES = (
@@ -568,7 +569,7 @@ def diagnose(scene):
         try:
             issues.extend(rule(scene, objects))
         except Exception as ex:
-            issues.append(Issue(rule.__name__, "error", 'HIGH', "Check %s failed: %s" % (rule.__name__, ex)))
+            issues.append(Issue(rule.__name__, "error", 'HIGH', tip_("Check %s failed: %s") % (rule.__name__, ex)))
     issues.sort(key=lambda i: (SEVERITY_ORDER[i.severity], i.rule, i.key))
     return issues
 
@@ -624,9 +625,9 @@ class GAME_OT_scene_doctor(Operator):
                 area.spaces.active.context = 'SCENE'
                 area.tag_redraw()
         if issues:
-            self.report({'INFO'}, "Scene Doctor: %d issue(s), see Properties > Scene" % len(issues))
+            self.report({'INFO'}, tip_("Scene Doctor: %d issue(s), see Properties > Scene") % len(issues))
         else:
-            self.report({'INFO'}, "Scene Doctor: nothing to improve")
+            self.report({'INFO'}, tip_("Scene Doctor: nothing to improve"))
         return {'FINISHED'}
 
 
@@ -671,7 +672,7 @@ class GAME_OT_scene_doctor_fix(Operator):
         revert = issue.fix()
         if revert is not None:
             _applied.append((issue.title, revert))
-        self.report({'INFO'}, "Fixed: %s" % issue.title)
+        self.report({'INFO'}, tip_("Fixed: %s") % issue.title)
         _run(context)
         return {'FINISHED'}
 
@@ -691,9 +692,9 @@ class GAME_OT_scene_doctor_revert(Operator):
         try:
             revert()
         except ReferenceError:
-            self.report({'WARNING'}, "Could not revert, the data no longer exists: %s" % title)
+            self.report({'WARNING'}, tip_("Could not revert, the data no longer exists: %s") % title)
             return {'CANCELLED'}
-        self.report({'INFO'}, "Reverted: %s" % title)
+        self.report({'INFO'}, tip_("Reverted: %s") % title)
         _run(context)
         return {'FINISHED'}
 
@@ -732,7 +733,7 @@ class SCENE_PT_scene_doctor(Panel):
             box.label(text="Applied fixes")
             for index, (title, _revert) in enumerate(_applied):
                 row = box.row(align=True)
-                row.label(text=title, icon='FILE_TICK')
+                row.label(text=title, translate=False, icon='FILE_TICK')
                 row.operator("game.scene_doctor_revert", text="Revert").index = index
 
         if _last_scene != context.scene.name:
@@ -746,7 +747,7 @@ class SCENE_PT_scene_doctor(Panel):
         for index, issue in enumerate(issues):
             box = layout.box()
             row = box.row(align=True)
-            row.label(text=issue.title, icon=SEVERITY_ICON[issue.severity])
+            row.label(text=issue.title, translate=False, icon=SEVERITY_ICON[issue.severity])
             if issue.objects:
                 row.operator("game.scene_doctor_select", text="", icon='RESTRICT_SELECT_OFF').index = index
             if issue.fix is not None:
@@ -756,7 +757,7 @@ class SCENE_PT_scene_doctor(Panel):
                 col = box.column(align=True)
                 col.scale_y = 0.8
                 for line in _wrap(issue.detail, 70):
-                    col.label(text=line)
+                    col.label(text=line, translate=False)
 
 
 def _wrap(text, width):

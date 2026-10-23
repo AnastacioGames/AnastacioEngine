@@ -20,6 +20,7 @@ splits them out of the batch) and objects that already have LoD levels made by h
 import math
 
 import bpy
+from bpy.app.translations import pgettext_tip as tip_
 from bpy.props import BoolProperty, EnumProperty, IntProperty
 from bpy.types import Operator
 
@@ -183,13 +184,13 @@ class GAME_OT_lod_generate_batch(Operator):
         else:
             objects = heavy_meshes(scene)
         if not objects:
-            self.report({'WARNING'}, "No meshes to generate LODs for")
+            self.report({'WARNING'}, tip_("No meshes to generate LODs for"))
             return {'CANCELLED'}
         done, skipped = generate(scene, objects, self.count)
-        msg = "LODs generated for %d object(s)" % len(done)
+        msg = tip_("LODs generated for %d object(s)") % len(done)
         if skipped:
-            msg += "; left out %d: %s" % (len(skipped), ", ".join(
-                "%s (%s)" % (ob.name, reason) for ob, reason in skipped[:5]))
+            msg += tip_("; left out %d: %s") % (len(skipped), ", ".join(
+                "%s (%s)" % (ob.name, tip_(reason)) for ob, reason in skipped[:5]))
         self.report({'INFO'} if done else {'WARNING'}, msg)
         return {'FINISHED'} if done else {'CANCELLED'}
 
@@ -204,7 +205,7 @@ class GAME_OT_lod_clear_generated(Operator):
         scene = context.scene
         objects = [ob for ob in context.selected_objects if TAG not in ob] or list(scene.objects)
         removed = sum(clear_generated(scene, ob) for ob in objects if TAG not in ob)
-        self.report({'INFO'}, "Removed %d generated LoD level(s)" % removed)
+        self.report({'INFO'}, tip_("Removed %d generated LoD level(s)") % removed)
         return {'FINISHED'}
 
 
