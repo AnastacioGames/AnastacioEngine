@@ -27,6 +27,7 @@
 #include <assert.h>
 
 #include "DNA_brush_types.h"
+#include "DNA_node_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_userdef_types.h"
 
@@ -38,6 +39,7 @@
 
 #include "BKE_context.h"
 #include "BKE_curve.h"
+#include "BKE_node.h"
 
 #include "RNA_access.h"
 
@@ -52,6 +54,8 @@
 #include "interface_intern.h"
 
 #include "GPU_basic_shader.h"
+
+#include "WM_types.h"
 
 #ifdef WITH_INPUT_IME
 #  include "WM_types.h"
@@ -3911,6 +3915,102 @@ static int widget_roundbox_set(uiBut *but, rcti *rect)
  * \{ */
 
 /* conversion from old to new buttons, so still messy */
+/* ************ node add buttons: socket preview dots ************ */
+
+/* Same colors as the standard sockets in the Node Editor (drawnode.c). */
+static const float node_add_socket_colors[][4] = {
+	{0.63, 0.63, 0.63, 1.0},    /* SOCK_FLOAT */
+	{0.39, 0.39, 0.78, 1.0},    /* SOCK_VECTOR */
+	{0.78, 0.78, 0.16, 1.0},    /* SOCK_RGBA */
+	{0.39, 0.78, 0.39, 1.0},    /* SOCK_SHADER */
+	{0.70, 0.65, 0.19, 1.0},    /* SOCK_BOOLEAN */
+	{0.0, 0.0, 0.0, 1.0},       /* __SOCK_MESH (deprecated) */
+	{0.06, 0.52, 0.15, 1.0},    /* SOCK_INT */
+	{0.39, 0.39, 0.39, 1.0},    /* SOCK_STRING */
+};
+
+#define NODE_ADD_DOTS_MAX 4
+
+/* Node type of a "node.add_node" button, only when it has static socket templates. */
+static bNodeType *ui_but_node_add_type(const uiBut *but)
+{
+	char idname[64];
+	bNodeType *ntype;
+
+	if (!but->optype || !but->opptr || !STREQ(but->optype->idname, "NODE_OT_add_node"))
+		return NULL;
+	RNA_string_get(but->opptr, "type", idname);
+	ntype = nodeTypeFind(idname);
+	if (!ntype || (!ntype->inputs && !ntype->outputs))
+		return NULL;
+	return ntype;
+}
+
+/* One entry per socket type: a node with two color inputs shows a single yellow dot. */
+static int node_add_unique_types(const bNodeSocketTemplate *stemp, int r_types[NODE_ADD_DOTS_MAX])
+{
+	int n = 0, i, j;
+	if (!stemp)
+		return 0;
+	for (i = 0; stemp[i].type != -1 && n < NODE_ADD_DOTS_MAX; i++) {
+		const int type = CLAMPIS(stemp[i].type, 0, (int)ARRAY_SIZE(node_add_socket_colors) - 1);
+		for (j = 0; j < n && r_types[j] != type; j++);
+		if (j == n)
+			r_types[n++] = type;
+	}
+	return n;
+}
+
+static int node_add_template_count(const bNodeSocketTemplate *stemp)
+{
+	int types[NODE_ADD_DOTS_MAX];
+	return node_add_unique_types(stemp, types);
+}
+
+static int node_add_dots_width(const bNodeType *ntype, float step)
+{
+	const int nin = node_add_template_count(ntype->inputs);
+	const int nout = node_add_template_count(ntype->outputs);
+	return (int)(step * (nin + nout + 3));
+}
+
+static void node_add_draw_dot_row(const bNodeSocketTemplate *stemp, float x, float y, float step, float radius)
+{
+	int types[NODE_ADD_DOTS_MAX];
+	const int n = node_add_unique_types(stemp, types);
+	int i;
+	for (i = 0; i < n; i++) {
+		glPushMatrix();
+		glTranslatef(x + step * i, y, 0.0f);
+		glColor4fv(node_add_socket_colors[types[i]]);
+		glutil_draw_filled_arc(0.0f, (float)(M_PI * 2.0), radius, 12);
+		glColor4f(0.0f, 0.0f, 0.0f, 0.6f);
+		glutil_draw_lined_arc(0.0f, (float)(M_PI * 2.0), radius, 12);
+		glPopMatrix();
+	}
+}
+
+/* Inputs, a gap, then outputs: a mini node at the right end of the button. */
+static void node_add_draw_dots(const bNodeType *ntype, const rcti *rect, float step)
+{
+	const float radius = step * 0.36f;
+	const float y = BLI_rcti_cent_y_fl(rect);
+	const int nin = node_add_template_count(ntype->inputs);
+	float x = rect->xmax - node_add_dots_width(ntype, step) + step * 0.5f;
+
+	glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+	node_add_draw_dot_row(ntype->inputs, x, y, step, radius);
+	x += step * nin;
+
+	/* gap between inputs and outputs */
+	x += step * 2.0f;
+
+	node_add_draw_dot_row(ntype->outputs, x, y, step, radius);
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+}
+
 void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rcti *rect)
 {
 	bTheme *btheme = UI_GetTheme();
@@ -4210,7 +4310,20 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 		}
 #endif
 
-		wt->text(fstyle, &wt->wcol, but, rect);
+		{
+			bNodeType *node_add_type = ui_but_node_add_type(but);
+			if (node_add_type) {
+				/* reserve room at the right so the label clips before the dots */
+				const float step = 0.42f * BLI_rcti_size_y(&rect_orig);
+				rcti rect_text = *rect;
+				rect_text.xmax -= node_add_dots_width(node_add_type, step);
+				wt->text(fstyle, &wt->wcol, but, &rect_text);
+				node_add_draw_dots(node_add_type, &rect_orig, step);
+			}
+			else {
+				wt->text(fstyle, &wt->wcol, but, rect);
+			}
+		}
 		if (disabled)
 			glDisable(GL_BLEND);
 

@@ -19,6 +19,106 @@
 # <pep8 compliant>
 import bpy
 
+# icon shown on the add buttons, picked from the category identifier
+_category_icons = (
+    ("INPUT", 'IMPORT'),
+    ("OUTPUT", 'EXPORT'),
+    ("OP_COLOR", 'COLOR'),
+    ("TEXTURE", 'TEXTURE'),
+    ("PATTERN", 'TEXTURE'),
+    ("OP_VECTOR", 'MANIPUL'),
+    ("CONVERTOR", 'ARROW_LEFTRIGHT'),
+    ("SHADER", 'MATERIAL'),
+    ("FILTER", 'FILTER'),
+    ("MATTE", 'IMAGE_ALPHA'),
+    ("DISTORT", 'MOD_LATTICE'),
+    ("GROUP", 'NODETREE'),
+    ("LAYOUT", 'NODE'),
+    ("SCRIPT", 'SCRIPT'),
+    ("VERTEX", 'VERTEXSEL'),
+    ("GEOMETRY", 'MESH_DATA'),
+    ("FRAGMENT", 'SOLID'),
+    ("RANGE", 'GAME'),
+)
+
+_draw_icon = 'NONE'
+
+
+def category_icon(identifier):
+    for key, icon in _category_icons:
+        if key in identifier:
+            return icon
+    return 'NONE'
+
+
+# socket types of each node type, per tree type: {(tree, node): (inputs, outputs)}
+_socket_cache = {}
+
+
+def filter_source_node(context):
+    # selected active node used by the compatibility filter, or None
+    snode = context.space_data
+    tree = getattr(snode, "edit_tree", None)
+    if tree is None:
+        return None
+    node = tree.nodes.active
+    if node is None or not node.select:
+        return None
+    return node
+
+
+def _socket_key(socket):
+    if socket.type == 'CUSTOM':
+        return socket.bl_idname
+    return socket.type
+
+
+def _node_socket_types(tree, nodetype):
+    key = (tree.bl_idname, nodetype)
+    types = _socket_cache.get(key)
+    if types is None:
+        # sockets only exist on a node instance: build one in a scratch tree
+        types = (set(), set())
+        scratch = bpy.data.node_groups.new("_node_add_filter", tree.bl_idname)
+        try:
+            node = scratch.nodes.new(nodetype)
+            types = ({_socket_key(s) for s in node.inputs},
+                     {_socket_key(s) for s in node.outputs})
+        except Exception:
+            pass
+        finally:
+            bpy.data.node_groups.remove(scratch)
+        _socket_cache[key] = types
+    return types
+
+
+def _filter_test(context):
+    # returns a test(item) for the current filter, or None to show everything
+    wm = context.window_manager
+    if getattr(wm, "node_add_filter_out", False):
+        mode = 'OUTPUT'
+    elif getattr(wm, "node_add_filter_in", False):
+        mode = 'INPUT'
+    else:
+        return None
+    node = filter_source_node(context)
+    if node is None:
+        return None
+    tree = context.space_data.edit_tree
+    if mode == 'OUTPUT':
+        wanted = {_socket_key(s) for s in node.outputs if s.enabled}
+        side = 0
+    else:
+        wanted = {_socket_key(s) for s in node.inputs if s.enabled}
+        side = 1
+
+    def test(item):
+        nodetype = getattr(item, "nodetype", None)
+        if nodetype is None:
+            return False
+        return not wanted.isdisjoint(_node_socket_types(tree, nodetype)[side])
+    return test
+
 
 class NodeCategory:
     @classmethod
@@ -81,7 +181,8 @@ class NodeItem:
     # NodeItemCustom sets this as a variable attribute in __init__
     @staticmethod
     def draw(self, layout, context):
-        props = layout.operator("node.add_node", text=self.label, text_ctxt=self.translation_context)
+        props = layout.operator("node.add_node", text=self.label, text_ctxt=self.translation_context,
+                                icon=_draw_icon)
         props.type = self.nodetype
         props.use_transform = True
 
@@ -107,10 +208,25 @@ def register_node_categories(identifier, cat_list):
 
     # works as draw function for both menus and panels
     def draw_node_item(self, context):
+        global _draw_icon
         layout = self.layout
         col = layout.column()
-        for item in self.category.items(context):
-            item.draw(item, col, context)
+        if isinstance(self, bpy.types.Panel):
+            # taller buttons in the shelf/popover, room for the socket dots
+            col.scale_y = 1.4
+        _draw_icon = category_icon(self.category.identifier)
+        test = _filter_test(context)
+        try:
+            shown = 0
+            for item in self.category.items(context):
+                if test is not None and not test(item):
+                    continue
+                item.draw(item, col, context)
+                shown += 1
+            if test is not None and shown == 0:
+                col.label("No compatible node")
+        finally:
+            _draw_icon = 'NONE'
 
     menu_types = []
     panel_types = []

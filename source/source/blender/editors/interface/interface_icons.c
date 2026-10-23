@@ -275,6 +275,76 @@ static void vicon_small_tri_right_draw(int x, int y, int w, int UNUSED(h), float
 	glEnd();
 }
 
+/* socket dot: filled disc with an antialiased outline */
+static void vicon_node_filter_dot(float cx, float cy, float r, float alpha)
+{
+	const int segs = 32;
+	int i;
+
+	glColor4f(0.78f, 0.78f, 0.16f, alpha);
+	glBegin(GL_POLYGON);
+	for (i = 0; i < segs; i++) {
+		const float a = (float)i * (float)M_PI * 2.0f / (float)segs;
+		glVertex2f(cx + cosf(a) * r, cy + sinf(a) * r);
+	}
+	glEnd();
+
+	glColor4f(0.0f, 0.0f, 0.0f, alpha * 0.8f);
+	glBegin(GL_LINE_LOOP);
+	for (i = 0; i < segs; i++) {
+		const float a = (float)i * (float)M_PI * 2.0f / (float)segs;
+		glVertex2f(cx + cosf(a) * r, cy + sinf(a) * r);
+	}
+	glEnd();
+}
+
+/* small node body with two socket dots on one side, for the node add filter */
+static void vicon_node_filter_draw(int x, int y, int w, int h, float alpha, bool out)
+{
+	const float bx = x + w * 0.20f, bw = w * 0.60f;
+	const float by = y + h * 0.14f, bh = h * 0.72f;
+	const float rad = w * 0.12f;
+	const float head = by + bh * 0.70f;
+	const float r = w * 0.115f;
+	const float sx = out ? bx + bw : bx;
+
+	glEnable(GL_BLEND);
+	glEnable(GL_LINE_SMOOTH);
+	glHint(GL_LINE_SMOOTH_HINT, GL_NICEST);
+
+	/* body */
+	glColor4f(0.55f, 0.55f, 0.55f, alpha);
+	UI_draw_roundbox_corner_set(UI_CNR_ALL);
+	UI_draw_roundbox_gl_mode(GL_POLYGON, bx, by, bx + bw, by + bh, rad);
+
+	/* header */
+	glColor4f(0.90f, 0.90f, 0.90f, alpha);
+	UI_draw_roundbox_corner_set(UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT);
+	UI_draw_roundbox_gl_mode(GL_POLYGON, bx, head, bx + bw, by + bh, rad);
+
+	/* outline */
+	glColor4f(0.08f, 0.08f, 0.08f, alpha);
+	UI_draw_roundbox_corner_set(UI_CNR_ALL);
+	UI_draw_roundbox_gl_mode(GL_LINE_LOOP, bx, by, bx + bw, by + bh, rad);
+
+	/* socket dots */
+	vicon_node_filter_dot(sx, by + bh * 0.47f, r, alpha);
+	vicon_node_filter_dot(sx, by + bh * 0.20f, r, alpha);
+
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+}
+
+static void vicon_node_filter_in_draw(int x, int y, int w, int h, float alpha)
+{
+	vicon_node_filter_draw(x, y, w, h, alpha, false);
+}
+
+static void vicon_node_filter_out_draw(int x, int y, int w, int h, float alpha)
+{
+	vicon_node_filter_draw(x, y, w, h, alpha, true);
+}
+
 static void vicon_keytype_draw_wrapper(int x, int y, int w, int h, float alpha, short key_type)
 {
 	/* init dummy theme state for Action Editor - where these colors are defined
@@ -683,6 +753,9 @@ static void init_internal_icons(void)
 	def_internal_vicon(ICON_COLORSET_18_VEC, vicon_colorset_draw_18);
 	def_internal_vicon(ICON_COLORSET_19_VEC, vicon_colorset_draw_19);
 	def_internal_vicon(ICON_COLORSET_20_VEC, vicon_colorset_draw_20);
+
+	def_internal_vicon(ICON_NODE_FILTER_IN_VEC, vicon_node_filter_in_draw);
+	def_internal_vicon(ICON_NODE_FILTER_OUT_VEC, vicon_node_filter_out_draw);
 
 	IMB_freeImBuf(b32buf);
 

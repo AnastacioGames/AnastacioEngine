@@ -33,6 +33,28 @@ from .properties_grease_pencil_common import (
 )
 
 
+def _node_add_filter_update(side):
+    # the two filter toggles are exclusive
+    other = "node_add_filter_out" if side == "node_add_filter_in" else "node_add_filter_in"
+
+    def update(self, context):
+        if getattr(self, side):
+            setattr(self, other, False)
+    return update
+
+
+bpy.types.WindowManager.node_add_filter_in = bpy.props.BoolProperty(
+    name="Compatible Inputs",
+    description="Show only nodes that can feed the inputs of the selected node",
+    update=_node_add_filter_update("node_add_filter_in"),
+)
+bpy.types.WindowManager.node_add_filter_out = bpy.props.BoolProperty(
+    name="Compatible Outputs",
+    description="Show only nodes that can receive the outputs of the selected node",
+    update=_node_add_filter_update("node_add_filter_out"),
+)
+
+
 class NODE_HT_header(Header):
     bl_space_type = 'NODE_EDITOR'
 
@@ -138,6 +160,14 @@ class NODE_HT_header(Header):
 
         # Category tabs of the tool shelf/sidebar as a horizontal icon bar
         layout.prop(context.user_preferences.view, "use_horizontal_tabs", text="", icon='COLLAPSEMENU')
+
+        # Compatibility filter of the add buttons, only with a selected node
+        node = nodeitems_utils.filter_source_node(context)
+        if node is not None:
+            row = layout.row(align=True)
+            wm = context.window_manager
+            row.prop(wm, "node_add_filter_in", text="", icon='NODE_FILTER_IN_VEC')
+            row.prop(wm, "node_add_filter_out", text="", icon='NODE_FILTER_OUT_VEC')
 
         layout.template_running_jobs()
 
