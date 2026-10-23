@@ -570,6 +570,11 @@ iOS fora do escopo.
   `OB_MBALL` e a metaball some no Play; a saída é Alt+C → Mesh. Proposta: converter a superfície em malha
   estática ao dar Play, como curva/texto (custo só no carregamento). Versão dinâmica (re-tessellar a cada
   frame) descartada por ora: pesada na CPU; só com caso de uso concreto, de preferência na GPU.
+- **Compositing no jogo (futuro)**: hoje as árvores Compositing e Texture só valem no render e ficam escondidas
+  no cabeçalho do Node Editor em modo jogo. Proposta: compilar o grafo do compositor numa cadeia de 2D Filters
+  (cada nó vira um trecho de GLSL, como os nós de shader), começando por ~10 nós baratos (Blur leve, Glare,
+  Color Balance, Vinheta, Mix, Curves...). Defocus pesado e Denoise ficam fora. Texture nodes no jogo: sem
+  ganho (os nós de Shader já cobrem), no máximo um bake para imagem.
 
 ## Performance
 

@@ -79,7 +79,27 @@ class NODE_HT_header(Header):
         if context.area.show_header_menus:
             NODE_MT_editor_menus.draw_collapsible(context, layout)
 
-        layout.prop(snode, "tree_type", text="", expand=True)
+        # tree type switch: icon + short name, set apart from the other header buttons
+        layout.separator()
+        row = layout.row(align=True)
+        row.scale_x = 1.1
+        # the enum items are dynamic (python sees only DUMMY): list the tree classes
+        trees = [("ShaderNodeTree", "Shader"), ("CompositorNodeTree", "Compositing"),
+                 ("TextureNodeTree", "Texture")]
+        for cls in bpy.types.NodeTree.__subclasses__():
+            if hasattr(cls, "bl_idname") and (not hasattr(cls, "poll") or cls.poll(context)):
+                label = getattr(cls, "bl_label", cls.bl_idname)
+                if label.endswith(" Tree"):
+                    label = label[:-5]
+                trees.append((cls.bl_idname, label))
+        # compositing and texture nodes only work in renders: hide them in game mode
+        render_only = {"CompositorNodeTree", "TextureNodeTree"}
+        game = scene.render.engine == 'BLENDER_GAME'
+        for idname, label in trees:
+            if game and idname in render_only and snode.tree_type != idname:
+                continue
+            row.prop_enum(snode, "tree_type", idname, text=label)
+        layout.separator()
 
         if snode.tree_type == 'ShaderNodeTree':
             if scene.render.use_shading_nodes:
