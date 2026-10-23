@@ -109,9 +109,22 @@ class BrickNode(LogicNode):
                 return "Preencha: %s" % type(self).bl_rna.properties[f].name
         return ""
 
+    range_logic_show_extra = BoolProperty(
+        name="More", description="Show the other brick settings inside the node")
+
     def draw_buttons(self, context, layout):
         for f in self.main:
             layout.prop(self, f)
+        extra = [f for f in self.extra if f not in self.main]
+        if extra:
+            # as demais opções do brick, recolhidas por padrão para o nó ficar pequeno
+            show = self.range_logic_show_extra
+            layout.prop(self, "range_logic_show_extra", emboss=False,
+                        icon="TRIA_DOWN" if show else "TRIA_RIGHT")
+            if show:
+                col = layout.column(align=True)
+                for f in extra:
+                    col.prop(self, f)
         err = self.error()
         if err:
             layout.label(err, icon="ERROR")
