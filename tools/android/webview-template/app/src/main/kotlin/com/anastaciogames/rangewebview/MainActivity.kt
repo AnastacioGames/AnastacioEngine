@@ -107,6 +107,8 @@ class MainActivity : Activity() {
 
     // WebView.onPause() nao pausa o JavaScript; o protocolo de pausa com o runtime fica para a proxima rodada.
     override fun onPause() {
+        // Suspende o audio do jogo (chuva, musica): o WebView continua rodando o JavaScript em segundo plano.
+        webView.evaluateJavascript("window.rangeAppHidden&&window.rangeAppHidden(true)", null)
         webView.onPause()
         super.onPause()
     }
@@ -114,6 +116,7 @@ class MainActivity : Activity() {
     override fun onResume() {
         super.onResume()
         webView.onResume()
+        webView.evaluateJavascript("window.rangeAppHidden&&window.rangeAppHidden(false)", null)
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
