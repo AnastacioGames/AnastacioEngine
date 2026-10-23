@@ -276,6 +276,21 @@ class UIQuitNode(UIActionNode, Node):
     action = "QUIT"
 
 
+class UISetPropertyNode(UIActionNode, Node):
+    bl_idname = "RangeUISetProperty"
+    bl_label = "Set Property"
+    action = "SET_PROP"
+
+    prop_name = StringProperty(name="Property", description="Propriedade de jogo do dono do script")
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "prop_name", text="")
+        layout.prop(self, "value", text="=")
+
+    def payload(self):
+        return (self.prop_name, self.value)
+
+
 class UISoundNode(UIActionNode, Node):
     bl_idname = "RangeUISound"
     bl_label = "Play Sound"
@@ -294,7 +309,7 @@ class UISoundNode(UIActionNode, Node):
 
 
 ACTION_NODES = (UIPrintNode, UIMessageNode, UIScreenNode, UISceneNode, UIQuitNode,
-                UISoundNode)
+                UISoundNode, UISetPropertyNode)
 
 
 def _abs_location(node):

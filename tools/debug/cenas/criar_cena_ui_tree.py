@@ -7,8 +7,9 @@ grava o Bake e liga Always + Python (range_ui_runtime.main) na câmera, com M/H
 mostrando e escondendo o menu pela propriedade ui_screen.
 
 HUD: tela "HUD" com vida e velocidade lidas das propriedades da câmera.
-D tira vida, R recupera, W/S (segurando) aceleram e freiam, J liga/desliga
-o HUD (propriedade ui_hud).
+Começa só com o menu; Jogar esconde o menu e liga o HUD (Set Property
+ui_hud).  D tira vida, R recupera, W/S (segurando) aceleram e freiam, J
+liga/desliga o HUD, M volta o menu.
 """
 
 import sys
@@ -96,6 +97,11 @@ vel_bar.fill_color = (1.0, 0.55, 0.1, 1.0)
 
 link(jogar, "On Enter", action(ui.UIPrintNode, "mouse entrou em Jogar", 800, 0))
 link(jogar, "On Click", action(ui.UIPrintNode, "clicou Jogar", 800, -100))
+# Jogar: esconde o menu e liga o HUD.
+link(jogar, "On Click", action(ui.UIScreenNode, "", 1100, 100))
+hud_on = action(ui.UISetPropertyNode, "True", 1100, 0)
+hud_on.prop_name = "ui_hud"
+link(jogar, "On Click", hud_on)
 link(btn_opcoes, "On Click", action(ui.UIScreenNode, "Opcoes", 800, -200))
 link(sair, "On Click", action(ui.UIQuitNode, "", 800, -300))
 link(voltar, "On Click", action(ui.UIScreenNode, "Menu", 800, -600))
@@ -133,7 +139,7 @@ sensor.link(controller)
 bpy.ops.object.game_property_new(type="STRING", name="ui_screen")
 cam.game.properties["ui_screen"].value = "Menu"
 for prop, kind, value in (("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0),
-                          ("ui_hud", "BOOL", True)):
+                          ("ui_hud", "BOOL", False)):
     bpy.ops.object.game_property_new(type=kind, name=prop)
     cam.game.properties[prop].value = value
 

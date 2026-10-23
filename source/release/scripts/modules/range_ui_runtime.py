@@ -103,6 +103,23 @@ class UIRuntime:
                 logic.endGame()
             elif action == "SOUND":
                 self.play_sound(*value)
+            elif action == "SET_PROP":
+                self.set_property(*value)
+
+    def set_property(self, name, text):
+        """Converte o texto para o tipo atual da propriedade (bool/int/float)."""
+        current = self.owner.get(name)
+        if isinstance(current, bool):
+            value = text.strip().lower() in ("1", "true", "yes", "on")
+        elif isinstance(current, (int, float)):
+            try:
+                value = type(current)(float(text))
+            except ValueError:
+                print("[UI] valor inválido para %s: %r" % (name, text))
+                return
+        else:
+            value = text
+        self.owner[name] = value
 
     def play_sound(self, path, volume):
         import aud
@@ -135,6 +152,13 @@ class UIRuntime:
         import blf
         width = Range.render.getWindowWidth()
         height = Range.render.getWindowHeight()
+        # O render deixa iluminação/shader ligados; sem isso as cores do
+        # desenho imediato saem escurecidas.
+        bgl.glPushAttrib(bgl.GL_ALL_ATTRIB_BITS)
+        bgl.glUseProgram(0)
+        bgl.glDisable(bgl.GL_LIGHTING)
+        bgl.glDisable(bgl.GL_TEXTURE_2D)
+        bgl.glDisable(bgl.GL_CULL_FACE)
         bgl.glMatrixMode(bgl.GL_PROJECTION)
         bgl.glPushMatrix()
         bgl.glLoadIdentity()
@@ -165,6 +189,7 @@ class UIRuntime:
         bgl.glPopMatrix()
         bgl.glMatrixMode(bgl.GL_MODELVIEW)
         bgl.glPopMatrix()
+        bgl.glPopAttrib()
 
 
 def main(cont):
