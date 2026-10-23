@@ -1,6 +1,6 @@
 # Logic Tree: lógica de jogo por nós
 
-Estado: **plano v1 (2026-10-23)**. Nada implementado. Branch prevista: `feat/logic-tree`.
+Estado: **plano v1 (2026-10-23)**, decisões aprovadas (seção 11). F0 em andamento (seção 13). Branch prevista: `feat/logic-tree`.
 
 ## 1. Objetivo e meta de sensação
 
@@ -183,15 +183,16 @@ Regras:
 - **Undo:** compilar dentro do `save_pre` mexe no objeto. Conferir que isso não suja o Undo nem marca o arquivo
   como modificado depois de salvar.
 
-## 11. Decisões em aberto (para o usuário)
+## 11. Decisões (aprovadas pelo usuário em 2026-10-23)
 
-1. Compilar para bricks nativos (opção A) em vez de gerar Python? (proposta: sim)
-2. Uma árvore compartilhável entre vários objetos? (proposta: sim)
-3. Bricks gerados visíveis no Logic Editor, num grupo recolhido? (proposta: sim; escondê-los esconde a depuração)
-4. Nomes: "Logic Tree" e as famílias "Gatilhos / Lógica / Ações / Receitas" em pt-BR ("Triggers / Logic /
-   Actions / Recipes" em inglês)?
-5. A lista de nós da F1 está boa para passar no teste dos 15 segundos?
-6. Começar pela F0?
+1. Compilar para bricks nativos (opção A): **sim**.
+2. Uma árvore compartilhável entre vários objetos: **sim**.
+3. Bricks gerados visíveis no Logic Editor, num grupo recolhido: **sim**.
+4. Nomes "Logic Tree" e famílias "Gatilhos / Lógica / Ações / Receitas" ("Triggers / Logic / Actions /
+   Recipes" em inglês): **sim**.
+5. Nós da F1 da seção 8: **sim**.
+
+Próximo passo: F0 (seção 13).
 
 ## 12. Referências externas
 
@@ -201,3 +202,41 @@ Regras:
 | Unreal Blueprints | Separar fio de execução de dado. Eventos como pontos de entrada. Norte de experiência |
 | Animation Nodes (Blender 2.7x) | Sistema de nós em Python sobre `bNodeTree`: ordem por dependência e geração de código |
 | Godot VisualScript (removido no 4.0) | O alerta: generalizar demais deixa o editor mais trabalhoso que escrever código |
+
+## 13. Resultado da F0 (2026-10-23)
+
+### 13.1 Estados (leitura de código)
+
+- No editor, um controller pertence a **um** estado só: `rna_Controller_state_number_set` grava um único bit e
+  `rna_controller.c:183` diz "only works for one state at once". O runtime aceitaria uma máscara
+  (`SCA_IController::SetState`, `BL_ConvertControllers.cpp:195`), mas o Logic Editor e o "To Python" leem um
+  número só. **Regra:** controller gerado sempre com um bit. Um nó ativo em vários estados vira um controller por
+  estado, ligados aos mesmos sensores e actuators.
+- Os eventos de um actuator são dois booleanos (`m_posevent`/`m_negevent`, `SCA_IActuator.h:50`), e
+  `AddActiveActuator` só liga o evento. Dois controllers que disparam o mesmo actuator no mesmo tick contam como um
+  disparo, então duplicar o controller por estado não faz a ação rodar duas vezes.
+- O actuator State do usuário no modo Set (`OP_CPY`, `KX_StateActuator.cpp:79`) **substitui a máscara inteira**.
+  Por isso a árvore não pode reservar um bit "sempre ligado" (ex.: estado 30): o primeiro Set do usuário apagaria.
+
+Regras propostas para a F1/F2:
+1. **Nós fora de Frame de Estado** ficam ativos em todos os estados que o objeto usa: estados dos controllers do
+   usuário, estados iniciais, máscaras dos actuators State do usuário e estados dos Frames da árvore. No caso
+   comum (objeto sem estados), isso é só o estado 1: um controller por nó.
+2. **Frame de Estado** usa o número do estado com o mesmo nome; sem nome igual, o primeiro número livre, e a
+   árvore grava o nome em `state_names`.
+3. **Ir para Estado** compila para dois actuators State: Remove (bits dos outros Frames da árvore) e Add (bit do
+   destino). As máscaras são disjuntas, então a ordem não importa, e estados paralelos do usuário ficam intactos.
+4. **Estado inicial:** o Frame marcado como inicial (ou o primeiro) entra nos estados iniciais do objeto.
+5. O registro de regeneração guarda também os nomes de estado e os bits iniciais que a árvore acrescentou, para
+   desfazer ao recompilar ou ao tirar a árvore do objeto.
+
+### 13.2 Expression no lugar de portas (leitura de código)
+
+- `SCA_ExpressionController::FindIdentifier` (`SCA_ExpressionController.cpp:126`) resolve cada nome de sensor
+  ligado para `sensor->GetState()`, a mesma leitura do And (`SCA_ANDController::Trigger`). Nome que não é sensor
+  cai nas propriedades do objeto. O resultado manda positivo ou negativo para os actuators, como o And.
+- Lexer (`InputParser.cpp:134`): identificador começa com letra ASCII e segue com `[0-9A-Za-z._]`. Reservadas,
+  sem diferenciar maiúsculas: `SUM`, `NOT`, `AND`, `OR`, `IF`, `WHOMADE`, `TRUE`, `FALSE`.
+- **Regras:** sensores citados numa expressão recebem nome ASCII seguro derivado do rótulo (ex.: "Tecla Espaço" →
+  `Tecla_Espaco_3`), diferente das palavras reservadas e das propriedades do objeto. And ou Or simples continuam
+  como controllers And/Or com o rótulo original; só a lógica com portas misturadas vira Expression.
