@@ -111,6 +111,11 @@ class MFTSceneRender2X(bpy.types.Operator):
         max=500.0
     )
 
+    @classmethod
+    def poll(cls, context):
+        # Mexe nos nós do Compositor: sem "Use Nodes" não há árvore.
+        return context.scene.node_tree is not None
+
     def execute(self, context):
 
         scene = context.scene
@@ -138,6 +143,11 @@ class MFTCropNodeRegion(bpy.types.Operator):
     bl_label = "Crop Node Region"
     bl_description = "Crop Node Region"
     bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        # Mexe nos nós do Compositor: sem "Use Nodes" não há árvore.
+        return context.scene.node_tree is not None
 
     def execute(self, context):
 
@@ -173,6 +183,11 @@ class MFTCropToViewport(bpy.types.Operator):
     bl_description = "Crop To Viewport..."
     bl_options = {'REGISTER', 'UNDO'}
 
+    @classmethod
+    def poll(cls, context):
+        # Mexe nos nós do Compositor: sem "Use Nodes" não há árvore.
+        return context.scene.node_tree is not None
+
     def execute(self, context):
 
         scene = context.scene
@@ -205,6 +220,11 @@ class MFTOutputCreator(bpy.types.Operator):
     bl_label = "Create Output"
     bl_description = "Output Creator"
     bl_options = {'REGISTER', 'UNDO'}
+
+    @classmethod
+    def poll(cls, context):
+        # Mexe nos nós do Compositor: sem "Use Nodes" não há árvore.
+        return context.scene.node_tree is not None
 
     def execute(self, context):
 
