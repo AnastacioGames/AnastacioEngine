@@ -725,6 +725,9 @@ static GPUShader *gpu_shader_create_ex_impl_raw(const char *vertexcode,
 	if (flags & GPU_SHADER_FLAGS_SKY_LOW) {
 		strcat(standard_defines, "#define SKY_LOW\n");
 	}
+	if (flags & GPU_SHADER_FLAGS_SKY_VERY_LOW) {
+		strcat(standard_defines, "#define SKY_VERY_LOW\n");
+	}
 	gpu_shader_standard_extensions(standard_extensions, geocode != NULL);
 	/* RANGE_SHADER_SALT=<text>: added as a comment to every shader, so the driver cache misses and a run measures
 	 * a first (cold) compile. */

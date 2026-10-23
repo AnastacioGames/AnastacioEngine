@@ -203,7 +203,7 @@ typedef struct GPUPassStages {
 	float strand_curvature;            /* Strands: bend of the tip away from the normal */
 	float explode_factor;              /* Explode: triangles pushed apart along their normal, 0 disables */
 	ListBase *scripts;                 /* GPUScriptCode */
-	int sky_low;                       /* World Sky Quality Low: #define SKY_LOW */
+	int sky_low;                       /* World Sky Quality: 1 = Low (SKY_LOW), 2 = Very Low (+ SKY_VERY_LOW) */
 } GPUPassStages;
 
 GPUPass *GPU_generate_pass(ListBase *nodes, struct GPUNodeLink *outlinks[8],

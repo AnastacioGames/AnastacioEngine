@@ -300,6 +300,7 @@ typedef struct World {
 #define WO_SKY_QUALITY_AUTO     0
 #define WO_SKY_QUALITY_HIGH     1
 #define WO_SKY_QUALITY_LOW      2
+#define WO_SKY_QUALITY_VERY_LOW 3
 
 /* aurora_flag / aurora_colors */
 #define WO_AURORA_ENABLE        (1 << 0)

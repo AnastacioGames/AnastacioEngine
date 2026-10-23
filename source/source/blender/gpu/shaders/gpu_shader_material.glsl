@@ -2510,7 +2510,9 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 					float g        // Mie preferred scattering direction
 					)
 {
-#ifdef SKY_LOW
+#if defined(SKY_VERY_LOW)
+	const float iSteps = 3.0;
+#elif defined(SKY_LOW)
 	// Sky Quality Low (Auto na Web/Android): 16 passos por pixel (e 3 chamadas por pixel de objeto) derrubavam o celular
 	// a ~24 FPS; 6 passos mantem o degrade do ceu.
 	const float iSteps = 6.0;
@@ -3261,7 +3263,11 @@ void env_sky_atmospheric(vec3 wv, vec3 wn, vec3 wr, vec3 sundir, float rough,
 						out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
 	do_sky_atmospheric(wr, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
+#ifdef SKY_VERY_LOW
+	diffibl = mirror; // Very Low: so um raymarch por pixel de objeto
+#else
 	do_sky_atmospheric(-wn, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.831, diffibl);
+#endif
 #ifdef SKY_LOW
 	transmit = mirror; // celular: um raymarch a menos por pixel (transmissao so vale em refracao)
 #else

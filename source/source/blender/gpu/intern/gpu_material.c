@@ -503,10 +503,17 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	{
 		const World *wo = material->scene ? material->scene->world : NULL;
 		const short q = wo ? wo->sky_quality : WO_SKY_QUALITY_AUTO;
+		if (q == WO_SKY_QUALITY_VERY_LOW) {
+			stages.sky_low = 2;
+		}
 #ifdef __EMSCRIPTEN__
-		stages.sky_low = (q != WO_SKY_QUALITY_HIGH);
+		else if (q != WO_SKY_QUALITY_HIGH) {
+			stages.sky_low = 1;
+		}
 #else
-		stages.sky_low = (q == WO_SKY_QUALITY_LOW);
+		else if (q == WO_SKY_QUALITY_LOW) {
+			stages.sky_low = 1;
+		}
 #endif
 	}
 

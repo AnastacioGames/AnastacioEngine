@@ -49,6 +49,8 @@ enum {
 	GPU_SHADER_FLAGS_USER_GEOMETRY		= (1 << 7),
 	/* World Sky Quality Low: lighter Atmospheric sky (#define SKY_LOW). */
 	GPU_SHADER_FLAGS_SKY_LOW			= (1 << 8),
+	/* World Sky Quality Very Low (#define SKY_LOW and SKY_VERY_LOW). */
+	GPU_SHADER_FLAGS_SKY_VERY_LOW		= (1 << 9),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.

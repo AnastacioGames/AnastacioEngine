@@ -1824,6 +1824,8 @@ void RNA_def_world(BlenderRNA *brna)
 		{WO_SKY_QUALITY_HIGH, "HIGH", 0, "High", "Full quality atmosphere (16 steps per pixel)"},
 		{WO_SKY_QUALITY_LOW, "LOW", 0, "Low",
 		 "Faster atmosphere for phones and integrated GPUs (6 steps, fewer sky lookups on objects)"},
+		{WO_SKY_QUALITY_VERY_LOW, "VERY_LOW", 0, "Very Low",
+		 "Cheapest atmosphere for weak phones (3 steps, one sky lookup per object pixel)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 	prop = RNA_def_property(srna, "sky_quality", PROP_ENUM, PROP_NONE);
