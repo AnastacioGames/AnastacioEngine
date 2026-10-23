@@ -294,3 +294,19 @@ no RNA, então o grupo aparece como os outros.
 - Testes: `f3_recipes_test.py -- <pasta>` (10 provas) e `f3_runtime_check.py <pasta>/f3.txt` (plataforma da
   receita anda e troca de estado 6 vezes em 200 ticks). F1 e F2 continuam passando.
 - Fica para o teste com janela: menu Recipes, posição no cursor e o teste dos 15 s usando a receita Jump.
+
+## 17. F4 implementada (2026-10-23)
+
+- Todo sensor e actuator do RNA tem nó (Armature não existe neste build). Os novos são gerados por `_auto_node`
+  direto do RNA: os primeiros campos no nó, o resto no painel N; enums dinâmicos e ponteiros que não são ID
+  ficam de fora. "Property (all modes)" e "State (mask)" dão acesso ao brick completo ao lado dos nós simples.
+  Sem os dados do RolimaRacer aqui, a cobertura foi total em vez de priorizada.
+- Campos do painel N só são copiados quando o usuário mexeu neles (`is_property_set`); os demais ficam no padrão
+  do brick. Assim campos que dividem memória (como `value`/`value_min`) não se sobrescrevem. Valor recusado pelo
+  brick vira aviso, sem parar a compilação.
+- **Run Python:** `modulo.funcao`; vira um controller Python em modo Module, um por regra e estado, ligado a todos
+  os gatilhos da expressão. O script decide com `cont.sensors` (a porta E/Ou/Não não se aplica a ele).
+- Testes: `f4_nodes_test.py -- <pasta>` (9 provas: cobertura, um brick de cada tipo, ponteiro, campo extra) e
+  runtime do Run Python (`AnastacioRuntime --server <pasta>/f4.range` grava `f4.txt` com "60 1"). F1–F3
+  continuam passando.
+- Fica para o teste com janela: tamanho do menu Actions (cerca de 30 itens).

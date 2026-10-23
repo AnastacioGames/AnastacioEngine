@@ -230,7 +230,88 @@ class GoToStateNode(ActionNode, Node):
         self.draw_buttons(context, layout)
 
 
-ACTION_NODES += (GoToStateNode,)
+class RunPythonNode(ActionNode, Node):
+    """Roda modulo.funcao num controller Python (modo Module).  A função recebe o
+    controller e lê os sensores ligados com cont.sensors"""
+    bl_idname = "RangeLogicRunPython"
+    bl_label = "Run Python"
+    kind = "controller"
+    brick_type = 'PYTHON'
+    module = StringProperty(name="Module", description="modulo.funcao (texto interno ou arquivo .py)")
+    use_debug = BoolProperty(name="D (Debug)", description="Recarrega o módulo a cada execução")
+    main = ("module",)
+    extra = ("use_debug",)
+    required = ("module",)
+
+    def error(self):
+        if not self.module:
+            return "Preencha: Module"
+        if "." not in self.module:
+            return "Use modulo.funcao"
+        return ""
+
+
+ACTION_NODES += (GoToStateNode, RunPythonNode)
+
+
+# ---------------------------------------------------------------- demais bricks, direto do RNA
+
+def _auto_fields(rna, kind, skip=()):
+    base = set(getattr(T, kind.title()).bl_rna.properties.keys())
+    out = []
+    for p in rna.bl_rna.properties:
+        if p.identifier in base or p.identifier in skip or p.is_readonly:
+            continue
+        try:
+            _prop_from_rna(p)
+        except Exception:  # enum dinâmico ou ponteiro que não é ID: fica de fora
+            continue
+        out.append(p.identifier)
+    return out
+
+
+def _auto_node(base, idname, label, rna, brick_type, skip=(), n_main=3, **kw):
+    kind = "sensor" if base is TriggerNode else "actuator"
+    fields = _auto_fields(rna, kind, skip)
+    extra = fields[n_main:] + (list(PULSE) if base is TriggerNode else [])
+    return _brick_node(base, idname, label, rna, brick_type, fields[:n_main], extra, **kw)
+
+
+TRIGGER_NODES += (
+    _auto_node(TriggerNode, "RangeLogicDelay", "Delay", T.DelaySensor, 'DELAY'),
+    _auto_node(TriggerNode, "RangeLogicRandom", "Random", T.RandomSensor, 'RANDOM'),
+    _auto_node(TriggerNode, "RangeLogicRadar", "Radar", T.RadarSensor, 'RADAR'),
+    _auto_node(TriggerNode, "RangeLogicMovement", "Movement", T.MovementSensor, 'MOVEMENT'),
+    _auto_node(TriggerNode, "RangeLogicJoystick", "Joystick", T.JoystickSensor, 'JOYSTICK', n_main=4),
+    _auto_node(TriggerNode, "RangeLogicAnimEvent", "Animation Event", T.AnimationEventSensor,
+               'ANIMATIONEVENT'),
+    _auto_node(TriggerNode, "RangeLogicActuatorSensor", "Actuator State", T.ActuatorSensor, 'ACTUATOR',
+               required=("actuator",)),
+    _auto_node(TriggerNode, "RangeLogicVRHead", "VR Head", T.VRHeadSensor, 'VR_HEAD'),
+)
+
+ACTION_NODES += (
+    _auto_node(ActionNode, "RangeLogicCamera", "Camera Follow", T.CameraActuator, 'CAMERA',
+               n_main=4, required=("object",)),
+    _auto_node(ActionNode, "RangeLogicMouseLook", "Mouse Look", T.MouseActuator, 'MOUSE'),
+    _auto_node(ActionNode, "RangeLogicEditObject", "Edit Object", T.EditObjectActuator, 'EDIT_OBJECT',
+               n_main=2),
+    _brick_node(ActionNode, "RangeLogicPropertyFull", "Property (all modes)", T.PropertyActuator,
+                'PROPERTY', ("mode", "property", "value"),
+                [f for f in _auto_fields(T.PropertyActuator, "actuator")
+                 if f not in ("mode", "property", "value")], required=("property",)),
+    _auto_node(ActionNode, "RangeLogicRandomAct", "Random Value", T.RandomActuator, 'RANDOM'),
+    _auto_node(ActionNode, "RangeLogicScene", "Scene", T.SceneActuator, 'SCENE'),
+    _auto_node(ActionNode, "RangeLogicGame", "Game", T.GameActuator, 'GAME', n_main=2),
+    _auto_node(ActionNode, "RangeLogicParent", "Parent", T.ParentActuator, 'PARENT', n_main=2),
+    _auto_node(ActionNode, "RangeLogicVisibility", "Visibility", T.VisibilityActuator, 'VISIBILITY'),
+    _auto_node(ActionNode, "RangeLogicConstraint", "Constraint", T.ConstraintActuator, 'CONSTRAINT',
+               n_main=2),
+    _auto_node(ActionNode, "RangeLogicFilter2D", "2D Filter", T.Filter2DActuator, 'FILTER_2D',
+               n_main=2),
+    _auto_node(ActionNode, "RangeLogicVibration", "Vibration", T.VibrationActuator, 'VIBRATION'),
+    _auto_node(ActionNode, "RangeLogicStateRaw", "State (mask)", T.StateActuator, 'STATE', n_main=2),
+)
 
 
 class GateNode(LogicNode):
@@ -552,11 +633,16 @@ def compile_object(ob):
         for k, v in node.fixed.items():
             setattr(brick, k, v)
         for f in node.fields():
+            if not node.is_property_set(f) and f not in node.main:
+                continue  # nunca mexido: fica o padrão do brick (campos que dividem memória não se sobrescrevem)
             value = getattr(node, f)
             if hasattr(value, "__len__") and not isinstance(value, (str, set)) \
                     and not isinstance(value, bpy.types.ID):
                 value = tuple(value)
-            setattr(brick, f, value)
+            try:
+                setattr(brick, f, value)
+            except (TypeError, ValueError) as exc:
+                errors.append("%s: %s (%s)" % (_label(node), f, exc))
 
     # quais gatilhos aparecem dentro de um Expression: esses precisam de nome ASCII
     in_expr = set()
@@ -585,7 +671,7 @@ def compile_object(ob):
     sensors, actuators = {}, {}
     for _e, acts, _f in rules:
         for node in acts:
-            if node in actuators:
+            if node in actuators or node.kind == "controller":
                 continue
             if isinstance(node, GoToStateNode):
                 target = frame_state[find_frame(tree, node.state).name]
@@ -638,8 +724,20 @@ def compile_object(ob):
             text = _write(e, {n: sensors[n].name for n in linked})
             if text.startswith("(") and text.endswith(")") and text.count("(") == 1:
                 text = text[1:-1]
+        states = [frame_state[frame.name]] if frame else loose
+        # Run Python: controller próprio ligado aos gatilhos; o script decide com cont.sensors
+        for py in [a for a in acts if a.kind == "controller"]:
+            leaves = _leaves(e)
+            for state in states:
+                c = add("controller", 'PYTHON', _label(py))
+                c.states, c.mode, c.module, c.use_debug = state, 'MODULE', py.module, py.use_debug
+                for n in leaves:
+                    c.link(sensor=sensors[n])
+        acts = [a for a in acts if a.kind != "controller"]
+        if not acts:
+            continue
         name = " + ".join(_label(a) for a in acts)
-        for state in ([frame_state[frame.name]] if frame else loose):
+        for state in states:
             c = add("controller", typ, name)
             c.states = state
             if text is not None:

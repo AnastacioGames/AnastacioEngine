@@ -7,6 +7,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Logic Tree F4 (todos os bricks e Run Python)
+
+- `range_logic_tree.py`: nós para os demais sensores (Delay, Random, Radar, Movement, Joystick, Animation Event,
+  Actuator State, VR Head) e actuators (Camera Follow, Mouse Look, Edit Object, Property completo, Random Value,
+  Scene, Game, Parent, Visibility, Constraint, 2D Filter, Vibration, State), gerados do RNA. Nó Run Python vira
+  controller Python Module. Campos do painel N só vão ao brick quando alterados.
+- Teste `tools/tests/logic_tree/f4_nodes_test.py` (9 provas + runtime do Run Python), Linux.
+
 ## 2026-10-23 - Logic Tree F3 (receitas)
 
 - `range_logic_tree.py`: menu Add > Recipes com 6 receitas (Walk WASD, Jump, Collect Item, Health and Damage,
