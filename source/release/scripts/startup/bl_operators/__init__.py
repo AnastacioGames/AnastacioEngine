@@ -40,6 +40,7 @@ _modules = [
     "anastacio_prepare_audio",
     "anastacio_scene_doctor",
     "anastacio_lod_auto",
+    "anastacio_hlod",
     "anastacio_collision_proxy",
     "anastacio_explosive",
     "anastacio_lightmap",

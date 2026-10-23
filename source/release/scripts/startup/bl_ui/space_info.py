@@ -360,6 +360,10 @@ class INFO_PT_game_performance(Panel):
         row.operator("game.lod_clear_generated", text="", icon='X')
         row = box.row(align=True)
         row.scale_y = 1.3
+        row.operator("game.hlod_build", text="Build HLOD", icon='GROUP')
+        row.operator("game.hlod_clear", text="", icon='X')
+        row = box.row(align=True)
+        row.scale_y = 1.3
         row.operator("game.collision_proxy_generate", text="Collision Proxies", icon='MOD_PHYSICS')
         row.operator("game.collision_proxy_clear", text="", icon='X')
         box.label(text="Lighter meshes and collision.")

@@ -220,6 +220,41 @@ TABLE = (
     ('Removed %d generated LoD level(s)', '%d nível(is) de LoD gerado(s) removido(s)',
      'Se quitaron %d nivel(es) de LoD generado(s)', 'Удалено созданных уровней LoD: %d'),
 
+    # Build HLOD
+    ('Build HLOD', 'Gerar HLOD', 'Generar HLOD', 'Создать HLOD'),
+    ('Clear HLOD', 'Limpar HLOD', 'Limpiar HLOD', 'Очистить HLOD'),
+    ('Join far groups of meshes into one simplified proxy per cell (selected meshes, or every static mesh when '
+     'nothing is selected)',
+     'Junta grupos distantes de malhas em um proxy simplificado por célula (malhas selecionadas, ou toda malha '
+     'estática quando nada está selecionado)',
+     'Une grupos lejanos de mallas en un proxy simplificado por celda (mallas seleccionadas, o toda malla '
+     'estática si no hay nada seleccionado)',
+     'Объединяет дальние группы мешей в один упрощённый прокси на ячейку (выделенные меши или все статичные, '
+     'если ничего не выделено)'),
+    ('Delete the HLOD proxies and the invisible levels Build HLOD added',
+     'Apaga os proxies de HLOD e os níveis invisíveis que o Gerar HLOD adicionou',
+     'Borra los proxies de HLOD y los niveles invisibles que añadió Generar HLOD',
+     'Удаляет прокси HLOD и невидимые уровни, добавленные Создать HLOD'),
+    ('Cell Size', 'Tamanho da célula', 'Tamaño de celda', 'Размер ячейки'),
+    ('Side of the square cells that are joined', 'Lado das células quadradas que são juntadas',
+     'Lado de las celdas cuadradas que se unen', 'Сторона объединяемых квадратных ячеек'),
+    ('Camera distance from which a cell is drawn as its proxy',
+     'Distância da câmera a partir da qual a célula é desenhada como proxy',
+     'Distancia de la cámara a partir de la cual la celda se dibuja como proxy',
+     'Расстояние от камеры, с которого ячейка рисуется прокси'),
+    ('Share of the triangles kept in the proxy', 'Parte dos triângulos mantida no proxy',
+     'Parte de los triángulos que se mantiene en el proxy', 'Доля треугольников, остающихся в прокси'),
+    ('Min Objects', 'Mín. de objetos', 'Mín. de objetos', 'Мин. объектов'),
+    ('Cells with fewer objects are left as they are', 'Células com menos objetos ficam como estão',
+     'Las celdas con menos objetos se quedan como están', 'Ячейки с меньшим числом объектов не меняются'),
+    ('HLOD: %d proxy(ies)', 'HLOD: %d proxy(s)', 'HLOD: %d proxy(s)', 'HLOD: прокси %d'),
+    ('Removed %d HLOD proxy(ies)', '%d proxy(s) de HLOD removido(s)', 'Se quitaron %d proxy(s) de HLOD',
+     'Удалено прокси HLOD: %d'),
+    ('HLOD proxy', 'proxy de HLOD', 'proxy de HLOD', 'прокси HLOD'),
+    ('moves', 'se move', 'se mueve', 'движется'),
+    ('Static Batch', 'Static Batch', 'Static Batch', 'Static Batch'),
+    ('own LoD reaches further', 'LoD próprio vai mais longe', 'su LoD llega más lejos', 'свой LoD дальше'),
+
     # Collision Proxies
     ('Generate Collision Proxies', 'Gerar proxies de colisão', 'Generar proxies de colisión', 'Создать прокси коллизий'),
     ('Clear Collision Proxies', 'Limpar proxies de colisão', 'Borrar proxies de colisión', 'Удалить прокси коллизий'),
