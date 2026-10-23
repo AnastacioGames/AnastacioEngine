@@ -68,7 +68,8 @@ def filter_source_node(context):
 
 
 def _socket_key(socket):
-    if socket.type == 'CUSTOM':
+    # python sockets may report a builtin type (VALUE): match them by idname
+    if socket.type == 'CUSTOM' or not socket.bl_idname.startswith("NodeSocket"):
         return socket.bl_idname
     return socket.type
 
