@@ -34,16 +34,29 @@ class OUTLINER_HT_header(Header):
         row = layout.row(align=True)
         row.template_header()
 
-        if context.area.show_header_menus:
-            OUTLINER_MT_editor_menus.draw_collapsible(context, layout)
-
-        # Like Blender 2.8: "New Collection" button next to the menus.
+        # Ordem: New Collection, busca, grade, Display Mode e menus.
         if space.display_mode in {'CURRENT_SCENE', 'ALL_SCENES'}:
             layout.operator("outliner.collection_new", text="", icon='NEWFOLDER').nested = True
 
+        # Busca compacta quando vazia; cresce quando há filtro digitado.
+        search = layout.row()
+        search.ui_units_x = 6 if space.filter_text else 2.5
+        search.prop(space, "filter_text", icon='VIEWZOOM', text="")
+
+        # Grade 6x2 no estilo da grade de camadas: um quadrado por Display Mode.
+        modes = [item.identifier for item in space.bl_rna.properties["display_mode"].enum_items]
+        grid = layout.column(align=True)
+        grid.scale_y = 0.5
+        for start in (0, 6):
+            row = grid.row(align=True)
+            row.scale_x = 0.6
+            for mode in modes[start:start + 6]:
+                row.prop_enum(space, "display_mode", mode, text="")
+
         layout.prop(space, "display_mode", text="")
 
-        layout.prop(space, "filter_text", icon='VIEWZOOM', text="")
+        if context.area.show_header_menus:
+            OUTLINER_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.separator(factor=1)
 
