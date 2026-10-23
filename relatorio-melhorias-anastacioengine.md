@@ -367,6 +367,16 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   automaticamente a partir desses dados — não é mais só um marcador de design. `KX_GameObject::getVehicle()`
   expõe o veículo já pronto para Python. O painel Vehicle também tem um botão para criar/anexar o
   `vehicle_player_component.py` de controle jogável direto no objeto.
+  O controle já inclui torque/RPM, câmbio, direção em graus/sensível à velocidade,
+  freio de mão, volante visual e recursos de moto. Smart Components mantêm a base
+  `KX_PythonComponent` e acrescentam `Range.args` e hooks de editor. O básico de
+  veículo distribuído usa 42 campos tipados, diagnóstico e gizmos de rodas/COM,
+  com nomes/padrões de args preservados; demo e template sincronizados, incluindo
+  ajustes live. Reload/persistência e runtime de força/torque passaram em cena
+  controlada; avaliação com janela continua pendente. O `NativeVehicle` externo do
+  RolimaRacer já usa campos tipados/`Editor` e oferece assists arcade avançados;
+  sua integração reutilizável está proposta no [plano revisado](docs/vehicle-system-plan-2.md),
+  sem migração do jogo implementada.
 - `Shift+A > Constraints` oferece exemplos prontos de Bullet para jogos: Hinge, Limited Hinge (6DOF),
   Slider (6DOF), Ball Socket e Cone Twist (6DOF). Cada item anexa no cursor o conjunto original completo
   da biblioteca do tutorial 2.69: dois corpos físicos e dois filhos `NO_COLLISION` que formam o acabamento

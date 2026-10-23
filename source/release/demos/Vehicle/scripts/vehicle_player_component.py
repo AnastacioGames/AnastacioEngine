@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-"""Controle jogável mínimo para o carro de teste da Range Engine.
+"""Smart Component de condução para o veículo nativo da Anastacio Engine.
 
 Anexe ``VehiclePlayerComponent`` diretamente no objeto Chassis. O veículo em
 si já é criado automaticamente pela engine a partir do painel Physics >
@@ -7,10 +7,10 @@ Vehicle (marque "is_vehicle" e preencha a lista de rodas com raio/suspensão/
 steering/drive por roda); este componente só lê esse veículo já pronto
 (``self.object.getVehicle()``) e aplica o controle de jogador nele.
 Controles padrão: W acelera, S dá ré, A/D esterçam, Espaço freia, Shift
-esquerdo é o freio de mão. Se ``game.vehicle_steering_wheel`` estiver
+esquerdo é o freio de mão. Se ``Object.vehicle_steering_wheel`` estiver
 preenchido no painel Vehicle, o objeto referenciado gira no seu eixo Y
 local para acompanhar o esterço atual. Se houver marchas cadastradas em
-``game.vehicle_gears``, o câmbio (automático por RPM, ou manual com E/Q)
+``Object.vehicle_gears``, o câmbio (automático por RPM, ou manual com E/Q)
 seleciona a marcha atual e sua relação multiplica a força de motor. As
 marchas (e o tipo de câmbio) são cadastradas no painel Physics > Vehicle.
 As teclas de controle são configuráveis na seção "Controles". O chassi
@@ -26,61 +26,62 @@ from collections import OrderedDict
 
 import mathutils
 import Range
+from Range.args import Float, Int, Bool, Text
 
 
 class VehiclePlayerComponent(Range.types.KX_PythonComponent):
     args = OrderedDict([
         ("C_Icons", "AUTO"),
         ("C_Header /Motor/AUTO", True),
-        ("Engine Force", 3200.0),
-        ("Reverse Force", 1800.0),
-        ("Invert Direction", False),
-        ("Throttle Time (s)", 0.4),
-        ("Engine Inertia", 1.0),
+        ('Engine Force', Float(3200.0, min=0, tip='Força por roda motriz no modo legado (N). Torque > 0 no painel Vehicle usa o motor por Nm.')),
+        ('Reverse Force', Float(1800.0, min=0, tip='Força de ré por roda motriz no modo legado (N).')),
+        ('Invert Direction', Bool(False, tip='Inverte a força do motor para modelos cuja frente está no sentido oposto.')),
+        ('Throttle Time (s)', Float(0.4, min=0, tip='Tempo de resposta do pedal em segundos; zero aplica imediatamente.')),
+        ('Engine Inertia', Float(1.0, min=0, tip='Inércia simulada do RPM; valores maiores tornam a resposta mais lenta.')),
         ("C_Header /Freios/FORCE_FORCE", True),
-        ("Brake Force", 120.0),
-        ("Handbrake Force", 250.0),
+        ('Brake Force', Float(120.0, min=0, tip='Intensidade do freio normal aplicada às rodas.')),
+        ('Handbrake Force', Float(250.0, min=0, tip='Intensidade do freio de mão aplicada às rodas traseiras.')),
         ("C_Header /Direcao/MAN_ROT", True),
-        ("Max Steering Angle (deg)", 26.0),
-        ("Steering Speed (deg/s)", 180.0),
-        ("Speed-Sensitive Steering", True),
-        ("Steering Sign", 1.0),
-        ("Steering Wheel Multiplier", 4.0),
+        ('Max Steering Angle (deg)', Float(26.0, min=0, tip='Ângulo máximo de direção em graus.')),
+        ('Steering Speed (deg/s)', Float(180.0, min=0, tip='Velocidade de movimento da direção em graus por segundo.')),
+        ('Speed-Sensitive Steering', Bool(True, tip='Reduz o ângulo máximo conforme a velocidade aumenta.')),
+        ('Steering Sign', Float(1.0, tip='Sinal da direção; use -1 para inverter e 1 para o sentido padrão.')),
+        ('Steering Wheel Multiplier', Float(4.0, tip='Multiplica a rotação do volante visual configurado no painel Vehicle.')),
         ("C_Header /Moto/MOD_PHYSICS", True),
-        ("Motorcycle", False),
-        ("Max Lean (deg)", 35.0),
-        ("Balance Strength", 60.0),
-        ("Balance Damping", 12.0),
-        ("Max Wheelie (deg)", 45.0),
-        ("Wheelie Force", 30.0),
-        ("Wheelie Min Speed", 5.0),
+        ('Motorcycle', Bool(False, tip='Ativa o balanceamento e o controle de empinar para veículos de duas rodas.')),
+        ('Max Lean (deg)', Float(35.0, min=0, show_if='Motorcycle', tip='Inclinação máxima da moto durante a curva, em graus.')),
+        ('Balance Strength', Float(60.0, min=0, show_if='Motorcycle', tip='Força da correção de equilíbrio da moto.')),
+        ('Balance Damping', Float(12.0, min=0, show_if='Motorcycle', tip='Amortecimento da correção de equilíbrio da moto.')),
+        ('Max Wheelie (deg)', Float(45.0, min=0, show_if='Motorcycle', tip='Inclinação máxima de empinar, em graus.')),
+        ('Wheelie Force', Float(30.0, min=0, show_if='Motorcycle', tip='Força usada para levantar a frente da moto.')),
+        ('Wheelie Min Speed', Float(5.0, min=0, show_if='Motorcycle', tip='Velocidade mínima para empinar (km/h).')),
         ("C_Header /Cambio/DRIVER", True),
-        ("Final Drive", 1.0),
-        ("Idle RPM", 800.0),
-        ("Rev Limiter", True),
-        ("Launch RPM", 2500.0),
-        ("Engine Brake", 40.0),
-        ("Upshift RPM", 5500.0),
-        ("Downshift RPM", 2000.0),
-        ("Shift Up Key", "EKEY"),
-        ("Shift Down Key", "QKEY"),
+        ('Final Drive', Float(1.0, min=0, tip='Relação final multiplicada pela relação da marcha no motor por torque.')),
+        ('Idle RPM', Float(800.0, min=0, tip='RPM de marcha lenta do motor simulado.')),
+        ('Rev Limiter', Bool(True, tip='Corta a força ao atingir o RPM máximo configurado no painel Vehicle.')),
+        ('Launch RPM', Float(2500.0, min=0, tip='RPM alvo na saída com o pedal pressionado.')),
+        ('Engine Brake', Float(40.0, min=0, tip='Intensidade do freio motor ao soltar o acelerador.')),
+        ('Upshift RPM', Float(5500.0, min=0, tip='RPM a partir do qual o câmbio automático sobe marcha.')),
+        ('Downshift RPM', Float(2000.0, min=0, tip='RPM abaixo do qual o câmbio automático reduz marcha.')),
+        ('Shift Up Key', Text('EKEY', tip='Nome da tecla Range.events para subir marcha no câmbio manual.')),
+        ('Shift Down Key', Text('QKEY', tip='Nome da tecla Range.events para reduzir marcha no câmbio manual.')),
         ("C_Header /Som/SOUND", True),
-        ("Engine Sound", ""),
-        ("Engine Volume", 0.8),
-        ("Idle Pitch", 0.6),
-        ("Max RPM Pitch", 2.0),
+        ('Engine Sound', Text('', tip='Caminho do áudio do motor; vazio desliga o som. Aceita caminho relativo //.')),
+        ('Engine Volume', Float(0.8, min=0, max=1, show_if='Engine Sound', tip='Volume do áudio do motor.')),
+        ('Idle Pitch', Float(0.6, min=0, show_if='Engine Sound', tip='Pitch do áudio em marcha lenta.')),
+        ('Max RPM Pitch', Float(2.0, min=0, show_if='Engine Sound', tip='Pitch do áudio no RPM máximo.')),
         ("C_Header /Controles/KEY_HLT", False),
-        ("Throttle Key", "WKEY"),
-        ("Reverse Key", "SKEY"),
-        ("Steer Left Key", "AKEY"),
-        ("Steer Right Key", "DKEY"),
-        ("Brake Key", "SPACEKEY"),
-        ("Handbrake Key", "LEFTSHIFTKEY"),
-        ("Wheelie Key", "LEFTSHIFTKEY"),
+        ('Throttle Key', Text('WKEY', tip='Nome da tecla Range.events para acelerar.')),
+        ('Reverse Key', Text('SKEY', tip='Nome da tecla Range.events para ré ou frear no modo por torque.')),
+        ('Steer Left Key', Text('AKEY', tip='Nome da tecla Range.events para virar à esquerda.')),
+        ('Steer Right Key', Text('DKEY', tip='Nome da tecla Range.events para virar à direita.')),
+        ('Brake Key', Text('SPACEKEY', tip='Nome da tecla Range.events para o freio normal.')),
+        ('Handbrake Key', Text('LEFTSHIFTKEY', tip='Nome da tecla Range.events para o freio de mão.')),
+        ('Wheelie Key', Text('LEFTSHIFTKEY', show_if='Motorcycle', tip='Nome da tecla Range.events para empinar a moto.')),
         ("C_Header /Joystick/GAME", True),
-        ("Use Joystick", True),
-        ("Joystick Index", 0),
-        ("Joystick Deadzone", 0.15),
+        ('Use Joystick', Bool(True, tip='Lê o gamepad além das teclas configuradas.')),
+        ('Joystick Index', Int(0, min=0, show_if='Use Joystick', tip='Índice do controle, começando em zero.')),
+        ('Joystick Deadzone', Float(0.15, min=0, max=0.99, show_if='Use Joystick', tip='Zona morta do analógico; movimentos abaixo deste valor são ignorados.')),
     ])
 
     # Layout padrão de controle (SDL GameController, Xbox/PlayStation): eixos
@@ -125,6 +126,79 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
     RPM_RESPONSE = 10.0
     ENGINE_BRAKE_MIN_SPEED_KMH = 3.0
 
+    class Editor:
+        """Diagnóstico e prévia; não altera a configuração física do objeto."""
+
+        def warnings(self, obj, comp):
+            if obj.game.physics_type not in {'RIGID_BODY', 'DYNAMIC'}:
+                yield "O chassi precisa de física Rigid Body ou Dynamic."
+            if not obj.game.is_vehicle:
+                yield "Ative Vehicle no painel Physics para criar o veículo nativo."
+            wheels = obj.vehicle_wheels
+            if not wheels:
+                yield "Cadastre as rodas no painel Physics > Vehicle."
+            used = set()
+            for index, wheel in enumerate(wheels):
+                label = "Roda %d: " % (index + 1)
+                if wheel.object is None:
+                    yield label + "escolha o objeto de conexão/visual."
+                elif wheel.object == obj:
+                    yield label + "o objeto da roda não pode ser o próprio chassi."
+                else:
+                    pointer = wheel.object.as_pointer()
+                    if pointer in used:
+                        yield label + "o mesmo objeto foi usado em outra roda."
+                    used.add(pointer)
+                    if wheel.object.game.physics_type != 'NO_COLLISION':
+                        yield label + "use No Collision para evitar colisão com a suspensão."
+                if not math.isfinite(wheel.radius) or wheel.radius <= 0:
+                    yield label + "raio inválido; a engine usa fallback de 0,3 m para zero."
+                if not math.isfinite(wheel.suspension_rest_length) or wheel.suspension_rest_length <= 0:
+                    yield label + "suspensão sem comprimento positivo; fallback de 0,3 m."
+            if wheels and not any(wheel.has_steering for wheel in wheels):
+                yield "Nenhuma roda está marcada como Steering."
+            if wheels and not any(wheel.has_drive or not wheel.has_steering for wheel in wheels):
+                yield "Marque ao menos uma roda como Drive para aplicar a força do motor."
+            for other in obj.game.components:
+                if other.as_pointer() != comp.as_pointer() and other.name in {
+                        'VehiclePlayerComponent', 'NativeVehicle', 'NativeRolima'}:
+                    yield "Outro controlador de veículo está anexado: " + other.name
+
+        def draw_ui(self, layout, obj, comp):
+            layout.label("Geometria e motor: Physics > Vehicle", icon='INFO')
+            if obj.vehicle_max_torque > 0:
+                layout.label("Motor por torque; Engine Force/Reverse Force não são usados.", icon='INFO')
+            for warning in self.warnings(obj, comp):
+                layout.label(warning, icon='ERROR')
+
+        def on_change(self, obj, name, value):
+            if name in {'Upshift RPM', 'Downshift RPM'}:
+                if self.args['Downshift RPM'] >= self.args['Upshift RPM']:
+                    return "Downshift RPM deve ser menor que Upshift RPM."
+            if name == 'Steering Sign' and value == 0:
+                return "Zero desativa a direção; use 1 ou -1 para escolher o sentido."
+
+        def draw_gizmo(self, obj, args, g, selected):
+            # Posições de conexão seguem a conversão nativa; orientação sem escala.
+            rotation = obj.matrix_world.to_quaternion()
+            down = rotation * mathutils.Vector((0, 0, -1))
+            axle = rotation * mathutils.Vector((1, 0, 0))
+            for wheel in obj.vehicle_wheels:
+                if wheel.object is None or wheel.object == obj:
+                    continue
+                radius = wheel.radius if wheel.radius > 0 else 0.3
+                rest = wheel.suspension_rest_length if wheel.suspension_rest_length > 0 else 0.3
+                if not math.isfinite(radius) or not math.isfinite(rest):
+                    continue
+                connection = wheel.object.matrix_world.translation
+                center = connection + down * rest
+                color = 'YELLOW' if wheel.has_steering else 'GREEN'
+                g.line(connection, center, color)
+                g.circle(center, radius, color, axis=axle)
+            center_of_mass = obj.matrix_world.translation + rotation * mathutils.Vector(obj.vehicle_com_offset)
+            g.sphere(center_of_mass, 0.06, 'RED')
+            g.text(center_of_mass, 'COM')
+
     def start(self, args):
         self._args = args
         self._vehicle = self.object.getVehicle()
@@ -134,24 +208,13 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
             return
 
         self._num_wheels = self._vehicle.getNumWheels()
-        configs = [self._vehicle.getWheelConfig(i) for i in range(self._num_wheels)]
-        self._steering_wheels = [i for i, c in enumerate(configs) if c["hasSteering"]]
-
-        explicit_drive_wheels = [i for i, c in enumerate(configs) if c.get("isDriveWheel")]
-        if explicit_drive_wheels:
-            # has_drive foi marcado manualmente no painel Vehicle para pelo menos
-            # uma roda; respeita essa escolha (permite FWD/RWD/AWD reais).
-            self._drive_wheels = explicit_drive_wheels
-        else:
-            # Nenhuma roda marcada como "Drive": mantém o comportamento legado
-            # (todas as rodas não-esterçantes recebem força de motor) para não
-            # quebrar carros/presets já configurados antes deste campo existir.
-            self._drive_wheels = [i for i in range(self._num_wheels) if i not in self._steering_wheels]
+        self._refresh_wheel_roles()
 
         # Orientação de repouso do volante visual, capturada uma vez para que a
         # rotação de esterço seja sempre relativa a ela (evita deriva ao
         # acumular pequenas rotações quadro a quadro).
         self._steering_wheel_base_orientation = None
+        self._steering_wheel_object = None
 
         # Esterço atual (rad), interpolado gradualmente em direção ao alvo em
         # vez de saltar direto pro valor máximo — tanto para virar quanto para
@@ -163,15 +226,7 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         self._current_gear_index = self._first_forward_gear_index() or 0
         # Câmbio manual começa em ponto morto (N), como num carro real.
         self._neutral = self._gearbox_type == self.GEARBOX_MANUAL
-        self._shift_up_key = self._key_arg("Shift Up Key", "EKEY")
-        self._shift_down_key = self._key_arg("Shift Down Key", "QKEY")
-        self._throttle_key = self._key_arg("Throttle Key", "WKEY")
-        self._reverse_key = self._key_arg("Reverse Key", "SKEY")
-        self._steer_left_key = self._key_arg("Steer Left Key", "AKEY")
-        self._steer_right_key = self._key_arg("Steer Right Key", "DKEY")
-        self._brake_key = self._key_arg("Brake Key", "SPACEKEY")
-        self._handbrake_key = self._key_arg("Handbrake Key", "LEFTSHIFTKEY")
-        self._wheelie_key = self._key_arg("Wheelie Key", "LEFTSHIFTKEY")
+        self._read_keys()
         self._prev_shift_up_held = False
         self._prev_shift_down_held = False
         self._joy = self._empty_joy()
@@ -188,10 +243,44 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
               (self._num_wheels, len(self._steering_wheels), len(self._drive_wheels),
                len(self._gear_ratios)))
 
+    def _read_keys(self):
+        self._shift_up_key = self._key_arg("Shift Up Key", "EKEY")
+        self._shift_down_key = self._key_arg("Shift Down Key", "QKEY")
+        self._throttle_key = self._key_arg("Throttle Key", "WKEY")
+        self._reverse_key = self._key_arg("Reverse Key", "SKEY")
+        self._steer_left_key = self._key_arg("Steer Left Key", "AKEY")
+        self._steer_right_key = self._key_arg("Steer Right Key", "DKEY")
+        self._brake_key = self._key_arg("Brake Key", "SPACEKEY")
+        self._handbrake_key = self._key_arg("Handbrake Key", "LEFTSHIFTKEY")
+        self._wheelie_key = self._key_arg("Wheelie Key", "LEFTSHIFTKEY")
+
+    def update_args(self, args):
+        # Chamado pela engine quando um argumento muda no painel com a UI liberada no Play.
+        self._args.update(args)
+        if self._vehicle is not None:
+            self._read_keys()
+
+    def _refresh_wheel_roles(self):
+        # Relido todo quadro: Steering/Drive podem mudar no painel durante o Play.
+        configs = [self._vehicle.getWheelConfig(i) for i in range(self._num_wheels)]
+        self._steering_wheels = [i for i, c in enumerate(configs) if c["hasSteering"]]
+
+        explicit_drive_wheels = [i for i, c in enumerate(configs) if c.get("isDriveWheel")]
+        if explicit_drive_wheels:
+            # has_drive foi marcado manualmente no painel Vehicle para pelo menos
+            # uma roda; respeita essa escolha (permite FWD/RWD/AWD reais).
+            self._drive_wheels = explicit_drive_wheels
+        else:
+            # Nenhuma roda marcada como "Drive": mantém o comportamento legado
+            # (todas as rodas não-esterçantes recebem força de motor) para não
+            # quebrar carros/presets já configurados antes deste campo existir.
+            self._drive_wheels = [i for i in range(self._num_wheels) if i not in self._steering_wheels]
+
     def update(self):
         if self._vehicle is None:
             return
         try:
+            self._refresh_wheel_roles()
             self._poll_joystick()
             throttle, steering, brake, handbrake = self._read_input()
             self._refresh_gearbox()
@@ -604,6 +693,10 @@ class VehiclePlayerComponent(Range.types.KX_PythonComponent):
         steering_wheel = self.object.getVehicleSteeringWheel()
         if steering_wheel is None:
             return
+        if steering_wheel is not self._steering_wheel_object:
+            # Volante trocado no painel durante o Play: captura a orientação do novo.
+            self._steering_wheel_object = steering_wheel
+            self._steering_wheel_base_orientation = None
         if self._steering_wheel_base_orientation is None:
             self._steering_wheel_base_orientation = steering_wheel.localOrientation.copy()
 

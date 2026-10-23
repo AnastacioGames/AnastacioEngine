@@ -424,10 +424,17 @@ quedas dominadas por swap. Esse baseline é do componente legado corrigido; não
 benchmark do novo núcleo. Refinamentos e validações restantes estão indicados acima.
 Ver [eventos](engine-profiling.md#eventos-de-ragdoll-do-rolimaracer).
 
-[Plano 2](vehicle-system-plan-2.md): Fases B (direção em graus, direção sensível à velocidade, freio de mão,
-volante visual), C (`has_drive`, torque/RPM, gearbox automático/manual) e A (`vehicle_com_offset` via compound
-shape) já estão no código desde o snapshot 28775369. Falta validar cada uma no jogo real (usuário). Fase D
-está fechada. O componente do demo `Vehicle` foi sincronizado com a versão com gearbox em 2026-09-24.
+[Plano revisado de veículos](vehicle-system-plan-2.md) (2026-10-22): integração
+proposta com Smart Components e reaproveitamento do controlador avançado do
+RolimaRacer. Pendentes: V0 baseline em cena e contrato de configuração/entrada;
+V1 modernizar o componente básico; V2 extrair assists arcade por etapas;
+V3 presets/documentação; V4 adaptador e validação no jogo real. As antigas fases
+A/B/C já estão no código e saem do inventário de recursos ausentes; validações
+específicas de dirigibilidade continuam necessárias. Primeiro lote V1: campos
+tipados, diagnóstico e gizmos no básico; demo/template alinhados, 25 checagens
+de editor e smoke no player (força legada e torque/câmbio) PASS. V0 ganhou
+inventário dos cinco veículos salvos do RolimaRacer, sem alterar o jogo. Pendentes
+na V1: preparação com Undo/Redo e avaliação com janela; V0–V4 não estão fechadas.
 
 ### Destruição e explosões
 

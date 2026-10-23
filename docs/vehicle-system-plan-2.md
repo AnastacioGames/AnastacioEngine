@@ -1,162 +1,264 @@
-# Vehicle System — plano 2 (Chassis/Powertrain/Steering/Wheels)
+# Vehicle System — plano revisado: Smart Components e RolimaRacer
 
-## Contexto
+Revisão: 2026-10-22. Substitui o inventário e as fases A–D anteriores, preservando
+o caminho dos links existentes. Auditoria das fontes e inspeção do arquivo do
+RolimaRacer, seguida do primeiro lote V1 testado em cena controlada. O jogo
+RolimaRacer não foi alterado nem migrado.
 
-O plano anterior (`vehicle-system-roadmap.md`, removido do repo — histórico
-completo no git log) chegou até a Fase 5 (presets versionados). As Fases 6 (adaptador de assists
-Python) e 7 (pneus/transmissão avançados) nunca foram iniciadas e ficaram
-como texto aberto/especulativo, gateado em decisões de modelo de pneu
-(Pacejka) que o usuário não quer mais perseguir agora.
+## Objetivo e direção proposta
 
-O usuário trouxe uma especificação concreta de UI (Chassis, Powertrain,
-Steering & Brakes, Wheel & Suspension — a seção de Telemetria da spec
-original foi descartada por decisão do usuário) baseada em como editores de
-veículo arcade tipicamente se estruturam, e pediu para:
-1. apagar o que ainda falta do plano antigo (Fases 6/7, pendências obsoletas);
-2. mapear essa especificação contra o que já existe (Vehicle Lab, DNA/RNA,
-   painel Physics, preset v1) e reaproveitar;
-3. planejar só o que realmente falta.
+Oferecer controle básico e arcade avançado sobre a física Bullet existente,
+com autoria por Smart Components. Reaproveitar os algoritmos do RolimaRacer
+antes de criar outro sistema. O básico mantém o caminho curto para montar e
+dirigir; o avançado acrescenta assists configuráveis e pode integrar o powertrain
+já disponível na engine, após definir sua compatibilidade.
 
-Este documento substitui as Fases 6 e 7 do roadmap antigo. Mantém o princípio
-arquitetural já registrado: física/bridge Bullet em C++, feeling arcade
-(torque, marchas, RPM, drive type, assists) em Python — evita reabrir a
-decisão de modelo de pneu (Pacejka) que o roadmap antigo deixou
-propositalmente fora de escopo.
+Esses dois níveis são uma proposta, não dois produtos prontos. O RolimaRacer
+já possui um controlador arcade avançado próprio. Isso não equivale a um
+simulador de pneus/transmissão avançado. Pacejka, slip físico, diferencial e
+embreagem só devem entrar após demonstrar uma limitação concreta do modelo atual.
 
-## Inventário — o que já existe (reaproveitar, não recriar)
+## O que mudou desde o plano anterior
 
-| Seção da spec do usuário | Já existe | Onde |
+COM offset, rodas motrizes, torque/RPM, câmbio, direção em graus, freio de mão
+e volante visual já estão no código. As antigas fases A/B/C deixam de ser
+implementação pendente; a fase D já estava encerrada. A validação da sensação
+de dirigir continua pendente nos casos sem confirmação específica em jogo real.
+Testes pontuais recentes não encerram toda essa avaliação.
+
+Smart Component mantém `Range.types.KX_PythonComponent`, acrescentando campos
+`Range.args`, `requires` e classe interna `Editor`. Não exige trocar a base de
+execução. O runtime continua independente de `bpy`; imports de editor ficam
+nos métodos do `Editor`. O componente de veículo distribuído agora usa 42 campos tipados, preservando
+nomes, padrões e cabeçalhos existentes; o `NativeVehicle` do RolimaRacer também
+já usa campos tipados.
+
+## Inventário conferido na engine
+
+| Recurso | Estado encontrado |
+|---|---|
+| Chassi e rodas nativos | DNA/RNA, painel Physics > Vehicle, criação no conversor e `getVehicle()` |
+| Chassi | Massa do corpo físico, `vehicle_com_offset` e referência de volante visual |
+| Rodas | Raio, suspensão, atrito, roll influence, steering e `has_drive` por roda |
+| Direção/freios | Graus, suavização, redução por velocidade e freio de mão distinto |
+| Powertrain | Torque em Nm, RPM, câmbio automático/manual, relações e seleção FWD/RWD/AWD na UI |
+| Exemplo jogável | Pedais, inércia/RPM, freio motor, joystick, som, balanceamento/empinar de moto |
+| Ajuste live | Sincronização do editor no Play e setters Python de torque/RPM/relações, raio e comprimento de suspensão |
+| Diagnóstico | Vehicle Lab, debug draw, telemetria e estado/contato por roda |
+| Presets | Save/load, bloco opcional `engine` e rebuild explícito |
+| Smart Components | Campos tipados, condições, dicas, requisitos, botões/avisos/desenho de editor |
+
+Fontes de referência para a implementação:
+
+- [`vehicle_player_component.py`](../source/release/demos/Vehicle/scripts/vehicle_player_component.py): comportamento do exemplo, incluindo torque/RPM/câmbio.
+- [`custom_pt_physics.py`](../source/release/scripts/startup/flowmenu/custom_pt_physics.py): painéis e template embutido criado pelo botão Add Vehicle Component.
+- [`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp): acesso ao veículo e getters/setters do motor.
+- [`KX_VehicleWrapper.cpp`](../source/source/gameengine/Ketsji/KX_VehicleWrapper.cpp): rodas, estado, setters e presets.
+- [`KX_VehiclePreset.cpp`](../source/source/gameengine/Ketsji/KX_VehiclePreset.cpp): contrato efetivo de serialização, incluindo `engine`.
+- [`04_smart_component.py`](../source/release/scripts/templates_components/04_smart_component.py) e [`range_component_editor.py`](../source/release/scripts/modules/range_component_editor.py): contrato de campos/hooks de editor.
+
+O changelog de 2026-10-22 registra testes específicos de contato, altura por
+suspensão e restauração de torque por preset. São evidências pontuais.
+A documentação `.rst` do veículo não cobre toda a superfície Python encontrada;
+o contrato de presets também precisa de reconciliação com o código atual.
+
+## Auditoria do RolimaRacer
+
+Fontes externas lidas em `D:/ProjetoRolimaRacer`, sem alterar o jogo.
+Os caminhos abaixo são relativos a esse projeto; não são componentes já
+distribuídos pela engine. Consultados também `AGENTS.md` e `PROJECT_MAP.md` do jogo.
+
+| Fonte | Implementação encontrada | Reaproveitamento e limite |
 |---|---|---|
-| Massa do chassi | Sim (campo genérico do Rigid Body, não específico de veículo) | painel Physics padrão |
-| Roll Influence | Sim, mas **por roda**, não por chassi | `bWheelSettings.roll_influence`, `custom_pt_physics.py` |
-| Raio/Suspensão (stiffness, comp damping, relax damping, travel) | Sim, completo | `bWheelSettings` (DNA) + RNA + `custom_pt_physics.py` |
-| Has Steering por roda | Sim | `bWheelSettings.has_steering` |
-| Brake Force (uniforme) | Sim (Python, um único valor para todas as rodas) | `vehicle_player_component.py` |
-| Max Steering (escalar linear) | Sim, mas não em graus/ângulo | `vehicle_player_component.py` arg "Max Steering" |
-| Debug Draw (raycasts, círculo de roda, contato) | Sim, completo (Fase 2 do roadmap antigo) | `KX_VehicleDebugUI.cpp` `RenderDebugDrawTab` |
-| Telemetria numérica (tabela de suspensão, ring buffer) | Sim | `RenderSuspensionTab`, `RenderTelemetryTab` |
-| Presets versionados + rebuild transacional | Sim (Fase 5) | `KX_VehiclePreset.*`, `vehicle.savePreset/loadPreset/rebuildPreset` |
+| `scripts/VehicleSystem/NativeVehicleComponent.py` | `NativeVehicle`: `Range.args`, `Editor.draw_ui`, botões de editor externo e cópia de JSON | Já é Smart Component; adaptar caminhos/regras do jogo |
+| Mesmo arquivo | Direção/pedais suaves, LUTs por velocidade, drift automático, mini-turbo, nitro, burnout e contraesterço | Candidatos ao controle avançado; separar pontuação/HUD/teclas |
+| Mesmo arquivo | Downforce, controle de tração por torque corretivo, estabilização aérea, inclinação e giro traseiro | Assists arcade opcionais; medir efeitos de escritas em velocidade/orientação |
+| `scripts/VehicleSystem/vehicle_fields.py` | Padrões, limites, dicas, seções e condições compartilhados | Base para campos/presets, após generalização |
+| `scripts/VehicleSystem/NativeRolimaComponent.py` | Herda `NativeVehicle`, especializa rodas/eixo dianteiro solidário | Preservar especialização; ainda declara `args` legados próprios |
+| `scripts/VehicleSystem/VehiclePhysics_common.py` | Pausa, contagem, slow motion/substeps e damping/freio de repouso | Separar políticas de corrida e alterações globais de física |
+| `scripts/VehicleSystem/controls.py` e `player_controller.py` | `SetThrottle`, `SetBrake`, `SetSteering`, `SetHandbrake`, input/jogador | Preservar interface ou fornecer adaptador explícito |
+| `scripts/VehicleSystem/NetworkVehicleSync.py` | Ownership, replicação/interpolação e visuais remotos | Não executar controle local no veículo remoto |
+| `Tools/VehicleConfigEditor.py` e `Vehicle_data/*_config.json` | Editor externo e configuração por grupo | Preservar originais; importação exige mapa de campos/unidades/geometria |
 
-**Faltam por completo:** Center of Mass offset, Drive Type (FWD/RWD/AWD),
-Max Torque + RPM Máximo, Gearbox (tipo + lista de marchas), Speed-Sensitive
-Steering, Handbrake Force distinto do freio normal, volante visual.
+Diferenças e dependências verificadas diretamente:
 
-## Fases novas
+- `NativeVehicle.start()` usa `getPhysicsId()` + `Range.constraints.createVehicle()`.
+  `_setup_wheels()` descobre filhos pela propriedade `Wheel` e chama `addWheel`.
+  O exemplo da engine consome `getVehicle()` do conversor. Migração precisa
+  impedir criação dupla e preservar ordem/conexões/visuais das rodas.
+- `NativeTransmission` guarda `CurrentGear` e `SetGear`; força usa LUT por
+  velocidade e `Forca do Motor`. Isso não equivale ao powertrain por torque,
+  RPM e relações da engine. Esses valores não podem virar Nm automaticamente.
+- O `Editor` informa que JSON do grupo vence os campos da caixa; debug carrega
+  configuração no início. Explicitar essa precedência evita campos sem efeito.
+- Drift escreve pontuação e `HUD_STUNT_MSG`; pausa usa `PAUSED`, `CONTAGEM_321`
+  e modo de jogo. Assists usam `ontheground`, `nitro`, `mini_turbo` e
+  `queimar_pneu`. Esses contratos pertencem ao adaptador do jogo.
+- Há leitura direta de Espaço no drift além da interface de comandos. O núcleo
+  comum deve receber comandos; o adaptador preserva input por jogador.
+- Há setters de roda por frame e alterações diretas de velocidades, orientação
+  e visibilidade. Distinguir aplicação contínua de configuração que só precisa
+  de envio ao mudar; medir antes de alegar ganho.
 
-### Fase A — Chassis Setup
+O sistema antigo 100% Python (`VehicleComponent`, `VehiclePhysics`, `VehicleWheel`,
+`VehicleTransmission`) foi removido deliberadamente no jogo. Não o restaurar.
 
-- **Roll Influence:** manter por roda (é assim que o Bullet realmente aplica);
-  não criar campo duplicado a nível de chassi. Documentar essa decisão no
-  painel (tooltip) para não reabrir a dúvida depois.
-- **Massa:** reaproveitar o campo de massa do Rigid Body existente; não criar
-  campo "Vehicle Mass" separado (evita duas fontes de verdade da mesma
-  propriedade Bullet).
-- **Center of Mass Offset (novo, C++):** Bullet não tem um "setter" simples de
-  COM local — a técnica real é envolver a shape de colisão do chassi num
-  `btCompoundShape` com um transform local deslocado. Isso toca a criação da
-  shape em `CcdPhysicsController`/`CcdPhysicsEnvironment.cpp`, não é cosmético.
-  Sub-tarefa própria dentro da Fase A:
-  1. Adicionar `float vehicle_com_offset[3]` (vetor XYZ) no objeto, ao lado de
-     `is_vehicle`, em DNA + RNA + UI.
-  2. No converter (`BL_BlenderDataConversion.cpp`, junto do loop "Create
-     native vehicles"), se o offset for não-zero, envolver a shape do chassi
-     num compound shape deslocado antes de criar o rigid body.
-  3. Testar em cena real: chassi não deve capotar tão facilmente com offset
-     negativo em Z.
+## Primeiro lote executado — V0/V1 (2026-10-22)
 
-### Fase B — Steering & Brakes
+Branch: `feat/vehicle-smart-components`. A inspeção pelo editor em background,
+sem salvar o jogo, encontrou cinco objetos com componentes de veículo:
 
-- **Max Steering Angle em graus:** trocar o argumento "Max Steering" do
-  `vehicle_player_component.py` de escalar linear para graus (0-50°),
-  convertendo para o valor que `setSteeringValue` espera. Puro Python, sem
-  mudança de engine.
-- **Speed-Sensitive Steering (novo, Python):** toggle no componente; se
-  ativado, reduz o ângulo máximo com base em `vehicle.getCurrentSpeedKmh()`.
-  Sem mudança de C++.
-- **Handbrake Force distinto (novo):** hoje só existe um freio uniforme em
-  todas as rodas. Precisa de metadado por roda para saber quais rodas são
-  traseiras (handbrake normalmente só trava traseira). Reaproveita o mesmo
-  metadado `has_drive` da Fase C em vez de criar dois metadados separados.
-- Freio normal (Brake Force): já existe, sem mudança.
-- **Volante visual (novo, DNA/RNA/UI + Python):** objeto filho do chassi que
-  gira no próprio eixo Z conforme o valor de esterço atual.
-  - **Decidido: campo nativo, não argumento de component.** Novo ponteiro de
-    objeto `steering_wheel` no painel Vehicle (DNA/RNA), ao lado de
-    `is_vehicle`/`vehicle_wheels`, seguindo o mesmo padrão já usado para as
-    rodas. Fica disponível como `object.game.steering_wheel` para qualquer
-    script Python, não só para quem usa o `vehicle_player_component`
-    específico — consistente com o resto do painel nativo.
-  - A rotação em si continua em Python: `vehicle_player_component.py` lê
-    `object.game.steering_wheel`, calcula o esterço atual (mesmo valor
-    aplicado via `setSteeringValue`) e aplica no eixo Z local do objeto do
-    volante (`applyRotation` com eixo local, ou `localOrientation` direto),
-    com um fator de multiplicação configurável no componente (o volante gira
-    mais que a roda, tipicamente 3x-6x o ângulo real das rodas dianteiras).
-    Não precisa de nada novo em C++ além do campo de referência em si — a
-    física de esterço não muda.
+| Objeto | Componente | Rodas marcadas | Massa no painel / args / JSON candidato (kg) |
+|---|---|---|---|
+| `Car.Collider` | NativeRolima | 4 | 100 / 150 / 120 |
+| `Car.Collider.carrinho_de_mao` | NativeRolima | 3 | 100 / 150 / 120 |
+| `Car.Collider.trampo` | NativeRolima | 4 | 100 / 100 / 110 |
+| `Triciclo.Collider` | NativeRolima | 3 | 100 / 150 / 120 |
+| `VehicleCollider` | NativeVehicle | 4 | 1700 / 800 / 1700 |
 
-### Fase C — Powertrain (Python arcade, sem tocar modelo de pneu do Bullet)
+Todos têm `is_vehicle=False`, torque/RPM nativos zero e JSON candidato existente.
+Os valores diferem entre painel, args e JSON: por exemplo, o carro tem força
+2500 nos args e 7500 no JSON candidato de `Group_Vehicle_Car`. A escolha por grupo
+é candidata de editor; confirmar a resolução da instância em runtime antes de
+migrar. Nenhuma configuração foi normalizada ou sobrescrita.
 
-Decisão de arquitetura chave: torque/RPM/marchas/drive-type são **feeling
-arcade**, calculados em Python, e traduzidos para o `applyEngineForce` já
-existente por roda — não se deve mexer no modelo de atrito do
-`btRaycastVehicle` (isso é exatamente o que o roadmap antigo isolou como Fase
-7, fora de escopo). Isso evita reabrir a decisão de Pacejka/slip.
+Entregue no componente básico:
 
-- **Metadado "roda motriz" (novo, DNA/RNA/UI):** adicionar `has_drive` (bool)
-  em `bWheelSettings`, ao lado de `has_steering`, exposto no painel Vehicle
-  igual ao steering hoje.
-- **Drive Type dropdown (novo, UI apenas):** `FWD` / `RWD` / `AWD` a nível de
-  chassi, como atalho de UI que só liga/desliga `has_drive` nas rodas certas.
-  Front/rear é inferido pela posição Y da roda relativa ao chassi (mesma
-  convenção `forward=Y` já usada no projeto) — sem campo novo de DNA para
-  isso.
-- **Max Torque + RPM Máximo (novo, DNA/RNA/UI + Python):** decidido, sem
-  curva — só dois campos numéricos simples (Torque Máximo, RPM Máximo). Sem
-  editor de curva, sem gráfico. Fórmula de queda de torque com RPM (linear ou
-  constante até corte) a decidir na implementação, puramente Python.
-- **Gearbox (novo, DNA/RNA/UI + Python):**
-  - Tipo: dropdown Automático/Manual.
-  - Lista de marchas: `bGearRatio` (DNA, float `ratio`) + `ListBase` no
-    Object, reaproveitando o mesmo padrão de UIList já usado para
-    `vehicle_wheels` (Add/Remove) — inclui marcha à ré (ratio negativo).
-  - Lógica em Python: manter RPM simulado, força = torque(RPM) × gearRatio ×
-    finalDrive, aplicada via `applyEngineForce` só nas rodas com `has_drive`.
-    Troca automática por limiar de RPM; manual por tecla.
+- 42 campos `Range.args` com dicas, limites e exibição condicional de moto,
+  áudio e joystick; nomes/padrões/cabeçalhos legados mantidos para reload.
+- `Editor` com diagnóstico de chassi, ativação nativa, rodas/referências,
+  raio/comprimento, papéis de direção/tração e controladores conhecidos duplicados;
+  avisos de limiares do câmbio e sinal de direção. São avisos, sem bloqueio no runtime.
+- Gizmos de conexão/comprimento de suspensão, raio das rodas e COM em coordenadas
+  do mundo. Prévia de repouso, não telemetria da suspensão em movimento.
+- Demo e template do botão idênticos. A demo estava defasada: foi alinhada aos
+  métodos mais completos do template, incluindo `update_args`, releitura das
+  teclas e papéis Steering/Drive durante Play. Métodos de runtime do template
+  anterior preservados por comparação AST.
+- Instalação do painel sincronizada em `build/bin/2.79/scripts/`.
 
-### Fase D — Wheel & Suspension
+Validação automatizada: 25 checagens de editor, incluindo reload de código
+legado com valores alterados, salvar/reabrir, campos condicionais, avisos sem
+mutação e geometria de gizmos com chassi rotacionado/COM deslocado. Player
+`--server`: quatro rodas em contato, tipos comuns em `args`, import sem `bpy`,
+ajuste live de tecla, aceleração, frenagem e telemetria; PASS em modo força
+legada e em modo torque 175 Nm com câmbio. Não mede paridade de dirigibilidade.
+Detector existente em cena parada com render: os cinco contadores de atualização
+ficaram em zero nos segundos 4–6, após estabilizar a suspensão; log com `# fim`.
+Verificador estático manteve quatro suspeitos preexistentes em C++; selftest PASS.
 
-- **Decidido: sem campo Width.** A malha da roda já vem pronta do `.blend`,
-  não é procedural — descartado da spec.
-- Radius, Stiffness, Comp/Relax Damping, Travel já existem por completo —
-  Fase D fica fechada sem trabalho novo.
+Reprodução: `tools/debug/cenas/inspecionar_veiculos.py` e
+`tools/debug/cenas/validar_vehicle_smart_component.py`; saídas desta rodada em
+`artifacts/vehicle-smart-v1/` (artefatos locais, fora do commit). Para comparar
+os métodos com a versão anterior, o validador aceita o arquivo antigo após a
+pasta de saída; sem esse argumento, executa as demais verificações.
 
-Telemetria (gráficos, RPM/marcha, barras de compressão) fica **fora deste
-plano** — descartada por decisão do usuário. O que já existe no Vehicle Lab
-(`RenderSuspensionTab`, `RenderTelemetryTab`, `RenderDebugDrawTab`) continua
-como está, sem expansão.
+V0 segue aberta para baseline no jogo real, contrato e confirmação das instâncias.
+V1 segue aberta para preparação explícita com Undo/Redo e avaliação com janela.
+A extração dos assists avançados ainda não começou.
 
-## Ordem de execução sugerida (paradas obrigatórias, como no plano antigo)
+## Contrato proposto de integração
 
-1. Fase B (Steering & Brakes) — Python + metadado DNA `has_drive`
-   (compartilhado com Fase C).
-2. Fase C (Powertrain) — a maior fatia; sub-passos pequenos (`has_drive` →
-   drive type UI por inferência Y → torque/RPM simples → gearbox), parando
-   para teste em jogo real a cada sub-passo.
-3. Fase A (Chassis: COM offset) — última, por ser a única que mexe em criação
-   de shape Bullet (compound shape), isolando qualquer regressão de física a
-   essa mudança específica.
+1. **Um controlador ativo por chassi:** básico ou avançado escolhe um único
+   caminho de motor/freio/direção. Assists não podem duplicar as forças.
+2. **Física e geometria:** manter Bullet. Em veículos novos, preferir painel
+   nativo e `getVehicle()`. Preservar montagem por script nos carros existentes
+   até conversão explícita e validada em cópia da cena.
+3. **Configuração:** geometria/parâmetros físicos nos dados nativos; assists
+   no Smart Component. Importação de JSON é explícita. Adaptador legado mantém
+   precedência atual até migrar; não sobrescrever arquivos/valores automaticamente.
+4. **Entradas:** acelerador, freio, direção, freio de mão e boost recebidos pelo
+   núcleo. Adaptadores para teclado/gamepad, Range Input System por jogador e IA.
+5. **Estado/eventos:** contato pode usar `getWheelState(i)["isInContact"]`.
+   HUD, pontuação, ragdoll, áudio específico e corrida ficam no jogo; definir
+   eventos/estado na V0. Reutilizar telemetria existente quando compatível.
+6. **Editor:** `Range.args` e `Editor` para limites, referências, avisos, botões
+   e gizmos de rodas/suspensão/COM. Preparação/migração preserva dados e permite
+   Undo/Redo; avaliar `requires` antes de alterar física de objeto existente.
+7. **Compatibilidade:** preservar `.range`, `Range`, `bge`, nomes de args,
+   módulos/classes referenciados e scripts existentes. Novos módulos/classes
+   usam `anastacio`/`Anastacio`. Não substituir componentes já gerados em projetos.
 
-(Fase D — Wheel & Suspension — está fechada, sem trabalho novo.)
+## Etapas e critérios de saída
 
-Cada sub-passo C++ segue o processo já documentado em `AGENTS.md`: rebuild via
-`vcvars64.bat` + `ninja`, teste na cena real (não screenshot automatizado), e
-só então atualizar changelog/roadmap.
+### V0 — Baseline e contrato antes de portar algoritmos
 
-## Verificação
+- Selecionar com o usuário carro, rolimã e, se usada, moto/triciclo. Identificar
+  componentes realmente anexados e valores efetivos em JSON/args/painel.
+  Leitura de scripts não comprova o conteúdo salvo nos `.range`.
+- Registrar massa, eixos, escala, ordem/conexões/contato das rodas, input,
+  curvas/LUTs, precedência e comportamento de pausa/rede.
+- Definir perfis básico/avançado e contrato de comandos/estado/eventos;
+  classificar cada assist como reutilizar, adaptar ou manter no jogo.
+- Comparar motor por torque da engine e força/LUT do jogo; preservar modo
+  legado na transição e evitar dois caminhos de força simultâneos.
 
-- Cada sub-fase: rebuild limpo (`RangeEngine`+`RangeRuntime`), teste manual no
-  jogo real (dirigir o carro, alternar drive type, trocar marcha, puxar o
-  freio de mão), sem depender de screenshot automatizado.
-- Regressão: rodar `VehicleContractTestComponent` (32 PASS/0 SKIP hoje) depois
-  de cada mudança em C++ que toque `PHY_IVehicle`/`WrapperVehicle`/converter.
+Saída: matriz de compatibilidade e baseline em cópia do jogo aprovado pelo
+usuário. Esta auditoria inicia V0; V0 ainda não está concluída.
+
+### V1 — Controle básico como Smart Component
+
+- Modernizar exemplo existente preservando nomes/valores de args e comportamento;
+  reutilizar o veículo do painel nativo.
+- Avisar veículo/rodas ausentes, raios inválidos, referências e controladores
+  conflitantes; preparação explícita com Undo/Redo.
+- Sincronizar demo e template do botão. Runtime/export sem dependência de
+  Tkinter, subprocesso ou `bpy`.
+
+Saída: criar, salvar/reabrir, recarregar e dirigir no editor/player; usuário
+confirma paridade com baseline e carros legados permanecem funcionais.
+
+### V2 — Núcleo avançado reutilizável em peças pequenas
+
+- Extrair do RolimaRacer direção/roll por velocidade; depois drift/atrito;
+  depois boost; depois downforce/tração/estabilização, uma peça por vez.
+- Manter assists opcionais, parâmetros visíveis e integração de pontuação,
+  HUD, teclas e estado da corrida por adaptador.
+- Integrar powertrain definido na V0 sem duplicar força por roda; recalcular
+  LUTs apenas ao mudar parâmetros. Usar APIs atuais antes de propor C++ novo;
+  lacunas exigem reprodução pequena que demonstre a necessidade.
+
+Saída por peça: comparação no jogo real, custo por componente medido e cena
+parada sem atualizações desnecessárias. Validar antes de avançar para outra
+mudança grande/arriscada.
+
+### V3 — Presets e autoria integrada
+
+- Separar preset físico e preset de assists. Reconciliar
+  [contrato v1](vehicle-preset-v1.md) com parser/serializer atual, incluindo
+  `engine` e o que save/load/rebuild preservam.
+- Importar JSONs sobre geometria conhecida com relatório de campos aplicados,
+  sem equivalências inventadas, mantendo o original.
+- Smart Component edita assists; Vehicle Lab serve à física/diagnóstico.
+  Definir quem grava cada valor. Migração do editor externo é decisão posterior
+  à paridade, não pré-requisito. Atualizar API `.rst` e exemplos.
+
+Saída: ida/volta sem perda dos campos suportados; arquivo/estrutura inválidos
+mantêm veículo e configuração anteriores.
+
+### V4 — Adaptador e validação no RolimaRacer
+
+- Migrar um carro em cópia do projeto, preservando PlayerController, IA, input
+  por jogador, replay/fantasma, roda/eixo visual e regras da corrida.
+- Validar ownership, pausa online, ausência de forças duplicadas e interpolação.
+  Predição de veículo segue fora: depende de trabalho específico de replay
+  completo do Bullet, não resolvido por este plano.
+- Substituir caminho legado só após confirmação do usuário no jogo real;
+  avaliar rolimã e moto/triciclo separadamente e permitir retorno ao anterior.
+- Desktop primeiro; Web/APK exigem testes próprios de input, arquivos e export.
+  Smart Component sozinho não comprova compatibilidade nessas plataformas.
+
+Saída: dirigibilidade e integrações confirmadas no jogo real pelo usuário.
+
+## Validação e limites desta revisão
+
+Futuras implementações: testes automáticos de contratos/dados/logs e avaliação
+manual no jogo real. Cobrir spawn inclinado, COM deslocado, rodas sem colisão,
+freio/ré/drift/boost, pausa/retomada, respawn/remoção, IA, tela dividida e ownership.
+Ao tocar atualizações/transformações, executar verificador de trabalho repetido,
+selftest e medições parado/em movimento. C++ segue build e critérios do `AGENTS.md`.
+
+A revisão inicial do plano foi documental. O primeiro lote posterior alterou
+Python e executou editor/player instalados; não exigiu recompilação de C++.
+Não houve teste de dirigibilidade no RolimaRacer nem avaliação visual com janela.
+O Ollama local estava indisponível; análise feita diretamente nas fontes e índices.

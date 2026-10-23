@@ -7,6 +7,51 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-22 - Veículos: branch e primeiro lote Smart Component básico
+
+- Criada `feat/vehicle-smart-components`. Inspeção read-only de RolimaRacer.range:
+  cinco veículos (quatro NativeRolima, um NativeVehicle), todos com montagem por
+  script e is_vehicle desativado. JSONs candidatos divergem dos args/painel;
+  valores preservados, sem migração. Inventário e limites no plano de veículos.
+- Básico da engine recebeu 42 campos Range.args, dicas/limites/condições e Editor
+  com diagnóstico e gizmos de suspensão/rodas/COM. Sem alteração automática da
+  física, sem novo C++ e sem dependência de bpy no runtime.
+- Demo estava atrás do template: sincronizada com a versão que já tinha update_args,
+  releitura de teclas e Steering/Drive live. Métodos do runtime do template anterior
+  preservados por comparação AST. Painel instalado em build/bin sincronizado.
+- Novo inspetor e validador em tools/debug/cenas. Editor: 25 checagens PASS,
+  incluindo valores antigos no reload, persistência, condições/avisos sem mutação
+  e gizmos com rotação/COM. Player --server: contato, tipos de args, ausência de
+  import bpy, update_args, aceleração/freio/telemetria PASS nos modos força legada
+  e torque 175 Nm com câmbio; 240 frames por cena, exit 0.
+- Primeiro teste de torque precisou corrigir o harness: o powertrain consulta
+  pedais separados em _resolve_pedals, além de _read_input. Código do motor não alterado.
+- Detector existente em cena parada com render: após estabilizar (segundos 4–6),
+  sceneNodeUpdates/transformSyncs/boundsPushes/meshMatrixChanges/updateNotifies = 0;
+  log terminou com `# fim`. Verificador estático: quatro suspeitos preexistentes
+  no C++; selftest PASS. Sem alegação de ganho de FPS.
+- `git diff --check` PASS nos arquivos da entrega. `check_docs.py`: os mesmos
+  65 erros e 118 avisos preexistentes (erros somente no mapa de código defasado).
+- V0/V1 continuam parciais: falta baseline/aprovação no jogo real, preparação
+  com Undo/Redo e avaliação com janela. Assists avançados ainda não extraídos.
+
+## 2026-10-22 - Revisão do plano de veículos: Smart Components e RolimaRacer
+
+- Auditoria estática da API, demo/template e Smart Components; comparados NativeVehicle,
+  NativeRolima, descritores, mixin de física, input e rede em `D:/ProjetoRolimaRacer`
+  (somente leitura). Modelo local indisponível; leitura direta das fontes.
+- Corrigido inventário que marcava como ausentes COM, torque/RPM, câmbio, rodas motrizes,
+  direção/freios/volante já implementados. Novas etapas V0–V4: baseline, componente
+  básico, extração gradual de assists, presets e adaptador.
+- Registradas diferenças de montagem (`createVehicle/addWheel` versus `getVehicle`),
+  força/LUT versus torque/RPM, precedência JSON e dependências de HUD/pausa/input.
+  NativeVehicle já usa Smart Component; NativeRolima ainda declara args legados.
+- Roadmap, índice e relatório alinhados. Só documentação alterada, sem build/runtime
+  ou mudanças no jogo. Dirigibilidade, migração e compatibilidade seguem pendentes.
+- Verificação: `git diff --check` passou nos cinco documentos; `tools/check_docs.py`
+  encontrou 65 erros preexistentes, todos de linhas defasadas em `docs/code-map-gameengine.md`,
+  e 118 avisos. Nenhum erro nos documentos revisados; mapa fora do escopo preservado.
+
 ## 2026-10-22 - Merge: DDS Marco 4, Preparar Audio e export compartilhado
 
 - `main` recebeu `feat/preparar-texturas-dds`, `feat/dds-marco4` e `feat/preparar-audio` (sem push).

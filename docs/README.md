@@ -50,8 +50,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   possui e das decisões técnicas vigentes.
 - [Modernização dos Logic Bricks](logic-bricks-modernization.md): contrato, marcos implementados e testes
   ainda pendentes dessa frente.
-- [Plano do Vehicle System](vehicle-system-plan-2.md): evolução faseada da ponte Bullet, debug de veículo
-  e ferramenta Vehicle Lab em ImGui.
+- [Plano do Vehicle System](vehicle-system-plan-2.md): plano revisado de Smart Components, controle básico
+  e assists avançados a reaproveitar do RolimaRacer sobre a física Bullet existente.
 - [Asset Browser](asset-browser.md): modo Assets do File Browser, bibliotecas, arrastar para a Vista 3D,
   janela flutuante e miniaturas.
 - [Preset físico de veículo v1](vehicle-preset-v1.md): contrato do arquivo, save/load e rebuild explícito.
