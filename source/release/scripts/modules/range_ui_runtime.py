@@ -431,7 +431,17 @@ class UIRuntime:
         obj = self.obj_for(data)
         if obj is None:
             return {}
-        return {prop: obj[prop] for prop in obj.getPropertyNames()}
+        values = {prop: obj[prop] for prop in obj.getPropertyNames()}
+        # Velocidade do objeto em km/h, sem script: Object = carro e o
+        # velocímetro (prop "velocidade") já anda. Prop de mesmo nome ganha.
+        try:
+            speed = obj.worldLinearVelocity.length * 3.6
+        except Exception:
+            speed = 0.0
+        values.setdefault("speed", speed)
+        if obj is not self.owner:
+            values.setdefault("velocidade", speed)
+        return values
 
     def texture(self, path):
         """Textura GL da imagem (carregada uma vez com Range.texture)."""
