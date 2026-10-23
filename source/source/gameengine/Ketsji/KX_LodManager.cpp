@@ -94,7 +94,8 @@ inline bool KX_LodManager::LodLevelIterator::operator>(float distance2) const
 
 KX_LodManager::KX_LodManager(Object *ob, KX_Scene *scene, BL_SceneConverter& converter)
 	:m_refcount(1),
-	m_distanceFactor(ob->lodfactor)
+	m_distanceFactor(ob->lodfactor),
+	m_hasDistanceOrigin(false)
 {
 	Mesh *lodmesh = (Mesh *)ob->data;
 	Object *lodmatob = ob;
@@ -132,6 +133,10 @@ KX_LodManager::KX_LodManager(Object *ob, KX_Scene *scene, BL_SceneConverter& con
 		}
 		else {
 			flag |= KX_LodLevel::USE_INVISIBLE;
+			if (lod->source && lod->source != ob) {
+				m_hasDistanceOrigin = true;
+				m_distanceOrigin = mt::vec3(lod->source->obmat[3]);
+			}
 		}
 
 		m_levels.emplace_back(lod->distance, lod->obhysteresis, level++,

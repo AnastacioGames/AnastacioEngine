@@ -13,9 +13,9 @@ The scene floor is cut into square cells. The meshes of each cell are joined int
 (Decimate Collapse, High Quality, applied) placed at the cell center. Everything is baked here, in
 the editor; the game only switches LoD levels:
   - the proxy has an invisible base level and shows its own mesh from Distance on;
-  - each original gets a last invisible level at Distance + cell radius, measured from its origin.
-An original only hides once its proxy is already showing, so far groups never open holes; in the
-band between the two distances both are drawn.
+  - each original gets a last invisible level at the same Distance whose object is the proxy: the
+    runtime then measures the original's distance from the proxy, so the whole cell and its proxy
+    switch on the same frame (no holes, no band where both are drawn).
 
 Left out: meshes with shape keys or an armature, dynamic physics objects, Static Batch objects and
 objects whose LoD levels go past the HLOD distance. "Clear HLOD" deletes what this tool made."""
@@ -92,15 +92,15 @@ def _decimate(scene, ob, ratio):
         bpy.data.meshes.remove(old)
 
 
-def _set_invisible_from(scene, ob, distance):
-    """Append a last invisible LoD level to ob. False when its own levels already reach further."""
+def _set_invisible_from(scene, ob, distance, anchor):
+    """Append a last invisible LoD level to ob, measured from anchor. False when its own levels already reach further."""
     levels = ob.lod_levels
     if len(levels) > 1 and levels[-1].distance >= distance:
         return False
     scene.objects.active = ob
     bpy.ops.object.lod_add()
     level = ob.lod_levels[-1]
-    level.object = None
+    level.object = anchor
     level.use_mesh = False
     level.use_material = False
     level.use_invisible_mesh = True
@@ -159,11 +159,9 @@ def build(scene, objects, cell_size=40.0, distance=80.0, ratio=0.25, min_objects
             continue
         center = sum((ob.matrix_world.translation for ob in group), Vector()) / len(group)
         center.z = min(ob.matrix_world.translation.z for ob in group)
-        radius = max((ob.matrix_world.translation - center).length for ob in group)
-
-        group = [ob for ob in group if _set_invisible_from(scene, ob, distance + radius)
+        group = [ob for ob in group if not (len(ob.lod_levels) > 1 and ob.lod_levels[-1].distance >= distance)
                  or skipped.append((ob, "own LoD reaches further"))]
-        if not group:
+        if len(group) < min_objects:
             continue
 
         proxy = _joined_proxy(scene, group, "HLOD_%d_%d" % (cx, cy))
@@ -174,6 +172,7 @@ def build(scene, objects, cell_size=40.0, distance=80.0, ratio=0.25, min_objects
         proxy.layers = group[0].layers[:]
         proxy.game.physics_type = 'NO_COLLISION'
         for ob in group:
+            _set_invisible_from(scene, ob, distance, proxy)
             ob[TAG_SOURCE] = proxy.name
 
         scene.objects.active = proxy

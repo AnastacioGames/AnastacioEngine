@@ -1555,7 +1555,8 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 	/* Deformed mesh (skinning, ragdoll): the object origin stays with its parent (the car) while the
 	 * bones take the body away. The auto-updated bounds follow the deformed vertices, so measure from
 	 * their center. Static objects keep the origin, which their LOD distances were tuned on. */
-	const mt::vec3 lodPos = (m_autoUpdateBounds && GetDeformer()) ?
+	const mt::vec3 lodPos = m_lodManager->HasDistanceOrigin() ? m_lodManager->GetDistanceOrigin() :
+	                        (m_autoUpdateBounds && GetDeformer()) ?
 	                        NodeGetWorldTransform() * m_cullingNode.GetAabb().GetCenter() : NodeGetWorldPosition();
 	const float distance2 = (lodPos - cam_pos).LengthSquared() * (lodfactor * lodfactor);
 	const KX_LodLevel& lodLevel = m_lodManager->GetLevel(scene, m_currentLodLevel, distance2);

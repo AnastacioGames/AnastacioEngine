@@ -28,6 +28,7 @@
 #define __KX_LOD_MANAGER_H__
 
 #include "EXP_Value.h"
+#include "mathfu.h"
 #include <vector>
 
 class KX_Scene;
@@ -80,6 +81,11 @@ private:
 	/// Used if want to update the physics.
 	bool m_updatePhysics;
 
+	/** World point the distance is measured from instead of the object origin (Build HLOD: the
+	 * object of an invisible level is the cell proxy, so the group and its proxy switch together). */
+	bool m_hasDistanceOrigin;
+	mt::vec3 m_distanceOrigin;
+
 public:
 	KX_LodManager(Object *ob, KX_Scene *scene, BL_SceneConverter& converter);
 	virtual ~KX_LodManager();
@@ -104,6 +110,15 @@ public:
 	const KX_LodLevel& GetLevel(KX_Scene *scene, short previouslod, float distance);
 
 	const bool GetUpdatePhysics();
+
+	bool HasDistanceOrigin() const
+	{
+		return m_hasDistanceOrigin;
+	}
+	const mt::vec3& GetDistanceOrigin() const
+	{
+		return m_distanceOrigin;
+	}
 
 #ifdef WITH_PYTHON
 
