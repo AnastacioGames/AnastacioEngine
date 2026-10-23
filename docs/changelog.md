@@ -7,6 +7,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Logic Tree F3 (receitas)
+
+- `range_logic_tree.py`: menu Add > Recipes com 6 receitas (Walk WASD, Jump, Collect Item, Health and Damage,
+  Door with Key, Moving Platform) feitas de nós comuns num Frame, no cursor; cria as propriedades de jogo que
+  faltam. Nós novos: Ray, Near, Toggle Property, Send Message.
+- Testes `tools/tests/logic_tree/f3_recipes_test.py` (10 provas) e `f3_runtime_check.py`, Linux.
+
 ## 2026-10-23 - Logic Tree F2 (Then, Frames de Estado, Go To State)
 
 - `range_logic_tree.py`: saída Then em Wait, Sound e nos nós novos Play Action, Steering e Video (sensor Actuator

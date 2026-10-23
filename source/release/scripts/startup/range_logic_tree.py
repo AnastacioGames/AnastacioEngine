@@ -162,6 +162,10 @@ TRIGGER_NODES = (
                 required=("property",)),
     _brick_node(TriggerNode, "RangeLogicMessage", "Message", T.MessageSensor, 'MESSAGE',
                 ("subject",), PULSE),
+    _brick_node(TriggerNode, "RangeLogicRay", "Ray", T.RaySensor, 'RAY',
+                ("axis", "range", "property"), ("ray_type", "use_x_ray", "mask") + PULSE),
+    _brick_node(TriggerNode, "RangeLogicNear", "Near", T.NearSensor, 'NEAR',
+                ("property", "distance", "reset_distance"), PULSE),
 )
 
 ACTION_NODES = (
@@ -174,6 +178,10 @@ ACTION_NODES = (
                 ("property", "value"), fixed={"mode": 'ASSIGN'}, required=("property",)),
     _brick_node(ActionNode, "RangeLogicAddProperty", "Add to Property", T.PropertyActuator,
                 'PROPERTY', ("property", "value"), fixed={"mode": 'ADD'}, required=("property",)),
+    _brick_node(ActionNode, "RangeLogicToggleProperty", "Toggle Property", T.PropertyActuator,
+                'PROPERTY', ("property",), fixed={"mode": 'TOGGLE'}, required=("property",)),
+    _brick_node(ActionNode, "RangeLogicMessageSend", "Send Message", T.MessageActuator, 'MESSAGE',
+                ("subject", "to_property"), ("body_type", "body_message", "body_property")),
     _brick_node(ActionNode, "RangeLogicSound", "Sound", T.SoundActuator, 'SOUND',
                 ("sound", "mode"), ("volume", "pitch"), required=("sound",), then=True),
     _brick_node(ActionNode, "RangeLogicRemove", "Remove Object", T.EditObjectActuator,
@@ -664,6 +672,165 @@ def _auto_compile(_scene):
         print("[Logic Tree] Compilação falhou: %s" % exc)
 
 
+# ---------------------------------------------------------------- receitas
+
+class _Builder:
+    """Monta nós dentro de um Frame com o nome da receita."""
+
+    def __init__(self, tree, label, origin):
+        self.tree, self.origin = tree, origin
+        self.frame = self.node("NodeFrame", 0, 0, label=label)
+        self.props = []
+
+    def node(self, kind, x, y, parent=None, **kw):
+        n = self.tree.nodes.new(kind)
+        for k, v in kw.items():
+            setattr(n, k, v)
+        # posição absoluta antes de prender: ao prender, o Blender converte para relativa
+        n.location = (self.origin[0] + x, self.origin[1] + y)
+        if kind != "NodeFrame" or parent is not None:
+            n.parent = parent or self.frame
+        return n
+
+    def link(self, src, dst, i=0):
+        self.tree.links.new(src.outputs[0], dst.inputs[i])
+
+    def gate(self, kind, x, y, *srcs, parent=None):
+        g = self.node(kind, x, y, parent)
+        for i, src in enumerate(srcs):
+            self.link(src, g, i)
+        return g
+
+    def prop(self, name, typ, value):
+        self.props.append((name, typ, value))
+
+
+def _r_walk(b):
+    for i, (key, label, loc, rot) in enumerate((
+            ('W', "Forward", (0.0, 0.1, 0.0), (0.0, 0.0, 0.0)),
+            ('S', "Back", (0.0, -0.1, 0.0), (0.0, 0.0, 0.0)),
+            ('A', "Turn Left", (0.0, 0.0, 0.0), (0.0, 0.0, 0.05)),
+            ('D', "Turn Right", (0.0, 0.0, 0.0), (0.0, 0.0, -0.05)))):
+        k = b.node("RangeLogicKey", 0, -i * 120, label="Key " + key, key=key,
+                   use_pulse_true_level=True)
+        m = b.node("RangeLogicMotion", 260, -i * 120, label=label, offset_location=loc,
+                   offset_rotation=rot, use_local_location=True, use_local_rotation=True)
+        b.link(k, m)
+
+
+def _r_jump(b):
+    k = b.node("RangeLogicKey", 0, 0, label="Key Space", key='SPACE')
+    g = b.node("RangeLogicRay", 0, -140, label="On Ground", axis='NEGZAXIS', range=1.1)
+    a = b.gate("RangeLogicAnd", 240, -40, k, g)
+    m = b.node("RangeLogicMotion", 420, -40, label="Jump")
+    m.linear_velocity = (0.0, 0.0, 6.0)
+    b.link(a, m)
+
+
+def _r_collect(b):
+    t = b.node("RangeLogicCollision", 0, 0, label="Touch Player", property="player")
+    r = b.node("RangeLogicRemove", 260, 0, label="Remove")
+    m = b.node("RangeLogicMessageSend", 260, -120, label="Collected", subject="collected")
+    b.link(t, r)
+    b.link(t, m)
+
+
+def _r_health(b):
+    b.prop("health", 'INT', 100)
+    hit = b.node("RangeLogicCollision", 0, 0, label="Hit", property="damage")
+    dmg = b.node("RangeLogicAddProperty", 260, 0, label="Take Damage", property="health", value="-10")
+    b.link(hit, dmg)
+    dead = b.node("RangeLogicProperty", 0, -160, label="No Health", property="health",
+                  evaluation_type='PROPLESSTHAN', value="1")
+    die = b.node("RangeLogicRemove", 260, -160, label="Die")
+    b.link(dead, die)
+
+
+def _r_door(b):
+    b.prop("open", 'BOOL', False)
+    key = b.node("RangeLogicKey", 0, 0, label="Key E", key='E')
+    near = b.node("RangeLogicNear", 0, -140, label="Player Near", property="player",
+                  distance=3.0, reset_distance=4.0)
+    use = b.gate("RangeLogicAnd", 240, -40, key, near)
+    tog = b.node("RangeLogicToggleProperty", 420, -40, label="Toggle Open", property="open")
+    b.link(use, tog)
+    is_open = b.node("RangeLogicProperty", 0, -300, label="Is Open", property="open",
+                     evaluation_type='PROPEQUAL', value="True")
+    anim = b.node("RangeLogicAction", 260, -300, label="Door Animation", play_mode='FLIPPER')
+    b.link(is_open, anim)
+
+
+def _r_platform(b):
+    frames = {}
+    for i, (name, step, other) in enumerate((("Going", 0.03, "Returning"),
+                                             ("Returning", -0.03, "Going"))):
+        x = i * 760
+        f = b.node("NodeFrame", x, 0, parent=b.frame, label=name)
+        f.range_logic_state, f.range_logic_initial = True, i == 0
+        frames[name] = f
+        t = b.node("RangeLogicAlways", x, 0, f, label="Every Frame " + name,
+                   use_pulse_true_level=True)
+        m = b.node("RangeLogicMotion", x + 260, 0, f, label="Move " + name,
+                   offset_location=(0.0, step, 0.0), use_local_location=True)
+        b.link(t, m)
+        st = b.node("RangeLogicAlways", x, -200, f, label="Start " + name)
+        w = b.node("RangeLogicWait", x + 200, -200, f, label="Wait " + name, duration=2.0)
+        go = b.node("RangeLogicGoToState", x + 420, -200, f, label="To " + other, state=other)
+        b.link(st, w)
+        b.link(w, go)
+
+
+RECIPES = (
+    ("WALK", "Walk WASD", _r_walk),
+    ("JUMP", "Jump", _r_jump),
+    ("COLLECT", "Collect Item", _r_collect),
+    ("HEALTH", "Health and Damage", _r_health),
+    ("DOOR", "Door with Key", _r_door),
+    ("PLATFORM", "Moving Platform", _r_platform),
+)
+
+
+def add_recipe(tree, ident, origin=(0.0, 0.0), objects=()):
+    """Põe a receita na árvore como nós comuns num Frame; cria as propriedades
+    de jogo que ela usa nos objetos dados.  Devolve o Frame."""
+    _id, label, build = next(r for r in RECIPES if r[0] == ident)
+    b = _Builder(tree, label, origin)
+    build(b)
+    for ob in objects:
+        for name, typ, value in b.props:
+            if name not in ob.game.properties:
+                bpy.ops.object.game_property_new(_ops(ob), type=typ, name=name)
+                ob.game.properties[name].value = value
+    return b.frame
+
+
+class RANGE_OT_logic_tree_recipe(Operator):
+    """Adiciona uma receita pronta, feita de nós comuns que podem ser editados"""
+    bl_idname = "node.range_logic_tree_recipe"
+    bl_label = "Add Logic Recipe"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    recipe = EnumProperty(items=[(i, l, "") for i, l, _f in RECIPES])
+
+    @classmethod
+    def poll(cls, context):
+        tree = getattr(context.space_data, "edit_tree", None)
+        return tree is not None and tree.bl_idname == TREE_ID
+
+    def execute(self, context):
+        tree = context.space_data.edit_tree
+        users = [ob for ob in bpy.data.objects if ob.logic_tree == tree]
+        for n in tree.nodes:
+            n.select = False
+        add_recipe(tree, self.recipe, tuple(context.space_data.cursor_location), users)
+        return {'FINISHED'}
+
+
+def _draw_recipes(_item, layout, context):
+    for ident, label, _f in RECIPES:
+        layout.operator(RANGE_OT_logic_tree_recipe.bl_idname, text=label).recipe = ident
+
+
 # ---------------------------------------------------------------- editor
 
 class RANGE_OT_logic_tree_compile(Operator):
@@ -693,7 +860,7 @@ class RANGE_OT_logic_tree_new(Operator):
         ob = context.object
         tree = bpy.data.node_groups.new(ob.name + " Logic", TREE_ID)
         note = tree.nodes.new("NodeFrame")
-        note.label = "Add > Triggers, Logic, Actions"
+        note.label = "Add > Triggers, Logic, Actions or Recipes"
         note.width, note.height, note.shrink = 300.0, 60.0, False
         ob.logic_tree = tree
         for area in context.screen.areas:
@@ -765,12 +932,14 @@ CATEGORIES = [
                   items=[NodeItem(c.bl_idname) for c in GATE_NODES]),
     LogicCategory("RANGE_LOGIC_ACTIONS", "Actions",
                   items=[NodeItem(c.bl_idname) for c in ACTION_NODES]),
+    LogicCategory("RANGE_LOGIC_RECIPES", "Recipes",
+                  items=[nodeitems_utils.NodeItemCustom(draw=_draw_recipes)]),
     LogicCategory("RANGE_LOGIC_LAYOUT", "Layout",
                   items=[NodeItem("NodeFrame"), NodeItem("NodeReroute")]),
 ]
 
 CLASSES = (LogicTree, PulseSocket) + TRIGGER_NODES + GATE_NODES + ACTION_NODES + (
-    RANGE_OT_logic_tree_compile, RANGE_OT_logic_tree_new, NODE_PT_range_logic_tree)
+    RANGE_OT_logic_tree_compile, RANGE_OT_logic_tree_new, RANGE_OT_logic_tree_recipe, NODE_PT_range_logic_tree)
 
 
 def register():

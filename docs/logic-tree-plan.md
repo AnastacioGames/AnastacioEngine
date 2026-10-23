@@ -282,3 +282,15 @@ no RNA, então o grupo aparece como os outros.
 - A prova `f0_editor_probe.py` registra a própria `logic_tree` e agora conflita com o módulo instalado (prova 4
   falha); vale só como registro da F0.
 - Fica para o teste com janela: plataforma e inimigo com patrulha feitos à mão.
+
+## 16. F3 implementada (2026-10-23)
+
+- Menu Add > **Recipes**: Walk WASD, Jump, Collect Item, Health and Damage, Door with Key e Moving Platform. Cada
+  uma entra no cursor do Node Editor como nós comuns dentro de um Frame com o nome da receita, e cria nos objetos
+  que usam a árvore as propriedades de jogo que faltam (`health`, `open`). Mesmo conteúdo dos presets dos bricks
+  (`logic_presets.py`); a plataforma usa dois Frames de Estado e Go To State.
+- Nós novos para as receitas: Ray, Near, Toggle Property e Send Message. A porta compila com o aviso "Preencha:
+  Action" até o usuário escolher a animação.
+- Testes: `f3_recipes_test.py -- <pasta>` (10 provas) e `f3_runtime_check.py <pasta>/f3.txt` (plataforma da
+  receita anda e troca de estado 6 vezes em 200 ticks). F1 e F2 continuam passando.
+- Fica para o teste com janela: menu Recipes, posição no cursor e o teste dos 15 s usando a receita Jump.
