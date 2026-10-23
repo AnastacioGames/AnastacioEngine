@@ -661,11 +661,48 @@ def bake_tree(tree, scene):
         screens.append({"name": frame.label or frame.name, "location": (fx, fy),
                         "hud": frame.ui_hud, "buttons": buttons, "widgets": widgets,
                         "fade": frame.ui_fade, "scale_mode": frame.ui_scale_mode,
-                        "design": (fw, fh),
+                        "design": (fw, fh), "camera": frame.ui_camera if frame.ui_hud else "",
                         "sounds": {"hover": frame.ui_hover_sound, "click": frame.ui_click_sound}})
     # A tela inicial é a Screen mais acima e à esquerda no editor.
     screens.sort(key=lambda s: (-s["location"][1], s["location"][0]))
     return {"tree": tree.name, "screens": screens}
+
+
+def write_bake(tree, scene):
+    data = bake_tree(tree, scene)
+    text = bpy.data.texts.get(DATA_TEXT) or bpy.data.texts.new(DATA_TEXT)
+    text.from_string("# Gerado por Bake UI (UI Tree). Não editar.\nDATA = %r\n" % data)
+    return data
+
+
+def _baked_tree():
+    """A UI Tree que vai para o jogo: a do último Bake ou, se ainda não houve
+    Bake, a única UI Tree do arquivo."""
+    text = bpy.data.texts.get(DATA_TEXT)
+    if text is not None:
+        import ast
+        try:
+            name = ast.literal_eval(text.as_string().split("DATA = ", 1)[1])["tree"]
+        except (IndexError, KeyError, ValueError, SyntaxError):
+            name = None
+        tree = bpy.data.node_groups.get(name) if name else None
+        if tree is not None and tree.bl_idname == UITree.bl_idname:
+            return tree
+    trees = [t for t in bpy.data.node_groups if t.bl_idname == UITree.bl_idname]
+    return trees[0] if len(trees) == 1 else None
+
+
+@bpy.app.handlers.persistent
+def _auto_bake(_scene):
+    """Bake automático ao apertar P e ao salvar (o export salva o arquivo):
+    o jogo nunca roda com um menu velho."""
+    tree = _baked_tree()
+    if tree is None:
+        return
+    try:
+        write_bake(tree, bpy.context.scene)
+    except Exception as exc:  # um Bake quebrado não pode impedir de jogar/salvar
+        print("[UI Tree] Bake automático falhou: %s" % exc)
 
 
 class RANGE_OT_ui_tree_bake(Operator):
@@ -679,9 +716,7 @@ class RANGE_OT_ui_tree_bake(Operator):
         return tree is not None and tree.bl_idname == UITree.bl_idname
 
     def execute(self, context):
-        data = bake_tree(context.space_data.edit_tree, context.scene)
-        text = bpy.data.texts.get(DATA_TEXT) or bpy.data.texts.new(DATA_TEXT)
-        text.from_string("# Gerado por Bake UI (UI Tree). Não editar.\nDATA = %r\n" % data)
+        data = write_bake(context.space_data.edit_tree, context.scene)
         count = sum(len(s["buttons"]) for s in data["screens"])
         self.report({'INFO'}, "UI: %d tela(s), %d botão(ões)" % (len(data["screens"]), count))
         return {'FINISHED'}
@@ -821,6 +856,8 @@ class UITreePanel:
             box = layout.box()
             box.label("Tela: %s" % (frame.label or frame.name))
             box.prop(frame, "ui_hud")
+            if frame.ui_hud:
+                box.prop_search(frame, "ui_camera", context.scene, "objects", text="Camera")
             box.prop(frame, "ui_scale_mode", text="")
             if not frame.ui_hud:
                 box.prop(frame, "ui_fade")
@@ -908,6 +945,10 @@ def register():
         name="Screen", description="Na UI Tree, este Frame é uma tela do jogo (lido em drawnode.c)")
     bpy.types.NodeFrame.ui_hud = BoolProperty(
         name="HUD", description="Tela de HUD: fica sempre visível, por baixo do menu")
+    bpy.types.NodeFrame.ui_camera = StringProperty(
+        name="Camera",
+        description="HUD desenhado só dentro do viewport desta câmera (split screen); "
+                    "vazio = janela inteira")
     bpy.types.NodeFrame.ui_scale_mode = EnumProperty(
         name="Scale Mode", default="STRETCH",
         description="Como a tela se adapta a uma janela com outra proporção",
@@ -925,9 +966,15 @@ def register():
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
     space = bpy.types.SpaceNodeEditor
     _draw_handles.append(space.draw_handler_add(_draw_editor, (), "WINDOW", "PRE_VIEW"))
+    for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
+        if _auto_bake not in handlers:
+            handlers.append(_auto_bake)
 
 
 def unregister():
+    for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
+        if _auto_bake in handlers:
+            handlers.remove(_auto_bake)
     while _draw_handles:
         bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handles.pop(), "WINDOW")
     del bpy.types.NodeFrame.ui_backdrop
@@ -935,6 +982,7 @@ def unregister():
     del bpy.types.NodeFrame.ui_hud
     del bpy.types.NodeFrame.ui_fade
     del bpy.types.NodeFrame.ui_scale_mode
+    del bpy.types.NodeFrame.ui_camera
     del bpy.types.NodeFrame.ui_hover_sound
     del bpy.types.NodeFrame.ui_click_sound
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")

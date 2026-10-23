@@ -35,7 +35,7 @@ O que o teste precisa mostrar:
 5. Sair fecha o jogo.
 
 Limites conhecidos do protótipo:
-- Precisa apertar Bake UI depois de cada mudança.
+- ~~Precisa apertar Bake UI depois de cada mudança.~~ Resolvido: Bake automático ao apertar P e ao salvar.
 - O tamanho do botão vem do nó desenhado; em `-b` usa 30 de altura.
 - Só retângulo arredondado com cor e texto.
 
@@ -58,8 +58,17 @@ Limites conhecidos do protótipo:
 - Integração com Logic Bricks: propriedades `ui_screen`/`ui_hud` e a ação Send Message
   (sensor Message).
 
-Ainda falta (precisa de C++ ou é etapa à parte): runtime em C++ sem Bake, HUD por viewport
-(split screen), export Web/Android.
+- **Bake automático:** ao apertar P e ao salvar (o export salva), a UI Tree do último Bake
+  (ou a única do arquivo) é gravada de novo; o botão Bake UI continua para conferir.
+- **HUD por viewport (split screen):** campo Camera na Screen de HUD; o HUD é desenhado dentro
+  do viewport daquela câmera (`setViewport`), lido pelo novo `KX_Camera.viewport` (C++).
+  Um HUD por jogador: cada widget pode ler as propriedades de um Object diferente.
+
+Ainda falta:
+- **Web/Android:** o player Web roda Python, mas o desenho usa `glBegin` (modo imediato), que
+  não existe em WebGL/GLES. Precisa de um caminho com VBO + shader (C++ no rasterizer ou módulo `gpu`).
+- **Runtime em C++** lendo a árvore direto do DNA: com o Bake automático deixou de ser urgente;
+  passa a fazer sentido junto com o desenho novo da Web.
 
 ## Etapas do projeto de verdade (se o protótipo for aprovado)
 

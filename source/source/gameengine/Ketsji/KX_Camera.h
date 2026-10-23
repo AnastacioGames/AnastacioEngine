@@ -399,6 +399,7 @@ public:
 	static int			pyattr_set_shift_y(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 
 	static PyObject*	pyattr_get_use_viewport(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject*	pyattr_get_viewport(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int			pyattr_set_use_viewport(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	
 	static PyObject*	pyattr_get_projectionMatrixLeft(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

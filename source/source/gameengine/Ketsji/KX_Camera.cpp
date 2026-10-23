@@ -1063,6 +1063,7 @@ PyAttributeDef KX_Camera::Attributes[] = {
 	EXP_PYATTRIBUTE_FLOAT_RW("lodDistanceFactor", 0.0f, FLT_MAX, KX_Camera, m_lodDistanceFactor),
 
 	EXP_PYATTRIBUTE_RW_FUNCTION("useViewport",  KX_Camera,  pyattr_get_use_viewport,  pyattr_set_use_viewport),
+	EXP_PYATTRIBUTE_RO_FUNCTION("viewport", KX_Camera, pyattr_get_viewport),
 
 	EXP_PYATTRIBUTE_RW_FUNCTION("projection_matrix", KX_Camera, pyattr_get_projectionMatrixLeft, pyattr_set_projectionMatrixLeft),
 	EXP_PYATTRIBUTE_RW_FUNCTION("projectionMatrixLeft", KX_Camera, pyattr_get_projectionMatrixLeft, pyattr_set_projectionMatrixLeft),
@@ -1491,6 +1492,15 @@ PyObject *KX_Camera::pyattr_get_use_viewport(EXP_PyObjectPlus *self_v, const EXP
 {
 	KX_Camera *self = static_cast<KX_Camera *>(self_v);
 	return PyBool_FromLong(self->UseViewport());
+}
+
+/* Last viewport rect used to render this camera, [left, bottom, right, top] in pixels
+ * (ratios set in the editor already resolved against the window). */
+PyObject *KX_Camera::pyattr_get_viewport(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Camera *self = static_cast<KX_Camera *>(self_v);
+	const RAS_Rect& rect = self->GetViewport();
+	return Py_BuildValue("[iiii]", rect.GetLeft(), rect.GetBottom(), rect.GetRight(), rect.GetTop());
 }
 
 int KX_Camera::pyattr_set_use_viewport(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)

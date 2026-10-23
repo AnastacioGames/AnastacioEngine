@@ -102,6 +102,7 @@ class Screen:
         self.design = data.get("design", (640.0, 360.0))
         self.fade = data.get("fade", 0.0)
         self.sounds = data.get("sounds", {})
+        self.camera = data.get("camera", "")
         self.buttons = [Button(b) for b in data["buttons"]]
         widgets = sorted(data.get("widgets", ()), key=lambda w: _DRAW_ORDER.get(w["kind"], 2))
         self.controls = [Control(w) for w in widgets if w["kind"] in ("TOGGLE", "SLIDER")]
@@ -456,6 +457,19 @@ class UIRuntime:
         self.textures[path] = bindcode
         return bindcode
 
+    def hud_area(self, screen):
+        """(esquerda, baixo, largura, altura) do viewport da câmera do HUD, ou
+        None para a janela inteira."""
+        if not screen.camera:
+            return None
+        cam = self.scene.objects.get(screen.camera)
+        if cam is None or not getattr(cam, "useViewport", False):
+            return None
+        left, bottom, right, top = cam.viewport
+        if right <= left or top <= bottom:
+            return None
+        return left, bottom, right - left, top - bottom
+
     def draw_widgets(self, bgl, blf, screen, width, height):
         for data in screen.widgets:
             x, y, w, h = screen.place(data, width, height)
@@ -507,7 +521,19 @@ class UIRuntime:
         bgl.glDisable(bgl.GL_DEPTH_TEST)
         range_ui_draw.set_alpha(1.0)
         for hud_screen in hud:
-            self.draw_widgets(bgl, blf, hud_screen, width, height)
+            area = self.hud_area(hud_screen)
+            if area is None:
+                self.draw_widgets(bgl, blf, hud_screen, width, height)
+                continue
+            # Split screen: o HUD vive dentro do viewport da sua câmera.
+            left, bottom, w, h = area
+            bgl.glEnable(bgl.GL_SCISSOR_TEST)
+            bgl.glScissor(left, bottom, w, h)
+            bgl.glPushMatrix()
+            bgl.glTranslatef(left, bottom, 0.0)
+            self.draw_widgets(bgl, blf, hud_screen, w, h)
+            bgl.glPopMatrix()
+            bgl.glDisable(bgl.GL_SCISSOR_TEST)
         if self.leaving is not None:
             self.leave_alpha -= dt / self.leaving.fade
             if self.leave_alpha <= 0.0:

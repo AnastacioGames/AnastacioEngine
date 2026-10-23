@@ -157,6 +157,13 @@ base class --- :class:`KX_GameObject`
 
       :type: boolean
 
+   .. attribute:: viewport
+
+      The viewport rectangle used for the last render of this camera, in pixels (read-only).
+      Ratios set in the editor are already resolved against the window.
+
+      :type: list [left, bottom, right, top]
+
    .. method:: sphereInsideFrustum(centre, radius)
 
       Tests the given sphere against the view frustum.
