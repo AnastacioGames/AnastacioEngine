@@ -51,6 +51,12 @@ static bool wm_tooltip_region_is_valid(const bScreen *screen, const ARegion *ar_
 	if (ar_from == NULL) {
 		return false;
 	}
+	/* Popups (menus, the splash) are screen regions, not area regions. */
+	for (const ARegion *ar = screen->regionbase.first; ar; ar = ar->next) {
+		if (ar == ar_from) {
+			return true;
+		}
+	}
 	for (const ScrArea *sa = screen->areabase.first; sa; sa = sa->next) {
 		for (const ARegion *ar = sa->regionbase.first; ar; ar = ar->next) {
 			if (ar == ar_from) {
