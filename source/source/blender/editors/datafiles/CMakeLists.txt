@@ -464,6 +464,12 @@ set(ICON_NAMES
 	discord
 	patreon
 	cut
+	gate_and
+	gate_or
+	gate_nand
+	gate_nor
+	gate_xor
+	gate_xnor
 	sortalpha
 	sortbyext
 	sorttime

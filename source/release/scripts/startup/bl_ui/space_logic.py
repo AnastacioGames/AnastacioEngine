@@ -271,6 +271,10 @@ class LOGIC_MT_view(Menu):
 
         layout.separator()
 
+        layout.prop(context.space_data, "show_menu_icons")
+
+        layout.separator()
+
         layout.operator("logic.convert_to_component", icon='SCRIPT')
 
         layout.separator()

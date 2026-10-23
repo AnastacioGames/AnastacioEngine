@@ -36,14 +36,14 @@
 #include "WM_types.h"
 
 const EnumPropertyItem rna_enum_controller_type_items[] = {
-	{CONT_LOGIC_AND, "LOGIC_AND", 0, "And", "Logic And"},
-	{CONT_LOGIC_OR, "LOGIC_OR", 0, "Or", "Logic Or"},
-	{CONT_LOGIC_NAND, "LOGIC_NAND", 0, "Nand", "Logic Nand"},
-	{CONT_LOGIC_NOR, "LOGIC_NOR", 0, "Nor", "Logic Nor"},
-	{CONT_LOGIC_XOR, "LOGIC_XOR", 0, "Xor", "Logic Xor"},
-	{CONT_LOGIC_XNOR, "LOGIC_XNOR", 0, "Xnor", "Logic Xnor"},
-	{CONT_EXPRESSION, "EXPRESSION", 0, "Expression", ""},
-	{CONT_PYTHON, "PYTHON", 0, "Python", ""},
+	{CONT_LOGIC_AND, "LOGIC_AND", ICON_GATE_AND, "And", "Logic And"},
+	{CONT_LOGIC_OR, "LOGIC_OR", ICON_GATE_OR, "Or", "Logic Or"},
+	{CONT_LOGIC_NAND, "LOGIC_NAND", ICON_GATE_NAND, "Nand", "Logic Nand"},
+	{CONT_LOGIC_NOR, "LOGIC_NOR", ICON_GATE_NOR, "Nor", "Logic Nor"},
+	{CONT_LOGIC_XOR, "LOGIC_XOR", ICON_GATE_XOR, "Xor", "Logic Xor"},
+	{CONT_LOGIC_XNOR, "LOGIC_XNOR", ICON_GATE_XNOR, "Xnor", "Logic Xnor"},
+	{CONT_EXPRESSION, "EXPRESSION", ICON_SYNTAX_ON, "Expression", ""},
+	{CONT_PYTHON, "PYTHON", ICON_FILE_SCRIPT, "Python", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -51,6 +51,20 @@ const EnumPropertyItem rna_enum_controller_type_items[] = {
 
 #include "BKE_sca.h"
 #include "DNA_actuator_types.h"
+
+const EnumPropertyItem *rna_Controller_type_itemf(bContext *C, PointerRNA *UNUSED(ptr),
+                                                  PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	EnumPropertyItem *item = NULL;
+	int totitem = 0;
+
+	RNA_enum_items_add(&item, &totitem, rna_enum_controller_type_items);
+	rna_logic_type_items_icons(C, item, totitem);
+	RNA_enum_item_end(&item, &totitem);
+	*r_free = true;
+
+	return item;
+}
 
 static StructRNA *rna_Controller_refine(struct PointerRNA *ptr)
 {

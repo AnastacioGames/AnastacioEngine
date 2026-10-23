@@ -43,27 +43,27 @@
 
 /* Always keep in alphabetical order */
 static const EnumPropertyItem actuator_type_items[] = {
-	{ACT_ACTION, "ACTION", 0, "Action", ""},
-	{ACT_ARMATURE, "ARMATURE", 0, "Armature", ""},
-	{ACT_CAMERA, "CAMERA", 0, "Camera", ""},
-	{ACT_CONSTRAINT, "CONSTRAINT", 0, "Constraint", ""},
-	{ACT_EDIT_OBJECT, "EDIT_OBJECT", 0, "Edit Object", ""},
-	{ACT_2DFILTER, "FILTER_2D", 0, "Filter 2D", ""},
-	{ACT_GAME, "GAME", 0, "Game", ""},
-	{ACT_MESSAGE, "MESSAGE", 0, "Message", ""},
-	{ACT_OBJECT, "MOTION", 0, "Motion", ""},
-	{ACT_MOUSE, "MOUSE", 0, "Mouse", ""},
-	{ACT_PARENT, "PARENT", 0, "Parent", ""},
-	{ACT_PROPERTY, "PROPERTY", 0, "Property", ""},
-	{ACT_RANDOM, "RANDOM", 0, "Random", ""},
-	{ACT_SCENE, "SCENE", 0, "Scene", ""},
-	{ACT_SOUND, "SOUND", 0, "Sound", ""},
-	{ACT_STATE, "STATE", 0, "State", ""},
-	{ACT_STEERING, "STEERING", 0, "Steering", ""},
-	{ACT_VIBRATION, "VIBRATION", 0, "Vibration", ""},
-	{ACT_VISIBILITY, "VISIBILITY", 0, "Visibility", ""},
-	{ACT_VIDEO, "VIDEO", 0, "Video", ""},
-	{ACT_WAIT, "WAIT", 0, "Wait", ""},
+	{ACT_ACTION, "ACTION", ICON_ACTION, "Action", ""},
+	{ACT_ARMATURE, "ARMATURE", ICON_ARMATURE_DATA, "Armature", ""},
+	{ACT_CAMERA, "CAMERA", ICON_CAMERA_DATA, "Camera", ""},
+	{ACT_CONSTRAINT, "CONSTRAINT", ICON_CONSTRAINT, "Constraint", ""},
+	{ACT_EDIT_OBJECT, "EDIT_OBJECT", ICON_OBJECT_DATAMODE, "Edit Object", ""},
+	{ACT_2DFILTER, "FILTER_2D", ICON_IMAGE_RGB, "Filter 2D", ""},
+	{ACT_GAME, "GAME", ICON_GAME, "Game", ""},
+	{ACT_MESSAGE, "MESSAGE", ICON_TEXT, "Message", ""},
+	{ACT_OBJECT, "MOTION", ICON_MAN_TRANS, "Motion", ""},
+	{ACT_MOUSE, "MOUSE", ICON_RESTRICT_SELECT_OFF, "Mouse", ""},
+	{ACT_PARENT, "PARENT", ICON_CONSTRAINT_BONE, "Parent", ""},
+	{ACT_PROPERTY, "PROPERTY", ICON_BUTS, "Property", ""},
+	{ACT_RANDOM, "RANDOM", ICON_RNDCURVE, "Random", ""},
+	{ACT_SCENE, "SCENE", ICON_SCENE_DATA, "Scene", ""},
+	{ACT_SOUND, "SOUND", ICON_SPEAKER, "Sound", ""},
+	{ACT_STATE, "STATE", ICON_SPACE3, "State", ""},
+	{ACT_STEERING, "STEERING", ICON_MOD_CURVE, "Steering", ""},
+	{ACT_VIBRATION, "VIBRATION", ICON_FORCE_HARMONIC, "Vibration", ""},
+	{ACT_VISIBILITY, "VISIBILITY", ICON_RESTRICT_VIEW_OFF, "Visibility", ""},
+	{ACT_VIDEO, "VIDEO", ICON_FILE_MOVIE, "Video", ""},
+	{ACT_WAIT, "WAIT", ICON_TIME, "Wait", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
@@ -530,6 +530,7 @@ const EnumPropertyItem *rna_Actuator_type_itemf(bContext *C, PointerRNA *ptr, Pr
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VISIBILITY);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_WAIT);
 
+	rna_logic_type_items_icons(C, item, totitem);
 	RNA_enum_item_end(&item, &totitem);
 	*r_free = true;
 

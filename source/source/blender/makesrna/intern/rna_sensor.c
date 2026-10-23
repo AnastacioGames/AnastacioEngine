@@ -40,30 +40,42 @@
 
 /* Always keep in alphabetical order */
 static const EnumPropertyItem sensor_type_items[] = {
-	{SENS_ANIMATIONEVENT, "ANIMATIONEVENT", 0, "Animation Event", ""},
-	{SENS_ACTUATOR, "ACTUATOR", 0, "Actuator", ""},
-	{SENS_ALWAYS, "ALWAYS", 0, "Always", ""},
-	{SENS_ARMATURE, "ARMATURE", 0, "Armature", ""},
-	{SENS_COLLISION, "COLLISION", 0, "Collision", ""},
-	{SENS_DELAY, "DELAY", 0, "Delay", ""},
-	{SENS_JOYSTICK, "JOYSTICK", 0, "Joystick", ""},
-	{SENS_KEYBOARD, "KEYBOARD", 0, "Keyboard", ""},
-	{SENS_MESSAGE, "MESSAGE", 0, "Message", ""},
-	{SENS_MOUSE, "MOUSE", 0, "Mouse", ""},
-	{SENS_NEAR, "NEAR", 0, "Near", ""},
-	{SENS_PROPERTY, "PROPERTY", 0, "Property", ""},
-	{SENS_RADAR, "RADAR", 0, "Radar", ""},
-	{SENS_MOVEMENT, "MOVEMENT", 0, "Movement", ""},
-	{SENS_RANDOM, "RANDOM", 0, "Random", ""},
-	{SENS_RAY, "RAY", 0, "Ray", ""},
-	{SENS_VR_HEAD, "VR_HEAD", 0, "VR Head", ""},
+	{SENS_ANIMATIONEVENT, "ANIMATIONEVENT", ICON_ANIM, "Animation Event", ""},
+	{SENS_ACTUATOR, "ACTUATOR", ICON_LINKED, "Actuator", ""},
+	{SENS_ALWAYS, "ALWAYS", ICON_LOOP_FORWARDS, "Always", ""},
+	{SENS_ARMATURE, "ARMATURE", ICON_ARMATURE_DATA, "Armature", ""},
+	{SENS_COLLISION, "COLLISION", ICON_MOD_PHYSICS, "Collision", ""},
+	{SENS_DELAY, "DELAY", ICON_TIME, "Delay", ""},
+	{SENS_JOYSTICK, "JOYSTICK", ICON_NDOF_DOM, "Joystick", ""},
+	{SENS_KEYBOARD, "KEYBOARD", ICON_FONT_DATA, "Keyboard", ""},
+	{SENS_MESSAGE, "MESSAGE", ICON_TEXT, "Message", ""},
+	{SENS_MOUSE, "MOUSE", ICON_RESTRICT_SELECT_OFF, "Mouse", ""},
+	{SENS_NEAR, "NEAR", ICON_PROP_ON, "Near", ""},
+	{SENS_PROPERTY, "PROPERTY", ICON_BUTS, "Property", ""},
+	{SENS_RADAR, "RADAR", ICON_LAMP_SPOT, "Radar", ""},
+	{SENS_MOVEMENT, "MOVEMENT", ICON_MAN_TRANS, "Movement", ""},
+	{SENS_RANDOM, "RANDOM", ICON_RNDCURVE, "Random", ""},
+	{SENS_RAY, "RAY", ICON_RIGHTARROW_THIN, "Ray", ""},
+	{SENS_VR_HEAD, "VR_HEAD", ICON_RESTRICT_VIEW_OFF, "VR Head", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
 #ifdef RNA_RUNTIME
 
 #include "BKE_sca.h"
+#include "BKE_context.h"
 #include "DNA_controller_types.h"
+#include "DNA_space_types.h"
+
+void rna_logic_type_items_icons(bContext *C, EnumPropertyItem *item, int totitem)
+{
+	SpaceLogic *slogic = C ? CTX_wm_space_logic(C) : NULL;
+	if (slogic && (slogic->flag & SLOGIC_MENU_ICONS_OFF)) {
+		for (int i = 0; i < totitem; i++) {
+			item[i].icon = 0;
+		}
+	}
+}
 
 static const EnumPropertyItem property_sensor_evaluation_items[] = {
 	{SENS_PROP_EQUAL, "PROPEQUAL", 0, "Equal", ""},
@@ -227,6 +239,7 @@ const EnumPropertyItem *rna_Sensor_type_itemf(bContext *C, PointerRNA *ptr, Prop
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_TOUCH);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_VR_HEAD);
 
+	rna_logic_type_items_icons(C, item, totitem);
 	RNA_enum_item_end(&item, &totitem);
 	*r_free = true;
 

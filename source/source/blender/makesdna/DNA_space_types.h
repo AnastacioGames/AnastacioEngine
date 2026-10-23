@@ -1304,6 +1304,8 @@ typedef struct SpaceLogic {
 enum {
 	/* Realce dos bricks ativos durante o jogo desligado (bit negado: ligado por padrão). */
 	SLOGIC_HIGHLIGHT_ACTIVE_OFF = (1 << 0),
+	/* Icons in the Add Sensor/Controller/Actuator menus hidden (negated bit: shown by default). */
+	SLOGIC_MENU_ICONS_OFF = (1 << 1),
 };
 
 /** \} */

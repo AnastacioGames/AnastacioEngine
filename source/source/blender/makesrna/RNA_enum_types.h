@@ -223,6 +223,7 @@ struct PropertyRNA;
 struct bContext;
 const EnumPropertyItem *rna_TransformOrientation_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 const EnumPropertyItem *rna_Sensor_type_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
+const EnumPropertyItem *rna_Controller_type_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 const EnumPropertyItem *rna_Actuator_type_itemf(struct bContext *C, struct PointerRNA *ptr, struct PropertyRNA *prop, bool *r_free);
 
 /* Generic functions, return an enum from library data, index is the position

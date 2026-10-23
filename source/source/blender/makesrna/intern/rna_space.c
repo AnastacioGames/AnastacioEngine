@@ -4710,6 +4710,11 @@ static void rna_def_space_logic(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Highlight Active",
 	                         "While the game runs, light up the logic bricks and links that are firing");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "show_menu_icons", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SLOGIC_MENU_ICONS_OFF);
+	RNA_def_property_ui_text(prop, "Menu Icons", "Show icons in the Add Sensor, Controller and Actuator menus");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
 static void rna_def_space_clip(BlenderRNA *brna)

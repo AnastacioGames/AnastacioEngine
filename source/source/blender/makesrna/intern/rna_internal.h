@@ -443,4 +443,9 @@ void rna_RenderPass_rect_set(PointerRNA *ptr, const float *values);
 		float: -FLT_MAX, double: -DBL_MAX)
 #endif
 
+#ifdef RNA_RUNTIME
+/* Logic brick type menus: drop the icons when the Logic Editor hides them. */
+void rna_logic_type_items_icons(struct bContext *C, struct EnumPropertyItem *item, int totitem);
+#endif
+
 #endif  /* __RNA_INTERNAL_H__ */
