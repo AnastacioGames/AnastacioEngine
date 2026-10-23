@@ -264,3 +264,21 @@ salvar/reabrir sem duplicar, árvore compartilhada, compilar sem objeto ativo) e
 janela: menu Add, painel N, campo no cabeçalho do Logic Editor, nó pintado de vermelho com campo vazio e o teste
 dos 15 s. Diferenças do plano: a nota da árvore nova é um Frame com rótulo; grupos não têm estado recolhido
 no RNA, então o grupo aparece como os outros.
+
+## 15. F2 implementada (2026-10-23)
+
+- **Then:** saída nas ações Wait, Sound, Play Action, Steering e Video (as três últimas são nós novos). Compila
+  para um sensor Actuator no modo Finished ("Then <ação>"), como o botão "Então". O Then entra nas portas como
+  qualquer gatilho. Then de uma ação sem gatilho vira erro no painel.
+- **Frame de Estado:** um Frame comum com "Logic State" ligado no painel N (rótulo = nome do estado, "Initial
+  State" opcional; sem marca, o mais à esquerda é o inicial). Segue as regras 1–5 da seção 13.1. Ações no mesmo
+  Frame com a mesma expressão dividem um controller. O estado 1 ligado por padrão, sem nada do usuário nele, é
+  desligado para não somar com o inicial da árvore; o registro desfaz isso ao recompilar ou tirar a árvore.
+- **Go To State:** nó com o nome do Frame (busca nos nós da árvore); vira os actuators State "(out)" Remove e
+  Add.
+- Testes: `f2_compile_test.py -- <pasta>` (13 provas) e `f2_runtime_check.py <pasta>/f2.txt` sobre
+  `AnastacioRuntime --server <pasta>/f2.range`: plataforma vai-e-volta só com nós, fases de 32 ticks, uma
+  volta por ida, nó fora de Frame em todo tick. F1 continua passando.
+- A prova `f0_editor_probe.py` registra a própria `logic_tree` e agora conflita com o módulo instalado (prova 4
+  falha); vale só como registro da F0.
+- Fica para o teste com janela: plataforma e inimigo com patrulha feitos à mão.

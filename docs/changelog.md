@@ -7,6 +7,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Logic Tree F2 (Then, Frames de Estado, Go To State)
+
+- `range_logic_tree.py`: saída Then em Wait, Sound e nos nós novos Play Action, Steering e Video (sensor Actuator
+  Finished); Frame com "Logic State" vira um estado (nome em `state_names`, estado inicial, um bit por
+  controller); nó Go To State vira actuators State Remove + Add. O registro guarda nomes e bits iniciais
+  alterados e os desfaz ao recompilar. Erros novos: Then de ação sem gatilho, estado inexistente, Frames com o
+  mesmo nome.
+- Testes `tools/tests/logic_tree/f2_compile_test.py` (13 provas) e `f2_runtime_check.py` (plataforma vai-e-volta
+  no `AnastacioRuntime --server`, fases de 32 ticks), Linux.
+
 ## 2026-10-23 - Logic Tree F1 (árvore, nós e compilador)
 
 - Novo `source/release/scripts/startup/range_logic_tree.py`: tipo de árvore "Logic Tree", `Object.logic_tree`

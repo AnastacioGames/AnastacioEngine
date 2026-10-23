@@ -127,16 +127,20 @@ class TriggerNode(BrickNode):
 
 class ActionNode(BrickNode):
     kind = "actuator"
+    has_then = False  # ações que concluem ganham a saída Then
 
     def init(self, context):
         sock = self.inputs.new(PulseSocket.bl_idname, "Do")
         sock.link_limit = 4095
+        if self.has_then:
+            self.outputs.new(PulseSocket.bl_idname, "Then")
 
 
-def _brick_node(base, idname, label, rna, brick_type, main, extra=(), fixed=None, required=()):
+def _brick_node(base, idname, label, rna, brick_type, main, extra=(), fixed=None, required=(),
+                then=False):
     attrs = {"bl_idname": idname, "bl_label": label, "brick_type": brick_type,
              "main": tuple(main), "extra": tuple(extra), "fixed": fixed or {},
-             "required": tuple(required)}
+             "required": tuple(required), "has_then": then}
     for f in tuple(main) + tuple(extra):
         attrs[f] = _prop_from_rna(rna.bl_rna.properties[f])
     return type(idname, (base, Node), attrs)
@@ -171,12 +175,54 @@ ACTION_NODES = (
     _brick_node(ActionNode, "RangeLogicAddProperty", "Add to Property", T.PropertyActuator,
                 'PROPERTY', ("property", "value"), fixed={"mode": 'ADD'}, required=("property",)),
     _brick_node(ActionNode, "RangeLogicSound", "Sound", T.SoundActuator, 'SOUND',
-                ("sound", "mode"), ("volume", "pitch"), required=("sound",)),
+                ("sound", "mode"), ("volume", "pitch"), required=("sound",), then=True),
     _brick_node(ActionNode, "RangeLogicRemove", "Remove Object", T.EditObjectActuator,
                 'EDIT_OBJECT', (), fixed={"mode": 'ENDOBJECT'}),
     _brick_node(ActionNode, "RangeLogicWait", "Wait", T.WaitActuator, 'WAIT',
-                ("duration",), ("use_restart",)),
+                ("duration",), ("use_restart",), then=True),
+    _brick_node(ActionNode, "RangeLogicAction", "Play Action", T.ActionActuator, 'ACTION',
+                ("action", "play_mode", "frame_start", "frame_end"),
+                ("property", "frame_property", "frame_blend_in", "priority", "layer",
+                 "layer_weight", "blend_mode", "use_additive", "use_continue_last_frame"),
+                required=("action",), then=True),
+    _brick_node(ActionNode, "RangeLogicSteering", "Steering", T.SteeringActuator, 'STEERING',
+                ("mode", "target", "velocity", "distance"),
+                ("acceleration", "turn_speed", "navmesh", "self_terminated", "update_period",
+                 "facing", "facing_axis", "normal_up", "lock_z_velocity"),
+                required=("target",), then=True),
+    _brick_node(ActionNode, "RangeLogicVideo", "Video", T.VideoActuator, 'VIDEO',
+                ("mode", "object"), ("seconds", "use_relative"), then=True),
 )
+
+
+class GoToStateNode(ActionNode, Node):
+    """Troca o estado do objeto para o Frame de Estado escolhido"""
+    bl_idname = "RangeLogicGoToState"
+    bl_label = "Go To State"
+    brick_type = 'STATE'
+    state = StringProperty(name="State", description="Rótulo de um Frame de Estado desta árvore")
+
+    def fields(self):
+        return ()
+
+    def error(self):
+        if not self.state:
+            return "Preencha: State"
+        if find_frame(self.id_data, self.state) is None:
+            return "Sem Frame de Estado \"%s\"" % self.state
+        return ""
+
+    def draw_buttons(self, context, layout):
+        layout.prop_search(self, "state", self.id_data, "nodes", text="", icon="NODETREE")
+        err = self.error()
+        if err:
+            layout.label(err, icon="ERROR")
+
+    def draw_buttons_ext(self, context, layout):
+        self.draw_buttons(context, layout)
+
+
+ACTION_NODES += (GoToStateNode,)
 
 
 class GateNode(LogicNode):
@@ -248,8 +294,8 @@ def _expr(node, stack=()):
     """Árvore de expressão: ('S', trigger) | ('AND'|'OR', [filhos]) | ('NOT', filho) | None."""
     if node is None or node in stack:
         return None
-    if isinstance(node, TriggerNode):
-        return ('S', node)
+    if isinstance(node, TriggerNode) or (isinstance(node, ActionNode) and node.has_then):
+        return ('S', node)  # ação na folha = sua saída Then
     if isinstance(node, GateNode):
         kids = [_expr(_source(s), stack + (node,)) for s in node.inputs]
         kids = [k for k in kids if k is not None]
@@ -307,8 +353,46 @@ def _label(node):
     return node.label or node.name
 
 
+def _pos(node):
+    loc = node.location.copy()
+    while node.parent is not None:  # filhos de Frame guardam posição relativa
+        node = node.parent
+        loc += node.location
+    return (loc.x, -loc.y)
+
+
+def state_frames(tree):
+    """Frames marcados como Estado, da esquerda para a direita."""
+    frames = [n for n in tree.nodes if n.bl_idname == "NodeFrame" and n.range_logic_state]
+    return sorted(frames, key=_pos)
+
+
+def find_frame(tree, text):
+    """Frame de Estado pelo rótulo (ou pelo nome do nó)."""
+    frames = state_frames(tree)
+    return next((f for f in frames if _label(f) == text), None) or \
+        next((f for f in frames if f.name == text), None)
+
+
+def frame_of(node):
+    """Frame de Estado mais próximo que contém o nó, ou None."""
+    node = node.parent
+    while node is not None:
+        if node.bl_idname == "NodeFrame" and node.range_logic_state:
+            return node
+        node = node.parent
+    return None
+
+
+def _leaves(e):
+    out = []
+    _triggers(e, out)
+    return out
+
+
 def plan(tree):
-    """Lista de regras (expressão, ações) da árvore e erros, sem tocar em objetos."""
+    """Regras [expressão, ações, frame] da árvore e erros, sem tocar em objetos.
+    Ações no mesmo frame com a mesma expressão dividem um controller."""
     rules, errors = {}, []
     for node in tree.nodes:
         if not isinstance(node, ActionNode):
@@ -321,11 +405,25 @@ def plan(tree):
         if not exprs:
             continue
         e = exprs[0] if len(exprs) == 1 else ('OR', exprs)
-        rules.setdefault(_key(e), [e, []])[1].append(node)
+        frame = frame_of(node)
+        rules.setdefault((_key(e), frame.name if frame else ""), [e, [], frame])[1].append(node)
     for node in tree.nodes:
         if isinstance(node, TriggerNode) and node.error():
             errors.append("%s: %s" % (_label(node), node.error()))
-    out = sorted(rules.values(), key=lambda r: (r[1][0].location.x, -r[1][0].location.y))
+    # Then de uma ação que nunca roda não dispara nada
+    acting = {a for r in rules.values() for a in r[1]}
+    out = []
+    for r in rules.values():
+        dead = [n for n in _leaves(r[0]) if isinstance(n, ActionNode) and n not in acting]
+        if dead:
+            errors.append("%s: Then de \"%s\", que não tem gatilho" % (
+                _label(r[1][0]), _label(dead[0])))
+            continue
+        out.append(r)
+    names = [_label(f) for f in state_frames(tree)]
+    for n in set(x for x in names if names.count(x) > 1):
+        errors.append("Frames de Estado com o mesmo nome: %s" % n)
+    out.sort(key=lambda r: _pos(r[1][0]))
     return out, errors
 
 
@@ -352,12 +450,66 @@ def clear(ob):
             if name in coll:
                 getattr(bpy.ops.logic, kind[:-1] + "_remove")(
                     _ops(ob), **{kind[:-1]: name, "object": ob.name})
+    for i in rec.get("names", ()):
+        game.state_names[i - 1].name = ""
+    for i in rec.get("init_on", ()):
+        game.states_initial[i - 1] = False
+    for i in rec.get("init_off", ()):
+        game.states_initial[i - 1] = True
     group = rec.get("group")
     if group and group in game.brick_groups and not any(
             b.group == group for kind in ("sensors", "controllers", "actuators")
             for b in getattr(game, kind)):
         game.brick_groups.remove(game.brick_groups[group])
     ob.logic_tree_record = ""
+
+
+def _used_states(ob):
+    """Estados que os bricks do usuário usam (controllers e actuators State)."""
+    game, used = ob.game, set()
+    for c in game.controllers:
+        used.add(c.states)
+    for a in game.actuators:
+        if a.type == 'STATE':
+            used.update(i + 1 for i, on in enumerate(a.states) if on)
+    return used
+
+
+def _assign_states(ob, tree, rec):
+    """Número de estado de cada Frame de Estado: o do nome igual em state_names, senão o
+    primeiro livre.  Marca o estado inicial.  Grava no rec o que mudou no objeto."""
+    game = ob.game
+    frames = state_frames(tree)
+    if not frames:
+        return {}
+    names = {sn.name: i + 1 for i, sn in enumerate(game.state_names) if sn.name}
+    taken = _used_states(ob) | set(names.values())
+    out = {}
+    for f in frames:
+        label = _label(f)
+        if label in names and names[label] not in out.values():
+            out[f.name] = names[label]
+            continue
+        free = next((i for i in range(1, 31) if i not in taken and i not in out.values()), None)
+        if free is None:
+            continue
+        out[f.name] = free
+        game.state_names[free - 1].name = label
+        rec["names"].append(free)
+    start = next((f for f in frames if f.range_logic_initial), frames[0])
+    for f in frames:
+        if f.name not in out:
+            continue
+        bit = out[f.name]
+        want = f == start
+        if game.states_initial[bit - 1] != want:
+            game.states_initial[bit - 1] = want
+            rec["init_on" if want else "init_off"].append(bit)
+    # o estado 1 ligado por padrão, sem nada nele, não pode somar com o inicial da árvore
+    if game.states_initial[0] and 1 not in _used_states(ob) and 1 not in out.values():
+        game.states_initial[0] = False
+        rec["init_off"].append(1)
+    return out
 
 
 def compile_object(ob):
@@ -373,8 +525,13 @@ def compile_object(ob):
     group = "Tree: " + tree.name
     if group not in game.brick_groups:
         group = game.brick_groups.new(group).name
-    rec = {"group": group, "sensors": [], "controllers": [], "actuators": []}
-    states = [i + 1 for i, on in enumerate(game.states_initial) if on] or [1]
+    rec = {"group": group, "sensors": [], "controllers": [], "actuators": [],
+           "names": [], "init_on": [], "init_off": []}
+    frame_state = _assign_states(ob, tree, rec)
+    tree_bits = set(frame_state.values())
+    loose = _used_states(ob) | tree_bits | {
+        i + 1 for i, on in enumerate(game.states_initial) if on}
+    loose = sorted(loose) or [1]
 
     def add(kind, typ, name):
         getattr(bpy.ops.logic, kind + "_add")(_ops(ob), type=typ, name=name, object=ob.name)
@@ -395,7 +552,7 @@ def compile_object(ob):
 
     # quais gatilhos aparecem dentro de um Expression: esses precisam de nome ASCII
     in_expr = set()
-    for e, _acts in rules:
+    for e, _acts, _f in rules:
         if e[0] in ('NOT',) or (e[0] in ('AND', 'OR') and _flat(e[0], e[1]) is None):
             tr = []
             _triggers(e, tr)
@@ -414,18 +571,35 @@ def compile_object(ob):
             for k in e[1]:
                 _neg(k, inside)
 
-    for e, _acts in rules:
+    for e, _acts, _f in rules:
         _neg(e, False)
 
     sensors, actuators = {}, {}
+    for _e, acts, _f in rules:
+        for node in acts:
+            if node in actuators:
+                continue
+            if isinstance(node, GoToStateNode):
+                target = frame_state[find_frame(tree, node.state).name]
+                rem = add("actuator", 'STATE', _label(node) + " (out)")
+                rem.operation = 'REMOVE'
+                rem.states = [i + 1 in tree_bits and i + 1 != target for i in range(30)]
+                put = add("actuator", 'STATE', _label(node))
+                put.operation = 'ADD'
+                put.states = [i + 1 == target for i in range(30)]
+                actuators[node] = [rem, put]
+            else:
+                a = add("actuator", node.brick_type, _label(node))
+                fill(a, node)
+                actuators[node] = [a]
+
     used = set(RESERVED) | {p.name.upper() for p in game.properties}
-    for e, acts in rules:
-        tr = []
-        _triggers(e, tr)
-        for node in tr:
+    for e, acts, _f in rules:
+        for node in _leaves(e):
             if node in sensors:
                 continue
-            name = _label(node)
+            then = isinstance(node, ActionNode)
+            name = "Then " + _label(node) if then else _label(node)
             if node in in_expr:
                 base, n = _ascii(name), 1
                 name = base
@@ -433,18 +607,18 @@ def compile_object(ob):
                     n += 1
                     name = "%s_%d" % (base, n)
                 used.add(name.upper())
-            s = add("sensor", node.brick_type, name)
-            fill(s, node)
+            if then:
+                s = add("sensor", 'ACTUATOR', name)
+                s.actuator = actuators[node][-1].name
+                s.mode = 'FINISHED'
+            else:
+                s = add("sensor", node.brick_type, name)
+                fill(s, node)
             if node in negated:
                 s.use_pulse_false_level = True
             sensors[node] = s
-        for node in acts:
-            if node not in actuators:
-                a = add("actuator", node.brick_type, _label(node))
-                fill(a, node)
-                actuators[node] = a
 
-    for e, acts in rules:
+    for e, acts, frame in rules:
         if e[0] == 'S':
             typ, linked, text = 'LOGIC_AND', [e[1]], None
         elif e[0] in ('AND', 'OR') and _flat(e[0], e[1]) is not None:
@@ -457,7 +631,7 @@ def compile_object(ob):
             if text.startswith("(") and text.endswith(")") and text.count("(") == 1:
                 text = text[1:-1]
         name = " + ".join(_label(a) for a in acts)
-        for state in states:
+        for state in ([frame_state[frame.name]] if frame else loose):
             c = add("controller", typ, name)
             c.states = state
             if text is not None:
@@ -465,7 +639,8 @@ def compile_object(ob):
             for n in linked:
                 c.link(sensor=sensors[n])
             for a in acts:
-                c.link(actuator=actuators[a])
+                for brick in actuators[a]:
+                    c.link(actuator=brick)
 
     ob.logic_tree_record = json.dumps(rec)
     return errors
@@ -559,6 +734,13 @@ class NODE_PT_range_logic_tree(Panel):
         if context.object is not None:
             layout.label("Objeto ativo:")
             _draw_object_field(layout, context)
+        node = tree.nodes.active
+        if node is not None and node.bl_idname == "NodeFrame":
+            box = layout.box()
+            box.prop(node, "range_logic_state")
+            if node.range_logic_state:
+                box.prop(node, "label", text="Name")
+                box.prop(node, "range_logic_initial")
         _rules, errors = plan(tree)
         for err in errors:
             layout.label(err, icon="ERROR")
@@ -600,6 +782,10 @@ def register():
     bpy.types.Object.logic_tree_record = StringProperty(
         name="Logic Tree Record", options={'HIDDEN'},
         description="Bricks gerados pela Logic Tree (apagados e recriados a cada compilação)")
+    bpy.types.NodeFrame.range_logic_state = BoolProperty(
+        name="Logic State", description="Logic Tree: os nós dentro deste Frame valem só neste estado")
+    bpy.types.NodeFrame.range_logic_initial = BoolProperty(
+        name="Initial State", description="Logic Tree: o objeto começa neste estado")
     nodeitems_utils.register_node_categories("RANGE_LOGIC_TREE", CATEGORIES)
     bpy.types.LOGIC_HT_header.append(_logic_header)
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
@@ -613,6 +799,8 @@ def unregister():
             handlers.remove(_auto_compile)
     bpy.types.LOGIC_HT_header.remove(_logic_header)
     nodeitems_utils.unregister_node_categories("RANGE_LOGIC_TREE")
+    del bpy.types.NodeFrame.range_logic_initial
+    del bpy.types.NodeFrame.range_logic_state
     del bpy.types.Object.logic_tree_record
     del bpy.types.Object.logic_tree
     for cls in reversed(CLASSES):
