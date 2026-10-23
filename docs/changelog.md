@@ -7,6 +7,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Plano da Logic Tree (lógica por nós)
+
+- Novo `docs/logic-tree-plan.md`: árvore de nós de lógica como complemento aos Logic Bricks. Proposta de compilar
+  para bricks nativos (sem runtime novo; Web, janela de depuração e "To Python" herdados), comparada com gerar
+  Python, interpretar em runtime e runtime C++.
+- Levantamento do que se reaproveita: padrão e Bake automático da UI Tree, melhorias genéricas do Node Editor,
+  `_Bricks` dos presets, "Então"/Esperar/estados/grupos do Bricks 2.0 e `AND`/`OR`/`NOT`/`IF` do parser de
+  expressões (`InputParser.cpp`).
+- Só documentação (plano, roadmap, índice). Sem build.
+
 ## 2026-10-23 - UI Tree na Web/Android
 
 - `bgl` na Web: `glBegin`, `glEnd`, `glOrtho`, `glVertex2f` e `glTexCoord2f` chamam a emulação de GL legado direto (os ponteiros GLEW ficavam nulos).

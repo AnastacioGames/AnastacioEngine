@@ -50,6 +50,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   possui e das decisões técnicas vigentes.
 - [Modernização dos Logic Bricks](logic-bricks-modernization.md): contrato, marcos implementados e testes
   ainda pendentes dessa frente.
+- [Logic Tree](logic-tree-plan.md): plano da lógica por nós como complemento aos bricks, compilada para
+  bricks nativos; meta de praticidade, fatias e decisões em aberto.
 - [Plano do Vehicle System](vehicle-system-plan-2.md): plano revisado de Smart Components, controle básico
   e assists avançados a reaproveitar do RolimaRacer sobre a física Bullet existente.
 - [Asset Browser](asset-browser.md): modo Assets do File Browser, bibliotecas, arrastar para a Vista 3D,

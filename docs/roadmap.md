@@ -41,6 +41,7 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
   - [Deformação por impacto](#deformação-por-impacto)
   - [Câmera: foco, rastreio e Camera FX](#câmera-foco-rastreio-e-camera-fx)
   - [Logic Bricks → Python Component](#logic-bricks--python-component)
+  - [Logic Tree (lógica por nós)](#logic-tree-lógica-por-nós)
   - [Android / iOS](#android--ios)
   - [Outros](#outros)
 - [Performance](#performance)
@@ -506,6 +507,14 @@ Validado com `tools/create_logic_convert_scene.py` (mesmo resultado com bricks e
 - Pendente: usuário testar no editor com um objeto real lotado de bricks; no modo Module/Script outro controller Python
   que leia o objeto no mesmo quadro vê a mudança um quadro antes do que veria com bricks; Near/Radar no componente seguem com distância ao centro (a engine usa
   esfera/cone físico) e só enxergam Actor com física, como a engine.
+
+### Logic Tree (lógica por nós)
+
+[Plano v1](logic-tree-plan.md) (2026-10-23), nada implementado. Complemento aos Logic Bricks, que continuam.
+Proposta: a árvore compila para bricks nativos ao apertar P e ao salvar, sem runtime novo. Liberdade extra vem
+de portas compostas, sequências por fio (Then), Frames de Estado, árvore compartilhada entre objetos e receitas.
+Aceite da fatia 1: "Espaço → pular" em ~15 s, como nos bricks. Pendente: decisões da seção 11 do plano e F0
+(estados com bricks do usuário, Expression no lugar de portas, campos gerados do RNA, regeneração).
 
 ### Android / iOS
 
