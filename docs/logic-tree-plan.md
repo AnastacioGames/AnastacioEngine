@@ -1,6 +1,6 @@
 # Logic Tree: lógica de jogo por nós
 
-Estado: **plano v1 (2026-10-23)**, decisões aprovadas (seção 11). F0 em andamento (seção 13). Branch prevista: `feat/logic-tree`.
+Estado: **F0–F5 feitas (2026-10-23)**, decisões aprovadas (seção 11). Branch: `feat/logic-tree` (separada do main).
 
 ## 1. Objetivo e meta de sensação
 
@@ -310,3 +310,28 @@ no RNA, então o grupo aparece como os outros.
   runtime do Run Python (`AnastacioRuntime --server <pasta>/f4.range` grava `f4.txt` com "60 1"). F1–F3
   continuam passando.
 - Fica para o teste com janela: tamanho do menu Actions (cerca de 30 itens).
+
+## 18. F5 implementada (2026-10-23)
+
+- **Nó ↔ brick:** o registro guarda qual nó gerou cada brick (`nodes`, chave `tipo:nome`). Funções
+  `bricks_of_node(ob, nó)` e `node_of_brick(ob, tipo, nome)`; o painel N lista os bricks do nó ativo no objeto
+  ativo. Os nomes dos bricks já eram os rótulos dos nós (F1), então a janela Logic Bricks do Debug Mode mostra
+  nomes que o usuário reconhece.
+- **Pausar no disparo pelo nó:** "Pause When Fired" no painel N de gatilhos e ações (o título do nó ganha `*`).
+  Só com o Debug Mode da cena ligado, a compilação acrescenta um actuator Scene Suspend da própria cena
+  ("Pause: <nó>"): numa ação, ligado ao controller dela; num gatilho, com um And próprio em cada estado usado.
+  Sem C++: a marca da janela de depuração (`KX_DebugMode::m_logicBreak`) só existe em runtime. Diferença: só a
+  cena do objeto pausa (a marca da janela suspende todas); o botão de pausa da janela retoma. Com gatilho em
+  True Level, pausa de novo no tick seguinte, como um breakpoint.
+- **Destaque do nó ativo (investigação):** o jogo embutido (P) roda o laço do jogo dentro do laço do editor,
+  então nenhum desenho ou timer Python do Node Editor roda durante o jogo. Destacar o nó exigiria C++: o
+  `KX_DebugMode` já conta disparos por brick; bastaria o editor ler, ao voltar do jogo, um resumo por brick
+  (ex.: contagem de disparos) e pintar os nós pelo `node_of_brick`. Fica para F6, se o usuário quiser.
+- Testes: `f5_debug_test.py -- <pasta>` (16 provas: registro, `*`, sem Debug Mode sem pausa, pausa de ação e de
+  gatilho, recompilar sem duplicar, desmarcar, reabrir) e `f5_runtime_check.py <pasta>/f5.txt` sobre
+  `AnastacioRuntime --server <pasta>/f5.range` (a cena Main para em n = 21; a cena Watch por cima continua até 90).
+  F1–F4 continuam passando (Windows).
+- **Ícones das abas** (barra horizontal do Node Editor): Triggers, Logic, Recipes e Mifth ganharam ícone em
+  `UI_panel_category_icon` (`interface_panel.c`), C, precisa do build do `RangeEngine`.
+- Fica para o teste com janela: ícones das abas; marcar "Pause When Fired" num nó, ligar Debug Mode, apertar P
+  e ver o jogo parar; painel N listando os bricks.

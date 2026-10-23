@@ -7,6 +7,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+## 2026-10-23 - Logic Tree F5 (depuração) e ícones das abas
+
+- `range_logic_tree.py`: o registro (`logic_tree_record`) guarda `nodes` (`"tipo:brick"` -> nó), com
+  `bricks_of_node()`/`node_of_brick()`; o painel N mostra os bricks que o nó ativo gerou no objeto ativo.
+  Opção "Pause When Fired" em gatilhos e ações (rótulo com `*`): com o Debug Mode da cena ligado, compila um
+  actuator Scene Suspend da própria cena ("Pause: <nó>"), ligado ao controller da ação ou a um And próprio do
+  gatilho. Sem Debug Mode nada é gerado. O botão de pausa da janela de depuração retoma.
+- `interface_panel.c` (`UI_panel_category_icon`): ícones para as abas Triggers (HAND), Logic (LOGIC), Recipes
+  (PACKAGE) e Mifth (CURVE_BEZCURVE). Compilado isolado (cl) no Windows; falta o build do executável.
+- Teste `tools/tests/logic_tree/f5_debug_test.py` (16 provas) e `f5_runtime_check.py` (a cena pausa no tick 21
+  enquanto outra cena continua), Windows. F1-F4 continuam passando.
+
 ## 2026-10-23 - Logic Tree F4 (todos os bricks e Run Python)
 
 - `range_logic_tree.py`: nós para os demais sensores (Delay, Random, Radar, Movement, Joystick, Animation Event,

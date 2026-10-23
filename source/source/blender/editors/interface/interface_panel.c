@@ -1833,6 +1833,12 @@ int UI_panel_category_icon(const char *idname)
 		{"UI Tree", ICON_SPLITSCREEN},
 		{"Widgets", ICON_UI},
 		{"Actions", ICON_LOGIC},
+		/* Logic Tree (range_logic_tree.py) */
+		{"Triggers", ICON_HAND},
+		{"Logic", ICON_LOGIC},
+		{"Recipes", ICON_PACKAGE},
+		/* Range_Object_Pencil addon */
+		{"Mifth", ICON_CURVE_BEZCURVE},
 	};
 
 	for (int i = 0; i < ARRAY_SIZE(table); i++) {

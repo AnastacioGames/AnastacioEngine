@@ -91,6 +91,11 @@ class BrickNode(LogicNode):
     fixed = {}
     required = ()
 
+    range_logic_break = BoolProperty(
+        name="Pause When Fired",
+        description="Depuração: com o Debug Mode da cena ligado, pausa o jogo quando este nó dispara "
+                    "(o botão de pausa da janela de depuração continua)")
+
     def fields(self):
         return self.main + self.extra
 
@@ -110,6 +115,10 @@ class BrickNode(LogicNode):
     def draw_buttons_ext(self, context, layout):
         for f in self.fields():
             layout.prop(self, f)
+
+    def draw_label(self):
+        label = self.label or self.bl_label
+        return ("* " + label) if self.range_logic_break else label
 
     def update(self):
         err = bool(self.error())
@@ -615,18 +624,20 @@ def compile_object(ob):
     if group not in game.brick_groups:
         group = game.brick_groups.new(group).name
     rec = {"group": group, "sensors": [], "controllers": [], "actuators": [],
-           "names": [], "init_on": [], "init_off": []}
+           "names": [], "init_on": [], "init_off": [], "nodes": {}}
     frame_state = _assign_states(ob, tree, rec)
     tree_bits = set(frame_state.values())
     loose = _used_states(ob) | tree_bits | {
         i + 1 for i, on in enumerate(game.states_initial) if on}
     loose = sorted(loose) or [1]
 
-    def add(kind, typ, name):
+    def add(kind, typ, name, node=None):
         getattr(bpy.ops.logic, kind + "_add")(_ops(ob), type=typ, name=name, object=ob.name)
         brick = getattr(game, kind + "s")[-1]
         brick.group = group
         rec[kind + "s"].append(brick.name)
+        if node is not None:  # F5: liga o brick ao nó (painel N e depuração)
+            rec["nodes"]["%s:%s" % (kind, brick.name)] = node.name
         return brick
 
     def fill(brick, node):
@@ -675,15 +686,15 @@ def compile_object(ob):
                 continue
             if isinstance(node, GoToStateNode):
                 target = frame_state[find_frame(tree, node.state).name]
-                rem = add("actuator", 'STATE', _label(node) + " (out)")
+                rem = add("actuator", 'STATE', _label(node) + " (out)", node)
                 rem.operation = 'REMOVE'
                 rem.states = [i + 1 in tree_bits and i + 1 != target for i in range(30)]
-                put = add("actuator", 'STATE', _label(node))
+                put = add("actuator", 'STATE', _label(node), node)
                 put.operation = 'ADD'
                 put.states = [i + 1 == target for i in range(30)]
                 actuators[node] = [rem, put]
             else:
-                a = add("actuator", node.brick_type, _label(node))
+                a = add("actuator", node.brick_type, _label(node), node)
                 fill(a, node)
                 actuators[node] = [a]
 
@@ -702,11 +713,11 @@ def compile_object(ob):
                     name = "%s_%d" % (base, n)
                 used.add(name.upper())
             if then:
-                s = add("sensor", 'ACTUATOR', name)
+                s = add("sensor", 'ACTUATOR', name, node)
                 s.actuator = actuators[node][-1].name
                 s.mode = 'FINISHED'
             else:
-                s = add("sensor", node.brick_type, name)
+                s = add("sensor", node.brick_type, name, node)
                 fill(s, node)
             if node in negated:
                 s.use_pulse_false_level = True
@@ -729,7 +740,7 @@ def compile_object(ob):
         for py in [a for a in acts if a.kind == "controller"]:
             leaves = _leaves(e)
             for state in states:
-                c = add("controller", 'PYTHON', _label(py))
+                c = add("controller", 'PYTHON', _label(py), py)
                 c.states, c.mode, c.module, c.use_debug = state, 'MODULE', py.module, py.use_debug
                 for n in leaves:
                     c.link(sensor=sensors[n])
@@ -738,7 +749,7 @@ def compile_object(ob):
             continue
         name = " + ".join(_label(a) for a in acts)
         for state in states:
-            c = add("controller", typ, name)
+            c = add("controller", typ, name, acts[0])
             c.states = state
             if text is not None:
                 c.expression = text
@@ -748,8 +759,42 @@ def compile_object(ob):
                 for brick in actuators[a]:
                     c.link(actuator=brick)
 
+    # F5: pausar no disparo.  Só com o Debug Mode da cena ligado, para nunca ir num jogo final.
+    scene = next(iter(ob.users_scene), None)
+    if scene is not None and scene.game_settings.show_debug_mode:
+        every = sorted(set(loose) | tree_bits)
+        for node in [n for n in tree.nodes if getattr(n, "range_logic_break", False)]:
+            if node in sensors:
+                pause = add("actuator", 'SCENE', "Pause: " + _label(node), node)
+                pause.mode, pause.scene = 'SUSPEND', scene
+                for state in every:
+                    c = add("controller", 'LOGIC_AND', "Pause: " + _label(node), node)
+                    c.states = state
+                    c.link(sensor=sensors[node])
+                    c.link(actuator=pause)
+            elif node in actuators:
+                pause = add("actuator", 'SCENE', "Pause: " + _label(node), node)
+                pause.mode, pause.scene = 'SUSPEND', scene
+                for c in game.controllers:
+                    if c.name in rec["controllers"] and any(
+                            a.name == actuators[node][-1].name for a in c.actuators):
+                        c.link(actuator=pause)
+
     ob.logic_tree_record = json.dumps(rec)
     return errors
+
+
+def bricks_of_node(ob, node):
+    """F5: bricks que um nó gerou neste objeto, como [(tipo, nome)]."""
+    nodes = _record(ob).get("nodes", {})
+    return [tuple(k.split(":", 1)) for k, v in nodes.items() if v == node.name]
+
+
+def node_of_brick(ob, kind, name):
+    """F5: nó que gerou o brick (kind = sensor, controller ou actuator), ou None."""
+    tree = ob.logic_tree
+    node = _record(ob).get("nodes", {}).get("%s:%s" % (kind, name))
+    return tree.nodes.get(node) if tree is not None and node else None
 
 
 def compile_all(scene=None):
@@ -1000,6 +1045,18 @@ class NODE_PT_range_logic_tree(Panel):
             layout.label("Objeto ativo:")
             _draw_object_field(layout, context)
         node = tree.nodes.active
+        if isinstance(node, BrickNode):
+            box = layout.box()
+            box.prop(node, "range_logic_break")
+            if node.range_logic_break and not context.scene.game_settings.show_debug_mode:
+                box.label("Ligue o Debug Mode da cena", icon="INFO")
+            ob = context.object
+            if ob is not None and ob.logic_tree == tree:
+                made = bricks_of_node(ob, node)
+                box.label("Bricks em %s:" % ob.name if made else "Ainda não compilado em %s" % ob.name)
+                for kind, name in made:
+                    icon = {"sensor": "TRIA_RIGHT", "controller": "DOT"}.get(kind, "TRIA_LEFT")
+                    box.label(name, icon=icon)
         if node is not None and node.bl_idname == "NodeFrame":
             box = layout.box()
             box.prop(node, "range_logic_state")
