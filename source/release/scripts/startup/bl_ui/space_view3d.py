@@ -529,42 +529,42 @@ class VIEW3D_MT_view(Menu):
 
         layout.separator(factor=1)
 
-        layout.operator("view3d.view_selected").use_all_regions = False
+        layout.operator("view3d.view_selected", icon='ZOOM_SELECTED').use_all_regions = False
         if view.region_quadviews:
-            layout.operator("view3d.view_selected", text="View Selected (Quad View)").use_all_regions = True
+            layout.operator("view3d.view_selected", text="View Selected (Quad View)", icon='ZOOM_SELECTED').use_all_regions = True
 
-        layout.operator("view3d.view_all").center = False
-        layout.operator("view3d.localview", text="View Global/Local")
-        layout.operator("view3d.view_persportho")
-
-        layout.separator(factor=1)
-
-        layout.menu("VIEW3D_MT_view_cameras", text="Cameras")
+        layout.operator("view3d.view_all", icon='ZOOM_ALL').center = False
+        layout.operator("view3d.localview", text="View Global/Local", icon='WORLD')
+        layout.operator("view3d.view_persportho", icon='ORTHO')
 
         layout.separator(factor=1)
-        layout.menu("VIEW3D_MT_view_viewpoint")
-        layout.menu("VIEW3D_MT_view_navigation")
-        layout.menu("VIEW3D_MT_view_align")
+
+        layout.menu("VIEW3D_MT_view_cameras", text="Cameras", icon='CAMERA_DATA')
+
+        layout.separator(factor=1)
+        layout.menu("VIEW3D_MT_view_viewpoint", icon='AXIS_TOP')
+        layout.menu("VIEW3D_MT_view_navigation", icon='HAND')
+        layout.menu("VIEW3D_MT_view_align", icon='LOCKVIEW_ON')
 
         layout.separator(factor=1)
 
         layout.operator_context = 'INVOKE_REGION_WIN'
-        layout.menu("VIEW3D_MT_view_borders", text="View Borders")
+        layout.menu("VIEW3D_MT_view_borders", text="View Borders", icon='BORDER_RECT')
 
         layout.separator(factor=1)
 
-        layout.operator("view3d.layers", text="Show All Layers").nr = 0
+        layout.operator("view3d.layers", text="Show All Layers", icon='RENDERLAYERS').nr = 0
 
         layout.separator(factor=1)
 
-        layout.operator("screen.animation_play", text="Playback Animation")
+        layout.operator("screen.animation_play", text="Playback Animation", icon='PLAY')
 
         layout.separator(factor=1)
 
-        layout.operator("screen.area_dupli")
-        layout.operator("screen.region_quadview")
-        layout.operator("screen.screen_full_area")
-        layout.operator("screen.screen_full_area", text="Toggle Fullscreen Area").use_hide_panels = True
+        layout.operator("screen.area_dupli", icon='LINK_AREA')
+        layout.operator("screen.region_quadview", icon='SPLITSCREEN')
+        layout.operator("screen.screen_full_area", icon='FULLSCREEN_ENTER')
+        layout.operator("screen.screen_full_area", text="Toggle Fullscreen Area", icon='FULLSCREEN').use_hide_panels = True
 
 
 class VIEW3D_MT_view_cameras(Menu):
@@ -740,31 +740,31 @@ class VIEW3D_MT_select_object(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("view3d.select_border")
-        layout.operator("view3d.select_circle")
+        layout.operator("view3d.select_border", icon='BORDER_RECT')
+        layout.operator("view3d.select_circle", icon='MESH_CIRCLE')
 
         layout.separator(factor=1)
 
-        layout.operator("object.select_all").action = 'TOGGLE'
-        layout.operator("object.select_all", text="Inverse").action = 'INVERT'
+        layout.operator("object.select_all", icon='RESTRICT_SELECT_OFF').action = 'TOGGLE'
+        layout.operator("object.select_all", text="Inverse", icon='ARROW_LEFTRIGHT').action = 'INVERT'
 
         layout.separator(factor=1)
 
-        layout.operator("object.select_random", text="Random")
-        layout.operator("object.select_mirror", text="Mirror")
-        layout.operator("object.select_by_layer", text="Select All by Layer")
-        layout.operator_menu_enum("object.select_by_type", "type", text="Select All by Type...")
-        layout.operator("object.select_camera", text="Select Camera")
+        layout.operator("object.select_random", text="Random", icon='RNDCURVE')
+        layout.operator("object.select_mirror", text="Mirror", icon='MOD_MIRROR')
+        layout.operator("object.select_by_layer", text="Select All by Layer", icon='RENDERLAYERS')
+        layout.operator_menu_enum("object.select_by_type", "type", text="Select All by Type...", icon='OBJECT_DATA')
+        layout.operator("object.select_camera", text="Select Camera", icon='CAMERA_DATA')
 
         layout.separator(factor=1)
 
-        layout.menu("VIEW3D_MT_select_object_more_less")
+        layout.menu("VIEW3D_MT_select_object_more_less", icon='ZOOMIN')
 
         layout.separator(factor=1)
 
-        layout.operator_menu_enum("object.select_grouped", "type", text="Grouped")
-        layout.operator_menu_enum("object.select_linked", "type", text="Linked")
-        layout.operator("object.select_pattern", text="Select Pattern...")
+        layout.operator_menu_enum("object.select_grouped", "type", text="Grouped", icon='GROUP')
+        layout.operator_menu_enum("object.select_linked", "type", text="Linked", icon='LINKED')
+        layout.operator("object.select_pattern", text="Select Pattern...", icon='SORTALPHA')
 
 
 class VIEW3D_MT_select_pose_more_less(Menu):
@@ -1497,60 +1497,60 @@ class VIEW3D_MT_object(Menu):
         view = context.space_data
         is_local_view = (view.local_view is not None)
 
-        layout.menu("VIEW3D_MT_undo_redo")
+        layout.menu("VIEW3D_MT_undo_redo", icon='LOOP_BACK')
 
         layout.separator(factor=1)
 
-        layout.operator("object.delete", text="Delete...").use_global = False
+        layout.operator("object.delete", text="Delete...", icon='X').use_global = False
 
         layout.separator(factor=1)
 
-        layout.menu("VIEW3D_MT_transform_object")
-        layout.menu("VIEW3D_MT_mirror")
-        layout.menu("VIEW3D_MT_object_clear")
-        layout.menu("VIEW3D_MT_object_apply")
+        layout.menu("VIEW3D_MT_transform_object", icon='MANIPUL')
+        layout.menu("VIEW3D_MT_mirror", icon='MOD_MIRROR')
+        layout.menu("VIEW3D_MT_object_clear", icon='PANEL_CLOSE')
+        layout.menu("VIEW3D_MT_object_apply", icon='FILE_TICK')
 
         layout.separator(factor=1)
 
-        layout.menu("VIEW3D_MT_object_parent")
-        layout.menu("VIEW3D_MT_object_group")
-        layout.menu("VIEW3D_MT_snap")
+        layout.menu("VIEW3D_MT_object_parent", icon='CONSTRAINT')
+        layout.menu("VIEW3D_MT_object_group", icon='GROUP')
+        layout.menu("VIEW3D_MT_snap", icon='SNAP_ON')
 
         layout.separator(factor=1)
 
-        layout.operator("object.duplicate_move")
-        layout.operator("object.duplicate_move_linked")
-        layout.operator("object.join")
+        layout.operator("object.duplicate_move", icon='MOD_ARRAY')
+        layout.operator("object.duplicate_move_linked", icon='LINKED')
+        layout.operator("object.join", icon='AUTOMERGE_ON')
         if is_local_view:
             layout.operator_context = 'EXEC_REGION_WIN'
-            layout.operator("object.move_to_layer", text="Move out of Local View")
+            layout.operator("object.move_to_layer", text="Move out of Local View", icon='RENDERLAYERS')
             layout.operator_context = 'INVOKE_REGION_WIN'
         else:
-            layout.operator("object.move_to_layer", text="Move to Layer...")
+            layout.operator("object.move_to_layer", text="Move to Layer...", icon='RENDERLAYERS')
 
         layout.separator(factor=1)
-        layout.menu("VIEW3D_MT_make_links", text="Make Links...")
-        layout.menu("VIEW3D_MT_object_relations")
-        layout.menu("VIEW3D_MT_object_constraints")
-        layout.menu("VIEW3D_MT_object_track")
-
-        layout.separator(factor=1)
-
-        layout.menu("VIEW3D_MT_object_animation")
+        layout.menu("VIEW3D_MT_make_links", text="Make Links...", icon='LINK_BLEND')
+        layout.menu("VIEW3D_MT_object_relations", icon='OOPS')
+        layout.menu("VIEW3D_MT_object_constraints", icon='CONSTRAINT_DATA')
+        layout.menu("VIEW3D_MT_object_track", icon='CAMERA_DATA')
 
         layout.separator(factor=1)
 
-        layout.menu("VIEW3D_MT_object_quick_effects")
+        layout.menu("VIEW3D_MT_object_animation", icon='ANIM')
 
         layout.separator(factor=1)
 
-        layout.menu("VIEW3D_MT_object_game")
+        layout.menu("VIEW3D_MT_object_quick_effects", icon='MOD_PARTICLES')
 
         layout.separator(factor=1)
 
-        layout.menu("VIEW3D_MT_object_showhide")
+        layout.menu("VIEW3D_MT_object_game", icon='GAME')
 
-        layout.operator_menu_enum("object.convert", "target")
+        layout.separator(factor=1)
+
+        layout.menu("VIEW3D_MT_object_showhide", icon='RESTRICT_VIEW_OFF')
+
+        layout.operator_menu_enum("object.convert", "target", icon='FILE_REFRESH')
 
 
 class VIEW3D_MT_object_animation(Menu):
