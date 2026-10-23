@@ -2510,7 +2510,13 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 					float g        // Mie preferred scattering direction
 					)
 {
+#ifdef GL_ES
+	// Web/celular: 16 passos por pixel (e 3 chamadas por pixel de objeto) derrubavam o celular
+	// a ~24 FPS; 6 passos mantem o degrade do ceu.
+	const float iSteps = 6.0;
+#else
 	const float iSteps = 16.0; // Primary rays.
+#endif
 	
 	// Normalize the sun and view directions.
 	pSun = normalize(pSun);
@@ -3256,7 +3262,11 @@ void env_sky_atmospheric(vec3 wv, vec3 wn, vec3 wr, vec3 sundir, float rough,
 {
 	do_sky_atmospheric(wr, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
 	do_sky_atmospheric(-wn, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.831, diffibl);
+#ifdef GL_ES
+	transmit = mirror; // celular: um raymarch a menos por pixel (transmissao so vale em refracao)
+#else
 	do_sky_atmospheric(wv, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, transmit);
+#endif
 }
 
 /* Diffuse irradiance taps around the outward normal n: n itself plus 4 directions tilted ~50 deg,
