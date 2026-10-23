@@ -500,6 +500,15 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	stages.strand_curvature = material->strand_curvature;
 	stages.explode_factor = material->explode_factor;
 	stages.scripts = &material->scripts;
+	{
+		const World *wo = material->scene ? material->scene->world : NULL;
+		const short q = wo ? wo->sky_quality : WO_SKY_QUALITY_AUTO;
+#ifdef __EMSCRIPTEN__
+		stages.sky_low = (q != WO_SKY_QUALITY_HIGH);
+#else
+		stages.sky_low = (q == WO_SKY_QUALITY_LOW);
+#endif
+	}
 
 	if (used) {
 		material->pass = GPU_generate_pass(&material->nodes, material->outlinks,

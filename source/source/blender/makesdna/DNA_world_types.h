@@ -91,7 +91,7 @@ typedef struct World {
 	short star_style; /* WO_STARS_SIMPLE/REALISTIC/CONSTELLATIONS (era pad2[0]; arquivos antigos = 0 = simples) */
 	short aurora_flag;   /* WO_AURORA_ENABLE (era pad2[0]; 0 = desligada) */
 	short aurora_colors; /* WO_AURORA_GREEN/CLASSIC/RAINBOW */
-	short pad2[1];
+	short sky_quality;   /* WO_SKY_QUALITY_AUTO/HIGH/LOW (era pad2[0]; 0 = Auto) */
 
 	/**
 	 * Gravitation constant for the game world
@@ -295,6 +295,11 @@ typedef struct World {
 #define WO_STARS_SIMPLE         0
 #define WO_STARS_REALISTIC      1
 #define WO_STARS_CONSTELLATIONS 2
+
+/* sky_quality: passos do raymarch do ceu Atmospheric (Auto = Low na Web/Android) */
+#define WO_SKY_QUALITY_AUTO     0
+#define WO_SKY_QUALITY_HIGH     1
+#define WO_SKY_QUALITY_LOW      2
 
 /* aurora_flag / aurora_colors */
 #define WO_AURORA_ENABLE        (1 << 0)

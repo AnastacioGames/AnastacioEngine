@@ -47,6 +47,8 @@ enum {
 	GPU_SHADER_FLAGS_BINARY_CACHE		= (1 << 6),
 	/* Material geometry stage (Material.geomcode, Fur Shells, Outline). */
 	GPU_SHADER_FLAGS_USER_GEOMETRY		= (1 << 7),
+	/* World Sky Quality Low: lighter Atmospheric sky (#define SKY_LOW). */
+	GPU_SHADER_FLAGS_SKY_LOW			= (1 << 8),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.

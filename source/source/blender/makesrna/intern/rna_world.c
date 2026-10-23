@@ -1819,6 +1819,19 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Star Style", "How the night sky stars are drawn");
 	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
 
+	static EnumPropertyItem sky_quality_items[] = {
+		{WO_SKY_QUALITY_AUTO, "AUTO", 0, "Auto", "Low on Web/Android, High on desktop"},
+		{WO_SKY_QUALITY_HIGH, "HIGH", 0, "High", "Full quality atmosphere (16 steps per pixel)"},
+		{WO_SKY_QUALITY_LOW, "LOW", 0, "Low",
+		 "Faster atmosphere for phones and integrated GPUs (6 steps, fewer sky lookups on objects)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "sky_quality", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "sky_quality");
+	RNA_def_property_enum_items(prop, sky_quality_items);
+	RNA_def_property_ui_text(prop, "Sky Quality", "Cost of the Atmospheric sky on the GPU");
+	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
+
 	prop = RNA_def_property(srna, "use_sky_aurora", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "aurora_flag", WO_AURORA_ENABLE);
 	RNA_def_property_ui_text(prop, "Aurora", "Draw an animated aurora in the night sky");

@@ -3611,6 +3611,9 @@ GPUPass *GPU_generate_pass(
 	if (use_geometry) {
 		flags |= GPU_SHADER_FLAGS_USER_GEOMETRY;
 	}
+	if (stages && stages->sky_low) {
+		flags |= GPU_SHADER_FLAGS_SKY_LOW;
+	}
 	const unsigned int hash = shader_cache_hash(vertexcode, fragmentcode, geometrycode, flags);
 	const bool use_cache = shader_cache_enabled();
 	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :

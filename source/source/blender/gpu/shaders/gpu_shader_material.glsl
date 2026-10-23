@@ -2510,8 +2510,8 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 					float g        // Mie preferred scattering direction
 					)
 {
-#ifdef GL_ES
-	// Web/celular: 16 passos por pixel (e 3 chamadas por pixel de objeto) derrubavam o celular
+#ifdef SKY_LOW
+	// Sky Quality Low (Auto na Web/Android): 16 passos por pixel (e 3 chamadas por pixel de objeto) derrubavam o celular
 	// a ~24 FPS; 6 passos mantem o degrade do ceu.
 	const float iSteps = 6.0;
 #else
@@ -3262,7 +3262,7 @@ void env_sky_atmospheric(vec3 wv, vec3 wn, vec3 wr, vec3 sundir, float rough,
 {
 	do_sky_atmospheric(wr, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
 	do_sky_atmospheric(-wn, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.831, diffibl);
-#ifdef GL_ES
+#ifdef SKY_LOW
 	transmit = mirror; // celular: um raymarch a menos por pixel (transmissao so vale em refracao)
 #else
 	do_sky_atmospheric(wv, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, transmit);

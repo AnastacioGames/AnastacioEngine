@@ -343,6 +343,7 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
             col.label(text="")
             col.prop(world, "atmosphere_mie_density")
             col.prop(world, "atmosphere_mie_direction", slider=True)
+            box.prop(world, "sky_quality")
 
 
 
