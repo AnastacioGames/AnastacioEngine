@@ -56,3 +56,89 @@ def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL"):
     bgl.glColor4f(*style["text_color"])
     blf.position(0, tx, y + (h - size * 0.7) / 2, 0)
     blf.draw(0, text)
+
+
+# -- HUD ----------------------------------------------------------------------
+
+class _Values(dict):
+    """Propriedades para o format do Label; nome que falta vira 0."""
+
+    def __missing__(self, key):
+        return 0
+
+
+def format_label(fmt, values):
+    try:
+        return fmt.format_map(_Values(values))
+    except (ValueError, TypeError, IndexError, AttributeError):
+        return fmt
+
+
+def bar_fraction(data, values):
+    span = data["max"] - data["min"]
+    try:
+        value = float(values.get(data["property"], data["min"]))
+    except (TypeError, ValueError):
+        value = data["min"]
+    return 0.0 if span == 0 else max(0.0, min(1.0, (value - data["min"]) / span))
+
+
+def _mix(a, b, t):
+    return tuple(x + (y - x) * t for x, y in zip(a, b))
+
+
+def draw_bar(bgl, data, frac, x, y, w, h):
+    radius = data["radius"] * min(w, h) * 0.5
+    bgl.glEnable(bgl.GL_BLEND)
+    bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
+    bgl.glColor4f(*data["bg"])
+    _rounded_polygon(bgl, bgl.GL_POLYGON, x, y, w, h, radius)
+    if frac <= 0.0:
+        return
+    # Barra vazia = cor Low, cheia = cor Fill.
+    color = _mix(data["low"], data["fill"], frac) if data["use_low"] else data["fill"]
+    pad = min(w, h) * 0.12
+    fx, fy, fw, fh = x + pad, y + pad, w - 2 * pad, h - 2 * pad
+    direction = data["direction"]
+    if direction == "RIGHT":
+        fw *= frac
+    elif direction == "LEFT":
+        fx += fw * (1.0 - frac)
+        fw *= frac
+    elif direction == "UP":
+        fh *= frac
+    else:  # DOWN
+        fy += fh * (1.0 - frac)
+        fh *= frac
+    bgl.glColor4f(*color)
+    _rounded_polygon(bgl, bgl.GL_POLYGON, fx, fy, fw, fh, max(0.0, radius - pad))
+
+
+def draw_label(bgl, blf, data, text, x, y, w, h):
+    size = max(6, int(h * data["text_size"]))
+    blf.size(0, size, 72)
+    tw = blf.dimensions(0, text)[0]
+    if data["align"] == "LEFT":
+        tx = x
+    elif data["align"] == "RIGHT":
+        tx = x + w - tw
+    else:
+        tx = x + (w - tw) / 2
+    ty = y + (h - size * 0.7) / 2
+    bgl.glEnable(bgl.GL_BLEND)
+    if data["shadow"]:
+        off = max(1, size // 14)
+        bgl.glColor4f(0.0, 0.0, 0.0, 0.8 * data["color"][3])
+        blf.position(0, tx + off, ty - off, 0)
+        blf.draw(0, text)
+    bgl.glColor4f(*data["color"])
+    blf.position(0, tx, ty, 0)
+    blf.draw(0, text)
+
+
+def draw_widget(bgl, blf, data, values, x, y, w, h):
+    """Desenha um widget de HUD (Progress Bar ou Label) com os valores dados."""
+    if data["kind"] == "BAR":
+        draw_bar(bgl, data, bar_fraction(data, values), x, y, w, h)
+    elif data["kind"] == "LABEL":
+        draw_label(bgl, blf, data, format_label(data["format"], values), x, y, w, h)

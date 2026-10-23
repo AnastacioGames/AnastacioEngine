@@ -10,6 +10,10 @@ A tela ativa é a propriedade de jogo "ui_screen" do dono do controlador:
 nome da tela para mostrar, texto vazio para esconder o menu.  Assim dá para
 ligar e desligar pelos Logic Bricks (atuador Property) ou por Python
 (own["ui_screen"] = "Menu").  Sem a propriedade, começa na primeira tela.
+
+Telas marcadas como HUD ficam sempre visíveis, por baixo do menu, enquanto a
+propriedade "ui_hud" for verdadeira (padrão).  Os widgets de HUD leem as
+propriedades de jogo do objeto escolhido a cada frame.
 """
 
 import Range
@@ -30,11 +34,16 @@ class Button:
 
 class UIRuntime:
     def __init__(self, data, owner):
-        self.screens = {s["name"]: [Button(b) for b in s["buttons"]] for s in data["screens"]}
+        menus = [s for s in data["screens"] if not s.get("hud")]
+        self.screens = {s["name"]: [Button(b) for b in s["buttons"]] for s in menus}
+        self.screen_widgets = {s["name"]: s.get("widgets", ()) for s in menus}
+        self.hud_widgets = [w for s in data["screens"] if s.get("hud") for w in s["widgets"]]
         self.owner = owner
         self.scene = owner.scene
         if "ui_screen" not in owner:
-            owner["ui_screen"] = data["screens"][0]["name"] if data["screens"] else ""
+            owner["ui_screen"] = menus[0]["name"] if menus else ""
+        if "ui_hud" not in owner:
+            owner["ui_hud"] = True
         self.active = None
         self.sounds = {}
         self.scene.post_draw.append(self.draw)
@@ -110,8 +119,17 @@ class UIRuntime:
 
     # -- desenho -------------------------------------------------------------
 
+    def widget_values(self, name):
+        obj = self.scene.objects.get(name) if name else self.owner
+        if obj is None:
+            return {}
+        return {prop: obj[prop] for prop in obj.getPropertyNames()}
+
     def draw(self):
-        if self.active is None:
+        widgets = list(self.hud_widgets) if self.owner.get("ui_hud", True) else []
+        if self.active is not None:
+            widgets += self.screen_widgets.get(self.active, ())
+        if self.active is None and not widgets:
             return
         import bgl
         import blf
@@ -125,6 +143,11 @@ class UIRuntime:
         bgl.glPushMatrix()
         bgl.glLoadIdentity()
         bgl.glDisable(bgl.GL_DEPTH_TEST)
+        for data in widgets:
+            x, y, w, h = data["rect"]
+            range_ui_draw.draw_widget(bgl, blf, data, self.widget_values(data["object"]),
+                                      x * width, height - (y + h) * height,
+                                      w * width, h * height)
         for button in self.screens.get(self.active, ()):
             data = button.data
             x, y, w, h = data["rect"]

@@ -5,6 +5,10 @@
 Monta duas telas (Screens "Menu" e "Opcoes") com botões ligados a ações,
 grava o Bake e liga Always + Python (range_ui_runtime.main) na câmera, com M/H
 mostrando e escondendo o menu pela propriedade ui_screen.
+
+HUD: tela "HUD" com vida e velocidade lidas das propriedades da câmera.
+D tira vida, R recupera, W/S (segurando) aceleram e freiam, J liga/desliga
+o HUD (propriedade ui_hud).
 """
 
 import sys
@@ -25,6 +29,15 @@ def frame(name, x, y):
     node.shrink = False
     node.location = (x, y)
     node.width, node.height = 640, 360  # 16:9
+    return node
+
+
+def hud_widget(kind, parent, x, y, width, height):
+    node = tree.nodes.new(kind.bl_idname)
+    node.parent = parent
+    node.location = (x, y)
+    node.width = width
+    node.button_height = height
     return node
 
 
@@ -50,6 +63,8 @@ def link(src, event, dst):
 
 menu = frame("Menu", 0, 0)
 opcoes = frame("Opcoes", 0, -500)
+hud = frame("HUD", 0, 500)
+hud.ui_hud = True
 
 jogar = button(menu, "Jogar", 220, -120)
 btn_opcoes = button(menu, "Opções", 220, -170)
@@ -65,6 +80,19 @@ sair.radius = 0.0
 sair.color = (0.55, 0.12, 0.12, 0.9)
 sair.hover_color = (0.8, 0.2, 0.2, 1.0)
 voltar.align = "LEFT"
+
+# HUD: barra e texto de vida no canto de cima, velocímetro embaixo à direita.
+vida_bar = hud_widget(ui.UIProgressBarNode, hud, 20, -20, 220, 24)
+vida_txt = hud_widget(ui.UILabelNode, hud, 20, -48, 220, 24)
+vida_txt.text_format = "Vida {vida:.0f}"
+vel_txt = hud_widget(ui.UILabelNode, hud, 420, -280, 200, 40)
+vel_txt.text_format = "{velocidade:.0f} km/h"
+vel_txt.align = "RIGHT"
+vel_bar = hud_widget(ui.UIProgressBarNode, hud, 420, -325, 200, 14)
+vel_bar.prop_name = "velocidade"
+vel_bar.max_value = 200.0
+vel_bar.use_low_color = False
+vel_bar.fill_color = (1.0, 0.55, 0.1, 1.0)
 
 link(jogar, "On Enter", action(ui.UIPrintNode, "mouse entrou em Jogar", 800, 0))
 link(jogar, "On Click", action(ui.UIPrintNode, "clicou Jogar", 800, -100))
@@ -104,17 +132,34 @@ sensor.link(controller)
 # ("" esconde).  Tecla M mostra o Menu, H esconde.
 bpy.ops.object.game_property_new(type="STRING", name="ui_screen")
 cam.game.properties["ui_screen"].value = "Menu"
-for key, value in (("M", "Menu"), ("H", "")):
+for prop, kind, value in (("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0),
+                          ("ui_hud", "BOOL", True)):
+    bpy.ops.object.game_property_new(type=kind, name=prop)
+    cam.game.properties[prop].value = value
+
+
+def key_brick(key, mode, prop, value, hold=False):
     bpy.ops.logic.sensor_add(type="KEYBOARD", object=cam.name)
     bpy.ops.logic.controller_add(type="LOGIC_AND", object=cam.name)
     bpy.ops.logic.actuator_add(type="PROPERTY", object=cam.name)
     key_sensor, and_ctrl, act = cam.game.sensors[-1], cam.game.controllers[-1], cam.game.actuators[-1]
     key_sensor.key = key
-    act.mode = "ASSIGN"
-    act.property = "ui_screen"
-    act.value = '"%s"' % value
+    key_sensor.use_pulse_true_level = hold
+    act.mode = mode
+    act.property = prop
+    if mode != "TOGGLE":
+        act.value = value
     key_sensor.link(and_ctrl)
     act.link(and_ctrl)
+
+
+key_brick("M", "ASSIGN", "ui_screen", '"Menu"')
+key_brick("H", "ASSIGN", "ui_screen", '""')
+key_brick("D", "ADD", "vida", "-10")
+key_brick("R", "ASSIGN", "vida", "100")
+key_brick("W", "ADD", "velocidade", "2", hold=True)
+key_brick("S", "ADD", "velocidade", "-2", hold=True)
+key_brick("J", "TOGGLE", "ui_hud", "")
 
 bpy.ops.wm.save_as_mainfile(filepath=out)
 print("UI_OK", out)

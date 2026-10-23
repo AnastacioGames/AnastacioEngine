@@ -60,16 +60,30 @@ def _color(name, default):
                                min=0.0, max=1.0, default=default)
 
 
-class UIButtonNode(UINode, Node):
-    """O nó fica recolhido e serve de alça; o botão é a prévia desenhada
-    embaixo dele, com largura = largura do nó e altura = Height."""
-    bl_idname = "RangeUIButton"
-    bl_label = "Button"
+class UIWidgetNode(UINode):
+    """Base dos widgets: o nó fica recolhido e serve de alça; o widget é a
+    prévia desenhada embaixo dele, com largura = largura do nó e altura =
+    Height."""
     bl_width_min = 20.0  # deixa a alça recolhida (width_hidden) estreita
 
-    text = StringProperty(name="Text", default="Button")
     button_height = FloatProperty(name="Height", default=40.0, min=8.0, soft_max=200.0,
-                           description="Altura do botão (a largura é a do nó)")
+                                  description="Altura do widget (a largura é a do nó)")
+
+    def init(self, context):
+        self.width = 200
+        self.hide = True
+        self.width_hidden = 20.0
+
+    def draw_label(self):
+        # Recolhido, o nó é só a alça: sem texto para não cobrir a prévia.
+        return " " if self.hide else self.bl_label
+
+
+class UIButtonNode(UIWidgetNode, Node):
+    bl_idname = "RangeUIButton"
+    bl_label = "Button"
+
+    text = StringProperty(name="Text", default="Button")
     color = _color("Color", (0.20, 0.22, 0.26, 0.90))
     hover_color = _color("Hover", (0.30, 0.45, 0.75, 0.95))
     press_color = _color("Pressed", (0.15, 0.30, 0.55, 1.0))
@@ -86,9 +100,7 @@ class UIButtonNode(UINode, Node):
     shadow = BoolProperty(name="Shadow", default=False)
 
     def init(self, context):
-        self.width = 200
-        self.hide = True
-        self.width_hidden = 20.0
+        UIWidgetNode.init(self, context)
         for name in EVENTS:
             self.outputs.new(UIEventSocket.bl_idname, name)
 
@@ -109,10 +121,6 @@ class UIButtonNode(UINode, Node):
         layout.row().prop(self, "align", expand=True)
         layout.prop(self, "shadow")
 
-    def draw_label(self):
-        # Recolhido, o nó é só a alça: sem texto para não cobrir a prévia.
-        return " " if self.hide else (self.text or "Button")
-
     def style(self):
         return {
             "color": tuple(self.color), "hover": tuple(self.hover_color),
@@ -121,6 +129,99 @@ class UIButtonNode(UINode, Node):
             "border_color": tuple(self.border_color), "text_size": self.text_size,
             "align": self.align, "shadow": self.shadow,
         }
+
+
+class UIHudNode(UIWidgetNode):
+    """Widget de HUD: mostra propriedades de jogo de um objeto."""
+    object_name = StringProperty(
+        name="Object", description="Objeto com as propriedades (vazio = dono do script)")
+
+    def draw_buttons(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects", text="")
+
+
+class UIProgressBarNode(UIHudNode, Node):
+    bl_idname = "RangeUIProgressBar"
+    bl_label = "Progress Bar"
+
+    prop_name = StringProperty(name="Property", default="vida")
+    min_value = FloatProperty(name="Min", default=0.0)
+    max_value = FloatProperty(name="Max", default=100.0)
+    bg_color = _color("Background", (0.0, 0.0, 0.0, 0.55))
+    fill_color = _color("Fill", (0.25, 0.85, 0.35, 1.0))
+    use_low_color = BoolProperty(name="Low Color", default=True,
+                                 description="Mistura até esta cor quando a barra esvazia")
+    low_color = _color("Low", (0.9, 0.15, 0.1, 1.0))
+    direction = EnumProperty(name="Direction", default="RIGHT", items=(
+        ("RIGHT", "Right", ""), ("LEFT", "Left", ""), ("UP", "Up", ""), ("DOWN", "Down", "")))
+    radius = FloatProperty(name="Roundness", default=0.4, min=0.0, max=1.0, subtype="FACTOR")
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.button_height = 24.0
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects")
+        layout.prop(self, "prop_name")
+        row = layout.row(align=True)
+        row.prop(self, "min_value")
+        row.prop(self, "max_value")
+        layout.prop(self, "button_height")
+        col = layout.column(align=True)
+        col.prop(self, "bg_color")
+        col.prop(self, "fill_color")
+        row = layout.row(align=True)
+        row.prop(self, "use_low_color")
+        row.prop(self, "low_color", text="")
+        layout.row().prop(self, "direction", expand=True)
+        layout.prop(self, "radius", slider=True)
+
+    def widget(self):
+        return {
+            "kind": "BAR", "property": self.prop_name,
+            "min": self.min_value, "max": self.max_value,
+            "bg": tuple(self.bg_color), "fill": tuple(self.fill_color),
+            "use_low": self.use_low_color, "low": tuple(self.low_color),
+            "direction": self.direction, "radius": self.radius,
+        }
+
+    def preview_values(self):
+        return {self.prop_name: self.min_value + 0.7 * (self.max_value - self.min_value)}
+
+
+class UILabelNode(UIHudNode, Node):
+    bl_idname = "RangeUILabel"
+    bl_label = "Label"
+
+    text_format = StringProperty(
+        name="Format", default="{velocidade:.0f} km/h",
+        description="Texto com propriedades entre chaves, ex.: {vida:.0f}, Volta {volta}/3")
+    text_color = _color("Color", (1.0, 1.0, 1.0, 1.0))
+    text_size = FloatProperty(name="Text Size", default=0.8, min=0.1, max=1.0)
+    align = EnumProperty(name="Align", default="LEFT", items=(
+        ("LEFT", "Left", ""), ("CENTER", "Center", ""), ("RIGHT", "Right", "")))
+    shadow = BoolProperty(name="Shadow", default=True)
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects")
+        layout.prop(self, "text_format")
+        layout.prop(self, "button_height")
+        layout.prop(self, "text_color")
+        layout.prop(self, "text_size", slider=True)
+        layout.row().prop(self, "align", expand=True)
+        layout.prop(self, "shadow")
+
+    def widget(self):
+        return {
+            "kind": "LABEL", "format": self.text_format, "color": tuple(self.text_color),
+            "text_size": self.text_size, "align": self.align, "shadow": self.shadow,
+        }
+
+    def preview_values(self):
+        return {}
+
+
+HUD_NODES = (UIProgressBarNode, UILabelNode)
 
 
 class UIActionNode(UINode):
@@ -235,20 +336,30 @@ def bake_tree(tree, scene):
             continue
         fx, fy, fw, fh = _canvas(frame, scene)
         buttons = []
+        widgets = []
         for node in tree.nodes:
-            if node.bl_idname != UIButtonNode.bl_idname or node.parent != frame:
+            if node.parent != frame:
                 continue
             nx, ny = _abs_location(node)
+            # Retângulo normalizado na tela: x da esquerda, y do topo.
+            rect = ((nx - fx) / fw, (fy - ny) / fh, node.width / fw, node.button_height / fh)
+            if isinstance(node, UIHudNode):
+                data = node.widget()
+                data["rect"] = rect
+                data["object"] = node.object_name
+                widgets.append(data)
+                continue
+            if node.bl_idname != UIButtonNode.bl_idname:
+                continue
             buttons.append({
-                "name": node.name,
+                "name": node.text or node.name,
                 "text": node.text,
-                # Retângulo normalizado na tela: x da esquerda, y do topo.
-                "rect": ((nx - fx) / fw, (fy - ny) / fh, node.width / fw, node.button_height / fh),
+                "rect": rect,
                 "style": node.style(),
                 "events": {s.name: _actions_for(s) for s in node.outputs if s.is_linked},
             })
         screens.append({"name": frame.label or frame.name, "location": (fx, fy),
-                        "buttons": buttons})
+                        "hud": frame.ui_hud, "buttons": buttons, "widgets": widgets})
     # A tela inicial é a Screen mais acima e à esquerda no editor.
     screens.sort(key=lambda s: (-s["location"][1], s["location"][0]))
     return {"tree": tree.name, "screens": screens}
@@ -344,14 +455,19 @@ def _draw_previews():
     if tree is None or tree.bl_idname != UITree.bl_idname:
         return
     for node in tree.nodes:
-        if node.bl_idname != UIButtonNode.bl_idname:
+        is_hud = isinstance(node, UIHudNode)
+        if not is_hud and node.bl_idname != UIButtonNode.bl_idname:
             continue
         scale = bpy.context.user_preferences.system.ui_scale  # U.dpi_fac
         x, y = _abs_location(node)
         w, h = node.width * scale, node.button_height * scale
         x, y = x * scale, y * scale - h
-        state = tree.preview_state if node.select else "NORMAL"
-        range_ui_draw.draw_button(bgl, blf, node.style(), node.text, x, y, w, h, state)
+        if is_hud:
+            # Prévia com valor de exemplo (barra em 70%, propriedades = 0).
+            range_ui_draw.draw_widget(bgl, blf, node.widget(), node.preview_values(), x, y, w, h)
+        else:
+            state = tree.preview_state if node.select else "NORMAL"
+            range_ui_draw.draw_button(bgl, blf, node.style(), node.text, x, y, w, h, state)
         if node.select:
             bgl.glColor4f(1.0, 0.6, 0.2, 1.0)
             bgl.glBegin(bgl.GL_LINE_LOOP)
@@ -382,11 +498,13 @@ class NODE_PT_range_ui_tree(Panel):
         if frame is not None:
             box = layout.box()
             box.label("Tela: %s" % (frame.label or frame.name))
+            box.prop(frame, "ui_hud")
             box.prop_search(frame, "ui_backdrop", bpy.data, "images", text="")
             box.operator(RANGE_OT_ui_tree_capture.bl_idname, icon="RENDER_STILL")
         layout.label("Jogo: Always (pulso) + Python")
         layout.label("Module: range_ui_runtime.main")
-        layout.label("Liga/desliga: propriedade ui_screen")
+        layout.label("Menu: propriedade ui_screen")
+        layout.label("HUD: propriedade ui_hud (bool)")
 
 
 class UICategory(NodeCategory):
@@ -399,14 +517,19 @@ CATEGORIES = [
     UICategory("RANGE_UI_WIDGETS", "Widgets", items=[
         NodeItem("NodeFrame", label="Screen", settings={
             "ui_screen": "True", "label": "'Screen'", "width": "640.0", "shrink": "False"}),
+        NodeItem("NodeFrame", label="HUD Screen", settings={
+            "ui_screen": "True", "ui_hud": "True", "label": "'HUD'", "width": "640.0",
+            "shrink": "False"}),
         NodeItem(UIButtonNode.bl_idname),
+        NodeItem(UIProgressBarNode.bl_idname),
+        NodeItem(UILabelNode.bl_idname),
         NodeItem("NodeFrame"),
     ]),
     UICategory("RANGE_UI_ACTIONS", "Actions",
                items=[NodeItem(cls.bl_idname) for cls in ACTION_NODES]),
 ]
 
-CLASSES = (UITree, UIEventSocket, UIButtonNode) + ACTION_NODES + (
+CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
     RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_capture, NODE_PT_range_ui_tree)
 
 _draw_handles = []
@@ -419,6 +542,8 @@ def register():
         name="Backdrop", description="Imagem de fundo desta tela no editor (não vai para o jogo)")
     bpy.types.NodeFrame.ui_screen = BoolProperty(
         name="Screen", description="Na UI Tree, este Frame é uma tela do jogo (lido em drawnode.c)")
+    bpy.types.NodeFrame.ui_hud = BoolProperty(
+        name="HUD", description="Tela de HUD: fica sempre visível, por baixo do menu")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
     space = bpy.types.SpaceNodeEditor
     _draw_handles.append(space.draw_handler_add(_draw_editor, (), "WINDOW", "PRE_VIEW"))
@@ -429,6 +554,7 @@ def unregister():
         bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handles.pop(), "WINDOW")
     del bpy.types.NodeFrame.ui_backdrop
     del bpy.types.NodeFrame.ui_screen
+    del bpy.types.NodeFrame.ui_hud
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
