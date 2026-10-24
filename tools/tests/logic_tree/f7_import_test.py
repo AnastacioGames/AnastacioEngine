@@ -100,10 +100,18 @@ log = add("controller", 'PYTHON', "log")
 log.mode, log.text = 'SCRIPT', text
 log.link(sensor=tick)
 
+# 7) controller desligado no checkbox: vira porta mutada, não gera actuator
+offs = add("sensor", 'ALWAYS', "off_tick")
+offc = add("controller", 'LOGIC_AND', "off_ctrl")
+offa = add("actuator", 'PROPERTY', "off_act")
+offa.mode, offa.property, offa.value = 'ASSIGN', "late", "5"
+offc.link(sensor=offs, actuator=offa)
+offc.active = False
+
 n_before = len(game.controllers)
 tree, n, warnings = lt.import_bricks(ob)
 print("WARN", warnings)
-check("importou 4 controllers (count, walk, notyet, after)", n == 4, n)
+check("importou 5 controllers (count, walk, notyet, after, off_ctrl)", n == 5, n)
 check("3 ficaram como brick (expr, servo, log)", len(warnings) == 3, warnings)
 left = sorted(c.name for c in game.controllers)
 check("controllers que sobraram", left == ["expr", "log", "servo_ctrl"], left)
@@ -113,13 +121,17 @@ check("servo ficou", "servo" in game.actuators)
 kinds = sorted(nd.bl_idname for nd in tree.nodes)
 print("NODES", kinds)
 check("Add Property para mode ADD", "RangeLogicAddProperty" in kinds)
-check("Set Property para mode ASSIGN", kinds.count("RangeLogicSetProperty") == 2, kinds)
+check("Set Property para mode ASSIGN", kinds.count("RangeLogicSetProperty") == 3, kinds)
 check("Nand virou And + Not", "RangeLogicNot" in kinds)
-check("um nó por sensor (tick reaproveitado)", kinds.count("RangeLogicAlways") == 2, kinds)
+check("um nó por sensor (tick reaproveitado)", kinds.count("RangeLogicAlways") == 3, kinds)
 check("Delay manteve o valor", any(nd.bl_idname == "RangeLogicDelay" and nd.delay == 30 for nd in tree.nodes))
 check("Motion manteve o offset", any(nd.bl_idname == "RangeLogicMotion" and abs(nd.offset_location[0] - 0.02) < 1e-6
                                      for nd in tree.nodes))
+check("controller desligado virou porta mutada",
+      any(nd.bl_idname == "RangeLogicAnd" and nd.mute for nd in tree.nodes))
 errs = lt.compile_object(ob)
+check("porta mutada não gera o actuator", not any(a.property == "late" and a.value == "5"
+                                                  for a in game.actuators if a.type == 'PROPERTY'))
 check("compila sem erro", errs == [], errs)
 again, n2, _w = lt.import_bricks(ob)
 check("importar de novo não duplica (bricks da árvore são ignorados)", n2 == 0, n2)

@@ -91,6 +91,8 @@ class NODE_HT_header(Header):
                 label = getattr(cls, "bl_label", cls.bl_idname)
                 if label.endswith(" Tree"):
                     label = label[:-5]
+                if getattr(cls, "range_experimental", False):
+                    label += " (Experimental)"
                 trees.append((cls.bl_idname, label))
         # compositing and texture nodes only work in renders: hide them in game mode
         render_only = {"CompositorNodeTree", "TextureNodeTree"}

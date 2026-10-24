@@ -496,6 +496,17 @@ TABLE = (
     ('Click Sound', 'Som do clique', 'Sonido del clic', 'Звук щелчка'),
     ('Scale Mode', 'Modo de escala', 'Modo de escala', 'Режим масштаба'),
     ('Keep Aspect', 'Manter proporção', 'Mantener proporción', 'Сохранять пропорции'),
+    # Logic Tree
+    ('Convert to Nodes', 'Converter em nós', 'Convertir a nodos', 'Преобразовать в узлы'),
+    ('Compile Logic Tree', 'Compilar Logic Tree', 'Compilar Logic Tree', 'Скомпилировать Logic Tree'),
+    ('Green: fired in the last game', 'Verde: disparou no último jogo', 'Verde: se activó en el último juego',
+     'Зелёный: сработал в прошлой игре'),
+    ('Turn on the scene Debug Mode', 'Ligue o Debug Mode da cena', 'Activa el Debug Mode de la escena',
+     'Включите Debug Mode сцены'),
+    ('(renamed node? press Compile)', '(nó renomeado? aperte Compile)', '(¿nodo renombrado? pulsa Compile)',
+     '(узел переименован? нажмите Compile)'),
+    ('Pause When Fired', 'Pausar ao disparar', 'Pausar al activarse', 'Пауза при срабатывании'),
+    ('More', 'Mais', 'Más', 'Ещё'),
 )
 
 PT_BR = {en: pt for en, pt, _es, _ru in TABLE if pt}

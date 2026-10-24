@@ -24,6 +24,7 @@ class UITree(NodeTree):
     bl_idname = "RangeUITree"
     bl_label = "UI Tree"
     bl_icon = "MENU_PANEL"
+    range_experimental = True  # cabeçalho do Node Editor mostra (Experimental)
 
     preview_state = EnumProperty(
         name="Preview", default="NORMAL",

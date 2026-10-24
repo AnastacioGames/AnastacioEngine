@@ -81,6 +81,11 @@ class MFTPanelPlaykot(bpy.types.Panel):
     bl_category = 'Mifth'
     # bl_options = {'DEFAULT_CLOSED'}
 
+    @classmethod
+    def poll(cls, context):
+        # Ferramentas do Compositor: fora dele (Shader, Logic Tree, UI Tree) a aba não aparece.
+        return getattr(context.space_data, "tree_type", "") == 'CompositorNodeTree'
+
     def draw(self, context):
         layout = self.layout
         mifthTools = context.scene.mifthTools

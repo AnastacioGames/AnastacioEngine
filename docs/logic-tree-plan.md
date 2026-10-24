@@ -136,7 +136,7 @@ Regras:
 | **F4** | Demais sensores e actuators por tabela, priorizando os mais usados no RolimaRacer. Nó Rodar Python | Baixo, mas é volume | Não |
 | **F5** | Depuração: nomes ligando nó e brick na janela F4/F5, pausar no disparo pelo nó. Investigar destaque do nó ativo no Node Editor durante o jogo | Médio | Talvez (só leitura) |
 | **F6** | Destaque dos nós que dispararam (feito, seção 19) | Baixo | Sim (só leitura) |
-| **F7** | Importação feita (2026-10-23): **Import Bricks** no painel N vira sensores/actuators em nós, And/Or/Nand/Nor em portas (Nand/Nor = porta + Not), Python Module em Run Python, estados em Frames; o que não tem nó equivalente (Expression, Xor, Python Script, brick com campo fora do nó) fica como brick. Teste `tools/tests/logic_tree/f7_import_test.py` (18/18 + 4/4 no runtime). Pinos de dado e runtime próprio seguem só com caso real | — | — |
+| **F7** | Importação feita (2026-10-23): **Convert to Nodes** (cabeçalhos do Logic Editor e da Logic Tree) vira sensores/actuators em nós, And/Or/Nand/Nor em portas (Nand/Nor = porta + Not), Python Module em Run Python, estados em Frames; o que não tem nó equivalente (Expression, Xor, Python Script, brick com campo fora do nó) fica como brick. Teste `tools/tests/logic_tree/f7_import_test.py` (18/18 + 4/4 no runtime). Pinos de dado e runtime próprio seguem só com caso real | — | — |
 
 **F0, o que precisa ser provado antes da F1:**
 1. **Estados:** se o usuário também tem bricks com estados no mesmo objeto, os estados da árvore usam os mesmos
@@ -356,3 +356,24 @@ no RNA, então o grupo aparece como os outros.
   sem cor, Clear). Precisa do runtime desta branch (`fireCount`).
 - Fica para o teste com janela: ligar Debug Mode, apertar P, jogar, sair com Esc e ver os nós verdes.
 - F7 (antiga F6): importação de bricks como árvore, pinos de dado e runtime próprio continuam só para caso real.
+
+## 20. F7 e acabamento (2026-10-23), aceito com janela
+
+- **Convert to Nodes** (cabeçalhos do Logic Editor e da Logic Tree): bricks do usuário viram nós; o que não tem
+  nó equivalente fica como brick com aviso. Brick ou controller desligado no checkbox vira nó mutado.
+  Teste `f7_import_test.py` (20/20 + 4/4 no runtime).
+- **Active** em cada nó (mesmo que Mute/M): nó desligado não vira brick e corta o caminho.
+- **Highlight Active** ao vivo: moldura nos nós, portas acesas pelo caminho, fio com o pulso correndo
+  (`debug_intensity` dos bricks, redesenho das áreas da Logic Tree em `wm_event_system.c`).
+- Cores por conjunto (opção Color): gatilhos azul, portas/Run Python amarelo, ações verde; disparou = verde forte,
+  erro = vermelho; cor escolhida pelo usuário é mantida.
+- Seção **More** dentro do nó; painel N em caixas; abas com ícone + nome; Logic Tree e UI Tree marcadas
+  **(Experimental)** no cabeçalho; Horizontal Tabs sempre ligadas ao abrir a engine.
+
+**Para o futuro:**
+- Pinos de dado (variáveis, matemática, comparações) — exigem runtime próprio ou geração de Python.
+- Convert to Nodes para Expression, Xor/Xnor e Python modo Script; layout automático mais caprichado dos nós
+  importados.
+- Se o usuário desligar a opção Color de um nó, a próxima compilação liga de novo a cor do conjunto.
+- Posição do fio aceso é calculada aproximando o layout dos sockets; pode sair um pouco do socket em nós com
+  muitos campos.

@@ -30,6 +30,7 @@ class LogicTree(NodeTree):
     bl_idname = TREE_ID
     bl_label = "Logic Tree"
     bl_icon = "LOGIC"
+    range_experimental = True  # cabeçalho do Node Editor mostra (Experimental)
 
     show_highlight_active = BoolProperty(
         name="Highlight Active", default=True,
@@ -78,7 +79,41 @@ def _prop_from_rna(p):
     raise TypeError("%s: tipo %s sem conversão" % (p.identifier, p.type))
 
 
+def _set_active(node, value):
+    node.mute = not value
+
+
+# cor de cada conjunto, como no Logic Editor: sensores azul, controllers amarelo, actuators verde
+TRIGGER_COLOR = (0.32, 0.45, 0.6)
+GATE_COLOR = (0.58, 0.54, 0.3)
+ACTION_COLOR = (0.33, 0.52, 0.36)
+ERROR_COLOR = (0.6, 0.15, 0.15)
+FIRED_COLOR = (0.1, 0.78, 0.25)
+_OUR_COLORS = (TRIGGER_COLOR, GATE_COLOR, ACTION_COLOR, ERROR_COLOR, FIRED_COLOR)
+
+
+def _is_ours(color):
+    return any(all(abs(a - b) < 1e-3 for a, b in zip(color, c)) for c in _OUR_COLORS)
+
+
 class LogicNode:
+    base_color = None
+
+    def paint(self):
+        """Disparou > erro > cor do conjunto.  Cor escolhida pelo usuário fica."""
+        if self.use_custom_color and not _is_ours(self.color):
+            return
+        err = isinstance(self, BrickNode) and self.error()
+        color = FIRED_COLOR if "range_logic_fired" in self else ERROR_COLOR if err else self.base_color
+        self.use_custom_color = color is not None
+        if color is not None:
+            self.color = color
+
+    # checkbox como o dos logic bricks: desligado = nó mutado, não vira brick
+    range_logic_active = BoolProperty(
+        name="Active", description="Off: this node is ignored (same as Mute, M)",
+        get=lambda self: not self.mute, set=_set_active)
+
     @classmethod
     def poll(cls, ntree):
         return ntree.bl_idname == TREE_ID
@@ -113,6 +148,7 @@ class BrickNode(LogicNode):
         name="More", description="Show the other brick settings inside the node")
 
     def draw_buttons(self, context, layout):
+        layout.prop(self, "range_logic_active")
         for f in self.main:
             layout.prop(self, f)
         extra = [f for f in self.extra if f not in self.main]
@@ -138,28 +174,29 @@ class BrickNode(LogicNode):
         return ("* " + label) if self.range_logic_break else label
 
     def update(self):
-        err = bool(self.error())
-        self.use_custom_color = err
-        if err:
-            self.color = (0.6, 0.15, 0.15)
+        self.paint()
 
 
 class TriggerNode(BrickNode):
     kind = "sensor"
+    base_color = TRIGGER_COLOR
 
     def init(self, context):
         self.outputs.new(PulseSocket.bl_idname, "Pulse")
+        self.paint()
 
 
 class ActionNode(BrickNode):
     kind = "actuator"
     has_then = False  # ações que concluem ganham a saída Then
+    base_color = ACTION_COLOR
 
     def init(self, context):
         sock = self.inputs.new(PulseSocket.bl_idname, "Do")
         sock.link_limit = 4095
         if self.has_then:
             self.outputs.new(PulseSocket.bl_idname, "Then")
+        self.paint()
 
 
 def _brick_node(base, idname, label, rna, brick_type, main, extra=(), fixed=None, required=(),
@@ -247,6 +284,7 @@ class GoToStateNode(ActionNode, Node):
         return ""
 
     def draw_buttons(self, context, layout):
+        layout.prop(self, "range_logic_active")
         layout.prop_search(self, "state", self.id_data, "nodes", text="", icon="NODETREE")
         err = self.error()
         if err:
@@ -263,6 +301,7 @@ class RunPythonNode(ActionNode, Node):
     bl_label = "Run Python"
     kind = "controller"
     brick_type = 'PYTHON'
+    base_color = GATE_COLOR
     module = StringProperty(name="Module", description="modulo.funcao (texto interno ou arquivo .py)")
     use_debug = BoolProperty(name="D (Debug)", description="Recarrega o módulo a cada execução")
     main = ("module",)
@@ -342,11 +381,16 @@ ACTION_NODES += (
 
 class GateNode(LogicNode):
     op = ""
+    base_color = GATE_COLOR
 
     def init(self, context):
         for _ in range(self.n_inputs):
             self.inputs.new(PulseSocket.bl_idname, "In")
         self.outputs.new(PulseSocket.bl_idname, "Pulse")
+        self.paint()
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "range_logic_active")
 
 
 class AndNode(GateNode, Node):
@@ -407,7 +451,7 @@ def _sources(socket):
 
 def _expr(node, stack=()):
     """Árvore de expressão: ('S', trigger) | ('AND'|'OR', [filhos]) | ('NOT', filho) | None."""
-    if node is None or node in stack:
+    if node is None or node in stack or node.mute:  # nó mutado (M) corta o caminho
         return None
     if isinstance(node, TriggerNode) or (isinstance(node, ActionNode) and node.has_then):
         return ('S', node)  # ação na folha = sua saída Then
@@ -510,7 +554,7 @@ def plan(tree):
     Ações no mesmo frame com a mesma expressão dividem um controller."""
     rules, errors = {}, []
     for node in tree.nodes:
-        if not isinstance(node, ActionNode):
+        if not isinstance(node, ActionNode) or node.mute:
             continue
         if node.error():
             errors.append("%s: %s" % (_label(node), node.error()))
@@ -635,6 +679,9 @@ def compile_object(ob, scene=None):
     tree = ob.logic_tree
     if tree is None or tree.bl_idname != TREE_ID:
         return []
+    for node in tree.nodes:  # árvores antigas ganham as cores dos conjuntos
+        if isinstance(node, LogicNode):
+            node.paint()
     rules, errors = plan(tree)
     game = ob.game
     group = "Tree: " + tree.name
@@ -814,7 +861,6 @@ def compile_object(ob, scene=None):
 
 TRACE_MODULE = "range_logic_trace"
 TRACE_FILE = "range_logic_trace.json"
-FIRED_COLOR = (0.2, 0.5, 0.25)
 TRACE_SOURCE = '''# Gerado pela Logic Tree (Debug Mode): ao fim do jogo grava quantas vezes cada brick
 # disparou (fireCount) para o editor destacar os nós.  Pode apagar; volta ao compilar.
 import json, os, tempfile
@@ -871,9 +917,8 @@ def clear_highlight(tree=None):
         for node in t.nodes:
             if "range_logic_fired" in node:
                 del node["range_logic_fired"]
-                node.use_custom_color = False
-                if isinstance(node, BrickNode):
-                    node.update()  # devolve o vermelho de erro, se houver
+                if isinstance(node, LogicNode):
+                    node.paint()  # volta à cor do conjunto (ou ao vermelho de erro)
 
 
 def apply_trace(path=None):
@@ -904,7 +949,7 @@ def apply_trace(path=None):
         tree = bpy.data.node_groups[tree_name]
         for name in names:
             node = tree.nodes[name]
-            node.use_custom_color, node.color = True, FIRED_COLOR
+            node.paint()
     return {k: sorted(v) for k, v in fired.items()}
 
 
@@ -1039,8 +1084,13 @@ def _draw_live():
 
 
 def _node_header(self, context):
+    if context.space_data.tree_type != TREE_ID:
+        return
+    # objeto + New/Compile/Import também aqui: sem árvore o painel N nem aparece
+    self.layout.separator()
+    _draw_object_field(self.layout, context)
     tree = getattr(context.space_data, "edit_tree", None)
-    if tree is not None and tree.bl_idname == TREE_ID:
+    if tree is not None:
         self.layout.prop(tree, "show_highlight_active", text="Highlight Active", icon='LIGHTPAINT')
 
 
@@ -1386,6 +1436,7 @@ def import_bricks(ob, tree=None, remove=True):
     def make(cls, brick):
         node = tree.nodes.new(cls.bl_idname)
         node.label = brick.name
+        node.mute = not brick.active  # brick desligado no checkbox vira nó desligado
         for f in node.fields():
             try:
                 v = getattr(brick, f)
@@ -1418,13 +1469,15 @@ def import_bricks(ob, tree=None, remove=True):
         if c.type == 'PYTHON':
             py = tree.nodes.new(RunPythonNode.bl_idname)
             py.label, py.module, py.use_debug = c.name, c.module, c.use_debug
+            py.mute = not c.active
             place(py, st, 2)
             for o in outs:
                 tree.links.new(o, py.inputs[0])
             continue
         gate_id, negate = GATE_OF[c.type]
         src = outs[0]
-        if len(outs) > 1:
+        # controller desligado: precisa de uma porta (mutada) para guardar o "desligado"
+        if len(outs) > 1 or (not c.active and not negate):
             # a porta tem 3 entradas: com mais sensores, a próxima porta recebe a anterior + 2
             pending = list(outs)
             src = None
@@ -1437,11 +1490,13 @@ def import_bricks(ob, tree=None, remove=True):
                 for sock, o in zip(gate.inputs, take):
                     tree.links.new(o, sock)
                 src = gate.outputs[0]
+            gate.mute = not c.active
         if negate:
             n = tree.nodes.new("RangeLogicNot")
             place(n, st, 1)
             tree.links.new(src, n.inputs[0])
             src = n.outputs[0]
+            n.mute = not c.active
         for a in acts:
             key = ("actuator", a.name, st)
             if key not in made:
@@ -1466,7 +1521,7 @@ def import_bricks(ob, tree=None, remove=True):
 class RANGE_OT_logic_tree_import(Operator):
     """Turn the logic bricks of the active object into Logic Tree nodes (the ones without a node stay as bricks)"""
     bl_idname = "logic.range_logic_tree_import"
-    bl_label = "Import Bricks"
+    bl_label = "Convert to Nodes"
     bl_options = {'REGISTER', 'UNDO'}
 
     @classmethod
@@ -1542,6 +1597,13 @@ def _draw_object_field(layout, context):
         row.operator(RANGE_OT_logic_tree_new.bl_idname, text="", icon="ZOOMIN")
     else:
         row.operator(RANGE_OT_logic_tree_compile.bl_idname, text="", icon="FILE_REFRESH")
+    if _has_user_bricks(ob):
+        row.operator(RANGE_OT_logic_tree_import.bl_idname, text="Convert to Nodes", icon="NODETREE")
+
+
+def _has_user_bricks(ob):
+    mine = set(_record(ob).get("controllers", ()))
+    return ob.library is None and any(c.name not in mine for c in ob.game.controllers)
 
 
 class NODE_PT_range_logic_tree(Panel):
@@ -1557,36 +1619,45 @@ class NODE_PT_range_logic_tree(Panel):
     def draw(self, context):
         layout = self.layout
         tree = context.space_data.edit_tree
-        layout.operator(RANGE_OT_logic_tree_compile.bl_idname, icon="FILE_REFRESH")
+
+        # árvore: compilar e quem usa
+        box = layout.box()
+        box.operator(RANGE_OT_logic_tree_compile.bl_idname, icon="FILE_REFRESH")
         users = [ob.name for ob in bpy.data.objects if ob.logic_tree == tree]
-        layout.label("Objetos: %s" % (", ".join(users) if users else "nenhum"))
-        if context.object is not None:
-            layout.label("Objeto ativo:")
-            _draw_object_field(layout, context)
-            if any(c.name not in _record(context.object).get("controllers", ())
-                   for c in context.object.game.controllers):
-                layout.operator(RANGE_OT_logic_tree_import.bl_idname, icon="IMPORT")
-        node = tree.nodes.active
+        box.label("Objects: %s" % (", ".join(users) if users else "none"), icon="OBJECT_DATA")
         if any("range_logic_fired" in n for n in tree.nodes):
-            row = layout.row()
-            row.label("Verde: disparou no último jogo", icon="INFO")
+            row = box.row()
+            row.label("Green: fired in the last game", icon="INFO")
             row.operator(RANGE_OT_logic_tree_clear_highlight.bl_idname, text="", icon="X")
-        if isinstance(node, BrickNode):
+
+        # objeto ativo: qual árvore usa, Convert to Nodes
+        if context.object is not None:
             box = layout.box()
-            if "range_logic_fired" in node:
-                box.label("Disparou %d vez(es) no último jogo" % node["range_logic_fired"])
-            box.prop(node, "range_logic_break")
-            if node.range_logic_break and not context.scene.game_settings.show_debug_mode:
-                box.label("Ligue o Debug Mode da cena", icon="INFO")
-            ob = context.object
-            if ob is not None and ob.logic_tree == tree:
-                made = bricks_of_node(ob, node)
-                box.label("Bricks em %s:" % ob.name if made else "Ainda não compilado em %s" % ob.name)
-                if not made:
-                    box.label("(nó renomeado? aperte Compile)")
-                for kind, name in made:
-                    icon = {"sensor": "TRIA_RIGHT", "controller": "DOT"}.get(kind, "TRIA_LEFT")
-                    box.label(name, icon=icon)
+            box.label("Active Object: %s" % context.object.name, icon="OBJECT_DATAMODE")
+            _draw_object_field(box, context)
+
+        node = tree.nodes.active
+        if isinstance(node, LogicNode):
+            box = layout.box()
+            row = box.row()
+            row.label(_label(node), icon="NODE")
+            row.prop(node, "range_logic_active")
+            if isinstance(node, BrickNode):
+                if "range_logic_fired" in node:
+                    box.label("Fired %d time(s) in the last game" % node["range_logic_fired"])
+                box.prop(node, "range_logic_break")
+                if node.range_logic_break and not context.scene.game_settings.show_debug_mode:
+                    box.label("Turn on the scene Debug Mode", icon="INFO")
+                ob = context.object
+                if ob is not None and ob.logic_tree == tree:
+                    made = bricks_of_node(ob, node)
+                    sub = box.box()
+                    sub.label("Bricks in %s:" % ob.name if made else "Not compiled in %s yet" % ob.name)
+                    if not made:
+                        sub.label("(renamed node? press Compile)")
+                    for kind, name in made:
+                        icon = {"sensor": "TRIA_RIGHT", "controller": "DOT"}.get(kind, "TRIA_LEFT")
+                        sub.label(name, icon=icon)
         if node is not None and node.bl_idname == "NodeFrame":
             box = layout.box()
             box.prop(node, "range_logic_state")
@@ -1594,8 +1665,10 @@ class NODE_PT_range_logic_tree(Panel):
                 box.prop(node, "label", text="Name")
                 box.prop(node, "range_logic_initial")
         _rules, errors = plan(tree)
-        for err in errors:
-            layout.label(err, icon="ERROR")
+        if errors:
+            box = layout.box()
+            for err in errors:
+                box.label(err, icon="ERROR")
 
 
 def _logic_header(self, context):

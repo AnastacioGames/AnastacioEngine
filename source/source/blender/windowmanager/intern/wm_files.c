@@ -320,6 +320,10 @@ static void wm_init_userdef(Main *bmain, const bool read_userdef_from_memory)
 	/* versioning is here */
 	UI_init_userdef();
 
+	/* abas com ícone em faixa horizontal: sempre ligadas ao abrir a engine
+	 * (dá para desligar na sessão pelo botão do cabeçalho dos nós) */
+	U.uiflag2 |= USER_HORIZONTAL_TABS;
+
 	/* avoid re-saving for every small change to our prefs, allow overrides */
 	if (read_userdef_from_memory) {
 		BLO_update_defaults_userpref_blend();
