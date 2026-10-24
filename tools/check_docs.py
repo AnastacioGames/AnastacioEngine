@@ -33,6 +33,7 @@ REFS_EXTERNAS = {'docs/web-audio-analysis.md'}
 CODE_MAPS = {
     'docs/code-map-gameengine.md': None,
     'docs/code-map-kx-gameobject.md': 'Ketsji/KX_GameObject.cpp',
+    'docs/code-map-gpu.md': None,
 }
 EXTS_CODIGO = 'cpp|cc|c|h|hpp|py|glsl|cjs|js|cmake'
 
@@ -118,14 +119,20 @@ def conferir_arq_linha(doc, linhas, rel, por_nome, existentes, cache):
                 rel.erro(doc, n, f'{nome}:{num} passa do fim do arquivo ({maior} linhas)')
 
 
+def fonte_do_mapa(caminho):
+    """Caminhos de mapa sao relativos a gameengine/, ou a raiz quando comecam com source/."""
+    return ler(caminho if caminho.startswith('source/') else GAMEENGINE + caminho).split('\n')
+
+
 def inicios_de_metodo(fonte, nome):
-    padrao = re.compile(r'::' + nome + r'\s*\(')
+    # `Classe::Metodo(` em C++ ou `funcao(` no inicio da linha em C/GLSL.
+    padrao = re.compile(r'(?:::|\b)' + nome + r'\s*\(')
     return [i + 1 for i, l in enumerate(fonte) if not l.startswith((' ', '\t')) and padrao.search(l)]
 
 
 def conferir_mapa(doc, arquivo_padrao, rel, fix, por_nome, existentes):
     linhas = ler(doc).split('\n')
-    fonte = ler(GAMEENGINE + arquivo_padrao).split('\n') if arquivo_padrao else None
+    fonte = fonte_do_mapa(arquivo_padrao) if arquivo_padrao else None
     ajustes = 0
 
     def formatar(num):
@@ -135,7 +142,7 @@ def conferir_mapa(doc, arquivo_padrao, rel, fix, por_nome, existentes):
         n = i + 1
         cab = re.match(r'## `([^`]+)` \(', linha)
         if cab:
-            fonte = ler(GAMEENGINE + cab.group(1)).split('\n')
+            fonte = fonte_do_mapa(cab.group(1))
 
         def tamanho(m):
             nonlocal ajustes

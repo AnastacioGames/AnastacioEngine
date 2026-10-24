@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-10-23 (`HEAD` `1e03e987`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-10-23 (`HEAD` `6960d5e7`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -37,12 +37,12 @@ Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings
 | Partículas GPU | `UpdateGpuParticleEmitters` 2980, listas de emissores/colisores 2219–2250 |
 | Sombras (listas) | casters estáticos/dinâmicos e flag "dirty" 2255–2298 |
 | Física e rede | `Get/SetPhysicsEnvironment` 2339–2344, gravidade 2353–2358, `Get/SetNetworkMessageScene` 2329–2334, `Get/SetSuspendedDelta` 2363–2368 |
-| Merge de cenas | `MergeScene_LogicBrick` 2378, `MergeScene_GameObject` 2401, `MergeScene` 3465 |
+| Merge de cenas | `MergeScene_LogicBrick` 3367, `MergeScene_GameObject` 3390, `MergeScene` 3465 |
 | Iluminação (flag) | `Get/SetUseLightScatter` 2582–2587 |
 | Cutscene e Trace Rail (em `Ketsji/KX_SceneCutscene.cpp`, 901 linhas) | `SetCutsceneManager` 153, `StopCutscene` 164, `RestartCutscene` 174, `UpdateCutscene` 185, `StartTraceRail` 241, `StartTraceRailOrigin` 295, `UpdateTraceRail` 361, `UpdateCutscenePaths` 467, `TakePendingCutsceneEvents` 518, `DispatchCutsceneEvents` 574 (~300 linhas), `ClearCutsceneSpawnedObjects` 877, `GetCutsceneManager` 893 |
 | Busca e texto (`static`, em `KX_SceneCutscene.cpp`) | `FindObjectWithComponent` 526, `FindGameObject` 548, `GetLocalizedText` 566 |
 | Callbacks de Python | `RunDrawingCallbacks` 3679, `RunOnRemoveCallbacks` 3695 |
-| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 3711 |
+| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 4543 |
 
 Observações: `DispatchCutsceneEvents` e `AddReplicaObject` são as funções mais longas; a remoção de objetos tem
 cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`, `NewRemoveObject`,
@@ -61,22 +61,22 @@ não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específic
 | Utilitários do módulo `Range` (funções globais `gPy*`) | aleatório/gravidade/caminho 214–243, `gPyStartGame`/`EndGame`/`RestartGame` 261–289, `SaveGlobalDict`/`LoadGlobalDict` 300–318, `GetProfileInfo` 336, `SendMessage` 349, `GetSpectrum` 372 |
 | Taxas e relógio | tic rate, render rate, animation rate, exit key, max frames, clock/time scale 384–602 |
 | Lista de arquivos e cenas | `.blend`/`.range`/`.rasec` 607–660, `AddScene`/`GetCurrentScene`/`GetSceneList` 671–707 |
-| Informação de sistema | `pyPrintStats` 716, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 798 |
-| Bibliotecas externas | `gLibLoad` 817, `gLibNew` 896, `gLibFree` 950, `gLibList` 966, `gPyNextFrame` 979 |
+| Informação de sistema | `pyPrintStats` 837, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 919 |
+| Bibliotecas externas | `gLibLoad` 938, `gLibNew` 1157, `gLibFree` 1211, `gLibList` 1227, `gPyNextFrame` 1253 |
 | Tabela `game_methods[]` | 997 |
-| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1063–1257 |
-| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1463, janela/fullscreen 1507–1524 |
+| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1388–1582 |
+| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1893, janela/fullscreen 1507–1524 |
 | Áudio e debug na tela | `MasterVolume` 1585–1597, `ShowFramerate`/`ShowProfile`/`ShowProperties`/`AutoDebugList` 1606–1650, `GetDisplayDimensions` 1660 |
 | Tabela `rasterizer_methods[]` | 1679 |
-| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 1760 (~430 linhas, constantes de tipos/estados) |
-| Ambiente `sys` e caminhos | `backupPySysObjects` 2186 … `restorePySysObjects` 2261, `appendPythonPath` 2289, `addImportMain`/`removeImportMain` 2295–2300 |
-| Módulo `Range` e compatibilidade | `addSubModule` 2322, `initRANGE` 2330, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2365, `installLegacyAudFactoryAlias` 2419 (alias `bge`/`aud`) |
-| Init/saída do Python | `initPlayerPython` 2467, `exitPlayerPython` 2504, console 2528–2595, `initGamePython` 2595, `exitGamePython` 2636 |
-| Console e joystick | `createPythonConsole` 2655, `getPythonJoystick` 2667, `updatePythonJoysticks` 2672 |
-| Módulo `Rasterizer` | `initRasterizerPythonBinding` 2713 |
-| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 2842 (~190 linhas de constantes) |
-| Módulo `Application` | `initApplicationPythonBinding` 3037 |
-| Config persistente do jogo | `saveGamePythonConfig` 3099, `loadGamePythonConfig` 3178, `pathGamePythonConfig` 3241 (contém código Web/IDBFS) |
+| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2262 (~430 linhas, constantes de tipos/estados) |
+| Ambiente `sys` e caminhos | `backupPySysObjects` 2692 … `restorePySysObjects` 2767, `appendPythonPath` 2795, `addImportMain`/`removeImportMain` 2806–2811 |
+| Módulo `Range` e compatibilidade | `addSubModule` 2828, `initRANGE` 2836, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2874, `installLegacyAudFactoryAlias` 2928 (alias `bge`/`aud`) |
+| Init/saída do Python | `initPlayerPython` 2976, `exitPlayerPython` 3016, console 2528–2595, `initGamePython` 3107, `exitGamePython` 3201 |
+| Console e joystick | `createPythonConsole` 3223, `getPythonJoystick` 3235, `updatePythonJoysticks` 3240 |
+| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3281 |
+| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3415 (~190 linhas de constantes) |
+| Módulo `Application` | `initApplicationPythonBinding` 3610 |
+| Config persistente do jogo | `saveGamePythonConfig` 3672, `loadGamePythonConfig` 3751, `pathGamePythonConfig` 3828 (contém código Web/IDBFS) |
 
 Observação: `initPlayerPython` (editor não usa) é o caminho do standalone; o editor entra por `BPY_python_start`.
 
@@ -96,12 +96,12 @@ ambiente; o callback de subtick é registrado no construtor com `this`.
 | Simulação (passo) | `DebugDrawWorld` 1052, subticks 980–987, `ProceedDeltaTime` 1075, `ProceedDeltaTimeCar` 1152, `ProcessFhSprings` 1236 |
 | Parâmetros do mundo | `SetDebugMode`… `SetSolverType` 1518–1668 (iterações, erp/cfm, sleeping, slop, ccd), `Get/SetGravity` 1447–1452, `WakeAllBodies` 1566 |
 | Constraints (consulta) | `RemoveConstraintById` 1579, `GetConstraintById` 2587 |
-| Raycast e consulta de esfera | `GetHitTriangle` 1544, `RayTest` 1692, `SphereQuery` 2404 (broadphase `aabbTest`, usado pelo `scene.explode()`) |
+| Raycast e consulta de esfera | `GetHitTriangle` 1651, `RayTest` 1692, `SphereQuery` 2404 (broadphase `aabbTest`, usado pelo `scene.explode()`) |
 | **Oclusão em software (não é física)** | `struct OcclusionBuffer` 1740 (~520 linhas, rasterizador de oclusão), `DbvtCullingCallback` 2262, `CullingTest` 2473 |
 | Contatos e broadphase | `GetNumContactPoints` 2501, `GetBroadphase`/`GetDispatcher` 2515–2520 |
 | Sensores e callbacks de colisão | `AddSensor` 2605, `Add/RemoveCollisionCallback` 2460–2471, `CallbackTriggers` 2634, `CheckCollision` 2684, `needBroadphaseCollision` 2724 |
 | Veículos e personagem | `GetVehicleConstraint`/`GetNumVehicles`/`GetVehicleFromIndex` 2787–2807, `GetCharacterController` 2795, `CreateVehicle` 3139, `DestroyVehicle` 3164 |
-| Criação de shapes | `CreateSphereController` 2802, `CreateConeController` 3173, `Ccd_FindClosestNode` 2675 |
+| Criação de shapes | `CreateSphereController` 2802, `CreateConeController` 3173, `Ccd_FindClosestNode` 2829 |
 | Constraints (criação) | `CreateConstraint` 2846 (~290 linhas) |
 | Exportação e fábrica | `getAppliedImpulse` 3106, `ExportFile` 3220, `Create` 3284 |
 | Conversão de objeto | `ConvertObject` 3309 (~530 linhas), `SetupObjectConstraints` 3921 |
@@ -123,7 +123,7 @@ Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdP
 | Constraints (referências) | `add/remove/getCcdConstraintRef` 236–254 |
 | Motion state e transformação | `GetTransformFromMotionState` 614, `SetCenterOfMassOffset` 676, `SimulationTick` 1171, `SynchronizeMotionStates` 1208, `Write*ToDynamics/MotionState` 849–855, `SetTransform`, posição/orientação/escala 936–1185, `DefaultMotionState` 2739–2785 |
 | Criação de corpos | `CreateSoftbody` 719 (~200 linhas), `CreateCharacterController` 956, `CreateRigidbody` 983 |
-| Shapes | `DeleteBulletShape` 654, `DeleteControllerShape` 1071, `ReplaceControllerShape` 1092, `ReinstancePhysicsShape` 2687, `ReplacePhysicsShape` 2712, `CreateBulletShape` 3015 (~160 linhas), `AddShape` 3243, `UpdateMesh` 2821 (~170 linhas), `FindMesh` 2785 |
+| Shapes | `DeleteBulletShape` 1055, `DeleteControllerShape` 1071, `ReplaceControllerShape` 1092, `ReinstancePhysicsShape` 2687, `ReplacePhysicsShape` 2712, `CreateBulletShape` 3015 (~160 linhas), `AddShape` 3243, `UpdateMesh` 2821 (~170 linhas), `FindMesh` 2785 |
 | Compound | `AddCompoundChild` 2498, `RemoveCompoundChild` 2575 |
 | Suspensão | `SuspendPhysics`/`RestorePhysics` 1554–1559, `SuspendDynamics`/`RestoreDynamics` 1645–1668, `IsPhysicsSuspended` 2672 |
 | Massa, atrito, forças, velocidades | 1185–1421 e 1791–1840 |
@@ -140,18 +140,18 @@ Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConve
 
 | Domínio | Funções (linha inicial) |
 |---|---|
-| Utilitários | `BL_ConvertKeyCode` 403, `BL_GetUvRgba` 408 |
-| Materiais e malhas | `BL_ConvertMaterial` 448, `BL_ConvertMesh` 474, `BL_ComputeVertexBoneData` 577, `BL_ConvertDerivedMeshToArray` 625 |
-| Deformers e ações | `BL_ConvertDeformer` 751, `BL_ConvertAction(s)` 834–843 |
-| Física e gráfico | `BL_CreateGraphicObjectNew` 851, `BL_CreatePhysicsObjectNew` 879 |
-| LOD, animação, culling | `BL_LodManagerFromBlenderObject` 928, `BL_AnimationEventManagerFromBlenderObject` 944, `activityCullingInfoFromBlenderObject` 958 |
-| Luz, câmera, speaker | `BL_GameLightFromBlenderLamp` 991, `BL_GameCameraFromBlenderCamera` 1055, `BL_SpeakerFromBlenderSpeaker` 1097 |
-| Objeto de jogo | `BL_GameObjectFromBlenderObject` 1194 (~180 linhas) |
-| Pose, constraints, fundo | `BL_GetActivePoseChannel` 1378, `BL_GetActiveConstraint` 1393, `BL_SetBlenderSceneBackground` 1416 |
-| Componentes e cutscene | `BL_ConvertComponentsObject` 1427, `BL_ConvertCutscene` 1594 |
-| Conversão de objeto único | `bl_ConvertBlenderObject_Single` 1512 |
-| **Passagem principal** | `BL_ConvertBlenderObjects` 1634–2333 (**uma função de ~700 linhas** que converte os objetos da cena) |
-| Pós-conversão e cursor | `BL_PostConvertBlenderObjects` 2333, `BL_ConvertCustomMouseCursor` 2415 |
+| Utilitários | `BL_ConvertKeyCode` 451, `BL_GetUvRgba` 456 |
+| Materiais e malhas | `BL_ConvertMaterial` 496, `BL_ConvertMesh` 631, `BL_ComputeVertexBoneData` 793, `BL_ConvertDerivedMeshToArray` 1154 |
+| Deformers e ações | `BL_ConvertDeformer` 1710, `BL_ConvertAction(s)` 834–843 |
+| Física e gráfico | `BL_CreateGraphicObjectNew` 1835, `BL_CreatePhysicsObjectNew` 1863 |
+| LOD, animação, culling | `BL_LodManagerFromBlenderObject` 1912, `BL_AnimationEventManagerFromBlenderObject` 1928, `activityCullingInfoFromBlenderObject` 1942 |
+| Luz, câmera, speaker | `BL_GameLightFromBlenderLamp` 1975, `BL_GameCameraFromBlenderCamera` 2045, `BL_SpeakerFromBlenderSpeaker` 2126 |
+| Objeto de jogo | `BL_GameObjectFromBlenderObject` 2223 (~180 linhas) |
+| Pose, constraints, fundo | `BL_GetActivePoseChannel` 2421, `BL_GetActiveConstraint` 2436, `BL_SetBlenderSceneBackground` 2459 |
+| Componentes e cutscene | `BL_ConvertComponentsObject` 2470, `BL_ConvertCutscene` 2693 |
+| Conversão de objeto único | `bl_ConvertBlenderObject_Single` 2555 |
+| **Passagem principal** | `BL_ConvertBlenderObjects` 2762–3461 (**uma função de ~700 linhas** que converte os objetos da cena) |
+| Pós-conversão e cursor | `BL_PostConvertBlenderObjects` 3722, `BL_ConvertCustomMouseCursor` 3917 |
 
 Observação: `BL_ConvertBlenderObjects` concentra a conversão numa só função; mudanças aqui exigem ler o
 trecho inteiro, não só um método.

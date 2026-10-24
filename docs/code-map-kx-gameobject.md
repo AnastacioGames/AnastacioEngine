@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade de
 [`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp) (7.135 linhas) sem ler o
 arquivo inteiro. Não descreve arquitetura nem decisões; é só um índice.
 
-**Linhas conferidas em 2026-10-23 (`HEAD` `7da651a1`).** Números de linha são aproximados e envelhecem a cada
+**Linhas conferidas em 2026-10-23 (`HEAD` `6960d5e7`).** Números de linha são aproximados e envelhecem a cada
 edição: use-os como ponto de partida e confirme com `grep -n "KX_GameObject::NomeDoMetodo"`. Se o arquivo
 for dividido, este mapa deve
 ser refeito.
@@ -32,11 +32,11 @@ Os métodos de um mesmo domínio **não são contíguos**: por exemplo, animaç�
 | Física: forças e velocidades | `ApplyForce/Torque/Movement/Rotation` 1166–1189, `Add/SetLinearVelocity`, `SetAngularVelocity` 1961–1976, `GetMass`…`GetVelocity` 2152–2219, `SuspendPhysics`/`RestorePhysics` 2442–2449 |
 | Malhas e renderização | `UpdateBlenderObjectMatrix` 1358, `AddMeshUser` 1369, `UpdateBuckets` 1421, `ReplaceMesh` 1444, `RemoveMeshes` 1474, `GetMeshList` 1491, `Renderable` 1501, cor 1686–1691, `Get/SetPassIndex` 1654–1659, `Get/SetLayer` 1644–1649 |
 | LOD | `Set/GetLodManager` 1291–1313, `UpdateLod` 1549, `GetVisibleLOD`/`UpdateVisibleLOD` 1808–1813 |
-| Visibilidade e depuração | `GetVisible`/`SetVisible` 1845/1563, `SetOccluder` 1873, `SetUseDebugProperties` 1908, helpers `static` `setVisible_recursive` 1546, `setOccluder_recursive` 1575, `setDebug_recursive` 1603 |
+| Visibilidade e depuração | `GetVisible`/`SetVisible` 1845/1563, `SetOccluder` 1873, `SetUseDebugProperties` 1908, helpers `static` `setVisible_recursive` 1828, `setOccluder_recursive` 1857, `setDebug_recursive` 1885 |
 | Atividade e culling | `UpdateActivity` 1685, `Get/SetActivityCullingInfo` 2092–2097, `SetActivityCulling` 2395, `UpdateBounds` 2333, `Get/SetBoundsAabb` 2070–2081, `GetCullingNode` 2380 |
 | SceneGraph e transformação | `UpdateTransform`/`SynchronizeTransform` 1763–1792, `AlignAxisToVect` 1978, `NodeSet*`/`NodeGet*` 1878–2015, `SetNode` 2328 |
 | Componentes Python | `SetComponents` 2649, `UpdateComponents` 2654 (runtime; ficam no núcleo apesar do `#ifdef WITH_PYTHON`) |
-| Helpers `static` do núcleo | `setGraphicController_recursive` 823, `walk_children`/`walk_parent` 2224–2246 (servem a `GetChildren*`) |
+| Helpers `static` do núcleo | `setGraphicController_recursive` 981, `walk_children`/`walk_parent` 2608–2630 (servem a `GetChildren*`) |
 
 ## Bindings Python (linhas 2363–5979)
 
