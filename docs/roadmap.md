@@ -15,6 +15,10 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
 
 ## GT2: direcao e extracao do original
 
+Garagem: usuario confirmou altura funcionando. Salto ao editar molas ou
+amortecedores instalado e validado no player; falta avaliar visualmente o
+movimento. artifacts/gt2-garage-bounce/README.md.
+
 Suspensao e rodas: 1.001 cenas com compensacao antiga de COM corrigidas;
 1.110 carros reabertos e 4.440 pontos conferidos com disco. Elevacao global
 +6 cm e ajustes no menu passaram no player (DB6, 5.9999 cm medidos). Falta

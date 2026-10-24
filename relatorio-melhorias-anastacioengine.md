@@ -6,6 +6,10 @@ Este documento registra o estado técnico vigente da engine. O trabalho ainda ab
 
 ## Contexto
 
+GT2, garagem: editar molas/amortecedores provoca pequeno salto fisico apos
+0.2 s sem edicoes, sem acumular impulsos; subida/queda/repouso validados no
+player. Usuario confirmou altura no menu. artifacts/gt2-garage-bounce/README.md.
+
 GT2, suspensao e rodas: aumento global de 6 cm sobre o ajuste anterior,
 configuracao salva aplicada na selecao e mudancas ao vivo acordam o chassi.
 1.001 cenas corrigidas retirando compensacao antiga de COM; 1.110 carros e

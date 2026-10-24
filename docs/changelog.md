@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-23 - GT2: salto para avaliar suspensao na garagem
+
+- Alterar Molas/Amortecedores dispara salto fisico de 1.1 m/s apos 0.2 s sem
+  edicoes, sem acumular impulsos. Usa a suspensao configurada para cair e assentar;
+  outros ajustes nao disparam. Scripts do jogo/importador sincronizados com backup.
+- Player: controles dos dois campos acionados, dois saltos, subida/queda e
+  repouso conferidos, exit 0. Usuario confirmou altura funcionando no menu.
+  Evidencias: artifacts/gt2-garage-bounce/README.md; visual do salto pendente.
+
 ## 2026-10-23 - GT2: rodas alinhadas e suspensao no menu
 
 - 1.110 carros / 4.440 rodas auditados contra o disco; 1.001 cenas corrigidas
