@@ -84,3 +84,7 @@ debug-logs/
 *.cooked
 docs/*.blend1
 .ccache-linux/
+
+# Evidencias locais e backups .range1 da engine
+artifacts/
+*.range1
