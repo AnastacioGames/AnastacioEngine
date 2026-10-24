@@ -2529,8 +2529,15 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 	if (p.x > p.y) return vec3(0,0,0);
 	p.x = max(p.x, 0.0); // the camera is inside the atmosphere: start at the camera, not behind it
 	vec2 pg = rsi(r0, r, rPlanet);
-	if (pg.x <= pg.y && pg.x > 0.0) p.y = min(p.y, pg.x); // stop at the ground only when the ray hits it
-	float iStepSize = (p.y - p.x) / iSteps;
+	float nSteps = iSteps;
+	if (pg.x <= pg.y && pg.x > 0.0) {
+		p.y = min(p.y, pg.x); // stop at the ground only when the ray hits it
+#ifdef SKY_LOW
+		// abaixo do horizonte o trecho ate o chao e curto e quase uniforme: 2 passos bastam
+		nSteps = min(iSteps, 2.0);
+#endif
+	}
+	float iStepSize = (p.y - p.x) / nSteps;
 	float iTime = p.x;
 
 	// Initialize accumulators for Rayleigh and Mie scattering.
@@ -2547,6 +2554,7 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 
 	// Sample the primary ray.
 	for (int i = 0; i < int(iSteps); i++) {
+		if (float(i) >= nSteps) break;
 		// Calculate the primary ray sample position.
 		vec3 iPos = r0 + r * (iTime + iStepSize * 0.5);
 
