@@ -19,7 +19,7 @@ não deu para testar.
 | DNA | `DNA_scene_types.h` (`RangeNetworkSettings` em `GameData.network`), `DNA_object_types.h` (`RangeNetObjectSettings` em `Object.net`), `DNA_property_types.h` (`PROP_REPLICATED`) |
 | Defaults, versioning | `BKE_scene_network_defaults`, `BKE_object_net_defaults`, `BKE_object_net_id_generate`; bloco `GameData.network` em `versioning_range.c` |
 | RNA | `rna_scene.c` (`game_settings.network`), `rna_object.c` (`object.game.network`), `rna_property.c` (`GameProperty.use_replicate`) |
-| Painéis | `properties_game.py`: `SCENE_PT_game_network`, `OBJECT_PT_game_network`, botão "Rep" em Game Properties |
+| Painéis | `properties_game_scene.py`: `SCENE_PT_game_network`; `properties_game_object.py`: `OBJECT_PT_game_network`, botão "Rep" em Game Properties |
 | CMake | `gameengine/CMakeLists.txt` (`add_subdirectory(Network)`), `Ketsji/CMakeLists.txt` (`ge_network` na LIB), `blenderplayer/CMakeLists.txt` (`ge_network extern_enet`) |
 | Teste | `tools/net_engine_test/` (dois `RangeRuntime`, servidor + cliente) |
 | Input, predição, lag compensation | `Ketsji/KX_NetworkManager.*` (`ClientPredict`, `ServerStepPredicted`, `RecordHitboxes`, `RaycastPast`), `Ketsji/KX_PyNetwork.cpp` (`predict`, `set_input`, `raycast_past`...) |

@@ -20,7 +20,9 @@
    (ex.: `MA_SKINNING` em `shade_flag`, `ARM_VDEF_BGE_GPU`).
 2. `source/blender/makesrna/intern/rna_material.c` / `rna_armature.c` / `rna_object.c` — registra a
    propriedade RNA (ex.: `use_gpu_skinning`).
-3. Painel Python da UI (`properties_material.py`, `properties_game.py`) **— e qualquer addon/panel próprio
+3. Painel Python da UI (`properties_material.py`, `properties_game_<aba>.py` — os painéis Game ficam
+   divididos por aba: `object`, `physics`, `render`, `scene`, `world`, `light`; a ordem de registro
+   continua na tupla `classes` de `properties_game.py`, onde toda classe nova precisa entrar) **— e qualquer addon/panel próprio
    que sobrescreva o painel stock** (ex.: `Range_Components_Label/custom_pt_physics.py` sombreia
    `properties_game.py` — se existir um panel customizado equivalente, editar os dois).
 4. Consumo em `BL_BlenderDataConversion.cpp` — lê a flag na conversão de cena (ex.: `SetOccluder()`,

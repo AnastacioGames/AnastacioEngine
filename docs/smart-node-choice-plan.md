@@ -16,7 +16,7 @@ Revisão do Codex (aceita):
   `PythonComponentProperty`; Choice/Object/Scene são tratados em `create_properties`.
 - Object/Scene num shader exigem definir comportamento (posição? transform? atualiza no jogo?) e uma ponte
   CPU→GPU. Fora do escopo inicial.
-- A UI do Component fica em `source/release/scripts/startup/bl_ui/properties_game.py:143` (via RNA), não em
+- A UI do Component fica em `source/release/scripts/startup/bl_ui/properties_game_object.py:146` (via RNA), não em
   `buttons_object.c`.
 
 ## Decisão

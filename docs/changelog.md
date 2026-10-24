@@ -8,6 +8,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-23 - Build Windows, ctest e divisão do properties_game.py
+
+- Windows: editor e player compilados após as mudanças só testadas no Linux. O install falhava
+  procurando `debugmode_configfile/imgui.ini`; era `cmake_install` desatualizado, resolvido com `cmake .`.
+- `ctest` no Windows: 14/15; `script_load_modules` caía em `range_ui_runtime` (só de jogo, importa
+  `Range`). Adicionado à lista de exclusão (`de08a965`); 15/15.
+- `bl_ui/properties_game.py` (3.365 linhas) dividido em `properties_game_object/physics/render/scene/world/light.py`.
+  O arquivo original reexporta tudo e mantém a tupla `classes`: ordem de registro e imports do flowmenu
+  idênticos. Conferido no editor em background (mesmas 1.006 classes registradas, mesma ordem de `classes`),
+  pyflakes sem nome novo indefinido e `ctest` 15/15. Falta aceite visual da aba Game.
+
 ## 2026-10-23 - GT2: retomada e auditoria dos seletores de efeitos
 
 - Relida a retomada e conferidos os resultados anteriores da sombra: 126 pistas
