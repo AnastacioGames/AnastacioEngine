@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-24 - Logic Tree: Color desligado pelo usuário é respeitado
+
+- `LogicNode.paint()` religava a cor do conjunto a cada compilação mesmo com Color desligado no nó. Agora o
+  nó guarda `range_logic_painted`; desligado com a nossa cor ainda no campo = escolha do usuário. Teste em
+  background (4 casos) e `f6`/`f7` sem falhas.
+
 ## 2026-10-24 - Range Trace: módulos scripts e runtime no relatório e no launcher
 
 - A engine já gravava `scripts`, `memory`, `sound`, `scene_add` e `scene_remove` (`09b397e2`), mas o

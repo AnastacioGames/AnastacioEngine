@@ -103,9 +103,13 @@ class LogicNode:
         """Disparou > erro > cor do conjunto.  Cor escolhida pelo usuário fica."""
         if self.use_custom_color and not _is_ours(self.color):
             return
+        # Pintado por nós antes e agora com Color desligado: foi o usuário, não ligar de novo.
+        if self.get("range_logic_painted") and not self.use_custom_color and _is_ours(self.color):
+            return
         err = isinstance(self, BrickNode) and self.error()
         color = FIRED_COLOR if "range_logic_fired" in self else ERROR_COLOR if err else self.base_color
         self.use_custom_color = color is not None
+        self["range_logic_painted"] = color is not None
         if color is not None:
             self.color = color
 

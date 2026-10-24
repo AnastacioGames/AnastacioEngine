@@ -376,6 +376,5 @@ Testado em background e no runtime; Convert to Nodes visto com janela. Cores, Ac
 - Pinos de dado (variáveis, matemática, comparações) — exigem runtime próprio ou geração de Python.
 - Convert to Nodes para Expression, Xor/Xnor e Python modo Script; layout automático mais caprichado dos nós
   importados.
-- Se o usuário desligar a opção Color de um nó, a próxima compilação liga de novo a cor do conjunto.
 - Posição do fio aceso é calculada aproximando o layout dos sockets; pode sair um pouco do socket em nós com
   muitos campos.
