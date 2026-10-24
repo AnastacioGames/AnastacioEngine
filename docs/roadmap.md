@@ -13,52 +13,6 @@ editor novo passaram após corrigir falso positivo no diagnóstico de shaders. A
 de teste em aparelho. Exportação pela GUI RangeArmor passou em cena controlada; jogo real permanece pendente.
 Evidências e limites no [plano de renomeação](executable-rename-plan.md).
 
-## GT2: direcao e extracao do original
-
-Garagem: usuario confirmou altura funcionando. Salto ao editar molas ou
-amortecedores instalado e validado no player; falta avaliar visualmente o
-movimento. artifacts/gt2-garage-bounce/README.md.
-
-Suspensao e rodas: 1.001 cenas com compensacao antiga de COM corrigidas;
-1.110 carros reabertos e 4.440 pontos conferidos com disco. Elevacao global
-+6 cm e ajustes no menu passaram no player (DB6, 5.9999 cm medidos). Falta
-avaliacao visual dos demais carros. artifacts/gt2-suspension-wheels/README.md.
-
-GT2, etapa 1: a primeira calibracao de direcao esta instalada no remake externo.
-Fechamento do player corrigido e validado. Equilibrio traseiro 0.73 aplicado no
-remake: recuperacao da rotacao 0.25 -> 0.55 s no pulso medido com quatro rodas
-apoiadas. Reta e multiplicador da chuva passaram no player. Falta avaliacao do
-usuario e dos demais carros; fidelidade ao original nao comprovada. Artefatos locais:
-`artifacts/gt2-handling-stage1/README.md`. Etapas de dados dos carros, bancos de
-audio e UV/transformacoes continuam separadas por compactacao solicitada.
-Etapa 2: 621 fichas de ID exato disponiveis (618 USA + 3 europeias), tres
-carros antes sem ficha receberam massa/motor/transmissao/tracao. Permanecem
-26 sem ficha, 463 derivados e cambios com marcadores invalidos. Quatro
-modelos divergem no entre-eixos; curvas de potencia e fidelidade fisica pendentes.
-Evidencias em `artifacts/gt2-car-data-stage2/README.md`.
-Etapa 3, motores: 621 IDs vinculados a 282 bancos base originais, 1.911 loops,
-instalados e validados com aud/player reais. Mistura adaptada, sem comparacao
-auditiva. Restam bancos adicionais de preparacao e identificacao de pneus,
-batidas/raspagem e outros efeitos. 489 IDs sem vinculo mantem fallback.
-Efeitos adiados: usuario priorizou arvores e depois Z offset nas pinturas da pista.
-Retomada dos efeitos: tabela de seis seletores relida do disco e correspondencia
-dos 18 instrumentos de se01.ins com WAVs conferida por PCM. Identificacao
-funcional e selecao do banco ainda pendentes; nenhuma substituicao instalada.
-Evidencias em `artifacts/gt2-effects-stage3/README.md`.
-Etapa 4: UVs cruzadas de sprites corrigidas em 78 pistas (12.054 faces de
-exportacao). Z offset aplicado a 11.282 faces coplanares em 55 pistas;
-importador atualizado e circuito validado no player. Falta avaliacao visual
-das pinturas e arvores e dimensoes absolutas dos modelos. Escalas de colocacao
-e inclinacoes originais aplicadas a 98 objetos em 27 pistas, importador
-atualizado, circuito/Laguna validados no player. Evidencias das transformacoes
-em `artifacts/gt2-prop-transforms/README.md`. Evidencias do Z offset em
-`artifacts/gt2-track-zoffset/README.md`. Evidencias em `artifacts/gt2-trees-stage4/README.md`.
-Evidencias em `artifacts/gt2-audio-stage3/README.md`.
-Sombra de contato: SSAO instalado nas 126 pistas (fator 2.2, distancia 0.8,
-16 amostras), com importador atualizado e circuito executado com exit 0.
-Faltam avaliacao visual do usuario e custo de GPU; tambem afeta os demais
-objetos. Evidencias em `artifacts/gt2-car-shadow/README.md`.
-
 ## Scene Doctor: colisao simplificada (fase 1)
 
 - Regra Python implementada e validada em background: formas primitivas com encaixe >=85%, fix/revert

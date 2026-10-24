@@ -8,27 +8,6 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
-## 2026-10-23 - GT2: salto para avaliar suspensao na garagem
-
-- Alterar Molas/Amortecedores dispara salto fisico de 1.1 m/s apos 0.2 s sem
-  edicoes, sem acumular impulsos. Usa a suspensao configurada para cair e assentar;
-  outros ajustes nao disparam. Scripts do jogo/importador sincronizados com backup.
-- Player: controles dos dois campos acionados, dois saltos, subida/queda e
-  repouso conferidos, exit 0. Usuario confirmou altura funcionando no menu.
-  Evidencias: artifacts/gt2-garage-bounce/README.md; visual do salto pendente.
-
-## 2026-10-23 - GT2: rodas alinhadas e suspensao no menu
-
-- 1.110 carros / 4.440 rodas auditados contra o disco; 1.001 cenas corrigidas
-  removendo compensacao antiga de COM em Y. DB6: deslocamento de 25.86 cm.
-  Backup por cena e reabertura de todos os carros sem desvio acima de 1e-6 m.
-- Suspensao global +6 cm sobre o ajuste anterior; selecao aplica configuracao
-  salva, edicao acorda o chassi parado sem alterar velocidade. Scripts do jogo
-  e importador sincronizados; regulagens pessoais preservadas.
-- Player: DB6 no menu sobe 0.0599986 m ao ajustar +6 cm; corrida exit 0 com
-  quatro rodas apoiadas e altura salva aplicada. Visual dos demais modelos
-  aguarda usuario. Evidencias: artifacts/gt2-suspension-wheels/README.md.
-
 ## 2026-10-23 - Build Windows, ctest e divisão do properties_game.py e do KX_Scene.cpp
 
 - Windows: editor e player compilados após as mudanças só testadas no Linux. O install falhava
@@ -42,127 +21,6 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `Ketsji/KX_Scene.cpp` (5.349 linhas): cutscene e Trace Rail (750 linhas) movidos sem alteração para
   `Ketsji/KX_SceneCutscene.cpp`, mesma classe `KX_Scene`. Editor e player compilam, `ctest` 15/15.
 - Mapa novo `docs/code-map-gpu.md` (gpu_material.c e gpu_shader_material.glsl, com receitas). `tools/check_docs.py` passa a conferir funções livres C/GLSL (antes só `Classe::Metodo`), o que revelou e corrigiu dezenas de linhas velhas nos mapas antigos.
-
-## 2026-10-23 - GT2: retomada e auditoria dos seletores de efeitos
-
-- Relida a retomada e conferidos os resultados anteriores da sombra: 126 pistas
-  instaladas, circuito com exit 0; avaliacao visual e GPU continuam pendentes.
-  Estado do SSAO acrescentado ao roadmap e ao relatorio vigente.
-- Nova auditoria le GT2.OVL e se01.ins diretamente do disco original, sem alterar
-  remake/importador. Tabela 0x8002F528: 17,11,15,14,10,5. Resolucao INST de 20
-  bytes e enderecos SPU em unidades de 8 bytes confirmada contra rotinas originais.
-- Os 18 descritores do banco candidato foram associados aos WAVs existentes;
-  PCM e marcadores de loop conferidos integralmente. `audit.py` exit 0.
-- Selecao do banco global, nomes dos eventos e pitch final ainda nao comprovados.
-  Nenhum efeito instalado. Evidencias e proxima trilha em
-  `artifacts/gt2-effects-stage3/README.md`.
-- `python tools/check_docs.py`: 102 documentos/2 mapas, zero erros e avisos.
-
-## 2026-10-23 - GT2: escalas e inclinacoes originais dos objetos
-
-- Relidas 6.084 colocacoes em 126 arquivos originais; modelo/posicao/yaw coincidem com exportacoes instaladas. Confirmadas tres rotacoes e escalas pelas rotinas do original.
-- Importador/construtor passam a preservar e aplicar rotation_raw/scale_raw com conversao de eixos por matriz. 98 objetos em 27 cenas corrigidos; backup integral dos arquivos alterados.
-- Comparacao de 508 padroes contra algoritmo em ponto fixo e tabela trigonometrica do executavel: diferenca maxima 0.000559107 nos coeficientes. Seno/cosseno flutuante adaptados, sem emulacao de arredondamentos do PS1.
-- Todas as cenas afetadas reabertas e conferidas; geometria, UVs, materiais/Z offset, posicoes e fisica preservados. Reconstrucao de Laguna verificou 70 objetos; circuito e Laguna passaram no player com exit 0.
-- Aparencia e dimensoes absolutas dos modelos permanecem pendentes; esta etapa corrige fatores de colocacao ignorados.
-- Evidencias: `artifacts/gt2-prop-transforms/README.md`.
-
-## 2026-10-23 - GT2: Z offset nas pinturas sobrepostas da pista
-
-- Detector de faces menores coplanares cobertas por superf?cies maiores; 126 exporta??es examinadas, 55 pistas com 11.282 faces ajustadas. Circuito: 593 faces.
-- Materiais separados com offset 0.05/0.10 conforme n?vel de sobreposi??o, usando recurso existente da engine. Geometria/colis?o preservadas; backup por pista e construtor.
-- Importador externo passa a detectar sobreposi??es e persistir offset por face. Constru??o nova de circuito confirmou todas as 593 faces e aus?ncia de offset nas demais.
-- 55 cenas salvas e reabertas com verifica??o dos valores. Compara??o de circuito/autumn/roma confirma malhas, UVs, transforma??es e f?sica id?nticas ao backup. Player real executou circuito com exit 0; apar?ncia ainda requer avalia??o no jogo pelo usu?rio.
-- Evid?ncias: `artifacts/gt2-track-zoffset/README.md`.
-
-## 2026-10-23 - GT2: UV das arvores e sprites nas cenas instaladas
-
-- Corrigida ordem TL/TR/BL/BR para TL/TR/BR/BL somente nos sprites de modelos do importador externo.
-- Backup e atualizacao de 78 JSONs/cenas: 12.054 faces exportadas, 10.798 faces nas malhas instanciadas; verificacao dos valores anteriores e reabertura de cada cena apos salvar.
-- Execucao do editor concluida com exit 0; teste de circuito real registrado nos artefatos. Aparencia depende de avaliacao no jogo pelo usuario.
-- Escalas/inclinacoes continuam pendentes. Proxima prioridade do usuario: Z offset nas pinturas de pista sobrepostas; efeitos de audio adiados.
-- Evidencias: `artifacts/gt2-trees-stage4/README.md`.
-
-## 2026-10-23 - GT2: motores originais por ID exato (etapa 3, parte 1)
-
-Campo u16 +0x0A dos registros engine confirmado no codigo recompilado original:
-621 IDs exatos (618 USA + 3 europeus), 282 bancos base, zero conflito regional.
-Instalados 1.911 loops e mapa com proveniencia/hashes no remake externo; scripts
-sincronizados no importador. Jogador e IA selecionam por ID, faixas de RPM e pitch
-SPU do descritor. Duas camadas no maximo por voz, cache de Sound, pausa/parada.
-489 IDs instalados sem vinculo confirmado conservam fallback compartilhado.
-
-Validacao com aud real: 5.250 pontos de limites/pesos/pitch, quatro carros e
-fallback, IA distinta, pausa e invalidacao. Tres corridas reais com adversario
-(ld7cn/ne14n/a-a7r), exit 0 sem erro de audio; bancos esperados registrados,
-incluindo jogador a-a7r e IA a-emn com bancos diferentes confirmados.
-Backup e byte-verificacao de 1.916 destinos; nenhum C++ ou cena alterados.
-
-Mistura equal-power, volume, emenda e limites de pitch adaptados; sem comparacao
-auditiva ou reproducao integral do SPU. Bancos adicionais de preparacao, pneus,
-batidas e outros efeitos ainda pendentes. Pausa para compactacao solicitada;
-continuar pelos efeitos da etapa 3 antes da etapa 4. Evidencias e reproducao:
-`artifacts/gt2-audio-stage3/README.md`.
-
-## 2026-10-23 ? GT2: fichas exatas adicionais e auditoria dos carros (etapa 2)
-
-Auditoria dos 1.110 metadados do remake externo: 618 IDs conferem com USA
-Simulation, 463 fichas eram derivadas de carros semelhantes e 29 estavam vazias.
-As cinco tabelas europeias concordam para ne14n/ne15n/nep2n: aplicados massa,
-torque, limite de giro, marchas/re/final, tracao e COM nas tres cenas, com backup
-completo e reabertura. Potencia e dimensoes registradas na ficha; geometria
-preservada. Multiplicadores calibrados 0.4 de autoria e 0.7 da corrida mantidos;
-PS de catalogo nao implica potencia efetiva equivalente no solver Bullet.
-
-Player real executou os tres carros e ld7cn, exit 0: massa com garagem, torque
-escalado, relacoes, final e rodas motrizes conferidos aos 7 s; sem Traceback/Error.
-Sonda temporaria restaurada byte a byte. Importador passou a completar IDs exatos
-ausentes preservando prioridade USA (621 fichas; 618 USA inalteradas), compensacao
-de COM antigo somente com GT2_LEGACY_COM=1 e fallback integral para cambio invalido.
-Nenhuma mudanca de C++ nesta etapa. Scripts executados com o editor/player instalado.
-
-Limitacoes: 26 sem ficha, 463 derivados, 93 fichas com marcadores de marcha;
-idle decodificado suspeito nao aplicado. a26ss/efcon/efe2n/umcon apresentam
-entre-eixos de malha >10% diferente da ficha e requerem investigacao. Curva de
-potencia ainda aproximada. Evidencias e backups:
-`artifacts/gt2-car-data-stage2/README.md`. Pausa para compactacao antes do audio.
-
-## 2026-10-23 - GT2: calibracao do equilibrio entre eixos
-
-- Remake externo e scripts do importador receberam equilibrio traseiro 0.73 sobre
-  a calibracao anterior de aderencia 0.16. Eixos identificados pela posicao local Y,
-  inclusive com direcao nas quatro rodas; leitura apenas ao aplicar suspensao.
-  Ajustes por roda, garagem e chuva preservados; IA permanece como antes.
-- Sete experiencias no circuito separaram subesterco por reducao uniforme,
-  recuperacao rapida a 80% e perda de controle a 65% de aderencia traseira.
-  Valor 73% retornou ao alinhamento no trecho apoiado; instalado com backup.
-- Player real, `ld7cn`, ~55 km/h, pulso de 0.55 s: tempo ate yaw abaixo de
-  0.1 rad/s por tres amostras passou de 0.25 para 0.55 s, quatro contatos na
-  janela comparada. Isso nao equivale a medir o beta do GT2 original.
-- Curva, reta e reta na chuva instaladas encerraram 0. Preset real confirmou
-  chuva x0.72 nos dois eixos e equilibrio traseiro 0.73; controles passaram
-  novamente no editor. Evidencias e limites em `artifacts/gt2-handling-stage1/README.md`.
-  Usuario ainda nao testou; outros carros e fidelidade permanecem pendentes.
-  Pausa para compactacao antes da etapa 2 (dados confirmados dos carros).
-
-## 2026-10-23 - GT2: fechamento com varias referencias ao veiculo
-
-- Captura na cena real `D:\GT2Range\circuit\circuit.range` terminava com retorno 22.
-  O crash log em TEMP identificou `purecall` no destrutor de `KX_VehicleWrapper`,
-  durante `Py_FinalizeEx`. `getVehicle()` cria wrappers independentes, mas o backend
-  guardava somente um callback de invalidacao; destruir outro wrapper tambem apagava esse aviso.
-- `WrapperVehicle` registra callbacks por cliente e invalida todos ao destruir o veiculo.
-  Destrutor e `rebuildPreset` removem somente o registro do proprio wrapper.
-  Sem mudancas no solver de pneus ou em trabalho por frame.
-- MSVC com `VSLANG=1033`: `RangeRuntime` e `RangeEngine` compilados e instalados.
-  Primeira chamada no sandbox ficou bloqueada antes do compilador; execucao elevada passou.
-  Player real: tres wrappers retidos e um temporario descartado; ao remover o carro,
-  os tres passaram a levantar `ReferenceError`, encerramento 0. Corrida com ajuste
-  e corrida com scripts anteriores tambem encerraram 0.
-- Direcao do remake continua uma primeira calibracao. Janela 8.0--8.65 s com quatro
-  rodas apoiadas confirmou recuperacao lateral rapida; fidelidade ao deslizamento
-  do GT2 original permanece pendente. Evidencias locais em
-  `artifacts/gt2-handling-stage1/` (README, CSVs, JSONs e logs).
 
 ## 2026-10-23 - Logic Tree: Highlight Active ao vivo e abas com nome
 
@@ -408,16 +266,16 @@ potencia ainda aproximada. Evidencias e backups:
 - Pendente: link do editor/teste PREMUL, visual e benchmark RolimaRacer/iGPU, execu??o Linux.
   Sem altera??o do jogo original ou expans?o do `.cooked`. Procedimento em `docs/plano-texturas-dds.md`.
 
-## 2026-10-22 - Veículo nativo: ajustes em tempo real pelo Python (pedidos do GT2)
+## 2026-10-22 - Veículo nativo: ajustes em tempo real pelo Python
 
 - Novos: `gameOb.setVehicleMaxTorque/setVehicleMaxRPM/setVehicleGearRatios` e `vehicle.setSuspensionRestLength(valor, roda)` / `vehicle.setWheelRadius(valor, roda)` (aplicados no próximo passo da física pela fila de comandos).
 - `getWheelState()['isInContact']` voltava sempre False: o sync das rodas chamava `updateWheelTransform`, que zera o contato da Bullet. O valor do raycast do passo agora é preservado.
 - `savePreset` falhava com máscara de raio 0xFFFF (16 bits gravados como short negativo); agora grava/lê 0-65535. `savePreset`/`loadPreset` pelo Python passam a incluir o bloco `engine` (torque, RPM, câmbio), como o Vehicle Lab.
-- Teste: `tools/debug/cenas/veiculo_runtime/` (carro a-a7r do GT2 + chão; contato True nas 4 rodas, carro sobe 18 cm ao mudar a suspensão, preset restaura o torque).
+- Teste: `tools/debug/cenas/veiculo_runtime/` (carro de teste + chão; contato True nas 4 rodas, carro sobe 18 cm ao mudar a suspensão, preset restaura o torque).
 - `world.setWeather('rain', True)` agora funciona numa cena que abriu sem chuva: o passe é criado na hora (uma compilação) e segue o liga/desliga do World a cada quadro (antes, desligar não tirava o passe). Teste: `chuva_runtime.py` (capturas antes/com/depois; antes = depois).
 - Mesmo para nuvens (inclui Sky Layers e Volumetric Clouds, que dividem o passe) e lens flare: `world.setWeather('clouds'/'lens_flare', True)` cria o passe na hora numa cena que abriu sem eles; desligar tira o passe. A névoa volumétrica já fazia isso (KX_Scene). Teste: `ceu_runtime.py`.
-- `setTimeScale(0)` (pausa): forças e torques aplicados durante a pausa ficavam guardados na Bullet e saíam todos ao voltar (carro dava tranco, ~-9,5 m/s e giro). Agora, sem passo da física, as forças do quadro são descartadas (`ProceedDeltaTime`/`ProceedDeltaTimeCar`). Testes: `pausa_fis.py` (caixa) e `pausa_carro.py` (carro do GT2).
-- Rodas do veículo com `vehicle_com_offset` (ou centro de massa deslocado pela caixa de colisão): o ponto de fixação era aplicado a partir do centro de massa e as rodas saíam do lugar pelo mesmo offset. Agora `AddWheel` desconta o offset; `getWheelConfig` continua mostrando o ponto a partir da origem do objeto. RolimaRacer não é afetado (chassis sem offset). Carros que compensavam à mão (GT2 `apply_specs`) precisam tirar a compensação. Teste: `rodas_com.py` (offset 0,4 m → diferença 0; antes 0,4).
+- `setTimeScale(0)` (pausa): forças e torques aplicados durante a pausa ficavam guardados na Bullet e saíam todos ao voltar (carro dava tranco, ~-9,5 m/s e giro). Agora, sem passo da física, as forças do quadro são descartadas (`ProceedDeltaTime`/`ProceedDeltaTimeCar`). Testes: `pausa_fis.py` (caixa) e `pausa_carro.py`.
+- Rodas do veículo com `vehicle_com_offset` (ou centro de massa deslocado pela caixa de colisão): o ponto de fixação era aplicado a partir do centro de massa e as rodas saíam do lugar pelo mesmo offset. Agora `AddWheel` desconta o offset; `getWheelConfig` continua mostrando o ponto a partir da origem do objeto. RolimaRacer não é afetado (chassis sem offset). Teste: `rodas_com.py` (offset 0,4 m → diferença 0; antes 0,4).
 - Loop de tempo sem passo fixo e sem vsync: `UpdateSleepTime` calculava a espera em segundos (~0,02) e a passava como milissegundos inteiros, então dormia 0 ms e girava um núcleo inteiro. Agora `SleepUnderRate` dorme em microssegundos, limitado ao tempo que falta no quadro (`m_timeUnderRate` virou `double`). Também em `FrameOver`, o ramo de atraso negativo usava `m_deltaTime` (passo lógico) onde o resto usa `m_deltatime` (tempo real); trocado. Teste `criar_cena_loop_sleep.py` (60 Hz, 10 s): antes 60,3 FPS e 106% de CPU; depois 59,5 FPS e 7%.
 - Static Batch: o construtor de `RAS_BatchGroup` ficou protegido; só `KX_BatchGroup` cria grupos, então os `static_cast` de `GetBatchGroup()` para ele são garantidos pelo compilador.
 
