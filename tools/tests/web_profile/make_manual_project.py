@@ -1,4 +1,4 @@
-"""Gera o projeto de teste manual do perfil Web em build/web-manual/ (ver docs/web-profile-manual-tests.md):
+"""Gera o projeto de teste manual do perfil Web em build/web-manual/ (ver docs/web-profile-validation-plan.md, secao 11):
 
     build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_manual_project.py
 

@@ -1,12 +1,11 @@
 # Range Engine — compatibilidade Web e validação de exportação
 
-Data: 2026-09-12. Estado: **marcos A e B implementados (2026-09-18: `Scene.range_web`/painel Web e núcleo puro `range_web`, sem coleta nem UI de validação); marcos C–G pendentes**.
-O runtime Web já existe e foi aceito manualmente (ver [web-deploy.md](web-deploy.md)); referências abaixo à "Etapa 6"/frente Claude são históricas.
+Estado: marcos A–F feitos (histórico em [changelog-arquivo.md](changelog-arquivo.md), 2026-09-12 a 2026-09-20).
+Abertos: aceite do painel A pelo usuário, teste manual do pré-voo dentro do editor (E) e expansão (G).
+O runtime Web foi aceito manualmente (ver [web-deploy.md](web-deploy.md)).
 
-Este documento define a criação de jogos na própria Range Engine com compatibilidade Web,
-o catálogo inicial de regras e a sequência de implementação. Complementa a
-[PoC Python](web-python-poc-plan.md) e a [auditoria de integração](web-integration-audit.md).
-A PoC permanece independente. Ter CPython Wasm não significa ter um runtime da engine validado.
+Este documento define a autoria com compatibilidade Web, o catálogo de regras e os testes manuais.
+Complementa a [PoC Python](web-python-poc-plan.md) e a [auditoria de integração](web-integration-audit.md).
 
 ## 1. Resultado esperado
 
@@ -30,25 +29,16 @@ WebGL 2 é piso proposto, ainda dependente da integração gráfica. Navegador m
 de validação posterior; selecionar Web não promete suporte a Android/iOS pelo navegador.
 Threads continuam sendo decisão da integração, não um toggle livre que muda apenas o exportador.
 
-## 2. Levantamento do código e consequências
+## 2. Pontos de integração
 
-| Área | Evidência local | Consequência para o plano |
-|---|---|---|
-| Seletor visível | `RENDER_PT_render.draw`, [properties_render.py](../source/release/scripts/startup/bl_ui/properties_render.py), desenha `scene.render.engine` | Preservar o seletor e a entrada Range Engine; compatibilidade Web pertence às opções de exportação. |
-| Registro da engine | [external_engine.c](../source/source/blender/render/intern/source/external_engine.c) registra `BLENDER_GAME` com nome Range Engine e flag `RE_GAME` | Não basta acrescentar um nome para obter uma segunda engine funcional. |
-| Identidade do jogo | [scene.c](../source/source/blender/blenkernel/intern/scene.c) compara diretamente com `RE_engine_id_BLENDER_GAME`; há comparações também em `view3d_draw.c` e `pipeline.c` | Um identificador novo exigiria auditoria de todos os consumidores C/C++. |
-| Painéis | [properties_game.py](../source/release/scripts/startup/bl_ui/properties_game.py) e outros painéis usam `COMPAT_ENGINES = {'BLENDER_GAME'}` | Manter a identidade real evita perder painéis e comportamento de game engine. |
-| Preferências export | `RangeArmorExportSettings` e `SCENE_PT_rangearmor_export`, [properties_scene.py](../source/release/scripts/startup/bl_ui/properties_scene.py); registro em [bl_ui/__init__.py](../source/release/scripts/startup/bl_ui/__init__.py) | Já existe precedente para PropertyGroup persistido na Scene sem alterar DNA. |
-| Export desktop | Operadores em [wm.py](../source/release/scripts/startup/bl_operators/wm.py); plano de export presets | Reutilizar metadados de produto, mas não encaminhar Web ao pipeline de executáveis desktop. Conferir schema vigente antes de qualquer integração RangeArmor. |
-| Build Web | [CMakePresets.json](../source/CMakePresets.json) e [platform_web.cmake](../source/build_files/cmake/platform/platform_web.cmake) | Preset exploratório não é manifesto de capacidades comprovadas. Áudio/vídeo e diversas libs estão desligados. |
-| Python e APIs | [KX_PythonInit.cpp](../source/source/gameengine/Ketsji/KX_PythonInit.cpp) expõe `startGame`, `restartGame`, `endGame`, `LibLoad`, `saveGlobalDict`, `loadGlobalDict` | Validar também operações da própria Range, não somente imports da stdlib. |
-| Loop, scheduler e renderer | Pontos e evidências na [auditoria](web-integration-audit.md) | São pré-requisitos do runtime. O validador de cena não corrige falta de backend, shaders base ou scheduler serial. |
-| Capacidades do fork | [Relatório vigente](../relatorio-melhorias-anastacioengine.md) | Instancing, LOD, batching, GPU skinning, partículas, CSM, resolução dinâmica, veículos e cutscenes já existem; verificar cada um no port, sem reimplementar nem assumir suporte. |
-
-Consulta auxiliar `tools/ask_local.sh` feita para `properties_scene.py`: o modelo pediu o conteúdo
-apesar do redirecionamento, sem análise útil. As decisões acima vieram da leitura direta.
-O roadmap ainda contém descrições antigas de Web/export presets; usar os documentos específicos
-e o código para esta proposta. Não foi feita uma varredura exaustiva de cada símbolo C++.
+- O identificador da engine continua `BLENDER_GAME` (`external_engine.c`, `scene.c`, `COMPAT_ENGINES`).
+  Um id novo exigiria auditar todos os consumidores C/C++ e perderia painéis.
+- `Scene.range_web` segue o precedente de `RangeArmorExportSettings`: PropertyGroup sem mudar DNA.
+- O export Web não passa pelo pipeline de executáveis desktop (`bl_operators/wm.py`).
+- Validar também as operações da Range (`startGame`, `restartGame`, `endGame`, `LibLoad`,
+  `saveGlobalDict`, `loadGlobalDict`), não só imports.
+- Recursos do fork (instancing, LOD, batching, GPU skinning, partículas, CSM, veículos, cutscenes)
+  são verificados no port um a um, sem assumir suporte.
 
 ## 3. Contrato da autoria e dos destinos de exportação
 
@@ -263,23 +253,19 @@ pacote, relatório JSON e instruções de hospedagem. Layout exato deve consumir
 PoC/integração, sem mover os artefatos do Claude agora. Falhas técnicas detalhadas ficam nos logs;
 o jogador recebe mensagem simples e opção de tentar novamente quando aplicável.
 
-## 8. Sequência de implementação e critérios de aceite
+## 8. Marcos
 
-| Marco | Entrega pequena | Aceite e dependência |
+| Marco | Entrega | Estado |
 |---|---|---|
-| A — Autoria (**feito**; painel conferido pelo usuário: pendente) | PropertyGroup + opção de verificar compatibilidade Web + painel de estado | Salvar/reabrir, Undo/Redo, troca de cena e export desktop preservados; seletor continua Range Engine. Export Web indisponível com motivo. Não exige runtime Web. |
-| B — Núcleo (**feito**, núcleo puro; integração `bpy` é do marco C) | Schema do manifesto, resultados e regras de arquivos/Python | Testes puros com casos positivos/negativos e integração `bpy`; nenhuma execução de scripts analisados. |
-| C — Coleta (**feito**, sem UI) | Cenas, bibliotecas, controllers/components, assets e referências | Fixtures de dependências transitivas, ciclos e referências dinâmicas; Localizar aponta origem correta. |
-| D — Convergência (**aceite manual feito em 2026-09-18**: cubo com material, textura difusa, normal map, Sun e Point, sensor de teclado e atuador Motion rodando no navegador; teste automatizado no navegador feito em 2026-09-20: `verify-capabilities.cjs` modo `keys`, controller Python + teclado no `web-smoke`) | Consumir runtime da Etapa 6, manifesto e pacote mínimo | Cubo da engine + Python controller + A/D no navegador. PoC C→Python isolada não fecha este marco. |
-| E — Validação Web (**parcial**: leitura do pré-voo em `preflight.py` e página `?preflight=1` do pacote, exercitada no Chrome com `web-smoke`; calibrada com import inexistente, ValueError e GLSL inválido; o relatório entra no editor pelo botão "Importar pré-voo Web" (JSON manual, preservado ao revalidar) e roda sozinho após o Exportar e no botão "Testar pacote no navegador" via `preflight_run.py` (servidor local + Chrome/Edge headless, página com `&post=1`; testado com navegador falso e com o Chrome real; o fluxo dentro do editor ainda precisa de teste manual)) | Pré-voo, logs, testes de shader e execução | Falhas de contexto/arquivo/import chegam ao relatório; desktop Play identificado como desktop. |
-| F — Export (**verificado por testes em 2026-09-20**: 75 testes puros e os 4 testes de integração no motor (`engine_web_export`, `engine_web_cli`, `engine_web_ui`, `engine_collect_bpy`) passam; teste manual no editor aceito pelo usuário em 2026-09-20; histórico: botão e núcleo de export; comando de linha feito; módulos e assets do projeto incluídos (subpastas no FS virtual confirmadas no navegador); WEB-PKG-004 também no scanner Python; `import bge` vira WEB-PY-001 com correção para `import Range`; components de template precisam estar na pasta do projeto, senão WEB-PKG-003) | Pacote reproduzível e regras obrigatórias em todo entry point | Export via UI e comando usam mesmo validador; snapshot sem alterações ocultas; falha preserva export anterior. |
-| G — Expansão | Áudio, saves, render avançado, transições e dispositivos | Cada capacidade sai de N somente com teste específico no runtime e navegadores declarados.
-|  |  | Estado (2026-09-19): áudio com prova por sonda Web Audio (WAV, Audaspace+SDL, `tools/create_web_audio_scene.py`); saves, transições e simulação com `verify-capabilities.cjs`/`verify-save.cjs`; render avançado (`create_web_render_scene.py`) e dispositivos (`create_web_devices_scene.py`) têm pacote de teste manual, aguardando aceite visual. |
+| A — Autoria | `Scene.range_web` + painel Web (`bl_ui/properties_web.py`) | Feito; falta o usuário conferir o painel. |
+| B — Núcleo | Manifesto, resultados e regras de arquivos/Python (`modules/range_web/`) | Feito. |
+| C — Coleta | Cenas, bibliotecas, controllers/components, assets | Feito. |
+| D — Convergência | Cubo + Python controller + teclado no navegador | Feito (aceite manual 2026-09-18; automático 2026-09-20). |
+| E — Validação Web | Pré-voo `?preflight=1`, "Importar pré-voo Web", `preflight_run.py` após exportar e em "Testar pacote no navegador" | Parcial: falta testar o fluxo dentro do editor (seção 11, D) e importar o relatório pela UI (roadmap, M1). |
+| F — Export | Pacote reproduzível; UI e linha de comando com o mesmo validador | Feito (testes e aceite manual 2026-09-20). |
+| G — Expansão | Áudio, saves, render avançado, transições, dispositivos | Cada capacidade sai de N só com teste específico. Render avançado (`create_web_render_scene.py`) e dispositivos (`create_web_devices_scene.py`) têm pacote de teste manual, aguardando aceite visual. |
 
-A/B/C podem ser desenvolvidos antes do port final, em arquivos próprios, após coordenar ownership.
-D depende diretamente da frente Claude e da integração. Não modificar agora o preset, CPython,
-renderer, scheduler, build-web ou plano da PoC para implementar UI.
-Mudanças C++ posteriores seguem peças pequenas e verificadas e a regra anti-loop do `AGENTS.md`.
+Mudanças C++ seguem peças pequenas e a regra anti-loop do `AGENTS.md`.
 
 ## 9. Matriz mínima de testes
 
@@ -315,3 +301,71 @@ Este levantamento cobre as famílias de funcionalidade e os pontos de integraç�
 promete detectar todos os comportamentos de Python dinâmico nem todas as variantes de shader.
 As fontes oficiais consultadas descrevem a plataforma; o suporte deste fork depende do runtime
 fixado e dos seus testes. Nenhum build ou teste de funcionalidade foi executado para este documento.
+
+## 11. Testes manuais
+
+Só o que precisa de janela ou navegador. O resto roda em `tools/tests/web_profile/`.
+
+Os botões estão em inglês por padrão (Validate Web, Export Web, Open in browser, Stop server, Locate); com
+Idioma Português (Preferências > System) aparecem como Validar Web, Exportar Web, Abrir no navegador, Parar servidor, Localizar.
+
+### Preparação
+
+    build/bin/AnastacioEngine.exe -b --python tools/tests/web_profile/make_manual_project.py
+
+Gera `build/web-manual/` com `bom.blend` (controller em `meu_mod.main`, que importa `pkg.util`)
+e `ruim.blend` (módulo inexistente).
+
+### A. Painel no editor (AnastacioEngine.exe com janela)
+
+1. Abra `build/web-manual/bom.blend`. Propriedades > aba Export Game > painel **Web (Range)**.
+2. Clique **Validar Web**. Esperado: resumo sem erros ("Nenhuma incompatibilidade").
+3. Clique **Exportar Web**. Esperado: mensagem "Pacote Web gerado em ...", pasta `build/web-manual/web/`
+   com `game/meu_mod.py` e `game/pkg/util.py`.
+4. Abra `ruim.blend`, clique **Validar Web**. Esperado: erro WEB-PKG-003 com botão **Localizar**.
+5. Clique **Localizar**. Esperado: o objeto Porta fica selecionado.
+6. Clique **Exportar Web**. Esperado: bloqueado, e `build/web-manual/web/` do passo 3 continua intacta
+   (se o destino do `ruim.blend` for o mesmo `//web/`, confira que os arquivos antigos seguem lá).
+7. Edite `bom.blend` sem salvar e clique **Exportar Web**. Esperado: pede para salvar.
+
+### C. Análise de submódulo (`from pkg import util`)
+
+1. Abra `build/web-manual/sub.blend` (controller em `sub_mod.main`, que faz `from sub_pkg import perigo`;
+   `sub_pkg/perigo.py` chama `subprocess.run` em nível de módulo; dentro de função seria só aviso).
+2. Clique **Validar Web**. Esperado: erro **WEB-PY-002** apontando para `sub_pkg/perigo.py`
+   (antes da correção passava sem erro).
+3. Clique **Exportar Web**. Esperado: bloqueado.
+
+### B. Pacote no navegador
+
+    cd build/web-manual/web
+    python serve.py 8080
+
+Abra http://localhost:8080/ (Chrome ou Edge).
+
+1. O jogo carrega sem erro no console (F12).
+2. No console não deve haver 404 para `game/meu_mod.py` nem `game/pkg/util.py`.
+3. Confirma a criação de subpastas: no console rode
+   `FS.readdir('/pkg')` (ou `Module.FS.readdir('/pkg')`). Esperado: `util.py` na lista.
+   Isso valida o `FS_createPath` do `index.html`, que nunca foi executado.
+4. Anote o que falhar (mensagem do console) e me passe.
+
+### D. Pré-voo importado no editor
+
+Arquivos de exemplo em `build/web-manual/preflight/` (gerados a mão; o `make_manual_project.py` não os recria):
+`pf-limpo.json`, `pf-problemas.json`, `pf-invalido.json`. Use `bom.blend` no painel **Web (Range)**.
+
+1. Clique **Importar pré-voo Web** e escolha `pf-limpo.json`. Esperado: mensagem "Pré-voo sem problemas.".
+2. Importe `pf-problemas.json`. Esperado: mensagem "Pré-voo: 3 problema(s).", e no painel **WEB-GFX-002**,
+   **WEB-PY-001** (numpy) e **WEB-PY-009** (ValueError). Só o WEB-PY-* mostra origem em `meu_mod.py`.
+3. Clique **Validar Web**. Esperado: os 3 resultados do pré-voo continuam na lista, junto do resumo novo.
+4. Importe `pf-limpo.json` de novo. Esperado: os 3 resultados de pré-voo somem (substitui, não acumula).
+5. Importe `pf-invalido.json`. Esperado: um único **WEB-DEPLOY-002** ("Não foi possível ler...").
+6. Importe `pf-problemas.json` duas vezes seguidas. Esperado: continuam 3 resultados, sem duplicar.
+7. Com resultados de pré-voo na lista, clique **Exportar Web**. Esperado: o export segue a validação normal
+   (o pré-voo não bloqueia) e a lista passa a mostrar só a revalidação, sem os resultados de pré-voo.
+8. Automático: em `bom.blend`, deixe **Pré-voo após exportar** ligado e clique **Exportar Web**. Esperado: a engine
+   fica ocupada uns 15 s e a mensagem termina com "Pré-voo sem problemas.". Depois clique **Testar pacote no navegador**:
+   mesma mensagem. Sem Chrome/Edge (ou com `RANGE_WEB_BROWSER` inválido): "Pré-voo não executado: ..." sem erro do jogo.
+9. Real (manual): sirva `build/web-manual/web`, abra `http://localhost:8080/?preflight=1`, chame `rangePreflight()` no console,
+   salve o JSON e importe. Esperado: sem problemas num pacote saudável.

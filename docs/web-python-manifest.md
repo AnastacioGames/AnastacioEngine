@@ -107,7 +107,7 @@ configure. O build travou logo em seguida num problema estrutural do
 preset, **não relacionado ao Python**: ferramentas geradoras de código do
 build (`makesdna`, `datatoc`, conversor de shaders) compilam para wasm em
 vez de nativo e não rodam no host Windows. Detalhes e próximos passos em
-`docs/web-python-poc-plan.md`, seção "Etapa 6", "Status (2026-09-12)".
+`docs/web-python-poc-plan.md` (histórico da etapa 6 em `docs/changelog-arquivo.md`).
 
 ## Referências
 

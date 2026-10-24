@@ -1,27 +1,24 @@
 # Plano: Multiplayer nativo
 
-Criado em 2026-10-03. Status: **implementação avançada, funcional e validada**.
+Criado em 2026-10-03. Estado: **implementado na main e validado** (Linux, Windows/MSVC, wasm32 e
+runtime Web em Chrome real contra `RangeRuntime --server`). O que está aberto fica em
+[`roadmap.md`](roadmap.md#multiplayer-nativo); histórico das etapas 0–9 e das rodadas A–J em
+[`changelog.md`](changelog.md) e [`changelog-arquivo.md`](changelog-arquivo.md). Contrato do formato em
+[`multiplayer-protocol.md`](multiplayer-protocol.md). Complemento Steam em
+[`steam-multiplayer-plan.md`](steam-multiplayer-plan.md).
 
-O núcleo e a integração com a engine já estão implementados na main. Desktop/Linux, Windows/MSVC,
-wasm32 e o runtime Web foram exercitados com cenários automatizados; o cliente Web também foi validado
-em Chrome real contra um `RangeRuntime --server` nativo. Este documento continua sendo o plano de
-arquitetura e o inventário de pendências, enquanto o estado factual mais recente fica no
-[`roadmap.md`](roadmap.md) e os detalhes de cada sessão no [`changelog.md`](changelog.md).
+Objetivo: multiplayer **dentro da engine** (C++), configurável pela UI sem código, com API Python curta.
+Desktop, Web e Android (APK WebView, mesmo caminho do Web) com o mesmo `.range`.
 
-Documentos ligados: contrato do formato e das interfaces em [`multiplayer-protocol.md`](multiplayer-protocol.md);
-as rodadas A–J de tarefas na nuvem estão concluídas (histórico no [changelog](changelog.md)).
+Este documento guarda as decisões de arquitetura e o que segue aberto.
 
-Objetivo: multiplayer **dentro da engine** (C++), configurável pela UI sem código, com API Python curta
-para quem quiser mais. Rodar em Desktop, Web e Android (APK WebView, mesmo caminho do Web) com o mesmo `.range`.
+## Pendente
 
-Escopo por versão (para não prometer antes da hora):
-
-- **v1 (etapas 0–6):** implementada no Desktop: host/servidor dedicado, replicação de
-  transform e propriedades com interpolação, spawn/ownership, RPC, UI, logic bricks e ferramentas de teste.
-- **v1.1 (etapas 7–8):** implementada em grande parte: predição no cliente, compensação de lag,
-  prioridade/orçamento de banda e relevância por distância.
-- **v1.2 (etapas 9–10):** Web via WebSocket com cross-play implementado e validado; Android WebView,
-  descoberta LAN completa e alguns itens de endurecimento ainda estão pendentes.
+- APK WebView: teste do cliente Android não feito.
+- Descoberta LAN completa (etapa 10) e lista de sessões; NAT punch/relay fora da v1.
+- IPv6 real: build é `ENET_IPV4_ONLY` (ver roadmap).
+- Alguns itens de endurecimento (sem lista fechada no plano original).
+- Recursos pós-v1 ainda sem decisão (seção 2.2 e "Fora da v1").
 
 ## 1. Por que nativo e não um SDK em Python
 
@@ -294,43 +291,15 @@ Regras de design para funcionar em todas as plataformas:
 - **Custo:** menu fechado = nenhuma janela ImGui desenhada (o `KX_Imgui::Render` já pula frames sem
   vértices).
 
-Etapas: telas Principal/Hospedar/Entrar/Sala/Avisos na etapa 5 (com o template); Pausa e Configurações na
-etapa 6; Servidores LAN na etapa 10. Teste manual em Desktop, navegador e APK a cada entrega.
+Tela Servidores LAN depende da etapa 10.
 
-## 7. Etapas e estado atual
+## 7. Etapas
 
-Cada etapa termina com uma cena de teste em `tools/create_*_test.py` (padrão do repositório) e entrada no
-changelog.
+Etapas 0–9 (contrato/bitstream, sessão, replicação, spawn/ownership, RPC/Python, UI/bricks, ferramentas,
+predição/lag compensation, otimização, Web via WebSocket) implementadas; detalhes no changelog.
+Aberto da etapa 9: APK WebView. Etapa 10 (lobby/descoberta LAN) aberta.
 
-As etapas abaixo foram escritas como estimativa inicial e não representam mais o estado atual. As etapas
-0–9 estão implementadas total ou parcialmente; a validação recente inclui Linux, Windows/MSVC, wasm32 e
-o runtime Web completo. Permanecem como trabalho aberto principalmente o servidor Windows sem janela,
-validação de IPv6 real, APK WebView, descoberta LAN completa e a decisão sobre recursos pós-v1.
-
-| # | Etapa | Entrega verificável | Esforço |
-|---|---|---|---|
-| 0 | Contrato + bitstream | `docs/multiplayer-protocol.md` curto (tick, ids, ciclo de vida, mensagens, canais, limites, versão). Depois `ge_network` no CMake e `NET_BitStream` com gtest: ida e volta, leitura truncada, valores fora da faixa, quantização, mesma saída em x64 e wasm32. ENet ainda não entra | 3–4 dias |
-| 1 | Sessão | `extern/enet`; host/join/disconnect, handshake com versão do jogo, ping/RTT, timeout; transporte loopback; flag `--server` | 1 semana |
-| 2 | Replicação de transform | `NetId`, snapshots + delta + ack, interpolação; dois cubos em duas janelas | 1–2 semanas |
-| 3 | Spawn, ownership, propriedades | Add Object replicado, Player Prefab, `PROP_REPLICATED`, despawn | 1 semana |
-| 4 | RPC + Python | `Range.network`, `@rpc`, eventos; testes em Python Component | 1 semana |
-| 5 | UI e logic bricks | painéis Network/Multiplayer, sensor e actuator, template Starter, menu ImGui `NetworkMenu` (seção 6.4) | 2 semanas |
-| 6 | Ferramentas | Play com N clientes, simulador de rede, overlay de debug | 1 semana |
-| 7 | Predição + lag compensation | personagem predito, reconciliação, `rayCast(lagCompensated)` | 2 semanas |
-| 8 | Otimização | prioridade/orçamento, relevância por grid, medição contra as metas da seção 4 | 1 semana |
-| 9 | Web/Android | `NET_TransportWeb` (WebSocket), endpoint WebSocket no servidor junto do ENet (cross-play), teste no APK WebView, imagem Docker do servidor | 2 semanas |
-| 10 | Lobby | descoberta LAN (broadcast), lista de sessões; depois NAT punch/relay (fora da v1) | 1 semana+ |
-
-- **v1 (0–6), ~7–9 semanas:** multiplayer funcional básico no Desktop, **sem** predição, compensação de lag
-  nem Web.
-- **v1.1 (7–8), ~3 semanas:** predição, compensação de lag e otimização de banda.
-- **v1.2 (9–10), ~3 semanas:** Web/Android via WebSocket com cross-play, lobby LAN.
-
-## 8. Avaliação
-
-**Vale a pena?** Sim. É o recurso que mais muda o tipo de jogo que dá para fazer na engine, e o desenho
-nativo dá vantagem real sobre um SDK em Python: performance, configuração sem código e netcode que um
-script não alcança (rewind de física, tick fixo).
+## 8. Riscos
 
 **Riscos e mitigação**
 

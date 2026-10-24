@@ -134,7 +134,7 @@ validados no Linux e no Windows. Plano em [`multiplayer-plan.md`](multiplayer-pl
 Aberto:
 
 - **Complemento Steam** (Windows implementado, SDK 1.55, `Range.network.steam`;
-  [inventário](steam-multiplayer-inventory.md), [guia](steam-complement-development.md),
+  [guia](steam-complement-development.md),
   [plano](steam-multiplayer-plan.md)). Pendentes: dois jogadores em redes distintas com relay confirmado,
   convites aberto/fechado, corrida real com carros e saída/reentrada, AppID comercial, revisão de
   distribuição, Linux, conquistas e avaliação visual no RolimaRacer. Web segue com WebSocket; não há cross-play Steam.

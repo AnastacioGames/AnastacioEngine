@@ -3526,7 +3526,7 @@ larguras e pontos escalados por `U.pixelsize`, pontos redondos (`GL_POINT_SMOOTH
 - Consulta bpy no RolimaRacer.range pelo editor de build/bin, sem salvar: SteamComponent,
   NetworkManager, NetworkMenu e quatro NetworkVehicleSync confirmados; processo saiu com c?digo 0.
 - SDK 1.55 local encontrado, incluindo lanes; AppID de desenvolvimento ? 480, comercial pendente.
-- [Decis?o proposta](steam-multiplayer-inventory.md): pacote reutiliz?vel da engine, complemento
+- [Decis?o proposta](steam-multiplayer-plan.md#2-arquitetura): pacote reutiliz?vel da engine, complemento
   opcional por ABI C, ?nico dono do runtime e canais compat?veis com a sess?o atual.
 - Pr?xima pe?a isolada: carregador e DLL de prova antes da integra??o SDK. N?o houve mudan?a C++
   nem gameplay; exportador efetivo e distribui??o do complemento ainda precisam ser fechados.

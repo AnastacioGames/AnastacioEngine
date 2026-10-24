@@ -14,7 +14,7 @@ cmake --build build-steam
 O build local gera `AnastacioSteam.dll` e copia `steam_api64.dll` para o mesmo
 diretório. O complemento usa CRT estático; buffers/contextos são liberados pelo
 lado que os criou. Não instala essas DLLs no pacote comum da engine.
-Isto não é um release; publicação e revisão de licenças permanecem pendentes.
+Não é release: publicação e revisão de licenças pendentes.
 O carregador usa ABI **v2**; reconstruir complemento e engine juntos ao atualizar o contrato.
 
 ## API durante o jogo
@@ -105,8 +105,7 @@ de ser recusada; essa condição ainda precisa de teste entre contas.
 RolimaRacer: `scripts/net_menu.py` é um adaptador do componente da engine;
 `scripts/network_settings.py` guarda AppID/build/configuração. SteamComponent usa
 o serviço compartilhado para idioma/conquistas e NetworkManager mantém regras de pista.
-Os binários de desenvolvimento foram instalados em `D:/ProjetoRolimaRacer/complements/steam/`.
-O `.range` original e o sistema de veículos não foram alterados nesta integração.
+Binários de desenvolvimento ficam em `D:/ProjetoRolimaRacer/complements/steam/`.
 
 ## Exportar o complemento opcional
 
@@ -114,8 +113,8 @@ No exportador nativo legado, **Steam Complement Folder** vazio gera o pacote LAN
 Selecionar a pasta das duas DLLs inclui `complements/steam/`. O pacote Python reutilizável
 é incluído mesmo com Copy Scripts desabilitado. Python completo e `blender.crt/`
 são copiados pelas opções correspondentes; AppID de desenvolvimento não é copiado automaticamente.
-O player padrão do exportador agora é RangeRuntime, e o timer usa perf_counter no Python atual.
-RangeArmor/Web não receberam um novo seletor Steam nesta etapa; em export nativo compatível,
+O player padrão do exportador é RangeRuntime.
+RangeArmor/Web não têm seletor Steam; em export nativo compatível,
 usar o instalador explícito abaixo quando o exportador não tiver essa opção.
 
 ```text
@@ -163,38 +162,18 @@ falhas Python pelo exit code. O teste não imprime a identidade da conta.
 Online requer Steam conectada; offline e DLL de prova não comprovam conexão real,
 transporte, salas ou relay. Esses itens continuam no plano multiplayer.
 
-Validado em 2026-10-07: Windows, SDK 1.55, conta conectada e AppID 480;
-smoke test online confirmou init, identidade, callbacks e shutdown/reinit no player.
-Não substitui a futura prova de tráfego entre duas contas em redes diferentes.
+Outros testes locais (Windows, todos passaram em 2026-10-07; histórico no [changelog](changelog.md)):
 
-Validação ampliada Windows (2026-10-07): `net_steam_probe` passou quatro canais nos
-limites nativos, handshake, chat, transform/propriedade, spawn/despawn e ownership
-por socket pair do SDK com loopback de rede. `steam_lobby_test.py` passou criação,
-busca filtrada da própria sala pública, cancelamento e host nativo Steam.
-`steam_menu_test.py` passou com componente anexado e ImGui no player.
-`steam_game_adapter_test.py` passou com cópias dos scripts do RolimaRacer e troca
-de cena mínima; não é prova de carros ou corrida real.
-Regressão LAN spawner e CTest da rede passaram.
+| Teste | Cobre | Não comprova |
+|---|---|---|
+| `net_steam_probe` | 4 canais nos limites, handshake, chat, transform/propriedade, spawn/despawn, ownership (socket pair do SDK) | rede externa/relay |
+| `steam_lobby_test.py` | criar, busca filtrada, cancelamento, nova criação após cancelar, host Steam | segunda conta |
+| `steam_menu_test.py` | componente anexado e ImGui no player, retorno à sala | avaliação visual |
+| `lobby_return_test.py` | dois players ENet, duas partidas, retorno e reentrada | Steam |
+| `steam_game_adapter_test.py` | scripts do RolimaRacer com troca de cena mínima (resolver o componente vivo após a troca) | carros e corrida real |
+| `network_adapter_review_test.py` | on_start atrasado, responsável pelo tick, Steam desligada, confirmação de convite, nomes no chat | — |
+| `steam_cold_invite_test.py` | ID fictício nos argumentos chega ao componente no player exportado | convite real de outra conta |
 
-Exportação foi executada para Steam e LAN, e ambos os players exportados passaram
-no smoke test; a variante LAN não contém DLL Steam. Pacote local de teste em
-`build-steam/export-smoke.zip` (não publicado). Artefatos e SDK redistribuível locais
-ficam ignorados pelo git. O ZIP foi extraído para `build-steam/export-extracted/` e o
-Game.exe extraído passou com SDK real e componente anexado. Avaliação visual do usuário
-e prova externa continuam pendentes.
-
-Revisão em 2026-10-07: testes locais de política do complemento cobrem argv inválido,
-sequenciamento, fila de desconexão e liberação de cancelamento/timeout sem login.
-`steam_lobby_test.py` passou nova criação imediatamente após cancelamento, com SDK real.
-Dois players ENet em `lobby_return_test.py` passaram duas partidas, retornos e reentrada;
-menu Steam passou retorno, segunda partida e sala novamente visível na busca pública
-após a propagação dos metadados. Adaptadores do RolimaRacer passaram ida/volta de cenas
-mínimas; resolver novamente o componente vivo depois da troca é necessário no teste.
-`network_adapter_review_test.py` cobre callback on_start atrasado (início único), responsável
-pelo tick, Steam desabilitada, confirmação de convite e nomes no chat.
-`steam_cold_invite_test.py` usa um ID fictício nos argumentos e comprova sua entrega ao
-componente no player exportado; não é prova de convite real enviado por outra conta.
-O ZIP local foi atualizado e extraído em `build-steam/export-final-extracted/`;
-executável, DLL e módulos conferidos contra a cópia validada, e o Game.exe extraído
-passou a prova de argv. Menu Steam e LAN também executaram com ImGui no player exportado;
-os testes verificam execução/estado, sem avaliação visual por captura automatizada.
+Export Steam e LAN passaram no smoke test; a variante LAN não tem DLL Steam. Validar sempre pelo ZIP
+extraído (pastas locais `build-steam/export-*`, ignoradas pelo git). Pendências no
+[plano](steam-multiplayer-plan.md#1-pendente).

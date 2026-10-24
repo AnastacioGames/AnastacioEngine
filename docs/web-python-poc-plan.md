@@ -1,491 +1,60 @@
-# Plano — Prova de conceito Python-no-navegador (pré-requisito do port Web)
+# Python no navegador (CPython wasm32)
 
-> PoC concluída: o runtime Web roda no navegador. Os arquivos de teste das etapas 2 a 5
-> (`docs/web-python-poc-stage*`) foram removidos em 2026-10-07 e podem ser recuperados pelo histórico do git.
+> PoC concluída: o runtime Web roda com Python no navegador. O histórico das etapas 0–7
+> (2026-09-12 a 2026-10-13) está em [changelog-arquivo.md](changelog-arquivo.md) e no git.
+> Pendências abertas ficam na seção Web do [roadmap](roadmap.md).
 
-## Contexto
+O BGE usa a API Python sem guardas `#ifdef WITH_PYTHON`. Por isso a rota foi cross-compilar
+CPython 3.11 para `wasm32-emscripten` e manter `WITH_PYTHON=ON` no runtime Web.
+O que o runtime Python suporta está em [web-python-manifest.md](web-python-manifest.md).
 
-O build `web-runtime` (Emscripten) já avança até compilar boa parte do
-`RangeRuntime` (ver `docs/web-export-plan.md`), mas trava porque o game
-engine (BGE) usa a API do Python incondicionalmente, sem guardas
-`#ifdef WITH_PYTHON`, em dezenas de arquivos. Reescrever esse código é
-arriscado (quebra lógica de jogo). A rota escolhida é cross-compilar CPython
-3.11 para `wasm32-emscripten` e religar `WITH_PYTHON=ON`.
+## Decisões vigentes
 
-Este documento define uma **prova de conceito incremental**, isolando cada
-variável antes de integrar ao build completo da engine — evita descobrir
-problemas de fundo (path da stdlib, FS virtual, padrão de chamada por frame)
-só depois de um build de 10+ minutos do `RangeRuntime` inteiro.
+- Sem pthreads/`SharedArrayBuffer`. Threads reais seriam um build separado, com COOP/COEP na hospedagem.
+- A stdlib entra no FS virtual por `--preload-file`. IDBFS serve só para saves.
+- `NODERAWFS` só vale para as ferramentas de build (`makesdna`, `makesrna`, `datatoc`) sob Node.
+  Não levar ao runtime servido no navegador.
+- As ferramentas geradoras rodam nativas no host; o resto do alvo é wasm.
+- `bgl` no Web: `glLogicOp` e `gluPickMatrix` são stubs no-op; `glMaterialf` encaminha para `glMaterialfv`.
+- wasm32 exige alinhamento estrito: structs com `double`/`uint64_t` usam alocação alinhada a 8
+  (SDNA, `Main`, `ImBuf` via `MEM_mallocN_aligned`).
 
-Consolidado a partir de duas propostas independentes (Claude e Codex, revisão
-cruzada em 2026-09-12); a versão do Codex corrigiu pontos concretos da
-primeira leitura, incorporados abaixo.
+## Versões fixadas
 
-## Etapa 0 — Ambiente
+- CPython: branch `3.11`, commit `9eaf48a56547872b86de5cecbaa7edd3279159ed` (2026-08-20).
+- emsdk: `6.0.9`.
 
-- WSL2 Ubuntu, realocado para `D:\WSL\Ubuntu` (concluído).
-- Dependências de build instaladas via `apt-get` (concluído).
-- Pendente: ativar emsdk **Linux** dentro do WSL (o `D:\emsdk` existente é
-  Windows-only, não roda a partir do ambiente Linux).
-- Diretório de build desta PoC deve ficar **separado** do `build-web/`
-  gerado no Windows, para não misturar artefatos de toolchains diferentes.
+## Build do Python wasm32 em host Linux
 
-## Etapa 1 — Fixar ambiente e versões antes de compilar
+Usado pelo preset `web-runtime-release-linux`. Nada disso é versionado: `~/web-python-poc/` fica fora do repo.
 
-- Registrar explicitamente: revisão exata do CPython 3.11 (tag/commit),
-  versão do emsdk usada, opções de configuração do `wasm_build.py`.
-- Usar o **mesmo** SDK Linux (emsdk) para: compilar o Python, rodar os
-  testes mínimos desta PoC, e depois compilar a engine — evita divergência
-  de toolchain entre etapas.
-- Decidir threads cedo: começar **sem** pthreads/`SharedArrayBuffer` no
-  teste mínimo (mais simples, sem exigir cabeçalhos COOP/COEP no servidor).
-  Se a engine precisar de threads reais em algum subsistema, isso é uma
-  decisão separada, tomada mais adiante — não travar a PoC nisso agora.
-  Se a integração exigir pthreads, revisar a configuração e recompilar
-  CPython e dependências conforme necessário para compatibilidade com o
-  runtime. Os binários da PoC sem threads não são artefatos definitivos do
-  port; repetir os testes das Etapas 2–5 na configuração escolhida antes
-  de avançar com a integração.
+1. Clonar o CPython em `~/web-python-poc/cpython` na revisão acima.
+2. Rodar `python3 Tools/wasm/wasm_build.py --verbose emscripten-browser build` com um `EM_CONFIG`
+   próprio (`~/web-python-poc/emscripten-config`), com os caminhos do emsdk escritos por extenso.
+   O `wasm_build.py` faz `exec()` do arquivo e não resolve o `$CFGDIR` do `~/emsdk/.emscripten`.
+   Não altere o `.emscripten` principal.
+3. Teste rápido: `node python.js -c "print(42*2)"` deve imprimir `84`.
+4. Montar `~/web-python-poc/python-wasm-web` no layout que `FindPythonLibsUnix.cmake` exige:
+   - `include/python3.11/`: `Include/*.h` do fonte + `pyconfig.h` do build wasm32.
+   - `lib/libpython3.11.a`, `lib/libexpat.a`, `lib/libmpdec.a`. As duas últimas (usadas por
+     `audaspace-py`) ficam em `Modules/expat/` e `Modules/_decimal/libmpdec/` do builddir.
+   - `lib/python3.11/`: cópia do `Lib/` do fonte (o `usr/local/lib/python3.11` do build é incompleto).
+   - `lib/python311.zip`: de `builddir/emscripten-browser/usr/local/lib/`. Sem ele o link falha só
+     no `file_packager`, depois de ~1887 alvos.
+5. `export PYTHON_WASM_ROOT_DIR=~/web-python-poc/python-wasm-web`, depois
+   `cmake --preset web-runtime-release-linux` e `cmake --build build-web-release --target RangeRuntime`.
 
-**Entrega:** procedimento reproduzível, com ferramentas/caminhos/versões
-documentados (neste arquivo ou em anexo).
+No Windows o preset `web-runtime` usa `PYTHON_ROOT_DIR=D:/python-wasm-web`, no mesmo layout.
 
-### Versões fixadas (2026-09-12)
+## Estado do build Linux
 
-- CPython: branch `3.11`, commit `9eaf48a56547872b86de5cecbaa7edd3279159ed`
-  (2026-08-20), clonado em `~/web-python-poc/cpython` dentro do WSL.
-- emsdk: `6.0.9` — mesma versão já ativa no `D:\emsdk` (Windows), agora
-  também instalada e ativada em `~/emsdk` dentro do WSL, via
-  `./emsdk install 6.0.9 && ./emsdk activate 6.0.9`.
-- Diretório de trabalho da PoC: `~/web-python-poc/` (dentro do filesystem
-  do WSL), separado do `build-web/` gerado no Windows.
-- Threads: sem pthreads/`SharedArrayBuffer` nesta primeira rodada, conforme
-  decidido acima.
-
-## Etapa 2 — Compilar CPython e provar integração C → Python no navegador
-
-- Rodar o processo oficial de `Tools/wasm/wasm_build.py` (ou os passos que
-  ele automatiza: `configure-build-python` → `configure-host` → `make-host`)
-  para a revisão fixada na Etapa 1.
-- Preservar: `libpython3.11.a`, headers, `pyconfig.h` gerado para o alvo
-  wasm, stdlib empacotada, flags de link necessárias.
-- Programa de teste em C: `Py_Initialize()`, executa um script Python que
-  **retorna um valor** para o C (não só imprime), com **relato explícito de
-  erro** se a inicialização falhar (não falhar silenciosamente).
-
-**Aceite:** página servida por HTTP real (`python3 -m http.server`, não
-apenas rodar via `node`) executa o teste, e o código C recebe o valor
-esperado de volta do Python. Rodar só no Node não fecha esta etapa — o
-runtime dentro do navegador tem diferenças de FS/ambiente que o Node não
-expõe.
-
-### Status (2026-09-12)
-
-- CPython compilado com sucesso para `emscripten-browser` via
-  `wasm_build.py` (revisão fixada acima). Artefatos gerados em
-  `~/web-python-poc/cpython/builddir/emscripten-browser/`:
-  `libpython3.11.a` (~29 MB), `pyconfig.h`, `python.js`/`python.wasm`
-  (build de referência do próprio CPython) e stdlib empacotada em
-  `usr/local/lib/python3.11` + `python311.zip`.
-- Programa de teste em C criado (`docs/web-python-poc-stage2-test.c`):
-  `Py_InitializeEx(0)`, roda um script Python (`6 * 7`), recupera o valor
-  via `PyDict_GetItemString`/`PyLong_AsLong`, com `PyErr_Print()` em cada
-  ponto de falha (init, execução do script, valor ausente).
-- Link final via `emcc`, replicando o mesmo conjunto de libs do
-  `python.js` de referência: `libpython3.11.a` + `libmpdec.a` (decimal) +
-  `libexpat.a` + `-sUSE_ZLIB -sUSE_BZIP2 -sUSE_SQLITE3` + `-lpthread -ldl -lm`
-  + `--preload-file=.../usr/local@/usr/local` (stdlib no FS virtual).
-  Primeira tentativa de link falhou por símbolos `mpd_*` não resolvidos
-  (faltava `libmpdec.a`/`libexpat.a`/flags de uso das libs) — corrigido
-  adicionando exatamente as mesmas libs/flags do link de referência.
-- Validado via Node (`node stage2_test.js`): saída
-  `STAGE2_OK valor_recebido_do_python=42` — confirma o roundtrip
-  C → Python → C.
-- Servido via `python3 -m http.server 8765` dentro do WSL
-  (`~/web-python-poc/test_stage2/index.html` +
-  `docs/web-python-poc-stage2-index.html` como fonte). Pendente:
-  confirmação visual em navegador real (WSL2 encaminha `localhost`
-  automaticamente para o Windows) — sem headless browser disponível no
-  ambiente de build para automatizar essa checagem.
-
-## Etapa 3 — Validar import de módulos e arquivos, antes do loop por frame
-
-- Empacotar um `game_logic.py` externo (fora do binário, arquivo real).
-- Importar módulos da stdlib (`json`, `math`) e o módulo externo.
-- Ler um arquivo de configuração simples a partir do Python.
-- Provocar uma exceção controlada e verificar que o traceback aparece
-  corretamente (diagnóstico de erro, não só o caminho feliz).
-- **Correção importante**: `--preload-file` (Emscripten) é o mecanismo para
-  carregar arquivos/scripts iniciais no FS virtual; `IDBFS` é para
-  **persistência** (saves) e não é necessário aqui. Ver
-  [packaging files](https://emscripten.org/docs/porting/files/packaging_files.html)
-  e [Filesystem API](https://emscripten.org/docs/api_reference/Filesystem-API.html).
-
-**Aceite:** imports, leitura de arquivo e diagnóstico de exceção funcionam
-sem depender de nenhum caminho da máquina de desenvolvimento (tudo via
-`--preload-file`/FS virtual).
-
-### Status (2026-09-12)
-
-- Módulo externo `game_logic.py` criado
-  (`docs/web-python-poc-stage3-game_logic.py`): `compute_distance(config_path)`
-  lê um `config.json` (`json.load`) e calcula distância euclidiana
-  (`math.sqrt`); `trigger_controlled_exception()` levanta `ValueError`
-  proposital.
-- Arquivo de config (`docs/web-python-poc-stage3-config.json`): dois pontos
-  `(0,0)` e `(3,4)` — distância esperada `5.0`, valor determinístico fácil
-  de conferir.
-- Programa de teste em C (`docs/web-python-poc-stage3-test.c`): adiciona
-  `/assets` a `sys.path`, importa `game_logic`, chama `compute_distance`
-  com `/assets/config.json`, confere o valor recebido, depois chama
-  `trigger_controlled_exception` e verifica que o C recebe `NULL` (erro
-  Python) em vez de derrubar o processo — imprime o traceback via
-  `PyErr_Print()` entre marcadores (`STAGE3_EXCEPTION_TRACEBACK_INICIO/FIM`).
-- Link via `emcc`: mesmo conjunto de libs da Etapa 2
-  (`libpython3.11.a` + `libmpdec.a` + `libexpat.a` +
-  `-sUSE_ZLIB -sUSE_BZIP2 -sUSE_SQLITE3` + `-lpthread -ldl -lm`), com
-  **dois** `--preload-file`: a stdlib (`usr/local@/usr/local`, igual à
-  Etapa 2) e os assets do jogo
-  (`test_stage3/assets@/assets`, contendo `game_logic.py` e
-  `config.json`) — compilou de primeira, sem erros de link novos.
-- Validado via Node (stdout/stderr capturados separadamente, pois o
-  console do Node intercala os dois fluxos e embaralha a leitura se
-  combinados): stdout mostra
-  `STAGE3_DISTANCE_OK valor=5.000000` seguido de
-  `STAGE3_EXCEPTION_TRACEBACK_INICIO` / `_FIM` / `STAGE3_OK`; stderr
-  mostra o traceback completo e correto (`game_logic.py`, linha do
-  `raise`, mensagem da exceção) — confirma import de stdlib, import de
-  módulo externo, leitura de arquivo via FS virtual, e diagnóstico de
-  exceção sem crash.
-- Servido via `python3 -m http.server 8766` dentro do WSL
-  (`test_stage3/index.html`, cópia do harness da Etapa 2 apontando para
-  `stage3_test.js`). HTTP 200 confirmado para a página e para o `.js`.
-  Pendente, como na Etapa 2: confirmação visual em navegador real (sem
-  headless browser disponível neste ambiente para automatizar).
-
-> **Pacote de execução 1 (próximo passo imediato): Etapas 1–3.**
-> Entrega uma página HTTP que chama Python, importa um script externo e
-> devolve um resultado pro C — avanço concreto e revisável antes de tocar no
-> loop da engine.
-
-## Etapa 4 — Chamadas repetidas e ponte Python → C (padrão de frame)
-
-- Expandir o teste para um callback por frame via
-  `emscripten_set_main_loop()`, com Python inicializado **uma única vez**
-  (não por frame).
-- C chama `update(dt, input)`; Python chama de volta uma pequena função
-  exposta pelo C para atualizar uma posição (round-trip bidirecional,
-  simulando o padrão real do BGE: engine chama script, script chama API da
-  engine).
-- O navegador precisa recuperar o controle entre frames — não pode haver
-  loop bloqueante. Ver
-  [Emscripten runtime environment](https://emscripten.org/docs/porting/emscripten-runtime-environment.html).
-
-**Aceite:** resultado correto sustentado por alguns minutos, página
-responsiva, sem crescimento contínuo inexplicado de memória. (Detecta
-problemas evidentes; não prova sozinho ausência de vazamentos — validação
-mais profunda fica para a integração real.)
-
-### Status (2026-09-12)
-
-- Módulo `game_logic.py` (`docs/web-python-poc-stage4-game_logic.py`):
-  `update(dt, input_left, input_right)` mantém uma posição em variável de
-  módulo e chama `stage4_engine.set_position(...)` — o módulo
-  `stage4_engine` é a "API da engine" exposta pelo C, não um arquivo
-  Python.
-- Programa em C (`docs/web-python-poc-stage4-test.c`): registra o módulo
-  embutido `stage4_engine` via `PyImport_AppendInittab` **antes** de
-  `Py_InitializeEx`, com um único método (`set_position`) que grava num
-  campo de uma `struct` estática (`Stage4State g_state`) — deliberadamente
-  **não** uma variável local de `main`, para não capturar um ponteiro que
-  sairia de escopo no callback assíncrono (risco citado em
-  `docs/web-integration-audit.md`, seção 3).
-- Loop por frame via `emscripten_set_main_loop(main_loop_iter, 0, 1)`
-  (fps=0 → usa `requestAnimationFrame`; `simulate_infinite_loop=1` → o
-  controle volta ao navegador entre frames, sem `while` bloqueante).
-  `Py_InitializeEx` roda uma única vez em `main`, antes do registro do
-  loop; cada iteração só chama `PyObject_CallObject` em `update`.
-- Padrão de input determinístico (sem depender de teclado real): move para
-  a direita por 90 frames, depois para a esquerda por mais 90 — simetria
-  escolhida para dar um valor final verificável (deve voltar a `0.0`) sem
-  provar por si só que a posição mudou no meio do caminho.
-- Compilou de primeira reusando o mesmo conjunto de libs/flags das Etapas
-  2–3 (`libpython3.11.a` + `libmpdec.a` + `libexpat.a` +
-  `-sUSE_ZLIB -sUSE_BZIP2 -sUSE_SQLITE3` + `-lpthread -ldl -lm`), com os
-  dois `--preload-file` de sempre (stdlib + assets do jogo).
-- Validado via Node (stdout/stderr separados): `STAGE4_INIT_OK aguardando
-  frames...`, depois `STAGE4_MEIO_CAMINHO frame=89 posicao=14.833333`
-  (confirma que a posição mudou de fato, não ficou travada em zero) e por
-  fim `STAGE4_OK frames=180 posicao_final=0.000000` — round-trip C → Python
-  → C sustentado por 180 chamadas de frame, sem crash, sem loop
-  bloqueante, sem reinicializar o Python a cada frame.
-- Servido via `python3 -m http.server 8767` dentro do WSL
-  (`test_stage4/index.html`, mesmo harness das etapas anteriores apontando
-  para `stage4_test.js`). HTTP 200 confirmado para a página e para o `.js`.
-  Pendente, como nas Etapas 2–3: confirmação visual em navegador real (sem
-  headless browser disponível neste ambiente).
-- **Limite explícito desta etapa**: 180 frames via Node não é o mesmo que
-  "alguns minutos" num navegador real com `requestAnimationFrame` de
-  verdade — fecha a prova de padrão (callback, round-trip, sem
-  reinicialização), não fecha sozinha a parte de estabilidade/memória do
-  aceite. Isso fica para quando o navegador rodar o teste por mais tempo.
-
-## Etapa 5 — Prova gráfica: SDL2 + WebGL + Python
-
-- Antes de tocar no `RangeRuntime`: programa separado que desenha um
-  triângulo/quadrado via SDL2 e o move com teclado real, usando a mesma
-  função Python da Etapa 4 para calcular a posição.
-- Alvo inicial proposto: **WebGL 2**, sujeito a confirmação com os caminhos
-  gráficos já existentes na engine (ver gaps de GLSL ES/WebGL 1 vs. 2 em
-  `docs/web-export-plan.md`).
-
-**Aceite:** desenho e movimento no navegador, sem erro de compilação de
-shader. Este marco comprova a combinação das tecnologias (Python + SDL2 +
-WebGL); a compatibilidade do renderizador *da engine* continua sendo uma
-etapa própria, não coberta por este teste isolado.
-
-### Status (2026-09-12)
-
-- Programa em C (`docs/web-python-poc-stage5-test.c`): reusa o mesmo
-  padrão da Etapa 4 (`stage4_engine.set_position`, `game_logic.update`),
-  acrescentando `SDL_Init(SDL_INIT_VIDEO)`, criação de janela/contexto
-  `SDL_GL_CONTEXT_PROFILE_ES` (WebGL 2), leitura de teclado real via
-  `SDL_GetKeyboardState` (`A`/`D`) em vez do padrão determinístico da
-  Etapa 4, e desenho de um quadrado (via `glScissor`+`glClear`, sem
-  depender de pipeline de shader/VBO) cuja posição horizontal reflete a
-  variável atualizada pelo Python.
-- Compilado com `-sUSE_SDL=2 -sMIN_WEBGL_VERSION=2 -sMAX_WEBGL_VERSION=2`,
-  além do mesmo conjunto de libs/flags do Python usado nas Etapas 2–4.
-  Primeira compilação: o Emscripten baixou e cacheou automaticamente o
-  port `sdl2` (`libSDL2.a`) — sem intervenção manual, sem erro de link.
-- **Validação via Node não fechou esta etapa** (esperado, conforme o
-  próprio texto da Etapa 5 e da Etapa 2): falhou em
-  `_emscripten_get_screen_size` com `ReferenceError: screen is not
-  defined` — Node não tem `window`/`screen`/WebGL. Isso não é um bug a
-  corrigir; é a ausência de DOM do Node, motivo pelo qual esta etapa
-  **depende do navegador real** para fechar (diferente das Etapas 2–4,
-  que puderam ser pré-validadas fora do navegador).
-- Servido via `python3 -m http.server 8768` dentro do WSL
-  (`test_stage5/index.html`, mesmo harness, apontando para
-  `stage5_test.js`). HTTP 200 confirmado para página, `.js` e `.wasm`.
-  **Pendente integralmente**: confirmação visual em navegador real —
-  contexto WebGL criado com sucesso, quadrado desenhado, e movimento com
-  teclas A/D. Sem headless browser neste ambiente, este é o primeiro teste
-  da PoC que não pôde ser parcialmente pré-validado por mim antes da
-  checagem do usuário.
-
-## Etapa 6 — Integração ao RangeRuntime em partes verificáveis
-
-- Preparar o preset `web-runtime` para o build a partir do WSL (hoje ele
-  ainda aponta para o Ninja do Windows e mantém `WITH_PYTHON=OFF` e
-  emulação de OpenGL legado — precisa de ajuste próprio, não é só apontar
-  `PYTHON_LIBRARY`/`PYTHON_INCLUDE_DIR`).
-- Religar `WITH_PYTHON=ON` e resolver as dependências obrigatórias
-  identificadas nas explorações anteriores.
-- **Atenção**: `NODERAWFS` é usado hoje só para os geradores de dados
-  (`datatoc`/`makesdna`/`makesrna`) rodarem sob Node durante o build — é
-  exclusivo desse ambiente de ferramenta e **não deve** ser levado ao
-  runtime final servido no navegador. Ver
-  [NODERAWFS](https://emscripten.org/docs/api_reference/Filesystem-API.html#noderawfs).
-- Adaptar inicialização, execução por frame (`emscripten_set_main_loop`) e
-  encerramento em mudanças pequenas, verificadas uma a uma:
-  inicialização → carregamento do `.range` → cena desenhada → controller
-  Python → resposta a teclado.
-
-**Aceite decisivo:** cubo da engine, movido por um Python Controller real,
-rodando no navegador — validação visual + logs sem falha.
-
-### Status (2026-09-12)
-
-- Artefatos do CPython wasm (Etapas 2–5) relocados do diretório de trabalho
-  do WSL (`~/web-python-poc/cpython/builddir/emscripten-browser/`, fora do
-  repo) para um caminho estável acessível pelo build Windows/Ninja:
-  `D:\python-wasm-web`, em layout Unix-like (`include/python3.11/`,
-  `lib/libpython3.11.a`, `lib/libmpdec.a`, `lib/libexpat.a`,
-  `lib/python3.11/` + `lib/python311.zip` para a stdlib).
-- `source/CMakePresets.json` (preset `web-runtime`): `WITH_PYTHON` religado
-  para `ON`, com `PYTHON_VERSION=3.11` e `PYTHON_ROOT_DIR=D:/python-wasm-web`.
-  Adicionado também `CMAKE_FIND_ROOT_PATH_MODE_INCLUDE=BOTH` e
-  `CMAKE_FIND_ROOT_PATH_MODE_LIBRARY=BOTH` — sem isso o `find_package` só
-  enxerga o sysroot do Emscripten e não encontra o Python fora dele.
-- `source/build_files/cmake/platform/platform_web.cmake` (antes um stub
-  vazio): adicionado `find_package(PythonLibsUnix REQUIRED)` sob
-  `WITH_PYTHON`, espelhando o que `platform_unix.cmake` já fazia.
-- **Configure passa limpo** com essas mudanças — `PythonLibsUnix` é
-  encontrado e linkado.
-- **Build trava em `[49/1688]`, antes de qualquer código do Python ou do
-  renderer**: as ferramentas geradoras de código do próprio processo de
-  build (`makesdna`, `datatoc`, conversor de shaders GLSL→C) estão sendo
-  compiladas para `wasm32-emscripten` (`.js`) em vez de nativas, e o Ninja
-  tenta rodá-las via `cmd.exe` no host Windows, que não sabe executar um
-  `.js` diretamente. Esse problema é **anterior e independente** da mudança
-  de Python — é uma lacuna estrutural do preset `web-runtime`: essas
-  ferramentas geram `.c`/`.h` consumidos pelo próprio build e por isso
-  precisam rodar no host, não no alvo wasm.
-- Correção provável: passe de build separado (nativo, Windows) só para
-  `makesdna`/`datatoc`/o conversor de shaders, usado como
-  `IMPORTED EXECUTABLE`/`ExternalProject` pelo passe Emscripten — não
-  decidido nem implementado ainda; ver nota abaixo sobre a regra anti-loop.
-- Pausado aqui por decisão do usuário (sessão longa) antes de investigar o
-  dual-toolchain. Próximo passo ao retomar: decidir e implementar como
-  compilar essas ferramentas geradoras como binários nativos dentro do
-  preset `web-runtime`.
-
-### Status (2026-09-12, continuação — build limpo + primeiro teste no navegador)
-
-- O dual-toolchain (`makesdna`/`datatoc`/`makesrna` nativos vs. runtime
-  wasm) foi resolvido em sessões seguintes; o preset `web-runtime` hoje
-  compila essas ferramentas geradoras nativamente e o restante do alvo
-  como wasm. Detalhes incrementais dessas correções (guarda de áudio,
-  remoção de Boost, fallback de TBB, fallback de GL query,
-  `BLI_STATIC_ASSERT` + contorno de RNA range-check, stubs de protótipo,
-  fix da lib GLEW, OpenMP/mpdec/expat, stub de `sound.c`, flags de porta
-  bz2/sqlite3) ficaram registrados nos logs de build da sessão
-  (`build-web-log*.txt`, não versionados) e nas mensagens de commit
-  correspondentes.
-- Nesta continuação, restavam três símbolos indefinidos no link final,
-  todos vindos de `libbf_python_ext.a(bgl.c.o)` — ou seja, do módulo
-  Python `bgl` (`source/blender/python/generic/bgl.c`), que expõe
-  chamadas GL/GLU cruas a scripts Python via as macros `BGL_Wrap`/
-  `BGLU_Wrap`, e não do caminho de renderização C++ da engine:
-  - `glLogicOp` — sem equivalente em `libglemu.js` (WebGL/GLES não têm
-    estágio de logic-op de função fixa); resolvido com um stub no-op em
-    `source/blender/gpu/intern/gpu_basic_shader.c` (`#ifdef __EMSCRIPTEN__`).
-  - `glMaterialf` — `libglemu.js` implementa `glMaterialfv` mas não a
-    variante escalar; resolvido encaminhando para `glMaterialfv` (mesmo
-    padrão já usado para `glLightf` em sessão anterior).
-  - `gluPickMatrix` — seleção/picking do GLU, fora do subconjunto mínimo
-    de GLU do Emscripten (`gluLookAt`/`gluOrtho2D`/etc.); resolvido com
-    stub no-op.
-- **Build web limpo**: com esses três shims, `build-web-log20.txt` fechou
-  com `BUILD_EXIT=0`, sem símbolos indefinidos, produzindo
-  `build-web/bin/RangeRuntime.js` (692.753 bytes) e
-  `build-web/bin/RangeRuntime.wasm` (19.810.531 bytes).
-- **Primeiro teste no navegador** (harness mínimo `build-web/bin/test.html`
-  + `python -m http.server` local + Chrome headless com log verboso,
-  na ausência de uma ferramenta de automação de navegador dedicada):
-  o wasm carrega, a emulação de OpenGL de função fixa inicializa (aviso
-  esperado do próprio Emscripten sobre `LEGACY_GL_EMULATION`), e o
-  `Py_Initialize` do CPython embarcado começa e imprime corretamente toda
-  a configuração de `sys.path`/`sys.prefix` apontando para
-  `/usr/local/lib/python3.11` — mas falha em seguida com:
-  ```
-  Fatal Python error: init_fs_encoding: failed to get the Python codec of the filesystem encoding
-  ModuleNotFoundError: No module named 'encodings'
-  ```
-  **Causa raiz identificada**: `CMAKE_EXE_LINKER_FLAGS` do preset
-  `web-runtime` (`source/CMakePresets.json`) nunca inclui a flag
-  `--preload-file=<...>/usr/local@/usr/local` que o próprio plano já
-  especifica (ver Etapa 2/3 acima) — sem ela, a stdlib do CPython nunca é
-  empacotada no filesystem virtual do Emscripten, então `encodings` (e
-  qualquer outro módulo da stdlib) não existe em tempo de execução, mesmo
-  que `sys.path` aponte para os caminhos "certos". Resultado: a
-  inicialização não passa do arranque do CPython — nenhuma cena chega a
-  ser carregada, porque o carregamento de `.range`/Python Controller só
-  acontece depois de `Py_Initialize` completar.
-  **Isto é apenas um build limpo, não uma validação de que o port
-  funciona** — a barra de aceite da Etapa 6 (cubo real, controlado por
-  Python, rodando no navegador) ainda não foi atingida.
-  **Próximo passo concreto**: adicionar `--preload-file` ao
-  `CMAKE_EXE_LINKER_FLAGS` do preset `web-runtime`, apontando para o
-  prefixo `/usr/local` do CPython wasm compilado (`D:\python-wasm-web`),
-  e reexecutar o teste no navegador para confirmar que `encodings` passa
-  a ser encontrado.
-
-## Etapa 7 — Depois do cubo: rumo a um jogo exportável
-
-- Áudio (OpenAL via Emscripten), saves persistentes (IDBFS, agora sim
-  aplicável), shaders restantes, módulos Python usados pelos jogos reais,
-  tamanho de download, orçamento de memória, requisitos de hospedagem
-  (COOP/COEP se threads reais forem necessárias).
-- Registrar recursos suportados e limitações observadas como conclusão
-  formal do port.
-
-## Nota sobre bugs secundários já mapeados
-
-Em vez de "resolver Boost/TBB/codecs de imagem conforme o build reclamar"
-(abordagem reativa usada até aqui), fazer um **inventário curto dessas
-dependências antes do build completo da Etapa 6** — mantendo, ainda assim,
-correções isoladas uma por vez e a regra anti-loop do repositório:
-
-- Após duas tentativas falhas de resolver o mesmo erro de build, parar e
-  pedir orientação ao usuário, mesmo que os comandos tenham mudado.
-- Se o erro aparecer duas vezes seguidas de forma idêntica, não repetir o
-  comando pela terceira vez; ler o erro completo e identificar a causa.
-- Se um fix conhecido resultar em um erro diferente, parar e relatar o
-  erro exato ao usuário, conforme o `AGENTS.md`, sem testar variações às cegas.
-
-## Divisão de trabalho (Claude + Codex, em paralelo)
-
-Para não haver conflito de arquivos nem retrabalho, o trabalho foi dividido
-em duas frentes independentes que convergem na Etapa 6:
-
-- **Claude** segue a cadeia 0 → 6: ambiente WSL, compilação do CPython
-  wasm32-emscripten, testes mínimos C↔Python (Etapas 0–5), preparando o
-  binário/headers que a integração final vai consumir.
-- **Codex** audita, em paralelo e sem alterar código nem build, o que a
-  integração final (Etapa 6) vai exigir, registrando os achados em
-  `docs/web-integration-audit.md` (documento próprio, separado deste):
-  - Dependências necessárias para a primeira cena (o que pode ficar
-    desligado sem quebrar o teste do cubo).
-  - Mapeamento do loop principal da engine: onde adaptar a execução ao
-    navegador (`emscripten_set_main_loop`), incluindo chamadas ao Python e
-    processamento de input.
-  - Auditoria do renderer para WebGL: usos de OpenGL incompatíveis,
-    separando bloqueios reais de itens opcionais.
-  - Critérios claros do teste final (Etapa 6): cena mínima com cubo,
-    controller Python e teclado — o que precisa ser verdade para considerar
-    "funcionou".
-
-Ponto de encontro: quando o binário Python da Claude estiver pronto (fim da
-Etapa 3/5) e a auditoria da Codex estiver documentada, a Etapa 6 usa os dois
-resultados juntos. Nenhuma das duas frentes deve, por enquanto, compilar a
-engine inteira, fixar decisão definitiva de threads, ou alterar o renderer —
-isso é trabalho da própria Etapa 6, feito depois que as duas partes
-convergirem.
+Configure, build e carga no Chrome headless passam (`tools/web/verify-package.cjs`: cena convertida,
+texturas e materiais sem `alignment fault`). Falta o teste ponta a ponta jogável/visual antes de
+refazer o pacote Linux com `web/` (ver roadmap).
 
 ## Referências
 
-- `docs/web-export-plan.md` — levantamento e histórico de bugs já corrigidos
-  no build Emscripten da engine.
-- `docs/changelog.md` — entradas de 2026-09-12 com os fixes aplicados até
-  agora.
+- [web-integration-audit.md](web-integration-audit.md): auditoria da integração (Codex).
 - [Emscripten: packaging files](https://emscripten.org/docs/porting/files/packaging_files.html)
 - [Emscripten: Filesystem API](https://emscripten.org/docs/api_reference/Filesystem-API.html)
 - [Emscripten: runtime environment](https://emscripten.org/docs/porting/emscripten-runtime-environment.html)
-
-### Atualização 2026-09-13 — leitura de `.range` no wasm32
-
-- O preload da stdlib foi incorporado ao alvo web e o `Py_Initialize` passou da falha de `encodings`. A leitura de `untitled.range` chegou ao bloco `GLOB` e ao `ENDB` sem crash.
-- Foram corrigidos dois casos de alinhamento estrito do wasm32: structs reconstruídas pelo SDNA agora usam alocação alinhada a 8 bytes, e `Main` também é alocado com esse alinhamento. O primeiro acesso que comprovava o problema era `FileGlobal.build_commit_timestamp` (`uint64_t`).
-- `blo_nextbhead` também passou a calcular o endereço do `BHeadN` com aritmética explícita em `char *`, evitando o underflow unsigned de `POINTER_OFFSET`.
-- O build incremental de `RangeRuntime` terminou com sucesso após a limpeza da instrumentação temporária. O teste em Chrome com janela real confirmou que `could not create main window` também ocorria fora do headless. O SDL agora solicita GLES 2 explicitamente e cria um canvas WebGL de 640×480; a inicialização também usa a extensão WebGL de VAO e ignora placeholders 1D/3D inexistentes no WebGL 1. O bloqueio seguinte é portar os shaders GLSL desktop (`#version 120`) para GLSL ES antes de executar a cena.
-
-### Atualização 2026-10-13 — build em host Linux nativo (sem WSL) + Python wasm32 compilado + correção de alignment fault
-
-**Resumo para quem continuar (Codex ou outra sessão): o build Web completo agora funciona num host Linux puro, Python roda dentro do engine e a cena com PNG carrega. O próximo marco é validar uma sessão jogável/visual; não há mais crash de alinhamento nesse caminho.**
-
-O que foi feito nesta sessão:
-
-1. **CPython 3.11 cross-compilado para wasm32-emscripten num host Linux nativo** (sem WSL/Windows), reproduzindo o mesmo artefato que antes só existia em WSL. Commit da revisão pinada em `Versões fixadas (2026-09-12)` (`9eaf48a56547872b86de5cecbaa7edd3279159ed`), emsdk 6.0.9.
-   - Local: `~/web-python-poc/cpython` (fora do repo, não versionado).
-   - Processo: `python3 Tools/wasm/wasm_build.py --verbose emscripten-browser build`, usando um `EM_CONFIG` próprio (`~/web-python-poc/emscripten-config`) com os caminhos do emsdk **expandidos literalmente** — `wasm_build.py` faz `exec()` cru do arquivo apontado por `EM_CONFIG` e não resolve o `$CFGDIR` que o `~/emsdk/.emscripten` usa. Não altere o `.emscripten` principal do emsdk por causa disso; ele é usado por outras coisas (toolchain file do CMake, `emcc` direto).
-   - Smoke test isolado: `node python.js -c "print(42*2)"` → `84`.
-2. **Diretório curado em `~/web-python-poc/python-wasm-web`** no formato que `build_files/cmake/Modules/FindPythonLibsUnix.cmake` exige (não é o mesmo layout que o build do CPython produz por padrão):
-   - `include/python3.11/` — `Include/*.h` do source do CPython + `pyconfig.h` do build wasm32.
-   - `lib/libpython3.11.a`, `lib/libexpat.a`, `lib/libmpdec.a` — as duas últimas são necessárias por `audaspace-py` (`extern/audaspace`) e ficam em `Modules/expat/` e `Modules/_decimal/libmpdec/` dentro do builddir do CPython, fáceis de esquecer.
-   - `lib/python3.11/` — cópia do `Lib/` fonte do CPython (não o `usr/local/lib/python3.11` do build, que só tem `os.py` + `lib-dynload`; falta `abc.py` etc. ali).
-   - `lib/python311.zip` — copiado de `builddir/emscripten-browser/usr/local/lib/python311.zip`. **Fácil de esquecer**: sem ele o link final do `RangeRuntime.js` falha tarde, no `file_packager` (`--preload-file=.../python311.zip does not exist`), depois de ~1887 alvos já terem compilado.
-3. **Corrigido `source/CMakePresets.json`**: a lista `inherits` de `web-runtime-release-linux` estava na ordem errada (`["web-runtime-release", "web-runtime-linux"]`). O CMake dá prioridade ao *primeiro* preset da lista em `cacheVariables` conflitantes, então os caminhos Windows de `web-runtime-release` (via `web-runtime`) vinham na frente dos caminhos Linux. Corrigido invertendo a ordem **e** adicionando as flags de release (`CMAKE_C_FLAGS`/`CMAKE_CXX_FLAGS`/`CMAKE_EXE_LINKER_FLAGS` sem `SAFE_HEAP`/`ASSERTIONS`/`-g2`) diretamente no preset `web-runtime-release-linux`, para não depender da ordem de `inherits` de novo.
-4. **Configure (`cmake --preset web-runtime-release-linux`) passou por completo**, incluindo o `FindPythonLibsUnix` que travava antes por falta do CPython wasm32. Variável de ambiente usada: `PYTHON_WASM_ROOT_DIR=~/web-python-poc/python-wasm-web` (consumida pelo preset via `PYTHON_ROOT_DIR = "$env{PYTHON_WASM_ROOT_DIR}"`).
-5. **Build (`cmake --build build-web-release --target RangeRuntime`) terminou com sucesso** — todos os 1887 alvos, incluindo `ge_ketsji`, `ge_logic_bricks`, `bf_python*`. Gerou `RangeRuntime.{js,wasm,data}` em `build-web-release/bin/`.
-6. **Teste real em `google-chrome --headless=new` servindo via `tools/web/package-web.py`** com o jogo `tools/ADD na engine anastacioEngine/WEB_TESTE_2D.range`:
-   - Runtime inicializa, idbfs sincroniza, **Python executa de fato** (`Warning: Python compatibility: restored 24 legacy collections aliases from collections.abc.` só aparece se o interpretador correu).
-   - A cena carrega (`[Load] convert "Scene": 34 objects, meshes 30...`).
-   - **Crash imediatamente depois, ao converter a primeira textura**: `Aborted(alignment fault)` em `IMB_initImBuf`, chamado por `imb_loadpng` → `IMB_ibImageFromMemory` → `load_image_single` → `image_load_image_file` → `image_acquire_ibuf` → `BKE_image_acquire_ibuf` → `GPU_texture_from_blender` → `BL_Texture::BL_Texture(MTex*)` → `BL_PostConvertBlenderObjects`. Stack trace completo capturado via Chrome DevTools Protocol (script Python ad-hoc com `urllib`+socket cru, sem dependências, em `cdp_client.py`; útil se precisar repetir — não versionado).
-   - **Hipótese provável**: mesma classe de bug já corrigida no bloco acima (structs alocadas sem alinhamento de 8 bytes em wasm32) — mas agora dentro do decoder PNG (`imb_loadpng`/`IMB_initImBuf`), não no loader `.range`/SDNA. Provavelmente um campo de `ImBuf` ou da struct interna do libpng acessado como tipo largo (uint64/double) num endereço não alinhado, ou um `malloc` que a libc do CPython/Emscripten não garante alinhado a 8 nesse caminho específico.
-   - **Próximo passo sugerido**: inspecionar `IMB_allocImBuf`/`IMB_initImBuf` em `source/blender/imbuf/intern/allocimbuf.c` (ou equivalente) e `imb_loadpng` em `source/blender/imbuf/intern/png.c`, seguindo o mesmo padrão dos fixes de 2026-09-13 acima (alocação alinhada a 8 bytes para a struct afetada). Regra anti-loop do `AGENTS.md` continua valendo: se duas tentativas de fix não resolverem ou mudarem o erro, parar e reportar.
-7. **Pacote de teste gerado** com `tools/web/package-web.py --runtime-dir build-web-release/bin` (109 MiB, build ainda com flags de debug na hora do teste — o fix do item 3 veio depois; refazer o build e reempacotar antes do próximo teste para medir o tamanho real de release).
-8. **Correção e validação do alignment fault (continuação em 2026-10-13):** `ImBuf` tem `double ppm[2]`, mas `IMB_allocImBuf` usava `MEM_mallocN`, cujo caminho lock-free do wasm32 pode retornar alinhamento de apenas 4 bytes. A primeira escrita de `ppm` em `IMB_initImBuf` causava o aborto. A alocação passou a usar `MEM_mallocN_aligned(sizeof(ImBuf), 8, "ImBuf_struct")`; `MEM_freeN` continua sendo o par correto. Após reconfigurar o preset Linux release (removendo também as flags de debug antigas) e recompilar o `RangeRuntime`, `tools/web/verify-package.cjs` no Chrome headless confirmou: cena convertida, texturas em 90 ms, oito materiais compilados e nenhum `alignment fault`/aborto. O pacote temporário mediu 102,2 MiB; isso fecha o carregamento automatizado, não uma avaliação visual/jogável.
-
-Nada disso foi commitado como binário: `~/web-python-poc/` inteiro (CPython fonte, builddir, diretório curado `python-wasm-web`) fica fora do repositório. Só o fix do `CMakePresets.json` e esta nota de status vão para o git.
