@@ -456,6 +456,30 @@ void rna_reverb_area_apply_preset(RangeReverbAreaSettings *ra, int preset)
 		                               REVERB_AREA_FILTER_HIGHPASS, 0.7f, 0.4f, 1.0f},
 	};
 
+	if (preset <= REVERB_AREA_PRESET_CUSTOM || preset > REVERB_AREA_PRESET_FOREST) {
+		/* Custom: keep whatever the user set. */
+		return;
+	}
+
+	ra->density = presets[preset].density;
+	ra->diffusion = presets[preset].diffusion;
+	ra->gain = presets[preset].gain;
+	ra->gain_hf = presets[preset].gain_hf;
+	ra->decay_time = presets[preset].decay_time;
+	ra->decay_hf_ratio = presets[preset].decay_hf_ratio;
+	ra->reflections_gain = presets[preset].refl_gain;
+	ra->reflections_delay = presets[preset].refl_delay;
+	ra->late_reverb_gain = presets[preset].late_gain;
+	ra->late_reverb_delay = presets[preset].late_delay;
+	ra->air_absorption_gain_hf = presets[preset].air_abs_hf;
+	ra->room_rolloff_factor = presets[preset].room_rolloff;
+	ra->decay_limit_hf = presets[preset].decay_limit_hf;
+	ra->filter_type = presets[preset].filter_type;
+	ra->filter_gain = presets[preset].filter_gain;
+	ra->filter_gain_lf = presets[preset].filter_gain_lf;
+	ra->filter_gain_hf = presets[preset].filter_gain_hf;
+}
+
 /* Keeps the Empty's viewport display matching the area shape, so what is drawn is the area. */
 void rna_reverb_area_sync_empty_draw(Object *ob)
 {
