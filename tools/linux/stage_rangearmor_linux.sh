@@ -1,7 +1,7 @@
 #!/bin/bash
 # Monta RangeArmor-<versao>-linux-x86_64.tar.xz: painel Rust compilado no Linux + release/ do git
 # (data, icons, scripts) + release/launcher/ do zip Windows da mesma versao (Launcher Linux, Launcher.exe e
-# launcher.py minificado; os launchers nao ficam no git). Ver docs/release-0.5.3.md.
+# launcher.py minificado; os launchers nao ficam no git). Ver docs/releases.md (0.5.3).
 # Painel (glibc max. 2.30), na raiz do repo:
 #   podman run --rm -v $PWD/tools/rangearmor:/ra:Z -v <target>:/target:Z -e CARGO_TARGET_DIR=/target \
 #     docker.io/library/rust:1.95-bullseye bash -c "cd /ra/source/gui-rs && cargo build --release --locked"
@@ -25,7 +25,7 @@ install -m755 "$panel" "$stage/RangeArmor Panel"
 strip "$stage/RangeArmor Panel"
 chmod +x "$stage/release/launcher/Launcher"
 cp "$ra/LICENSE" "$stage/LICENSE"
-# O Launcher Linux registrado em legacy-template-sha256.json/release-0.5.2.md e o 3cb1ade9...
+# O Launcher Linux registrado em legacy-template-sha256.json/docs/releases.md e o 3cb1ade9...
 sha256sum "$stage/release/launcher/Launcher" | grep -q '^3cb1ade91d3440c3'
 
 tar -C "$(dirname "$stage")" -cJf "$out/$pkg.tar.xz" "$pkg"

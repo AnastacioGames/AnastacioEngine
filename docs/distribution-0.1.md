@@ -63,7 +63,7 @@ build/dist/
   versionamento (`tools/RangeArmor-master/` continua ignorado pelo Git). O painel (GUI,
   Rust/eframe, com Godot preservado como backup) roda no Windows e, desde a 0.5.3, também no Linux:
   `RangeArmor-<versao>-linux-x86_64.tar.xz`, montado por `tools/linux/stage_rangearmor_linux.sh`
-  (ver `docs/release-0.5.3.md`).
+  (ver [releases.md](releases.md#053)).
 - `SHA256SUMS.txt`: hashes SHA-256 de todos os artefatos da release (Windows e Linux); publicar junto dos
   arquivos para permitir verificação de integridade por quem baixar.
 

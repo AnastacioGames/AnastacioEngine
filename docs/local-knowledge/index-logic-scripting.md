@@ -7,14 +7,14 @@
 
 | arquivo | linhas | classes |
 |---|---:|---|
-| SCA_2DFilterActuator.cpp | 206 | `SCA_2DFilterActuator` |
-| SCA_2DFilterActuator.h | 76 | `SCA_2DFilterActuator` |
+| SCA_2DFilterActuator.cpp | 214 | `SCA_2DFilterActuator` |
+| SCA_2DFilterActuator.h | 80 | `SCA_2DFilterActuator` |
 | SCA_ANDController.cpp | 124 | `SCA_ANDController` |
 | SCA_ANDController.h | 51 | `SCA_ANDController` |
 | SCA_ActuatorEventManager.cpp | 64 | `SCA_ActuatorEventManager` |
 | SCA_ActuatorEventManager.h | 46 | `SCA_ActuatorEventManager` |
-| SCA_ActuatorSensor.cpp | 172 | `SCA_ActuatorSensor` |
-| SCA_ActuatorSensor.h | 70 | `SCA_ActuatorSensor` |
+| SCA_ActuatorSensor.cpp | 205 | `SCA_ActuatorSensor` |
+| SCA_ActuatorSensor.h | 84 | `SCA_ActuatorSensor` |
 | SCA_AlwaysSensor.cpp | 139 | `SCA_AlwaysSensor` |
 | SCA_AlwaysSensor.h | 53 | `SCA_AlwaysSensor` |
 | SCA_AnimationEventSensor.cpp | 184 | `SCA_AnimationEventSensor` |
@@ -27,20 +27,20 @@
 | SCA_EventManager.h | 84 | `SCA_EventManager` |
 | SCA_ExpressionController.cpp | 154 | `SCA_ExpressionController` |
 | SCA_ExpressionController.h | 63 | `SCA_ExpressionController` |
-| SCA_IActuator.cpp | 168 | `SCA_IActuator` |
-| SCA_IActuator.h | 152 | `SCA_IActuator` |
+| SCA_IActuator.cpp | 193 | `SCA_IActuator` |
+| SCA_IActuator.h | 183 | `SCA_IActuator` |
 | SCA_IController.cpp | 283 | `SCA_IController` |
-| SCA_IController.h | 90 | `SCA_IController` |
+| SCA_IController.h | 91 | `SCA_IController` |
 | SCA_IInputDevice.cpp | 191 | `SCA_IInputDevice` |
 | SCA_IInputDevice.h | 249 | `SCA_IInputDevice` |
-| SCA_ILogicBrick.cpp | 178 | `SCA_ILogicBrick` |
-| SCA_ILogicBrick.h | 144 | `SCA_ILogicBrick` |
+| SCA_ILogicBrick.cpp | 187 | `SCA_ILogicBrick` |
+| SCA_ILogicBrick.h | 153 | `SCA_ILogicBrick` |
 | SCA_IObject.cpp | 386 | `SCA_IObject` |
 | SCA_IObject.h | 181 | `SCA_IObject` |
 | SCA_IScene.cpp | 121 | `SCA_IScene` |
 | SCA_IScene.h | 69 | `SCA_DebugProp`, `SCA_IScene` |
-| SCA_ISensor.cpp | 496 | `SCA_ISensor` |
-| SCA_ISensor.h | 207 | `SCA_ISensor` |
+| SCA_ISensor.cpp | 520 | `SCA_ISensor` |
+| SCA_ISensor.h | 218 | `SCA_ISensor` |
 | SCA_InputEvent.cpp | 228 | `SCA_InputEvent` |
 | SCA_InputEvent.h | 89 | `SCA_InputEvent` |
 | SCA_JoystickManager.cpp | 63 | `SCA_JoystickManager` |
@@ -49,25 +49,25 @@
 | SCA_JoystickSensor.h | 200 | `SCA_JoystickSensor` |
 | SCA_KeyboardManager.cpp | 71 | `SCA_KeyboardManager` |
 | SCA_KeyboardManager.h | 54 | `SCA_KeyboardManager` |
-| SCA_KeyboardSensor.cpp | 377 | `SCA_KeyboardSensor` |
+| SCA_KeyboardSensor.cpp | 373 | `SCA_KeyboardSensor` |
 | SCA_KeyboardSensor.h | 112 | `SCA_KeyboardSensor` |
-| SCA_LogicManager.cpp | 325 | `SCA_LogicManager` |
-| SCA_LogicManager.h | 159 | `SCA_LogicManager` |
-| SCA_MouseManager.cpp | 95 | `SCA_MouseManager` |
+| SCA_LogicManager.cpp | 339 | `SCA_LogicManager` |
+| SCA_LogicManager.h | 174 | `SCA_LogicManager` |
+| SCA_MouseManager.cpp | 102 | `SCA_MouseManager` |
 | SCA_MouseManager.h | 55 | `SCA_MouseManager` |
-| SCA_MouseSensor.cpp | 247 | `SCA_MouseSensor` |
-| SCA_MouseSensor.h | 112 | `SCA_MouseSensor` |
+| SCA_MouseSensor.cpp | 261 | `SCA_MouseSensor` |
+| SCA_MouseSensor.h | 118 | `SCA_MouseSensor` |
 | SCA_NANDController.cpp | 126 | `SCA_NANDController` |
 | SCA_NANDController.h | 52 | `SCA_NANDController` |
 | SCA_NORController.cpp | 126 | `SCA_NORController` |
 | SCA_NORController.h | 48 | `SCA_NORController` |
 | SCA_ORController.cpp | 123 | `SCA_ORController` |
 | SCA_ORController.h | 49 | `SCA_ORController` |
-| SCA_PropertyActuator.cpp | 327 | `SCA_PropertyActuator` |
-| SCA_PropertyActuator.h | 92 | `SCA_PropertyActuator` |
-| SCA_PropertySensor.cpp | 376 | `SCA_PropertySensor` |
+| SCA_PropertyActuator.cpp | 392 | `SCA_PropertyActuator` |
+| SCA_PropertyActuator.h | 102 | `SCA_PropertyActuator` |
+| SCA_PropertySensor.cpp | 379 | `SCA_PropertySensor` |
 | SCA_PropertySensor.h | 104 | `SCA_PropertySensor` |
-| SCA_PythonController.cpp | 508 | `SCA_PythonController` |
+| SCA_PythonController.cpp | 511 | `SCA_PythonController` |
 | SCA_PythonController.h | 120 | `SCA_PythonController` |
 | SCA_RandomActuator.cpp | 569 | `SCA_RandomActuator` |
 | SCA_RandomActuator.h | 120 | `SCA_RandomActuator` |
@@ -76,10 +76,12 @@
 | SCA_RandomSensor.cpp | 187 | `SCA_RandomSensor` |
 | SCA_RandomSensor.h | 71 | `SCA_RandomSensor` |
 | SCA_RuntimeProperty.h | 18 | `SCA_RuntimePropertyValue` |
-| SCA_TimeEventManager.cpp | 112 | `SCA_TimeEventManager` |
+| SCA_TimeEventManager.cpp | 113 | `SCA_TimeEventManager` |
 | SCA_TimeEventManager.h | 56 | `SCA_TimeEventManager` |
 | SCA_VibrationActuator.cpp | 197 | `SCA_VibrationActuator` |
 | SCA_VibrationActuator.h | 72 | `SCA_VibrationActuator` |
+| SCA_WaitActuator.cpp | 146 | `SCA_WaitActuator` |
+| SCA_WaitActuator.h | 60 | `SCA_WaitActuator` |
 | SCA_XNORController.cpp | 129 | `SCA_XNORController` |
 | SCA_XNORController.h | 53 | `SCA_XNORController` |
 | SCA_XORController.cpp | 128 | `SCA_XORController` |
@@ -109,7 +111,7 @@
 | EXP_Python.h | 80 |  |
 | EXP_PythonCallBack.h | 55 |  |
 | EXP_StringValue.h | 56 | `EXP_StringValue` |
-| EXP_Value.h | 202 | `EXP_Value`, `EXP_PropValue` |
+| EXP_Value.h | 207 | `EXP_Value`, `EXP_PropValue` |
 
 ## source/source/gameengine/Expressions/intern
 
@@ -168,9 +170,9 @@
 
 | arquivo | linhas | classes |
 |---|---:|---|
-| bgl.c **grande** | 3768 |  |
+| bgl.c **grande** | 3784 |  |
 | bgl.h | 57 |  |
-| blf_py_api.c | 464 |  |
+| blf_py_api.c | 491 |  |
 | blf_py_api.h | 26 |  |
 | bpy_internal_import.c | 373 |  |
 | bpy_internal_import.h | 56 |  |
@@ -189,7 +191,7 @@
 |---|---:|---|
 | bpy.c | 374 |  |
 | bpy.h | 33 |  |
-| bpy_app.c | 426 |  |
+| bpy_app.c | 435 |  |
 | bpy_app.h | 26 |  |
 | bpy_app_alembic.c | 107 |  |
 | bpy_app_alembic.h | 29 |  |
@@ -230,7 +232,7 @@
 | bpy_path.h | 27 |  |
 | bpy_props.c **grande** | 3518 |  |
 | bpy_props.h | 44 |  |
-| bpy_rna.c **grande** | 8553 |  |
+| bpy_rna.c **grande** | 8632 |  |
 | bpy_rna.h | 225 |  |
 | bpy_rna_anim.c | 508 |  |
 | bpy_rna_anim.h | 34 |  |
@@ -249,7 +251,7 @@
 | bpy_utils_previews.h | 26 |  |
 | bpy_utils_units.c | 333 |  |
 | bpy_utils_units.h | 26 |  |
-| gpu.c | 358 |  |
+| gpu.c | 362 |  |
 | gpu.h | 33 |  |
 | gpu_offscreen.c | 410 |  |
 | stubs.c | 40 |  |

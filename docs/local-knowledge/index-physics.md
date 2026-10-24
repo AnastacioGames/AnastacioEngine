@@ -9,13 +9,15 @@
 |---|---:|---|
 | CcdConstraint.cpp | 207 | `CcdConstraint` |
 | CcdConstraint.h | 39 | `CcdConstraint` |
+| CcdCookedData.cpp | 510 |  |
+| CcdCookedData.h | 55 |  |
 | CcdGraphicController.cpp | 134 | `CcdGraphicController` |
 | CcdGraphicController.h | 97 | `CcdGraphicController` |
 | CcdMathUtils.h | 54 |  |
-| CcdPhysicsController.cpp **grande** | 2593 | `CcdPhysicsController`, `CcdCharacter`, `CcdShapeConstructionInfo`, `DefaultMotionState`, `CleanPairCallback` |
-| CcdPhysicsController.h | 976 | `CcdShapeConstructionInfo`, `UVco`, `CcdConstructionInfo`, `CcdCharacter`, `CleanPairCallback`, `CcdPhysicsController` |
-| CcdPhysicsEnvironment.cpp **grande** | 3830 | `CcdPhysicsEnvironment`, `CcdCollData`, `CcdOverlapFilterCallBack` |
-| CcdPhysicsEnvironment.h | 361 | `CcdPhysicsEnvironment`, `CollisionPair`, `CcdCollData` |
+| CcdPhysicsController.cpp **grande** | 3274 | `CcdPhysicsController`, `CcdCharacter`, `CcdShapeConstructionInfo`, `DefaultMotionState`, `CleanPairCallback` |
+| CcdPhysicsController.h | 1016 | `CcdShapeConstructionInfo`, `UVco`, `CcdConstructionInfo`, `CcdCharacter`, `CleanPairCallback`, `CcdPhysicsController` |
+| CcdPhysicsEnvironment.cpp **grande** | 4068 | `CcdPhysicsEnvironment`, `CcdCollData`, `CcdOverlapFilterCallBack` |
+| CcdPhysicsEnvironment.h | 368 | `CcdPhysicsEnvironment`, `CollisionPair`, `CcdCollData` |
 
 ## source/source/gameengine/Physics/Common
 
@@ -27,16 +29,16 @@
 | PHY_IController.h | 56 | `PHY_IController` |
 | PHY_IGraphicController.h | 59 | `PHY_IGraphicController` |
 | PHY_IMotionState.h | 59 | `PHY_IMotionState` |
-| PHY_IPhysicsController.h | 203 | `PHY_IPhysicsController` |
-| PHY_IPhysicsEnvironment.h | 292 | `PHY_RayCastResult`, `PHY_IRayCastFilterCallback`, `PHY_IPhysicsEnvironment` |
-| PHY_IVehicle.h | 194 | `PHY_VehicleWheelConfig`, `PHY_VehicleWheelState`, `PHY_VehicleParameterCommand`, `PHY_IVehicle` |
+| PHY_IPhysicsController.h | 214 | `PHY_IPhysicsController` |
+| PHY_IPhysicsEnvironment.h | 295 | `PHY_RayCastResult`, `PHY_IRayCastFilterCallback`, `PHY_IPhysicsEnvironment` |
+| PHY_IVehicle.h | 198 | `PHY_VehicleWheelConfig`, `PHY_VehicleWheelState`, `PHY_VehicleParameterCommand`, `PHY_IVehicle` |
 
 ## source/source/gameengine/Physics/Dummy
 
 | arquivo | linhas | classes |
 |---|---:|---|
 | DummyPhysicsEnvironment.cpp | 122 | `DummyPhysicsEnvironment` |
-| DummyPhysicsEnvironment.h | 149 | `DummyPhysicsEnvironment` |
+| DummyPhysicsEnvironment.h | 152 | `DummyPhysicsEnvironment` |
 
 ## source/source/blender/physics
 

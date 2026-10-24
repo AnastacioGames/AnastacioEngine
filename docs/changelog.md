@@ -472,7 +472,7 @@ arquivos viraram não-static em `rna_internal.h`. Mapa em `docs/code-map-rna-obj
   no `python3` do sistema (`WEB_MANIFEST_PYTHON`). Conferido: apagar o `.wasm` e relinkar regenera o manifesto.
 - Versão 0.5.4 (`ANASTACIO_VERSION_STRING`, About, scripts de release). Runtime Web recompilado; pacotes
   `AnastacioEngine-0.5.4-linux-x86_64.tar.xz` e `RangeArmor-0.5.4-linux-x86_64.tar.xz` em `build-linux/dist/`.
-  Notas em `docs/release-notes-0.5.4.md`. **Não lançada de propósito:** a 0.5.4 vai receber mais recursos antes
+  Notas em `docs/releases.md` (0.5.4). **Não lançada de propósito:** a 0.5.4 vai receber mais recursos antes
   de sair; pacotes e notas serão refeitos na hora de publicar.
 - Testes no pacote extraído: manifesto Web confere; Export Web pelo editor (`validate-web.py --export`) sem
   problemas; `tools/test_*.py` OK (os dois de atlas com janela não rodaram); `AnastacioRuntime --server` roda a
@@ -681,7 +681,7 @@ Etapas 1-3 de `docs/componentes-editor-plano.md`.
 
 - Versão 0.5.3 com as correções do módulo Effects (sons da chuva) e das partículas/chuva no WebGL2.
   Zips Windows e RangeArmor montados e conferidos; Linux (engine e RangeArmor Linux) fica para depois.
-  Detalhes em `docs/release-0.5.3.md`.
+  Detalhes em `docs/releases.md` (0.5.3).
 - Linux 0.5.3: pacote da engine e primeira RangeArmor para Linux (`tools/linux/stage_rangearmor_linux.sh`);
   `test_weather_sounds_auto.py` ajustado ao módulo Effects completo de `79556dad`.
 
@@ -701,7 +701,7 @@ Etapas 1-3 de `docs/componentes-editor-plano.md`.
   ficavam fora do pacote (Linux e, sem cópia manual no `build/bin`, também o zip Windows). Regra de
   `install` adicionada; `container-build-22.04.sh` confere `sounds/effects/trovao1.wav` no tar.
 - Pacote Linux 0.5.2: `ctest` 10/10 e testes Python do pacote extraído; detalhes e avisos para o Windows
-  em `docs/release-0.5.2.md`.
+  em `docs/releases.md` (0.5.2).
 
 ## 2026-10-18 - Sons automáticos com projeto na mesma unidade da engine
 
@@ -715,7 +715,7 @@ Etapas 1-3 de `docs/componentes-editor-plano.md`.
 ## 2026-10-18 - Preparação da 0.5.2
 
 - Versão 0.5.2 em `ANASTACIO_VERSION_STRING`, About (`wm.py`), `stage_release_windows.py` e
-  `container-build-22.04.sh`. Novidades, testes feitos e checklist do Linux em `docs/release-0.5.2.md`.
+  `container-build-22.04.sh`. Novidades, testes feitos e checklist do Linux em `docs/releases.md` (0.5.2).
 - `script_load_modules` (ctest) falhava ao importar `anastacio_video` (só existe no jogo, importa `Range`):
   entrou na BLACKLIST de `bl_load_py_modules.py`. ctest 15/15.
 

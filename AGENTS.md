@@ -118,11 +118,7 @@ para mudanças reais de código/arquitetura — isso continua sendo trabalho do 
 Codex), não do modelo local.
 
 Antes deles, use `docs/local-knowledge/index-<área>.md`: índice mecânico (arquivo, linhas, classes) gerado por
-`python tools/build_code_index.py`, sem LLM e sem alucinação. Além disso, `docs/local-knowledge/*.md` tem resumos por área (rendering, physics, logic-scripting,
-scenegraph-converter, dna-blend) pré-gerados pelo modelo local via `tools/build_local_knowledge.sh`. Consulte
-o `.md` da área relevante antes de explorar um arquivo desconhecido do zero — mas trate como ponto de partida
-raso, não como fonte final para decisões reais. Regenere com `tools/build_local_knowledge.sh <area>` se
-estiver desatualizado.
+`python tools/build_code_index.py`, sem LLM e sem alucinação. Para arquivos grandes, veja `docs/code-map-*.md`.
 
 ## Outras regras práticas
 

@@ -16,7 +16,6 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 4. [Diretórios de build](build-dirs.md), [build no Windows](build-notes.md) e [no Linux](linux-build.md).
 5. Para achar código: [mapa dos arquivos grandes](code-map-gameengine.md), [mapa do `KX_GameObject.cpp`](code-map-kx-gameobject.md)
    e os índices gerados do código em `local-knowledge/index-*.md` (`python tools/build_code_index.py` atualiza).
-   Os resumos `local-knowledge/<area>.md` foram gerados por IA local e podem ter erros.
    `python tools/check_docs.py` confere links, referências `arquivo:linha` e os mapas; `--fix` atualiza as linhas dos mapas.
 6. Regras de trabalho e build para agentes: [AGENTS.md](../AGENTS.md).
 

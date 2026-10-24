@@ -49,7 +49,7 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
   do jogo.
 - **Traduções:** toda a interface nova em português, espanhol e russo.
 
-Lista completa em [docs/release-notes-0.5.4.md](docs/release-notes-0.5.4.md).
+Lista completa em [docs/releases.md](docs/releases.md#054).
 
 ## Novidades da 0.5.3
 
@@ -66,7 +66,7 @@ Lista completa em [docs/release-notes-0.5.4.md](docs/release-notes-0.5.4.md).
 - **Sons de efeito:** o módulo Effects criado pela chuva já vem com os sons da engine, então explosão e
   destruição não ficam mais mudas.
 
-Lista completa em [docs/release-notes-0.5.3.md](docs/release-notes-0.5.3.md).
+Lista completa em [docs/releases.md](docs/releases.md#053).
 
 ## Novidades da 0.5.2
 
@@ -88,7 +88,7 @@ Lista completa em [docs/release-notes-0.5.3.md](docs/release-notes-0.5.3.md).
 - **Correções:** vídeos não caem mais para ~1 FPS nem engasgam no loop, CSM sem cascatas clareadas, ícone
   inválido não some com o painel, sons da engine vão junto no jogo exportado, PNG no runtime Web.
 
-Lista completa em [docs/release-notes-0.5.2.md](docs/release-notes-0.5.2.md).
+Lista completa em [docs/releases.md](docs/releases.md#052).
 
 ## Novidades da 0.5.1
 
