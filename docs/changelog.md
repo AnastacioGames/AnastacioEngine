@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-23 - GT2: rodas alinhadas e suspensao no menu
+
+- 1.110 carros / 4.440 rodas auditados contra o disco; 1.001 cenas corrigidas
+  removendo compensacao antiga de COM em Y. DB6: deslocamento de 25.86 cm.
+  Backup por cena e reabertura de todos os carros sem desvio acima de 1e-6 m.
+- Suspensao global +6 cm sobre o ajuste anterior; selecao aplica configuracao
+  salva, edicao acorda o chassi parado sem alterar velocidade. Scripts do jogo
+  e importador sincronizados; regulagens pessoais preservadas.
+- Player: DB6 no menu sobe 0.0599986 m ao ajustar +6 cm; corrida exit 0 com
+  quatro rodas apoiadas e altura salva aplicada. Visual dos demais modelos
+  aguarda usuario. Evidencias: artifacts/gt2-suspension-wheels/README.md.
+
 ## 2026-10-23 - Build Windows, ctest e divisão do properties_game.py e do KX_Scene.cpp
 
 - Windows: editor e player compilados após as mudanças só testadas no Linux. O install falhava

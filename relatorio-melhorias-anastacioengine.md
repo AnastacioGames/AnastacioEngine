@@ -6,6 +6,13 @@ Este documento registra o estado técnico vigente da engine. O trabalho ainda ab
 
 ## Contexto
 
+GT2, suspensao e rodas: aumento global de 6 cm sobre o ajuste anterior,
+configuracao salva aplicada na selecao e mudancas ao vivo acordam o chassi.
+1.001 cenas corrigidas retirando compensacao antiga de COM; 1.110 carros e
+4.440 rodas reabertos e conferidos. Player confirmou +5.9999 cm no menu e
+quatro contatos na corrida DB6. Visual dos demais modelos pendente.
+Evidencias em artifacts/gt2-suspension-wheels/README.md.
+
 GT2 (remake externo): primeira calibracao de circuito instalada, com direcao
 progressiva, sem limitar diretamente o yaw e equilibrio traseiro de aderencia
 0.73 sobre o ajuste global 0.16. Player validou curva, reta e chuva; recuperacao

@@ -15,6 +15,11 @@ Evidências e limites no [plano de renomeação](executable-rename-plan.md).
 
 ## GT2: direcao e extracao do original
 
+Suspensao e rodas: 1.001 cenas com compensacao antiga de COM corrigidas;
+1.110 carros reabertos e 4.440 pontos conferidos com disco. Elevacao global
++6 cm e ajustes no menu passaram no player (DB6, 5.9999 cm medidos). Falta
+avaliacao visual dos demais carros. artifacts/gt2-suspension-wheels/README.md.
+
 GT2, etapa 1: a primeira calibracao de direcao esta instalada no remake externo.
 Fechamento do player corrigido e validado. Equilibrio traseiro 0.73 aplicado no
 remake: recuperacao da rotacao 0.25 -> 0.55 s no pulso medido com quatro rodas
