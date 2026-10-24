@@ -32,7 +32,7 @@ DOCS_IGNORADOS = {'docs/changelog.md'}  # historico: links e linhas antigos sao 
 REFS_EXTERNAS = {'docs/web-audio-analysis.md'}
 CODE_MAPS = {
     'docs/code-map-gameengine.md': None,
-    'docs/code-map-kx-gameobject.md': 'Ketsji/KX_GameObject.cpp',
+    'docs/code-map-kx-gameobject.md': None,
     'docs/code-map-gpu.md': None,
     'docs/code-map-logic-window.md': None,
     'docs/code-map-rna-object.md': None,
