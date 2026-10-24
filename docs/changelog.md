@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-23 - RNA: rna_object.c dividido (rna_object_game.c)
+
+Sem mudança de comportamento. As definições dos sistemas da engine no Object (partículas GPU, reverb, raio,
+rede, destruição, explosivo, deformação) e seus callbacks saíram de `rna_object.c` (5.492 → 4.048 linhas)
+para `rna_object_game.c` (1.562), novo item de `PROCESS_ITEMS` (`RNA_def_object_game`, logo após
+`RNA_def_object`) e de `DEFSRC`. Precisa ser item próprio: o makesrna põe o código gerado de cada struct no
+`_gen.c` do arquivo que o definiu, então callbacks e `rna_def_` ficam juntos. Três funções usadas pelos dois
+arquivos viraram não-static em `rna_internal.h`. Mapa em `docs/code-map-rna-object.md`.
+
 ## 2026-10-23 - Build Windows, ctest e divisão do properties_game.py e do KX_Scene.cpp
 
 - Windows: editor e player compilados após as mudanças só testadas no Linux. O install falhava

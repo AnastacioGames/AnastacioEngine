@@ -3380,6 +3380,7 @@ static RNAProcessItem PROCESS_ITEMS[] = {
 	{"rna_nodetree.c", NULL, RNA_def_nodetree},
 	{"rna_object.c", "rna_object_api.c", RNA_def_object},
 	{"rna_object_force.c", NULL, RNA_def_object_force},
+	{"rna_object_game.c", NULL, RNA_def_object_game},
 	{"rna_packedfile.c", NULL, RNA_def_packedfile},
 	{"rna_palette.c", NULL, RNA_def_palette},
 	{"rna_particle.c", NULL, RNA_def_particle},
