@@ -1,0 +1,30 @@
+# Fast checks with no build: docs and code maps, UI icon names and the repeated-work detector.
+# Runs on every push; takes under a minute.
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Docs and code maps
+        run: python tools/check_docs.py
+      - name: UI icon names
+        run: python tools/check_ui_icons.py
+      - name: Repeated-work detector self test
+        run: python tools/check_trabalho_repetido.py --selftest

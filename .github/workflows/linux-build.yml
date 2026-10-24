@@ -1,0 +1,59 @@
+# Linux editor + player build in ubuntu:22.04 (the release toolchain, tools/linux/container-deps-22.04.sh)
+# and ctest. Catches code that only compiles on MSVC and breaks the Linux release.
+# The first run builds everything (slow); ccache keeps later runs short.
+name: Linux build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "source/**"
+      - "tools/linux/**"
+      - ".github/workflows/linux-build.yml"
+  pull_request:
+    paths:
+      - "source/**"
+      - "tools/linux/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: linux-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    container: ubuntu:22.04
+    timeout-minutes: 300
+    env:
+      CCACHE_DIR: ${{ github.workspace }}/.ccache-linux
+      CCACHE_MAXSIZE: 4G
+    steps:
+      - name: Git for checkout
+        run: apt-get update && apt-get install -y git
+      - uses: actions/checkout@v4
+      - name: Dependencies
+        run: bash tools/linux/container-deps-22.04.sh
+      - uses: actions/cache@v4
+        with:
+          path: .ccache-linux
+          key: ccache-linux-${{ github.sha }}
+          restore-keys: ccache-linux-
+      - name: Configure
+        run: >
+          cmake --preset linux-editor -S source
+          -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
+      - name: Build editor and player
+        run: cmake --build build-linux-editor --target RangeEngine RangeRuntime -j"$(nproc)"
+      - name: Install
+        run: cmake --install build-linux-editor
+      - name: Player smoke test
+        run: test -x build-linux-editor/bin/AnastacioRuntime && test -x build-linux-editor/bin/AnastacioEngine
+      - name: ctest
+        run: ctest --test-dir build-linux-editor --output-on-failure -E "anastacio_steam"
+      - name: ccache stats
+        if: always()
+        run: ccache -s

@@ -243,7 +243,7 @@ def _draw_object_list(box, col, index, prop, meta):
     if meta.get("create"):
         _field_tool(row, index, prop.name, 'CREATE', text="New", icon="EMPTY_DATA")
     if names:
-        _field_tool(row, index, prop.name, 'LIST_CLEAR', icon="TRASH")
+        _field_tool(row, index, prop.name, 'LIST_CLEAR', icon="X")
 
 
 _EMPTY_LOOK = {"object": 'SPHERE', "objectlist": 'PLAIN_AXES'}

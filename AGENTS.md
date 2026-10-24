@@ -96,6 +96,7 @@ antes de começar:
   `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`. Novas entradas vão no topo de
   `docs/changelog.md`.
 - `docs/code-map-*.md` — mapas de navegação dos arquivos grandes (onde fica cada domínio), para não ler o arquivo inteiro: `code-map-gameengine.md` (KX_Scene, KX_PythonInit, física, conversão, KetsjiEngine, RenderPipeline, BL_Converter), `code-map-view3d-draw.md` (viewport 3D), `code-map-kx-gameobject.md` e `code-map-gpu.md` (gpu_material.c, gpu_shader_material.glsl, receitas de nó de shader, uniform de mundo e sombra), `code-map-logic-window.md` (editor de Logic Bricks) e `code-map-rna-object.md` (RNA do objeto). Antes de abrir um desses arquivos, leia o mapa. Arquivo muito editado com mais de ~3 mil linhas e sem mapa: crie um no mesmo formato e registre em `CODE_MAPS` do `tools/check_docs.py`. Depois de mudar código ou docs, `python tools/check_docs.py` diz se algum link, referência `arquivo:linha` ou linha dos mapas envelheceu (`--fix` corrige os mapas).
+- CI no GitHub (`.github/workflows/`): `checks.yml` roda `check_docs`, `check_ui_icons` e o selftest do detector em todo push; `linux-build.yml` compila editor e player no Ubuntu 22.04 e roda `ctest` quando muda `source/`. Depois do push, confira com `gh run list`; não dê a tarefa por concluída com CI vermelho sem avisar o usuário.
 
 Antes de propor "vamos implementar X", confira o roadmap e o relatório; consulte no changelog apenas o
 histórico relevante. Depois de implementar, atualize o estado vigente e acrescente o registro histórico sem
