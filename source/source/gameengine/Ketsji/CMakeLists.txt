@@ -174,6 +174,7 @@ set(SRC
 	KX_BoneParentNodeRelationship.cpp
 	KX_NodeRelationships.cpp
 	KX_Scene.cpp
+	KX_SceneCutscene.cpp
 	KX_RainAura.cpp
 	KX_RainShelterMap.cpp
 	KX_RainSurfaceMask.cpp

@@ -8,7 +8,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
-## 2026-10-23 - Build Windows, ctest e divisão do properties_game.py
+## 2026-10-23 - Build Windows, ctest e divisão do properties_game.py e do KX_Scene.cpp
 
 - Windows: editor e player compilados após as mudanças só testadas no Linux. O install falhava
   procurando `debugmode_configfile/imgui.ini`; era `cmake_install` desatualizado, resolvido com `cmake .`.
@@ -18,6 +18,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   O arquivo original reexporta tudo e mantém a tupla `classes`: ordem de registro e imports do flowmenu
   idênticos. Conferido no editor em background (mesmas 1.006 classes registradas, mesma ordem de `classes`),
   pyflakes sem nome novo indefinido e `ctest` 15/15. Falta aceite visual da aba Game.
+- `Ketsji/KX_Scene.cpp` (5.349 linhas): cutscene e Trace Rail (750 linhas) movidos sem alteração para
+  `Ketsji/KX_SceneCutscene.cpp`, mesma classe `KX_Scene`. Editor e player compilam, `ctest` 15/15.
 
 ## 2026-10-23 - GT2: retomada e auditoria dos seletores de efeitos
 
