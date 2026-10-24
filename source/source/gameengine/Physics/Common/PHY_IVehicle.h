@@ -189,9 +189,9 @@ public:
 	virtual void SetRayCastMask(short mask) = 0;
 	virtual short GetRayCastMask() const = 0;
 
-	/* Lets a single external owner (e.g. KX_VehicleWrapper) know when this
-	 * vehicle is about to be destroyed, so it can stop dereferencing it.
-	 * Passing a nullptr callback unregisters any previous registration. */
+	/* Notify every registered client before this vehicle is destroyed.
+	 * Registration replaces only the callback belonging to this client.
+	 * A nullptr callback unregisters only this client. */
 	virtual void SetInvalidationCallback(void (*callback)(void *client), void *client) = 0;
 };
 

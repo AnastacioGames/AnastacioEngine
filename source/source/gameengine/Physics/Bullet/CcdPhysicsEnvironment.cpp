@@ -218,8 +218,11 @@ public:
 
 	~WrapperVehicle()
 	{
-		if (m_invalidationCallback) {
-			m_invalidationCallback(m_invalidationClient);
+		// A vehicle can have several Python wrappers (getVehicle creates one
+		// per call). Invalidate all of them before deleting the native vehicle.
+		auto callbacks = std::move(m_invalidationCallbacks);
+		for (const auto &entry : callbacks) {
+			entry.callback(entry.client);
 		}
 
 		for (unsigned short i = 0, numWheels = GetNumWheels(); i < numWheels; ++i) {
@@ -645,13 +648,28 @@ public:
 
 	virtual void SetInvalidationCallback(void (*callback)(void *client), void *client)
 	{
-		m_invalidationCallback = callback;
-		m_invalidationClient = client;
+		for (auto it = m_invalidationCallbacks.begin(); it != m_invalidationCallbacks.end(); ++it) {
+			if (it->client == client) {
+				if (callback) {
+					it->callback = callback;
+				}
+				else {
+					m_invalidationCallbacks.erase(it);
+				}
+				return;
+			}
+		}
+		if (callback) {
+			m_invalidationCallbacks.push_back({callback, client});
+		}
 	}
 
 private:
-	void (*m_invalidationCallback)(void *client) = nullptr;
-	void *m_invalidationClient = nullptr;
+	struct InvalidationCallback {
+		void (*callback)(void *client);
+		void *client;
+	};
+	std::vector<InvalidationCallback> m_invalidationCallbacks;
 	std::vector<PHY_VehicleWheelConfig> m_wheelConfigs;
 	std::vector<PHY_VehicleParameterCommand> m_pendingCommands;
 	unsigned long long m_physicsTick = 0;

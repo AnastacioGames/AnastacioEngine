@@ -46,7 +46,7 @@ KX_VehicleWrapper::KX_VehicleWrapper(PHY_IVehicle *vehicle)
 KX_VehicleWrapper::~KX_VehicleWrapper()
 {
 	if (m_vehicle) {
-		m_vehicle->SetInvalidationCallback(nullptr, nullptr);
+		m_vehicle->SetInvalidationCallback(nullptr, this);
 	}
 }
 
@@ -688,7 +688,7 @@ PyObject *KX_VehicleWrapper::PyRebuildPreset(PyObject *args)
 	}
 
 	PHY_IVehicle *oldVehicle = m_vehicle;
-	oldVehicle->SetInvalidationCallback(nullptr, nullptr);
+	oldVehicle->SetInvalidationCallback(nullptr, this);
 	m_vehicle = candidate;
 	candidate->SetInvalidationCallback(&KX_VehicleWrapper::OnVehicleInvalidated, this);
 	physicsEnvironment->DestroyVehicle(oldVehicle);
