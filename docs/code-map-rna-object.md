@@ -4,7 +4,7 @@
 (física de jogo, destruição, explosivo, deformação, partículas GPU, reverb, raio, rede, LOD). Não descreve
 arquitetura.
 
-**Linhas conferidas em 2026-10-23 (`HEAD` `7a93da6c`).** Os números envelhecem a cada edição: confirme com
+**Linhas conferidas em 2026-10-23 (`HEAD` `4e25630e`).** Os números envelhecem a cada edição: confirme com
 `grep -n "nome" arquivo`. `python tools/check_docs.py --fix` corrige os números deste mapa.
 
 Cada arquivo tem duas metades: callbacks `rna_*` (get, set, update) dentro de `#ifdef RNA_RUNTIME` e definições
@@ -30,30 +30,30 @@ zero não servir (arquivos da Range original pulam nosso versioning). 2) `RNA_de
 `rna_object.c` (`rna_GameObjectSettings_use_explosive_set` e vizinhos); os `*_set` internos de cada sistema ficam
 em `rna_object_game.c`.
 
-## `source/source/blender/makesrna/intern/rna_object.c` (4.048 linhas)
+## `source/source/blender/makesrna/intern/rna_object.c` (4.024 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
 | Toggles de jogo (veículo, destruição, explosivo, deformação) | `rna_GameObjectSettings_is_vehicle_set` 223, `rna_GameObjectSettings_use_destruction_set` 247, `rna_GameObjectSettings_use_explosive_set` 267, `rna_GameObjectSettings_use_deform_set` 289 |
-| Partículas GPU, reverb e raio (liga/desliga) | `rna_Object_use_gpu_particles_update` 327, `rna_Object_use_reverb_area_update` 365, `rna_Object_use_lightning_update` 389 |
-| Matrizes, camadas e Base | `rna_Object_matrix_local_get` 423, `rna_Object_matrix_basis_get` 449, `rna_Object_layer_update` 541, `rna_Base_collection_get` 565, `rna_Object_layer_set` 1390, `rna_Base_layer_set` 1400 |
-| Data, parent e dupli | `rna_Object_data_set` 606, `rna_Object_data_typef` 656, `rna_Object_parent_set` 677, `rna_Object_parent_type_itemf` 694, `rna_Object_collision_bounds_itemf` 735, `rna_Object_dup_group_set` 772 |
-| Vertex groups, UV e cor | `rna_VertexGroup_name_set` 791, `rna_Object_active_vertex_group_index_set` 818, `rna_object_uvlayer_name_set` 871, `rna_Object_vgroup_new` 1799, `rna_VertexGroup_vertex_add` 1829 |
-| Materiais e slots | `rna_Object_active_material_index_set` 923, `rna_Object_active_material_set` 954, `rna_MaterialSlot_material_set` 1128, `rna_MaterialSlot_link_set` 1146, `rna_MaterialSlot_path` 1198 |
-| Transformação | `rna_Object_rotation_axis_angle_get` 1008, `rna_Object_rotation_mode_set` 1029, `rna_Object_dimensions_set` 1046, `rna_Object_location_editable` 1052 |
-| Jogo: Load Mode, física, estados | `rna_Object_game_load_mode_get` 1208, `rna_Object_convert_object_set` 1224, `rna_GameObjectSettings_physics_type_get` 1240, `rna_GameObjectSettings_physics_type_set` 1281, `rna_GameObjectSettings_state_set` 1424, `rna_GameStateName_name_set` 1465, `rna_GameObjectSettings_col_group_set` 1556, `rna_GameObjectSettings_col_mask_set` 1585 |
-| Grupos de bricks e componentes | `rna_object_brick_group_rename` 1471, `rna_LogicBrickGroups_new` 1503, `rna_GameObjectSettings_components_new` 1750, `rna_GameObjectSettings_components_remove` 1770 |
-| Constraints, modifiers, shape keys | `rna_Object_active_shape_key_index_range` 1605, `rna_Object_constraints_new` 1688, `rna_Object_modifier_new` 1724, `rna_Object_boundbox_get` 1786 |
-| Polls e LOD | `rna_Mesh_object_poll` 1886, `rna_Camera_object_poll` 1891, `rna_Object_lod_distance_update` 1913 |
-| Definições: auxiliares | `rna_def_vertex_group` 1925, `rna_def_material_slot` 1989, `rna_def_game_object_activity_culling` 2030 |
-| Definições: jogo | `rna_def_game_state_name` 2070, `rna_def_logic_brick_group` 2093, `rna_def_object_game_components` 2130, **`rna_def_object_game_settings`** 2158 (≈470 linhas: física, colisão, estados) |
-| Definições: coleções e veículo | `rna_def_object_constraints` 2617, `rna_def_object_modifiers` 2665, `rna_def_object_vertex_groups` 2750, `rna_def_object_lodlevel` 2799, `rna_def_object_wheel_settings` 2875, `rna_def_object_gear_ratio` 2989, `rna_def_object_animation_event` 3007 |
-| Definição principal | **`rna_def_object`** 3057 (≈870 linhas), `rna_def_dupli_object` 3925, `rna_def_object_base` 3983, `RNA_def_object` 4028 |
+| Partículas GPU, reverb e raio (liga/desliga) | `rna_Object_use_gpu_particles_update` 327, `rna_Object_use_reverb_area_update` 341, `rna_Object_use_lightning_update` 365 |
+| Matrizes, camadas e Base | `rna_Object_matrix_local_get` 399, `rna_Object_matrix_basis_get` 425, `rna_Object_layer_update` 517, `rna_Base_collection_get` 541, `rna_Object_layer_set` 1366, `rna_Base_layer_set` 1376 |
+| Data, parent e dupli | `rna_Object_data_set` 582, `rna_Object_data_typef` 632, `rna_Object_parent_set` 653, `rna_Object_parent_type_itemf` 670, `rna_Object_collision_bounds_itemf` 711, `rna_Object_dup_group_set` 748 |
+| Vertex groups, UV e cor | `rna_VertexGroup_name_set` 767, `rna_Object_active_vertex_group_index_set` 794, `rna_object_uvlayer_name_set` 847, `rna_Object_vgroup_new` 1775, `rna_VertexGroup_vertex_add` 1805 |
+| Materiais e slots | `rna_Object_active_material_index_set` 899, `rna_Object_active_material_set` 930, `rna_MaterialSlot_material_set` 1104, `rna_MaterialSlot_link_set` 1122, `rna_MaterialSlot_path` 1174 |
+| Transformação | `rna_Object_rotation_axis_angle_get` 984, `rna_Object_rotation_mode_set` 1005, `rna_Object_dimensions_set` 1022, `rna_Object_location_editable` 1028 |
+| Jogo: Load Mode, física, estados | `rna_Object_game_load_mode_get` 1184, `rna_Object_convert_object_set` 1200, `rna_GameObjectSettings_physics_type_get` 1216, `rna_GameObjectSettings_physics_type_set` 1257, `rna_GameObjectSettings_state_set` 1400, `rna_GameStateName_name_set` 1441, `rna_GameObjectSettings_col_group_set` 1532, `rna_GameObjectSettings_col_mask_set` 1561 |
+| Grupos de bricks e componentes | `rna_object_brick_group_rename` 1447, `rna_LogicBrickGroups_new` 1479, `rna_GameObjectSettings_components_new` 1726, `rna_GameObjectSettings_components_remove` 1746 |
+| Constraints, modifiers, shape keys | `rna_Object_active_shape_key_index_range` 1581, `rna_Object_constraints_new` 1664, `rna_Object_modifier_new` 1700, `rna_Object_boundbox_get` 1762 |
+| Polls e LOD | `rna_Mesh_object_poll` 1862, `rna_Camera_object_poll` 1867, `rna_Object_lod_distance_update` 1889 |
+| Definições: auxiliares | `rna_def_vertex_group` 1901, `rna_def_material_slot` 1965, `rna_def_game_object_activity_culling` 2006 |
+| Definições: jogo | `rna_def_game_state_name` 2046, `rna_def_logic_brick_group` 2069, `rna_def_object_game_components` 2106, **`rna_def_object_game_settings`** 2134 (≈470 linhas: física, colisão, estados) |
+| Definições: coleções e veículo | `rna_def_object_constraints` 2593, `rna_def_object_modifiers` 2641, `rna_def_object_vertex_groups` 2726, `rna_def_object_lodlevel` 2775, `rna_def_object_wheel_settings` 2851, `rna_def_object_gear_ratio` 2965, `rna_def_object_animation_event` 2983 |
+| Definição principal | **`rna_def_object`** 3033 (≈870 linhas), `rna_def_dupli_object` 3901, `rna_def_object_base` 3959, `RNA_def_object` 4004 |
 
-## `source/source/blender/makesrna/intern/rna_object_game.c` (1.562 linhas)
+## `source/source/blender/makesrna/intern/rna_object_game.c` (1.586 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
 | Rede, destruição, explosivo, deformação (callbacks) | `rna_RangeNetObjectSettings_replicate_set` 113, `rna_explosive_style_colors` 130, `rna_RangeExplosiveSettings_use_particle_explosion_set` 163, `rna_RangeDeformSettings_mode_set` 181, `rna_RangeDeformSettings_decal_set` 194, `rna_RangeDestructionSettings_fragments_set` 213, `rna_RangeExplosiveSettings_use_light_flash_set` 245, `rna_RangeExplosiveSettings_use_ground_mark_set` 263 |
-| Partículas GPU, reverb e raio (callbacks) | `rna_GPUParticleSettings_particle_look_update` 283, `rna_reverb_area_apply_preset` 436, `rna_ReverbAreaSettings_preset_update` 467, `rna_Object_lightning_preview_update` 489, `rna_GPUParticles_use_size_curve_update` 497 |
-| Definições: sistemas da engine | `rna_def_object_gpu_particles` 519 (≈300 linhas), `rna_def_object_lightning` 828, `rna_def_object_reverb_area` 942, `rna_def_object_network` 1033, `rna_def_object_destruction` 1092, `rna_def_object_explosive` 1158, `rna_def_object_deform` 1391, `RNA_def_object_game` 1551 |
+| Partículas GPU, reverb e raio (callbacks) | `rna_GPUParticleSettings_particle_look_update` 283, `rna_reverb_area_apply_preset` 436, `rna_ReverbAreaSettings_preset_update` 491, `rna_Object_lightning_preview_update` 513, `rna_GPUParticles_use_size_curve_update` 521 |
+| Definições: sistemas da engine | `rna_def_object_gpu_particles` 543 (≈300 linhas), `rna_def_object_lightning` 852, `rna_def_object_reverb_area` 966, `rna_def_object_network` 1057, `rna_def_object_destruction` 1116, `rna_def_object_explosive` 1182, `rna_def_object_deform` 1415, `RNA_def_object_game` 1575 |
