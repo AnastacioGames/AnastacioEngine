@@ -20,6 +20,7 @@ scene.game_settings.resolution_y = 540
 world = bpy.data.worlds.new("CameraFX World")
 world.horizon_color = (0.35, 0.5, 0.7)
 scene.world = world
+bpy.ops.object.lamp_add(type='SUN', location=(0, 0, 10), rotation=(math.radians(40), 0, math.radians(30)))
 
 
 def material(name, color):
