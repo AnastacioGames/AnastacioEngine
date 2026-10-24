@@ -47,6 +47,7 @@
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
+#include "GPU_basic_shader.h"
 
 #include "BLF_api.h"
 
@@ -1930,8 +1931,15 @@ static void ui_panel_category_draw_all_horizontal(ARegion *ar, const char *categ
 	UI_GetThemeColor3ubv(TH_TEXT_HI, theme_col_text_hi);
 	UI_GetThemeColor4ubv(TH_TAB_BACK, theme_col_tab_bg);
 	UI_GetThemeColor3ubv(TH_TAB_ACTIVE, theme_col_tab_active);
+	uchar theme_col_text4[4], theme_col_text_hi4[4];
+	UI_GetThemeColor4ubv(TH_TEXT, theme_col_text4);
+	UI_GetThemeColor4ubv(TH_TEXT_HI, theme_col_text_hi4);
+	/* aba ativa: branco sobre o laranja (o TEXT_HI do tema é escuro) */
+	const uchar col_white[4] = {255, 255, 255, 255};
 
 	glEnable(GL_BLEND);
+	/* o modo de mistura herdado pode deixar o fundo dos ícones preto */
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	if (is_floating) {
 		glColor4ubv(theme_col_tab_bg);
 		UI_draw_roundbox_corner_set(UI_CNR_ALL);
@@ -1946,30 +1954,48 @@ static void ui_panel_category_draw_all_horizontal(ARegion *ar, const char *categ
 		BLF_enable(fontid, BLF_KERNING_DEFAULT);
 	}
 
+	/* Três passadas (fundos, ícones, textos): o texto no meio deixava o estado de desenho
+	 * diferente do que o ícone espera e os ícones saíam com um quadrado preto atrás. */
+	for (PanelCategoryDyn *pc_dyn = ar->panels_category.first; pc_dyn; pc_dyn = pc_dyn->next) {
+		if (STREQ(pc_dyn->idname, category_id_active)) {
+			const rcti *rct = &pc_dyn->rect;
+			glColor3ubv(theme_col_tab_active);
+			UI_draw_roundbox_corner_set(UI_CNR_ALL);
+			UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, radius);
+		}
+	}
+
+	/* UI_draw_roundbox desliga o blend ao terminar */
+	glEnable(GL_BLEND);
+	GPU_basic_shader_bind(GPU_SHADER_USE_COLOR);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	for (PanelCategoryDyn *pc_dyn = ar->panels_category.first; pc_dyn; pc_dyn = pc_dyn->next) {
+		const rcti *rct = &pc_dyn->rect;
+		const int cell = BLI_rcti_size_y(rct);
+		const int icon = UI_panel_category_icon(pc_dyn->idname);
+		if (icon != ICON_NONE) {
+			const bool is_active = STREQ(pc_dyn->idname, category_id_active);
+			/* posição inteira, como nos botões: ícone nítido */
+			const int ix = rct->xmin + (cell - icon_size) / 2;
+			const int iy = rct->ymin + (cell - icon_size) / 2;
+			UI_icon_draw_aspect((float)ix, (float)iy, icon, 1.0f / dpi_fac, is_active ? 1.0f : 0.8f,
+			                    (const char *)(is_active ? col_white : theme_col_text4));
+		}
+	}
+
+	glEnable(GL_BLEND);
 	for (PanelCategoryDyn *pc_dyn = ar->panels_category.first; pc_dyn; pc_dyn = pc_dyn->next) {
 		const rcti *rct = &pc_dyn->rect;
 		const int cell = BLI_rcti_size_y(rct);
 		const bool is_active = STREQ(pc_dyn->idname, category_id_active);
 		const int icon = UI_panel_category_icon(pc_dyn->idname);
-		int text_x = rct->xmin + pad * 2;
-
-		if (is_active) {
-			glColor3ubv(theme_col_tab_active);
-			UI_draw_roundbox_corner_set(UI_CNR_ALL);
-			UI_draw_roundbox(rct->xmin, rct->ymin, rct->xmax, rct->ymax, radius);
-		}
-
-		if (icon != ICON_NONE) {
-			UI_icon_draw_aspect(rct->xmin + (cell - icon_size) * 0.5f, rct->ymin + (cell - icon_size) * 0.5f,
-			                    icon, 1.0f / dpi_fac, is_active ? 1.0f : 0.8f, NULL);
-			text_x = rct->xmin + cell;
-		}
+		const int text_x = (icon != ICON_NONE) ? rct->xmin + cell : rct->xmin + pad * 2;
 
 		if ((is_active || icon == ICON_NONE) && text_x < rct->xmax - pad) {
 			const char *name = IFACE_(pc_dyn->idname);
 			const size_t len = BLF_width_to_strlen(fontid, name, BLF_DRAW_STR_DUMMY_MAX,
 			                                       rct->xmax - text_x - pad, NULL);
-			glColor3ubv(is_active ? theme_col_text_hi : theme_col_text);
+			glColor4ub(UNPACK3(is_active ? col_white : theme_col_text), 255);
 			BLF_position(fontid, text_x, rct->ymin + (cell - BLF_height_max(fontid)) * 0.5f -
 			             BLF_descender(fontid), 0.0f);
 			BLF_draw(fontid, name, len);

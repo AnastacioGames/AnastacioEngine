@@ -1457,7 +1457,7 @@ void node_draw_nodetree(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeT
 /* draw tree path info in lower left corner */
 /* Cor que identifica o módulo de trabalho de cada tipo de árvore (fundo e nome no canto);
  * NULL = fundo do tema sem tinta. */
-static const float *node_space_tint(const char *tree_idname)
+const float *node_space_tint(const char *tree_idname)
 {
 	static const struct { const char *idname; float col[3]; } tints[] = {
 		{"ShaderNodeTree", {0.30f, 0.55f, 0.95f}},

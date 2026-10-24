@@ -78,6 +78,7 @@ void node_update_nodetree(const struct bContext *C, struct bNodeTree *ntree);
 void node_draw_nodetree(const struct bContext *C, struct ARegion *ar, struct SpaceNode *snode,
                         struct bNodeTree *ntree, bNodeInstanceKey parent_key);
 void drawnodespace(const bContext *C, ARegion *ar);
+const float *node_space_tint(const char *tree_idname);
 
 void node_set_cursor(struct wmWindow *win, struct SpaceNode *snode, float cursor[2]);
 	/* DPI scaled coords */

@@ -744,14 +744,18 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 		icons[i].x += shift;
 	}
 
-	/* opaque backdrop like the 3D View floating controls */
+	/* opaque backdrop: the module color of the background, a bit lighter */
 	{
-		bTheme *btheme = UI_GetTheme();
-		unsigned char col[4];
-		copy_v4_v4_uchar(col, (unsigned char *)btheme->tui.wcol_tool.inner);
-		col[3] = 255;
+		const SpaceNode *snode = CTX_wm_space_node(C);
+		const float *tint = snode ? node_space_tint(snode->tree_idname) : NULL;
+		float col[3];
+		UI_GetThemeColor3fv(TH_BACK, col);
+		if (tint) {
+			interp_v3_v3v3(col, col, tint, 0.18f);
+		}
+		add_v3_fl(col, 0.06f);
 		glEnable(GL_BLEND);
-		glColor4ubv(col);
+		glColor4f(col[0], col[1], col[2], 1.0f);
 		UI_draw_roundbox_corner_set(UI_CNR_ALL);
 		UI_draw_roundbox_gl_mode(GL_POLYGON, (float)(xstart + shift), (float)(top - cell), (float)(xmax_used + shift),
 		                         (float)ytop, 0.2f * U.widget_unit);
@@ -761,6 +765,7 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 
 	/* bigger icons than the buttons would draw */
 	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	for (int i = 0; i < icons_len; i++) {
 		UI_icon_draw_aspect(icons[i].x, icons[i].y, icons[i].icon, icon_aspect, 1.0f, NULL);
 	}
