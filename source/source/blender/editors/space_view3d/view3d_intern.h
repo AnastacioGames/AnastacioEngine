@@ -189,6 +189,14 @@ void view3d_layer_profile_begin(unsigned int lay, double t_begin, double dag_sec
  * (GL_ARB_parallel_shader_compile), so the next draw only takes the finished programs. */
 void view3d_layer_prefetch_materials(struct Main *bmain, Scene *scene, View3D *v3d, unsigned int lay_new);
 
+/* view3d_draw_warmup.c */
+double view3d_layer_profile_draw_begin(void);
+void view3d_layer_profile_draw_end(double t_draw_begin);
+void view3d_warmup_step(const struct bContext *C, struct Main *bmain, Scene *scene, struct ARegion *ar, View3D *v3d);
+
+/* view3d_draw_shadows.c */
+void gpu_update_lamps_shadows_world(struct Main *bmain, Scene *scene, View3D *v3d, struct RegionView3D *viewer_rv3d);
+
 /* drawarmature.c */
 bool draw_armature(
         Scene *scene, View3D *v3d, ARegion *ar, Base *base,
