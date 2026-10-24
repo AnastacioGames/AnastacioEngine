@@ -19,6 +19,17 @@ Use esta checklist para revisar um subsistema antes de considerá-lo estável.
 - [ ] Callbacks/ciclo de vida: registro, desregistro, recarga e duplicação.
 - [ ] Validade de dados: ponteiros, referências CPython, objetos removidos e dados corrompidos.
 
+Pares de ciclo de vida a conferir em addons Blender (recarregar 2-3 vezes):
+
+| Registro | Contraparte |
+| --- | --- |
+| `bpy.app.handlers.*.append` | `remove` no `unregister()` |
+| `bpy.app.timers.register` | `unregister` ou callback que retorna `None` |
+| `Space*.draw_handler_add` | `draw_handler_remove` |
+| keymap/item | remoção do item e do keymap |
+| msgbus | `bpy.msgbus.clear_by_owner(owner)` |
+| thread/processo | sinalizar, esperar e descartar |
+
 ## Registro de cada achado
 
 - [ ] ID, local exato e sintoma/risco.
@@ -34,8 +45,7 @@ Use esta checklist para revisar um subsistema antes de considerá-lo estável.
 - [ ] Para Python, importar e testar registro/desregistro repetido.
 - [ ] Atualizar changelog e registrar limitações restantes.
 
-## Relatório desta execução
+## Relatórios
 
-O resultado da varredura de `source/source/blender` está separado em:
-
-[relatorio-varredura-bugs-silenciosos.md](relatorio-varredura-bugs-silenciosos.md)
+- `source/source/blender`: [relatorio-varredura-bugs-silenciosos.md](relatorio-varredura-bugs-silenciosos.md).
+- Cycles: [relatorio-varredura-cycles.md](relatorio-varredura-cycles.md).

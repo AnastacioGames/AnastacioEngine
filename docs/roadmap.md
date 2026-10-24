@@ -368,6 +368,8 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   registrada no plano; a pendência é de validação manual, não de implementação desses campos.
 - **Auditoria de `source/blender`** ([relatório](relatorio-varredura-bugs-silenciosos.md)): os 26 itens têm
   correção ou descarte; falta só GPU-001, testar `gl_load()` numa sessão interativa já aberta.
+- **Auditoria do Cycles** ([relatório](relatorio-varredura-cycles.md)): CYC-001 a CYC-012 corrigidos; faltam as
+  validações funcionais listadas no relatório (I/O injetado, corpus IES, cópias acima de 2 GiB em CUDA/OpenCL).
 - **Release**: antes da próxima distribuição, declarar se o fork sai como GPLv2-or-later ou GPLv3 e incluir o
   arquivo de licença correspondente na raiz/pacote.
 - **Metaball no jogo (futuro, sem pressa)**: hoje o conversor (`BL_BlenderDataConversion.cpp`) ignora
@@ -404,6 +406,10 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   - KX11/RA9: medir ganho em cena com muitas luzes, validar Point/Spot/CSM/Area e a reconstrução de
     `dynamicCasterSet` com Static Split.
   - KX10 (Auto Shadow): faltam Spot, deformadores, layers/parâmetros, ganho no jogo real e visual.
+  - CV3/CV4/CV5/CV6, KX6/KX7/KX8/KX9: corrigidos; falta visual/runtime no jogo (o que falta em cada um está no relatório).
+  - GL2/GL3 (replicação): compilados, não testados em rede.
+  - Adiados com motivo: PH1, PY7, LP3 (estéreo), LP9/LP10, GP3, GP7, SP6/SP7/SP9/SP10/SP11/SP14/SP15.
+  - RA4: o player não fecha após `endGame()` na cena de teste de instancing.
 - **Uploads repetidos de estado no PBR (2026-10-08):** cache de probes ausentes (+20% FPS com 1600 objetos PBR) e
   da camada de objeto. Falta validar o visual no jogo com probes e veículo; sombras e luzes/IES seguem sem cache.
   Procedimento em [engine-profiling.md](engine-profiling.md).
