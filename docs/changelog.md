@@ -4,7 +4,7 @@ Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas a
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
 `docs/roadmap.md` e `relatorio-melhorias-anastacioengine.md`.
 
-**Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
+**Como está organizado.** Este arquivo guarda as entradas recentes (novas entradas vão no topo). O histórico antigo está em [changelog-arquivo.md](changelog-arquivo.md); não leia inteiro, use grep. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para o fim do arquivo.
 
 
 
@@ -2561,30 +2561,10 @@ observado; após destruição, 63 draws. Reload de cena no mesmo processo não t
 Nenhum C++ foi alterado. Dados e limites em
 `<investigacao-local>/benchmark/diagnostico/anastacio_batch_manual/RESULTADO.md`.
 
-Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog/`.
+Para achar uma entrada por assunto: `grep -rn "^## .*termo" docs/changelog.md docs/changelog-arquivo.md`.
 Entradas antigas não estão em ordem cronológica estrita; a data no título é a referência.
 
-| Arquivo | Datas | Entradas | Tamanho |
-|---|---|---|---|
-| [este arquivo](changelog.md) (entradas recentes) | 2026-10-08 | 35 | 45 KB |
-| [14_2026-10-06_a_2026-10-05.md](changelog/14_2026-10-06_a_2026-10-05.md) | 2026-10-06 a 2026-10-05 | 42 | 54 KB |
-| [15_2026-10-04_a_2026-10-03.md](changelog/15_2026-10-04_a_2026-10-03.md) | 2026-10-04 a 2026-10-03 | 60 | 63 KB |
-| [16_2026-10-02_a_2026-10-01.md](changelog/16_2026-10-02_a_2026-10-01.md) | 2026-10-02 a 2026-10-01 | 76 | 68 KB |
-| [17_2026-09-30_a_2026-09-27.md](changelog/17_2026-09-30_a_2026-09-27.md) | 2026-09-30 a 2026-09-27 | 48 | 63 KB |
-| [18_2026-09-26_a_2026-09-25.md](changelog/18_2026-09-26_a_2026-09-25.md) | 2026-09-26 a 2026-09-25 | 54 | 62 KB |
-| [13_2026-09-24_a_2026-09-24.md](changelog/13_2026-09-24_a_2026-09-24.md) | 2026-09-24 a 2026-09-24 | 22 | 30 KB |
-| [12_2026-09-23_a_2026-09-23.md](changelog/12_2026-09-23_a_2026-09-23.md) | 2026-09-23 a 2026-09-23 | 9 | 13 KB |
-| [11_2026-09-22_a_2026-09-20.md](changelog/11_2026-09-22_a_2026-09-20.md) | 2026-09-22 a 2026-09-20 | 25 | 39 KB |
-| [10_2026-09-20_a_2026-09-20.md](changelog/10_2026-09-20_a_2026-09-20.md) | 2026-09-20 a 2026-09-20 | 12 | 19 KB |
-| [01_2026-09-20_a_2026-09-14.md](changelog/01_2026-09-20_a_2026-09-14.md) | 2026-09-20 a 2026-09-14 | 45 | 69 KB |
-| [09_2026-09-17_a_2026-09-06.md](changelog/09_2026-09-17_a_2026-09-06.md) | 2026-09-17 a 2026-09-06 | 51 | 71 KB |
-| [02_2026-09-14_a_2026-09-11.md](changelog/02_2026-09-14_a_2026-09-11.md) | 2026-09-14 a 2026-09-11 | 24 | 71 KB |
-| [03_2026-09-12_a_2026-08-23.md](changelog/03_2026-09-12_a_2026-08-23.md) | 2026-09-12 a 2026-08-23 | 49 | 90 KB |
-| [08_2026-09-06_a_2026-09-02.md](changelog/08_2026-09-06_a_2026-09-02.md) | 2026-09-06 a 2026-09-02 | 26 | 68 KB |
-| [07_2026-09-02_a_2026-08-31.md](changelog/07_2026-09-02_a_2026-08-31.md) | 2026-09-02 a 2026-08-31 | 23 | 69 KB |
-| [06_2026-08-31_a_2026-08-26.md](changelog/06_2026-08-31_a_2026-08-26.md) | 2026-08-31 a 2026-08-26 | 7 | 71 KB |
-| [05_2026-08-25_a_2026-08-24.md](changelog/05_2026-08-25_a_2026-08-24.md) | 2026-08-25 a 2026-08-24 | 2 | 68 KB |
-| [04_2026-08-24_a_2026-08-24.md](changelog/04_2026-08-24_a_2026-08-24.md) | 2026-08-24 a 2026-08-24 | 4 | 81 KB |
+O histórico antigo (até 2026-10-06) está em [changelog-arquivo.md](changelog-arquivo.md).
 
 ## 2026-10-08 - Auto-batching RAS confirmado na engine de referência
 

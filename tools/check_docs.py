@@ -79,7 +79,7 @@ def docs_para_conferir(todos):
     lista = [d for d in DOCS if os.path.exists(os.path.join(ROOT, d))]
     for f in todos:
         if f.startswith('docs/') and f.endswith('.md') and f.count('/') <= 2 \
-                and not f.startswith('docs/changelog/') and f not in DOCS_IGNORADOS:
+                and f != 'docs/changelog-arquivo.md' and f not in DOCS_IGNORADOS:
             lista.append(f)
     return lista
 
