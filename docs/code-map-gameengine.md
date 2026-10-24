@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-10-23 (`HEAD` `6960d5e7`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-10-23 (`HEAD` `d1f20408`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -155,3 +155,40 @@ Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConve
 
 Observação: `BL_ConvertBlenderObjects` concentra a conversão numa só função; mudanças aqui exigem ler o
 trecho inteiro, não só um método.
+
+---
+
+## `Ketsji/KX_KetsjiEngine.cpp` (1.606 linhas)
+
+Laço do jogo: tempo, frames lógicos/físicos, cenas. O desenho em si fica em `KX_RenderPipeline.cpp` (abaixo).
+
+| Domínio | Métodos (linha inicial) |
+|---|---|
+| Construção e serviços | `KX_KetsjiEngine` 189, `SetCanvas` 327, `SetRasterizer` 333, `SetConverter` 409, `StartEngine` 441, `StopEngine` 1102 |
+| Frame | `BeginFrame` 482, `EndFrame` 506, `UpdateDynamicResolution` 587, **`NextFrame`** 677 (lógica, física, animação), `Render` 1030 |
+| Tempo e espera | `ServerSleep` 882, `SleepUnderRate` 895, `UpdateSleepTime` 908, `ClockTiming` 1148, `FrameTiming` 1184, `AdvanceStepTime` 1197 |
+| Animação e sombra | `UpdateAnimations` 1088, `IsStaticShadowSettled` 1097 |
+| Cenas | `AddScene` 1142, `ConvertAndAddScene` 1241, `PreloadScene` 1246, `RemoveScene` 1251, `ReplaceScene` 1266, `SuspendScene` 1271, `ResumeScene` 1276 |
+| Taxas e flags | `SetTicRate` 1302, `SetUseFixedTimestep` 1374, `SetShadowCulling` 1401, `SetDynamicResolution` 1406 |
+
+## `Ketsji/KX_RenderPipeline.cpp` (1.216 linhas)
+
+| Domínio | Funções (linha inicial) |
+|---|---|
+| Névoa volumétrica | `KX_FillVolumetricFog` 125 |
+| Frame | **`Render`** 375 (sombras, câmeras, filtros), `RenderCollisionDepthBuffer` 555 |
+| Câmeras e visibilidade | `GetCameraRenderData` 598, `GetRenderData` 644, `GetVisibleMeshes` 738, `RenderCamera` 783 |
+| Pós-render | `PostRenderScene` 929 (2D filters, offscreen final) |
+
+## `Converter/BL_Converter.cpp` (1.924 linhas)
+
+Conversão de cenas e LibLoad (síncrono e assíncrono). A conversão objeto a objeto fica em
+`BL_BlenderDataConversion.cpp` (acima).
+
+| Domínio | Métodos (linha inicial) |
+|---|---|
+| Cena | `ConvertScene` 682, `CompileSceneShaders` 721, `ConvertScene` 911, `PostConvertScene` 1018, `RemoveScene` 1023 |
+| Objetos sob demanda | `FindOrConvertMainObject` 253, `FindSceneObject` 298, `ConvertSceneObject` 310, `FreeUnconvertedData` 470 |
+| LibLoad | `LinkBlendFileMemory` 1375, `LinkBlendFilePath` 1383, **`LinkBlendFile`** 1412, `FreeBlendFileData` 1579, `FreeBlendFile` 1703 |
+| Merge e assíncrono | `StepMerge` 1138, `StepReloads` 1227, `ProcessScheduledLibraries` 1268, `FinalizeAsyncLoads` 1304, `AsyncConvertTask` 1335, `MergeSceneData` 1730, `MergeScene` 1744 |
+| Shaders e malhas | `ReloadShaders` 1778, `ConvertMeshSpecial` 1816 |

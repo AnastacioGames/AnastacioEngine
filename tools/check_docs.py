@@ -36,6 +36,7 @@ CODE_MAPS = {
     'docs/code-map-gpu.md': None,
     'docs/code-map-logic-window.md': None,
     'docs/code-map-rna-object.md': None,
+    'docs/code-map-view3d-draw.md': None,
 }
 EXTS_CODIGO = 'cpp|cc|c|h|hpp|py|glsl|cjs|js|cmake'
 
