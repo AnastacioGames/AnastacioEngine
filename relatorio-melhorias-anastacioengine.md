@@ -6,6 +6,49 @@ Este documento registra o estado técnico vigente da engine. O trabalho ainda ab
 
 ## Contexto
 
+GT2 (remake externo): primeira calibracao de circuito instalada, com direcao
+progressiva, sem limitar diretamente o yaw e equilibrio traseiro de aderencia
+0.73 sobre o ajuste global 0.16. Player validou curva, reta e chuva; recuperacao
+de rotacao do pulso medido 0.25 -> 0.55 s com quatro rodas apoiadas. Sao valores
+calibrados, nao coeficientes extraidos; avaliacao do usuario e outros carros
+permanecem pendentes. Evidencias locais em `artifacts/gt2-handling-stage1/README.md`.
+
+GT2, dados dos carros: 618 fichas USA conferidas; tres IDs europeus ausentes
+receberam massa, torque, transmissao e tracao no remake. Tres carros alterados e
+ld7cn passaram conferencia no player. Importador preserva prioridade USA e completa
+IDs exatos (621). Permanecem 26 sem ficha, 463 fichas derivadas, cambios com
+sentinelas e discrepancias de geometria. Potencia efetiva ainda depende da curva
+aproximada e dos multiplicadores calibrados. Detalhes locais em
+`artifacts/gt2-car-data-stage2/README.md`.
+
+GT2, arvores: corrigida a ordem UV dos sprites de modelos em 78 pistas,
+12.054 faces exportadas; cenas salvas e reabertas para verificar persistencia.
+Avaliacao visual e dimensoes absolutas dos modelos pendentes. Evidencias:
+`artifacts/gt2-trees-stage4/README.md`.
+
+GT2, transformacoes dos objetos: escala e tres angulos relidos do disco,
+confirmados contra as rotinas originais e aplicados a 98 objetos em 27 pistas.
+JSONs/importador preservam campos completos; circuito/Laguna passaram no player.
+UVs, geometria, posicoes, fisica e Z offset preservados. Dimensao absoluta e
+avaliacao visual ainda pendentes. Evidencias: `artifacts/gt2-prop-transforms/README.md`.
+
+GT2, pinturas de pista: Z offset aplicado a 11.282 faces coplanares em 55 pistas
+com materiais separados, preservando geometria e colisao. Importador gera os
+mesmos ajustes; circuito executado no player. Confirmacao visual pendente.
+Evidencias: `artifacts/gt2-track-zoffset/README.md`.
+
+GT2, sombra de contato: SSAO nativo ativado nas 126 pistas, fator 2.2,
+distancia 0.8 e 16 amostras; importador preserva o preset para pistas.
+Instalacao salva/reaberta e circuito executado com exit 0. Aparencia e custo
+de GPU pendentes; o efeito tambem escurece contatos do cenario.
+Evidencias: `artifacts/gt2-car-shadow/README.md`.
+
+GT2, motores por carro: 621 IDs exatos usam 282 bancos base originais com
+1.911 loops, faixas de RPM e pitch SPU dos arquivos. Jogador/IA, pausa/parada
+validados com aud real e tres corridas no player. 489 IDs sem vinculo mantem
+fallback. Mistura adaptada; comparacao auditiva, bancos adicionais e efeitos
+continuam pendentes. Evidencias: `artifacts/gt2-audio-stage3/README.md`.
+
 Ragdoll do RolimaRacer: os dois scripts externos receberam correção de ciclo de vida,
 transições com confirmação, isolamento de constraints próprias e fonte física explícita.
 Os quatro rigs reais passaram 100 ciclos simultâneos por rig no player; usuário validou
@@ -371,7 +414,10 @@ Web exclui o carregador; build Web não revalidado. Linux Steam ainda não supor
   editável de rodas (`ob.vehicle_wheels`, com raio/suspensão/steering por roda), no painel "Vehicle" da aba
   Physics. Ao converter a cena, o próprio motor cria o `PHY_IVehicle`/`KX_VehicleWrapper` e as rodas
   automaticamente a partir desses dados — não é mais só um marcador de design. `KX_GameObject::getVehicle()`
-  expõe o veículo já pronto para Python. O painel Vehicle também tem um botão para criar/anexar o
+  expõe o veículo já pronto para Python. Cada wrapper registra sua propria invalidacao;
+  remover um wrapper nao desregistra os demais. Destruir o veiculo invalida todas as
+  referencias, inclusive apos LibLoad (regressao de fechamento do GT2 validada no player).
+  O painel Vehicle também tem um botão para criar/anexar o
   `vehicle_player_component.py` de controle jogável direto no objeto.
   O controle já inclui torque/RPM, câmbio, direção em graus/sensível à velocidade,
   freio de mão, volante visual e recursos de moto. Smart Components mantêm a base

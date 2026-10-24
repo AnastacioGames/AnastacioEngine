@@ -7,6 +7,128 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas mais recentes (novas entradas vão no topo, logo abaixo desta tabela). O histórico mais antigo está em `docs/changelog/`, dividido em arquivos de até ~70 KB para caber na leitura de uma IA. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para um novo arquivo em `docs/changelog/` e acrescente uma linha na tabela abaixo.
 
 
+
+## 2026-10-23 - GT2: retomada e auditoria dos seletores de efeitos
+
+- Relida a retomada e conferidos os resultados anteriores da sombra: 126 pistas
+  instaladas, circuito com exit 0; avaliacao visual e GPU continuam pendentes.
+  Estado do SSAO acrescentado ao roadmap e ao relatorio vigente.
+- Nova auditoria le GT2.OVL e se01.ins diretamente do disco original, sem alterar
+  remake/importador. Tabela 0x8002F528: 17,11,15,14,10,5. Resolucao INST de 20
+  bytes e enderecos SPU em unidades de 8 bytes confirmada contra rotinas originais.
+- Os 18 descritores do banco candidato foram associados aos WAVs existentes;
+  PCM e marcadores de loop conferidos integralmente. `audit.py` exit 0.
+- Selecao do banco global, nomes dos eventos e pitch final ainda nao comprovados.
+  Nenhum efeito instalado. Evidencias e proxima trilha em
+  `artifacts/gt2-effects-stage3/README.md`.
+- `python tools/check_docs.py`: 102 documentos/2 mapas, zero erros e avisos.
+
+## 2026-10-23 - GT2: escalas e inclinacoes originais dos objetos
+
+- Relidas 6.084 colocacoes em 126 arquivos originais; modelo/posicao/yaw coincidem com exportacoes instaladas. Confirmadas tres rotacoes e escalas pelas rotinas do original.
+- Importador/construtor passam a preservar e aplicar rotation_raw/scale_raw com conversao de eixos por matriz. 98 objetos em 27 cenas corrigidos; backup integral dos arquivos alterados.
+- Comparacao de 508 padroes contra algoritmo em ponto fixo e tabela trigonometrica do executavel: diferenca maxima 0.000559107 nos coeficientes. Seno/cosseno flutuante adaptados, sem emulacao de arredondamentos do PS1.
+- Todas as cenas afetadas reabertas e conferidas; geometria, UVs, materiais/Z offset, posicoes e fisica preservados. Reconstrucao de Laguna verificou 70 objetos; circuito e Laguna passaram no player com exit 0.
+- Aparencia e dimensoes absolutas dos modelos permanecem pendentes; esta etapa corrige fatores de colocacao ignorados.
+- Evidencias: `artifacts/gt2-prop-transforms/README.md`.
+
+## 2026-10-23 - GT2: Z offset nas pinturas sobrepostas da pista
+
+- Detector de faces menores coplanares cobertas por superf?cies maiores; 126 exporta??es examinadas, 55 pistas com 11.282 faces ajustadas. Circuito: 593 faces.
+- Materiais separados com offset 0.05/0.10 conforme n?vel de sobreposi??o, usando recurso existente da engine. Geometria/colis?o preservadas; backup por pista e construtor.
+- Importador externo passa a detectar sobreposi??es e persistir offset por face. Constru??o nova de circuito confirmou todas as 593 faces e aus?ncia de offset nas demais.
+- 55 cenas salvas e reabertas com verifica??o dos valores. Compara??o de circuito/autumn/roma confirma malhas, UVs, transforma??es e f?sica id?nticas ao backup. Player real executou circuito com exit 0; apar?ncia ainda requer avalia??o no jogo pelo usu?rio.
+- Evid?ncias: `artifacts/gt2-track-zoffset/README.md`.
+
+## 2026-10-23 - GT2: UV das arvores e sprites nas cenas instaladas
+
+- Corrigida ordem TL/TR/BL/BR para TL/TR/BR/BL somente nos sprites de modelos do importador externo.
+- Backup e atualizacao de 78 JSONs/cenas: 12.054 faces exportadas, 10.798 faces nas malhas instanciadas; verificacao dos valores anteriores e reabertura de cada cena apos salvar.
+- Execucao do editor concluida com exit 0; teste de circuito real registrado nos artefatos. Aparencia depende de avaliacao no jogo pelo usuario.
+- Escalas/inclinacoes continuam pendentes. Proxima prioridade do usuario: Z offset nas pinturas de pista sobrepostas; efeitos de audio adiados.
+- Evidencias: `artifacts/gt2-trees-stage4/README.md`.
+
+## 2026-10-23 - GT2: motores originais por ID exato (etapa 3, parte 1)
+
+Campo u16 +0x0A dos registros engine confirmado no codigo recompilado original:
+621 IDs exatos (618 USA + 3 europeus), 282 bancos base, zero conflito regional.
+Instalados 1.911 loops e mapa com proveniencia/hashes no remake externo; scripts
+sincronizados no importador. Jogador e IA selecionam por ID, faixas de RPM e pitch
+SPU do descritor. Duas camadas no maximo por voz, cache de Sound, pausa/parada.
+489 IDs instalados sem vinculo confirmado conservam fallback compartilhado.
+
+Validacao com aud real: 5.250 pontos de limites/pesos/pitch, quatro carros e
+fallback, IA distinta, pausa e invalidacao. Tres corridas reais com adversario
+(ld7cn/ne14n/a-a7r), exit 0 sem erro de audio; bancos esperados registrados,
+incluindo jogador a-a7r e IA a-emn com bancos diferentes confirmados.
+Backup e byte-verificacao de 1.916 destinos; nenhum C++ ou cena alterados.
+
+Mistura equal-power, volume, emenda e limites de pitch adaptados; sem comparacao
+auditiva ou reproducao integral do SPU. Bancos adicionais de preparacao, pneus,
+batidas e outros efeitos ainda pendentes. Pausa para compactacao solicitada;
+continuar pelos efeitos da etapa 3 antes da etapa 4. Evidencias e reproducao:
+`artifacts/gt2-audio-stage3/README.md`.
+
+## 2026-10-23 ? GT2: fichas exatas adicionais e auditoria dos carros (etapa 2)
+
+Auditoria dos 1.110 metadados do remake externo: 618 IDs conferem com USA
+Simulation, 463 fichas eram derivadas de carros semelhantes e 29 estavam vazias.
+As cinco tabelas europeias concordam para ne14n/ne15n/nep2n: aplicados massa,
+torque, limite de giro, marchas/re/final, tracao e COM nas tres cenas, com backup
+completo e reabertura. Potencia e dimensoes registradas na ficha; geometria
+preservada. Multiplicadores calibrados 0.4 de autoria e 0.7 da corrida mantidos;
+PS de catalogo nao implica potencia efetiva equivalente no solver Bullet.
+
+Player real executou os tres carros e ld7cn, exit 0: massa com garagem, torque
+escalado, relacoes, final e rodas motrizes conferidos aos 7 s; sem Traceback/Error.
+Sonda temporaria restaurada byte a byte. Importador passou a completar IDs exatos
+ausentes preservando prioridade USA (621 fichas; 618 USA inalteradas), compensacao
+de COM antigo somente com GT2_LEGACY_COM=1 e fallback integral para cambio invalido.
+Nenhuma mudanca de C++ nesta etapa. Scripts executados com o editor/player instalado.
+
+Limitacoes: 26 sem ficha, 463 derivados, 93 fichas com marcadores de marcha;
+idle decodificado suspeito nao aplicado. a26ss/efcon/efe2n/umcon apresentam
+entre-eixos de malha >10% diferente da ficha e requerem investigacao. Curva de
+potencia ainda aproximada. Evidencias e backups:
+`artifacts/gt2-car-data-stage2/README.md`. Pausa para compactacao antes do audio.
+
+## 2026-10-23 - GT2: calibracao do equilibrio entre eixos
+
+- Remake externo e scripts do importador receberam equilibrio traseiro 0.73 sobre
+  a calibracao anterior de aderencia 0.16. Eixos identificados pela posicao local Y,
+  inclusive com direcao nas quatro rodas; leitura apenas ao aplicar suspensao.
+  Ajustes por roda, garagem e chuva preservados; IA permanece como antes.
+- Sete experiencias no circuito separaram subesterco por reducao uniforme,
+  recuperacao rapida a 80% e perda de controle a 65% de aderencia traseira.
+  Valor 73% retornou ao alinhamento no trecho apoiado; instalado com backup.
+- Player real, `ld7cn`, ~55 km/h, pulso de 0.55 s: tempo ate yaw abaixo de
+  0.1 rad/s por tres amostras passou de 0.25 para 0.55 s, quatro contatos na
+  janela comparada. Isso nao equivale a medir o beta do GT2 original.
+- Curva, reta e reta na chuva instaladas encerraram 0. Preset real confirmou
+  chuva x0.72 nos dois eixos e equilibrio traseiro 0.73; controles passaram
+  novamente no editor. Evidencias e limites em `artifacts/gt2-handling-stage1/README.md`.
+  Usuario ainda nao testou; outros carros e fidelidade permanecem pendentes.
+  Pausa para compactacao antes da etapa 2 (dados confirmados dos carros).
+
+## 2026-10-23 - GT2: fechamento com varias referencias ao veiculo
+
+- Captura na cena real `D:\GT2Range\circuit\circuit.range` terminava com retorno 22.
+  O crash log em TEMP identificou `purecall` no destrutor de `KX_VehicleWrapper`,
+  durante `Py_FinalizeEx`. `getVehicle()` cria wrappers independentes, mas o backend
+  guardava somente um callback de invalidacao; destruir outro wrapper tambem apagava esse aviso.
+- `WrapperVehicle` registra callbacks por cliente e invalida todos ao destruir o veiculo.
+  Destrutor e `rebuildPreset` removem somente o registro do proprio wrapper.
+  Sem mudancas no solver de pneus ou em trabalho por frame.
+- MSVC com `VSLANG=1033`: `RangeRuntime` e `RangeEngine` compilados e instalados.
+  Primeira chamada no sandbox ficou bloqueada antes do compilador; execucao elevada passou.
+  Player real: tres wrappers retidos e um temporario descartado; ao remover o carro,
+  os tres passaram a levantar `ReferenceError`, encerramento 0. Corrida com ajuste
+  e corrida com scripts anteriores tambem encerraram 0.
+- Direcao do remake continua uma primeira calibracao. Janela 8.0--8.65 s com quatro
+  rodas apoiadas confirmou recuperacao lateral rapida; fidelidade ao deslizamento
+  do GT2 original permanece pendente. Evidencias locais em
+  `artifacts/gt2-handling-stage1/` (README, CSVs, JSONs e logs).
+
 ## 2026-10-23 - Logic Tree: Highlight Active ao vivo e abas com nome
 
 - Botão **Highlight Active** no cabeçalho da Logic Tree: com o jogo rodando no editor, nós que disparam ganham moldura, portas acendem pelo caminho e os fios brilham com o pulso correndo (como no Logic Editor). Brilho vem de `debug_intensity` (novo, só leitura) em Sensor/Controller/Actuator; `wm_event_system.c` redesenha áreas de nós da Logic Tree.
