@@ -46,6 +46,7 @@ BLACKLIST = {
     "range_language",
     "anastacio_ragdoll_runtime",
     "anastacio_video",
+    "range_ui_runtime",
     # Not an importable package name (space and hyphen).
     "BGE Post-Process",
     # Helper modules imported by add-ons through `sys.path`, not add-ons themselves.
