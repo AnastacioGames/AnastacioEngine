@@ -1,6 +1,6 @@
 # Auditoria: resultados do Claude (GL5-GL10)
 
-Lote delegado por `docs/auditoria-handoff-claude.md`. Branch `claude/auditoria-gl`
+Lote de auditoria GL. Branch `claude/auditoria-gl`
 (worktree separada). Codex integra estados em roadmap/changelog/suspeitos.
 
 ## Teste comum

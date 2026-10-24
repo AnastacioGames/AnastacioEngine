@@ -2,7 +2,7 @@
 
 Branch `smart-modules-2dfilter` (worktree `D:\AnastacioEngine-smart2d`, junction `lib` → `D:\AnastacioEngine\lib`;
 remover só a junction com `rmdir` antes do `git worktree remove`). Base: `main` em c8d7f2c9, com o Choice do
-GLSL Script já mesclado (ver `docs/smart-node-choice-plan.md`).
+GLSL Script já mesclado.
 
 ## Problema
 

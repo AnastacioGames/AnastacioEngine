@@ -77,7 +77,6 @@ Essa opção acrescenta: nome/título do painel, preset de exportação Godot, `
 
 ## 4. Scripts, testes e documentação
 
-A lista completa de ocorrências textuais rastreadas está no [inventário](executable-rename-inventory.md). Ela é um conjunto de candidatos para revisão, não uma lista de substituições automáticas: comentários, histórico e nomes de alvos internos não exigem a mesma ação que um caminho executável.
 
 Prioridades confirmadas para o editor Windows:
 
