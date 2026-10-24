@@ -1,18 +1,21 @@
-# Mapa de código — `KX_GameObject.cpp`
+# Mapa de código — `KX_GameObject`
 
-Guia de navegação para achar rápido onde fica cada responsabilidade de
-[`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp) (7.135 linhas) sem ler o
-arquivo inteiro. Não descreve arquitetura nem decisões; é só um índice.
+Guia de navegação para achar rápido onde fica cada responsabilidade de `KX_GameObject` sem ler os arquivos
+inteiros. Não descreve arquitetura nem decisões; é só um índice. A classe está dividida em três arquivos:
+o núcleo C++ em [`KX_GameObject.cpp`](../source/source/gameengine/Ketsji/KX_GameObject.cpp) e os bindings
+Python em [`KX_GameObject_Python.cpp`](../source/source/gameengine/Ketsji/KX_GameObject_Python.cpp)
+(tabelas, tipo e atributos) e
+[`KX_GameObject_PyMethods.cpp`](../source/source/gameengine/Ketsji/KX_GameObject_PyMethods.cpp) (métodos).
 
-**Linhas conferidas em 2026-10-23 (`HEAD` `6960d5e7`).** Números de linha são aproximados e envelhecem a cada
-edição: use-os como ponto de partida e confirme com `grep -n "KX_GameObject::NomeDoMetodo"`. Se o arquivo
-for dividido, este mapa deve
-ser refeito.
+**Linhas conferidas em 2026-10-23 (`HEAD` `7a93da6c`).** Números de linha são aproximados e envelhecem a cada
+edição: use-os como ponto de partida e confirme com `grep -n "KX_GameObject::NomeDoMetodo"`.
 
 Para a declaração das classes e membros, o header é
 [`KX_GameObject.h`](../source/source/gameengine/Ketsji/KX_GameObject.h) (1.412 linhas).
 
-## Núcleo C++ (linhas 1–2360)
+## `Ketsji/KX_GameObject.cpp` (2.728 linhas)
+
+Núcleo C++.
 
 Os métodos de um mesmo domínio **não são contíguos**: por exemplo, animação aparece em 643–698 e de novo em
 803–818, e partículas ficam no meio do bloco de animação. Procure pelo nome, não pela faixa.
@@ -38,23 +41,29 @@ Os métodos de um mesmo domínio **não são contíguos**: por exemplo, animaç�
 | Componentes Python | `SetComponents` 2649, `UpdateComponents` 2654 (runtime; ficam no núcleo apesar do `#ifdef WITH_PYTHON`) |
 | Helpers `static` do núcleo | `setGraphicController_recursive` 981, `walk_children`/`walk_parent` 2608–2630 (servem a `GetChildren*`) |
 
-## Bindings Python (linhas 2363–5979)
+## `Ketsji/KX_GameObject_Python.cpp` (2.816 linhas)
 
-Tudo dentro de `#ifdef WITH_PYTHON`. Ordem do arquivo:
+Bindings Python, parte 1. Tudo dentro de `#ifdef WITH_PYTHON`. Ordem do arquivo:
 
 | Linhas | Conteúdo |
 |---|---|
-| 2363–2653 | macro `PYTHON_CHECK_PHYSICS_CONTROLLER`, callbacks mathutils (`static`), `KX_GameObject_Mathutils_Callback_Init` (público, chamada por `KX_PythonInitTypes.cpp`) |
-| 2655–3110 | `Methods[]`, `Attributes[]`, `Map_GetItem`/`Map_SetItem`/`Seq_Contains` (`static`), `Mapping`, `Sequence`, `KX_GameObject::Type` |
-| 3113–4352 | getters/setters de atributos Python (`pyattr_get_*`, `pyattr_set_*`, ~167) e `py_get_*_item` |
-| 4354–5979 | métodos Python: `PyApply*` e `EXP_PYMETHODDEF_DOC*` (rayCast, getVectTo, playAction, addDebugProperty, …) e helpers `static` `CheckRayCastObject`, `none_tuple_*`, `layer_check` |
+| 127–417 | macro `PYTHON_CHECK_PHYSICS_CONTROLLER`, callbacks mathutils (`static`), `KX_GameObject_Mathutils_Callback_Init` 410 (público, chamada por `KX_PythonInitTypes.cpp`) |
+| 419–1386 | `Methods[]`, helpers de destruição (`static`), `Attributes[]`, `Map_GetItem` 1179, `Map_SetItem`, `Seq_Contains` (`static`), `Mapping`, `Sequence`, `KX_GameObject::Type` |
+| 1387–fim | getters/setters de atributos Python (`pyattr_get_*`, `pyattr_set_*`, a partir de `pyattr_get_name` 1387) e `py_get_*_item` |
+
+## `Ketsji/KX_GameObject_PyMethods.cpp` (1.853 linhas)
+
+Bindings Python, parte 2: métodos (`PyApply*` a partir de `PyApplyForce` 136, `EXP_PYMETHODDEF_DOC*`: rayCast,
+getVectTo, playAction, addDebugProperty, …). Repete a macro `PYTHON_CHECK_PHYSICS_CONTROLLER` (usada nos dois
+arquivos). Helpers `static`: `py_vehicle_float` 1033, `CheckRayCastObject` 1237, `none_tuple_3` 1323,
+`layer_check` 1540. Também traz `RayCastData`/`RayHit`/`NeedRayCast` e `ConvertPythonToGameObject` 1794.
 
 ## Como achar algo
 
-- **Um atributo Python** (`obj.worldPosition`): procure `pyattr_get_worldPosition` na faixa 3113–4352.
-- **Um método Python** (`obj.rayCast`): procure `EXP_PYMETHODDEF_DOC(KX_GameObject, rayCast` na faixa
-  4354–5979; sua entrada na tabela está em `Methods[]` (2657–2757).
-- **Um método C++**: procure `KX_GameObject::Nome(` e use a tabela acima para o domínio.
+- **Um atributo Python** (`obj.worldPosition`): procure `pyattr_get_worldPosition` em `KX_GameObject_Python.cpp`.
+- **Um método Python** (`obj.rayCast`): procure `EXP_PYMETHODDEF_DOC(KX_GameObject, rayCast` em
+  `KX_GameObject_PyMethods.cpp`; sua entrada na tabela está em `Methods[]` de `KX_GameObject_Python.cpp`.
+- **Um método C++**: procure `KX_GameObject::Nome(` e use a tabela do núcleo para o domínio.
 - **Quem chama/instancia**: `KX_Scene.cpp` (réplica, `AddObject`), `BL_BlenderDataConversion.cpp`
   (criação a partir do `.blend`) e as subclasses `KX_Camera`, `KX_LightObject`, `KX_FontObject`,
   `KX_Speaker`, `BL_ArmatureObject`.
