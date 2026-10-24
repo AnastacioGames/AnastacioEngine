@@ -1,4 +1,4 @@
-"""Mock Range / Range.imgui so net_menu imports without the engine."""
+"""Mock Range / Range.imgui / mathutils so net_menu imports without the engine."""
 
 import os
 import sys
@@ -32,6 +32,7 @@ def _install_range_mock():
 	sys.modules["Range"] = rng
 	sys.modules["Range.imgui"] = imgui
 	sys.modules["Range.types"] = rng.types
+	sys.modules["mathutils"] = types.SimpleNamespace(Color=tuple)
 	return rng
 
 
