@@ -37,7 +37,9 @@ jobs:
       - uses: actions/checkout@v4
       - name: Dependencies
         run: bash tools/linux/container-deps-22.04.sh
-      - uses: actions/cache@v4
+      # restore/save split: actions/cache@v4 only saves on success, so a failed or
+      # timed-out first build would lose the whole ccache.
+      - uses: actions/cache/restore@v4
         with:
           path: .ccache-linux
           key: ccache-linux-${{ github.sha }}
@@ -48,10 +50,17 @@ jobs:
           -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
       - name: Build editor and player
         run: cmake --build build-linux-editor --target RangeEngine RangeRuntime -j"$(nproc)"
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: .ccache-linux
+          key: ccache-linux-${{ github.sha }}
       - name: Install
         run: cmake --install build-linux-editor
       - name: Player smoke test
         run: test -x build-linux-editor/bin/AnastacioRuntime && test -x build-linux-editor/bin/AnastacioEngine
+      # ctest here covers only the Python --background tests: net_tests need
+      # NET_STANDALONE and the lib/tests data is not in the repo.
       - name: ctest
         run: ctest --test-dir build-linux-editor --output-on-failure -E "anastacio_steam"
       - name: ccache stats
