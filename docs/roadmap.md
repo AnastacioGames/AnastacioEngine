@@ -46,17 +46,9 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Prioridade atual
 
-- **Windows: compilar e testar de novo** (após 2026-10-13). Entraram no `main` mudanças em código compartilhado
-  que só foram compiladas no Linux: FFmpeg 5+ (`ffmpeg_compat.h`, `writeffmpeg`, `anim_movie`, `indexer`,
-  `VideoFFmpeg`), OpenColorIO 2.x (`intern/opencolorio`, Cycles, `config.ocio`), caminho do `imgui.ini`
-  (`KX_Imgui.cpp`), `ge_logic_imgui` passando a linkar `bf_editor_datafiles` e a dependência do `RangeEngine`
-  nos helpers de bake fora do `if(WIN32)` (`creator/CMakeLists.txt`). Conferir: build do editor e do player,
-  export de vídeo, video texture, views do Color Management (Filmic etc.), menu ImGui no jogo (fonte e
-  `imgui.ini` ao lado do executável) e bake de lightmap.
-  Soma-se, da preparação da release 0.5.1 (build e `ctest` só rodados no Linux): `bmesh_bevel.c`
-  (`adjust_offsets` recebe `bm` e usa `BM_ITER_MESH` em vez de `GHASH_ITER` na primeira passada, corrigindo
-  um `ctest bmesh_bevel` intermitente) e `selection_utils.py` (`bpy.utils.register_class` no lugar de
-  `register_module`, que não existe). Rodar `ctest` completo no Windows depois de compilar.
+- **Windows: conferir com janela** o que entrou via Linux (FFmpeg 5+/OpenColorIO 2.x/ImGui): export de vídeo,
+  video texture, views do Color Management (Filmic etc.), menu ImGui no jogo (fonte e `imgui.ini` ao lado do
+  executável) e bake de lightmap. Build e `ctest` 15/15 no Windows já passaram (2026-10-23 e 2026-10-24).
 - Migração Windows: editor `AnastacioEngine.exe` e player `AnastacioRuntime.exe` compilados.
   Cooking, standalone pelo editor e export nativo passaram em cena controlada; usuário
   confirmou que o jogo funciona após a migração. Pendente: console,
@@ -213,8 +205,7 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 - **Cycles OpenCL no Linux com GPU AMD:** sem máquina para testar (WSL não serve). Roteiro: Preferences > System >
   Cycles Compute Device = OpenCL, Render Device = GPU Compute, renderizar a cena padrão e bake de AO comparando com
   a CPU. Cubins CUDA sm_75/86/89/120 no release, só sm_120 testado em hardware. OSL desligado.
-- **FFmpeg 5+/OpenColorIO 2.x (2026-10-13):** compila no Ubuntu 24.04; falta compilar no Windows (ver
-  "Prioridade atual") e decidir se o pacote Linux liga o FFmpeg (`WITH_CODEC_FFMPEG=OFF` hoje).
+- **FFmpeg 5+/OpenColorIO 2.x (2026-10-13):** compila no Ubuntu 24.04 e no Windows; falta decidir se o pacote Linux liga o FFmpeg (`WITH_CODEC_FFMPEG=OFF` hoje).
 
 ### Cutscene nativo
 
@@ -242,9 +233,7 @@ Pendente:
   usuário conferir a aba na janela e ouvir crossfade, avanço da playlist, pausa/retomada e o eco das Reverb
   Areas em Music/Ambient (som 2D com efeito OpenAL nunca foi ouvido aqui). Cena:
   `tools/debug/cenas/criar_cena_world_sound.py`.
-- **Relinkar o editor**: o `AnastacioEngine.exe` estava aberto no build da etapa 2; rodar `ninja RangeEngine`
-  com ele fechado.
-- **Etapa 3**: comando por mensagem (assunto `audio`), para usar com logic bricks.
+- **Etapa 3 (comando por mensagem)** feita em 2026-10-24; falta ouvir `play`/`next`/`stop` por mensagem com janela.
 - Escopo fechado pelo usuário em 2026-10-12: só os módulos Music e Ambient. Efeitos e fala continuam nos
   próprios objetos (Speaker / Sound actuator); não haverá módulos Efeitos nem Voz.
 - Depois: salvar volumes do jogador, música atravessando a carga de outro `.range`, conferir se o export

@@ -354,6 +354,18 @@ void KX_KetsjiEngine::SetNetworkMessageManager(KX_NetworkMessageManager *manager
 	m_networkMessageManager = manager;
 }
 
+/// World Sound: commands sent as messages with subject "audio" and no receiver
+/// (Message actuator or sendMessage), read right after the message lists swap.
+static void process_audio_messages(KX_NetworkMessageManager *messages, KX_AudioManager *audio)
+{
+	if (!messages || !audio) {
+		return;
+	}
+	for (const KX_NetworkMessageManager::Message& message : messages->GetMessages("", "audio")) {
+		audio->ExecuteCommand(message.body);
+	}
+}
+
 void KX_KetsjiEngine::SetAudioManager(KX_AudioManager *manager)
 {
 	m_audioManager = manager;
@@ -809,6 +821,7 @@ bool KX_KetsjiEngine::NextFrame()
 					m_inputDevice->ReleaseMoveEvent();
 				}
 				m_networkMessageManager->ClearMessages();
+				process_audio_messages(m_networkMessageManager, m_audioManager);
 			}
 			// Animations are time based, so evaluating them once (on the last step) is enough
 			// for the drawn pose and avoids paying the skinning per catch-up step.
@@ -850,6 +863,7 @@ bool KX_KetsjiEngine::NextFrame()
 	m_logger.StartLog(tc_overhead);
 	if (steps > 0) {
 		m_networkMessageManager->ClearMessages();
+		process_audio_messages(m_networkMessageManager, m_audioManager);
 	}
 
 	if (m_audioManager) {

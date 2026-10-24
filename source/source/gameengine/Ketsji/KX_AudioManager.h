@@ -87,6 +87,14 @@ public:
 	/// Stop everything now, without fade.
 	void StopAll();
 
+	/** Run a command from a message with subject "audio" (Message actuator or sendMessage),
+	 * so logic bricks can drive the modules:
+	 * "play music", "play ambient rain fade=2", "stop music fade=1", "pause music",
+	 * "resume music", "next music", "prev music", "volume music 0.5", "stopall".
+	 * Names with spaces go in double quotes. Warns and returns false on a bad command.
+	 */
+	bool ExecuteCommand(const std::string& command);
+
 	/** Play a sound of the Effects modules for an engine event (WO_SOUND_EVENT_*): one of the
 	 * sounds with this event, at random, as a new voice; the voices already playing go on.
 	 * \param gain Multiplies the sound volume (e.g. a far thunder).

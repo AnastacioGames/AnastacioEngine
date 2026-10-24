@@ -8,6 +8,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-24 - World Sound: comandos por mensagem (etapa 3)
+
+- Mensagem com assunto `audio` e sem destinatário (Message actuator ou `sendMessage`) comanda os módulos:
+  `play music`, `play ambient chuva fade=2`, `stop music fade=1`, `pause`/`resume <módulo>`,
+  `next`/`prev <módulo>`, `volume music 0.5`, `stopall`. Nomes com espaço entre aspas. Comando inválido só
+  avisa no console. `KX_AudioManager::ExecuteCommand`; a engine lê as mensagens logo após cada troca de lista
+  (inclusive nos passos extras do fixed timestep), então nenhuma se perde.
+- Teste headless (`--server`): volume mudou por mensagem; comando desconhecido e módulo inexistente não
+  derrubam o jogo. Tocar não dá para conferir sem janela (o servidor não toca som, nem pela API Python).
+- Windows: editor e player relinkados e `ctest` 15/15 de novo.
+
 ## 2026-10-23 - RNA: rna_object.c dividido (rna_object_game.c)
 
 Sem mudança de comportamento. As definições dos sistemas da engine no Object (partículas GPU, reverb, raio,

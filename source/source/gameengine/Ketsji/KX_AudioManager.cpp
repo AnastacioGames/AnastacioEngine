@@ -49,6 +49,7 @@ typedef float sample_t;
 #include "CM_Message.h"
 
 #include <algorithm>
+#include <cctype>
 #include <cmath>
 #include <cstdlib>
 
@@ -942,6 +943,130 @@ void KX_AudioManager::StopAll()
 	}
 	m_rainPlaying = false;
 	m_delayedEvents.clear();
+}
+
+/// Split a command on spaces; "double quotes" keep names with spaces together.
+static std::vector<std::string> split_command(const std::string& text)
+{
+	std::vector<std::string> tokens;
+	std::string current;
+	bool quoted = false;
+	bool hasToken = false;
+	for (const char c : text) {
+		if (c == '"') {
+			quoted = !quoted;
+			hasToken = true;
+		}
+		else if (!quoted && (c == ' ' || c == '\t' || c == '\n' || c == '\r')) {
+			if (hasToken) {
+				tokens.push_back(current);
+				current.clear();
+				hasToken = false;
+			}
+		}
+		else {
+			current += c;
+			hasToken = true;
+		}
+	}
+	if (hasToken) {
+		tokens.push_back(current);
+	}
+	return tokens;
+}
+
+static bool parse_float(const std::string& text, float& value)
+{
+	if (text.empty()) {
+		return false;
+	}
+	char *end = nullptr;
+	const float result = std::strtof(text.c_str(), &end);
+	if (end == text.c_str() || *end != '\0') {
+		return false;
+	}
+	value = result;
+	return true;
+}
+
+bool KX_AudioManager::ExecuteCommand(const std::string& command)
+{
+	std::vector<std::string> args = split_command(command);
+	if (args.empty()) {
+		CM_Warning("World Sound: empty \"audio\" message");
+		return false;
+	}
+
+	std::string verb = args[0];
+	std::transform(verb.begin(), verb.end(), verb.begin(), [](unsigned char c) { return std::tolower(c); });
+
+	if (verb == "stopall") {
+		StopAll();
+		return true;
+	}
+
+	if (args.size() < 2) {
+		CM_Warning("World Sound: \"" << command << "\" needs a module name");
+		return false;
+	}
+	const std::string& module = args[1];
+	if (!HasModule(module)) {
+		CM_Warning("World Sound: \"" << command << "\": no module \"" << module << "\"");
+		return false;
+	}
+
+	// Optional "fade=seconds" anywhere after the module; the other word is the sound.
+	float fade = -1.0f;
+	std::string sound;
+	for (size_t i = 2; i < args.size(); ++i) {
+		if (args[i].compare(0, 5, "fade=") == 0) {
+			if (!parse_float(args[i].substr(5), fade)) {
+				CM_Warning("World Sound: \"" << command << "\": bad fade \"" << args[i] << "\"");
+				return false;
+			}
+		}
+		else if (sound.empty()) {
+			sound = args[i];
+		}
+	}
+
+	bool ok;
+	if (verb == "play") {
+		ok = Play(module, sound, fade);
+	}
+	else if (verb == "stop") {
+		ok = Stop(module, sound, fade);
+	}
+	else if (verb == "pause") {
+		ok = Pause(module);
+	}
+	else if (verb == "resume") {
+		ok = Resume(module);
+	}
+	else if (verb == "next") {
+		ok = Step(module, 1);
+	}
+	else if (verb == "prev" || verb == "previous") {
+		ok = Step(module, -1);
+	}
+	else if (verb == "volume") {
+		float volume;
+		if (!parse_float(sound, volume)) {
+			CM_Warning("World Sound: \"" << command << "\" needs a number, e.g. \"volume " << module << " 0.5\"");
+			return false;
+		}
+		ok = SetVolume(module, volume);
+	}
+	else {
+		CM_Warning("World Sound: unknown command \"" << args[0] << "\" (play, stop, pause, resume, next, prev, "
+		           "volume, stopall)");
+		return false;
+	}
+
+	if (!ok) {
+		CM_Warning("World Sound: \"" << command << "\" failed (sound not found?)");
+	}
+	return ok;
 }
 
 #ifdef WITH_PYTHON
