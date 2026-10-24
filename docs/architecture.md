@@ -20,11 +20,11 @@ A raiz do CMake é `source/` (presets em `source/CMakePresets.json`). Dentro del
 |---|---|
 | `source/source/gameengine/` | Runtime do jogo (Ketsji): loop, cena, objetos, lógica, física, render. Detalhado abaixo. |
 | `source/source/blender/` | Editor herdado do Blender 2.79: `makesdna` (structs gravadas no `.blend`), `makesrna` (propriedades expostas à UI/Python), `blenkernel` (dados), `blenloader` (ler/gravar `.blend` e versioning), `editors` (operadores e desenho da UI), `gpu` (shaders GLSL do material no jogo), `python` (`bpy`), `windowmanager`. |
-| `source/source/creator/` | `main()` do editor (`RangeEngine`). |
-| `source/source/blenderplayer/` | Alvo do player (`RangeRuntime`) e os stubs que substituem funções do editor. |
+| `source/source/creator/` | `main()` do editor (`AnastacioEngine.exe`, alvo Ninja `RangeEngine`). |
+| `source/source/blenderplayer/` | Alvo do player (`AnastacioRuntime.exe`, alvo Ninja `RangeRuntime`) e os stubs que substituem funções do editor. |
 | `source/intern/` | Bibliotecas internas: `cycles` (render offline), `ghost` (janela/input), `audaspace` (áudio), `guardedalloc` etc. |
 | `source/extern/` | Terceiros (Bullet, ImGui, Recast, clew/cuew…). |
-| `source/release/scripts/` | Python do editor: `startup/bl_ui` (painéis), `startup/bl_operators`, `startup/flowmenu` (painéis de física da Range), `modules/range_web` (export Web/Android, pré-voo e traduções), `addons`, `templates_components`. |
+| `source/release/scripts/` | Python do editor: `startup/bl_ui` (painéis), `startup/bl_operators`, `startup/flowmenu` (painéis de física da Range), `startup/range_logic_tree.py` e `range_ui_tree.py` (editores por nós), `modules/range_web` (export Web/Android, pré-voo e traduções), `modules/range_locale.py` (`Range.locale`), `modules/range_ui_runtime.py`, `addons`, `templates_components` (inclui o modelo de Smart Component). |
 | `source/release/datafiles/` | `startup.blend` de fábrica, ícones, locale. |
 | `tools/` | Scripts de apoio: `web/` (empacotar e verificar o pacote Web), `android/` (template do APK WebView), `linux/`, `build_code_index.py` (índices em `docs/local-knowledge/`). |
 | `docs/` | Documentação; índice em `docs/README.md`. |
@@ -61,7 +61,7 @@ main() [GPG_Ghost.cpp, standalone]        BL_KetsjiEmbedStart.cpp [embedded no B
 ```
 
 Dois pontos de entrada de `main()`:
-- **Standalone** (`RangeRuntime`): `GamePlayer/GPG_Ghost.cpp:842` (`int main(...)`) → constrói `GPG_Canvas` + `LA_PlayerLauncher`.
+- **Standalone** (`AnastacioRuntime`): `GamePlayer/GPG_Ghost.cpp:980` (`int main(...)`) → constrói `GPG_Canvas` + `LA_PlayerLauncher`.
 - **Embutido no Blender** (botão Play do editor): `BlenderRoutines/BL_KetsjiEmbedStart.cpp`, chamado a partir do
   `main()` do próprio Blender em `source/creator/` (fora de `gameengine/`).
 
@@ -84,7 +84,8 @@ código morto"):
 NextFrame()
   -> input / ImGui / joystick
   -> simulação: m_simulationPipeline->Update()
-       (uma chamada por frame; o acumulador de passo fixo está desligado desde 2026-09-26)
+       (uma chamada por frame; o acumulador de passo fixo está desligado desde 2026-09-26,
+        exceto com sessão multiplayer aberta, que liga o passo fixo: 1 Update = 1 tick de rede)
   -> processamento de libs/cenas agendadas (lib load/free, troca de cena)
   -> retorna m_doRender
 
@@ -159,8 +160,9 @@ Dois grupos, com ciclos de vida opostos:
 | ├─ `KXImgui/` | Integração ImGui exposta ao Python. | `KX_Imgui.h/.cpp` (`KX_Imgui::Init(DEV_InputDevice*)`), `KX_PythonImgui.cpp` | Ketsji, Device |
 | ├─ `KXNetwork/` | Sensores/atuadores de mensagens de rede. | — | Ketsji |
 | **Launcher** | Camada abstrata que dirige o loop de frames do `KX_KetsjiEngine`. | `LA_Launcher.h/.cpp` (`EngineNextFrame`, `RunPythonMainLoop`), `LA_PlayerLauncher.h/.cpp`, `LA_BlenderLauncher.h/.cpp` | Ketsji, Rasterizer, Device |
-| **GamePlayer** | Shell da aplicação standalone (fora do editor Blender). | `GPG_Ghost.cpp` (`main()`, linha 817), `GPG_Canvas.h/.cpp` | Launcher, Rasterizer, GHOST |
+| **GamePlayer** | Shell da aplicação standalone (fora do editor Blender). | `GPG_Ghost.cpp` (`main()`, linha 980), `GPG_Canvas.h/.cpp` | Launcher, Rasterizer, GHOST |
 | **BlenderRoutines** | Ponte entre o "Play" embutido no editor Blender e o Ketsji. | `BL_KetsjiEmbedStart.cpp`, `KX_BlenderCanvas.h/.cpp` | Ketsji, Rasterizer, Blender core |
+| **Network** | Multiplayer nativo: sessão, réplica por snapshot, RPC, predição, compensação de lag, descoberta em LAN; transportes ENet, Steam, WebSocket, loopback e simulado. Ligado ao loop por `Ketsji/KX_NetworkManager` (`BeginTick`/`EndTick` em `KX_SimulationPipeline::Update`) e ao Python por `KX_PyNetwork`. | `NET_Session`, `NET_Replicator`, `NET_ReplicaClient`, `NET_Transport*.cpp`, `NOTES-*.md` | Common; Ketsji só pela ponte |
 | **VideoTexture** | Add-on de captura de vídeo/render-to-texture exposto ao Python (`bge.texture`). | `Texture.h/.cpp`, `VideoFFmpeg.h/.cpp`, `ImageRender.h/.cpp`, `VideoDeckLink.h/.cpp` | Ketsji, Rasterizer, FFmpeg/DeckLink (3rd party) |
 
 ## Do editor para o jogo
@@ -174,6 +176,13 @@ UI Python (release/scripts/startup/bl_ui, flowmenu)
    -> Converter (BL_BlenderDataConversion.cpp e BL_Convert*.cpp) no início do jogo
    -> objetos de runtime (KX_GameObject, SCA_* logic bricks, controllers de física, materiais GLSL)
 ```
+
+Duas camadas de autoria por nós ficam antes desse caminho e não criam formato novo: a **Logic Tree**
+(`startup/range_logic_tree.py`) compila os nós em Logic Bricks nativos no grupo "Tree: <nome>" ao apertar P, ao
+salvar ou pelo Compile; a **UI Tree** (`startup/range_ui_tree.py`) grava, no "Bake UI", o texto `ui_tree_data.py`,
+que `modules/range_ui_runtime.py` lê e desenha no runtime. O arquivo **`.cooked`** ao lado do jogo guarda formas
+de colisão, shaders e buffers de malha já prontos para o conversor pular esse trabalho
+(`Physics/Bullet/CcdCookedData.cpp`, `Converter/BL_Converter.cpp`).
 
 Por isso uma opção nova de jogo costuma tocar DNA, RNA, UI Python, versioning e conversor. A lista de
 arquivos por tipo de mudança está em [maintenance-guide.md](maintenance-guide.md). Coisas só do editor (Asset

@@ -1,7 +1,7 @@
 # Diagramas da arquitetura
 
 Visão desenhada da AnastacioEngine, para quem chega ao projeto. O texto completo está em
-[architecture.md](architecture.md); este arquivo só desenha. Conferido com o código em 2026-09-26.
+[architecture.md](architecture.md); este arquivo só desenha. Conferido com o código em 2026-10-23.
 
 Os diagramas usam Mermaid e aparecem desenhados no GitHub. Caminhos de código são relativos a
 `source/source/gameengine/`, salvo indicação.
@@ -14,7 +14,7 @@ Os diagramas usam Mermaid e aparecem desenhados no GitHub. Caminhos de código s
 flowchart TB
     root["AnastacioEngine/"]
     root --> src["source/<br/>raiz do CMake e presets"]
-    root --> tools["tools/<br/>web, android, linux, índices de código"]
+    root --> tools["tools/<br/>web, android, linux, debug, modelagem, índices de código"]
     root --> docs["docs/<br/>documentação"]
     root --> builds["build*/<br/>saída dos builds (fora do git)"]
 
@@ -25,17 +25,17 @@ flowchart TB
 
     ss --> ge["gameengine/<br/>runtime do jogo (Ketsji)"]
     ss --> bl["blender/<br/>editor herdado do Blender 2.79"]
-    ss --> cr["creator/<br/>main() do RangeEngine"]
-    ss --> bp["blenderplayer/<br/>alvo do RangeRuntime e stubs"]
+    ss --> cr["creator/<br/>main() do editor (AnastacioEngine.exe)"]
+    ss --> bp["blenderplayer/<br/>player (AnastacioRuntime.exe) e stubs"]
 
-    rel --> ui["scripts/startup/<br/>painéis e operadores"]
-    rel --> rw["scripts/modules/range_web/<br/>export Web/Android e traduções"]
+    rel --> ui["scripts/startup/<br/>painéis, operadores, Logic Tree, UI Tree"]
+    rel --> rw["scripts/modules/<br/>range_web, range_locale, range_ui_runtime..."]
     rel --> df["datafiles/<br/>startup.blend, splash, ícones"]
 ```
 
 **Legenda.** O jogo roda a partir de `gameengine/`; o editor é o Blender 2.79 modificado (`blender/`). Os dois
-executáveis são `RangeEngine` (editor, `main()` em `creator/`) e `RangeRuntime` (player, montado em
-`blenderplayer/`). A interface do editor é quase toda Python, em `source/release/scripts/`.
+executáveis são `AnastacioEngine.exe` (editor, `main()` em `creator/`) e `AnastacioRuntime.exe` (player,
+montado em `blenderplayer/`); os alvos do Ninja continuam `RangeEngine` e `RangeRuntime`. A interface do editor é quase toda Python, em `source/release/scripts/`.
 
 ---
 
@@ -44,7 +44,7 @@ executáveis são `RangeEngine` (editor, `main()` em `creator/`) e `RangeRuntime
 ```mermaid
 flowchart TB
     subgraph entrada["Pontos de entrada"]
-        GP["GamePlayer<br/>RangeRuntime"]
+        GP["GamePlayer<br/>AnastacioRuntime"]
         BR["BlenderRoutines<br/>Play no editor"]
     end
     LA["Launcher<br/>LA_Launcher"]
@@ -54,6 +54,7 @@ flowchart TB
     PH["Physics<br/>Bullet"]
     RA["Rasterizer<br/>OpenGL / WebGL2, filtros 2D"]
     VT["VideoTexture<br/>bge.texture"]
+    NT["Network<br/>multiplayer NET_*: sessão, réplica, transportes"]
     SG["SceneGraph<br/>SG_Node"]
     DV["Device<br/>teclado, mouse, joystick"]
     EX["Expressions<br/>valores e ponte C++/Python"]
@@ -67,6 +68,8 @@ flowchart TB
     KX --> PH
     KX --> RA
     KX --> VT
+    KX --> NT
+    NT --> CM
     CV --> GL
     CV --> PH
     GL --> DV
@@ -90,7 +93,7 @@ papéis, não como regra de dependência garantida. Tabela de módulos em [archi
 
 ```mermaid
 flowchart LR
-    A["RangeRuntime<br/>GamePlayer/GPG_Ghost.cpp main()"] --> PL["LA_PlayerLauncher"]
+    A["AnastacioRuntime<br/>GamePlayer/GPG_Ghost.cpp main()"] --> PL["LA_PlayerLauncher"]
     B["Play no editor<br/>BlenderRoutines/BL_KetsjiEmbedStart.cpp"] --> BLL["LA_BlenderLauncher"]
     C["Navegador (WebAssembly)<br/>mesmo GPG_Ghost.cpp"] --> PL
     PL --> L["LA_Launcher"]
@@ -122,21 +125,25 @@ flowchart LR
     end
     subgraph SIM["2 · Simulação, para cada cena"]
         direction TB
+        S0["Rede: BeginTick<br/>(só com sessão multiplayer)"]
         S1["Atividade dos objetos"]
         S2["Animações e deformação"]
-        S3["Cutscene"]
+        S3["Cutscene e eventos"]
         S4["Lógica: sensores e controladores"]
         S5["Atuadores"]
-        S6["Física Bullet"]
-        S7["Atualiza hierarquia (UpdateParents)"]
-        S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7
+        S6["Terremoto e física Bullet"]
+        S7["Trilho do Range Trace, referência<br/>de otimização (LOD/HLOD), sol automático"]
+        S8["UpdateParents e Game FX da câmera"]
+        S9["Partículas GPU, chuva, raios,<br/>flicker das luzes"]
+        S10["Rede: EndTick (servidor envia)"]
+        S0 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9 --> S10
     end
     subgraph RD["3 · KX_RenderPipeline::Render()"]
         direction TB
         R1["BeginFrame"]
         R2["Sombras (KX_ShadowRenderer)"]
         R3["Render-to-texture"]
-        R4["Cada câmera: culling, LOD e desenho"]
+        R4["Cada câmera: culling, LOD/HLOD,<br/>céu e desenho (Static Batch)"]
         R5["Filtros 2D da cena"]
         R6["EndFrame: ImGui, debug, troca de buffers"]
         R1 --> R2 --> R3 --> R4 --> R5 --> R6
@@ -147,7 +154,8 @@ flowchart LR
 
 **Legenda.** `NextFrame()` sempre roda a simulação; o render só acontece quando `m_doRender` é verdadeiro
 (senão o motor só calcula quanto dormir). A hierarquia de objetos é atualizada várias vezes no frame (depois
-da lógica, dos atuadores e da física); o diagrama resume. Código: `Ketsji/KX_KetsjiEngine.cpp`,
+da lógica, dos atuadores e da física); o diagrama resume. Com sessão multiplayer aberta, cada `Update()` é
+um passo fixo = um tick de rede: antes aplica o estado recebido, depois o servidor captura e envia. Código: `Ketsji/KX_KetsjiEngine.cpp`,
 `Ketsji/KX_SimulationPipeline.cpp`, `Ketsji/KX_RenderPipeline.cpp`.
 
 ---
@@ -160,13 +168,22 @@ flowchart LR
     R --> D["Struct DNA<br/>blender/makesdna/DNA_*_types.h"]
     D --> F[".blend salvo"]
     V["Versioning de arquivos antigos<br/>blenloader/intern/versioning_range.c"] --> F
+    LT["Logic Tree (nós)<br/>startup/range_logic_tree.py"] -->|"P, salvar ou Compile"| BK["Logic Bricks no grupo<br/>Tree: nome"]
+    BK --> F
+    UT["UI Tree (nós)<br/>startup/range_ui_tree.py"] -->|"Bake UI"| UD["texto ui_tree_data.py"]
+    UD --> F
     F --> C["Converter<br/>BL_BlenderDataConversion.cpp<br/>BL_Convert*.cpp"]
+    CK[".cooked ao lado do jogo<br/>hull, shaders, buffers de malha"] -.->|"pula trabalho no load"| C
     C --> O["Runtime<br/>KX_GameObject, SCA_*, física, materiais GLSL"]
+    UD -.->|"lido por modules/range_ui_runtime.py"| O
 ```
 
 **Legenda.** O jogo nunca lê o editor, só o `.blend`. Uma opção nova de jogo costuma tocar todas essas
 caixas; a lista exata por tipo de mudança está em [maintenance-guide.md](maintenance-guide.md). Coisas só do
-editor (Asset Browser, pastas do Outliner, temas) param antes do conversor.
+editor (Asset Browser, pastas do Outliner, temas, Scene Doctor) param antes do conversor. Logic Tree e UI Tree
+não criam formato novo: a primeira gera Logic Bricks nativos (o jogo só vê bricks) e a segunda grava um texto
+que um controlador Python lê no runtime. O `.cooked` guarda trabalho já feito (formas de colisão, shaders,
+buffers de malha) para abrir o jogo mais rápido; sem ele o conversor refaz tudo.
 
 ---
 
@@ -175,8 +192,8 @@ editor (Asset Browser, pastas do Outliner, temas) param antes do conversor.
 ```mermaid
 flowchart TB
     code["Mesmo código-fonte"]
-    code -->|"preset v142-ninja<br/>build/"| W["Windows x64<br/>RangeEngine + RangeRuntime<br/>Cycles: Embree, CUDA, OpenCL"]
-    code -->|"presets linux-editor / linux-runtime"| L["Linux x86_64<br/>RangeEngine + RangeRuntime"]
+    code -->|"preset v142-ninja<br/>build/"| W["Windows x64<br/>AnastacioEngine + AnastacioRuntime<br/>Cycles: Embree, CUDA, OpenCL"]
+    code -->|"presets linux-editor / linux-runtime"| L["Linux x86_64<br/>AnastacioEngine + AnastacioRuntime"]
     code -->|"presets web-runtime / web-runtime-release<br/>build-web-release/"| WB["Runtime Web<br/>WebAssembly + WebGL2"]
     WB -->|"range_web: Exportar Web"| PK["Pacote do jogo para o navegador"]
     PK -->|"range_web/android.py"| AN["Android<br/>APK/AAB com WebView"]
