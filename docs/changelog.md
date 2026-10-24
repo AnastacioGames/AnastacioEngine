@@ -41,6 +41,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   pyflakes sem nome novo indefinido e `ctest` 15/15. Falta aceite visual da aba Game.
 - `Ketsji/KX_Scene.cpp` (5.349 linhas): cutscene e Trace Rail (750 linhas) movidos sem alteração para
   `Ketsji/KX_SceneCutscene.cpp`, mesma classe `KX_Scene`. Editor e player compilam, `ctest` 15/15.
+- `Ketsji/KX_GameObject.cpp` (7.135 linhas): bindings Python movidos sem alteração para
+  `Ketsji/KX_GameObject_Python.cpp` (mathutils, tabelas, tipo e atributos) e
+  `Ketsji/KX_GameObject_PyMethods.cpp` (métodos); o núcleo C++ fica com 2.728 linhas. Validado no CI Linux.
 - Mapa novo `docs/code-map-gpu.md` (gpu_material.c e gpu_shader_material.glsl, com receitas). `tools/check_docs.py` passa a conferir funções livres C/GLSL (antes só `Classe::Metodo`), o que revelou e corrigiu dezenas de linhas velhas nos mapas antigos.
 
 ## 2026-10-23 - GT2: retomada e auditoria dos seletores de efeitos

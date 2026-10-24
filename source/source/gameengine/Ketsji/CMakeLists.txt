@@ -113,6 +113,8 @@ set(SRC
 	KX_FontObject.cpp
 	KX_GameActuator.cpp
 	KX_GameObject.cpp
+	KX_GameObject_PyMethods.cpp
+	KX_GameObject_Python.cpp
 	KX_Globals.cpp
 	KX_DentDeformer.cpp
 	KX_ImpostorAtlasDeformer.cpp

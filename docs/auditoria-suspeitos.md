@@ -71,7 +71,7 @@ Grupo 1 também cobre PY1/PY2 (caminho Python + `activate(true)` da física). PY
 
 **Bugs de correção à parte (não são desempenho):**
 - ~~PH8~~ (corrigido): `CcdPhysicsEnvironment.cpp:1178` desreferencia `body` antes do teste de nulo.
-- PY2: `worldOrientation` por índice grava orientação local (`KX_GameObject.cpp:2863`).
+- PY2: `worldOrientation` por índice grava orientação local (`KX_GameObject_Python.cpp:389`).
 - PY3: activity culling de componentes nunca desliga o `update()`.
 - LP: `RAS_2DFilter::ComputeTextureOffsets` não acompanha resize.
 - SP1: `KX_Scene.cpp:875` reconstrói a navmesh do **original** a cada cópia; a cópia fica sem navmesh.
@@ -226,7 +226,7 @@ e um `UpdateWorldData` imediato por escrita. Getters mathutils não escrevem de 
 
 | ID | Onde | Padrão | Custo | Confiança | Status |
 |---|---|---|---|---|---|
-| PY1 | `Ketsji/KX_GameObject.cpp:4164-4360` `pyattr_set_world/local Position/Orientation/Transform` | `NodeSet*` + `NodeUpdate()` sem comparar; `CcdPhysicsController::SetPosition` (:1406) faz `activate(true)` → corpo nunca dorme; estático vira `CF_KINEMATIC_OBJECT` | árvore + física + culling por escrita | alta | decisão: não aplicado (nó pode estar atrasado em relação à física; comparar pularia escrita necessária) |
+| PY1 | `Ketsji/KX_GameObject_Python.cpp:2123-2340` `pyattr_set_world/local Position/Orientation/Transform` | `NodeSet*` + `NodeUpdate()` sem comparar; `CcdPhysicsController::SetPosition` (:1406) faz `activate(true)` → corpo nunca dorme; estático vira `CF_KINEMATIC_OBJECT` | árvore + física + culling por escrita | alta | decisão: não aplicado (nó pode estar atrasado em relação à física; comparar pularia escrita necessária) |
 | PY2 | `KX_GameObject.cpp:2715/2796/2847` callbacks mathutils de escrita | `obj.worldPosition.x = v` faz set completo; 3 componentes = 3 syncs; velocidades (`SetLinearVelocity` :1837) acordam sempre, mesmo gravando zero | ×3 do PY1 | alta | bug já corrigido; custo por componente segue (cada escrita muda valor) |
 | PY3 | `KX_GameObject.cpp:2530-2548` `UpdateComponents` | os dois ramos do if/else são idênticos → activity culling de componentes não tem efeito; `KX_PythonComponentManager.cpp:38` copia o vetor por frame; `PyObject_CallMethod` busca `update` por frame | N componentes × chamada Python | alta (bug) / média (impacto) | já corrigido (ramos não são mais idênticos); cópia do vetor/CallMethod ficam |
 | PY4 | `BL_Shader.cpp:405-640` → `Rasterizer/RAS_Shader.cpp:211/231` | `setUniform*` liga `m_dirty` sem `memcmp`; `ApplyShader` reenvia todos os uniforms; `FindUniform` linear | K glUniform por bind | média/baixa | corrigido: SetUniformfv/iv não sujam o shader com valor igual (memcmp) |
@@ -234,7 +234,7 @@ e um `UpdateWorldData` imediato por escrita. Getters mathutils não escrevem de 
 | PY6 | `KX_PythonInit.cpp:1367` `showMouse` → `GPG_Canvas.cpp:148` / `KX_BlenderCanvas.cpp:167` | chamada ao SO a cada chamada sem comparar estado | 1 syscall | baixa | decisão de design: SO pode mudar o cursor fora da engine |
 | PY7 | `KX_GameObject.cpp:1737` `SetVisible` | `Activate` do graphic controller sempre; `recursive=True` percorre a árvore | baixo | baixa | adiado: risco com controller criado depois contando com SetVisible igual |
 
-**Bug de correção à parte:** `KX_GameObject.cpp:2863-2867` `MATHUTILS_MAT_CB_ORI_GLOBAL` chama `NodeSetLocalOrientation`
+**Bug de correção à parte:** `KX_GameObject_Python.cpp:389-393` `MATHUTILS_MAT_CB_ORI_GLOBAL` chama `NodeSetLocalOrientation`
 em vez de `NodeSetGlobalOrientation` — em filho, `obj.worldOrientation[i][j] = x` grava a orientação local.
 
 Verificados OK: `SCA_PythonController::Trigger` (só recompila com `m_bModified`), getters mathutils, setters de luz,
