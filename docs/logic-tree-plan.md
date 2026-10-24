@@ -357,7 +357,9 @@ no RNA, então o grupo aparece como os outros.
 - Fica para o teste com janela: ligar Debug Mode, apertar P, jogar, sair com Esc e ver os nós verdes.
 - F7 (antiga F6): importação de bricks como árvore, pinos de dado e runtime próprio continuam só para caso real.
 
-## 20. F7 e acabamento (2026-10-23), aceito com janela
+## 20. F7 e acabamento (2026-10-23)
+
+Testado em background e no runtime; Convert to Nodes visto com janela. Cores, Active e painel em caixas ainda sem aceite visual.
 
 - **Convert to Nodes** (cabeçalhos do Logic Editor e da Logic Tree): bricks do usuário viram nós; o que não tem
   nó equivalente fica como brick com aviso. Brick ou controller desligado no checkbox vira nó mutado.
