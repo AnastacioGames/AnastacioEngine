@@ -34,6 +34,7 @@ struct IDProperty;
 struct Main;
 struct Mesh;
 struct Object;
+struct RangeReverbAreaSettings;
 struct ReportList;
 struct SDNA;
 
@@ -156,6 +157,7 @@ void RNA_def_nla(struct BlenderRNA *brna);
 void RNA_def_nodetree(struct BlenderRNA *brna);
 void RNA_def_object(struct BlenderRNA *brna);
 void RNA_def_object_force(struct BlenderRNA *brna);
+void RNA_def_object_game(struct BlenderRNA *brna);
 void RNA_def_packedfile(struct BlenderRNA *brna);
 void RNA_def_palette(struct BlenderRNA *brna);
 void RNA_def_particle(struct BlenderRNA *brna);
@@ -231,6 +233,10 @@ int rna_object_shapekey_index_set(struct ID *id, PointerRNA value, int current);
 
 /* named internal so as not to conflict with obj.update() rna func */
 void rna_Object_internal_update_data(struct Main *bmain, struct Scene *scene, struct PointerRNA *ptr);
+/* rna_object_game.c, shared with rna_object.c */
+void rna_reverb_area_apply_preset(struct RangeReverbAreaSettings *ra, int preset);
+void rna_reverb_area_sync_empty_draw(struct Object *ob);
+void rna_Object_lightning_preview_update(struct Main *bmain, struct Scene *scene, struct PointerRNA *ptr);
 void rna_Mesh_update_draw(struct Main *bmain, struct Scene *scene, struct PointerRNA *ptr);
 void rna_TextureSlot_update(struct Main *bmain, struct Scene *scene, struct PointerRNA *ptr);
 
