@@ -1455,14 +1455,50 @@ void node_draw_nodetree(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeT
 }
 
 /* draw tree path info in lower left corner */
+/* Cor que identifica o módulo de trabalho de cada tipo de árvore (fundo e nome no canto);
+ * NULL = fundo do tema sem tinta. */
+static const float *node_space_tint(const char *tree_idname)
+{
+	static const struct { const char *idname; float col[3]; } tints[] = {
+		{"ShaderNodeTree", {0.30f, 0.55f, 0.95f}},
+		{"CompositorNodeTree", {0.35f, 0.85f, 0.75f}},
+		{"TextureNodeTree", {0.85f, 0.45f, 0.45f}},
+		{"RangeLogicTree", {1.00f, 0.62f, 0.15f}},
+		{"RangeUITree", {0.70f, 0.40f, 1.00f}},
+	};
+	for (int i = 0; i < ARRAY_SIZE(tints); i++) {
+		if (STREQ(tints[i].idname, tree_idname)) {
+			return tints[i].col;
+		}
+	}
+	return NULL;
+}
+
 static void draw_tree_path(SpaceNode *snode)
 {
 	char info[256];
+	const float *tint = node_space_tint(snode->tree_idname);
+	bNodeTreeType *treetype = ntreeTypeFind(snode->tree_idname);
+	float x = 1.5f * UI_UNIT_X;
+
+	/* nome do módulo antes do caminho, na cor dele */
+	if (treetype && treetype->ui_name[0]) {
+		char name[80];
+		BLI_snprintf(name, sizeof(name), "%s  ", IFACE_(treetype->ui_name));
+		if (tint) {
+			glColor3f(tint[0], tint[1], tint[2]);
+		}
+		else {
+			UI_ThemeColor(TH_TEXT);
+		}
+		BLF_draw_default(x, 1.5f * UI_UNIT_Y, 0.0f, name, sizeof(name));
+		x += BLF_width_default(name, sizeof(name));
+	}
 
 	ED_node_tree_path_get_fixedbuf(snode, info, sizeof(info));
 
 	UI_ThemeColor(TH_TEXT_HI);
-	BLF_draw_default(1.5f * UI_UNIT_X, 1.5f * UI_UNIT_Y, 0.0f, info, sizeof(info));
+	BLF_draw_default(x, 1.5f * UI_UNIT_Y, 0.0f, info, sizeof(info));
 }
 
 static void snode_setup_v2d(SpaceNode *snode, ARegion *ar, const float center[2])
@@ -1516,7 +1552,16 @@ void drawnodespace(const bContext *C, ARegion *ar)
 	SpaceNode *snode = CTX_wm_space_node(C);
 	View2D *v2d = &ar->v2d;
 
-	UI_ThemeClearColor(TH_BACK);
+	{
+		/* fundo levemente tingido pelo módulo: Shader, Logic, UI... não se confundem */
+		const float *tint = node_space_tint(snode->tree_idname);
+		float col[3];
+		UI_GetThemeColor3fv(TH_BACK, col);
+		if (tint) {
+			interp_v3_v3v3(col, col, tint, 0.07f);
+		}
+		glClearColor(col[0], col[1], col[2], 1.0f);
+	}
 	glClear(GL_COLOR_BUFFER_BIT);
 
 	UI_view2d_view_ortho(v2d);
