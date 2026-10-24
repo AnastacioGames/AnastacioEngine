@@ -75,15 +75,16 @@ KX_Scene *KX_SceneScheduler::CreateScene(const std::string& scenename)
 
 void KX_SceneScheduler::AddScene(KX_Scene *scene)
 {
-	if (CM_TraceOn(CM_TRACE_RUNTIME)) {
-		CM_TraceEvent("scene_add", "\"scene\":" + CM_TraceStr(scene->GetName()));
-	}
 	m_engine->GetScenes()->Add(CM_AddRef(scene));
 	PostProcessScene(scene);
 }
 
 void KX_SceneScheduler::PostProcessScene(KX_Scene *scene)
 {
+	// Every path that puts a scene in the list (add, overlay/background, replace, async) ends here.
+	if (CM_TraceOn(CM_TRACE_RUNTIME)) {
+		CM_TraceEvent("scene_add", "\"scene\":" + CM_TraceStr(scene->GetName()));
+	}
 	bool override_camera = (((m_engine->GetFlag(KX_KetsjiEngine::CAMERA_OVERRIDE)) != 0) && (scene->GetName() == m_engine->GetOverrideSceneName()));
 
 	// if there is no activecamera, or the camera is being

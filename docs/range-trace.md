@@ -39,6 +39,8 @@ Desligado, cada ponto instrumentado custa um `if`. Num jogo exportado nada muda 
 | `usage` | Primeiro frame em que cada objeto passa no culling da câmera ou de uma sombra; cada imagem enviada para a GPU (tamanho, ms, frame) | Um teste de ponteiro por objeto visível por frame |
 | `frames` | Uma linha por frame: tempo total e as categorias do profiler acima de 0,05 ms | Uma linha por frame (~60 KB por minuto) |
 | `sector` | Câmera num trilho (ver abaixo): posição, progresso na curva e para onde a câmera olha, por frame | Só com `RANGE_TRACE_RAIL` |
+| `scripts` | Por frame: ms e chamadas de cada componente Python (pela classe) e controlador Python (pelo script), acima de 0,02 ms | Uma linha por frame com script |
+| `runtime` | Memória do processo a cada segundo, cada som iniciado (Sound actuator, Speaker, World Sound) e cada cena adicionada/removida (inclusive replace e async) | Pequeno |
 | `work` | Por frame: draw calls, trocas de material e luz e os contadores de `CM_WorkCounters.h` acima de 0. O launcher liga junto `RANGE_AUDIT_TRANSFORMS` (`objetos.txt`: objetos que mais geram trabalho) | Uma linha por frame |
 
 Só no launcher (variáveis próprias, gravadas na pasta do trace e resumidas no relatório): `shaders` liga o
@@ -46,7 +48,8 @@ Só no launcher (variáveis próprias, gravadas na pasta do trace e resumidas no
 `RANGE_PROFILE` (`profile.txt`), o log de ragdoll do RolimaRacer e o log do runtime (`tmp/`). Ver
 `docs/engine-profiling.md`.
 
-Próximo (ver `docs/roadmap.md`): `runtime` (sons, scripts, troca de cena).
+O relatório mostra `scripts` numa seção própria (média por frame, pior frame, total) e `runtime` na seção
+Runtime (memória no início/pico/fim, cenas e sons).
 
 ## Trilho de câmera (sector)
 
@@ -79,7 +82,8 @@ piloto automático; a tecla I continua alternando. Combina com o trilho ou serve
 
 Uma linha JSON por evento: `{"t":segundos,"f":frame,"ev":"tipo",...}`. Tipos: `session`, `scene_load`,
 `load_shaders`, `object`, `mesh`, `material`, `object_left_out`, `convert_object`, `visible`, `image`, `frame`,
-`rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `work`, `end`.
+`rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `work`, `scripts`, `memory`, `sound`, `scene_add`,
+`scene_remove`, `end`.
 Objetos são casados por nome entre cenas, porque réplicas e objetos On Demand entram na cena de destino com
 o nome do original (os On Demand aparecem primeiro na cena temporária `..ConvertSceneObject..`).
 

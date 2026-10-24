@@ -8,6 +8,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-24 - Range Trace: módulos scripts e runtime no relatório e no launcher
+
+- A engine já gravava `scripts`, `memory`, `sound`, `scene_add` e `scene_remove` (`09b397e2`), mas o
+  `relatorio_trace.py` ignorava esses eventos e o launcher não oferecia os módulos. Agora o HTML tem as seções
+  Scripts (média ms/frame, pior frame, total, chamadas) e Runtime (memória início/pico/fim, cenas, sons), o
+  `resumo.md` traz os mesmos itens e o launcher lista `scripts` e `runtime`.
+- `scene_add` passou para `KX_SceneScheduler::PostProcessScene`: antes só o `AddScene` gravava, e
+  `replace`, overlay/background agendados e cenas async ficavam de fora.
+- Teste: cena do World Sound em `--server` com `frames,scripts,runtime`: controlador listado, memória
+  222 → 231 MB, `+A -A +B -B`.
+
 ## 2026-10-24 - World Sound: comandos por mensagem (etapa 3)
 
 - Mensagem com assunto `audio` e sem destinatário (Message actuator ou `sendMessage`) comanda os módulos:

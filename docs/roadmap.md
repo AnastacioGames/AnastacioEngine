@@ -375,8 +375,8 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 
 ## Performance
 
-- **Range Trace ([range-trace.md](range-trace.md))** — fases 1 a 3 feitas (2026-10-19). Próxima: (4) `runtime`
-  (sons, scripts, troca de cena).
+- **Range Trace ([range-trace.md](range-trace.md))** — fases 1 a 4 feitas (scripts/runtime no relatório e no
+  launcher em 2026-10-24). Falta usar num jogo real com som (o `--server` não toca).
 - **Static Batch:** com ele ligado empatamos com a ThunderPlayer no benchmark de 2026-10-09
   ([batching estático e culling](batching-estatico-e-culling.md)). Grupos dupli entram desde 2026-10-21; grupo só
   RAS ficou impossível (construtor protegido). Próximo passo: tornar o Static Batch automático ou fácil de ligar.

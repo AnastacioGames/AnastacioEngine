@@ -290,6 +290,38 @@ def analisar_extras(pasta, eventos):
         x['shaders'] = dict(itens=itens, texturas=texturas, por_tipo=dict(por_tipo),
                             no_jogo=sorted((it for it in itens if it['f'] > FRAMES_DE_LOAD and it['tipo'] != 'prefetch'
                                             and it['ms'] >= 1.0), key=lambda it: it['ms'], reverse=True))
+    scripts = [e for e in eventos if e['ev'] == 'scripts']
+    if scripts:
+        soma = defaultdict(lambda: [0.0, 0, 0, 0.0])  # ms, chamadas, frames, pior frame
+        for e in scripts:
+            for nome, (ms, n) in e.get('c', {}).items():
+                r = soma[nome]
+                r[0] += ms
+                r[1] += n
+                r[2] += 1
+                r[3] = max(r[3], ms)
+        frames = len([e for e in eventos if e['ev'] == 'frame']) or (scripts[-1]['f'] - scripts[0]['f'] + 1)
+        frames = max(frames, 1)
+        x['scripts'] = dict(frames=frames, linhas=sorted(
+            ((nome, ms, n, nf, pior, ms / frames) for nome, (ms, n, nf, pior) in soma.items()),
+            key=lambda r: r[1], reverse=True))
+    memoria = [(e['t'], e['mb']) for e in eventos if e['ev'] == 'memory']
+    if memoria:
+        pico = max(memoria, key=lambda tm: tm[1])
+        x['memoria'] = dict(amostras=memoria, inicio=memoria[0][1], fim=memoria[-1][1], pico=pico[1], pico_t=pico[0])
+    sons = [e for e in eventos if e['ev'] == 'sound']
+    if sons:
+        por_som = {}
+        for e in sons:
+            r = por_som.setdefault((e.get('from', '?'), e.get('name', '?')), [0, e['t'], e['t']])
+            r[0] += 1
+            r[2] = e['t']
+        x['sons'] = dict(n=len(sons), linhas=sorted(
+            ((orig, nome, n, t0, t1) for (orig, nome), (n, t0, t1) in por_som.items()),
+            key=lambda r: r[2], reverse=True))
+    trocas = [e for e in eventos if e['ev'] in ('scene_add', 'scene_remove')]
+    if trocas:
+        x['trocas'] = trocas
     arquivos = []
     for nome in ('profile.txt', 'ragdoll.jsonl', 'ragdoll-summary.md', 'objetos.txt', 'shaders.txt'):
         if os.path.isfile(os.path.join(pasta, nome)):
@@ -420,6 +452,28 @@ def resumo_md(a):
             w('- %s: %.0f / %.0f / %d' % (k, med, p95, mx))
         for tipo, nome, v in x.get('objetos', [])[:10]:
             w('- objeto %s %s: %.1f por frame' % (tipo, nome, v))
+    if 'scripts' in x:
+        w('')
+        w('## Scripts (ms por frame em media / pior frame)')
+        w('')
+        for nome, ms, n, _nf, pior, media in x['scripts']['linhas'][:TOP_RESUMO]:
+            w('- %s: %.2f / %.1f ms (%d chamadas, %.0f ms no total)' % (nome, media, pior, n, ms))
+    if 'memoria' in x:
+        m = x['memoria']
+        w('')
+        w('## Memoria: inicio %.0f MB, pico %.0f MB (%.0f s), fim %.0f MB' % (m['inicio'], m['pico'], m['pico_t'], m['fim']))
+    if 'trocas' in x:
+        w('')
+        w('## Cenas adicionadas/removidas')
+        w('')
+        for e in x['trocas'][:TOP_RESUMO * 2]:
+            w('- %.1f s: %s %s' % (e['t'], '+' if e['ev'] == 'scene_add' else '-', e['scene']))
+    if 'sons' in x:
+        w('')
+        w('## Sons iniciados (%d)' % x['sons']['n'])
+        w('')
+        for orig, nome, n, _t0, _t1 in x['sons']['linhas'][:TOP_RESUMO]:
+            w('- %s (%s): %d vezes' % (nome, orig, n))
     if 'shaders' in x:
         w('')
         w('## Shaders e imagens no jogo (%d, depois do frame %d e acima de 1 ms)' % (len(x['shaders']['no_jogo']), FRAMES_DE_LOAD))
@@ -897,6 +951,47 @@ def html_work(a, w):
     w('</section>')
 
 
+def html_scripts(a, w):
+    x = a['extras'].get('scripts')
+    if not x:
+        return
+    w(secao('scripts', 'Scripts', '%d nomes' % len(x['linhas']),
+            'Tempo de cada componente Python (pela classe) e controlador Python (pelo script). Media = total dividido '
+            'por todos os frames da sessao; pior = o frame mais caro daquele script. Abaixo de 0,02 ms por frame '
+            'nao entra.'))
+    w(tabela(('script', 'media ms/frame', 'pior frame ms', 'total ms', 'chamadas', 'frames'),
+             [(nome, '%.3f' % media, '%.2f' % pior, '%.0f' % ms, n, nf) for nome, ms, n, nf, pior, media in x['linhas']],
+             (1, 2, 3, 4, 5), filtro=True, calor=(1, 2)))
+    w('</section>')
+
+
+def html_runtime(a, w):
+    x = a['extras']
+    if not any(k in x for k in ('memoria', 'sons', 'trocas')):
+        return
+    w(secao('runtime', 'Runtime', None, 'Memoria do processo (uma amostra por segundo), cenas adicionadas e removidas '
+                                          'e cada som iniciado (Sound actuator, Speaker e World Sound).'))
+    m = x.get('memoria')
+    if m:
+        kpis = (('memoria no inicio', m['inicio'], '%.0f s' % m['amostras'][0][0]),
+                ('pico', m['pico'], 'em %.0f s' % m['pico_t']),
+                ('no fim', m['fim'], 'variou %+.0f MB' % (m['fim'] - m['inicio'])))
+        w('<div class="kpis" style="margin-top:8px">%s</div>' % ''.join(
+            '<div class="kpi"><span class="rot">%s</span><span class="val">%.0f MB</span><span class="sub">%s</span></div>'
+            % (rot, v, sub) for rot, v, sub in kpis))
+    if x.get('trocas'):
+        w('<h3>Cenas <span class="chip">%d</span></h3>' % len(x['trocas']))
+        w(tabela(('segundo', 'frame', 'acao', 'cena'),
+                 [('%.1f' % e['t'], e['f'], 'adicionada' if e['ev'] == 'scene_add' else 'removida', e['scene'])
+                  for e in x['trocas']], (0, 1)))
+    if x.get('sons'):
+        w('<h3>Sons iniciados <span class="chip">%d</span></h3>' % x['sons']['n'])
+        w(tabela(('som', 'origem', 'vezes', 'primeiro s', 'ultimo s'),
+                 [(nome, orig, n, '%.1f' % t0, '%.1f' % t1) for orig, nome, n, t0, t1 in x['sons']['linhas']],
+                 (2, 3, 4), filtro=True, calor=(2,)))
+    w('</section>')
+
+
 def html_shaders(a, w):
     x = a['extras'].get('shaders')
     if not x:
@@ -1039,6 +1134,10 @@ def relatorio_html(a, meta=None, pasta=''):
         secoes.append(('lentos', 'Frames lentos'))
     if 'work' in a['extras'] or 'objetos' in a['extras']:
         secoes.append(('trabalho', 'Trabalho'))
+    if 'scripts' in a['extras']:
+        secoes.append(('scripts', 'Scripts'))
+    if any(k in a['extras'] for k in ('memoria', 'sons', 'trocas')):
+        secoes.append(('runtime', 'Runtime'))
     if 'shaders' in a['extras']:
         secoes.append(('shaders', 'Shaders'))
     secoes.append(('cenas', 'Cenas'))
@@ -1072,6 +1171,8 @@ def relatorio_html(a, meta=None, pasta=''):
     html_trilho(a, w)
     html_picos(a, w)
     html_work(a, w)
+    html_scripts(a, w)
+    html_runtime(a, w)
     html_shaders(a, w)
 
     w(secao('cenas', 'Cenas carregadas', len(a['cenas'])))

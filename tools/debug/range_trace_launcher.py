@@ -31,6 +31,8 @@ MODULOS = (
     ('frames', 'Frames lentos: custo de cada frame por categoria e o que carregou junto'),
     ('sector', 'Trilho: câmera percorre a curva da pista e mede o custo por trecho'),
     ('work', 'Trabalho repetido: transforms, bounds e chamadas de GPU por frame; objetos que mais pesam'),
+    ('scripts', 'Scripts: tempo de cada componente e controlador Python por frame'),
+    ('runtime', 'Runtime: memória por segundo, sons iniciados e cenas adicionadas/removidas'),
     ('shaders', 'Shaders e texturas: cada shader compilado e textura criada, com o frame e os ms'),
     ('profile', 'Profiler completo e logs do jogo (range_profile, log do runtime, ragdoll do Rolima)'),
 )
