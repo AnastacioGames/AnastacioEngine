@@ -56,6 +56,8 @@ set(SRC
 	intern/gpu_framebuffer.c
 	intern/gpu_init_exit.c
 	intern/gpu_material.c
+	intern/gpu_material_export.c
+	intern/gpu_material_ies.c
 	intern/gpu_select.c
 	intern/gpu_select_pick.c
 	intern/gpu_select_sample_query.c
@@ -79,6 +81,7 @@ set(SRC
 	GPU_texture.h
 	GPU_vertex_array.h
 	intern/gpu_codegen.h
+	intern/gpu_material_intern.h
 	intern/gpu_private.h
 	intern/gpu_select_private.h
 )
@@ -171,6 +174,8 @@ if(WITH_GL_PROFILE_CORE_RANGERUNTIME)
 	set_source_files_properties(
 		intern/gpu_shader.c
 		intern/gpu_material.c
+		intern/gpu_material_export.c
+		intern/gpu_material_ies.c
 		intern/gpu_codegen.c
 		intern/gpu_framebuffer.c
 		PROPERTIES COMPILE_DEFINITIONS "WITH_GL_PROFILE_CORE"
