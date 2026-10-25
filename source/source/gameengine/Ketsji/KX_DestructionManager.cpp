@@ -1506,12 +1506,37 @@ void KX_DestructionManager::Push(KX_GameObject *gameobj, const mt::vec3& center,
 	}
 
 	const mt::vec3 position = gameobj->NodeGetWorldPosition();
-	const mt::vec3 away = (position - center).SafeNormalized(mt::axisZ3);
-	const mt::vec3 direction = (away + mt::axisZ3 * upBias).SafeNormalized(mt::axisZ3);
+	const mt::vec3 delta = position - center;
+	// Object at the blast center: no horizontal direction, so a pure vertical
+	// full impulse would launch it straight up. Use a reduced magnitude.
+	const bool atCenter = (delta.LengthSquared() < 1.0e-4f);
+	if (atCenter) {
+		impulse *= 0.35f;
+	}
+	const mt::vec3 away = delta.SafeNormalized(mt::axisZ3);
+	const float bias = std::min(std::max(upBias, 0.0f), 0.5f);
+	const mt::vec3 direction = atCenter ? mt::axisZ3 : (away + mt::axisZ3 * bias).SafeNormalized(mt::axisZ3);
+
+	// Cap the velocity change so light objects (e.g. players) don't fly off;
+	// heavy bodies stay below the cap and behave as before.
+	static const float maxDeltaV = 10.0f; // m/s
+	const float mass = ctrl->GetMass();
+	if (mass > 0.0f) {
+		impulse = std::min(impulse, mass * maxDeltaV);
+	}
+
+	mt::vec3 linear = direction * impulse;
+	// The vertical part decides how high a body is thrown (h = v^2 / 2g): 10 m/s
+	// straight up is ~5 m. Limit it to ~5 m/s (~1.3 m) so a light body next to the
+	// blast (e.g. the player) is shoved, not launched; the sideways part is untouched.
+	static const float maxUpDeltaV = 5.0f; // m/s
+	if (mass > 0.0f && linear.z > mass * maxUpDeltaV) {
+		linear.z = mass * maxUpDeltaV;
+	}
 
 	std::uniform_real_distribution<float> jitter(-0.1f, 0.1f);
 	const mt::vec3 offset(jitter(m_random), jitter(m_random), jitter(m_random));
-	ctrl->ApplyImpulse(position + offset, direction * impulse, false);
+	ctrl->ApplyImpulse(position + offset, linear, false);
 }
 
 bool KX_DestructionManager::Occluded(const mt::vec3& center, KX_GameObject *target, const std::vector<KX_GameObject *>& ignore)

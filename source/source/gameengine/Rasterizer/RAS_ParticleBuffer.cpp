@@ -491,7 +491,12 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection, 
 	// in DNA_object_types.h, value 1) glows onto the scene for fire/sparks/electricity presets;
 	// alpha (value 0, default) is opaque mix for smoke/dust.
 	glEnable(GL_BLEND);
-	if (m_blendMode == 1) {
+	// Looks tagged PARTICLE_BLEND_PREMULT_ADDITIVE (the built-in fire) always add: SRC_ALPHA,ONE on
+	// straight rgb equals ONE,ONE on premultiplied rgb*alpha, and keeps the soft-particle fade
+	// (which scales alpha only) working.
+	const bool forceAdditive = !m_customFragShader.empty() &&
+	                           m_customFragShader.find("PARTICLE_BLEND_PREMULT_ADDITIVE") != std::string::npos;
+	if (m_blendMode == 1 || forceAdditive) {
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 	}
 	else {

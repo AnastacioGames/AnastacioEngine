@@ -224,6 +224,17 @@ const char *drawVertexSource =
 	"uniform bool u_useSizeCurve;\n"
 	"uniform int u_billboardMode;\n"
 	"void main() {\n"
+	// Dead particles (simulated, age past lifetime) would be rasterized at end size only to be
+	// discarded in the fragment shader; push all 4 corners outside the clip volume instead.
+	"	if (!u_static && in_particleAge >= u_lifetime) {\n"
+	"		gl_Position = vec4(2.0, 2.0, 2.0, 1.0);\n"
+	"		v_uv = in_corner;\n"
+	"		v_alpha = 0.0;\n"
+	"		v_lifeFrac = 1.0;\n"
+	"		v_viewPos = vec3(0.0);\n"
+	"		v_seed = 0.0;\n"
+	"		return;\n"
+	"	}\n"
 	"	vec3 worldPos = (u_model * vec4(in_particlePos, 1.0)).xyz;\n"
 	"	vec4 centerView = u_view * vec4(worldPos, 1.0);\n"
 	"	v_viewPos = centerView.xyz;\n"
@@ -406,25 +417,34 @@ float noise(vec2 p) {
 float fbm(vec2 p) {
 	return noise(p) * 0.55 + noise(p * 2.1 + 5.3) * 0.3 + noise(p * 4.3 + 1.7) * 0.15;
 }
-/* Black body ramp: dark red, orange, yellow-white. */
+/* Black body ramp, non-linear: dark red edges, orange body, yellow then white core. */
 vec3 fireRamp(float t) {
 	t = clamp(t, 0.0, 1.0);
-	if (t < 0.5) {
-		return mix(vec3(0.5, 0.04, 0.0), vec3(1.0, 0.35, 0.03), t * 2.0);
-	}
-	return mix(vec3(1.0, 0.35, 0.03), vec3(1.0, 0.92, 0.6), (t - 0.5) * 2.0);
+	vec3 c = mix(vec3(0.35, 0.02, 0.0), vec3(0.9, 0.18, 0.01), smoothstep(0.0, 0.35, t));
+	c = mix(c, vec3(1.0, 0.55, 0.06), smoothstep(0.3, 0.6, t));
+	c = mix(c, vec3(1.0, 0.88, 0.35), smoothstep(0.55, 0.82, t));
+	return mix(c, vec3(1.0, 0.97, 0.88), smoothstep(0.8, 1.0, t));
 }
-/* A flame tongue: round at the bottom, narrowing and torn upward by noise rising through it,
- * hot (white-yellow) in its core while young, cooling to red as it ages; flickers per sprite. */
+/* PARTICLE_BLEND_PREMULT_ADDITIVE: RAS_ParticleBuffer draws this look additively (SRC_ALPHA, ONE,
+ * i.e. ONE,ONE on rgb*alpha) whatever the emitter blend mode, so overlapping tongues add up to a
+ * bright core instead of muddying each other. */
+/* A flame tongue: round at the bottom, narrowing and torn upward by domain-warped noise rising
+ * through it, hot (white-yellow) in its core while young, cooling to transparent dark red at the
+ * edges and as it ages; flickers per sprite. */
 void main() {
 	vec2 uv = v_uv * 2.0;
 	uv.x *= 1.0 + max(uv.y, 0.0) * 0.9;
 	vec2 q = vec2(uv.x * 1.6 + v_seed * 31.0, uv.y * 1.2 - u_time * 2.2 - v_seed * 7.0);
-	float n = fbm(q);
+	/* Domain warp: offset the lookup by another noise layer so the tongues curl. */
+	vec2 w = vec2(fbm(q * 0.7 + vec2(1.7, 9.2) + u_time * 0.4),
+	              fbm(q * 0.7 + vec2(8.3, 2.8) - u_time * 0.3));
+	float n = fbm(q + (w - 0.5) * 1.4);
 	float d = length(vec2(uv.x, uv.y * 0.8 + 0.15));
 	float shape = 1.0 - d + (n - 0.5) * (0.8 + 0.6 * max(uv.y, 0.0));
 	float mask = smoothstep(0.0, 0.45, shape);
-	float heat = clamp((1.0 - v_lifeFrac * 1.25) * (0.45 + 0.75 * mask), 0.0, 1.0);
+	float heat = clamp((1.0 - v_lifeFrac * 1.25) * (0.3 + 0.9 * mask), 0.0, 1.0);
+	heat = heat * heat * (3.0 - 2.0 * heat);
+	heat = pow(heat, 1.3);
 	float flicker = 0.85 + 0.15 * sin(u_time * 13.0 + v_seed * 40.0);
 	vec3 ramp = fireRamp(heat);
 	/* White Color keeps the natural black body ramp; a saturated Color recolors the flame
@@ -433,9 +453,10 @@ void main() {
 	vec3 hue = u_color.rgb / max(max(u_color.r, max(u_color.g, u_color.b)), 0.001);
 	vec3 tinted = mix(hue * hue * lum * 1.2, vec3(lum), smoothstep(0.85, 1.0, heat) * 0.5);
 	float chroma = clamp((max(u_color.r, max(u_color.g, u_color.b)) - min(u_color.r, min(u_color.g, u_color.b))) * 2.0, 0.0, 1.0);
-	vec3 rgb = mix(ramp * u_color.rgb, tinted, chroma) * flicker * 1.4;
+	vec3 rgb = mix(ramp * u_color.rgb, tinted, chroma) * flicker * 0.6;
 	float fade = clamp(v_lifeFrac / 0.04, 0.0, 1.0) * clamp((1.0 - v_lifeFrac) / 0.5, 0.0, 1.0);
-	float alpha = mask * fade * u_color.a;
+	/* Edges (low heat) are dim red and nearly transparent; the core carries the light. */
+	float alpha = mask * fade * u_color.a * mix(0.25, 1.0, smoothstep(0.0, 0.6, heat));
 	if (alpha <= 0.001) { discard; }
 	fragColor = vec4(rgb, alpha);
 }

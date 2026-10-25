@@ -20,7 +20,8 @@ O que ver no editor (aba Physics):
     Barrel.00..02  Explosive com Explode on Impact e Chain Reaction
     Grenade        Explosive na layer 2 (inativa), Fuse 2 s; cada copia criada
                    com addObject tem o seu proprio pavio
-    Explosion_fx   o Effect dos barris e da granada, tambem na layer 2
+    Explosion_fx   antigo Effect (sem uso: barris e granada usam Particle Explosion
+                   nativa de fogo + Light Flash), na layer 2
 
 Os pedacos ficam na layer 2 e foram gerados pelo botao Generate Fragments...
 do painel Destruction. O limite de pedacos vivos esta em
