@@ -950,6 +950,15 @@ static bool test_projected_vert_dist(
 	return false;
 }
 
+/* Edge Center / Edge Perpendicular (Blender 5): o snap em aresta procura as arestas como sempre,
+ * só troca o ponto testado em cada uma. Vale durante uma chamada de
+ * ED_transform_snap_object_project_view3d_ex; obmat é o do objeto em teste (snapObject). */
+static struct {
+	unsigned short mode;
+	float prev_co[3];
+	float obmat[4][4];
+} g_snap_edge = {0};
+
 static bool test_projected_edge_dist(
         const float depth_range[2], const float mval[2],
         float pmat[4][4], const float win_half[2], const bool is_persp,
@@ -959,7 +968,22 @@ static bool test_projected_edge_dist(
 {
 
 	float tmp_co[3], depth;
-	dist_squared_ray_to_seg_v3(ray_start, ray_dir, va, vb, tmp_co, &depth);
+	if (g_snap_edge.mode == SCE_SNAP_MODE_EDGE_MIDPOINT) {
+		mid_v3_v3v3(tmp_co, va, vb);
+	}
+	else if (g_snap_edge.mode == SCE_SNAP_MODE_EDGE_PERPENDICULAR) {
+		float va_g[3], vb_g[3];
+		mul_v3_m4v3(va_g, g_snap_edge.obmat, va);
+		mul_v3_m4v3(vb_g, g_snap_edge.obmat, vb);
+		const float lambda = line_point_factor_v3(g_snap_edge.prev_co, va_g, vb_g);
+		if (!IN_RANGE_INCL(lambda, 0.0f, 1.0f)) {
+			return false;
+		}
+		interp_v3_v3v3(tmp_co, va, vb, lambda);
+	}
+	else {
+		dist_squared_ray_to_seg_v3(ray_start, ray_dir, va, vb, tmp_co, &depth);
+	}
 	return test_projected_vert_dist(depth_range, mval, tmp_co, pmat, win_half, is_persp, dist_px_sq, r_co);
 }
 typedef struct Nearest2dPrecalc {
@@ -1954,6 +1978,8 @@ static bool snapObject(
 {
 	bool retval = false;
 
+	copy_m4_m4(g_snap_edge.obmat, obmat);
+
 	if (ob->type == OB_MESH) {
 		BMEditMesh *em;
 
@@ -2378,7 +2404,43 @@ bool ED_transform_snap_object_project_view3d_mixed(
 	        r_co, r_no);
 }
 
+static bool snap_object_project_view3d_impl(
+        SnapObjectContext *sctx,
+        const unsigned short snap_to,
+        const struct SnapObjectParams *params,
+        const float mval[2], float *dist_px,
+        float *ray_depth,
+        float r_loc[3], float r_no[3], int *r_index,
+        Object **r_ob, float r_obmat[4][4]);
+
 bool ED_transform_snap_object_project_view3d_ex(
+        SnapObjectContext *sctx,
+        const unsigned short snap_to,
+        const struct SnapObjectParams *params,
+        const float mval[2], float *dist_px,
+        float *ray_depth,
+        float r_loc[3], float r_no[3], int *r_index,
+        Object **r_ob, float r_obmat[4][4])
+{
+	unsigned short snap_to_base = snap_to;
+	g_snap_edge.mode = 0;
+	if (ELEM(snap_to, SCE_SNAP_MODE_EDGE_MIDPOINT, SCE_SNAP_MODE_EDGE_PERPENDICULAR)) {
+		snap_to_base = SCE_SNAP_MODE_EDGE;
+		if (snap_to == SCE_SNAP_MODE_EDGE_MIDPOINT || params->prev_co) {
+			g_snap_edge.mode = snap_to;
+			if (params->prev_co) {
+				copy_v3_v3(g_snap_edge.prev_co, params->prev_co);
+			}
+		}
+	}
+	const bool retval = snap_object_project_view3d_impl(
+	        sctx, snap_to_base, params, mval, dist_px, ray_depth,
+	        r_loc, r_no, r_index, r_ob, r_obmat);
+	g_snap_edge.mode = 0;
+	return retval;
+}
+
+static bool snap_object_project_view3d_impl(
         SnapObjectContext *sctx,
         const unsigned short snap_to,
         const struct SnapObjectParams *params,

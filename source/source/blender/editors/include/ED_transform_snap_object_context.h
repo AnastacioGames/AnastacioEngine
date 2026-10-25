@@ -65,6 +65,8 @@ struct SnapObjectParams {
 	char snap_select;
 	/* use editmode cage */
 	unsigned int use_object_edit_cage : 1;
+	/* Edge Perpendicular: ponto de partida (espaço global); NULL vira snap em aresta comum. */
+	const float *prev_co;
 };
 
 typedef struct SnapObjectContext SnapObjectContext;

@@ -2325,6 +2325,8 @@ extern const char *RE_engine_id_CYCLES;
 #define SCE_SNAP_MODE_NODE_Y	6
 #define SCE_SNAP_MODE_NODE_XY	7
 #define SCE_SNAP_MODE_GRID		8
+#define SCE_SNAP_MODE_EDGE_MIDPOINT		9
+#define SCE_SNAP_MODE_EDGE_PERPENDICULAR	10
 
 /* ToolSettings.selectmode */
 #define SCE_SELECT_VERTEX	(1 << 0) /* for mesh */

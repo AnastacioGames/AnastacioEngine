@@ -1223,6 +1223,8 @@ bool snapObjectsTransform(
 	        &(const struct SnapObjectParams){
 	            .snap_select = t->tsnap.modeSelect,
 	            .use_object_edit_cage = (t->flag & T_EDIT) != 0,
+	            /* Edge Perpendicular parte do ponto de origem do transform (Blender 5). */
+	            .prev_co = (t->tsnap.status & TARGET_INIT) ? t->tsnap.snapTarget : t->center_global,
 	        },
 	        mval, dist_px, NULL,
 	        r_loc, r_no, NULL,
