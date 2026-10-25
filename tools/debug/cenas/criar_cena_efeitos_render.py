@@ -1,8 +1,9 @@
 # Cena de teste dos efeitos de render (plano-efeitos-render.md): SSR (esfera espelhada e rugosa),
-# SSAO (cantos e escada), SSGI, névoa volumétrica e Bloom (bloco emissivo), com a câmera em vaivém na frente.
-# Teclas no jogo: C pausa/retoma a órbita, 1 Low, 2 Medium, 3 High (o preset reinicia a cena).
+# SSAO (cantos e escada), SSGI, nÃ©voa volumÃ©trica e Bloom (bloco emissivo), com a cÃ¢mera em vaivÃ©m na frente.
+# Teclas no jogo: C pausa/retoma a Ã³rbita, 1 Low, 2 Medium, 3 High (o preset reinicia a cena).
 # Uso: AnastacioEngine.exe -b --factory-startup --python criar_cena_efeitos_render.py -- saida.range
 import bpy
+import os
 import sys
 from mathutils import Vector
 
@@ -57,7 +58,7 @@ def cubo(nome, loc, escala, mat):
     return ob
 
 
-# Piso liso e dielétrico: reflete as esferas pelo SSR.
+# Piso liso e dielÃ©trico: reflete as esferas pelo SSR.
 cubo("Piso", (0, 0, -0.1), (12, 12, 0.1), principled("PisoMat", (0.18, 0.2, 0.24), 0.0, 0.08))
 # Parede e escada: cantos para o SSAO e cor forte para o SSGI rebater.
 cubo("Parede", (0, -6, 2), (8, 0.2, 2), principled("ParedeMat", (0.85, 0.82, 0.75), 0.0, 0.7))
@@ -82,7 +83,7 @@ bpy.ops.object.shade_smooth()
 # Bloco emissivo forte para o Bloom.
 cubo("Luzinha", (0, 3, 0.6), (0.4, 0.4, 0.6), emissivo("LuzinhaMat", (1.0, 0.6, 0.2), 12.0))
 
-# Sol inclinado (névoa e sombras) e um ponto de preenchimento.
+# Sol inclinado (nÃ©voa e sombras) e um ponto de preenchimento.
 bpy.ops.object.lamp_add(type='SUN', location=(4, 4, 8))
 sol = bpy.context.object
 sol.rotation_euler = (Vector((0, 0, 0)) - sol.location).to_track_quat('-Z', 'Y').to_euler()
@@ -100,6 +101,10 @@ world.weather_settings.vfog_density = 0.03
 # Efeitos.
 fx = scene.scenefx_settings
 fx.quality_preset = 'MEDIUM'
+if os.environ.get("TESTE_EFEITOS_DESTRAVADO"):
+    # Gera a cena sem vsync e sem trava de FPS (medir o custo real dos presets).
+    scene.game_settings.vsync = 'OFF'
+    scene.game_settings.use_frame_rate = False
 fx.use_ssr = True
 fx.use_ssao = True
 fx.use_bloom = True
@@ -107,7 +112,7 @@ fx.use_tonemap = True
 fx.use_fxaa = True
 scene.ae_ssgi_use = True
 
-# Câmera em órbita, mirando o centro.
+# CÃ¢mera em Ã³rbita, mirando o centro.
 alvo = Vector((0, -1, 1))
 bpy.ops.object.camera_add(location=(0, 9, 3.5))
 cam = bpy.context.object
@@ -146,6 +151,10 @@ def tick(cont):
             scene.restart()
             return
         own["ini"] = True
+        if os.environ.get("TESTE_EFEITOS_DESTRAVADO"):
+            # Sem vsync e sem trava lÃ³gica e render a 60 Hz ainda limitam o quadro: sobe os dois.
+            Range.logic.setLogicTicRate(1000)
+            Range.logic.setRenderRate(1000)
         if os.environ.get("TESTE_EFEITOS_DOF"):
             # TESTE_EFEITOS_DOF=1: foco no alvo e fundo/frente desfocados (mede o passe do DOF).
             own.useDof = True
@@ -167,7 +176,7 @@ def tick(cont):
             return
     if own["orbita"]:
         own["ang"] += 0.4 / 60.0
-    # Vaivém na frente da cena (+-55 graus): nunca passa atrás das paredes.
+    # VaivÃ©m na frente da cena (+-55 graus): nunca passa atrÃ¡s das paredes.
     a = math.sin(own["ang"]) * 0.95
     own.worldPosition = (ALVO[0] + math.sin(a) * RAIO, ALVO[1] + math.cos(a) * RAIO, 3.5)
     own.alignAxisToVect([own.worldPosition[0] - ALVO[0], own.worldPosition[1] - ALVO[1],
@@ -175,7 +184,7 @@ def tick(cont):
     own.alignAxisToVect([0, 0, 1], 1, 0.3)
     seg = float(os.environ.get("TESTE_EFEITOS_SEGUNDOS", "0"))
     if seg > 0 and time.time() - Range.logic.globalDict["t0"] > seg:
-        # FPS médio sem os 2 primeiros segundos (carga de shaders).
+        # FPS mÃ©dio sem os 2 primeiros segundos (carga de shaders).
         gd = Range.logic.globalDict
         fps = (gd.get("quadros", 0) - gd.get("q2", 0)) / max(seg - 2.0, 0.1)
         _log("fim ok quadros=%d fps=%.1f" % (gd.get("quadros", 0), fps))
