@@ -304,6 +304,8 @@ unsigned long CurrentThreadId()
 {
 #ifdef _WIN32
 	return GetCurrentThreadId();
+#elif defined(__EMSCRIPTEN__)
+	return (unsigned long)std::hash<std::thread::id>()(std::this_thread::get_id());
 #else
 	return (unsigned long)syscall(SYS_gettid);
 #endif
