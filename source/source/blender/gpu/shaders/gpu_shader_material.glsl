@@ -3764,7 +3764,7 @@ float test_shadow_pcf_penumbra(sampler2D shadowmap, vec4 co, sampler2D jitter, i
 	mat2 rot = mat2(vec.x, vec.y,
 					-vec.y, vec.x);
 
-	float depth;
+	float depth = 0.0;
 	float types = (shadowtype == 0.0) ? 2.0 : 0.5;
 
 	for (int i = 0; i < 4; i++)
