@@ -630,13 +630,27 @@ class DATA_PT_game_text_box(GameTextPanel, Panel):
         tbox = text.text_boxes[0]
 
         box = self.layout.box()
-        box.label(text="Text Box (word wrap and pages):", icon="MESH_PLANE")
+        box.label(text="Text Box (word wrap and pages):", icon="BORDER_RECT")
         row = box.row(align=True)
         row.prop(tbox, "width", text="Width")
         row.prop(tbox, "height", text="Height")
+
+        # Same rules as KX_FontObject::LayoutLines / LinesPerPage.
         col = box.column(align=True)
-        col.label(text="Width wraps the lines, Height splits them in pages.")
-        col.label(text="0 = no limit. Python: page, pageCount, visibleCharacters.")
+        if tbox.width > 0.0:
+            col.label(text="Wraps the lines at %.2f units" % tbox.width, icon="FILE_TICK")
+        else:
+            col.label(text="No wrap: lines break only on new lines", icon="INFO")
+        line_height = text.size * text.space_line
+        if tbox.height > 0.0 and line_height > 0.0:
+            lines = max(1, int(tbox.height / line_height + 1e-4))
+            col.label(text="%d line%s per page" % (lines, "" if lines == 1 else "s"), icon="FILE_TICK")
+        else:
+            col.label(text="No pages: every line is shown", icon="INFO")
+
+        sub = box.column(align=True)
+        sub.active = False
+        sub.label(text="Python: lines, page, pageCount, visibleCharacters, characterCount")
 
 
 class DATA_PT_game_text_shadow(GameTextPanel, Panel):
