@@ -54,7 +54,7 @@ void main() {
 
 	float depth = texture(bgl_DepthTexture, texcoord).x;
 
-	vec4 camera_space_pos = gl_ProjectionMatrixInverse * vec4(texcoord * 2.0 - 1.0, depth, 1.0);
+	vec4 camera_space_pos = gl_ProjectionMatrixInverse * vec4(texcoord * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
 	vec3 pixel_position = camera_space_pos.xyz / camera_space_pos.w;
 
 	vec4 Gbuff0 = texture(bgl_DataTextures[0], texcoord).rgba;
@@ -88,14 +88,32 @@ void main() {
 
 		float scene_depth = texture(bgl_DepthTexture, screen_pos).x;
 
-		vec4 projected_pos = gl_ProjectionMatrixInverse * vec4(screen_pos * 2.0 - 1.0, scene_depth, 1.0);
+		vec4 projected_pos = gl_ProjectionMatrixInverse * vec4(screen_pos * 2.0 - 1.0, scene_depth * 2.0 - 1.0, 1.0);
 		vec3 scene_position = projected_pos.xyz / projected_pos.w;
 
-		if (length(scene_position) < length(ray_pos)) {
-			if(abs(ray_pos.z - scene_position.z) < stepSize * ge_ssrparams.y) {
-				col = texture(bgl_RenderedTexture, screen_pos).rgb;
+		/* Raio atras da superficie (view space olha para -z): so conta hit
+		 * dentro da espessura, senao o objeto vira uma parede infinita. */
+		float dz = scene_position.z - ray_pos.z;
+		if (dz > 0.0) {
+			/* Refino binario entre o passo anterior e este. */
+			vec3 a = ray_pos - one_step, b = ray_pos;
+			vec2 hit_uv = screen_pos;
+			for (int k = 0; k < 5; k++) {
+				vec3 m = 0.5 * (a + b);
+				vec4 cp = gl_ProjectionMatrix * vec4(m, 1.0);
+				vec2 suv = cp.xy / cp.w * 0.5 + 0.5;
+				float sd = texture(bgl_DepthTexture, suv).x;
+				vec4 pp = gl_ProjectionMatrixInverse * vec4(suv * 2.0 - 1.0, sd * 2.0 - 1.0, 1.0);
+				float mdz = pp.z / pp.w - m.z;
+				if (mdz > 0.0) { b = m; dz = mdz; hit_uv = suv; }
+				else { a = m; }
 			}
-
+			/* Espessura proporcional a distancia (bias escala); nao ao passo,
+			 * senao objetos viram paredes de varios metros. */
+			float thickness = (0.02 * -b.z + 0.05) * max(ge_ssrparams.y, 1.0);
+			if (dz < thickness) {
+				col = texture(bgl_RenderedTexture, hit_uv).rgb;
+			}
 			break;
 		}
 

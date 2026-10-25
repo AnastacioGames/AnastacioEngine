@@ -89,6 +89,12 @@ extern "C" {
 
 #  include "DNA_scene_types.h"
 #  include "DNA_material_types.h"
+#  include "DNA_node_types.h"
+#  include "DNA_world_types.h"
+
+#  include "BKE_node.h"
+#  include "BLI_string.h"
+#  include "MEM_guardedalloc.h"
 
 #  include "wm_event_types.h"
 }
@@ -195,8 +201,54 @@ static void DrawWarmUpScreen(RAS_ICanvas *canvas)
 	canvas->SwapBuffers();
 }
 
+/* The SSR filter reads the compact G-buffer (GBUFF0). Scene FX > SSR creates that attachment
+ * in its RNA update, but the World "Screen Space Reflections" node does not, so a scene that
+ * enables SSR only through the node had no G-buffer and nothing reflected. Create it here,
+ * before materials are compiled, when the node is present with Enable on. */
+static void LA_EnsureWorldSSRGbuffer(Scene *scene)
+{
+	World *world = scene ? scene->world : nullptr;
+	if (!world || !world->use_nodes || !world->nodetree) {
+		return;
+	}
+	bool enabled = false;
+	for (bNode *node = (bNode *)world->nodetree->nodes.first; node && !enabled; node = node->next) {
+		if (node->type != SH_NODE_WORLD_SSR_FX) {
+			continue;
+		}
+		for (bNodeSocket *sock = (bNodeSocket *)node->inputs.first; sock; sock = sock->next) {
+			if (STREQ(sock->name, "Enable") && sock->type == SOCK_BOOLEAN && sock->default_value) {
+				enabled = ((bNodeSocketValueBoolean *)sock->default_value)->value != 0;
+				break;
+			}
+		}
+	}
+	if (!enabled) {
+		return;
+	}
+	GameData &gm = scene->gm;
+	for (unsigned short i = 0; i < GAME_ATTACHMENT_COUNT; ++i) {
+		if (gm.attachments[i] && gm.attachments[i]->type == GAME_ATTACHMENT_GBUFF0) {
+			return;
+		}
+	}
+	/* Same slot and format as rna_SCENEFXSettings_ssr_fx_update. */
+	if (!gm.attachments[0]) {
+		RenderAttachment *attach = (RenderAttachment *)MEM_callocN(sizeof(RenderAttachment), "RenderAttachment");
+		attach->type = GAME_ATTACHMENT_GBUFF0;
+		attach->size = 3;
+		attach->hdr = GAME_HDR_HALF_FLOAT;
+		BLI_strncpy(attach->name, "Attachment", MAX_NAME);
+		gm.attachments[0] = attach;
+	}
+	else {
+		CM_Warning("World SSR node is on but attachment slot 1 is busy; SSR needs a Gbuff0 attachment");
+	}
+}
+
 void LA_Launcher::InitEngine()
 {
+	LA_EnsureWorldSSRGbuffer(m_startScene);
 	// Get and set the preferences.
 	SYS_SystemHandle syshandle = SYS_GetSystem();
 

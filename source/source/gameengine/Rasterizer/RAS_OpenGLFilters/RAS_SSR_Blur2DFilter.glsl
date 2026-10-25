@@ -35,16 +35,18 @@ void main() {
 	vec2 pixel = (rough_metal.x * 16.0) / vec2(textureSize(ssr_buffer, 0));
 
 	vec3 result = texture(ssr_buffer, texcoord).rgb;
+	float n = 1.0;
 
 	for( float d = 0.0; d < Pi; d += Pi/Directions) {
 		for(float i = 1.0/Quality; i <= 1.0; i += 1.0/Quality) {
 			vec2 offset = vec2(cos(d), sin(d)) * pixel * i;
 
 			result += texture(ssr_buffer, texcoord + offset).rgb;
+			n += 1.0;
 		}
 	}
 
-	result /= Quality * Directions - 15.0;
+	result = min(result / n, vec3(4.0));
 
 	vec3 image = texture(bgl_RenderedTexture, texcoord).rgb;
 

@@ -217,8 +217,53 @@ void GPU_material_viewport_barycentric(bool enable)
 	gpu_viewport_barycentric = enable;
 }
 
+/* PBR shading nodes never run GPU_shaderesult_set, so the compact G-buffer (GBUFF0, read by the
+ * SSR filter) stayed unwritten and node materials never reflected. Write it here from the view
+ * normal and the first Principled node's Roughness/Metallic (unlinked values). */
+static void gpu_material_node_gbuffer0(GPUMaterial *material)
+{
+	static float default_rough = 0.5f, default_metal = 0.0f, spec = 0.5f, blend = 1.0f, alpha = 1.0f;
+	Material *ma = material->ma;
+	if (!ma || !material->scene || material->type != GPU_MATERIAL_TYPE_MESH ||
+	    !GPU_material_use_new_shading_nodes(material) ||
+	    (ma->game.alpha_blend != GEMAT_SOLID && ma->game.alpha_blend != GEMAT_CLIP)) {
+		return;
+	}
+	for (unsigned short i = 0; i < GAME_ATTACHMENT_COUNT; ++i) {
+		RenderAttachment *attachment = material->scene->gm.attachments[i];
+		if (!attachment || attachment->type != GAME_ATTACHMENT_GBUFF0 || material->outlinks[i + 1]) {
+			continue;
+		}
+		float *rough = &default_rough, *metal = &default_metal;
+		if (ma->use_nodes && ma->nodetree) {
+			for (bNode *node = ma->nodetree->nodes.first; node; node = node->next) {
+				if (node->type != SH_NODE_BSDF_PRINCIPLED) {
+					continue;
+				}
+				for (bNodeSocket *sock = node->inputs.first; sock; sock = sock->next) {
+					if (sock->type != SOCK_FLOAT || !sock->default_value) {
+						continue;
+					}
+					if (STREQ(sock->name, "Roughness")) {
+						rough = &((bNodeSocketValueFloat *)sock->default_value)->value;
+					}
+					else if (STREQ(sock->name, "Metallic")) {
+						metal = &((bNodeSocketValueFloat *)sock->default_value)->value;
+					}
+				}
+				break;
+			}
+		}
+		GPUNodeLink *vn = GPU_material_builtin(material, GPU_VIEW_NORMAL);
+		GPU_link(material, "direction_transform_m4v3", vn, GPU_builtin(GPU_INVERSE_VIEW_MATRIX), &vn);
+		GPU_link(material, "shade_gbuffer0", vn, GPU_uniform(metal), GPU_uniform(rough),
+		         GPU_uniform(&spec), GPU_uniform(&blend), GPU_uniform(&alpha), &material->outlinks[i + 1]);
+	}
+}
+
 static int gpu_material_construct_end(GPUMaterial *material, const char *passname)
 {
+	gpu_material_node_gbuffer0(material);
     /* Unsupported materials must overwrite the auxiliary buffers too, rather than leave data
      * from an opaque surface behind them. Never enable these outputs for viewport/world passes. */
     const int ssgi_slot = GPU_material_ssgi_slot(material->scene);
