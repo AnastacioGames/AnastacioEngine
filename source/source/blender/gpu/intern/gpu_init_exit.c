@@ -61,6 +61,7 @@ void GPU_exit(void)
 	if (G.debug & G_DEBUG_GPU)
 		gpu_debug_exit();
 	gpu_codegen_exit();
+	gpu_world_sh_exit();
 	GPU_lamp_ies_exit();
 
 	gpu_extensions_exit(); /* must come last */

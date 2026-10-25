@@ -29,4 +29,7 @@ void gpu_extensions_exit(void);
 void gpu_debug_init(void);
 void gpu_debug_exit(void);
 
+/* gpu_material.c */
+void gpu_world_sh_exit(void);
+
 #endif  /* __GPU_PRIVATE_H__ */

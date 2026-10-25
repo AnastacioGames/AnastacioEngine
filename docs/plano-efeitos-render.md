@@ -41,7 +41,7 @@ JÃ¡ feito em 2026-10-24:
   - **Preset:** escolher pela UI sobrescreve os valores de cada efeito.
   - **Flipbook de partÃ­culas** (2026-10-25, aceito com janela): `RangeGPUParticleSettings.flipbook_cols/rows/cycles/random`, `particle_texture()` no preÃ¢mbulo do fragment (mistura os 2 quadros vizinhos; looks e shaders custom tambÃ©m podem usar), `object.particles.flipbook = (colunas, linhas, ciclos, aleatÃ³rio)`. Cena: `tools/debug/cenas/criar_cena_flipbook_particulas.py`.
   - **FusÃ£o de tonemap, FXAA e lente:** adiada. O FXAA lÃª ~12 vizinhos (cada um teria de passar pelo tonemap) e o lens flare fica entre eles; o ganho seria sÃ³ 1-2 cÃ³pias de tela.
-  - **Ainda nÃ£o feito:** IBL com SH9.
+  - **IBL com SH9** (2026-10-25, aceito com janela): a luz difusa do World em imagem (equiretangular, angular, cubo) vem de 9 coeficientes projetados uma vez por imagem na CPU (`gpu_world_sh9()`), no lugar de 5 leituras num mip baixo. Junto: o caminho dos nós passava a normal sem negar e iluminava o difuso do lado oposto (cor do chão no topo), inclusive sondas e captura do World. Cena: `tools/debug/cenas/criar_cena_sh9_ambiente.py`. Sondas ainda usam as 5 leituras.
   - **MediÃ§Ãµes:** ainda nÃ£o refeitas na iGPU. O profiler jÃ¡ separa os passes (`bloom_down0..3`, `bloom_up`, `bloom_image`...).
 
 ## Fase 1: correÃ§Ãµes baratas (custo de GPU ~0 e risco baixo)

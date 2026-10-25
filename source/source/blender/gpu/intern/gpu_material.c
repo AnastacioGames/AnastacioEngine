@@ -64,6 +64,7 @@
 #include "GPU_texture.h"
 
 #include "gpu_codegen.h"
+#include "gpu_private.h"
 
 #ifdef __EMSCRIPTEN__
 extern GLint emscripten_glGetFragDataLocation(GLuint program, const GLchar *name);
@@ -1520,6 +1521,204 @@ bool GPU_material_node_error(Material *ma, const char *node_name, const char **r
 		}
 	}
 	return false;
+}
+
+/* World image diffuse light as SH9 (L2 spherical harmonics), projected once per image on the CPU.
+ * The 9 RGB coefficients are already convolved with the cosine lobe and divided by pi, so the
+ * shader gets the diffuse radiance with one polynomial instead of 5 texture taps on a low mip. */
+
+enum { WORLD_SH_EQUIRECT = 0, WORLD_SH_ANGULAR = 1, WORLD_SH_CUBE = 2 };
+
+typedef struct WorldSH9 {
+	struct WorldSH9 *next, *prev;
+	Image *ima;
+	void *pixels; /* the ImBuf buffer it was made from; a reload changes it */
+	int x, y, mapping;
+	bool valid;
+	float coef[9][3];
+} WorldSH9;
+
+static ListBase world_sh_cache = {NULL, NULL};
+
+void gpu_world_sh_exit(void)
+{
+	BLI_freelistN(&world_sh_cache);
+}
+
+/* Same as uv_equirectangular() / uv_angular() in the shader. */
+static void world_sh_uv(int mapping, const float d[3], float r_uv[2])
+{
+	if (mapping == WORLD_SH_EQUIRECT) {
+		r_uv[0] = -atan2f(d[1], d[0]) / (2.0f * (float)M_PI) + 0.5f;
+		r_uv[1] = atan2f(d[2], hypotf(d[0], d[1])) / (float)M_PI + 0.5f;
+	}
+	else {
+		float n[3] = {d[0], d[1] - 1.0f, d[2]};
+		float div = 2.0f * sqrtf(max_ff(-0.5f * n[1], 0.0f));
+		if (div > 0.0f) {
+			mul_v3_fl(n, 1.0f / div);
+		}
+		r_uv[0] = 0.5f * (n[0] + 1.0f);
+		r_uv[1] = 0.5f * (n[2] + 1.0f);
+	}
+}
+
+/* Texel of the 3x2 cross (w = face size) that a cube map lookup in direction d reads: the GL face
+ * selection plus the face layout of gpu_gen_cube_map(). */
+static void world_sh_cube_texel(const float d[3], int w, int *r_col, int *r_row)
+{
+	float ax = fabsf(d[0]), ay = fabsf(d[1]), az = fabsf(d[2]);
+	float sc, tc, ma;
+	int face;
+	if (ax >= ay && ax >= az) {
+		face = d[0] > 0.0f ? 0 : 1; ma = ax; sc = d[0] > 0.0f ? -d[2] : d[2]; tc = -d[1];
+	}
+	else if (ay >= az) {
+		face = d[1] > 0.0f ? 2 : 3; ma = ay; sc = d[0]; tc = d[1] > 0.0f ? d[2] : -d[2];
+	}
+	else {
+		face = d[2] > 0.0f ? 4 : 5; ma = az; sc = d[2] > 0.0f ? d[0] : -d[0]; tc = -d[1];
+	}
+	int s = clamp_i((int)((sc / ma + 1.0f) * 0.5f * w), 0, w - 1);
+	int t = clamp_i((int)((tc / ma + 1.0f) * 0.5f * w), 0, w - 1);
+	int h = w, recth = 2 * w;
+	switch (face) {
+		case 0: *r_row = recth - 1 - s; *r_col = 2 * w + t; break;
+		case 1: *r_row = s + h;         *r_col = w - 1 - t; break;
+		case 2: *r_row = t;             *r_col = 2 * w + s; break;
+		case 3: *r_row = recth - 1 - t; *r_col = 2 * w - 1 - s; break;
+		case 4: *r_row = t;             *r_col = w + s; break;
+		default: *r_row = h - 1 - t;    *r_col = w - 1 - s; break;
+	}
+}
+
+static void world_sh_project(WorldSH9 *sh, ImBuf *ibuf)
+{
+	/* Box-filter the image down to a small grid first, so a point sample can't miss a bright sun. */
+	int sw, shh;
+	if (sh->mapping == WORLD_SH_CUBE) {
+		int w = ibuf->x / 3;
+		if (w < 1 || w != ibuf->y / 2) {
+			return;
+		}
+		int ws = min_ii(w, 32);
+		sw = 3 * ws;
+		shh = 2 * ws;
+	}
+	else {
+		sw = min_ii(ibuf->x, 128);
+		shh = min_ii(ibuf->y, 128);
+	}
+
+	float (*small)[3] = MEM_callocN(sizeof(float[3]) * sw * shh, __func__);
+	for (int j = 0; j < shh; j++) {
+		int y0 = j * ibuf->y / shh, y1 = max_ii((j + 1) * ibuf->y / shh, y0 + 1);
+		for (int i = 0; i < sw; i++) {
+			int x0 = i * ibuf->x / sw, x1 = max_ii((i + 1) * ibuf->x / sw, x0 + 1);
+			float sum[3] = {0.0f, 0.0f, 0.0f};
+			for (int y = y0; y < y1; y++) {
+				for (int x = x0; x < x1; x++) {
+					size_t p = (size_t)y * ibuf->x + x;
+					float c[3];
+					/* the same display-space values the texture upload uses (bytes, or float to sRGB clamped) */
+					if (ibuf->rect) {
+						const unsigned char *b = (const unsigned char *)&ibuf->rect[p];
+						c[0] = b[0] / 255.0f; c[1] = b[1] / 255.0f; c[2] = b[2] / 255.0f;
+					}
+					else {
+						const float *f = ibuf->rect_float + p * ibuf->channels;
+						for (int k = 0; k < 3; k++) {
+							c[k] = clamp_f(linearrgb_to_srgb(ibuf->channels >= 3 ? f[k] : f[0]), 0.0f, 1.0f);
+						}
+					}
+					add_v3_v3(sum, c);
+				}
+			}
+			mul_v3_v3fl(small[j * sw + i], sum, 1.0f / ((x1 - x0) * (y1 - y0)));
+		}
+	}
+
+	/* Uniform directions (Fibonacci sphere), each weighing 4pi / N. */
+	const int num = 4096;
+	const float band[3] = {1.0f, 2.0f / 3.0f, 0.25f}; /* cosine lobe / pi per band */
+	float acc[9][3] = {{0.0f}};
+	for (int n = 0; n < num; n++) {
+		float z = 1.0f - (2.0f * n + 1.0f) / num;
+		float r = sqrtf(max_ff(1.0f - z * z, 0.0f));
+		float phi = n * 2.39996323f;
+		float d[3] = {r * cosf(phi), r * sinf(phi), z};
+		int col, row;
+		if (sh->mapping == WORLD_SH_CUBE) {
+			world_sh_cube_texel(d, sw / 3, &col, &row);
+		}
+		else {
+			float uv[2];
+			world_sh_uv(sh->mapping, d, uv);
+			col = clamp_i((int)(uv[0] * sw), 0, sw - 1);
+			row = clamp_i((int)(uv[1] * shh), 0, shh - 1);
+		}
+		const float *c = small[row * sw + col];
+		const float y[9] = {
+			0.282095f,
+			0.488603f * d[1], 0.488603f * d[2], 0.488603f * d[0],
+			1.092548f * d[0] * d[1], 1.092548f * d[1] * d[2], 0.315392f * (3.0f * d[2] * d[2] - 1.0f),
+			1.092548f * d[0] * d[2], 0.546274f * (d[0] * d[0] - d[1] * d[1]),
+		};
+		for (int k = 0; k < 9; k++) {
+			madd_v3_v3fl(acc[k], c, y[k]);
+		}
+	}
+	MEM_freeN(small);
+
+	const float weight = 4.0f * (float)M_PI / num;
+	for (int k = 0; k < 9; k++) {
+		/* the shader evaluates the basis, so fold its constants in here */
+		mul_v3_v3fl(sh->coef[k], acc[k], weight * band[k == 0 ? 0 : (k < 4 ? 1 : 2)]);
+	}
+	sh->valid = true;
+}
+
+/* SH9 of a World image, or NULL when its pixels aren't readable on the CPU (compressed DDS). */
+static WorldSH9 *gpu_world_sh9(Image *ima, ImageUser *iuser, int mapping)
+{
+	ImBuf *ibuf = BKE_image_acquire_ibuf(ima, iuser, NULL);
+	if (!ibuf) {
+		return NULL;
+	}
+	void *pixels = ibuf->rect ? (void *)ibuf->rect : (void *)ibuf->rect_float;
+	WorldSH9 *sh;
+	for (sh = world_sh_cache.first; sh; sh = sh->next) {
+		if (sh->ima == ima && sh->mapping == mapping && sh->pixels == pixels &&
+		    sh->x == ibuf->x && sh->y == ibuf->y)
+		{
+			break;
+		}
+	}
+	if (!sh && pixels) {
+		sh = MEM_callocN(sizeof(*sh), __func__);
+		sh->ima = ima;
+		sh->pixels = pixels;
+		sh->x = ibuf->x;
+		sh->y = ibuf->y;
+		sh->mapping = mapping;
+		world_sh_project(sh, ibuf);
+		/* kept for the life of the GPU module: the material links point at coef */
+		BLI_addtail(&world_sh_cache, sh);
+	}
+	BKE_image_release_ibuf(ima, ibuf, NULL);
+	return (sh && sh->valid) ? sh : NULL;
+}
+
+/* Replaces the diffuse taps of env_*_tex with the World image's SH9 when it is available. */
+static void gpu_world_sh9_link(GPUMaterial *mat, Tex *tex, int mapping, GPUNodeLink *wn, GPUNodeLink **diffibl)
+{
+	WorldSH9 *sh = gpu_world_sh9(tex->ima, &tex->iuser, mapping);
+	if (sh) {
+		GPU_link(mat, "env_sh9", wn,
+		         GPU_uniform(sh->coef[0]), GPU_uniform(sh->coef[1]), GPU_uniform(sh->coef[2]),
+		         GPU_uniform(sh->coef[3]), GPU_uniform(sh->coef[4]), GPU_uniform(sh->coef[5]),
+		         GPU_uniform(sh->coef[6]), GPU_uniform(sh->coef[7]), GPU_uniform(sh->coef[8]), diffibl);
+	}
 }
 
 /* Code generation */
@@ -3720,16 +3919,19 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 							if (mtex->texco == TEXCO_ANGMAP) {
 								GPU_link(mat, "env_angular_tex", shi->roughness_bsdf, GPU_uniform(&ma->roughness), GPU_image(tex->ima, &tex->iuser, false),
 									wv, wn, wr, &mirror, &radiosity, &transmit);
+								gpu_world_sh9_link(mat, tex, WORLD_SH_ANGULAR, wn, &radiosity);
 							}
 							else { //if (mtex->texco == TEXCO_EQUIRECTMAP) {
 								GPU_link(mat, "env_equirect_tex", shi->roughness_bsdf, GPU_uniform(&ma->roughness), GPU_image(tex->ima, &tex->iuser, false),
 									wv, wn, wr, &mirror, &radiosity, &transmit);
+								gpu_world_sh9_link(mat, tex, WORLD_SH_EQUIRECT, wn, &radiosity);
 							}
 						}
 						else {
 							if (tex->type == TEX_ENVMAP) {
 								GPU_link(mat, "env_cube_tex", shi->roughness_bsdf, GPU_uniform(&ma->roughness), GPU_cube_map(tex->ima, &tex->iuser, false),
 									wv, wn, wr, &mirror, &radiosity, &transmit);
+								gpu_world_sh9_link(mat, tex, WORLD_SH_CUBE, wn, &radiosity);
 							}
 						}
 
@@ -4374,15 +4576,18 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 			if (mtex->texco == TEXCO_ANGMAP) {
 				GPU_link(mat, "env_angular_tex", rough, GPU_uniform(&turbid), GPU_image(tex->ima, &tex->iuser, false),
 				         wv, wn, wr, &mirror, &diffibl, &transmit);
+				gpu_world_sh9_link(mat, tex, WORLD_SH_ANGULAR, wn, &diffibl);
 			}
 			else {
 				GPU_link(mat, "env_equirect_tex", rough, GPU_uniform(&turbid), GPU_image(tex->ima, &tex->iuser, false),
 				         wv, wn, wr, &mirror, &diffibl, &transmit);
+				gpu_world_sh9_link(mat, tex, WORLD_SH_EQUIRECT, wn, &diffibl);
 			}
 		}
 		else if (tex->type == TEX_ENVMAP) {
 			GPU_link(mat, "env_cube_tex", rough, GPU_uniform(&turbid), GPU_cube_map(tex->ima, &tex->iuser, false),
 			         wv, wn, wr, &mirror, &diffibl, &transmit);
+			gpu_world_sh9_link(mat, tex, WORLD_SH_CUBE, wn, &diffibl);
 		}
 		else {
 			use_tex = false;

@@ -3384,6 +3384,19 @@ vec3 env_irradiance_dir(vec3 n, int k)
 	return normalize(n * 0.643 - b * 0.766);
 }
 
+/* World image diffuse light from its SH9 (see gpu_world_sh9()): c0..c8 already hold the cosine
+ * convolution / pi, so this is the diffuse radiance for the outward normal -wn. */
+void env_sh9(vec3 wn, vec3 c0, vec3 c1, vec3 c2, vec3 c3, vec3 c4, vec3 c5, vec3 c6, vec3 c7, vec3 c8, out vec4 diffibl)
+{
+	vec3 n = -wn;
+	vec3 r = c0 * 0.282095 +
+	         (c1 * n.y + c2 * n.z + c3 * n.x) * 0.488603 +
+	         (c4 * (n.x * n.y) + c5 * (n.y * n.z) + c7 * (n.x * n.z)) * 1.092548 +
+	         c6 * (0.315392 * (3.0 * n.z * n.z - 1.0)) +
+	         c8 * (0.546274 * (n.x * n.x - n.y * n.y));
+	diffibl = vec4(max(r, vec3(0.0)), 1.0);
+}
+
 /* Split-sum environment BRDF (Karis, mobile fit): specular = F0 * x + y for the
  * roughness-prefiltered reflection. */
 vec2 env_brdf_approx(float NdotV, float rough)

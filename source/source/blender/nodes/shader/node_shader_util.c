@@ -337,7 +337,10 @@ void node_shader_gpu_world_env(GPUMaterial *mat, GPUNodeLink *rough,
 	/* shade_world_vectors expects a normalized (perspective-aware) view direction (shade_view),
 	 * not the raw view-space position. */
 	GPU_link(mat, "shade_view", GPU_material_builtin(mat, GPU_VIEW_POSITION), &env_view);
-	GPUNodeLink *env_vn = GPU_material_builtin(mat, GPU_VIEW_NORMAL);
+	/* The environment code follows the legacy convention (normal negated, see shade_norm); the raw
+	 * normal lit the diffuse from the opposite side (ground color on top). */
+	GPUNodeLink *env_vn;
+	GPU_link(mat, "shade_norm", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &env_vn);
 	if (GPU_material_world_env(mat, env_view, env_vn, rough, r_mirror, r_diffuse)) {
 		*r_flag = GPU_uniform(&env_on);
 	}
