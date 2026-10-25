@@ -415,7 +415,21 @@ void view3d_header_tool_controls(uiLayout *row, bContext *C)
 	if (prop) {
 		RNA_property_enum_name_gettexted(C, &sceneptr, prop, RNA_property_enum_get(&sceneptr, prop), &orient_name);
 	}
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_transform_orientations", orient_name ? orient_name : "", ICON_AXIS_TOP);
+	{
+		/* Ícone da orientação atual; as criadas pelo usuário ficam com o de Global. */
+		int orient_icon = 0;
+		if (prop) {
+			const EnumPropertyItem *items;
+			bool free;
+			RNA_property_enum_items(C, &sceneptr, prop, &items, NULL, &free);
+			RNA_enum_icon_from_value(items, RNA_property_enum_get(&sceneptr, prop), &orient_icon);
+			if (free) {
+				MEM_freeN((void *)items);
+			}
+		}
+		uiItemPopoverPanel(row, C, "VIEW3D_PT_transform_orientations", orient_name ? orient_name : "",
+		                   orient_icon ? orient_icon : ICON_ORIENTATION_GLOBAL);
+	}
 	uiItemPopoverPanel(row, C, "VIEW3D_PT_pivot_point", "", view3d_pivot_point_icon(v3d));
 	uiItemS(row);
 

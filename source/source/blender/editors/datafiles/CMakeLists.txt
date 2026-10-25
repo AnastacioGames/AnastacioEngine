@@ -464,6 +464,14 @@ set(ICON_NAMES
 	discord
 	patreon
 	cut
+	inversesquarecurve
+	orientation_global
+	orientation_local
+	orientation_normal
+	orientation_gimbal
+	orientation_view
+	snap_midpoint
+	snap_perpendicular
 	gate_and
 	gate_or
 	gate_nand
