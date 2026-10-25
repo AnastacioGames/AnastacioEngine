@@ -357,4 +357,8 @@ extern unsigned char view3d_camera_border_hack_col[3];
 extern bool view3d_camera_border_hack_test;
 #endif
 
+/* view3d_header.c: header icon matching the current pivot point. */
+int view3d_pivot_point_icon(const struct View3D *v3d);
+void view3d_header_tool_controls(struct uiLayout *row, struct bContext *C);
+
 #endif /* __VIEW3D_INTERN_H__ */

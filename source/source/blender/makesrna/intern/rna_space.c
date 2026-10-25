@@ -2699,6 +2699,11 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_update(
 	    prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SpaceView3D_realtime_viewport_update");
 
+	prop = RNA_def_property(srna, "show_stats", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_SHOW_STATS);
+	RNA_def_property_ui_text(prop, "Statistics", "Show scene statistics (vertices, faces, objects) in the viewport corner");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
 	prop = RNA_def_property(srna, "show_floating_controls_in_header", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_FLOATING_CONTROLS_IN_HEADER);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);

@@ -3814,6 +3814,14 @@ class VIEW3D_PT_overlay(Panel):
         curve = mesh
         statvis = context.tool_settings.statvis
 
+        # Text Info (Blender 5): nome da vista e do objeto no canto da viewport.
+        prefs = context.user_preferences.view
+        row = layout.row(align=True)
+        row.prop(prefs, "show_view_name", text="View Name", toggle=True)
+        row.prop(prefs, "show_object_info", text="Object Info", toggle=True)
+        row.prop(view, "show_stats", text="Statistics", toggle=True)
+        layout.separator()
+
         layout.prop(view, "show_outline_selected")
         layout.prop(view, "show_all_objects_origin")
         layout.prop(view, "show_relationship_lines")
@@ -3955,6 +3963,32 @@ class VIEW3D_PT_overlay(Panel):
             layout.separator()
 
 
+class VIEW3D_PT_gizmo(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Gizmo"
+    bl_ui_units_x = 8
+
+    def draw(self, context):
+        layout = self.layout
+        view = context.space_data
+        layout.label(text="Viewport Gizmos")
+        col = layout.column()
+        col.active = view.show_manipulator
+        col.prop(view, "transform_manipulators", expand=True)
+
+        # Navegação (Blender 5: Navigate/Axes no mesmo popover).
+        prefs = context.user_preferences.view
+        layout.separator()
+        layout.label(text="Navigation")
+        row = layout.row(align=True)
+        row.prop(prefs, "show_mini_axis", text="Axes")
+        sub = row.row(align=True)
+        sub.active = prefs.show_mini_axis
+        sub.prop(prefs, "mini_axis_size", text="Size")
+        layout.prop(view, "show_floating_controls_in_header", text="Controls in Header")
+
+
 class VIEW3D_PT_pivot_point(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
@@ -3977,7 +4011,7 @@ class VIEW3D_PT_pivot_point(Panel):
             col.prop(
                 view,
                 "use_pivot_point_align",
-                text="Object Origin Only",
+                text="Only Locations",
                 toggle=False
             )
 
@@ -4410,6 +4444,7 @@ classes = (
     VIEW3D_OT_game_layers_unpin,
     VIEW3D_PT_shading,
     VIEW3D_PT_overlay,
+    VIEW3D_PT_gizmo,
     VIEW3D_PT_pivot_point,
     VIEW3D_PT_snapping,
     VIEW3D_PT_meshdisplay,

@@ -41,6 +41,8 @@
 #include "BKE_screen.h"
 #include "BKE_editmesh.h"
 
+#include "MEM_guardedalloc.h"
+
 #include "RNA_access.h"
 #include "RNA_define.h"
 #include "RNA_enum_types.h"
@@ -106,6 +108,18 @@ static void view3d_layers_editmode_ensure(Scene *scene, View3D *v3d)
 				break;
 			}
 		}
+	}
+}
+
+/* Same icons as the RNA pivot_point enum. */
+int view3d_pivot_point_icon(const View3D *v3d)
+{
+	switch (v3d->around) {
+		case V3D_AROUND_CENTER_BOUNDS: return ICON_ROTATE;
+		case V3D_AROUND_CURSOR: return ICON_CURSOR;
+		case V3D_AROUND_CENTER_MEDIAN: return ICON_ROTATECENTER;
+		case V3D_AROUND_ACTIVE: return ICON_ROTACTIVE;
+		default: return ICON_ROTATECOLLECTION;
 	}
 }
 
@@ -373,7 +387,10 @@ void uiTemplateHeader3D(uiLayout *layout, struct bContext *C)
 #endif
 }
 
-void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C)
+/* Botões de transformação/exibição da 3D View, na ordem do Blender 5:
+ * seleção do Edit | orientação, pivot, snap, proporcional | extras do Edit |
+ * layers | gizmo | render/overlay | shading. Usado pelo cabeçalho e pela barra flutuante. */
+void view3d_header_tool_controls(uiLayout *row, bContext *C)
 {
 	bScreen *screen = CTX_wm_screen(C);
 	ScrArea *sa = CTX_wm_area(C);
@@ -381,6 +398,91 @@ void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C)
 	Scene *scene = CTX_data_scene(C);
 	const Object *ob = CTX_data_active_object(C);
 	const bool edit_mode = (ob != NULL) && ((ob->mode & OB_MODE_EDIT) != 0);
+	PointerRNA v3dptr, sceneptr, toolptr;
+	PropertyRNA *prop;
+	const char *orient_name = NULL;
+	int snap_icon = ICON_DOWNARROW_HLT;
+
+	RNA_pointer_create(&screen->id, &RNA_SpaceView3D, v3d, &v3dptr);
+	RNA_pointer_create(&scene->id, &RNA_Scene, scene, &sceneptr);
+	RNA_pointer_create(&scene->id, &RNA_ToolSettings, scene->toolsettings, &toolptr);
+
+	uiTemplateHeader3D_mode(row, C);
+	uiItemS(row);
+
+	/* Orientação: ícone + nome do modo atual ("Global"), como no Blender 5. */
+	prop = RNA_struct_find_property(&sceneptr, "transform_orientation");
+	if (prop) {
+		RNA_property_enum_name_gettexted(C, &sceneptr, prop, RNA_property_enum_get(&sceneptr, prop), &orient_name);
+	}
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_transform_orientations", orient_name ? orient_name : "", ICON_AXIS_TOP);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_pivot_point", "", view3d_pivot_point_icon(v3d));
+	uiItemS(row);
+
+	/* Snap: a seta do popover mostra o alvo atual (vértice, incremento...). */
+	prop = RNA_struct_find_property(&toolptr, "snap_element");
+	if (prop) {
+		const EnumPropertyItem *items;
+		bool free;
+		RNA_property_enum_items(C, &toolptr, prop, &items, NULL, &free);
+		RNA_enum_icon_from_value(items, RNA_property_enum_get(&toolptr, prop), &snap_icon);
+		if (free) {
+			MEM_freeN((void *)items);
+		}
+	}
+	uiItemR(row, &toolptr, "use_snap", UI_ITEM_R_TOGGLE, "", ICON_SNAP_ON);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_snapping", "", snap_icon);
+	uiItemR(row, &toolptr, "proportional_edit", UI_ITEM_R_ICON_ONLY, "", ICON_PROP_OFF);
+	uiItemR(row, &toolptr, "proportional_edit_falloff", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+
+	if (edit_mode) {
+		uiItemS(row);
+		uiItemR(row, &toolptr, "use_mesh_automerge", UI_ITEM_R_TOGGLE, "", ICON_AUTOMERGE_ON);
+		uiItemR(row, &v3dptr, "use_occlude_geometry", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_VIEW_ON);
+		uiItemPopoverPanel(row, C, "VIEW3D_PT_meshdisplay", "", ICON_IMAGE_COL);
+	}
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_TOGGLE, "", ICON_NONE);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_layer", "", ICON_RENDERLAYERS);
+	uiItemS(row);
+
+	/* Gizmo: toggle + popover com mover/girar/escala (antes eram 3 ícones soltos). */
+	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_gizmo", "", ICON_DOWNARROW_HLT);
+	uiItemS(row);
+
+	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
+	uiItemR(row, &v3dptr, "show_only_render", UI_ITEM_R_TOGGLE, "",
+	        (v3d->flag2 & V3D_RENDER_OVERRIDE) ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF);
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_overlay", "", ICON_DOWNARROW_HLT);
+	uiItemS(row);
+
+	/* Shading: 4 botões lado a lado + popover, como no Blender 5. */
+	/* Só desenha os modos que o enum oferece agora (ex.: Rendered depende do motor). */
+	prop = RNA_struct_find_property(&v3dptr, "viewport_shade");
+	if (prop) {
+		const EnumPropertyItem *items, *it;
+		bool free;
+		RNA_property_enum_items(C, &v3dptr, prop, &items, NULL, &free);
+		for (it = items; it->identifier; it++) {
+			if (ELEM(it->value, OB_WIRE, OB_SOLID, OB_MATERIAL, OB_RENDER)) {
+				uiItemEnumR_string(row, &v3dptr, "viewport_shade", it->identifier, "", it->icon);
+			}
+		}
+		if (free) {
+			MEM_freeN((void *)items);
+		}
+	}
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_shading", "", ICON_DOWNARROW_HLT);
+}
+
+void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C)
+{
+	bScreen *screen = CTX_wm_screen(C);
+	ScrArea *sa = CTX_wm_area(C);
+	View3D *v3d = sa->spacedata.first;
+	Scene *scene = CTX_data_scene(C);
 	PointerRNA v3dptr;
 	PointerRNA gameptr;
 	PointerRNA toolptr;
@@ -407,38 +509,5 @@ void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C)
 	}
 
 	uiItemS(row);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_shading", "", ICON_DOWNARROW_HLT);
-	uiItemR(row, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-	uiItemS(row);
-
-	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
-	uiItemR(row,
-	        &v3dptr,
-	        "show_only_render",
-	        UI_ITEM_R_TOGGLE,
-	        "",
-	        (v3d->flag2 & V3D_RENDER_OVERRIDE) ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_overlay", "", ICON_DOWNARROW_HLT);
-	uiItemS(row);
-
-	uiItemR(row, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_TOGGLE, "", ICON_NONE);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_layer", "", ICON_RENDERLAYERS);
-	uiItemS(row);
-
-	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
-	uiItemR(row, &v3dptr, "transform_manipulators", UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-	uiTemplateHeader3D_mode(row, C);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_transform_orientations", "", ICON_DOWNARROW_HLT);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_pivot_point", "", ICON_ROTATECOLLECTION);
-	uiItemS(row);
-	uiItemR(row, &toolptr, "use_snap", UI_ITEM_R_TOGGLE, "", ICON_SNAP_ON);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_snapping", "", ICON_DOWNARROW_HLT);
-	uiItemR(row, &toolptr, "proportional_edit", UI_ITEM_R_ICON_ONLY, "", ICON_PROP_OFF);
-	uiItemR(row, &toolptr, "proportional_edit_falloff", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-	if (edit_mode) {
-		uiItemS(row);
-		uiItemR(row, &toolptr, "use_mesh_automerge", UI_ITEM_R_TOGGLE, "", ICON_AUTOMERGE_ON);
-		uiItemR(row, &v3dptr, "use_occlude_geometry", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_VIEW_ON);
-		uiItemPopoverPanel(row, C, "VIEW3D_PT_meshdisplay", "", ICON_IMAGE_COL);
-	}
+	view3d_header_tool_controls(row, C);
 }

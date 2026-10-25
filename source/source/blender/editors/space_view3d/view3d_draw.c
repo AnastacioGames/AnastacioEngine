@@ -86,6 +86,7 @@
 #include "ED_armature.h"
 #include "ED_keyframing.h"
 #include "ED_gpencil.h"
+#include "ED_info.h"
 #include "ED_screen.h"
 #include "ED_space_api.h"
 #include "ED_screen_types.h"
@@ -1181,6 +1182,32 @@ static void draw_viewport_name(ARegion *ar, View3D *v3d, rcti *rect)
 #else
 	BLF_draw_default_ascii(U.widget_unit + rect->xmin,  rect->ymax - U.widget_unit, 0.0f, name, sizeof(tmpstr));
 #endif
+	view3d_overlay_text_shadow(false);
+}
+
+/* Overlay de estatísticas (Blender 5): o mesmo texto da barra de info, um item por
+ * linha, abaixo do nome da vista. Pula o prefixo "RanGE <versão>". */
+static void draw_viewport_stats(Scene *scene, const rcti *rect, int first_line)
+{
+	const char *info = ED_info_stats_string(scene);
+	const char *p = strstr(info, " | ");
+	char line[128];
+	int y = rect->ymax - first_line * U.widget_unit;
+
+	p = p ? p + 3 : info;
+	UI_ThemeColor(TH_TEXT_HI);
+	view3d_overlay_text_shadow(true);
+	while (*p) {
+		const char *sep = strstr(p, " | ");
+		size_t len = sep ? (size_t)(sep - p) : strlen(p);
+		BLI_strncpy(line, p, MIN2(len + 1, sizeof(line)));
+		BLF_draw_default(rect->xmin + U.widget_unit, y, 0.0f, line, sizeof(line));
+		y -= (int)(0.9f * U.widget_unit);
+		if (!sep) {
+			break;
+		}
+		p = sep + 3;
+	}
 	view3d_overlay_text_shadow(false);
 }
 
@@ -4506,6 +4533,10 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 			                       rect.ymax - (USER_SHOW_VIEWPORTNAME ? 2 * U.widget_unit : U.widget_unit), 0.0f,
 			                       numstr[0] ? numstr : grid_unit, sizeof(numstr));
 		}
+
+		if (v3d->flag2 & V3D_SHOW_STATS) {
+			draw_viewport_stats(scene, &rect, grid_unit ? 3 : 2);
+		}
 	}
 }
 
@@ -4522,8 +4553,6 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	uiBlock *block;
 	uiLayout *layout;
 	uiLayout *row;
-	const Object *ob = CTX_data_active_object(C);
-	const bool edit_mode = (ob != NULL) && ((ob->mode & OB_MODE_EDIT) != 0);
 	rcti rect;
 	int x, y;
 
@@ -4586,55 +4615,38 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, x, y, UI_UNIT_Y, 1, 0, UI_style_get());
 	row = uiLayoutRow(layout, true);
 
-	/* Object Mode dropdown now lives only in the header; keep the shading
-	 * popover here so shading options are still one click away. */
-	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_shading", "", ICON_DOWNARROW_HLT);
-	uiItemS(row);
+	view3d_header_tool_controls(row, (bContext *)C);
 
-	/* Viewport shading (solid/wireframe/...) as a single dropdown button,
-	 * matching the style previously used in the header. Icon only, no
-	 * label text — the current mode name still shows up as a tooltip. */
-	uiItemR(row, &v3dptr, "viewport_shade", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-	uiItemS(row);
+	{
+		/* Fundo opaco atrás da barra, como no grupo do jogo: botões não marcados
+		 * são translúcidos e somem sobre o céu/chão claro. */
+		int end_x = x, end_y = y;
+		UI_block_layout_resolve(block, &end_x, &end_y);
+		{
+			/* Centraliza a barra na viewport, como o Blender 5; se não couber
+			 * no centro (janela estreita), fica colada no grupo do jogo. */
+			const int center_x = (rect.xmin + rect.xmax) / 2 - (end_x - x) / 2;
+			if (center_x > x) {
+				UI_block_translate(block, center_x - x, 0);
+				end_x += center_x - x;
+				x = center_x;
+			}
+		}
+		UI_block_end(C, block);
+		if (end_x > x) {
+			bTheme *btheme = UI_GetTheme();
+			unsigned char col[4];
 
-	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
-	uiItemR(row,
-	        &v3dptr,
-	        "show_only_render",
-	        UI_ITEM_R_TOGGLE,
-	        "",
-	        (v3d->flag2 & V3D_RENDER_OVERRIDE) ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF);
-	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_overlay", "", ICON_DOWNARROW_HLT);
-	uiItemS(row);
-
-	uiItemR(row, &v3dptr, "lock_camera_and_layers", UI_ITEM_R_TOGGLE, "", ICON_NONE);
-	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_layer", "", ICON_RENDERLAYERS);
-	uiItemS(row);
-
-	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
-	uiItemR(row,
-	        &v3dptr,
-	        "transform_manipulators",
-	        UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY,
-	        "",
-	        ICON_NONE);
-	uiTemplateHeader3D_mode(row, (bContext *)C);
-	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_transform_orientations", "", ICON_DOWNARROW_HLT);
-	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_pivot_point", "", ICON_ROTATECOLLECTION);
-	uiItemS(row);
-	uiItemR(row, &toolptr, "use_snap", UI_ITEM_R_TOGGLE, "", ICON_SNAP_ON);
-	uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_snapping", "", ICON_DOWNARROW_HLT);
-	uiItemR(row, &toolptr, "proportional_edit", UI_ITEM_R_ICON_ONLY, "", ICON_PROP_OFF);
-	uiItemR(row, &toolptr, "proportional_edit_falloff", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
-	if (edit_mode) {
-		uiItemS(row);
-		uiItemR(row, &toolptr, "use_mesh_automerge", UI_ITEM_R_TOGGLE, "", ICON_AUTOMERGE_ON);
-		uiItemR(row, &v3dptr, "use_occlude_geometry", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_VIEW_ON);
-		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_meshdisplay", "", ICON_IMAGE_COL);
+			copy_v4_v4_uchar(col, (unsigned char *)btheme->tui.wcol_tool.inner);
+			col[3] = 255;
+			glEnable(GL_BLEND);
+			glColor4ubv(col);
+			UI_draw_roundbox_corner_set(UI_CNR_ALL);
+			UI_draw_roundbox_gl_mode(GL_POLYGON, (float)x, (float)(y - UI_UNIT_Y), (float)end_x, (float)y,
+			                         0.2f * U.widget_unit);
+			glDisable(GL_BLEND);
+		}
 	}
-
-	UI_block_layout_resolve(block, NULL, NULL);
-	UI_block_end(C, block);
 	UI_block_draw(C, block);
 }
 
