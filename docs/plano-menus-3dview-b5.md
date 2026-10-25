@@ -90,3 +90,4 @@ Face Project/Face Nearest.
 Grupo 1 (1.4 Overlays primeiro, maior ganho) → aceite com janela → Grupo 2 → decidir Grupo 3.
 
 > 2026-10-25: Proportional (toggle + popover VIEW3D_PT_proportional_edit), ícones das Orientations e Snapping reordenado feitos; build OK; aguardando aceite com janela.
+> 2026-10-25: Exclude Non-Selectable + Backface Culling (Face/Volume) feitos em 04966276; build OK; props salvam/carregam. Próximo: Edge Center/Perpendicular.
