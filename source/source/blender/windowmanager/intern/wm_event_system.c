@@ -644,9 +644,9 @@ static bool logic_debug_tag_areas(bool tag)
 			const bool logic_editor = sa->spacetype == SPACE_LOGIC && !(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF);
 			if (logic_tree || logic_editor) {
 				found = true;
-				/* Com o jogo embutido o Logic Editor recebe o realce por cima a cada quadro
-				 * (wm_draw_logic_debug_overlays); reconstruir os bricks custava ~50 ms. */
-				if (tag && (logic_tree || !WM_game_embedded_draw_active())) {
+				/* Com o jogo embutido o realce é pintado por cima a cada quadro
+				 * (wm_draw_logic_debug_overlays); reconstruir o editor custava ~50 ms. */
+				if (tag && !WM_game_embedded_draw_active()) {
 					ED_area_tag_redraw(sa);
 				}
 			}

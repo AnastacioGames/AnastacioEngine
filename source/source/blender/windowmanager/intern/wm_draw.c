@@ -50,6 +50,8 @@
 #include "ED_view3d.h"
 #include "ED_screen.h"
 #include "ED_logic.h"
+#include "ED_space_api.h"
+#include "UI_view2d.h"
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
@@ -1018,20 +1020,46 @@ void wm_draw_update(bContext *C)
  * janela inteira no back buffer, sem trocar buffer -- o jogo desenha por cima na sua regiÃ£o e
  * faz a troca. CompÃµe todo quadro: com troca de buffer, um quadro sem composiÃ§Ã£o mostraria a UI
  * antiga no outro buffer. SÃ³ no mÃ©todo Triple (o padrÃ£o); nos outros a UI nÃ£o Ã© redesenhada. */
-/* Realce dos logic bricks: pintado por cima a cada quadro, sem reconstruir o Logic Editor. */
-static void wm_draw_logic_debug_overlays(wmWindow *win)
+/* Realce dos logic bricks e da Logic Tree: pintado por cima da imagem guardada a cada quadro,
+ * sem reconstruir os editores (reconstruir custava ~50 ms por vez). */
+static void wm_draw_logic_debug_overlays(bContext *C, wmWindow *win)
 {
+	ScrArea *prev_sa = CTX_wm_area(C);
+	ARegion *prev_ar = CTX_wm_region(C);
 	for (ScrArea *sa = win->screen->areabase.first; sa; sa = sa->next) {
-		const SpaceLogic *slogic = sa->spacedata.first;
-		if (sa->spacetype != SPACE_LOGIC || (slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF)) {
+		bool logic_editor = false, logic_tree = false;
+		if (sa->spacetype == SPACE_LOGIC) {
+			logic_editor = !(((const SpaceLogic *)sa->spacedata.first)->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF);
+		}
+		else if (sa->spacetype == SPACE_NODE) {
+			logic_tree = STREQ(((const SpaceNode *)sa->spacedata.first)->tree_idname, "RangeLogicTree");
+		}
+		if (!logic_editor && !logic_tree) {
 			continue;
 		}
 		for (ARegion *ar = sa->regionbase.first; ar; ar = ar->next) {
-			if (ar->regiontype == RGN_TYPE_WINDOW) {
+			if (ar->regiontype != RGN_TYPE_WINDOW || ar->swinid == 0) {
+				continue;
+			}
+			if (logic_editor) {
 				ED_logic_debug_draw_overlay(win, ar);
+			}
+			else {
+				/* O brilho dos nós é o draw handler POST_VIEW do range_logic_tree.py. */
+				/* Sem o override do game_start (área da 3D View) o Python enxerga este Node Editor. */
+				void *py_dict = CTX_py_dict_get(C);
+				CTX_py_dict_set(C, NULL);
+				CTX_wm_area_set(C, sa);
+				CTX_wm_region_set(C, ar);
+				wmSubWindowSet(win, ar->swinid);
+				UI_view2d_view_ortho(&ar->v2d);
+				ED_region_draw_cb_draw(C, ar, REGION_DRAW_POST_VIEW);
+				CTX_py_dict_set(C, py_dict);
 			}
 		}
 	}
+	CTX_wm_area_set(C, prev_sa);
+	CTX_wm_region_set(C, prev_ar);
 	wmSubWindowSet(win, win->screen->mainwin);
 }
 
@@ -1154,7 +1182,7 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar, bool
 			if (copytex) {
 				wm_triple_copy_textures(win, drawdata->triple);
 			}
-			wm_draw_logic_debug_overlays(win);
+			wm_draw_logic_debug_overlays(C, win);
 
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1169,7 +1197,7 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar, bool
 	}
 	else {
 		wm_method_draw_triple(C, win);
-		wm_draw_logic_debug_overlays(win);
+		wm_draw_logic_debug_overlays(C, win);
 	}
 
 	glMatrixMode(GL_TEXTURE);
