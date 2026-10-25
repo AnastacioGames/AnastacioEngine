@@ -596,8 +596,14 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	 * else keep the original source off screen. */
 	if (inputofs->GetSamples()) {
 		previousofs = canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER0);
+		if (ProfilePassHook) {
+			ProfilePassHook(-1);
+		}
 		// No need to bind previousofs because a blit is proceeded.
 		rasty->DrawOffScreen(inputofs, previousofs);
+		if (ProfilePassHook) {
+			ProfilePassHook(-2);
+		}
 	}
 
 	// The filter color input off screen, changed for each filters.

@@ -86,22 +86,26 @@ enum {
 };
 
 /// RANGE_PROFILE: GPU time of every filter pass ("filter.rain", "filter.vfog"...);
-/// "filter.prepare" is what runs before the first pass (rain masks, Camera FX update).
+/// "filter.prepare" is what runs before the first pass (rain masks, Camera FX update), "filter.resolve"
+/// the multisample blit into the filter input (pass -2).
 static void kx_profile_filter_pass(int pass)
 {
 	if (!KX_EngineProfiler::Enabled()) {
 		return;
 	}
-	static int ids[257] = {0};
-	const int slot = (pass < 0) ? 256 : std::min(pass, 255);
+	static int ids[258] = {0};
+	const int slot = (pass == -2) ? 257 : (pass < 0) ? 256 : std::min(pass, 255);
 	if (!ids[slot]) {
 		static const char *const names[] = {
 			/* 5 is the SSAO composite and 12 the half resolution DOF (see the slot constants below). */
 			"ssgi", "ssgi_image", "ssr", "ssr_blur", "ssao", "ssao_image", "bloom_down0", "bloom_down1",
 			"bloom_down2", "bloom_down3", "bloom_up", "bloom_image", "camera_dof_half", "lightscatter", "lightscatter_image", "fxaa", "tonemap", "rain", "clouds",
 			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens", "camera_dof_reduce"};
-		static std::string storage[257];
-		if (pass < 0) {
+		static std::string storage[258];
+		if (pass == -2) {
+			storage[slot] = "filter.resolve";
+		}
+		else if (pass < 0) {
 			storage[slot] = "filter.prepare";
 		}
 		else if (pass < (int)(sizeof(names) / sizeof(names[0]))) {

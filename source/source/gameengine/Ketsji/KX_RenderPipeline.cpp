@@ -936,6 +936,10 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 	RAS_ICanvas *canvas = m_engine->GetCanvas();
 
 	scene->FlushDebugDraw(rasterizer, canvas);
+	if (KX_EngineProfiler::Enabled()) {
+		static const int debugDrawId = KX_EngineProfiler::Register("filter.debugdraw");
+		KX_EngineProfiler::GpuStamp(debugDrawId);
+	}
 
 	// We need to first make sure our viewport is correct (enabling multiple viewports can mess this up), only for filters.
 	const int width = canvas->GetRenderWidth();
@@ -1198,6 +1202,10 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 		}
 	}
 
+	if (KX_EngineProfiler::Enabled()) {
+		static const int setupId = KX_EngineProfiler::Register("filter.setup");
+		KX_EngineProfiler::GpuStamp(setupId);
+	}
 	RAS_OffScreen *offScreen = scene->Render2DFilters(rasterizer, canvas, inputofs, targetofs, sunPos);
 
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
