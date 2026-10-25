@@ -192,6 +192,9 @@ class UIRuntime:
         self.audio_controls = [w for s in data["screens"] for w in s.get("widgets", ())
                                if w.get("audio", "NONE") != "NONE"]
         self.scene.post_draw.append(self.draw)
+        # HUD com botão precisa do cursor (o menu liga ao abrir, em show()).
+        if any(h.focusables for h in self.huds):
+            Range.render.showMouse(True)
         _instances.append(self)
 
     @property
@@ -713,8 +716,9 @@ class UIRuntime:
         range_ui_draw.set_alpha(1.0)
         for hud_screen in hud:
             area = self.hud_area(hud_screen)
+            # draw_screen: os botões e controles do HUD (Pause, A/B...) também.
             if area is None:
-                self.draw_widgets(bgl, blf, hud_screen, width, height)
+                self.draw_screen(bgl, blf, hud_screen, width, height, dt, True)
                 continue
             # Split screen: o HUD vive dentro do viewport da sua câmera.
             left, bottom, w, h = area
@@ -722,7 +726,7 @@ class UIRuntime:
             bgl.glScissor(left, bottom, w, h)
             bgl.glPushMatrix()
             bgl.glTranslatef(left, bottom, 0.0)
-            self.draw_widgets(bgl, blf, hud_screen, w, h)
+            self.draw_screen(bgl, blf, hud_screen, w, h, dt, True)
             bgl.glPopMatrix()
             bgl.glDisable(bgl.GL_SCISSOR_TEST)
         if self.leaving is not None:
