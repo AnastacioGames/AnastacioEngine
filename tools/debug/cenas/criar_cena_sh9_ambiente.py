@@ -2,6 +2,7 @@
 # lado +X vermelho, lado -X azul e chão verde; esferas brancas/coloridas e um piso mostram de onde vem a luz.
 # Uso: AnastacioEngine.exe -b --factory-startup --python criar_cena_sh9_ambiente.py -- saida.range
 # Env: TESTE_SH9_MAPA=EQUIRECT (padrão), ANGMAP ou CUBE; TESTE_SH9_LEGADO=1 usa materiais antigos (sem nós);
+#      TESTE_SH9_RELEVO=1 põe um Normal Map em faixas inclinadas para ±X (o ambiente deve seguir o relevo);
 #      TESTE_SH9_SHOT=<pasta> tira um screenshot no frame 30 e fecha.
 import bpy
 import math
@@ -13,6 +14,7 @@ saida = sys.argv[sys.argv.index("--") + 1]
 mapa = os.environ.get("TESTE_SH9_MAPA", "EQUIRECT")
 legado = os.environ.get("TESTE_SH9_LEGADO") == "1"
 shot = os.environ.get("TESTE_SH9_SHOT", "")
+relevo = os.environ.get("TESTE_SH9_RELEVO") == "1"
 
 scene = bpy.context.scene
 for ob in list(scene.objects):
@@ -137,6 +139,23 @@ def material(nome, cor):
         bsdf.inputs['Base Color'].default_value = (cor[0], cor[1], cor[2], 1.0)
         bsdf.inputs['Roughness'].default_value = 1.0
         bsdf.inputs['Specular'].default_value = 0.0
+        if relevo:
+            nm = bpy.data.images.new("RelevoSH9", 64, 64)
+            k = 0.7071
+            px = []
+            for j in range(64):
+                for i in range(64):
+                    nx = k if (i // 8) % 2 == 0 else -k
+                    px += [nx * 0.5 + 0.5, 0.5, k * 0.5 + 0.5, 1.0]
+            nm.pixels = px
+            nm.pack(as_png=True)
+            nm.colorspace_settings.name = 'Non-Color'
+            tex_node = nodes.new('ShaderNodeTexImage')
+            tex_node.image = nm
+            tex_node.color_space = 'NONE'
+            nmap = nodes.new('ShaderNodeNormalMap')
+            mat.node_tree.links.new(tex_node.outputs['Color'], nmap.inputs['Color'])
+            mat.node_tree.links.new(nmap.outputs['Normal'], bsdf.inputs['Normal'])
         out_node = nodes.new('ShaderNodeOutputMaterial')
         mat.node_tree.links.new(bsdf.outputs[0], out_node.inputs[0])
     return mat
@@ -144,11 +163,11 @@ def material(nome, cor):
 
 branco = material("Branco", (0.8, 0.8, 0.8))
 for k, x in enumerate((-3.0, 0.0, 3.0)):
-    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=24, size=1.2, location=(x, 0.0, 1.2))
+    bpy.ops.mesh.primitive_uv_sphere_add(segments=48, ring_count=24, size=1.2, location=(x, 0.0, 1.2), calc_uvs=True)
     ob = bpy.context.object
     bpy.ops.object.shade_smooth()
     ob.data.materials.append(branco)
-bpy.ops.mesh.primitive_plane_add(radius=8.0, location=(0.0, 0.0, 0.0))
+bpy.ops.mesh.primitive_plane_add(radius=8.0, location=(0.0, 0.0, 0.0), calc_uvs=True)
 bpy.context.object.data.materials.append(branco)
 
 cam = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera"))
@@ -168,7 +187,7 @@ def tick(cont):
         bge.render.makeScreenshot(%r)
     if n == 34:
         bge.logic.endGame()
-''' % (os.path.join(shot, "sh9_%s%s.png" % (mapa.lower(), "_legado" if legado else ""))))
+''' % (os.path.join(shot, "sh9_%s%s.png" % (mapa.lower(), ("_legado" if legado else "") + ("_relevo" if relevo else "")))))
     scene.objects.active = cam
     bpy.ops.logic.sensor_add(type='ALWAYS', object=cam.name)
     bpy.ops.logic.controller_add(type='PYTHON', object=cam.name)

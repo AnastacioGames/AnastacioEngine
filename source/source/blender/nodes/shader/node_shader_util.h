@@ -89,7 +89,7 @@ void nodestack_get_vec(float *in, short type_in, bNodeStack *ns);
 void node_gpu_stack_from_data(struct GPUNodeStack *gs, int type, struct bNodeStack *ns);
 void node_data_from_gpu_stack(struct bNodeStack *ns, struct GPUNodeStack *gs);
 void node_shader_gpu_tex_mapping(struct GPUMaterial *mat, struct bNode *node, struct GPUNodeStack *in, struct GPUNodeStack *out);
-void node_shader_gpu_world_env(struct GPUMaterial *mat, struct GPUNodeLink *rough,
+void node_shader_gpu_world_env(struct GPUMaterial *mat, struct GPUNodeLink *rough, struct GPUNodeLink *normal,
                                struct GPUNodeLink **r_mirror, struct GPUNodeLink **r_diffuse, struct GPUNodeLink **r_flag);
 struct GPUNodeLink *node_shader_gpu_lightmap(struct GPUMaterial *mat, struct GPUNodeLink *normal);
 struct GPUNodeLink *node_shader_gpu_scene_color(struct GPUMaterial *mat);

@@ -49,7 +49,7 @@ static int node_shader_gpu_bsdf_hair(GPUMaterial *mat, bNode *node, bNodeExecDat
 	float transmission = (node->custom1 == SHD_HAIR_TRANSMISSION) ? 1.0f : 0.0f;
 	float rough = 1.0f;
 	GPUNodeLink *env_mirror, *env_diffuse, *env_flag;
-	node_shader_gpu_world_env(mat, GPU_uniform(&rough), &env_mirror, &env_diffuse, &env_flag);
+	node_shader_gpu_world_env(mat, GPU_uniform(&rough), NULL, &env_mirror, &env_diffuse, &env_flag);
 
 	return GPU_stack_link(mat, "node_bsdf_hair", in, out, GPU_material_builtin(mat, GPU_VIEW_NORMAL),
 	                      GPU_material_builtin(mat, GPU_VIEW_POSITION), GPU_uniform(&transmission),

@@ -78,7 +78,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node)
 	GPUNodeLink *view = GPU_material_builtin(mat, GPU_VIEW_POSITION);
 	GPUNodeLink *rough = in[7].link ? in[7].link : GPU_uniform(in[7].vec);
 	GPUNodeLink *env_mirror, *env_diffuse, *env_flag;
-	node_shader_gpu_world_env(mat, rough, &env_mirror, &env_diffuse, &env_flag);
+	node_shader_gpu_world_env(mat, rough, own_normal ? NULL : in[17].link, &env_mirror, &env_diffuse, &env_flag);
 
 	/* screen copy for Transmission; only asked for (made each frame) when Transmission is used */
 	GPUNodeLink *scol = (in[15].link || in[15].vec[0] > 0.0f) ? node_shader_gpu_scene_color(mat) :
