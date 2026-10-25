@@ -1,4 +1,4 @@
-﻿# Plano de qualidade e performance dos efeitos de render
+# Plano de qualidade e performance dos efeitos de render
 
 RevisÃ£o por 10 especialistas em 2026-10-24, sÃ³ leitura do cÃ³digo. Os custos citados sÃ£o estimativas e ainda nÃ£o foram medidos. Antes e depois de cada fase, medir com o timer de GPU por passe, que jÃ¡ existe (`KX_EngineProfiler`), em rodadas de cerca de 10 s.
 
