@@ -4041,6 +4041,75 @@ class VIEW3D_PT_pivot_point(Panel):
             )
 
 
+_OBJECT_TYPE_ITEMS = (
+    ('MESH', "Mesh", 'OUTLINER_OB_MESH'),
+    ('CURVE', "Curve", 'OUTLINER_OB_CURVE'),
+    ('SURFACE', "Surface", 'OUTLINER_OB_SURFACE'),
+    ('META', "Meta", 'OUTLINER_OB_META'),
+    ('FONT', "Text", 'OUTLINER_OB_FONT'),
+    ('ARMATURE', "Armature", 'OUTLINER_OB_ARMATURE'),
+    ('LATTICE', "Lattice", 'OUTLINER_OB_LATTICE'),
+    ('EMPTY', "Empty", 'OUTLINER_OB_EMPTY'),
+    ('LAMP', "Light", 'OUTLINER_OB_LAMP'),
+    ('CAMERA', "Camera", 'OUTLINER_OB_CAMERA'),
+    ('SPEAKER', "Speaker", 'OUTLINER_OB_SPEAKER'),
+)
+
+
+class VIEW3D_OT_object_type_toggle(bpy.types.Operator):
+    """Toggle selectability or visibility of all objects of this type"""
+    bl_idname = "view3d.object_type_toggle"
+    bl_label = "Toggle Object Type"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    object_type = bpy.props.StringProperty()
+    attribute = bpy.props.EnumProperty(items=(('hide_select', "Select", ""), ('hide', "Visibility", "")))
+
+    def execute(self, context):
+        objs = [ob for ob in context.scene.objects if ob.type == self.object_type]
+        if not objs:
+            return {'CANCELLED'}
+        # Se algum está liberado, trava/esconde todos; senão libera todos.
+        value = not all(getattr(ob, self.attribute) for ob in objs)
+        for ob in objs:
+            setattr(ob, self.attribute, value)
+            if value and ob.select:
+                ob.select = False
+        return {'FINISHED'}
+
+
+class VIEW3D_PT_object_type_visibility(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Selectability & Visibility"
+    bl_ui_units_x = 9
+
+    def draw(self, context):
+        layout = self.layout
+        layout.label(text="Selectability & Visibility")
+
+        by_type = {}
+        for ob in context.scene.objects:
+            by_type.setdefault(ob.type, []).append(ob)
+
+        col = layout.column(align=True)
+        for type_id, label, icon in _OBJECT_TYPE_ITEMS:
+            objs = by_type.get(type_id)
+            row = col.row(align=True)
+            row.active = bool(objs)
+            row.label(text=label, icon=icon)
+            locked = bool(objs) and all(ob.hide_select for ob in objs)
+            hidden = bool(objs) and all(ob.hide for ob in objs)
+            op = row.operator("view3d.object_type_toggle", text="", emboss=False,
+                              icon='RESTRICT_SELECT_ON' if locked else 'RESTRICT_SELECT_OFF')
+            op.object_type = type_id
+            op.attribute = 'hide_select'
+            op = row.operator("view3d.object_type_toggle", text="", emboss=False,
+                              icon='RESTRICT_VIEW_ON' if hidden else 'RESTRICT_VIEW_OFF')
+            op.object_type = type_id
+            op.attribute = 'hide'
+
+
 class VIEW3D_OT_proportional_toggle(bpy.types.Operator):
     """Turn proportional editing on or off, keeping the last mode (Connected, Projected)"""
     bl_idname = "view3d.proportional_toggle"
@@ -4527,6 +4596,8 @@ classes = (
     VIEW3D_PT_overlay,
     VIEW3D_PT_gizmo,
     VIEW3D_PT_pivot_point,
+    VIEW3D_OT_object_type_toggle,
+    VIEW3D_PT_object_type_visibility,
     VIEW3D_OT_proportional_toggle,
     VIEW3D_PT_proportional_edit,
     VIEW3D_PT_snapping,

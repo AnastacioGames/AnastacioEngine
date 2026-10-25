@@ -464,6 +464,10 @@ void view3d_header_tool_controls(uiLayout *row, bContext *C)
 	uiItemPopoverPanel(row, C, "VIEW3D_PT_layer", "", ICON_RENDERLAYERS);
 	uiItemS(row);
 
+	/* Selectability & Visibility por tipo de objeto (Blender 5). */
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_object_type_visibility", "", ICON_RESTRICT_VIEW_OFF);
+	uiItemS(row);
+
 	/* Gizmo: toggle + popover com mover/girar/escala (antes eram 3 ícones soltos). */
 	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
 	uiItemPopoverPanel(row, C, "VIEW3D_PT_gizmo", "", ICON_DOWNARROW_HLT);
