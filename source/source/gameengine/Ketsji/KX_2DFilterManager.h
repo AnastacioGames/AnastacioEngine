@@ -52,6 +52,11 @@ public:
 	 * Processing Shaders" checkbox started off. No-op if already built.
 	 */
 	void EnsureBloomFilters(BuildInFilters filters);
+	/** Desktop SSAO: half resolution GTAO trace (FILTERPASS_SSAO) + bilateral composite (slot 5),
+	 * replacing the single full resolution pass of the base class. No-op on the Web. */
+	void EnsureSSAOFilters(BuildInFilters filters);
+	/** Half resolution bokeh gather of the Camera DOF (slot 12), built with the DOF pass. */
+	KX_2DFilter *EnsureDofHalf();
 	/** The bloom buffers follow the canvas, so their textures can be recreated. Point the bloom filters
 	 * at the current textures again. */
 	void RefreshBloomTextures();
@@ -89,6 +94,13 @@ private:
 	double m_lastSourceCheck = 0.0;
 
 	RAS_2DFilterData CameraFXData(int pass);
+
+	/// Temporal history ids (RAS_2DFilter::SetTemporalResolve), one per effect.
+	enum { TEMPORAL_VFOG = 0, TEMPORAL_SSGI = 1, TEMPORAL_SSR = 2 };
+	/** Shared temporal resolve (RAS_Temporal2DFilter.glsl) on the low resolution off screen of
+	 * a trace: returns the resolve filter (owned by trace) whose off screen holds the stable
+	 * buffer to composite, or nullptr (WebGL / failure: composite the trace buffer directly). */
+	KX_2DFilter *AttachTemporalResolve(KX_2DFilter *trace, int effect, float lod, const std::string& defines);
 	void CameraFXUsed(KX_Scene *scene, bool& dof, bool& lens) const;
 
 	RAS_ICanvas *m_canvas;

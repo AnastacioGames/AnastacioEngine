@@ -16,8 +16,13 @@ uniform float bgl_RenderedTextureHeight;
 // [2] speed blur, focus x, focus y, protect
 // [3] turn x, turn y, directional blur on, unused
 // [4] chromatic, vignette, vignette radius, fisheye
-// [5] blades, unused, unused, unused
+// [5] blades, unused, unused, half resolution buffer bound (dof_half)
 uniform vec4 ge_CameraFX[10];
+
+/* Desktop: the bokeh gather runs at half resolution (this text with DOF_HALF_RES, own off screen,
+ * rgb blurred, a = blur radius in pixels) and this full resolution pass only blends it over the
+ * sharp image by the circle of confusion of each pixel. */
+uniform sampler2D dof_half;
 
 float linearDepth(vec2 uv)
 {
@@ -64,10 +69,24 @@ void main()
 	float coc = circleOfConfusion(linearDepth(uv));
 	float maxRadius = ge_CameraFX[1].x;
 	float radius = coc * maxRadius;
+#ifndef DOF_HALF_RES
 	if (radius < 0.5) {
 		gl_FragColor = center;
 		return;
 	}
+	if (ge_CameraFX[5].w > 0.5) {
+		/* Composite: fade from the sharp pixel to the half resolution bokeh over the first pixels
+		 * of blur, so the focus plane stays full resolution. */
+		vec3 blurred = texture(dof_half, uv).rgb;
+		gl_FragColor = vec4(mix(center.rgb, blurred, smoothstep(0.5, 2.0, radius)), center.a);
+		return;
+	}
+#else
+	if (radius < 0.5) {
+		gl_FragColor = vec4(center.rgb, radius);
+		return;
+	}
+#endif
 
 	vec2 texel = vec2(1.0 / bgl_RenderedTextureWidth, 1.0 / bgl_RenderedTextureHeight);
 	float aspect = bgl_RenderedTextureWidth / bgl_RenderedTextureHeight;
@@ -107,5 +126,9 @@ void main()
 		}
 	}
 
+#ifdef DOF_HALF_RES
+	gl_FragColor = vec4(sum / weight, radius);
+#else
 	gl_FragColor = vec4(sum / weight, center.a);
+#endif
 }

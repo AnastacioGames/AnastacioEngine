@@ -449,7 +449,10 @@ vec3 vfogSunShadow(vec3 p)
 		return vec3(1.0);
 	}
 	uvz.z -= vfog_data[8].z;
-	float s = texture(vfog_shadow2, uvz);
+	/* 2 tap PCF (each tap is a bilinear 2x2 compare): softens the stair steps of the shaft edges;
+	 * the per frame step jitter and the temporal resolve average the rest. */
+	vec2 o = vec2(0.75, 0.25) / vec2(textureSize(vfog_shadow2, 0));
+	float s = 0.5 * (texture(vfog_shadow2, vec3(uvz.xy + o, uvz.z)) + texture(vfog_shadow2, vec3(uvz.xy - o, uvz.z)));
 	if (vfog_data[8].w > 1.5 && s > 0.0) {
 		return s * vfogShadowTint(vfog_shadowcolor2, uvz);
 	}

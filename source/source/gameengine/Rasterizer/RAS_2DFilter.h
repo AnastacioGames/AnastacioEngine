@@ -114,6 +114,13 @@ public:
 		GE_CLOUDS_HISTORY_VALID_UNIFORM,
 		GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM,
 
+		/* Shared temporal resolve (RAS_Temporal.glsl): history of a low resolution effect
+		 * buffer (Volumetric Fog, SSGI...) with the scene depth and view-projection it had. */
+		GE_TEMPORAL_HISTORY_UNIFORM,
+		GE_TEMPORAL_HISTORY_DEPTH_UNIFORM,
+		GE_TEMPORAL_HISTORY_VALID_UNIFORM,
+		GE_TEMPORAL_HISTORY_VIEWPROJ_UNIFORM,
+
 		/* Volumetric Fog (gpu_shader_vfog_lib.glsl): parameters/lamps, volume and shadow
 		 * matrices, and the shadow maps of up to 2 Spot lamps and the Sun casting light shafts. */
 		GE_VFOG_DATA_UNIFORM,
@@ -149,10 +156,23 @@ public:
 		int cloudHistoryDepthUnit = 19;
 		bool cloudHistoryValid = false;
 		mt::mat4 cloudHistoryViewProjection = mt::mat4::Identity();
+
+		/// Temporal history of the effect being resolved (set by the manager just before it
+		/// renders a temporal resolve filter, see RAS_2DFilter::SetTemporalResolve()).
+		unsigned int temporalHistory = 0;
+		unsigned int temporalHistoryDepth = 0;
+		int temporalHistoryUnit = 20;
+		int temporalHistoryDepthUnit = 21;
+		bool temporalHistoryValid = false;
+		mt::mat4 temporalHistoryViewProjection = mt::mat4::Identity();
 	};
 
 protected:
 	const FrameInputs *m_frameInputs = nullptr;
+	/// Owned resolve pass run by the manager right after this filter (temporal accumulation
+	/// of this filter's own off screen), and the id of its history (one per effect).
+	RAS_2DFilter *m_temporalResolve = nullptr;
+	int m_temporalEffect = -1;
 	/// Text name, external file path and last compile log of a custom filter.
 	std::string m_sourceName;
 	std::string m_sourcePath;
@@ -231,6 +251,18 @@ public:
 	bool UsesPreviousTexture() const
 	{
 		return m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1;
+	}
+	/** Attach a temporal resolve filter (owned, it has its own off screen at the size of this
+	 * filter's one, samples it and ge_TemporalHistory*). The manager renders it right after this
+	 * filter and keeps its output as the history of effect for the next frame. */
+	void SetTemporalResolve(RAS_2DFilter *resolve, int effect);
+	RAS_2DFilter *GetTemporalResolve() const
+	{
+		return m_temporalResolve;
+	}
+	int GetTemporalEffect() const
+	{
+		return m_temporalEffect;
 	}
 	/// True for the clouds filter when it reuses its previous output (ge_CloudsHistory).
 	bool UsesCloudHistory() const

@@ -250,6 +250,22 @@ const char *drawVertexSource =
 	"	if (u_static) {\n"
 	"		size = max(size, -centerView.z * 0.004);\n"
 	"	}\n"
+	// Distance LOD (perspective, simulated only): half-size on screen in NDC. Far sprites that
+	// shrink under ~1 px only shimmer and still cost a quad each; fade them out between ~1.5 and
+	// ~0.5 px (1080p) and skip the rasterization once invisible.
+	"	float lodFade = 1.0;\n"
+	"	if (!u_static && u_projection[3][3] == 0.0) {\n"
+	"		float ndcSize = size * u_projection[1][1] / max(-centerView.z, 1e-4);\n"
+	"		lodFade = smoothstep(0.0005, 0.0015, ndcSize);\n"
+	"		if (lodFade <= 0.0) {\n"
+	"			gl_Position = vec4(2.0, 2.0, 2.0, 1.0);\n"
+	"			v_uv = in_corner;\n"
+	"			v_alpha = 0.0;\n"
+	"			v_lifeFrac = lifeFrac;\n"
+	"			v_seed = 0.0;\n"
+	"			return;\n"
+	"		}\n"
+	"	}\n"
 	"	if (u_billboardMode == 1) {\n"
 	"		vec3 worldRight = vec3(u_view[0][0], u_view[1][0], u_view[2][0]);\n"
 	"		vec3 up = vec3(0.0, 0.0, 1.0);\n"
@@ -275,7 +291,7 @@ const char *drawVertexSource =
 	// Fade in over the first 10% of life, fade out over the last 30% -- avoids a hard pop
 	// on respawn/death.
 	"	v_alpha = min(lifeFrac / 0.1, (1.0 - lifeFrac) / 0.3);\n"
-	"	v_alpha = u_static ? 1.0 : clamp(v_alpha, 0.0, 1.0);\n"
+	"	v_alpha = u_static ? 1.0 : clamp(v_alpha, 0.0, 1.0) * lodFade;\n"
 	"}\n";
 
 // Fase P: split into a fixed preamble (varyings/uniforms every draw fragment shader needs,

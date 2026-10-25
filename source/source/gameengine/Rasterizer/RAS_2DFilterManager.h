@@ -184,6 +184,32 @@ private:
 	/// Copy the clouds filter output (color) and the scene depth for the next frame's reuse.
 	void UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScreen *cloudofs, RAS_OffScreen *depthofs, const int viewport[4]);
 
+	/** Shared temporal history (Fase 2 of docs/plano-efeitos-render.md): one per (effect,
+	 * viewport). color is the resolved low resolution effect buffer of the last frame (RGBA16F),
+	 * depth the scene depth it was resolved against, viewProjection the camera of that frame. */
+	struct TemporalHistory {
+		int effect = -1;
+		int viewport[4] = {0, 0, 0, 0};
+		unsigned int color = 0;
+		unsigned int depth = 0;
+		int width = 0;
+		int height = 0;
+		int depthWidth = 0;
+		int depthHeight = 0;
+		float viewProjection[16];
+		int lastFrame = 0;
+		bool valid = false;
+	};
+	std::vector<TemporalHistory> m_temporalHistories;
+	/// -1 unknown, 0 not enough texture units / unsupported, 1 available.
+	int m_temporalSupported = -1;
+
+	/** Render the temporal resolve attached to a filter (after it drew its off screen), then
+	 * copy the resolved buffer and the scene depth into the history of this viewport. */
+	void RenderTemporalResolve(RAS_2DFilter *filter, RAS_Rasterizer *rasty, RAS_ICanvas *canvas,
+	                           RAS_OffScreen *depthofs, RAS_OffScreen *colorofs, RAS_OffScreen *targetofs,
+	                           const float (&sun_screen_pos)[2], const int viewport[4]);
+
 	/** Creates a filter matching the given filter data. Returns nullptr if no
 	 * filter can be created with such information.
 	 */

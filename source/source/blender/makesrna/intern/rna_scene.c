@@ -476,6 +476,8 @@ static const EnumPropertyItem transform_orientation_items[] = {
 #include "BKE_freestyle.h"
 #include "BKE_gpencil.h"
 
+#include "GPU_material.h"
+
 #include "ED_info.h"
 #include "ED_node.h"
 #include "ED_view3d.h"
@@ -2288,6 +2290,16 @@ static void rna_GPUFXSettings_fx_update(Main *UNUSED(bmain), Scene *UNUSED(scene
 static void rna_SCENEFXSettings_fx_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
 {
 	BKE_scene_fx_validate(scene);
+}
+
+static void rna_SCENEFXSettings_quality_preset_update(Main *bmain, Scene *scene, PointerRNA *UNUSED(ptr))
+{
+	if (BKE_scene_quality_preset_apply(scene, scene->scenefx_settings.quality_preset)) {
+		/* Sky quality and shadow buffers live in GPU materials/lamps. */
+		GPU_materials_free(bmain);
+		WM_main_add_notifier(NC_WORLD | ND_WORLD_DRAW, NULL);
+		WM_main_add_notifier(NC_LAMP | ND_LIGHTING, NULL);
+	}
 }
 
 static void rna_SCENEFXSettings_ssr_fx_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
@@ -5958,6 +5970,25 @@ static void rna_def_scene_shaders_fx(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 0.0f, 0.2f, 1, 3);
 	RNA_def_property_ui_text(prop, "Grain Strength", "Amount of film grain");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	static const EnumPropertyItem quality_preset_items[] = {
+		{SCENE_FX_QUALITY_CUSTOM, "CUSTOM", 0, "Custom", "Each effect keeps its own quality settings"},
+		{SCENE_FX_QUALITY_VERY_LOW, "VERY_LOW", 0, "Very Low", "Lowest cost, for weak GPUs"},
+		{SCENE_FX_QUALITY_LOW, "LOW", 0, "Low", "Light settings, good for Web and phones"},
+		{SCENE_FX_QUALITY_MEDIUM, "MEDIUM", 0, "Medium", "Balanced settings"},
+		{SCENE_FX_QUALITY_HIGH, "HIGH", 0, "High", "Sharper effects, more GPU cost"},
+		{SCENE_FX_QUALITY_ULTRA, "ULTRA", 0, "Ultra", "Highest quality"},
+		{SCENE_FX_QUALITY_AUTO, "AUTO", 0, "Auto", "Medium on desktop, Low on Web and Android"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "quality_preset", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "quality_preset");
+	RNA_def_property_enum_items(prop, quality_preset_items);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Quality Preset",
+	                         "Sets the quality, resolution and steps of SSAO, SSGI, SSR, Light Scattering, "
+	                         "Volumetric Fog, clouds, DOF, shadows and sky at once. Custom changes nothing");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_SCENEFXSettings_quality_preset_update");
 }
 
 static void rna_def_scene_render_layer(BlenderRNA *brna)

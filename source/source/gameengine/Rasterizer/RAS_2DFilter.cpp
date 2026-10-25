@@ -179,6 +179,11 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_CloudsHistoryValid", // GE_CLOUDS_HISTORY_VALID_UNIFORM
 	"ge_CloudsHistoryViewProj", // GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM
 
+	"ge_TemporalHistory", // GE_TEMPORAL_HISTORY_UNIFORM
+	"ge_TemporalHistoryDepth", // GE_TEMPORAL_HISTORY_DEPTH_UNIFORM
+	"ge_TemporalHistoryValid", // GE_TEMPORAL_HISTORY_VALID_UNIFORM
+	"ge_TemporalHistoryViewProj", // GE_TEMPORAL_HISTORY_VIEWPROJ_UNIFORM
+
 	"vfog_data", // GE_VFOG_DATA_UNIFORM
 	"vfog_mats", // GE_VFOG_MATS_UNIFORM
 	"vfog_shadow0", // GE_VFOG_SHADOW0_UNIFORM
@@ -226,6 +231,16 @@ RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
 
 RAS_2DFilter::~RAS_2DFilter()
 {
+	delete m_temporalResolve;
+}
+
+void RAS_2DFilter::SetTemporalResolve(RAS_2DFilter *resolve, int effect)
+{
+	if (resolve != m_temporalResolve) {
+		delete m_temporalResolve;
+	}
+	m_temporalResolve = resolve;
+	m_temporalEffect = effect;
 }
 
 bool RAS_2DFilter::GetMipmap() const
@@ -544,6 +559,13 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 		glBindTexture(GL_TEXTURE_2D, m_frameInputs->previousTexture);
 	}
 
+	if (m_predefinedUniforms[GE_TEMPORAL_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->temporalHistory) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->temporalHistoryUnit);
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs->temporalHistory);
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->temporalHistoryDepthUnit);
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs->temporalHistoryDepth);
+	}
+
 	if (m_predefinedUniforms[GE_CLOUDS_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->cloudHistory) {
 		glActiveTexture(GL_TEXTURE0 + m_frameInputs->cloudHistoryUnit);
 		glBindTexture(GL_TEXTURE_2D, m_frameInputs->cloudHistory);
@@ -605,6 +627,13 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 
 	if (m_predefinedUniforms[BGL_PREVIOUS_TEXTURE_UNIFORM] != -1 && m_frameInputs && m_frameInputs->previousTexture) {
 		glActiveTexture(GL_TEXTURE0 + m_frameInputs->previousTextureUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+
+	if (m_predefinedUniforms[GE_TEMPORAL_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->temporalHistory) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->temporalHistoryUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->temporalHistoryDepthUnit);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
@@ -721,6 +750,21 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 		if (m_predefinedUniforms[GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM] != -1) {
 			SetUniform(m_predefinedUniforms[GE_CLOUDS_HISTORY_VIEWPROJ_UNIFORM],
 			           valid ? m_frameInputs->cloudHistoryViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
+		}
+	}
+
+	if (m_predefinedUniforms[GE_TEMPORAL_HISTORY_UNIFORM] != -1) {
+		const bool valid = m_frameInputs && m_frameInputs->temporalHistory && m_frameInputs->temporalHistoryValid;
+		SetUniform(m_predefinedUniforms[GE_TEMPORAL_HISTORY_UNIFORM], m_frameInputs ? m_frameInputs->temporalHistoryUnit : 20);
+		if (m_predefinedUniforms[GE_TEMPORAL_HISTORY_DEPTH_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_TEMPORAL_HISTORY_DEPTH_UNIFORM], m_frameInputs ? m_frameInputs->temporalHistoryDepthUnit : 21);
+		}
+		if (m_predefinedUniforms[GE_TEMPORAL_HISTORY_VALID_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_TEMPORAL_HISTORY_VALID_UNIFORM], valid ? 1.0f : 0.0f);
+		}
+		if (m_predefinedUniforms[GE_TEMPORAL_HISTORY_VIEWPROJ_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_TEMPORAL_HISTORY_VIEWPROJ_UNIFORM],
+			           valid ? m_frameInputs->temporalHistoryViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
 		}
 	}
 

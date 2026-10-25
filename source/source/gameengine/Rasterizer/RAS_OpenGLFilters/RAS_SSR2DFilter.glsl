@@ -1,3 +1,17 @@
+/* Screen Space Reflections, trace pass (Fase 3 of docs/plano-efeitos-render.md).
+ *
+ *  - ray march in screen space with the DDA of McGuire & Mara (2014): the reflected ray is
+ *    clipped to the near plane, projected, and walked pixel by pixel (with a stride) in 2D while
+ *    the view depth is interpolated in homogeneous space, so the steps are even on screen and
+ *    there is no "ring" banding of the fixed view-space step;
+ *  - per pixel and per frame jitter of the start (interleaved gradient noise), averaged by the
+ *    temporal resolve (RAS_Temporal2DFilter.glsl with TEMPORAL_HIT_REPROJECT);
+ *  - binary refinement of the hit, thickness proportional to the distance;
+ *  - fades: screen edge at the hit, ray distance, rays going back to the camera, Schlick fresnel;
+ *  - no hit: World color (horizon/zenith gradient by the world space direction).
+ *
+ * Output: rgb = reflection already weighted (fresnel * fades * spec), a = 1 / (1 + total ray
+ * length camera -> surface -> hit) for the reprojection by the hit point (0 = sky, at infinity). */
 
 #ifdef USE_CORE_PROFILE
 in vec2 texCoordVarying;
@@ -15,18 +29,14 @@ out vec4 fragColor;
 uniform sampler2D bgl_RenderedTexture;
 uniform sampler2D bgl_DataTextures[1];
 uniform sampler2D bgl_DepthTexture;
+uniform mat4 unfinvviewmat;
+uniform int bgl_Frame;
+uniform vec3 ge_RainSkyHorizon; // World horizon color
+uniform vec3 ge_RainSkyZenith;  // World zenith color
 
 uniform vec3 ge_ssrparams; // step_max, bias, max_distance
 
-vec3 rand3D(vec3 pos) {
-	pos = vec3(
-		dot(pos, vec3(12.1, 78.7, 45.7)),
-		dot(pos, vec3(93.5, 67.3, 12.1)),
-		dot(pos, vec3(54.5, 98.9, 12.6))
-	);
-
-	return fract(sin(pos) * 43758.5453123) - 0.5;
-}
+#define SSR_MAX_STEPS 128
 
 vec2 unpackFloat2(float f) {
 	return vec2(floor(f) / 255.0, fract(f));
@@ -41,92 +51,216 @@ vec3 decode_octa(vec2 e) {
 	return -(gl_ModelViewMatrix * vec4(normalize(v), 0.0)).xyz;
 }
 
-vec2 texcoord;
+float ign(vec2 p, float frame)
+{
+	p += frame * 5.588238;
+	return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
+}
+
+mat4 invProj;
+
+float viewZ(vec2 uv)
+{
+	float d = texture(bgl_DepthTexture, uv).x;
+	vec4 v = invProj * vec4(uv * 2.0 - 1.0, d * 2.0 - 1.0, 1.0);
+	return v.z / v.w;
+}
+
+vec3 worldColor(vec3 viewDir)
+{
+	vec3 w = normalize((unfinvviewmat * vec4(viewDir, 0.0)).xyz);
+	return mix(ge_RainSkyHorizon, ge_RainSkyZenith, clamp(w.z, 0.0, 1.0));
+}
 
 void main() {
+	vec2 texcoord;
 #ifdef USE_CORE_PROFILE
 	texcoord = texCoordVarying;
 #else
 	texcoord = gl_TexCoord[0].st;
 #endif
-
-	float stepSize = ge_ssrparams.z / ge_ssrparams.x;
+	invProj = gl_ProjectionMatrixInverse;
 
 	float depth = texture(bgl_DepthTexture, texcoord).x;
+	if (depth >= 1.0) {
+		gl_FragColor = vec4(0.0);
+		return;
+	}
 
-	vec4 camera_space_pos = gl_ProjectionMatrixInverse * vec4(texcoord * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
-	vec3 pixel_position = camera_space_pos.xyz / camera_space_pos.w;
+	vec4 csp = invProj * vec4(texcoord * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	vec3 P = csp.xyz / csp.w;
 
-	vec4 Gbuff0 = texture(bgl_DataTextures[0], texcoord).rgba;
-	vec3 normal = decode_octa(Gbuff0.rg);
+	vec4 Gbuff0 = texture(bgl_DataTextures[0], texcoord);
+	vec3 N = decode_octa(Gbuff0.rg);
 	vec2 rough_metal = unpackFloat2(Gbuff0.b);
 	vec2 diff_spec = unpackFloat2(Gbuff0.a);
+	float rough = rough_metal.x;
 
-	vec3 noise = rand3D(pixel_position) * 0.25;
+	vec3 V = normalize(P);
+	vec2 fullSize = vec2(textureSize(bgl_DepthTexture, 0));
+	vec2 pix = texcoord * fullSize;
+	float frame = float(bgl_Frame % 64);
+	float jitter = ign(pix, frame);
 
-	vec3 view_dir = normalize(pixel_position);
-	vec3 reflect_dir = reflect(view_dir, normal);
+	/* Rough surfaces: jitter the normal inside a cone of roughness^2 (averaged over frames). */
+	vec3 Nr = N;
+	if (rough > 0.02) {
+		float a = rough * rough;
+		float phi = 6.2831853 * ign(pix + 17.0, frame + 3.0);
+		float r = sqrt(ign(pix + 41.0, frame + 7.0)) * a * 0.6;
+		vec3 T = normalize(abs(N.z) < 0.99 ? cross(N, vec3(0.0, 0.0, 1.0)) : cross(N, vec3(1.0, 0.0, 0.0)));
+		vec3 B = cross(N, T);
+		Nr = normalize(N + (T * cos(phi) + B * sin(phi)) * r);
+	}
+	vec3 R = normalize(reflect(V, Nr));
 
-	if (rough_metal.x > 0.05) {
-		reflect_dir += noise * rough_metal.x * rough_metal.x;
+	/* Schlick fresnel: F0 0.04 (dielectric, scaled by spec) up to 1 (metal). */
+	/* The G-buffer normal sign is not guaranteed to face the camera: orient it by the view. */
+	float nSign = (dot(N, V) < 0.0) ? 1.0 : -1.0;
+	float NdV = clamp(abs(dot(N, V)), 0.0, 1.0);
+	float F0 = mix(0.04 * 2.0 * diff_spec.y, 1.0, rough_metal.y);
+	float fresnel = F0 + (1.0 - F0) * pow(1.0 - NdV, 5.0);
+	/* Rough reflections lose energy to the blur, not to a hard cut. */
+	float weight = fresnel * (1.0 - 0.5 * rough * rough);
+
+	vec3 fallback = worldColor(R);
+
+	/* --- McGuire DDA ------------------------------------------------------------------------ */
+	float maxDist = max(ge_ssrparams.z, 0.1);
+	float near = 0.0;
+	{
+		vec4 n = invProj * vec4(0.0, 0.0, -1.0, 1.0);
+		near = n.z / n.w; // negative
+	}
+	float rayLen = ((P.z + R.z * maxDist) > near) ? (near - 0.001 - P.z) / R.z : maxDist;
+	vec3 Pend = P + R * rayLen;
+
+	vec4 H0 = gl_ProjectionMatrix * vec4(P, 1.0);
+	vec4 H1 = gl_ProjectionMatrix * vec4(Pend, 1.0);
+	float k0 = 1.0 / H0.w, k1 = 1.0 / H1.w;
+	vec3 Q0 = P * k0, Q1 = Pend * k1;
+	vec2 S0 = (H0.xy * k0 * 0.5 + 0.5) * fullSize;
+	vec2 S1 = (H1.xy * k1 * 0.5 + 0.5) * fullSize;
+
+	/* Clip the 2D segment to the screen so the stride is spent on visible pixels. */
+	{
+		vec2 dS = S1 - S0;
+		float t = 1.0;
+		if (S1.x > fullSize.x) t = min(t, (fullSize.x - S0.x) / dS.x);
+		if (S1.x < 0.0) t = min(t, -S0.x / dS.x);
+		if (S1.y > fullSize.y) t = min(t, (fullSize.y - S0.y) / dS.y);
+		if (S1.y < 0.0) t = min(t, -S0.y / dS.y);
+		t = clamp(t, 0.0, 1.0);
+		S1 = mix(S0, S1, t);
+		Q1 = mix(Q0, Q1, t);
+		k1 = mix(k0, k1, t);
+	}
+	S1 += vec2((dot(S1 - S0, S1 - S0) < 0.0001) ? 0.01 : 0.0);
+	vec2 delta = S1 - S0;
+	bool permute = false;
+	if (abs(delta.x) < abs(delta.y)) {
+		permute = true;
+		delta = delta.yx;
+		S0 = S0.yx;
+		S1 = S1.yx;
+	}
+	float stepDir = sign(delta.x);
+	float invdx = stepDir / delta.x;
+	vec3 dQ = (Q1 - Q0) * invdx;
+	float dk = (k1 - k0) * invdx;
+	vec2 dS = vec2(stepDir, delta.y * invdx);
+
+	int steps = clamp(int(ge_ssrparams.x), 8, SSR_MAX_STEPS);
+	float stride = max(1.0, abs(delta.x) / float(steps));
+	dS *= stride;
+	dQ *= stride;
+	dk *= stride;
+
+	/* Start one pixel off the surface plus the jitter (no self hit, no rings). */
+	float start = (1.0 + jitter * stride) / stride;
+	vec2 S = S0 + dS * start;
+	vec3 Q = Q0 + dQ * start;
+	float k = k0 + dk * start;
+
+	float prevZ = P.z;
+	bool hit = false;
+	float confidence = 0.0;
+	vec2 hitUV = vec2(0.0);
+	vec3 hitPos = vec3(0.0);
+	float thickBias = max(ge_ssrparams.y, 1.0);
+
+	for (int i = 0; i < SSR_MAX_STEPS; i++) {
+		if (i >= steps) {
+			break;
+		}
+		float zA = prevZ;
+		float zB = (Q.z + dQ.z * 0.5) / (k + dk * 0.5);
+		prevZ = zB;
+		vec2 sp = permute ? S.yx : S;
+		vec2 uv = sp / fullSize;
+		if (any(lessThan(uv, vec2(0.0))) || any(greaterThan(uv, vec2(1.0)))) {
+			break;
+		}
+		float zMin = min(zA, zB), zMax = max(zA, zB);
+		float sceneZ = viewZ(uv);
+		float thickness = (0.02 * -sceneZ + 0.05) * thickBias + 0.5 * abs(zB - zA);
+		bool cand = zMin < sceneZ && zMax > sceneZ - thickness && texture(bgl_DepthTexture, uv).x < 1.0;
+		/* Surfaces seen from behind by the ray (the floor itself at grazing angles) are not a hit:
+		 * keep marching instead of stopping on them. */
+		if (cand && dot(decode_octa(texture(bgl_DataTextures[0], uv).rg), R) * nSign > 0.0) {
+			cand = false;
+		}
+		if (cand) {
+			/* Binary refinement between the previous step and this one. */
+			vec2 a = S - dS, b = S;
+			vec3 qa = Q - dQ, qb = Q;
+			float ka = k - dk, kb = k;
+			for (int r = 0; r < 5; r++) {
+				vec2 m = 0.5 * (a + b);
+				vec3 qm = 0.5 * (qa + qb);
+				float km = 0.5 * (ka + kb);
+				float zm = qm.z / km;
+				vec2 muv = (permute ? m.yx : m) / fullSize;
+				if (zm < viewZ(muv)) { b = m; qb = qm; kb = km; }
+				else { a = m; qa = qm; ka = km; }
+			}
+			vec2 rUV = (permute ? b.yx : b) / fullSize;
+			vec3 rPos = qb / kb;
+			/* Depth gap at the refined point: a ray passing behind an object (gap larger than the
+			 * thickness) is not a hit; keep marching, it may end on the sky fallback. */
+			float gap = abs(viewZ(rUV) - rPos.z);
+			float tRef = (0.02 * -rPos.z + 0.05) * thickBias;
+			if (gap < tRef) {
+				hitUV = rUV;
+				hitPos = rPos;
+				confidence = 1.0 - smoothstep(0.5, 1.0, gap / tRef);
+				hit = true;
+				break;
+			}
+		}
+		S += dS;
+		Q += dQ;
+		k += dk;
 	}
 
-	vec3 ray_pos = pixel_position;
-	vec3 one_step = reflect_dir * stepSize;
-
-	vec3 col = vec3(0.0);
-
-	for (int i = 0; i < int(ge_ssrparams.x); i++) {
-		ray_pos += one_step;
-
-		vec4 clip_pos = gl_ProjectionMatrix * vec4(ray_pos, 1.0);
-		vec2 screen_pos = clip_pos.xy / clip_pos.w * 0.5 + 0.5;
-
-		if (screen_pos.x < 0.0 || screen_pos.x > 1.0 || screen_pos.y < 0.0 || screen_pos.y > 1.0) {
-			break;
-		}
-
-		float scene_depth = texture(bgl_DepthTexture, screen_pos).x;
-
-		vec4 projected_pos = gl_ProjectionMatrixInverse * vec4(screen_pos * 2.0 - 1.0, scene_depth * 2.0 - 1.0, 1.0);
-		vec3 scene_position = projected_pos.xyz / projected_pos.w;
-
-		/* Raio atras da superficie (view space olha para -z): so conta hit
-		 * dentro da espessura, senao o objeto vira uma parede infinita. */
-		float dz = scene_position.z - ray_pos.z;
-		if (dz > 0.0) {
-			/* Refino binario entre o passo anterior e este. */
-			vec3 a = ray_pos - one_step, b = ray_pos;
-			vec2 hit_uv = screen_pos;
-			for (int k = 0; k < 5; k++) {
-				vec3 m = 0.5 * (a + b);
-				vec4 cp = gl_ProjectionMatrix * vec4(m, 1.0);
-				vec2 suv = cp.xy / cp.w * 0.5 + 0.5;
-				float sd = texture(bgl_DepthTexture, suv).x;
-				vec4 pp = gl_ProjectionMatrixInverse * vec4(suv * 2.0 - 1.0, sd * 2.0 - 1.0, 1.0);
-				float mdz = pp.z / pp.w - m.z;
-				if (mdz > 0.0) { b = m; dz = mdz; hit_uv = suv; }
-				else { a = m; }
-			}
-			/* Espessura proporcional a distancia (bias escala); nao ao passo,
-			 * senao objetos viram paredes de varios metros. */
-			float thickness = (0.02 * -b.z + 0.05) * max(ge_ssrparams.y, 1.0);
-			if (dz < thickness) {
-				col = texture(bgl_RenderedTexture, hit_uv).rgb;
-			}
-			break;
-		}
-
-		if (length(ray_pos) > ge_ssrparams.z) {
-			break;
-		}
+	/* The World fallback only on glossy surfaces (rough ones would just get brighter). */
+	fallback *= (1.0 - rough) * (1.0 - rough);
+	vec3 col = fallback;
+	float encDist = 0.0;
+	if (hit) {
+		/* Back faces of the hit (ray hits something facing away) are not visible in a mirror. */
+		vec3 hitN = decode_octa(texture(bgl_DataTextures[0], hitUV).rg);
+		float facing = smoothstep(-0.05, 0.15, dot(hitN * nSign, -R));
+		vec2 e = smoothstep(vec2(0.0), vec2(0.08), hitUV) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - hitUV);
+		float travel = length(hitPos - P);
+		float fade = confidence * e.x * e.y * facing * (1.0 - smoothstep(0.7, 1.0, travel / maxDist));
+		/* Rays going back toward the camera have no reliable screen data. */
+		fade *= 1.0 - smoothstep(0.4, 0.9, R.z);
+		vec3 hitCol = min(texture(bgl_RenderedTexture, hitUV).rgb, vec3(16.0));
+		col = mix(fallback, hitCol, fade);
+		encDist = (fade > 0.5) ? 1.0 / (1.0 + length(P) + travel) : 0.0;
 	}
 
-	depth = 1.0 - step(1.0, depth);
-
-	float fresnel = pow(1.0 - max(0.0, dot(-normal, view_dir)), 2.0);
-	float factor = fresnel * (1.0 - rough_metal.x);
-
-	gl_FragColor.rgb = col * depth * factor * ((rough_metal.y < 0.1) ? diff_spec.y : 1.0);
-	gl_FragColor.a = 1.0;
+	vec3 result = col * weight * ((rough_metal.y < 0.1) ? diff_spec.y : 1.0);
+	gl_FragColor = vec4(result, encDist);
 }

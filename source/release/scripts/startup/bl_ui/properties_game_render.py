@@ -501,6 +501,7 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
 
         layout = layout.box()
         layout.label(text="Post Processing Shaders:", icon="RENDER_STILL")
+        layout.prop(scenefx_settings, "quality_preset")
 
         row = layout.row(align=True)
         row.prop(scenefx_settings, "show_expanded_ssao", text="Ambient Occlusion", emboss=True)

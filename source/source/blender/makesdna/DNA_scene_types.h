@@ -904,7 +904,10 @@ typedef struct SCENEFXSettings {
 	char ssr_lod;
 	char use_grain; /* Film Grain, drawn in the camera lens pass */
 
-	char pad[2];
+	/* Global quality preset (SCENE_FX_QUALITY_*). Was pad[0]: 0 = Custom, so old files and
+	 * files from the original Range keep their own per-effect settings. */
+	char quality_preset;
+	char pad[1];
 
 	/* FXAA has no settings struct of its own, its values live here. */
 	float fxaa_edge_threshold;
@@ -927,6 +930,19 @@ typedef struct SCENEFXSettings {
 #define SCENE_FX_GRAIN_STRENGTH           0.035f
 /* Film Grain bit in expand_flag/editor_render_flag (chars, so they can't hold SCENE_FX_FLAG_GRAIN). */
 #define SCENE_FX_UI_GRAIN                 (1 << 6)
+
+/* SCENEFXSettings.quality_preset. Custom changes nothing; the others write the existing
+ * quality fields through BKE_scene_quality_preset_apply(). Auto = Medium on desktop, Low on
+ * Web (Emscripten) and Android. */
+enum {
+	SCENE_FX_QUALITY_CUSTOM   = 0,
+	SCENE_FX_QUALITY_VERY_LOW = 1,
+	SCENE_FX_QUALITY_LOW      = 2,
+	SCENE_FX_QUALITY_MEDIUM   = 3,
+	SCENE_FX_QUALITY_HIGH     = 4,
+	SCENE_FX_QUALITY_ULTRA    = 5,
+	SCENE_FX_QUALITY_AUTO     = 6,
+};
 
 /* shaderfx enables */
 typedef enum eSCENEFXFlags {

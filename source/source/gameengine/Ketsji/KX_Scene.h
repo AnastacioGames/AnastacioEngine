@@ -805,6 +805,8 @@ public:
 	EXP_PYMETHOD_DOC(KX_Scene, convertObject);
 	EXP_PYMETHOD_DOC(KX_Scene, end);
 	EXP_PYMETHOD_DOC(KX_Scene, restart);
+	EXP_PYMETHOD_DOC(KX_Scene, setQualityPreset);
+	EXP_PYMETHOD_DOC(KX_Scene, getQualityPreset);
 	EXP_PYMETHOD_DOC(KX_Scene, replace);
 	EXP_PYMETHOD_DOC(KX_Scene, suspend);
 	EXP_PYMETHOD_DOC(KX_Scene, resume);

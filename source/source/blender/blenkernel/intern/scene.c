@@ -29,6 +29,9 @@
 #include "MEM_guardedalloc.h"
 
 #include "DNA_anim_types.h"
+#include "DNA_camera_types.h"
+#include "DNA_lamp_types.h"
+#include "DNA_world_types.h"
 #include "DNA_group_types.h"
 #include "DNA_linestyle_types.h"
 #include "DNA_mesh_types.h"
@@ -203,6 +206,119 @@ void BKE_scene_fx_validate(Scene *scene)
 	}
 
 	scene->scenefx_settings = fx_settings;
+}
+
+/* ---- Global quality preset (SCENEFXSettings.quality_preset) ---- */
+
+int BKE_scene_quality_preset_resolve(int preset)
+{
+	if (preset == SCENE_FX_QUALITY_AUTO) {
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+		return SCENE_FX_QUALITY_LOW;
+#else
+		return SCENE_FX_QUALITY_MEDIUM;
+#endif
+	}
+	if (preset < SCENE_FX_QUALITY_CUSTOM || preset > SCENE_FX_QUALITY_AUTO) {
+		return SCENE_FX_QUALITY_CUSTOM;
+	}
+	return preset;
+}
+
+/* One row per level: Very Low, Low, Medium, High, Ultra. Each column writes a field that
+ * already exists (and is editable by hand when the preset is Custom). */
+typedef struct SceneQualityRow {
+	int ssao_samples;
+	int ssgi_rays, ssgi_steps, ssgi_divisor;
+	int ssr_steps, ssr_lod;
+	int scatter_steps, scatter_lod;
+	short vfog_quality, vfog_lod;  /* vfog_lod: 0 Half, 1 Full, 2 Quarter */
+	short cloud_detail, vcloud_quality;
+	short dof_quality;
+	short shadow_bufsize, shadow_samples;
+	short sky_quality;
+} SceneQualityRow;
+
+static const SceneQualityRow scene_quality_table[5] = {
+	/* Very Low */
+	{4,  1, 4, 4,   8, 4,  12, 8,  0, 2,  2, 0,  0,  256, 1,  WO_SKY_QUALITY_VERY_LOW},
+	/* Low */
+	{8,  2, 6, 2,  12, 2,  16, 4,  0, 0,  3, 0,  0,  512, 2,  WO_SKY_QUALITY_LOW},
+	/* Medium */
+	{16, 4, 8, 2,  16, 2,  32, 4,  1, 0,  5, 1,  1, 1024, 3,  WO_SKY_QUALITY_AUTO},
+	/* High */
+	{24, 6, 12, 1, 32, 1,  48, 2,  2, 0,  6, 2,  2, 2048, 4,  WO_SKY_QUALITY_HIGH},
+	/* Ultra */
+	{32, 8, 16, 1, 64, 1,  64, 1,  2, 1,  8, 2,  2, 4096, 6,  WO_SKY_QUALITY_HIGH},
+};
+
+static void scene_quality_set_idp_int(Scene *scene, const char *name, int value)
+{
+	IDProperty *group = IDP_GetProperties(&scene->id, true);
+	IDProperty *prop = IDP_GetPropertyFromGroup(group, name);
+	if (prop && prop->type == IDP_INT) {
+		IDP_Int(prop) = value;
+	}
+	else if (!prop) {
+		IDPropertyTemplate val = {0};
+		val.i = value;
+		IDP_AddToGroup(group, IDP_New(IDP_INT, &val, name));
+	}
+}
+
+bool BKE_scene_quality_preset_apply(Scene *scene, int preset)
+{
+	const int level = BKE_scene_quality_preset_resolve(preset);
+	if (level == SCENE_FX_QUALITY_CUSTOM) {
+		return false;
+	}
+	const SceneQualityRow *q = &scene_quality_table[level - SCENE_FX_QUALITY_VERY_LOW];
+	SCENEFXSettings *fx = &scene->scenefx_settings;
+
+	if (fx->ssao) {
+		fx->ssao->samples = q->ssao_samples;
+	}
+	if (fx->ssr) {
+		fx->ssr->step_max = q->ssr_steps;
+	}
+	fx->ssr_lod = (char)q->ssr_lod;
+	if (fx->scatter) {
+		fx->scatter->stepmax = q->scatter_steps;
+	}
+	fx->scatter_lod = (char)q->scatter_lod;
+
+	/* Native SSGI keeps its settings as Python-registered scene properties. */
+	scene_quality_set_idp_int(scene, "ae_ssgi_rays", q->ssgi_rays);
+	scene_quality_set_idp_int(scene, "ae_ssgi_steps", q->ssgi_steps);
+	scene_quality_set_idp_int(scene, "ae_ssgi_divisor", q->ssgi_divisor);
+
+	if (scene->world) {
+		World *wo = scene->world;
+		wo->vfog_quality = q->vfog_quality;
+		wo->vfog_lod = q->vfog_lod;
+		wo->cloud_detail = q->cloud_detail;
+		wo->sky_layer_detail = q->cloud_detail;
+		wo->vcloud_quality = q->vcloud_quality;
+		wo->sky_quality = q->sky_quality;
+	}
+
+	for (Base *base = scene->base.first; base; base = base->next) {
+		Object *ob = base->object;
+		if (!ob || !ob->data) {
+			continue;
+		}
+		if (ob->type == OB_CAMERA) {
+			((Camera *)ob->data)->gamefx.dof_quality = q->dof_quality;
+		}
+		else if (ob->type == OB_LAMP) {
+			Lamp *la = ob->data;
+			la->bufsize = q->shadow_bufsize;
+			la->samp = q->shadow_samples;
+			la->csm_bufsize[0] = q->shadow_bufsize;
+			la->csm_bufsize[1] = q->shadow_bufsize;
+		}
+	}
+	return true;
 }
 
 /* flag -- copying options (see BKE_library.h's LIB_ID_COPY_... flags for more). */

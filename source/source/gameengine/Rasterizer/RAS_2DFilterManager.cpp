@@ -29,6 +29,7 @@
 #include "RAS_OffScreen.h"
 #include "RAS_2DFilterManager.h"
 #include "RAS_2DFilter.h"
+#include "RAS_2DFilterOffScreen.h"
 
 #include "CM_Message.h"
 
@@ -115,6 +116,10 @@ RAS_2DFilterManager::~RAS_2DFilterManager()
 		glDeleteTextures(1, &m_frameInputs.cloudHistory);
 		glDeleteTextures(1, &m_frameInputs.cloudHistoryDepth);
 	}
+	for (TemporalHistory &history : m_temporalHistories) {
+		glDeleteTextures(1, &history.color);
+		glDeleteTextures(1, &history.depth);
+	}
 }
 
 void RAS_2DFilterManager::SetFrameTime(float time)
@@ -146,12 +151,16 @@ unsigned int RAS_2DFilterManager::RenderOrderKey(unsigned int passIndex)
 		case FILTERPASS_CLOUDS:       return 16;
 		case FILTERPASS_VFOG:         return 17;
 		case FILTERPASS_VFOG_IMAGE:   return 18;
-		case FILTERPASS_CAMERA_DOF:   return 19;
-		case FILTERPASS_TONEMAP:      return 20;
-		case FILTERPASS_FXAA:         return 21;
-		case FILTERPASS_LENSFLARE:    return 22;
-		case FILTERPASS_CAMERA_LENS:  return 23;
-		default:                      return passIndex; // 0..14 unchanged, custom filters >= 24
+		/* The last bloom slot holds the half resolution DOF gather (KX_2DFilterManager): it must
+		 * run right before the DOF pass that blends it. */
+		case FILTERPASS_BLOOM + 7:    return 19;
+		case FILTERPASS_CAMERA_DOF:   return 20;
+		case FILTERPASS_TONEMAP:      return 21;
+		case FILTERPASS_FXAA:         return 22;
+		case FILTERPASS_LENSFLARE:    return 23;
+		case FILTERPASS_CAMERA_LENS:  return 24;
+		default: // 0..14 unchanged, custom filters (>= 24) after the lens pass
+			return (passIndex < FILTERPASS_RAIN) ? passIndex : passIndex + 1;
 	}
 }
 
@@ -264,6 +273,166 @@ void RAS_2DFilterManager::UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScree
 	}
 	m_frameInputs.cloudHistoryValid = true;
 #endif
+}
+
+static void InitHistoryTexture(unsigned int tex, bool depth, int width, int height)
+{
+	glBindTexture(GL_TEXTURE_2D, tex);
+	if (depth) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, width, height, 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+	}
+	else {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+	}
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, depth ? GL_NEAREST : GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, depth ? GL_NEAREST : GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+}
+
+/// Camera cut / teleport: the history is thrown away instead of being reprojected.
+static bool ViewProjectionJumped(const mt::mat4 &current, const float previous[16])
+{
+	float cur[16];
+	current.Pack(cur);
+	float diff = 0.0f, norm = 0.0f;
+	for (int i = 0; i < 16; ++i) {
+		diff += (cur[i] - previous[i]) * (cur[i] - previous[i]);
+		norm += cur[i] * cur[i];
+	}
+	return diff > 0.09f * norm; // more than 30% relative change (Frobenius)
+}
+
+void RAS_2DFilterManager::RenderTemporalResolve(RAS_2DFilter *filter, RAS_Rasterizer *rasty, RAS_ICanvas *canvas,
+                                                RAS_OffScreen *depthofs, RAS_OffScreen *colorofs, RAS_OffScreen *targetofs,
+                                                const float (&sun_screen_pos)[2], const int viewport[4])
+{
+	RAS_2DFilter *resolve = filter->GetTemporalResolve();
+	RAS_2DFilterOffScreen *resolveofs = resolve->GetOffScreen();
+	if (!resolve->Ok() || !resolveofs) {
+		return;
+	}
+
+	m_frameInputs.temporalHistory = 0;
+	m_frameInputs.temporalHistoryDepth = 0;
+	m_frameInputs.temporalHistoryValid = false;
+
+#ifndef __EMSCRIPTEN__
+	if (m_temporalSupported == -1) {
+		GLint maxUnits = 0;
+		glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits);
+		// Units 20/21 are past the clouds history (18/19) and bgl_PreviousTexture (17).
+		m_temporalSupported = (maxUnits > 21) ? 1 : 0;
+		// A/B comparison and perf: RANGE_TEMPORAL_OFF=1 keeps the resolve as a pass through.
+		const char *off = getenv("RANGE_TEMPORAL_OFF");
+		if (off && off[0] == '1') {
+			m_temporalSupported = 0;
+		}
+	}
+	const bool supported = (m_temporalSupported == 1) && depthofs->GetSamples() == 0;
+	{
+		static int debugLeft = -1;
+		if (debugLeft == -1) {
+			const char *dbg = getenv("RANGE_TEMPORAL_DEBUG");
+			debugLeft = (dbg && dbg[0] == '1') ? 8 : 0;
+		}
+		if (debugLeft > 0) {
+			debugLeft--;
+			GLint maxUnits = 0;
+			glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits);
+			if (FILE *f = fopen("range_temporal_debug.log", "a")) {
+				fprintf(f, "TEMPORAL effect=%d maxUnits=%d samples=%d supported=%d\n", filter->GetTemporalEffect(),
+				        (int)maxUnits, (int)depthofs->GetSamples(), supported ? 1 : 0);
+				fclose(f);
+			}
+		}
+	}
+#else
+	// WebGL can't copy a float frame buffer into a texture: no accumulation, the resolve passes through.
+	const bool supported = false;
+#endif
+
+	TemporalHistory *history = nullptr;
+	const mt::mat4 viewProjection = rasty->GetProjectionMatrix() * rasty->GetViewMatrix();
+	if (supported) {
+		const int effect = filter->GetTemporalEffect();
+		for (TemporalHistory &entry : m_temporalHistories) {
+			if (entry.effect == effect && std::equal(viewport, viewport + 4, entry.viewport)) {
+				history = &entry;
+				break;
+			}
+		}
+		if (!history) {
+			// Bounded like the previous view-projections: a few split screen viewports per effect.
+			if (m_temporalHistories.size() >= 8) {
+				glDeleteTextures(1, &m_temporalHistories.front().color);
+				glDeleteTextures(1, &m_temporalHistories.front().depth);
+				m_temporalHistories.erase(m_temporalHistories.begin());
+			}
+			m_temporalHistories.push_back(TemporalHistory());
+			history = &m_temporalHistories.back();
+			history->effect = effect;
+			std::copy(viewport, viewport + 4, history->viewport);
+			glGenTextures(1, &history->color);
+			glGenTextures(1, &history->depth);
+		}
+
+		/* The resolve off screen follows the canvas; Update() here so a resize is seen before
+		 * comparing sizes (Render() calls it again, no rebuild then). */
+		resolveofs->Update(canvas);
+		const int width = (int)resolveofs->GetWidth();
+		const int height = (int)resolveofs->GetHeight();
+		const int dwidth = (int)depthofs->GetWidth();
+		const int dheight = (int)depthofs->GetHeight();
+		if (width != history->width || height != history->height) {
+			InitHistoryTexture(history->color, false, width, height);
+			history->width = width;
+			history->height = height;
+			history->valid = false;
+		}
+		if (dwidth != history->depthWidth || dheight != history->depthHeight) {
+			InitHistoryTexture(history->depth, true, dwidth, dheight);
+			history->depthWidth = dwidth;
+			history->depthHeight = dheight;
+			history->valid = false;
+		}
+		glBindTexture(GL_TEXTURE_2D, 0);
+		// Not resolved for a while (effect off, other scene): the old buffer is stale.
+		if (m_frameInputs.frame - history->lastFrame > 8 || ViewProjectionJumped(viewProjection, history->viewProjection)) {
+			history->valid = false;
+		}
+
+		m_frameInputs.temporalHistory = history->color;
+		m_frameInputs.temporalHistoryDepth = history->depth;
+		m_frameInputs.temporalHistoryValid = history->valid;
+		if (history->valid) {
+			m_frameInputs.temporalHistoryViewProjection = mt::mat4(history->viewProjection);
+		}
+	}
+
+	resolve->SetFrameInputs(&m_frameInputs);
+	resolve->Render(rasty, canvas, depthofs, colorofs, targetofs, sun_screen_pos);
+
+	if (history) {
+		// Commit: the resolved buffer and the depth it was resolved against.
+		resolveofs->Bind(rasty);
+		glReadBuffer(GL_COLOR_ATTACHMENT0);
+		glBindTexture(GL_TEXTURE_2D, history->color);
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, history->width, history->height);
+		resolveofs->Unbind(rasty, canvas);
+		depthofs->Bind();
+		glBindTexture(GL_TEXTURE_2D, history->depth);
+		CopyViewportRect(viewport, history->depthWidth, history->depthHeight, history->depthWidth, history->depthHeight);
+		glBindTexture(GL_TEXTURE_2D, 0);
+
+		viewProjection.Pack(history->viewProjection);
+		history->lastFrame = m_frameInputs.frame;
+		history->valid = true;
+	}
+	m_frameInputs.temporalHistory = 0;
+	m_frameInputs.temporalHistoryDepth = 0;
+	m_frameInputs.temporalHistoryValid = false;
 }
 
 RAS_2DFilter *RAS_2DFilterManager::EnsureTonemapFilter(const BuildInFilters& filters)
@@ -518,6 +687,9 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		previousofs = filter->Render(rasty, canvas, depthofs, colorofs, ftargetofs, sun_screen_pos);
 		if (ProfilePassHook) {
 			ProfilePassHook(it->first);
+		}
+		if (filter->Ok() && filter->GetTemporalResolve() && filter->GetOffScreen()) {
+			RenderTemporalResolve(filter, rasty, canvas, depthofs, colorofs, ftargetofs, sun_screen_pos, viewport);
 		}
 		usesPrevious = usesPrevious || (filter->Ok() && filter->UsesPreviousTexture());
 		// Only Volumetric Clouds (mask bit 4) reuses frames; Clouds/Sky Layers alone don't pay the copy.

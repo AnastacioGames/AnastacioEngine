@@ -2108,12 +2108,25 @@ void mtex_negate_texnormal(vec3 normal, out vec3 outnormal)
 	outnormal = vec3(-normal.x, -normal.y, normal.z);
 }
 
+/* Gram-Schmidt: the interpolated tangent drifts off the interpolated normal across a triangle, which
+ * skews the normal map (stretched bumps, lighting seams). Re-orthogonalize it against N; a degenerate
+ * tangent (no UVs) leaves the normal untouched. */
+vec3 tbn_perturb(vec4 tangent, vec3 normal, vec3 texnormal)
+{
+	vec3 N = normalize(normal);
+	vec3 T = tangent.xyz - N * dot(N, tangent.xyz);
+	float tl = dot(T, T);
+	if (tl < 1e-12) {
+		return N;
+	}
+	T *= inversesqrt(tl);
+	vec3 B = ((tangent.w < 0.0) ? -1.0 : 1.0) * cross(N, T);
+	return normalize(texnormal.x * T + texnormal.y * B + texnormal.z * N);
+}
+
 void mtex_nspace_tangent(vec4 tangent, vec3 normal, vec3 texnormal, out vec3 outnormal)
 {
-	vec3 B = tangent.w * cross(normal, tangent.xyz);
-
-	outnormal = texnormal.x * tangent.xyz + texnormal.y * B + texnormal.z * normal;
-	outnormal = normalize(outnormal);
+	outnormal = tbn_perturb(tangent, normal, texnormal);
 }
 
 void mtex_nspace_world(mat4 viewmat, vec3 texnormal, out vec3 outnormal)
@@ -2504,6 +2517,32 @@ float sky_logmean(float a, float b)
 	float d = a - b;
 	return (abs(d) < 1e-4 * max(a, b)) ? 0.5 * (a + b) : d / log(a / b);
 }
+
+vec3 sky_logmean3(vec3 a, vec3 b)
+{
+	return vec3(sky_logmean(a.x, b.x), sky_logmean(a.y, b.y), sky_logmean(a.z, b.z));
+}
+
+/* Very Low, one end of a segment: Rayleigh/Mie density at distance t along the ray, each already
+ * multiplied by its transmittance. The sun path uses the analytic Chapman depth (as every level).
+ * The ray's own extinction is what High's 16 equal steps apply per sample (density * L / 16),
+ * not the much longer Very Low segment: charging the long segment reddened the sky near the
+ * horizon into a thin orange band. */
+void sky_vlow_point(vec3 r0, vec3 r, float t, vec3 pSun, float rPlanet, vec3 kRlh, float kMie,
+                    float shRlh, float shMie, float stepHigh, out vec3 rlh, out vec3 mie)
+{
+	vec3 pos = r0 + r * t;
+	float rad = length(pos);
+	float h = rad - rPlanet;
+	float dR = exp(-h / shRlh);
+	float dM = exp(-h / shMie);
+	float cosSun = dot(pos, pSun) / rad;
+	float jR = shRlh * chapman_depth(rPlanet / shRlh, h / shRlh, cosSun);
+	float jM = shMie * chapman_depth(rPlanet / shMie, h / shMie, cosSun);
+	vec3 attn = exp(-(kMie * (dM * stepHigh + jM) + kRlh * (dR * stepHigh + jR)));
+	rlh = dR * attn;
+	mie = dM * attn;
+}
 #endif
 
 vec3 sky_atmosphere(vec3 r,       // normalized ray direction
@@ -2563,25 +2602,28 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 	float pRlh = 3.0 / (32.0 * M_PI) * (1.0 + mumu);
 	float pMie = 3.0 / (16.0 * M_PI) * ((1.0 - gg) * (mumu + 1.0)) / (pow(1.0 + gg - 2.0 * mu * g, 1.5) * (2.0 + gg));
 
+#ifdef SKY_VERY_LOW
+	/* Very Low (Chapman analytic): density x transmittance is close to exponential between two
+	 * points, so each segment integrates the log-mean of its ends instead of one midpoint sample.
+	 * Segments grow quadratically (dense near the camera, where the Mie haze lives). */
+	{
+		float stepHigh = (p.y - p.x) / 16.0;
+		vec3 aR, aM, bR, bM;
+		sky_vlow_point(r0, r, p.x, pSun, rPlanet, kRlh, kMie, shRlh, shMie, stepHigh, aR, aM);
+		float ta = p.x;
+		for (int i = 1; i <= int(iSteps); i++) {
+			float f = float(i) / iSteps;
+			float tb = p.x + (p.y - p.x) * f * f;
+			sky_vlow_point(r0, r, tb, pSun, rPlanet, kRlh, kMie, shRlh, shMie, stepHigh, bR, bM);
+			totalRlh += (tb - ta) * sky_logmean3(aR, bR);
+			totalMie += (tb - ta) * sky_logmean3(aM, bM);
+			aR = bR; aM = bM; ta = tb;
+		}
+	}
+#else
 	// Sample the primary ray.
 	for (int i = 0; i < int(iSteps); i++) {
 		if (float(i) >= nSteps) break;
-#ifdef SKY_VERY_LOW
-		// Very Low: com 3 passos iguais o ponto do meio fica alto demais (no zenite o 1o ja esta a ~17 km), o Mie
-		// (escala 1.2 km) some -> sem brilho do sol e faixa rosa no horizonte. Passos crescendo ao quadrado
-		// (densos perto da camera) e densidade integrada entre as pontas (media logaritmica da exponencial).
-		float f0 = float(i) / nSteps;
-		float f1 = float(i + 1) / nSteps;
-		float t0 = p.x + (p.y - p.x) * f0 * f0;
-		float t1 = p.x + (p.y - p.x) * f1 * f1;
-		float segLen = t1 - t0;
-		float h0 = length(r0 + r * t0) - rPlanet;
-		float h1 = length(r0 + r * t1) - rPlanet;
-		vec3 iPos = r0 + r * (0.5 * (t0 + t1));
-		float iHeight = length(iPos) - rPlanet;
-		float odStepRlh = segLen * sky_logmean(exp(-h0 / shRlh), exp(-h1 / shRlh));
-		float odStepMie = segLen * sky_logmean(exp(-h0 / shMie), exp(-h1 / shMie));
-#else
 		// Calculate the primary ray sample position.
 		vec3 iPos = r0 + r * (iTime + iStepSize * 0.5);
 
@@ -2591,7 +2633,6 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 		// Calculate the optical depth of the Rayleigh and Mie scattering for this step.
 		float odStepRlh = exp(-iHeight / shRlh) * iStepSize;
 		float odStepMie = exp(-iHeight / shMie) * iStepSize;
-#endif
 
 		// Optical depth toward the sun, analytic instead of a secondary ray march.
 		float cosSun = dot(iPos, pSun) / (iHeight + rPlanet);
@@ -2606,6 +2647,7 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 		totalMie += odStepMie * attn;
 		iTime += iStepSize;
 	}
+#endif
 
 	// Calculate and return the final color.
 	return iSun * (pRlh * kRlh * totalRlh + pMie * kMie * totalMie);
@@ -2822,6 +2864,19 @@ void shade_inp(vec3 vn, vec3 lv, out float inp)
 void shade_back_inp(vec3 vn, vec3 lv, float inp, float tra, out float outinp)
 {
 	outinp = max(inp, 0.0) + max(dot(-vn, lv), 0.0) * tra;
+}
+
+/* Specular anti-aliasing (Kaplanyan 2016 / Tokuyoshi, as in HDRP): widen the GGX lobe by the
+ * screen-space variance of the normal so a dense normal map or a curved mirror-like surface does
+ * not sparkle/shimmer when the highlight is smaller than a pixel. Takes and returns perceptual
+ * roughness (alpha = r^2). Call it in uniform control flow (uses derivatives). */
+float specular_aa_roughness(vec3 N, float rough)
+{
+	vec3 dndx = dFdx(N), dndy = dFdy(N);
+	float variance = 0.25 * (dot(dndx, dndx) + dot(dndy, dndy));
+	float kernel = min(2.0 * variance, 0.18);
+	float a = rough * rough;
+	return sqrt(sqrt(clamp(a * a + kernel, 0.0, 1.0)));
 }
 
 void shade_ggx_spec(float inp, vec3 n, vec3 l, vec3 v, float rough, float spec, out float is)
@@ -3194,6 +3249,7 @@ void shade_BSDF_ggx_spec(vec3 n, vec3 l, vec3 v, float rough, float metal, out f
 	float lh = clamp(dot(l, h), 0.0, 1.0);
 	float nh = clamp(dot(n, h), 0.0, 1.0);
 
+	rough = specular_aa_roughness(n, rough);
 	float alpha = rough * rough;
 	float alphaSqr = alpha * alpha;
 	float denom = nh * nh * (alphaSqr - 1.0) + 1.0;
@@ -3713,45 +3769,51 @@ float test_shadow_pcf_penumbra(sampler2D shadowmap, vec4 co, sampler2D jitter, i
 }
 
 
-float test_shadow_pcf(sampler2DShadow shadowmap, vec4 co, float samples, float samplesize)
+/* Per-pixel rotation for the PCF disk: interleaved gradient noise (same as dither()). */
+float shadow_ign()
 {
-	float pcfscale = shadow_pcf_scale(shadowmap);
-	float step = samplesize / samples;
-	float halfsample = samplesize * 0.5 - step * 0.49;
-
-	float result = 0.0;
-	for (float y = -halfsample; y <= halfsample; y += step) {
-		for (float x = -halfsample; x <= halfsample; x += step) {
-			result += texture_shadow_offset(shadowmap, co, vec2(x, y) * pcfscale);
-		}
-	}
-	result /= (samples * samples);
-
-	return result;
+	return fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
 }
 
-float test_shadow_pcf_jitter(sampler2DShadow shadowmap, vec4 co, sampler2D jitter, float samples, float samplesize)
+/* Rotated Poisson-disk PCF: the old regular grid with the same number of taps showed
+ * stair-stepped bands in the penumbra; a Poisson disk turned per pixel by IGN breaks them into
+ * fine noise the hardware 2x2 compare filter (and TAA/FXAA) smooths. Same tap count as before
+ * (samples^2, capped at 16), radius = half the Soft size like the old grid. */
+float shadow_pcf_poisson(sampler2DShadow shadowmap, vec4 co, float samples, float samplesize)
 {
-	float pcfscale = shadow_pcf_scale(shadowmap);
-	float step = samplesize / samples;
-	float halfsample = samplesize * 0.5 - step * 0.49;
-
-	vec2 jitterco = co.xy * 43543.0;
-	vec2 vec = texture2D(jitter, jitterco).xy;
-
-	mat2 rot = mat2(vec.x, vec.y,
-					-vec.y, vec.x);
+	const vec2 poisson[16] = vec2[](
+		vec2(-0.94201624, -0.39906216), vec2( 0.94558609, -0.76890725),
+		vec2(-0.09418410, -0.92938870), vec2( 0.34495938,  0.29387760),
+		vec2(-0.91588581,  0.45771432), vec2(-0.81544232, -0.87912464),
+		vec2(-0.38277543,  0.27676845), vec2( 0.97484398,  0.75648379),
+		vec2( 0.44323325, -0.97511554), vec2( 0.53742981, -0.47373420),
+		vec2(-0.26496911, -0.41893023), vec2( 0.79197514,  0.19090188),
+		vec2(-0.24188840,  0.99706507), vec2(-0.81409955,  0.91437590),
+		vec2( 0.19984126,  0.78641367), vec2( 0.14383161, -0.14100790));
+	int n = int(clamp(samples * samples, 1.0, 16.0));
+	float a = shadow_ign() * 6.2831853;
+	float ca = cos(a), sa = sin(a);
+	float radius = samplesize * 0.5 * shadow_pcf_scale(shadowmap);
+	mat2 rot = mat2(ca, sa, -sa, ca) * radius;
 
 	float result = 0.0;
-	for (float y = -halfsample; y <= halfsample; y += step) {
-		for (float x = -halfsample; x <= halfsample; x += step) {
-			vec2 ofs = vec2(x, y) * 0.1;
-			result += texture_shadow_offset(shadowmap, co, (vec2(x, y) * rot) * pcfscale);
-		}
+	for (int i = 0; i < 16; i++) {
+		if (i >= n) break;
+		result += texture_shadow_offset(shadowmap, co, rot * poisson[i]);
 	}
-	result /= (samples * samples);
+	return result / float(n);
+}
 
-	return result;
+float test_shadow_pcf(sampler2DShadow shadowmap, vec4 co, float samples, float samplesize)
+{
+	return shadow_pcf_poisson(shadowmap, co, samples, samplesize);
+}
+
+/* The jitter texture rotation (sampled at co.xy * 43543, aliasing with the shadow map) is replaced
+ * by the per-pixel IGN rotation of the Poisson disk; the sampler stays in the signature. */
+float test_shadow_pcf_jitter(sampler2DShadow shadowmap, vec4 co, sampler2D jitter, float samples, float samplesize)
+{
+	return shadow_pcf_poisson(shadowmap, co, samples, samplesize);
 }
 
 float test_shadow_vsm(sampler2D shadowmap, vec4 co, float bias, float bleedbias)
@@ -3962,22 +4024,30 @@ void shadow_simple_csm(
 		result = shadow_visibility(co) ? test_shadow_simple(shadowmap0, co, type) : 1.0;
 	}
 	else if (viewdist < split0 + blend0) {
-		co = csm_shadow_proj_coord(rco, vn, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0, bias0, slopebias0);
-		float shadow0 = shadow_visibility(co) ? test_shadow_simple(shadowmap0, co, type) : 1.0;
-		co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
-		float shadow1 = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
-		result = mix(shadow0, shadow1, smoothstep(split0 - blend0, split0 + blend0, viewdist));
+		/* Dithered cascade transition: each pixel takes one cascade with the blend weight as
+		 * probability (IGN), one tap instead of two and no doubled-up soft band. */
+		if (smoothstep(split0 - blend0, split0 + blend0, viewdist) <= shadow_ign()) {
+			co = csm_shadow_proj_coord(rco, vn, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0, bias0, slopebias0);
+			result = shadow_visibility(co) ? test_shadow_simple(shadowmap0, co, type) : 1.0;
+		}
+		else {
+			co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
+			result = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
+		}
 	}
 	else if (viewdist < split1 - blend1) {
 		co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
 		result = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
 	}
 	else if (viewdist < split1 + blend1) {
-		co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
-		float shadow1 = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
-		co = csm_shadow_proj_coord(rco, vn, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize, bias2, slopebias2);
-		float shadow2 = shadow_visibility(co) ? test_shadow_simple(shadowmap2, co, type) : 1.0;
-		result = mix(shadow1, shadow2, smoothstep(split1 - blend1, split1 + blend1, viewdist));
+		if (smoothstep(split1 - blend1, split1 + blend1, viewdist) <= shadow_ign()) {
+			co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
+			result = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
+		}
+		else {
+			co = csm_shadow_proj_coord(rco, vn, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize, bias2, slopebias2);
+			result = shadow_visibility(co) ? test_shadow_simple(shadowmap2, co, type) : 1.0;
+		}
 	}
 	else {
 		co = csm_shadow_proj_coord(rco, vn, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize, bias2, slopebias2);
@@ -4867,6 +4937,7 @@ void node_bsdf_diffuse(vec4 color, float roughness, vec3 N, out vec4 result)
 void node_bsdf_glossy(vec4 color, float roughness, vec3 N, vec3 I, vec3 ambient,
                       vec4 env_mirror, vec4 env_diffuse, float env_on, out vec4 result)
 {
+	roughness = specular_aa_roughness(N, roughness);
 	/* reflected World environment (roughness-blurred), or the World color as ambient without one */
 	vec3 L = (env_on > 0.5) ? env_mirror.rgb : ambient;
 
@@ -5156,6 +5227,8 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	out vec4 result,
     out vec4 ssgi_normal, out vec4 ssgi_albedo, out vec4 ssgi_direct, out vec4 ssgi_linear)
 {
+	roughness = specular_aa_roughness(N, roughness);
+	clearcoat_roughness = specular_aa_roughness(CN, clearcoat_roughness);
     /* Packed [0, 1]: this attachment is RGBA8 to save SSGI framebuffer memory. */
     ssgi_normal = vec4(normalize(N) * 0.5 + 0.5, 1.0);
 	float ao_mode = step(1.5, lightmap.a) * (1.0 - step(2.5, lightmap.a));
@@ -6837,10 +6910,7 @@ void node_object_info(mat4 obmat, vec3 info, out vec3 location, out float object
 
 void node_normal_map(vec4 tangent, vec3 normal, vec3 texnormal, out vec3 outnormal)
 {
-	vec3 B = tangent.w * cross(normal, tangent.xyz);
-
-	outnormal = texnormal.x * tangent.xyz + texnormal.y * B + texnormal.z * normal;
-	outnormal = normalize(outnormal);
+	outnormal = tbn_perturb(tangent, normal, texnormal);
 }
 
 void node_bump(float strength, float dist, float height, vec3 N, vec3 surf_pos, float invert, out vec3 result)

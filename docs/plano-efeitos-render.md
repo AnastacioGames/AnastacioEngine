@@ -7,6 +7,41 @@ Já feito em 2026-10-24:
 - `a0b077fe`: borrão da névoa por profundidade, céu Very Low e o aviso `show_highlight_active`.
 - `e6e4a41c`: SSR. O piso PBR passou a refletir, com profundidade em NDC, espessura proporcional à distância e refino do ponto de acerto.
 
+## Status em 2026-10-25 (para retomar)
+
+- **Fase 1:** enviada em `0e71f644`. Falta o aceite visual do usuário com a janela.
+- **Fase 2 (base temporal):**
+  - feita na névoa, no SSGI e no SSR;
+  - está em `RAS_Temporal2DFilter.glsl`, `SetTemporalResolve` e `RenderTemporalResolve`;
+  - `RANGE_TEMPORAL_OFF=1` desliga, para comparar antes e depois, e `RANGE_TEMPORAL_DEBUG=1` mostra o log.
+- **Fase 3, partes feitas:**
+  - **Sombras:** PCF Poisson rotacionado por IGN e dither entre cascatas.
+  - **Materiais:** TBN Gram-Schmidt e specular AA de Kaplanyan.
+  - **Céu Very Low:** sem a faixa laranja.
+  - **Partículas:** LOD por distância.
+  - **SSR:** DDA McGuire, fallback para o céu, blur pela rugosidade e reprojeção pelo ponto de acerto.
+  - **SSAO:** meia resolução com bilateral.
+  - **Bloom:** dual filter com 6 passes.
+  - **DOF:** meia resolução.
+  - **Névoa:** PCF de 2 taps no sol.
+- **Fase 4:** feita.
+  - `quality_preset` em `SCENEFXSettings`, com a tabela em `scene.c`.
+  - UI no topo do painel Post Processing.
+  - Python: `scene.setQualityPreset()` e `getQualityPreset()`.
+- **Pendências:**
+  - Build limpo do editor e do runtime, porque o DNA mudou (cerca de 45 min). Depois, teste do usuário com a janela, incluindo câmera em movimento para ver rastro, split screen e o jogo dentro do editor.
+  - **SSR:** riscos escuros no reflexo da esfera. Conferir se o temporal liga na iGPU (limite de unidades de textura e MSAA).
+  - **SSAO:** grão leve; o trace precisa virar float e ganhar temporal.
+  - **DOF:** ainda lê profundidade e cor em resolução cheia, por isso ganhou só ~15%.
+  - **Bloom:**
+    - entrar no preset;
+    - o profiler mede só `bloom_image`.
+  - **Preset:**
+    - trocar durante o jogo não muda resolução, sombras, DOF nem céu até `restart`;
+    - escolher pela UI sobrescreve os valores de cada efeito.
+  - **Ainda não feito:** GGX VNDF no SSR, flipbook de partículas, IBL com SH9 e fusão de tonemap, FXAA e lente.
+  - **Medições:** ainda não refeitas na iGPU; o notebook agora está sem placa dedicada.
+
 ## Fase 1: correções baratas (custo de GPU ~0 e risco baixo)
 
 **Pós-processo**

@@ -433,6 +433,11 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_reverbAreasActive = false;
 	m_renderlist = new EXP_ListValue<KX_GameObject>();
 
+	/* Global quality preset: writes its row into the quality fields before they are read here
+	 * and before the converter reads cameras, lamps and the World. Auto resolves per platform
+	 * (Medium on desktop, Low on Web/Android). Custom changes nothing. */
+	BKE_scene_quality_preset_apply(scene, scene->scenefx_settings.quality_preset);
+
 	SCENEFXSettings settings = scene->scenefx_settings;
 	BuildInFilters filters = {
 		(scene->scenefx_settings.scenefx_flag & SCENE_FX_FLAG_FXAA) ? true : false,
@@ -3733,6 +3738,8 @@ PyMethodDef KX_Scene::Methods[] = {
 	EXP_PYMETHODTABLE_KEYWORDS(KX_Scene, convertObject),
 	EXP_PYMETHODTABLE(KX_Scene, end),
 	EXP_PYMETHODTABLE(KX_Scene, restart),
+	EXP_PYMETHODTABLE(KX_Scene, setQualityPreset),
+	EXP_PYMETHODTABLE(KX_Scene, getQualityPreset),
 	EXP_PYMETHODTABLE(KX_Scene, replace),
 	EXP_PYMETHODTABLE(KX_Scene, suspend),
 	EXP_PYMETHODTABLE(KX_Scene, resume),
@@ -4335,6 +4342,93 @@ EXP_PYMETHODDEF_DOC(KX_Scene, restart,
 	KX_GetActiveEngine()->ReplaceScene(m_sceneName, m_sceneName);
 
 	Py_RETURN_NONE;
+}
+
+static const char *kx_quality_preset_names[] = {
+	"CUSTOM", "VERY_LOW", "LOW", "MEDIUM", "HIGH", "ULTRA", "AUTO"
+};
+
+EXP_PYMETHODDEF_DOC(KX_Scene, setQualityPreset,
+                    "setQualityPreset(name)\n"
+                    "Sets the global quality preset: 'CUSTOM', 'VERY_LOW', 'LOW', 'MEDIUM', 'HIGH', 'ULTRA' or 'AUTO'.\n"
+                    "Steps and samples (SSAO, SSGI, SSR, Light Scattering, clouds, Volumetric Fog) change now;\n"
+                    "resolutions, shadows, DOF and sky apply on the next scene.restart() or load.\n")
+{
+	const char *name;
+	if (!PyArg_ParseTuple(args, "s:setQualityPreset", &name)) {
+		return nullptr;
+	}
+
+	int preset = -1;
+	for (int i = 0; i < (int)ARRAY_SIZE(kx_quality_preset_names); ++i) {
+		std::string upper = name;
+		for (char& c : upper) {
+			c = (c == ' ') ? '_' : (char)toupper((unsigned char)c);
+		}
+		if (upper == kx_quality_preset_names[i]) {
+			preset = i;
+			break;
+		}
+	}
+	if (preset < 0) {
+		PyErr_Format(PyExc_ValueError, "scene.setQualityPreset(name): unknown preset '%s'", name);
+		return nullptr;
+	}
+
+	Scene *scene = m_blenderScene;
+	if (!scene) {
+		Py_RETURN_NONE;
+	}
+	scene->scenefx_settings.quality_preset = (char)preset;
+	if (!BKE_scene_quality_preset_apply(scene, preset)) {
+		Py_RETURN_NONE;
+	}
+
+	/* Live update of the uniforms the built-in filters read every frame. */
+	const SCENEFXSettings& fx = scene->scenefx_settings;
+	auto pass = [this](int index) { return m_filterManager ? m_filterManager->GetFilterPass(index, true) : nullptr; };
+	if (RAS_2DFilter *f = pass(RAS_2DFilterManager::FILTERPASS_SSAO)) {
+		if (fx.ssao) f->GetBuildInFilters()->ssao_samples = fx.ssao->samples;
+	}
+	if (RAS_2DFilter *f = pass(RAS_2DFilterManager::FILTERPASS_SSR)) {
+		if (fx.ssr) f->GetBuildInFilters()->ssr_step_max = fx.ssr->step_max;
+	}
+	for (int index : {(int)RAS_2DFilterManager::FILTERPASS_LIGHTSCATTER, (int)RAS_2DFilterManager::FILTERPASS_LIGHTSCATTER + 1}) {
+		if (RAS_2DFilter *f = pass(index)) {
+			if (fx.scatter) f->GetBuildInFilters()->scatter_step_max = fx.scatter->stepmax;
+		}
+	}
+	if (scene->id.properties) {
+		IDProperty *rays = IDP_GetPropertyFromGroup(scene->id.properties, "ae_ssgi_rays");
+		IDProperty *steps = IDP_GetPropertyFromGroup(scene->id.properties, "ae_ssgi_steps");
+		for (int index : {(int)RAS_2DFilterManager::FILTERPASS_SSGI, (int)RAS_2DFilterManager::FILTERPASS_SSGI_IMAGE}) {
+			if (RAS_2DFilter *f = pass(index)) {
+				if (rays && rays->type == IDP_INT) f->GetBuildInFilters()->ssgi_rays = IDP_Int(rays);
+				if (steps && steps->type == IDP_INT) f->GetBuildInFilters()->ssgi_steps = IDP_Int(steps);
+			}
+		}
+	}
+	if (scene->world) {
+		if (RAS_2DFilter *f = pass(RAS_2DFilterManager::FILTERPASS_CLOUDS)) {
+			BuildInFilters *p = f->GetBuildInFilters();
+			p->cloud_detail = scene->world->cloud_detail;
+			p->sky_layer_detail = scene->world->sky_layer_detail;
+			p->vcloud_quality = scene->world->vcloud_quality;
+		}
+	}
+
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_Scene, getQualityPreset,
+                    "getQualityPreset()\n"
+                    "Returns the global quality preset name ('CUSTOM', 'VERY_LOW', ..., 'AUTO').\n")
+{
+	int preset = m_blenderScene ? m_blenderScene->scenefx_settings.quality_preset : 0;
+	if (preset < 0 || preset >= (int)ARRAY_SIZE(kx_quality_preset_names)) {
+		preset = 0;
+	}
+	return PyUnicode_FromString(kx_quality_preset_names[preset]);
 }
 
 EXP_PYMETHODDEF_DOC(KX_Scene, replace,

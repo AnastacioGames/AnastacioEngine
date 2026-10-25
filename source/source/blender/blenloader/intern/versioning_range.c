@@ -756,4 +756,12 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
       }
     }
   }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "SCENEFXSettings", "char", "quality_preset")) {
+    /* quality_preset replaces pad[0]. Old files open as Custom, keeping their own per-effect
+     * settings (files from the original Range skip this function, but read 0 = Custom too). */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      scene->scenefx_settings.quality_preset = SCENE_FX_QUALITY_CUSTOM;
+    }
+  }
 }

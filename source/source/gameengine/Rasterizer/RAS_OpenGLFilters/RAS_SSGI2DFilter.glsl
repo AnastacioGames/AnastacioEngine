@@ -13,6 +13,7 @@ uniform mat4 unfprojmat;
 uniform mat4 unfinvprojmat;
 uniform float bgl_RenderedTextureWidth;
 uniform float bgl_RenderedTextureHeight;
+uniform int bgl_Frame;
 uniform vec4 ge_SSGIParams[2]; // radius, strength, thickness, rays; steps, slot, divisor, denoise
 
 /* 4x4 Bayer index in [0, 1): interleaved sampling (Keller & Heidrich 2001). Every 4x4 block
@@ -57,8 +58,17 @@ void main()
     float thickness = ge_SSGIParams[0].z;
     int rays = int(ge_SSGIParams[0].w);
     int steps = int(ge_SSGIParams[1].x);
-    /* Static pattern: no temporal flicker without a history buffer. */
-    float noise = bayer4(gl_FragCoord.xy) + 0.03125;
+    /* Bayer rotation shifted every frame by the R1 sequence: the temporal resolve
+     * (RAS_Temporal2DFilter.glsl) averages 16+ rotations per texel over time. The step jitter
+     * uses its own noise (IGN, also per frame) so ray direction and march distance decorrelate. */
+#ifdef SSGI_TEMPORAL
+    float fr = float(bgl_Frame);
+#else
+    float fr = 0.0; // no history (WebGL): a static pattern does not flicker
+#endif
+    float noise = fract(bayer4(gl_FragCoord.xy) + 0.03125 + fr * 0.61803398875);
+    vec2 ignp = gl_FragCoord.xy + vec2(5.588238) * mod(fr, 64.0);
+    float noise2 = fract(52.9829189 * fract(dot(ignp, vec2(0.06711056, 0.00583715))));
     float bias = max(0.002, thickness * 0.1) + 0.002 * abs(p.z);
     vec3 sum = vec3(0.0);
     for (int r = 0; r < 16; ++r) {
@@ -67,7 +77,7 @@ void main()
         float angle = 6.28318530718 * fract(float(r) * 0.61803398875 + noise);
         vec3 dir = tangent * (sqrt(u) * cos(angle)) + bitangent * (sqrt(u) * sin(angle)) + n * sqrt(1.0 - u);
         /* Per-ray step jitter turns the banding of fixed march distances into fine noise. */
-        float jitter = fract(noise + float(r) * 0.75487766625);
+        float jitter = fract(noise2 + float(r) * 0.75487766625);
         vec3 origin = p + n * bias;
         float previous_t = 0.0;
         for (int j = 0; j < 32; ++j) {

@@ -13,6 +13,8 @@ out vec4 fragColor;
 // Ambient Occlusion from 3D viewport as a Filter2D
 // ported by Murilo Hilas
 uniform vec4 ge_ssaoparams; // Samples, Strength, Distance, Attenuation
+/* Inverse projection from the CPU (was inverse() per pixel). */
+uniform mat4 unfinvprojmat;
 vec4 Color = vec4(0.0, 0.0, 0.0, 1.0);
 
 //---------------------------------------------------------------------
@@ -252,6 +254,11 @@ float gtao_visibility(float depth, vec3 albedo)
 		visibility += proj_len * (arc0 + arc1);
 	}
 	visibility = clamp(visibility / float(slices), 0.0, 1.0);
+#ifdef SSAO_TRACE
+	/* Half resolution trace: RAS_SSAO_Image2DFilter.glsl blurs it (depth aware), then applies the
+	 * multi-bounce with the full resolution albedo and the strength. */
+	return visibility;
+#endif
 
 	/* multi-bounce fit (Jimenez 2016): bright surfaces get light back from the occluders around them */
 	vec3 a = 2.0404 * albedo - 0.3324;
@@ -276,13 +283,17 @@ void main()
     ssao_params = vec4(ge_ssaoparams.z, ge_ssaoparams.y, att, 1.0);
     ssao_sample_params = get_sample_params();
     projection = gl_ProjectionMatrix;
-    invproj = inverse(projection);
+    invproj = unfinvprojmat;
 
     getviewvecs(viewvecs);
 
 	float depth = texture(bgl_DepthTexture, uvcoordsvar.xy).x;
     vec3 scene_col = texture(bgl_RenderedTexture, uvcoordsvar.xy).rgb;
 
+#if !defined(GL_ES) && defined(SSAO_TRACE)
+	gl_FragColor = vec4(gtao_visibility(depth, vec3(0.0)), 0.0, 0.0, 1.0);
+	return;
+#endif
 #ifndef GL_ES
 	gl_FragColor = vec4(scene_col * gtao_visibility(depth, clamp(scene_col, 0.0, 1.0)), 1.0);
 	return;

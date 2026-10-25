@@ -109,6 +109,11 @@ void BKE_scene_set_background(struct Main *bmain, struct Scene *sce);
 struct Scene *BKE_scene_set_name(struct Main *bmain, const char *name);
 
 void BKE_scene_fx_validate(struct Scene *scene);
+/* Global quality preset: Auto -> Medium (desktop) or Low (Web/Android); invalid -> Custom. */
+int BKE_scene_quality_preset_resolve(int preset);
+/* Writes the preset's row into the existing quality fields (Scene FX, SSGI, World, cameras,
+ * lamps). Custom does nothing and returns false. */
+bool BKE_scene_quality_preset_apply(struct Scene *scene, int preset);
 
 struct ToolSettings *BKE_toolsettings_copy(struct ToolSettings *toolsettings, const int flag);
 void BKE_toolsettings_free(struct ToolSettings *toolsettings);
