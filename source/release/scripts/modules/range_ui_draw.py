@@ -333,6 +333,99 @@ def draw_slider(bgl, blf, data, frac, values, x, y, w, h, hover=False):
     _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, kx - knob * 0.5, y + (h - knob) * 0.5, knob, knob, knob * 0.5)
 
 
+# -- Dialogue Box -------------------------------------------------------------
+
+def wrap_text(blf, text, width):
+    """Quebra nas palavras (blf.size já ajustado); palavra maior que a
+    largura é cortada entre letras."""
+    lines = []
+    for paragraph in text.split("\n"):
+        line = ""
+        for word in paragraph.split(" "):
+            candidate = line + " " + word if line else word
+            if blf.dimensions(0, candidate)[0] <= width:
+                line = candidate
+                continue
+            if line:
+                lines.append(line)
+            while len(word) > 1 and blf.dimensions(0, word)[0] > width:
+                cut = len(word) - 1
+                while cut > 1 and blf.dimensions(0, word[:cut])[0] > width:
+                    cut -= 1
+                lines.append(word[:cut])
+                word = word[cut:]
+            line = word
+        lines.append(line)
+    return lines
+
+
+def dialogue_metrics(data, h):
+    """Tamanhos em pixels: os do nó são unidades do editor, escalados pela
+    altura colocada (h) contra a altura do nó."""
+    s = h / max(1e-6, data["design_h"])
+    size = max(6, int(data["text_size"] * s))
+    pad = data["padding"] * s
+    return size, pad, size * data["line_spacing"]
+
+
+def dialogue_pages(blf, data, text, speaker, w, h):
+    """Páginas (listas de linhas): "|" força página nova, o resto quebra na
+    largura e pagina pela altura."""
+    size, pad, line_h = dialogue_metrics(data, h)
+    top = pad + (line_h if speaker else 0.0)
+    per_page = max(1, int((h - top - pad) / line_h + 1e-4))
+    blf.size(0, size, 72)
+    pages = []
+    # "\n" digitado no campo de texto (não dá para digitar Enter nele).
+    for chunk in text.replace("\\n", "\n").split("|"):
+        lines = wrap_text(blf, chunk.strip(), w - 2.0 * pad)
+        pages.extend(lines[i:i + per_page] for i in range(0, len(lines), per_page))
+    return pages or [[]]
+
+
+def page_length(page):
+    return sum(len(line) for line in page)
+
+
+def draw_dialogue(bgl, blf, data, speaker, page, visible, x, y, w, h, show_next):
+    """Fundo, nome de quem fala, as linhas da página até visible letras e a
+    seta de "próximo" quando a página terminou."""
+    draw_panel(bgl, data, x, y, w, h)
+    size, pad, line_h = dialogue_metrics(data, h)
+    blf.size(0, size, 72)
+    ty = y + h - pad - size * 0.8
+    if speaker:
+        _color(bgl, data["speaker_color"])
+        blf.position(0, x + pad, ty, 0)
+        blf.draw(0, speaker)
+        ty -= line_h
+    left = visible
+    for line in page:
+        if left <= 0:
+            break
+        part = line[:left]
+        left -= len(line)
+        if data["shadow"]:
+            off = max(1, size // 14)
+            _color(bgl, (0.0, 0.0, 0.0, 0.8 * data["text_color"][3]))
+            blf.position(0, x + pad + off, ty - off, 0)
+            blf.draw(0, part)
+        _color(bgl, data["text_color"])
+        blf.position(0, x + pad, ty, 0)
+        blf.draw(0, part)
+        ty -= line_h
+    if show_next:
+        a = size * 0.35
+        cx, cy = x + w - pad - a, y + pad + a * 0.5
+        _blend(bgl)
+        _color(bgl, data["speaker_color"])
+        bgl.glBegin(bgl.GL_TRIANGLES)
+        bgl.glVertex2f(cx - a, cy + a * 0.6)
+        bgl.glVertex2f(cx + a, cy + a * 0.6)
+        bgl.glVertex2f(cx, cy - a * 0.6)
+        bgl.glEnd()
+
+
 def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False):
     """Desenha um widget (HUD ou controle) com os valores dados."""
     kind = data["kind"]
@@ -348,5 +441,11 @@ def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False):
         draw_gauge(bgl, blf, data, bar_fraction(data, values), values, x, y, w, h)
     elif kind == "TOGGLE":
         draw_toggle(bgl, blf, data, bool(values.get(data["property"], False)), x, y, w, h, hover)
+    elif kind == "DIALOGUE":
+        # Prévia do editor: 1ª página inteira (o jogo usa range_ui_runtime.Dialogue).
+        text = format_label(data["text"], values) if not data["property"] else             "Text from the property '%s'" % data["property"]
+        speaker = format_label(data["speaker"], values)
+        page = dialogue_pages(blf, data, text, speaker, w, h)[0]
+        draw_dialogue(bgl, blf, data, speaker, page, page_length(page), x, y, w, h, True)
     elif kind == "SLIDER":
         draw_slider(bgl, blf, data, bar_fraction(data, values), values, x, y, w, h, hover)

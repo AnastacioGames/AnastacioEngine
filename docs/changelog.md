@@ -8,6 +8,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-25 - Diálogos sem código: nó Dialogue Box (UI Tree) e Setup Dialogue no objeto Text
+
+- **UI Tree > HUD > Dialogue Box**: caixa de diálogo 2D que quebra o texto na largura do nó, pagina pela
+  altura e escreve letra a letra (Speed letras/s, som opcional por letra). Enter/Espaço/clique/botão A
+  completa a página e depois avança; seta piscando quando a página terminou. `|` força página nova, `\n`
+  linha nova, `{prop}` mostra propriedades; Speaker opcional em cima. Saídas **On Page** e **On Finish**.
+  Fonte do texto: **Text** (digitado), **Property** (vazio esconde, o fim esvazia) ou **Text Object** (lê o
+  texto de um objeto Text e o esconde no 3D enquanto a caixa mostra).
+- **Ação Show Dialogue** (UI Tree): grava o texto numa propriedade de qualquer objeto (Dialogue Box com
+  Source = Property, ou `Text` de um objeto Text) — botão abre conversa sem script.
+- **Game Text > Text Box > Setup Dialogue**: no objeto Text 3D liga Always + `range_text_dialogue.main` e as
+  propriedades `td_speed`, `td_end` (Hide/Restart/Keep, botões no painel) e `td_message` (mensagem no fim).
+  Trocar o texto recomeça e reaparece. Remove Dialogue desfaz.
+- Teste `--server`: objeto Text 6 páginas, avanço, esconde no fim e volta com texto novo; Dialogue Box por
+  propriedade 2 páginas → fim esvazia a propriedade e some; Text Object esconde o 3D; palavra gigante cortada.
+
 ## 2026-10-25 - Texto: Text Boxes funcionando no jogo (quebra de linha, páginas, máquina de escrever)
 
 - O painel Text Boxes do objeto de texto era ignorado pelo `KX_FontObject`: só `

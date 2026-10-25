@@ -96,6 +96,41 @@ class Control(Element):
         return self.data["kind"]
 
 
+class Dialogue:
+    """Estado de um Dialogue Box: texto atual, página e letras já escritas.
+    As páginas dependem do blf, então são montadas no desenho e guardadas."""
+
+    def __init__(self, data):
+        self.data = data
+        self.reset()
+
+    def reset(self):
+        self.text = None
+        self.pages = None
+        self.layout_key = None
+        self.page = 0
+        self.shown = 0.0
+        self.done = False
+        self.last_sound = 0.0
+
+    def current_text(self, ui):
+        data = self.data
+        source = data.get("source", "TEXT")
+        obj = ui.obj_for(data)
+        if source == "PROPERTY":
+            return str(obj.get(data["property"], "")) if obj is not None else ""
+        if source == "TEXT_OBJECT":
+            return getattr(obj, "text", "") if obj is not None and data.get("object") else ""
+        return range_ui_draw.format_label(data["text"], ui.widget_values(data))
+
+    @property
+    def visible(self):
+        return bool(self.text) and not self.done
+
+    def page_length(self):
+        return range_ui_draw.page_length(self.pages[self.page]) if self.pages else 0
+
+
 # Fundo primeiro: Panel e Image ficam atrás do resto.
 _DRAW_ORDER = {"PANEL": 0, "IMAGE": 1}
 
@@ -111,14 +146,15 @@ class Screen:
         self.buttons = [Button(b) for b in data["buttons"]]
         widgets = sorted(data.get("widgets", ()), key=lambda w: _DRAW_ORDER.get(w["kind"], 2))
         self.controls = [Control(w) for w in widgets if w["kind"] in ("TOGGLE", "SLIDER")]
-        self.widgets = [w for w in widgets if w["kind"] not in ("TOGGLE", "SLIDER")]
+        self.dialogues = [Dialogue(w) for w in widgets if w["kind"] == "DIALOGUE"]
+        self.widgets = [w for w in widgets if w["kind"] not in ("TOGGLE", "SLIDER", "DIALOGUE")]
         # Ordem de leitura (de cima para baixo, da esquerda para a direita)
         # para a navegação por teclado.
         self.focusables = sorted(self.buttons + self.controls,
                                  key=lambda e: (round(e.data["rect"][1], 3), e.data["rect"][0]))
 
     def reset(self):
-        for element in self.focusables:
+        for element in self.focusables + self.dialogues:
             element.reset()
 
     def place(self, data, width, height):
@@ -149,6 +185,8 @@ class UIRuntime:
         self.textures = {}
         self.speeds = {}  # id(objeto) -> [tempo, posição, km/h]
         self.last_draw = None
+        self.last_tick = None
+        self.joy_advance = False
         self.master_volume = None
         self.first = menus[0]["name"] if menus else ""
         self.audio_controls = [w for s in data["screens"] for w in s.get("widgets", ())
@@ -188,6 +226,7 @@ class UIRuntime:
 
     def update(self):
         self.apply_audio()
+        self.update_dialogues()
         wanted = self.owner.get("ui_screen", "")
         if wanted != (self.active or ""):
             self.show(wanted)
@@ -244,6 +283,75 @@ class UIRuntime:
                 self.update_control(element, screen, inside, just_pressed, just_released, px)
             if self.screen is not current:
                 return
+
+    def visible_screens(self):
+        screens = list(self.huds) if self.owner.get("ui_hud", True) else []
+        if self.screen is not None:
+            screens.append(self.screen)
+        return screens
+
+    def advance_pressed(self):
+        """Enter/Espaço, clique ou botão A do controle."""
+        keyboard = logic.keyboard.inputs
+        pressed = any(keyboard[k].activated for k in (events.RETKEY, events.PADENTER, events.SPACEKEY))
+        pressed = pressed or logic.mouse.inputs[events.LEFTMOUSE].activated
+        joy = next((j for j in logic.joysticks if j is not None), None)
+        down = joy is not None and 0 in joy.activeButtons
+        pressed = pressed or (down and not self.joy_advance)
+        self.joy_advance = down
+        return pressed
+
+    def update_dialogues(self):
+        now = logic.getFrameTime()
+        dt = 0.0 if self.last_tick is None else max(0.0, now - self.last_tick)
+        self.last_tick = now
+        dialogues = [d for s in self.visible_screens() for d in s.dialogues]
+        if not dialogues:
+            return
+        advance = self.advance_pressed()
+        for dialogue in dialogues:
+            self.update_dialogue(dialogue, dt, advance)
+
+    def update_dialogue(self, dialogue, dt, advance):
+        data = dialogue.data
+        text = dialogue.current_text(self)
+        if text != dialogue.text:
+            dialogue.reset()
+            dialogue.text = text
+            self.hide_text_object(dialogue, bool(text))
+        if not dialogue.visible or dialogue.pages is None:
+            return  # as páginas saem no 1º desenho
+        length = dialogue.page_length()
+        before = int(dialogue.shown)
+        speed = data["speed"]
+        dialogue.shown = min(length, dialogue.shown + speed * dt) if speed > 0.0 else length
+        now = logic.getFrameTime()
+        if data["sound"] and int(dialogue.shown) > before and now - dialogue.last_sound > 0.06:
+            dialogue.last_sound = now
+            self.play_sound(data["sound"], 0.6)
+        if not advance:
+            return
+        if dialogue.shown < length:
+            dialogue.shown = length
+        elif dialogue.page + 1 < len(dialogue.pages):
+            dialogue.page += 1
+            dialogue.shown = 0.0
+            self.fire(dialogue, "On Page", None)
+        else:
+            dialogue.done = True
+            self.hide_text_object(dialogue, False)
+            obj = self.obj_for(data)
+            if data.get("source") == "PROPERTY" and obj is not None:
+                obj[data["property"]] = ""
+            self.fire(dialogue, "On Finish", None)
+
+    def hide_text_object(self, dialogue, hidden):
+        """Source = Text Object: o texto vai para a tela e o objeto 3D some."""
+        if dialogue.data.get("source") != "TEXT_OBJECT" or not dialogue.data.get("object"):
+            return
+        obj = self.obj_for(dialogue.data)
+        if obj is not None:
+            obj.visible = not hidden
 
     def back_pressed(self):
         keyboard = logic.keyboard.inputs
@@ -357,7 +465,9 @@ class UIRuntime:
 
     def fire(self, element, event, screen):
         sound = None
-        if event == "On Enter":
+        if screen is None:
+            pass  # Dialogue Box: sem som padrão da tela
+        elif event == "On Enter":
             sound = screen.sounds.get("hover")
         elif event in ("On Click", "On Change"):
             sound = screen.sounds.get("click")
@@ -383,6 +493,11 @@ class UIRuntime:
                 self.add_property(*value)
             elif action == "TOGGLE_PROP":
                 self.owner[value] = not self.owner.get(value, False)
+            elif action == "DIALOGUE":
+                name, prop, text = value
+                obj = self.scene.objects.get(name) if name else self.owner
+                if obj is not None:
+                    obj[prop] = text
             elif action == "PYTHON":
                 self.run_python(value)
 
@@ -529,6 +644,24 @@ class UIRuntime:
             bindcode = self.texture(data["path"]) if data["kind"] == "IMAGE" and data["path"] else 0
             range_ui_draw.draw_widget(bgl, blf, data, self.widget_values(data),
                                       x, y, w, h, bindcode=bindcode)
+        for dialogue in screen.dialogues:
+            if dialogue.visible:
+                self.draw_dialogue(bgl, blf, screen, dialogue, width, height)
+
+    def draw_dialogue(self, bgl, blf, screen, dialogue, width, height):
+        data = dialogue.data
+        x, y, w, h = screen.place(data, width, height)
+        speaker = range_ui_draw.format_label(data["speaker"], self.widget_values(data)) \
+            if data["speaker"] else ""
+        key = (dialogue.text, speaker, int(w), int(h))
+        if key != dialogue.layout_key:
+            dialogue.pages = range_ui_draw.dialogue_pages(blf, data, dialogue.text, speaker, w, h)
+            dialogue.layout_key = key
+            dialogue.page = min(dialogue.page, len(dialogue.pages) - 1)
+        complete = dialogue.shown >= dialogue.page_length()
+        blink = complete and (time.perf_counter() * 2.0) % 2.0 < 1.4
+        range_ui_draw.draw_dialogue(bgl, blf, data, speaker, dialogue.pages[dialogue.page],
+                                    int(dialogue.shown), x, y, w, h, blink)
 
     def draw_screen(self, bgl, blf, screen, width, height, dt, animate):
         self.draw_widgets(bgl, blf, screen, width, height)

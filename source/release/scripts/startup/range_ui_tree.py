@@ -379,6 +379,102 @@ class UIGaugeNode(UIHudNode, Node):
         return {self.prop_name: self.min_value + 0.6 * (self.max_value - self.min_value)}
 
 
+class UIDialogueNode(UIHudNode, Node):
+    """Caixa de diálogo: quebra o texto na largura, pagina pela altura e
+    escreve letra a letra; Enter/Espaço/clique (ou botão A) completa a
+    página e depois avança."""
+    bl_idname = "RangeUIDialogue"
+    bl_label = "Dialogue Box"
+
+    source = EnumProperty(name="Source", default="TEXT", items=(
+        ("TEXT", "Text", "The text typed here ({prop} shows properties)"),
+        ("PROPERTY", "Property", "String property of the Object: empty hides the box, the end of the dialogue empties it"),
+        ("TEXT_OBJECT", "Text Object", "Text of the Text object chosen in Object (hidden in 3D while the box shows it)")))
+    text = StringProperty(
+        name="Text", default="Olá, viajante! Este texto quebra sozinho na largura da caixa.|Use | para começar outra página.",
+        description="Dialogue text: | starts a new page, \\n a new line, {prop} shows a property")
+    prop_name = StringProperty(name="Property", default="dialogo",
+                               description="String property with the text")
+    speaker = StringProperty(name="Speaker", description="Name shown above the text ({prop} works); empty = no name")
+    speed = FloatProperty(name="Speed", default=40.0, min=0.0, soft_max=200.0,
+                          description="Letters per second (0 = the whole page at once)")
+    letter_sound = StringProperty(name="Letter Sound", subtype="FILE_PATH",
+                                  description="Short sound played while the letters appear (// = the .range folder)")
+    color = _color("Color", (0.04, 0.05, 0.10, 0.85))
+    radius = FloatProperty(name="Roundness", default=0.15, min=0.0, max=1.0, subtype="FACTOR")
+    border = FloatProperty(name="Border", default=0.01, min=0.0, max=0.1,
+                           description="Border thickness, as a fraction of the shorter side")
+    border_color = _color("Border Color", (1.0, 1.0, 1.0, 0.6))
+    text_color = _color("Text Color", (1.0, 1.0, 1.0, 1.0))
+    speaker_color = _color("Speaker Color", (1.0, 0.8, 0.3, 1.0))
+    text_size = FloatProperty(name="Text Size", default=18.0, min=4.0, soft_max=80.0,
+                              description="Letter size, in editor units (scales with the screen)")
+    line_spacing = FloatProperty(name="Line Spacing", default=1.3, min=0.8, max=3.0)
+    padding = FloatProperty(name="Padding", default=14.0, min=0.0, soft_max=60.0,
+                            description="Space between the border and the text, in editor units")
+    shadow = BoolProperty(name="Shadow", default=True)
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.width = 400
+        self.button_height = 110.0
+        for name in DIALOGUE_EVENTS:
+            self.outputs.new(UIEventSocket.bl_idname, name)
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "source", text="")
+
+    def draw_buttons_ext(self, context, layout):
+        box = layout.box()
+        box.label("Text", icon="FONT_DATA")
+        box.row().prop(self, "source", expand=True)
+        if self.source == "TEXT":
+            box.prop(self, "text", text="")
+            box.label("| = new page,  \\n = new line", icon="INFO")
+        elif self.source == "PROPERTY":
+            box.prop_search(self, "object_name", context.scene, "objects")
+            box.prop(self, "prop_name")
+        else:
+            box.prop_search(self, "object_name", context.scene, "objects", text="Text Object")
+        box.prop(self, "speaker")
+        box = layout.box()
+        box.label("Typewriter", icon="TIME")
+        box.prop(self, "speed")
+        box.prop(self, "letter_sound", text="Sound")
+        box = layout.box()
+        box.label("Look", icon="COLOR")
+        box.prop(self, "button_height")
+        col = box.column(align=True)
+        for prop in ("color", "text_color", "speaker_color"):
+            col.prop(self, prop)
+        box.prop(self, "radius", slider=True)
+        row = box.row(align=True)
+        row.prop(self, "border")
+        row.prop(self, "border_color", text="")
+        col = box.column(align=True)
+        col.prop(self, "text_size")
+        col.prop(self, "line_spacing")
+        col.prop(self, "padding")
+        box.prop(self, "shadow")
+
+    def widget(self):
+        return {"kind": "DIALOGUE", "source": self.source,
+                "text": self.text if self.source == "TEXT" else "",
+                "property": self.prop_name if self.source == "PROPERTY" else "",
+                "speaker": self.speaker, "speed": self.speed, "sound": self.letter_sound,
+                "color": tuple(self.color), "radius": self.radius, "border": self.border,
+                "border_color": tuple(self.border_color), "text_color": tuple(self.text_color),
+                "speaker_color": tuple(self.speaker_color), "text_size": self.text_size,
+                "line_spacing": self.line_spacing, "padding": self.padding,
+                "shadow": self.shadow, "design_h": self.button_height}
+
+    def preview_values(self):
+        return {}
+
+
+DIALOGUE_EVENTS = ("On Page", "On Finish")
+
+
 class UIControlNode(UIHudNode):
     """Controle que o jogador mexe e que grava numa propriedade de jogo;
     a saída On Change dispara quando o valor muda."""
@@ -468,7 +564,7 @@ class UISliderNode(UIControlNode, Node):
 
 
 HUD_NODES = (UIProgressBarNode, UILabelNode, UIPanelNode, UIImageNode, UIGaugeNode,
-             UIToggleNode, UISliderNode)
+             UIToggleNode, UISliderNode, UIDialogueNode)
 
 
 class UIActionNode(UINode):
@@ -577,6 +673,28 @@ class UITogglePropertyNode(UIActionNode, Node):
     param_label = "Property"
 
 
+class UIShowDialogueNode(UIActionNode, Node):
+    """Põe o texto numa propriedade: a de um Dialogue Box (Source =
+    Property) ou a "Text" de um objeto Text com Setup Dialogue.  Um botão
+    abre a conversa sem script."""
+    bl_idname = "RangeUIShowDialogue"
+    bl_label = "Show Dialogue"
+    action = "DIALOGUE"
+
+    object_name = StringProperty(
+        name="Object", description="Object that gets the text (empty = script owner)")
+    prop_name = StringProperty(name="Property", default="dialogo",
+                               description="Property read by the Dialogue Box (Text for a Text object)")
+
+    def draw_buttons(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects", text="")
+        layout.prop(self, "prop_name", text="")
+        layout.prop(self, "value", text="")
+
+    def payload(self):
+        return (self.object_name, self.prop_name, self.value)
+
+
 class UIRunPythonNode(UIActionNode, Node):
     """Chama modulo.funcao(ui); ui.owner é o dono do script."""
     bl_idname = "RangeUIRunPython"
@@ -587,7 +705,7 @@ class UIRunPythonNode(UIActionNode, Node):
 
 ACTION_NODES = (UIPrintNode, UIMessageNode, UIScreenNode, UISceneNode, UIQuitNode,
                 UISoundNode, UISetPropertyNode, UIAddPropertyNode, UITogglePropertyNode,
-                UIRunPythonNode)
+                UIShowDialogueNode, UIRunPythonNode)
 
 
 def _abs_location(node):
@@ -641,7 +759,7 @@ def bake_tree(tree, scene):
                 data["rect"] = rect
                 data["object"] = node.object_name
                 data["anchor"] = node.anchor
-                if isinstance(node, UIControlNode):
+                if isinstance(node, (UIControlNode, UIDialogueNode)):
                     data["events"] = {s.name: _actions_for(s) for s in node.outputs if s.is_linked}
                 widgets.append(data)
                 continue
@@ -1094,6 +1212,7 @@ CATEGORIES = [
         NodeItem(UIProgressBarNode.bl_idname),
         NodeItem(UILabelNode.bl_idname),
         NodeItem(UIGaugeNode.bl_idname),
+        NodeItem(UIDialogueNode.bl_idname),
     ]),
     UICategory("RANGE_UI_ACTIONS", "Actions",
                items=[NodeItem(cls.bl_idname) for cls in ACTION_NODES]),

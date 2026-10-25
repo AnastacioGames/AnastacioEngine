@@ -648,7 +648,31 @@ class DATA_PT_game_text_box(GameTextPanel, Panel):
         else:
             col.label(text="No pages: every line is shown", icon="INFO")
 
-        sub = box.column(align=True)
+        obj = context.object
+        props = obj.game.properties if obj is not None else {}
+        box = self.layout.box()
+        box.label(text="Dialogue (no code):", icon="TIME")
+        if obj is None or "td_speed" not in props:
+            box.operator("object.range_text_dialogue_setup", icon="ZOOMIN")
+            sub = box.column(align=True)
+            sub.active = False
+            sub.label(text="Typewriter + Enter/Space/click to advance the pages")
+        else:
+            box.prop(props["td_speed"], "value", text="Letters per Second")
+            if "td_end" in props:
+                row = box.row(align=True)
+                row.label(text="At the End:")
+                for end, label in (("HIDE", "Hide"), ("RESTART", "Restart"), ("KEEP", "Keep")):
+                    row.operator("object.range_text_dialogue_end", text=label,
+                                 depress=props["td_end"].value == end).end = end
+            if "td_message" in props:
+                box.prop(props["td_message"], "value", text="Message at End")
+            sub = box.column(align=True)
+            sub.active = False
+            sub.label(text="A new text (property Text) restarts the dialogue")
+            box.operator("object.range_text_dialogue_remove", icon="X")
+
+        sub = self.layout.column(align=True)
         sub.active = False
         sub.label(text="Python: lines, page, pageCount, visibleCharacters, characterCount")
 
