@@ -154,7 +154,7 @@ JÃ¡ feito em 2026-10-24:
 
 - `quality_preset` em `SCENEFXSettings`:
   - nÃ­veis Custom, Very Low, Low, Medium, High, Ultra e Auto;
-  - Auto vale Medium no desktop e Low na Web e no Android.
+  - Auto vale Medium em placa dedicada e Low em placa integrada, na Web e no Android.
 - Tabela Ãºnica por efeito. LaÃ§os compilados com `#define`.
 - `scene.setQualityPreset()` em Python e, opcionalmente, um governador tÃ©rmico.
 

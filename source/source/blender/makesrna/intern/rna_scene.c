@@ -6002,7 +6002,7 @@ static void rna_def_scene_shaders_fx(BlenderRNA *brna)
 		{SCENE_FX_QUALITY_MEDIUM, "MEDIUM", 0, "Medium", "Balanced settings"},
 		{SCENE_FX_QUALITY_HIGH, "HIGH", 0, "High", "Sharper effects, more GPU cost"},
 		{SCENE_FX_QUALITY_ULTRA, "ULTRA", 0, "Ultra", "Highest quality"},
-		{SCENE_FX_QUALITY_AUTO, "AUTO", 0, "Auto", "Medium on desktop, Low on Web and Android"},
+		{SCENE_FX_QUALITY_AUTO, "AUTO", 0, "Auto", "Medium on a dedicated GPU, Low on integrated GPUs, Web and Android"},
 		{0, NULL, 0, NULL, NULL}
 	};
 	prop = RNA_def_property(srna, "quality_preset", PROP_ENUM, PROP_NONE);

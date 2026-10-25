@@ -932,8 +932,8 @@ typedef struct SCENEFXSettings {
 #define SCENE_FX_UI_GRAIN                 (1 << 6)
 
 /* SCENEFXSettings.quality_preset. Custom changes nothing; the others write the existing
- * quality fields through BKE_scene_quality_preset_apply(). Auto = Medium on desktop, Low on
- * Web (Emscripten) and Android. */
+ * quality fields through BKE_scene_quality_preset_apply(). Auto = Medium on a dedicated GPU,
+ * Low on an integrated GPU, Web (Emscripten) and Android. */
 enum {
 	SCENE_FX_QUALITY_CUSTOM   = 0,
 	SCENE_FX_QUALITY_VERY_LOW = 1,
