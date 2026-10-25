@@ -3814,6 +3814,15 @@ float shadow_depth_from_linear(float z, vec3 clip)
  * the blocker distance. Soft sets the light size; the disk stops at 3x the plain PCF radius, and its taps
  * compare a bit closer to the lamp as it widens (a wide disk on a sloped receiver self-shadows).
  * Both disks are turned per pixel by IGN like shadow_pcf_poisson(). */
+/* Sun (ortho) scales of a shadow matrix: x = depth per world unit, y = map UV per world unit,
+ * z = 1 (ortho flag). Taken from the matrix so CSM cascades, each with its own projection, give
+ * the same penumbra in world units. */
+vec3 shadow_ortho_scale(mat4 m)
+{
+	return vec3(length(vec3(m[0][2], m[1][2], m[2][2])), length(vec3(m[0][0], m[1][0], m[2][0])), 1.0);
+}
+
+/* clip: Spot = (near, far, 0); Sun = shadow_ortho_scale() of its matrix. */
 float test_shadow_pcss(sampler2DShadow shadowmap, vec4 co, float samples, float soft, float samplesize, vec3 clip)
 {
 	const vec2 poisson[16] = vec2[](
@@ -3828,16 +3837,19 @@ float test_shadow_pcss(sampler2DShadow shadowmap, vec4 co, float samples, float 
 	float a = shadow_ign() * 6.2831853;
 	float ca = cos(a), sa = sin(a);
 	mat2 rot = mat2(ca, sa, -sa, ca);
+	bool ortho = clip.z > 0.5;
+	if (ortho) {
+		/* samplesize = soft / frustum, and the map is 2 * frustum wide. */
+		samplesize = 2.0 * soft * clip.y;
+	}
 	float texel = 1.0 / float(max(textureSize(shadowmap, 0).x, 1));
 	float pcfradius = samplesize * 0.5 * shadow_pcf_scale(shadowmap);
 	float maxradius = max(pcfradius * 3.0, texel * 2.0);
 
-	bool ortho = clip.z > 0.5;
-	float zr = shadow_linear_depth(co.z, clip);
-	/* Gap thresholds: Sun in world units, Spot as (zr - zb) / zb. */
-	vec2 gaps = ortho ? vec2(1.0, 4.0) : vec2(0.25, 1.0);
-	float ref1 = shadow_depth_from_linear(ortho ? zr - gaps.x : zr / (1.0 + gaps.x), clip);
-	float ref2 = shadow_depth_from_linear(ortho ? zr - gaps.y : zr / (1.0 + gaps.y), clip);
+	/* Gap thresholds: Sun 1 and 4 world units, Spot (zr - zb) / zb of 0.25 and 1. */
+	float zr = ortho ? 0.0 : shadow_linear_depth(co.z, clip);
+	float ref1 = ortho ? co.z - clip.x : shadow_depth_from_linear(zr / 1.25, clip);
+	float ref2 = ortho ? co.z - 4.0 * clip.x : shadow_depth_from_linear(zr / 2.0, clip);
 
 	vec3 blocked = vec3(0.0);
 	for (int i = 0; i < 16; i++) {
@@ -3861,11 +3873,14 @@ float test_shadow_pcss(sampler2DShadow shadowmap, vec4 co, float samples, float 
 	int n = int(clamp(samples * samples, 4.0, 16.0));
 	mat2 disk = rot * radius;
 	vec4 cob = co;
-	/* Disk radius in world units (Sun: map width = 2 * frustum, frustum = soft / samplesize;
-	 * Spot: about 2 * distance for a 90 degree cone); a quarter of it as depth covers gentle
-	 * slopes without lifting the shadow off its caster. */
-	float worldradius = 0.25 * radius * (ortho ? 2.0 * soft / max(samplesize, 1e-4) : 2.0 * zr);
-	cob.z = shadow_depth_from_linear(max(zr - worldradius, clip.x), clip);
+	/* Disk radius in world units (Spot: map about 2 * distance wide, 90 degree cone); a quarter
+	 * of it as depth covers gentle slopes without lifting the shadow off its caster. */
+	if (ortho) {
+		cob.z = max(co.z - 0.25 * radius / max(clip.y, 1e-6) * clip.x, 0.0);
+	}
+	else {
+		cob.z = shadow_depth_from_linear(max(zr - 0.5 * radius * zr, clip.x), clip);
+	}
 	float result = 0.0;
 	for (int i = 0; i < 16; i++) {
 		if (i >= n) break;
@@ -3985,7 +4000,8 @@ void shadow_pcss(
 		vec4 co = shadow_proj_coord(rco, vn, shadowpersmat, bias, slopebias);
 
 		if (shadow_visibility(co)) {
-			result = test_shadow_pcss(shadowmap, co, samples, soft, samplesize, clip);
+			result = test_shadow_pcss(shadowmap, co, samples, soft, samplesize,
+			                          (clip.z > 0.5) ? shadow_ortho_scale(shadowpersmat) : clip);
 		} else {
 			result = 1.0;
 		}
@@ -4054,13 +4070,23 @@ vec4 csm_shadow_proj_coord(vec3 rco, mat4 shadowpersmat, mat4 basepersmat,
 	return shadow_proj_coord(rco, shadowpersmat);
 }
 
+/* One cascade lookup: plain filter types, or PCSS (type 4, pcss = samples, soft) with the
+ * cascade's own scale so the penumbra keeps its world size across cascades. */
+float csm_shadow_test(sampler2DShadow shadowmap, vec4 co, mat4 persmat, float type, vec2 pcss)
+{
+	if (type > 3.5) {
+		return test_shadow_pcss(shadowmap, co, pcss.x, pcss.y, 0.0, shadow_ortho_scale(persmat));
+	}
+	return test_shadow_simple(shadowmap, co, type);
+}
+
 void shadow_simple_csm(
         vec3 rco, vec3 vn,
         sampler2DShadow shadowmap0, mat4 shadowpersmat0, float bias0, float slopebias0,
         sampler2DShadow shadowmap1, mat4 shadowpersmat1, float bias1, float slopebias1,
         sampler2DShadow shadowmap2, mat4 shadowpersmat2, float bias2, float slopebias2,
         mat4 lightimat, float referenceLight, float split0, float split1, float outerSize,
-        float type, float twosided, float inp,
+        float type, vec2 pcss, float twosided, float inp,
         out float result)
 {
 	if (inp <= 0.0) {
@@ -4079,37 +4105,37 @@ void shadow_simple_csm(
 
 	if (viewdist < split0 - blend0) {
 		co = csm_shadow_proj_coord(rco, vn, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0, bias0, slopebias0);
-		result = shadow_visibility(co) ? test_shadow_simple(shadowmap0, co, type) : 1.0;
+		result = shadow_visibility(co) ? csm_shadow_test(shadowmap0, co, shadowpersmat0, type, pcss) : 1.0;
 	}
 	else if (viewdist < split0 + blend0) {
 		/* Dithered cascade transition: each pixel takes one cascade with the blend weight as
 		 * probability (IGN), one tap instead of two and no doubled-up soft band. */
 		if (smoothstep(split0 - blend0, split0 + blend0, viewdist) <= shadow_ign()) {
 			co = csm_shadow_proj_coord(rco, vn, shadowpersmat0, shadowpersmat0, lightimat, referenceLight, split0, bias0, slopebias0);
-			result = shadow_visibility(co) ? test_shadow_simple(shadowmap0, co, type) : 1.0;
+			result = shadow_visibility(co) ? csm_shadow_test(shadowmap0, co, shadowpersmat0, type, pcss) : 1.0;
 		}
 		else {
 			co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
-			result = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
+			result = shadow_visibility(co) ? csm_shadow_test(shadowmap1, co, shadowpersmat1, type, pcss) : 1.0;
 		}
 	}
 	else if (viewdist < split1 - blend1) {
 		co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
-		result = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
+		result = shadow_visibility(co) ? csm_shadow_test(shadowmap1, co, shadowpersmat1, type, pcss) : 1.0;
 	}
 	else if (viewdist < split1 + blend1) {
 		if (smoothstep(split1 - blend1, split1 + blend1, viewdist) <= shadow_ign()) {
 			co = csm_shadow_proj_coord(rco, vn, shadowpersmat1, shadowpersmat0, lightimat, referenceLight, split1, bias1, slopebias1);
-			result = shadow_visibility(co) ? test_shadow_simple(shadowmap1, co, type) : 1.0;
+			result = shadow_visibility(co) ? csm_shadow_test(shadowmap1, co, shadowpersmat1, type, pcss) : 1.0;
 		}
 		else {
 			co = csm_shadow_proj_coord(rco, vn, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize, bias2, slopebias2);
-			result = shadow_visibility(co) ? test_shadow_simple(shadowmap2, co, type) : 1.0;
+			result = shadow_visibility(co) ? csm_shadow_test(shadowmap2, co, shadowpersmat2, type, pcss) : 1.0;
 		}
 	}
 	else {
 		co = csm_shadow_proj_coord(rco, vn, shadowpersmat2, shadowpersmat0, lightimat, referenceLight, outerSize, bias2, slopebias2);
-		result = shadow_visibility(co) ? test_shadow_simple(shadowmap2, co, type) : 1.0;
+		result = shadow_visibility(co) ? csm_shadow_test(shadowmap2, co, shadowpersmat2, type, pcss) : 1.0;
 	}
 }
 
@@ -4805,7 +4831,8 @@ float scene_shadow_filtered(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 p
 		return 1.0;
 	}
 	if (filt.x > 3.5) {
-		return test_shadow_pcss(shadowmap, co, filt.y, filt.z, filt.w, clip.xyz);
+		return test_shadow_pcss(shadowmap, co, filt.y, filt.z, filt.w,
+		                        (clip.z > 0.5) ? shadow_ortho_scale(persmat) : clip.xyz);
 	}
 	if (filt.x > 2.5) {
 		return shadow_pcf_poisson(shadowmap, co, filt.y, filt.w);

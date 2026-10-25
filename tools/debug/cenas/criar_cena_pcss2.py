@@ -3,7 +3,8 @@ para comparar a largura da penumbra lado a lado (PCF x PCSS).
 Câmera livre: WASD anda, Q/E sobe/desce, setas giram.
 
 Uso:
-  AnastacioEngine.exe -b --factory-startup --python criar_cena_pcss2.py -- saida.range [PCF|PCF_PENUMBRA] [soft]
+  AnastacioEngine.exe -b --factory-startup --python criar_cena_pcss2.py -- saida.range [PCF|PCF_PENUMBRA] [soft] [CSM]
+CSM: sol com cascatas e material clássico (o Principled não recebe sombra de CSM).
 """
 import bpy
 import math
@@ -13,18 +14,24 @@ argv = sys.argv[sys.argv.index('--') + 1:]
 out = argv[0]
 filtro = argv[1] if len(argv) > 1 else 'PCF_PENUMBRA'
 soft = float(argv[2]) if len(argv) > 2 else 3.0
+csm = len(argv) > 3 and argv[3] == 'CSM'
 
 scene = bpy.context.scene
 for ob in list(scene.objects):
     bpy.data.objects.remove(ob, do_unlink=True)
 scene.render.engine = 'BLENDER_GAME'
-scene.game_settings.use_shading_nodes = True
+scene.game_settings.use_shading_nodes = not csm
 scene.world.horizon_color = (0.4, 0.45, 0.5)
 scene.world.ambient_color = (0.35, 0.35, 0.35)
 
 
 def principled(name, color):
     mat = bpy.data.materials.new(name)
+    if csm:
+        mat.diffuse_color = color[:3]
+        mat.specular_intensity = 0.1
+        mat.ambient = 0.3
+        return mat
     mat.use_nodes = True
     nodes = mat.node_tree.nodes
     for n in list(nodes):
@@ -74,6 +81,8 @@ lamp.shadow_buffer_size = 2048
 lamp.shadow_buffer_samples = 4
 lamp.shadow_buffer_soft = soft
 lamp.shadow_filter = filtro
+if csm:
+    lamp.use_csm_shadow = True
 
 bpy.ops.object.camera_add(location=(0, -14, 13))
 cam = bpy.context.object

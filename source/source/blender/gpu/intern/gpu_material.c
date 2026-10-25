@@ -2394,6 +2394,11 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 				else {
 					float twoSidedShadows = (ma->mode2 & MA_TWOSIDEDSHADOWS) ? 1.0f : 0.0f;
 					float filtertype = (lamp->la->shadow_filter);
+					/* PCSS in the cascades (needs samples > 1 and some Soft, like the single map). */
+					float pcss[2] = {(float)lamp->la->samp, lamp->la->soft};
+					if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
+						filtertype = (lamp->la->samp > 1 && lamp->la->soft >= 0.01f) ? 4.0f : 0.0f;
+					}
 					GPU_link(mat, "shadow_simple_csm",
 					         GPU_material_builtin(mat, GPU_VIEW_POSITION),
 					         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
@@ -2411,7 +2416,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 					         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
 					         GPU_dynamic_uniform(&lamp->cascade_split[1], GPU_DYNAMIC_NONE, NULL),
 					         GPU_dynamic_uniform(&lamp->la->shadow_frustum_size, GPU_DYNAMIC_NONE, NULL),
-					         GPU_uniform(&filtertype), GPU_uniform(&twoSidedShadows), inp, &shadfac);
+					         GPU_uniform(&filtertype), GPU_uniform(pcss), GPU_uniform(&twoSidedShadows), inp, &shadfac);
 				}
 
 				/* Register the two cascade sub-lamps too, so GPU_material_update_lamps() refreshes
@@ -6377,6 +6382,11 @@ GPUNodeLink *GPU_lamp_get_data(
 			}
 			else {
 				float filtertype = (lamp->la->shadow_filter);
+				/* PCSS in the cascades (needs samples > 1 and some Soft, like the single map). */
+				float pcss[2] = {(float)lamp->la->samp, lamp->la->soft};
+				if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
+					filtertype = (lamp->la->samp > 1 && lamp->la->soft >= 0.01f) ? 4.0f : 0.0f;
+				}
 				GPU_link(mat, "shadow_simple_csm",
 				         GPU_material_builtin(mat, GPU_VIEW_POSITION),
 				         GPU_material_builtin(mat, GPU_VIEW_NORMAL),
@@ -6394,7 +6404,7 @@ GPUNodeLink *GPU_lamp_get_data(
 				         GPU_dynamic_uniform(&lamp->cascade_split[0], GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_uniform(&lamp->cascade_split[1], GPU_DYNAMIC_NONE, NULL),
 				         GPU_dynamic_uniform(&lamp->la->shadow_frustum_size, GPU_DYNAMIC_NONE, NULL),
-				         GPU_uniform(&filtertype), GPU_uniform(&twoSidedShadows), inp, &shadowfac);
+				         GPU_uniform(&filtertype), GPU_uniform(pcss), GPU_uniform(&twoSidedShadows), inp, &shadowfac);
 			}
 
 			/* Register the two cascade sub-lamps too, so GPU_material_update_lamps() refreshes
