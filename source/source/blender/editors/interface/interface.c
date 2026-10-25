@@ -293,6 +293,44 @@ void UI_block_translate(uiBlock *block, int x, int y)
 	BLI_rctf_translate(&block->rect, x, y);
 }
 
+/* Fundo arredondado atrás de cada grupo de botões encostados (separadores
+ * abrem um novo grupo), para barras flutuantes sobre a viewport. */
+void UI_block_draw_group_backgrounds(uiBlock *block, const unsigned char col[4], float radius)
+{
+	uiBut *but;
+	rctf grp;
+	bool open = false;
+
+	glEnable(GL_BLEND);
+	glColor4ubv(col);
+	UI_draw_roundbox_corner_set(UI_CNR_ALL);
+	for (but = block->buttons.first; ; but = but->next) {
+		const bool sep = (but == NULL) || ELEM(but->type, UI_BTYPE_SEPR, UI_BTYPE_SEPR_LINE, UI_BTYPE_SEPR_SPACER);
+		if (!sep && open && but->rect.xmin - grp.xmax > 1.0f) {
+			UI_draw_roundbox_gl_mode(GL_POLYGON, grp.xmin, grp.ymin, grp.xmax, grp.ymax, radius);
+			open = false;
+		}
+		if (sep) {
+			if (open) {
+				UI_draw_roundbox_gl_mode(GL_POLYGON, grp.xmin, grp.ymin, grp.xmax, grp.ymax, radius);
+				open = false;
+			}
+			if (but == NULL) {
+				break;
+			}
+			continue;
+		}
+		if (!open) {
+			grp = but->rect;
+			open = true;
+		}
+		else {
+			BLI_rctf_union(&grp, &but->rect);
+		}
+	}
+	glDisable(GL_BLEND);
+}
+
 static void ui_block_bounds_calc_text(uiBlock *block, float offset)
 {
 	uiStyle *style = UI_style_get();

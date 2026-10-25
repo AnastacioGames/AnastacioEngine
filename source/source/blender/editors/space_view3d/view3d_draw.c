@@ -4633,18 +4633,14 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 			}
 		}
 		UI_block_end(C, block);
-		if (end_x > x) {
+		{
+			/* Um fundo por grupo: os espaços entre grupos ficam transparentes. */
 			bTheme *btheme = UI_GetTheme();
 			unsigned char col[4];
 
 			copy_v4_v4_uchar(col, (unsigned char *)btheme->tui.wcol_tool.inner);
 			col[3] = 255;
-			glEnable(GL_BLEND);
-			glColor4ubv(col);
-			UI_draw_roundbox_corner_set(UI_CNR_ALL);
-			UI_draw_roundbox_gl_mode(GL_POLYGON, (float)x, (float)(y - UI_UNIT_Y), (float)end_x, (float)y,
-			                         0.2f * U.widget_unit);
-			glDisable(GL_BLEND);
+			UI_block_draw_group_backgrounds(block, col, 0.2f * U.widget_unit);
 		}
 	}
 	UI_block_draw(C, block);

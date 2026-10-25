@@ -577,6 +577,7 @@ void    UI_block_order_flip(uiBlock *block);
 void    UI_block_flag_enable(uiBlock *block, int flag);
 void    UI_block_flag_disable(uiBlock *block, int flag);
 void    UI_block_translate(uiBlock *block, int x, int y);
+void    UI_block_draw_group_backgrounds(uiBlock *block, const unsigned char col[4], float radius);
 
 int     UI_but_return_value_get(uiBut *but);
 
