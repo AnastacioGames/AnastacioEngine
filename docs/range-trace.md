@@ -81,7 +81,7 @@ piloto automático; a tecla I continua alternando. Combina com o trilho ou serve
 
 ## Formato
 
-Uma linha JSON por evento: `{"t":segundos,"f":frame,"ev":"tipo",...}`. Tipos: `session`, `scene_load`,
+Uma linha JSON por evento: `{"t":segundos,"f":frame,"ev":"tipo",...}`. Tipos: `session`, `gpu` (vendor, renderer e versão do OpenGL), `scene_load`,
 `load_shaders`, `object`, `mesh`, `material`, `object_left_out`, `convert_object`, `visible`, `image`, `frame`,
 `rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `work`, `scripts`, `memory`, `threads`, `sound`, `scene_add`,
 `scene_remove`, `end`.

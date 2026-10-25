@@ -69,6 +69,7 @@
 #include "DEV_Joystick.h"
 
 #include "CM_Message.h"
+#include "CM_Trace.h"
 
 #include <algorithm>
 #include <cstring>
@@ -293,6 +294,15 @@ void LA_Launcher::InitEngine()
 		}
 	}
 	m_pythonConsole.use = (gm.flag & GAME_PYTHON_CONSOLE);
+
+	// Range Trace: which GPU and driver drew the session (hybrid laptops may pick either one).
+	if (CM_TraceModules()) {
+		const char *vendor = (const char *)glGetString(GL_VENDOR);
+		const char *renderer = (const char *)glGetString(GL_RENDERER);
+		const char *version = (const char *)glGetString(GL_VERSION);
+		CM_TraceEvent("gpu", "\"vendor\":" + CM_TraceStr(vendor ? vendor : "") + ",\"renderer\":" +
+		              CM_TraceStr(renderer ? renderer : "") + ",\"version\":" + CM_TraceStr(version ? version : ""));
+	}
 
 	// Before any material is converted: the game's shaders take fixed values as uniforms.
 	GPU_material_uniform_values_set(gm.flag & GAME_FAST_SHADER_LOAD);
