@@ -91,3 +91,7 @@ Grupo 1 (1.4 Overlays primeiro, maior ganho) → aceite com janela → Grupo 2 �
 
 > 2026-10-25: Proportional (toggle + popover VIEW3D_PT_proportional_edit), ícones das Orientations e Snapping reordenado feitos; build OK; aguardando aceite com janela.
 > 2026-10-25: Exclude Non-Selectable + Backface Culling (Face/Volume) feitos em 04966276; build OK; props salvam/carregam. Próximo: Edge Center/Perpendicular.
+> 2026-10-25: Selectability & Visibility (opção A, Python + botão no header) em 85b2b456, testado headless.
+> Ícones conferidos: snap (Increment/Vertex/Edge/Face/Volume), pivot e falloff batem com o B5, exceto
+> Inverse Square (usa o mesmo de Root) e Orientations (aproximação). O conjunto 2.79 não tem os ícones
+> próprios do B5 (INVERSESQUARECURVE, ORIENTATION_*, edge midpoint/perpendicular): exigiria desenhar no blender_icons.
