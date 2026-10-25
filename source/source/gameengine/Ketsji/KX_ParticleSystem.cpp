@@ -103,6 +103,7 @@ PyAttributeDef KX_ParticleSystem::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("burstMode", KX_ParticleSystem, pyattr_get_burst_mode, pyattr_set_burst_mode),
 	EXP_PYATTRIBUTE_RW_FUNCTION("burstInterval", KX_ParticleSystem, pyattr_get_burst_interval, pyattr_set_burst_interval),
 	EXP_PYATTRIBUTE_RW_FUNCTION("drag", KX_ParticleSystem, pyattr_get_drag, pyattr_set_drag),
+	EXP_PYATTRIBUTE_RW_FUNCTION("flipbook", KX_ParticleSystem, pyattr_get_flipbook, pyattr_set_flipbook),
 	/* blendMode: str, 'ALPHA' or 'ADDITIVE'. */
 	EXP_PYATTRIBUTE_RW_FUNCTION("blendMode", KX_ParticleSystem, pyattr_get_panel, pyattr_set_panel),
 	/* billboardMode: str, 'CAMERA_FACING', 'VERTICAL' or 'HORIZONTAL'. */
@@ -282,6 +283,27 @@ int KX_ParticleSystem::pyattr_set_drag(EXP_PyObjectPlus *self_v, const EXP_PYATT
 		return PY_SET_ATTR_FAIL;
 	}
 	self->m_buffer->SetDrag((float)v);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+/// flipbook = (columns, rows, cycles, random_start); (1, 1, ...) = plain texture.
+PyObject *KX_ParticleSystem::pyattr_get_flipbook(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	const float *f = self->m_buffer->GetFlipbook();
+	return Py_BuildValue("(iifO)", (int)f[0], (int)f[1], f[2], (f[3] > 0.5f) ? Py_True : Py_False);
+}
+
+int KX_ParticleSystem::pyattr_set_flipbook(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_ParticleSystem *self = static_cast<KX_ParticleSystem *>(self_v);
+	int cols, rows, random = 0;
+	float cycles = 1.0f;
+	if (!PyArg_ParseTuple(value, "ii|fp:particles.flipbook = (columns, rows, cycles, random_start)",
+	                      &cols, &rows, &cycles, &random)) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_buffer->SetFlipbook(cols, rows, cycles, random != 0);
 	return PY_SET_ATTR_SUCCESS;
 }
 

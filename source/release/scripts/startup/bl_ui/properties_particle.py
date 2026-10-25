@@ -420,6 +420,13 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             box = col.box()
             box.label(text="Texture:", icon="TEXTURE")
             box.prop(gp, "texture", text="")
+            row = box.row(align=True)
+            row.prop(gp, "flipbook_columns")
+            row.prop(gp, "flipbook_rows")
+            if gp.flipbook_columns * gp.flipbook_rows > 1:
+                row = box.row(align=True)
+                row.prop(gp, "flipbook_cycles")
+                row.prop(gp, "use_flipbook_random")
             col = split.column()
             box = col.box()
             box.label(text="Blending:", icon="IMAGE_RGB_ALPHA")
@@ -503,6 +510,13 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             sub = split.column()
             sub.label(text="Blending:", icon="IMAGE_RGB_ALPHA")
             sub.prop(gpm, "texture", text="")
+            row = sub.row(align=True)
+            row.prop(gpm, "flipbook_columns")
+            row.prop(gpm, "flipbook_rows")
+            if gpm.flipbook_columns * gpm.flipbook_rows > 1:
+                row = sub.row(align=True)
+                row.prop(gpm, "flipbook_cycles")
+                row.prop(gpm, "use_flipbook_random")
             sub.prop(gpm, "blend_mode", text="")
             sub.prop(gpm, "billboard_mode", text="")
 

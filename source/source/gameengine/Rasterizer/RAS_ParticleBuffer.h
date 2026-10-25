@@ -106,6 +106,8 @@ private:
 	float m_burstTimer = 0.0f;
 	/// Velocity loss per second, exp(-drag * dt).
 	float m_drag = 0.0f;
+	/// Flipbook atlas: columns, rows, cycles over life, random start (0/1). 1x1 = plain texture.
+	float m_flipbook[4] = {1.0f, 1.0f, 1.0f, 0.0f};
 
 	/// Fase M: mirrors RangeGPUParticleSettings.blend_mode (GPU_PARTICLE_BLEND_*). Only affects
 	/// the glBlendFunc used in Draw() -- no shader/uniform involved.
@@ -254,6 +256,14 @@ public:
 	void Burst() { m_burstPending = true; m_burstTimer = 0.0f; }
 	float GetDrag() const { return m_drag; }
 	void SetDrag(float v) { m_drag = std::max(v, 0.0f); }
+	const float *GetFlipbook() const { return m_flipbook; }
+	void SetFlipbook(int cols, int rows, float cycles, bool randomStart)
+	{
+		m_flipbook[0] = (float)std::max(cols, 1);
+		m_flipbook[1] = (float)std::max(rows, 1);
+		m_flipbook[2] = std::max(cycles, 0.0f);
+		m_flipbook[3] = randomStart ? 1.0f : 0.0f;
+	}
 	void SetEmissionAngle(float v) { m_emissionAngle = v; }
 
 	/// Fase M: GPU_PARTICLE_BLEND_ALPHA (default) or GPU_PARTICLE_BLEND_ADDITIVE, see DNA_object_types.h.

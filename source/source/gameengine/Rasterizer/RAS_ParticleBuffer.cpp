@@ -453,6 +453,7 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection, 
 	glUniformMatrix4fv(m_shaderCache->GetDrawModelLoc(), 1, GL_FALSE, m_static ? m_model : kIdentity);
 	glUniform1i(m_shaderCache->GetDrawStaticLoc(), m_static ? 1 : 0);
 	glUniform1i(m_shaderCache->GetDrawUseTextureLoc(), m_texture != 0 ? 1 : 0);
+	glUniform4fv(m_shaderCache->GetDrawFlipbookLoc(), 1, m_flipbook);
 	if (m_texture != 0) {
 		glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, m_texture);

@@ -315,7 +315,27 @@ const char *drawFragmentPreamble =
 	"uniform bool u_useTexture;\n"
 	"uniform sampler2D u_colorCurveTex;\n"
 	"uniform bool u_useColorCurve;\n"
-	"uniform float u_time;\n";
+	"uniform float u_time;\n"
+	// Flipbook: the texture is an atlas of cols x rows frames played over the particle's life
+	// (cycles times, optional random start per sprite), blending the two nearest frames.
+	// cols * rows <= 1 = plain texture. Custom shaders can call particle_texture() too.
+	"uniform vec4 u_flipbook;\n" // cols, rows, cycles over life, random start (0/1)
+	"vec4 particle_texture(vec2 uv) {\n"
+	"	float cols = max(u_flipbook.x, 1.0);\n"
+	"	float rows = max(u_flipbook.y, 1.0);\n"
+	"	float frames = cols * rows;\n"
+	"	if (frames <= 1.0) {\n"
+	"		return texture2D(u_texture, uv);\n"
+	"	}\n"
+	"	float f = v_lifeFrac * max(u_flipbook.z, 0.0) * frames + u_flipbook.w * floor(v_seed * frames);\n"
+	"	float f0 = mod(floor(f), frames);\n"
+	"	float f1 = mod(f0 + 1.0, frames);\n"
+	"	vec2 cell = vec2(1.0 / cols, 1.0 / rows);\n"
+	// Frame 0 is the top-left cell, as flipbook atlases are usually laid out.
+	"	vec2 uv0 = (vec2(mod(f0, cols), rows - 1.0 - floor(f0 / cols)) + uv) * cell;\n"
+	"	vec2 uv1 = (vec2(mod(f1, cols), rows - 1.0 - floor(f1 / cols)) + uv) * cell;\n"
+	"	return mix(texture2D(u_texture, uv0), texture2D(u_texture, uv1), fract(f));\n"
+	"}\n";
 
 // Soft particles: compares this fragment's view distance with the scene depth snapshot (solid
 // pass only, see RAS_Rasterizer::UpdateGlobalDepthTexture) and fades the sprite over
@@ -351,7 +371,7 @@ const char *drawFragmentDefaultMain =
 	"	float mask;\n"
 	"	if (u_useTexture) {\n"
 	// v_uv is in [-0.5, 0.5] (unit quad corners) -- shift to [0, 1] for sampling.
-	"		vec4 texColor = texture2D(u_texture, v_uv + 0.5);\n"
+	"		vec4 texColor = particle_texture(v_uv + 0.5);\n"
 	"		rgb *= texColor.rgb;\n"
 	"		mask = texColor.a;\n"
 	"	} else {\n"
@@ -520,7 +540,7 @@ void main() {
 	vec3 rgb;
 	float baseMask;
 	if (u_useTexture) {
-		vec4 texColor = texture2D(u_texture, uv);
+		vec4 texColor = particle_texture(uv);
 		rgb = baseColor.rgb * texColor.rgb;
 		baseMask = texColor.a;
 	} else {
@@ -841,6 +861,7 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragSh
 	m_drawColorLoc = glGetUniformLocation(m_drawProgram, "u_color");
 	m_drawTextureLoc = glGetUniformLocation(m_drawProgram, "u_texture");
 	m_drawUseTextureLoc = glGetUniformLocation(m_drawProgram, "u_useTexture");
+	m_drawFlipbookLoc = glGetUniformLocation(m_drawProgram, "u_flipbook");
 	m_drawBillboardModeLoc = glGetUniformLocation(m_drawProgram, "u_billboardMode");
 	m_drawModelLoc = glGetUniformLocation(m_drawProgram, "u_model");
 	m_drawStaticLoc = glGetUniformLocation(m_drawProgram, "u_static");

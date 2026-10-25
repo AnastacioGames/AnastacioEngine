@@ -811,6 +811,9 @@ void KX_GameObject::ApplyGPUParticleParams(RAS_ParticleBuffer *buffer, const Ran
 	buffer->SetBurstMode(settings.emission_mode == GPU_PARTICLE_EMISSION_BURST);
 	buffer->SetBurstInterval(settings.burst_interval);
 	buffer->SetDrag(settings.drag);
+	/* 0 cycles only makes sense with a random start (still variant per sprite): otherwise play once. */
+	const float cycles = (settings.flipbook_cycles > 0.0f || settings.flipbook_random) ? settings.flipbook_cycles : 1.0f;
+	buffer->SetFlipbook(settings.flipbook_cols, settings.flipbook_rows, cycles, settings.flipbook_random != 0);
 }
 
 void KX_GameObject::ApplyGPUParticlesLive(const RangeGPUParticleSettings &oldSettings, const RangeGPUParticleSettings &settings, bool mix)

@@ -58,6 +58,7 @@ private:
 	int m_drawTextureLoc, m_drawUseTextureLoc, m_drawEndColorLoc, m_drawEndSizeLoc;
 	int m_drawBillboardModeLoc;
 	int m_drawModelLoc = -1;
+	int m_drawFlipbookLoc = -1;
 	int m_drawStaticLoc = -1;
 	/// Fase P: animated custom fragment scripts (see custom_frag_shader below) can read this.
 	int m_drawTimeLoc;
@@ -104,6 +105,7 @@ public:
 	int GetDrawUseTextureLoc() const { return m_drawUseTextureLoc; }
 	int GetDrawBillboardModeLoc() const { return m_drawBillboardModeLoc; }
 	int GetDrawModelLoc() const { return m_drawModelLoc; }
+	int GetDrawFlipbookLoc() const { return m_drawFlipbookLoc; }
 	int GetDrawStaticLoc() const { return m_drawStaticLoc; }
 	int GetDrawEndColorLoc() const { return m_drawEndColorLoc; }
 	int GetDrawEndSizeLoc() const { return m_drawEndSizeLoc; }

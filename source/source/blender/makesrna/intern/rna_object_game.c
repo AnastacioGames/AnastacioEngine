@@ -711,6 +711,32 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	                          "a fast burst with drag slows down like a fireball");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	prop = RNA_def_property(srna, "flipbook_columns", PROP_INT, PROP_NONE);
+	RNA_def_property_int_sdna(prop, NULL, "flipbook_cols");
+	RNA_def_property_range(prop, 0, 64);
+	RNA_def_property_ui_text(prop, "Columns",
+	                          "Flipbook: frames across the texture atlas (1 = plain texture)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "flipbook_rows", PROP_INT, PROP_NONE);
+	RNA_def_property_range(prop, 0, 64);
+	RNA_def_property_ui_text(prop, "Rows",
+	                          "Flipbook: frames down the texture atlas, frame 0 is the top left one");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "flipbook_cycles", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 100.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Cycles",
+	                          "Flipbook: times the animation plays over each particle's life "
+	                          "(0 = still frame, picked at random with Random Start)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
+	prop = RNA_def_property(srna, "use_flipbook_random", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flipbook_random", 1);
+	RNA_def_property_ui_text(prop, "Random Start", "Flipbook: each particle starts on a random frame");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "use_vortex", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_vortex", 1);
 	RNA_def_property_ui_text(prop, "Vortex / Cone",

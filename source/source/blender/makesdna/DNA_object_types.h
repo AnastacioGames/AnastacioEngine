@@ -258,6 +258,14 @@ typedef struct RangeGPUParticleSettings {
 	float burst_interval;
 	/* Air drag: the velocity loses this fraction per second (exp(-drag * t)), 0 = none. */
 	float drag;
+	/* Flipbook: texture_path is an atlas of flipbook_cols x flipbook_rows frames (frame 0 top
+	 * left) played flipbook_cycles times over each particle's life, the two nearest frames
+	 * blended. 0/1 x 0/1 (old files) = plain texture. flipbook_random starts each sprite on a
+	 * random frame; with 0 cycles that gives a still, random variant per sprite. */
+	short flipbook_cols, flipbook_rows;
+	float flipbook_cycles;
+	short flipbook_random;
+	short pad5[3];
 } RangeGPUParticleSettings;
 
 /* Native reverb area (opt-in on an Empty via gameflag2 & OB_REVERB_AREA). While the active camera
