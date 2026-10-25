@@ -49,6 +49,7 @@
 #include "ED_node.h"
 #include "ED_view3d.h"
 #include "ED_screen.h"
+#include "ED_logic.h"
 
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
@@ -1017,6 +1018,23 @@ void wm_draw_update(bContext *C)
  * janela inteira no back buffer, sem trocar buffer -- o jogo desenha por cima na sua regiÃ£o e
  * faz a troca. CompÃµe todo quadro: com troca de buffer, um quadro sem composiÃ§Ã£o mostraria a UI
  * antiga no outro buffer. SÃ³ no mÃ©todo Triple (o padrÃ£o); nos outros a UI nÃ£o Ã© redesenhada. */
+/* Realce dos logic bricks: pintado por cima a cada quadro, sem reconstruir o Logic Editor. */
+static void wm_draw_logic_debug_overlays(wmWindow *win)
+{
+	for (ScrArea *sa = win->screen->areabase.first; sa; sa = sa->next) {
+		const SpaceLogic *slogic = sa->spacedata.first;
+		if (sa->spacetype != SPACE_LOGIC || (slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF)) {
+			continue;
+		}
+		for (ARegion *ar = sa->regionbase.first; ar; ar = ar->next) {
+			if (ar->regiontype == RGN_TYPE_WINDOW) {
+				ED_logic_debug_draw_overlay(win, ar);
+			}
+		}
+	}
+	wmSubWindowSet(win, win->screen->mainwin);
+}
+
 void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar, bool dim)
 {
 	wmWindowManager *wm = CTX_wm_manager(C);
@@ -1136,6 +1154,7 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar, bool
 			if (copytex) {
 				wm_triple_copy_textures(win, drawdata->triple);
 			}
+			wm_draw_logic_debug_overlays(win);
 
 			glEnable(GL_BLEND);
 			glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1150,6 +1169,7 @@ void wm_draw_update_game_live(bContext *C, wmWindow *win, ARegion *game_ar, bool
 	}
 	else {
 		wm_method_draw_triple(C, win);
+		wm_draw_logic_debug_overlays(win);
 	}
 
 	glMatrixMode(GL_TEXTURE);

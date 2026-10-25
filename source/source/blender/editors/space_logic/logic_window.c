@@ -64,6 +64,7 @@
 
 #include "UI_interface.h"
 #include "WM_api.h"
+#include "ED_logic.h"
 #include "WM_types.h"
 #include "UI_view2d.h"
 
@@ -3544,6 +3545,17 @@ static void logic_debug_draw(uiBlock *block)
 	glDisable(GL_BLEND);
 }
 
+void ED_logic_debug_draw_overlay(wmWindow *win, ARegion *ar)
+{
+	uiBlock *block = ar->uiblocks.first;
+	if (block == NULL || ar->swinid == 0) {
+		return;
+	}
+	wmSubWindowSet(win, ar->swinid);
+	UI_view2d_view_ortho(&ar->v2d);
+	logic_debug_draw(block);
+}
+
 void logic_buttons(bContext *C, ARegion *ar)
 {
 	SpaceLogic *slogic= CTX_wm_space_logic(C);
@@ -3773,7 +3785,9 @@ void logic_buttons(bContext *C, ARegion *ar)
 
 	UI_block_end(C, block);
 	UI_block_draw(C, block);
-	if (!(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF)) {
+	/* Com o jogo embutido rodando o realce é pintado por cima a cada quadro
+	 * (ED_logic_debug_draw_overlay): a imagem guardada do editor fica sem ele. */
+	if (!(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF) && !WM_game_embedded_draw_active()) {
 		logic_debug_draw(block);
 	}
 

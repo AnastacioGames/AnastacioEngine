@@ -27,4 +27,10 @@
 /* logic_ops.c */
 void ED_operatortypes_logic(void);
 
+/* logic_window.c: realce dos bricks ativos pintado por cima da imagem guardada do editor,
+ * sem reconstruir os bricks (jogo embutido rodando). */
+struct ARegion;
+struct wmWindow;
+void ED_logic_debug_draw_overlay(struct wmWindow *win, struct ARegion *ar);
+
 #endif /* __ED_LOGIC_H__ */

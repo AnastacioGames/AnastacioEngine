@@ -722,6 +722,7 @@ bool WM_logic_debug_wanted(void);
 void WM_logic_debug_pulses(void *const *bricks, int count);
 float WM_logic_debug_intensity(const void *brick);
 void WM_logic_debug_clear(void);
+bool WM_game_embedded_draw_active(void);
 void wm_get_screensize(int *r_width, int *r_height);
 void wm_subwindow_close(struct wmWindow *win, int swinid);
 void wm_subwindow_matrix_get(struct wmWindow *win, int swinid, float mat[4][4]);
@@ -749,6 +750,7 @@ bool WM_game_live_ui_step(struct bContext *C) RET_ZERO
 bool WM_game_live_ui_active(void) RET_ZERO
 void WM_game_locked_ui_draw(struct bContext *C, struct ARegion *game_ar) RET_NONE
 bool WM_logic_debug_wanted(void) RET_ZERO
+bool WM_game_embedded_draw_active(void) RET_ZERO
 void WM_logic_debug_pulses(void *const *bricks, int count) RET_NONE
 float WM_logic_debug_intensity(const void *brick) RET_ZERO
 void WM_logic_debug_clear(void) RET_NONE

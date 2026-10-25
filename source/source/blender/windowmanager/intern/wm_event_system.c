@@ -520,6 +520,8 @@ static void wm_handler_ui_cancel(bContext *C)
 /* UI ao vivo durante o jogo embutido                                  */
 
 static ARegion *g_game_live_region = NULL;
+/* Jogo embutido com a UI travada (cadeado): desenhado por WM_game_locked_ui_draw. */
+static bool g_game_locked_drawing = false;
 
 /* Operadores que liberam/recarregam dados que o jogo convertido referencia, ou mexem no layout
  * da tela onde o jogo desenha. '*' no fim casa por prefixo. */
@@ -592,6 +594,7 @@ void WM_game_live_ui_end(void)
 
 void WM_game_locked_ui_draw(bContext *C, ARegion *game_ar)
 {
+	g_game_locked_drawing = true;
 	wmWindow *win = CTX_wm_window(C);
 	ScrArea *sa = CTX_wm_area(C);
 	ARegion *ar = CTX_wm_region(C);
@@ -612,10 +615,16 @@ void WM_game_locked_ui_draw(bContext *C, ARegion *game_ar)
  * Os ponteiros só servem de chave e nunca são lidos aqui. */
 
 #define LOGIC_DEBUG_FADE 0.4
-#define LOGIC_DEBUG_REDRAW_STEP (1.0 / 30.0)
+/* Cada redesenho reconstrói o Logic Editor inteiro (ms por área): 10 por segundo bastam ao fade. */
+#define LOGIC_DEBUG_REDRAW_STEP (1.0 / 10.0)
 
 static GHash *g_logic_debug_pulses = NULL;
 static double g_logic_debug_last_redraw = 0.0;
+/* Fim dos dois últimos quadros (chamada sem bricks). Brick que dispara a cada quadro (Always em
+ * pulso) fica aceso sem mudar e não pede redesenho, qualquer que seja o FPS. */
+static double g_logic_debug_end_prev = 0.0;
+static double g_logic_debug_end_last = 0.0;
+static bool g_logic_debug_dirty = false;
 
 static bool logic_debug_tag_areas(bool tag)
 {
@@ -632,10 +641,12 @@ static bool logic_debug_tag_areas(bool tag)
 			const SpaceLogic *slogic = sa->spacedata.first;
 			const bool logic_tree = sa->spacetype == SPACE_NODE &&
 			                        STREQ(((const SpaceNode *)sa->spacedata.first)->tree_idname, "RangeLogicTree");
-			if (logic_tree ||
-			    (sa->spacetype == SPACE_LOGIC && !(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF))) {
+			const bool logic_editor = sa->spacetype == SPACE_LOGIC && !(slogic->flag & SLOGIC_HIGHLIGHT_ACTIVE_OFF);
+			if (logic_tree || logic_editor) {
 				found = true;
-				if (tag) {
+				/* Com o jogo embutido o Logic Editor recebe o realce por cima a cada quadro
+				 * (wm_draw_logic_debug_overlays); reconstruir os bricks custava ~50 ms. */
+				if (tag && (logic_tree || !WM_game_embedded_draw_active())) {
 					ED_area_tag_redraw(sa);
 				}
 			}
@@ -660,9 +671,21 @@ void WM_logic_debug_pulses(void *const *bricks, int count)
 		void **val;
 		if (!BLI_ghash_ensure_p(g_logic_debug_pulses, bricks[i], &val)) {
 			*val = MEM_mallocN(sizeof(double), __func__);
+			g_logic_debug_dirty = true;
+		}
+		else if (*(double *)*val < g_logic_debug_end_prev) {
+			/* Estava apagando e acendeu de novo. */
+			g_logic_debug_dirty = true;
 		}
 		*(double *)*val = now;
 	}
+	if (count > 0) {
+		return;
+	}
+	/* Fim do quadro: decide se algo mudou na tela. */
+	const double frame_start = g_logic_debug_end_last;
+	g_logic_debug_end_prev = g_logic_debug_end_last;
+	g_logic_debug_end_last = now;
 
 	if (g_logic_debug_pulses == NULL || BLI_ghash_len(g_logic_debug_pulses) == 0) {
 		return;
@@ -670,17 +693,28 @@ void WM_logic_debug_pulses(void *const *bricks, int count)
 	if (now - g_logic_debug_last_redraw < LOGIC_DEBUG_REDRAW_STEP) {
 		return;
 	}
-	g_logic_debug_last_redraw = now;
 
-	/* Tira os já apagados; um quadro a mais desenhado sem eles limpa o editor. */
+	/* Tira os já apagados; um quadro a mais desenhado sem eles limpa o editor. Brick que dispara
+	 * todo quadro (Always em pulso) fica aceso sem mudar: não pede redesenho. */
 	const void **stale = MEM_mallocN(sizeof(void *) * BLI_ghash_len(g_logic_debug_pulses), __func__);
 	int stale_len = 0;
+	bool fading = false;
 	GHashIterator gh_iter;
 	GHASH_ITER (gh_iter, g_logic_debug_pulses) {
-		if (now - *(double *)BLI_ghashIterator_getValue(&gh_iter) > LOGIC_DEBUG_FADE) {
+		const double age = now - *(double *)BLI_ghashIterator_getValue(&gh_iter);
+		if (age > LOGIC_DEBUG_FADE) {
 			stale[stale_len++] = BLI_ghashIterator_getKey(&gh_iter);
 		}
+		else if (now - age < frame_start) {  /* não disparou neste quadro: apagando */
+			fading = true;
+		}
 	}
+	if (!(g_logic_debug_dirty || fading || stale_len > 0)) {
+		MEM_freeN((void *)stale);
+		return;
+	}
+	g_logic_debug_dirty = false;
+	g_logic_debug_last_redraw = now;
 	for (int i = 0; i < stale_len; i++) {
 		BLI_ghash_remove(g_logic_debug_pulses, stale[i], NULL, MEM_freeN);
 	}
@@ -708,6 +742,7 @@ float WM_logic_debug_intensity(const void *brick)
 
 void WM_logic_debug_clear(void)
 {
+	g_game_locked_drawing = false;
 	if (g_logic_debug_pulses) {
 		BLI_ghash_free(g_logic_debug_pulses, NULL, MEM_freeN);
 		g_logic_debug_pulses = NULL;
@@ -718,6 +753,12 @@ void WM_logic_debug_clear(void)
 bool WM_game_live_ui_active(void)
 {
 	return g_game_live_region != NULL;
+}
+
+/* Jogo embutido desenhando o editor por quadro, com a UI livre ou travada. */
+bool WM_game_embedded_draw_active(void)
+{
+	return g_game_live_region != NULL || g_game_locked_drawing;
 }
 
 bool WM_game_live_ui_step(bContext *C)
