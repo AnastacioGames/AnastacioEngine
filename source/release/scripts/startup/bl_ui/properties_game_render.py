@@ -289,7 +289,7 @@ class RENDER_PT_game_shading(RenderButtonsPanel, Panel):
         col.prop(gs, "use_glsl_ramps", text="Ramps", icon="IPO_BEZIER")
         col.prop(gs, "use_glsl_nodes", text="Nodes", icon="NODETREE")
         col.prop(gs, "use_glsl_extra_textures", text="Extra Textures", icon="ASSET_MANAGER")
-        col.prop(gs, "use_shading_nodes", text="PBR Shading Nodes", icon="MATERIAL")
+        col.prop(gs, "use_shading_nodes", text="PBR Shading Nodes", icon="MATERIAL_NODES" if gs.use_shading_nodes else "MATERIAL_DATA")
 
         box = layout.box()
         box.label(text="Shader Compilation:", icon="SCRIPT")

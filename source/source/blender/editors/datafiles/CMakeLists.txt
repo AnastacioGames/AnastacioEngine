@@ -472,6 +472,7 @@ set(ICON_NAMES
 	orientation_view
 	snap_midpoint
 	snap_perpendicular
+	material_nodes
 	gate_and
 	gate_or
 	gate_nand

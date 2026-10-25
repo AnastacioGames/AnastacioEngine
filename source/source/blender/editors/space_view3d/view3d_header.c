@@ -501,7 +501,15 @@ void view3d_header_tool_controls(uiLayout *row, bContext *C)
 		bool free;
 		RNA_property_enum_items(C, &v3dptr, prop, &items, NULL, &free);
 		for (it = items; it->identifier; it++) {
-			if (ELEM(it->value, OB_WIRE, OB_SOLID, OB_MATERIAL, OB_RENDER)) {
+			if (it->value == OB_MATERIAL) {
+				/* Texture não tem botão próprio: mostra o de Material aceso nesse modo.
+				 * Com PBR (nós de shading) ligado, o ícone vira o de nós. */
+				const bool pbr = scene && (scene->gm.flag & GAME_USE_SHADING_NODES);
+				const char *ident = (v3d->drawtype == OB_TEXTURE) ? "TEXTURED" : it->identifier;
+				uiItemEnumR_string(row, &v3dptr, "viewport_shade", ident, "",
+				                   pbr ? ICON_MATERIAL_NODES : it->icon);
+			}
+			else if (ELEM(it->value, OB_WIRE, OB_SOLID, OB_RENDER)) {
 				uiItemEnumR_string(row, &v3dptr, "viewport_shade", it->identifier, "", it->icon);
 			}
 		}
