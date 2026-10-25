@@ -2495,6 +2495,17 @@ float chapman_depth(float X, float h, float cosZ)
 	return 2.0 * sqrt(M_PI * 0.5 * x0) * exp(X - x0) - c / (1.0 - c * cosZ) * exp(-h);
 }
 
+#ifdef SKY_VERY_LOW
+/* integral of an exponential density between two samples a, b over a unit length (logarithmic mean) */
+float sky_logmean(float a, float b)
+{
+	a = max(a, 1e-30);
+	b = max(b, 1e-30);
+	float d = a - b;
+	return (abs(d) < 1e-4 * max(a, b)) ? 0.5 * (a + b) : d / log(a / b);
+}
+#endif
+
 vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 					vec3 r0,       // ray origin
 					vec3 pSun,     // position of the sun
@@ -2555,6 +2566,22 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 	// Sample the primary ray.
 	for (int i = 0; i < int(iSteps); i++) {
 		if (float(i) >= nSteps) break;
+#ifdef SKY_VERY_LOW
+		// Very Low: com 3 passos iguais o ponto do meio fica alto demais (no zenite o 1o ja esta a ~17 km), o Mie
+		// (escala 1.2 km) some -> sem brilho do sol e faixa rosa no horizonte. Passos crescendo ao quadrado
+		// (densos perto da camera) e densidade integrada entre as pontas (media logaritmica da exponencial).
+		float f0 = float(i) / nSteps;
+		float f1 = float(i + 1) / nSteps;
+		float t0 = p.x + (p.y - p.x) * f0 * f0;
+		float t1 = p.x + (p.y - p.x) * f1 * f1;
+		float segLen = t1 - t0;
+		float h0 = length(r0 + r * t0) - rPlanet;
+		float h1 = length(r0 + r * t1) - rPlanet;
+		vec3 iPos = r0 + r * (0.5 * (t0 + t1));
+		float iHeight = length(iPos) - rPlanet;
+		float odStepRlh = segLen * sky_logmean(exp(-h0 / shRlh), exp(-h1 / shRlh));
+		float odStepMie = segLen * sky_logmean(exp(-h0 / shMie), exp(-h1 / shMie));
+#else
 		// Calculate the primary ray sample position.
 		vec3 iPos = r0 + r * (iTime + iStepSize * 0.5);
 
@@ -2564,6 +2591,7 @@ vec3 sky_atmosphere(vec3 r,       // normalized ray direction
 		// Calculate the optical depth of the Rayleigh and Mie scattering for this step.
 		float odStepRlh = exp(-iHeight / shRlh) * iStepSize;
 		float odStepMie = exp(-iHeight / shMie) * iStepSize;
+#endif
 
 		// Optical depth toward the sun, analytic instead of a secondary ray march.
 		float cosSun = dot(iPos, pSun) / (iHeight + rPlanet);
@@ -3270,10 +3298,14 @@ void env_sky_atmospheric(vec3 wv, vec3 wn, vec3 wr, vec3 sundir, float rough,
 						vec4 rlh, vec4 atmo, float energy, float sunsize, vec3 suncol, float env_sky,
 						out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
-	do_sky_atmospheric(wr, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
 #ifdef SKY_VERY_LOW
-	diffibl = mirror; // Very Low: so um raymarch por pixel de objeto
+	// Very Low: um raymarch por pixel de objeto. Antes o ambiente copiava o reflexo (direcao wr, sem o
+	// achatamento do rough 1.831), entao a sombra pegava o chao/horizonte do reflexo e ficava esverdeada.
+	// Agora a amostra unica e a do ambiente (igual aos outros niveis) e o reflexo reaproveita ela.
+	do_sky_atmospheric(-wn, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.831, diffibl);
+	mirror = diffibl;
 #else
+	do_sky_atmospheric(wr, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, rough, mirror);
 	do_sky_atmospheric(-wn, rlh, atmo, sundir, suncol, energy, sunsize, 0.0, 0.01, 0.25, env_sky, 1.831, diffibl);
 #endif
 #ifdef SKY_LOW

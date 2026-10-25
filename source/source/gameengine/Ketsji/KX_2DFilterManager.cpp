@@ -443,13 +443,10 @@ void KX_2DFilterManager::EnsureVFogFilters(BuildInFilters filters)
 	fogData.shaderText = std::string(datatoc_gpu_shader_vfog_lib_glsl) + datatoc_RAS_VolumetricFog2DFilter_glsl;
 
 	const int lod = std::max(1, filters.vfog_lod);
-	if (lod == 1) {
-		AddFilter(fogData, true);
-		return;
-	}
 
-	/* Half/Quarter: like the Light Scattering, the fog (in-scatter rgb, transmittance a) goes to a
-	 * small offscreen and the image pass upscales it following the depth. */
+	/* Full/Half/Quarter: like the Light Scattering, the fog (in-scatter rgb, transmittance a) goes to a
+	 * offscreen and the image pass upscales it following the depth. Full resolution goes through it too:
+	 * the image pass also blurs the fog a little (depth aware), hiding the raymarch jitter stipple. */
 	fogData.shaderText = "#define VFOG_LOW_RES\n" + fogData.shaderText;
 	KX_2DFilter *fog = static_cast<KX_2DFilter *>(AddFilter(fogData, true));
 	fog->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
