@@ -954,6 +954,18 @@ def add_template(tree, kind, origin=(0.0, 0.0)):
             down = action(UISetPropertyNode, "True", 800, -250 - i * 200, (button, "On Press"))
             up = action(UISetPropertyNode, "False", 800, -350 - i * 200, (button, "On Release"))
             down.prop_name = up.prop_name = prop
+        # Conversa: a caixa lê "dialogo" (vazio = escondida).  O Show
+        # Dialogue fica solto de exemplo: ligue num botão, ou faça
+        # own["dialogo"] = "..." num script ou com o atuador Property.
+        talk = widget(UIDialogueNode, hud, 180, -180, 280, 100)
+        talk.source = "PROPERTY"
+        talk.speaker = "NPC"
+        talk.text_size = 14.0
+        talk.padding = 10.0
+        talk.anchor = "BOTTOM"
+        show = tree.nodes.new(UIShowDialogueNode.bl_idname)
+        show.location = (ox + 800, oy - 700)
+        show.value = "Olá! Esta é a caixa de diálogo do HUD.|Enter, Espaço ou clique avançam."
         return [hud]
 
     menu = frame("Menu", 0, 0)
@@ -989,7 +1001,8 @@ def add_template(tree, kind, origin=(0.0, 0.0)):
 GAME_PROPS = (("ui_screen", "STRING", "Menu"), ("ui_hud", "BOOL", False),
               ("som", "BOOL", True), ("volume", "FLOAT", 0.8),
               ("vida", "FLOAT", 100.0), ("velocidade", "FLOAT", 0.0),
-              ("botao_a", "BOOL", False), ("botao_b", "BOOL", False))
+              ("botao_a", "BOOL", False), ("botao_b", "BOOL", False),
+              ("dialogo", "STRING", ""))
 
 
 def setup_game_logic(obj):
@@ -1023,7 +1036,7 @@ class RANGE_OT_ui_tree_template(Operator):
 
     kind = EnumProperty(name="Template", items=(
         ("MENU", "Menu + Options", "Play/Options/Quit menu and an options screen with sound and volume"),
-        ("HUD", "HUD", "Health bar and speedometer")))
+        ("HUD", "HUD", "Health bar, speedometer, Pause/A/B buttons and a dialogue box")))
 
     @classmethod
     def poll(cls, context):
