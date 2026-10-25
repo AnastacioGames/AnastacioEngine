@@ -432,8 +432,25 @@ void view3d_header_tool_controls(uiLayout *row, bContext *C)
 	}
 	uiItemR(row, &toolptr, "use_snap", UI_ITEM_R_TOGGLE, "", ICON_SNAP_ON);
 	uiItemPopoverPanel(row, C, "VIEW3D_PT_snapping", "", snap_icon);
-	uiItemR(row, &toolptr, "proportional_edit", UI_ITEM_R_ICON_ONLY, "", ICON_PROP_OFF);
-	uiItemR(row, &toolptr, "proportional_edit_falloff", UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	/* Proporcional (Blender 5): clique liga/desliga; o popover traz falloff, modo e tamanho. */
+	{
+		const short prop_mode = scene->toolsettings->proportional;
+		int falloff_icon = ICON_SMOOTHCURVE;
+		prop = RNA_struct_find_property(&toolptr, "proportional_edit_falloff");
+		if (prop) {
+			const EnumPropertyItem *items;
+			bool free;
+			RNA_property_enum_items(C, &toolptr, prop, &items, NULL, &free);
+			RNA_enum_icon_from_value(items, RNA_property_enum_get(&toolptr, prop), &falloff_icon);
+			if (free) {
+				MEM_freeN((void *)items);
+			}
+		}
+		uiItemO(row, "", (prop_mode == PROP_EDIT_OFF) ? ICON_PROP_OFF :
+		        (prop_mode == PROP_EDIT_CONNECTED) ? ICON_PROP_CON : ICON_PROP_ON,
+		        "VIEW3D_OT_proportional_toggle");
+		uiItemPopoverPanel(row, C, "VIEW3D_PT_proportional_edit", "", falloff_icon);
+	}
 
 	if (edit_mode) {
 		uiItemS(row);

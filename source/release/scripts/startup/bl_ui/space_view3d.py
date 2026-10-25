@@ -3773,16 +3773,30 @@ class VIEW3D_PT_shading(Panel):
         obj = context.object
         fx_settings = view.fx_settings
 
-        layout.prop(view, "show_world")
-        layout.prop(view, "show_invisible_lods")
+        solid_like = view.viewport_shade not in {'BOUNDBOX', 'WIREFRAME'}
 
-        if view.viewport_shade not in {'BOUNDBOX', 'WIREFRAME'}:
-            layout.prop(view, "show_mist")
-            layout.prop(view, "show_backface_culling")
+        # Seções como no Blender 5, com o conteúdo do jogo.
+        layout.label(text="Viewport Shading")
+        col = layout.column()
+        col.label(text="Lighting")
+        col.prop(view, "show_world")
 
-            sub = layout.column()
+        layout.separator()
+        col = layout.column()
+        col.label(text="Game Preview")
+        if solid_like:
+            col.prop(view, "show_mist")
+            sub = col.column()
             sub.active = view.region_3d.view_perspective == 'CAMERA'
             sub.prop(fx_settings, "use_dof")
+        col.prop(view, "show_invisible_lods")
+
+        layout.separator()
+        col = layout.column()
+        col.label(text="Display")
+        if solid_like:
+            col.prop(view, "show_backface_culling")
+        col.prop(view, "show_icon_components", text="Component Icons")
 
         if view.viewport_shade == 'SOLID':
             layout.prop(view, "show_textured_solid")
@@ -3796,11 +3810,6 @@ class VIEW3D_PT_shading(Panel):
         if view.viewport_shade not in {'BOUNDBOX', 'WIREFRAME'}:
             if obj and obj.mode == 'EDIT':
                 layout.prop(view, "show_occlude_wire")
-        
-        
-        row = layout.row()
-        row.label("3D icons:")
-        row.prop(view, "show_icon_components")
 
 
 class VIEW3D_PT_overlay(Panel):
@@ -3819,39 +3828,49 @@ class VIEW3D_PT_overlay(Panel):
         curve = mesh
         statvis = context.tool_settings.statvis
 
-        # Text Info (Blender 5): nome da vista e do objeto no canto da viewport.
         prefs = context.user_preferences.view
-        row = layout.row(align=True)
-        row.prop(prefs, "show_view_name", text="View Name", toggle=True)
-        row.prop(prefs, "show_object_info", text="Object Info", toggle=True)
-        row.prop(view, "show_stats", text="Statistics", toggle=True)
-        layout.separator()
+        layout.label(text="Viewport Overlays")
 
-        layout.prop(view, "show_outline_selected")
-        layout.prop(view, "show_all_objects_origin")
-        layout.prop(view, "show_relationship_lines")
-        if hasattr(context.window_manager, "range_component_gizmos"):
-            layout.prop(context.window_manager, "range_component_gizmos")
-
-        layout.prop(view, "show_floor", text="Grid")
-        sub = layout.column(align=True)
-        sub.active = bool(view.show_floor or view.region_quadviews or not view.region_3d.is_perspective)
-        subsub = sub.column(align=True)
-        subsub.active = view.show_floor
-        subsub.prop(view, "grid_lines", text="Floor Lines")
-        sub.prop(view, "grid_scale", text="Scale")
-        subsub = sub.column(align=True)
-        subsub.active = scene.unit_settings.system == 'NONE'
-        subsub.prop(view, "grid_subdivisions", text="Subdivisions")
-
-        layout.separator()
-
-        col = layout.column(align=True)
-        col.label("World Axis")
-        row = col.row(align=True)
+        # Guides (Blender 5): grade, eixos e escala.
+        layout.label(text="Guides")
+        split = layout.split(factor=0.5)
+        split.prop(view, "show_floor", text="Grid")
+        row = split.row(align=True)
         row.prop(view, "show_axis_x", text="X", toggle=True)
         row.prop(view, "show_axis_y", text="Y", toggle=True)
         row.prop(view, "show_axis_z", text="Z", toggle=True)
+        sub = layout.column(align=True)
+        sub.active = bool(view.show_floor or view.region_quadviews or not view.region_3d.is_perspective)
+        row = sub.row(align=True)
+        row.prop(view, "grid_scale", text="Scale")
+        subsub = row.row(align=True)
+        subsub.active = scene.unit_settings.system == 'NONE'
+        subsub.prop(view, "grid_subdivisions", text="Subdivisions")
+        subsub = sub.row(align=True)
+        subsub.active = view.show_floor
+        subsub.prop(view, "grid_lines", text="Floor Lines")
+
+        layout.separator()
+
+        # Text: nome da vista e do objeto no canto da viewport.
+        layout.label(text="Text")
+        split = layout.split(factor=0.5)
+        col = split.column()
+        col.prop(prefs, "show_view_name", text="View Name")
+        col.prop(view, "show_stats", text="Statistics")
+        split.column().prop(prefs, "show_object_info", text="Object Info")
+
+        layout.separator()
+
+        layout.label(text="Objects")
+        split = layout.split(factor=0.5)
+        col = split.column()
+        col.prop(view, "show_outline_selected", text="Outline Selected")
+        col.prop(view, "show_relationship_lines", text="Relationship Lines")
+        col = split.column()
+        col.prop(view, "show_all_objects_origin", text="Origins (All)")
+        if hasattr(context.window_manager, "range_component_gizmos"):
+            layout.prop(context.window_manager, "range_component_gizmos", text="Components")
 
         layout.separator()
 
@@ -3977,21 +3996,22 @@ class VIEW3D_PT_gizmo(Panel):
     def draw(self, context):
         layout = self.layout
         view = context.space_data
-        layout.label(text="Viewport Gizmos")
-        col = layout.column()
-        col.active = view.show_manipulator
-        col.prop(view, "transform_manipulators", expand=True)
-
-        # Navegação (Blender 5: Navigate/Axes no mesmo popover).
         prefs = context.user_preferences.view
-        layout.separator()
-        layout.label(text="Navigation")
+
+        # Blender 5: Viewport Gizmos (navegação) e Object Gizmos (transformação).
+        layout.label(text="Viewport Gizmos")
         row = layout.row(align=True)
-        row.prop(prefs, "show_mini_axis", text="Axes")
+        row.prop(prefs, "show_mini_axis", text="Navigate")
         sub = row.row(align=True)
         sub.active = prefs.show_mini_axis
         sub.prop(prefs, "mini_axis_size", text="Size")
         layout.prop(view, "show_floating_controls_in_header", text="Controls in Header")
+
+        layout.separator()
+        layout.label(text="Object Gizmos")
+        col = layout.column()
+        col.active = view.show_manipulator
+        col.prop(view, "transform_manipulators", expand=True)
 
 
 class VIEW3D_PT_pivot_point(Panel):
@@ -4007,7 +4027,7 @@ class VIEW3D_PT_pivot_point(Panel):
 
         layout = self.layout
         col = layout.column()
-        col.label(text="Pivot Point")
+        col.label(text="Transform Pivot Point")
         col.prop(view, "pivot_point", expand=True)
 
         if (obj is None) or (mode in {'OBJECT', 'POSE', 'WEIGHT_PAINT'}):
@@ -4019,6 +4039,51 @@ class VIEW3D_PT_pivot_point(Panel):
                 text="Only Locations",
                 toggle=False
             )
+
+
+class VIEW3D_OT_proportional_toggle(bpy.types.Operator):
+    """Turn proportional editing on or off, keeping the last mode (Connected, Projected)"""
+    bl_idname = "view3d.proportional_toggle"
+    bl_label = "Proportional Editing"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    _last_mode = 'ENABLED'
+
+    def execute(self, context):
+        ts = context.tool_settings
+        if ts.proportional_edit == 'DISABLED':
+            ts.proportional_edit = VIEW3D_OT_proportional_toggle._last_mode
+        else:
+            VIEW3D_OT_proportional_toggle._last_mode = ts.proportional_edit
+            ts.proportional_edit = 'DISABLED'
+        return {'FINISHED'}
+
+
+class VIEW3D_PT_proportional_edit(Panel):
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_label = "Proportional Editing"
+    bl_ui_units_x = 8
+
+    def draw(self, context):
+        layout = self.layout
+        ts = context.tool_settings
+
+        layout.label(text="Proportional Editing")
+        col = layout.column(align=True)
+        col.prop(ts, "proportional_edit_falloff", expand=True)
+
+        layout.separator()
+        mode = ts.proportional_edit
+        col = layout.column()
+        col.active = mode != 'DISABLED'
+        # Connected/Projected como opções do modo ligado (Blender 5).
+        for value, label in (('CONNECTED', "Connected Only"), ('PROJECTED', "Projected from View")):
+            op = col.operator("wm.context_set_enum", text=label,
+                              icon='CHECKBOX_HLT' if mode == value else 'CHECKBOX_DEHLT', emboss=False)
+            op.data_path = "tool_settings.proportional_edit"
+            op.value = 'ENABLED' if mode == value else value
+        col.prop(ts, "proportional_size", text="Proportional Size")
 
 
 class VIEW3D_PT_snapping(Panel):
@@ -4034,23 +4099,27 @@ class VIEW3D_PT_snapping(Panel):
 
         layout = self.layout
         col = layout.column()
-        col.label(text="Snapping")
-        col.prop(toolsettings, "snap_element", expand=True)
+
+        # Ordem do Blender 5: Snap Base, Snap Target em lista, depois as opções.
+        col.label(text="Snap Base")
+        row = col.row(align=True)
+        row.active = snap_elements != {'INCREMENT'}
+        row.prop(toolsettings, "snap_target", expand=True)
+
+        col.label(text="Snap Target")
+        sub = col.column(align=True)
+        sub.prop(toolsettings, "snap_element", expand=True)
 
         col.separator()
         if 'INCREMENT' in snap_elements:
-            col.prop(toolsettings, "use_snap_grid_absolute")
+            col.prop(toolsettings, "use_snap_grid_absolute", text="Absolute Increment Snap")
 
         if snap_elements != {'INCREMENT'}:
-            col.label(text="Target")
-            row = col.row(align=True)
-            row.prop(toolsettings, "snap_target", expand=True)
-
             if obj:
                 if object_mode == 'EDIT':
                     col.prop(toolsettings, "use_snap_self")
                 if object_mode in {'OBJECT', 'POSE', 'EDIT'}:
-                    col.prop(toolsettings, "use_snap_align_rotation", text="Align Rotation")
+                    col.prop(toolsettings, "use_snap_align_rotation", text="Align Rotation to Target")
 
             if 'FACE' in snap_elements:
                 col.prop(toolsettings, "use_snap_project", text="Project Elements")
@@ -4140,8 +4209,10 @@ class VIEW3D_PT_transform_orientations(Panel):
         scene = context.scene
         orientation = scene.current_orientation
 
+        # Lista aberta como no Blender 5 (inclui as orientações criadas pelo usuário).
         row = layout.row()
-        row.prop(scene, "transform_orientation", text="")
+        col = row.column(align=True)
+        col.prop(scene, "transform_orientation", expand=True)
         row.operator("transform.create_orientation", text="", icon='ZOOMIN', emboss=False).use = True
 
         if orientation:
@@ -4451,6 +4522,8 @@ classes = (
     VIEW3D_PT_overlay,
     VIEW3D_PT_gizmo,
     VIEW3D_PT_pivot_point,
+    VIEW3D_OT_proportional_toggle,
+    VIEW3D_PT_proportional_edit,
     VIEW3D_PT_snapping,
     VIEW3D_PT_meshdisplay,
     VIEW3D_PT_transform_orientations,
