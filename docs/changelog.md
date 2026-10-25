@@ -8,6 +8,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-25 - Texto: Text Boxes funcionando no jogo (quebra de linha, páginas, máquina de escrever)
+
+- O painel Text Boxes do objeto de texto era ignorado pelo `KX_FontObject`: só `
+` quebrava linha. Agora a
+  1ª caixa vale no jogo: **Width** quebra por palavra (palavra maior que a caixa é cortada entre letras, UTF-8),
+  **Height** limita as linhas e divide em páginas (`altura / (Size × Line Spacing)` linhas por página). Funciona
+  com fonte e com atlas de bitmap. Width/Height 0 = comportamento antigo.
+- Python novo em `KX_FontObject`: `textBox` (w, h, RW), `lines` (linhas após a quebra), `page` (RW, limitado),
+  `pageCount`, `visibleCharacters` (efeito máquina de escrever, -1 = tudo; o corte acontece depois do
+  alinhamento, então o texto não "anda" enquanto aparece) e `characterCount` (caracteres da página).
+- Otimização: `obj.text = mesmo_texto` (HUD que reescreve todo frame) não refaz layout nem bounds;
+  `split_string` sem cópia.
+- Limite conhecido: o alinhamento X/Y continua no bloco inteiro (não por linha dentro da caixa); a posição X/Y
+  da caixa não desloca o texto.
+- Teste: `--server` com caixa 6×2,4: 15 linhas, 8 páginas, `page=99` → 7, `visibleCharacters=5` encolhe as
+  dimensões, `textBox=(0,0)` volta a 2 linhas.
+
 ## 2026-10-24 - Logic Tree: Color desligado pelo usuário é respeitado
 
 - `LogicNode.paint()` religava a cor do conjunto a cada compilação mesmo com Color desligado no nó. Agora o

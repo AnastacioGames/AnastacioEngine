@@ -120,7 +120,7 @@ static bool curve_has_atlas(const Curve *cu)
 	       cu->atlas_count > 0 && cu->atlas_size > 0.0f && cu->atlas_cell > 0.0f;
 }
 
-static std::vector<std::string> split_string(std::string str)
+static std::vector<std::string> split_string(const std::string& str)
 {
 	std::vector<std::string> text = std::vector<std::string>();
 
@@ -155,7 +155,10 @@ KX_FontObject::KX_FontObject(void *sgReplicationInfo,
 	m_atlasTexture(nullptr),
 	m_atlasTextureTried(false),
 	m_atlasCurve(nullptr),
-	m_localeVersion(0)
+	m_localeVersion(0),
+	m_boxSize(0.0f, 0.0f),
+	m_page(0),
+	m_visibleChars(-1)
 {
 	Curve *text = static_cast<Curve *> (ob->data);
 
@@ -169,6 +172,9 @@ KX_FontObject::KX_FontObject(void *sgReplicationInfo,
 	m_spacemode = (alignType)text->spacemode;
 	m_spacemode_y = (alignType_y)text->align_y;
 	m_fontid = GetFontId(text->vfont);
+	if (text->tb && text->totbox > 0) {
+		m_boxSize = mt::vec2(std::max(text->tb[0].w, 0.0f), std::max(text->tb[0].h, 0.0f));
+	}
 
 	m_use_shadow = text->use_shadows;
 	m_shadow_offset = mt::vec2(text->shadow_offx, text->shadow_offy);
@@ -180,7 +186,7 @@ KX_FontObject::KX_FontObject(void *sgReplicationInfo,
 	if (m_spacemode != TEXT_ALIGN_X_LEFT || m_spacemode_y != TEXT_ALIGN_Y_TOP_BASELINE) {
 		// Set text string here too (GetTextAabb needs this)
 		m_text = text->str;
-		m_texts = split_string(text->str);
+		LayoutLines();
 		GetTextAabb(m_textAABB_min, m_textAABB_max);
 	}
 
@@ -440,7 +446,7 @@ void KX_FontObject::BuildAtlasQuads()
 void KX_FontObject::SetText(const std::string& text)
 {
 	m_text = text;
-	m_texts = split_string(text);
+	LayoutLines();
 	if (UseAtlas()) {
 		BuildAtlasQuads();
 	}
@@ -454,8 +460,140 @@ void KX_FontObject::SetText(const std::string& text)
 		ApplyTextAlignment();
 	}
 
+	/* Typewriter: cut after the alignment, so the shown part does not slide while it grows. */
+	if (m_visibleChars >= 0) {
+		int left = m_visibleChars;
+		for (std::string& line : m_texts) {
+			size_t index = 0;
+			while (index < line.size() && left > 0) {
+				BLI_str_utf8_as_unicode_step(line.c_str(), &index);
+				--left;
+			}
+			line.resize(index);
+		}
+		if (UseAtlas()) {
+			BuildAtlasQuads();
+		}
+	}
+
 	GetTextAabb(m_textAABB_min, m_textAABB_max);
 	m_boundingBox->SetAabb(mt::vec3(m_textAABB_min.x, m_textAABB_min.y, 0.0f), mt::vec3(m_textAABB_max.x, m_textAABB_max.y, 0.0f));
+}
+
+float KX_FontObject::LineWidth(const std::string& line) const
+{
+	if (UseAtlas()) {
+		const float s = m_fsize / m_atlasCurve->atlas_size;
+		float pen = 0.0f;
+		size_t index = 0;
+		while (index < line.size()) {
+			const unsigned int code = BLI_str_utf8_as_unicode_step(line.c_str(), &index);
+			const auto it = m_atlasLookup.find(code);
+			// Same gap as BuildAtlasQuads for a missing glyph.
+			pen += (it == m_atlasLookup.end()) ? m_atlasCurve->atlas_cell * s * 0.5f :
+			       m_atlasCurve->atlas_glyphs[it->second].advance * s;
+		}
+		return pen;
+	}
+	if (line.empty()) {
+		return 0.0f;
+	}
+	const float size = m_fsize * BGE_FONT_RES * m_resolution;
+	BLF_size(m_fontid, size, m_dpi);
+	return BLF_width(m_fontid, line.c_str(), line.size()) * (m_fsize / size);
+}
+
+void KX_FontObject::LayoutLines()
+{
+	const std::vector<std::string> paragraphs = split_string(m_text);
+	const float maxWidth = m_boxSize.x;
+
+	m_allLines.clear();
+	if (maxWidth <= 0.0f) {
+		m_allLines = paragraphs;
+	}
+	else {
+		for (const std::string& paragraph : paragraphs) {
+			// Greedy wrap on spaces; a word wider than the box is broken between letters.
+			std::string line;
+			size_t pos = 0;
+			while (pos <= paragraph.size()) {
+				size_t end = paragraph.find(' ', pos);
+				if (end == std::string::npos) {
+					end = paragraph.size();
+				}
+				const std::string word = paragraph.substr(pos, end - pos);
+				const std::string candidate = line.empty() ? word : line + " " + word;
+				if (line.empty() || LineWidth(candidate) <= maxWidth) {
+					line = candidate;
+				}
+				else {
+					m_allLines.push_back(line);
+					line = word;
+				}
+				// A word alone wider than the box: cut it at the last letter that fits.
+				while (LineWidth(line) > maxWidth) {
+					size_t index = 0, cut = 0;
+					while (index < line.size()) {
+						size_t next = index;
+						BLI_str_utf8_as_unicode_step(line.c_str(), &next);
+						if (cut > 0 && LineWidth(line.substr(0, next)) > maxWidth) {
+							break;
+						}
+						cut = index = next;
+					}
+					if (cut == 0 || cut >= line.size()) {
+						break;
+					}
+					m_allLines.push_back(line.substr(0, cut));
+					line = line.substr(cut);
+				}
+				pos = end + 1;
+			}
+			m_allLines.push_back(line);
+		}
+	}
+
+	const int perPage = LinesPerPage();
+	if (perPage <= 0 || (int)m_allLines.size() <= perPage) {
+		m_page = 0;
+		m_texts = m_allLines;
+		return;
+	}
+	m_page = std::min(std::max(m_page, 0), PageCount() - 1);
+	const auto first = m_allLines.begin() + m_page * perPage;
+	m_texts.assign(first, std::min(first + perPage, m_allLines.end()));
+}
+
+int KX_FontObject::LinesPerPage() const
+{
+	const float lineHeight = m_fsize * m_line_spacing;
+	if (m_boxSize.y <= 0.0f || lineHeight <= 0.0f) {
+		return 0;
+	}
+	// Each line takes one line spacing of the box height, at least one line per page.
+	return std::max(1, (int)(m_boxSize.y / lineHeight + 1e-4f));
+}
+
+int KX_FontObject::PageCount() const
+{
+	const int perPage = LinesPerPage();
+	if (perPage <= 0 || m_allLines.empty()) {
+		return 1;
+	}
+	return ((int)m_allLines.size() + perPage - 1) / perPage;
+}
+
+int KX_FontObject::PageCharCount() const
+{
+	const int perPage = LinesPerPage();
+	const size_t first = perPage > 0 ? (size_t)(m_page * perPage) : 0;
+	const size_t last = perPage > 0 ? std::min(first + perPage, m_allLines.size()) : m_allLines.size();
+	int count = 0;
+	for (size_t i = first; i < last; ++i) {
+		count += (int)BLI_strlen_utf8(m_allLines[i].c_str());
+	}
+	return count;
 }
 
 void KX_FontObject::ApplyTextAlignment()
@@ -674,6 +812,12 @@ PyAttributeDef KX_FontObject::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("atlas", KX_FontObject, pyattr_get_atlas, pyattr_set_atlas),
 	EXP_PYATTRIBUTE_RW_FUNCTION("translationKey", KX_FontObject, pyattr_get_locale_key, pyattr_set_locale_key),
 	EXP_PYATTRIBUTE_RW_FUNCTION("useLanguageFont", KX_FontObject, pyattr_get_locale_font, pyattr_set_locale_font),
+	EXP_PYATTRIBUTE_RW_FUNCTION("textBox", KX_FontObject, pyattr_get_text_box, pyattr_set_text_box),
+	EXP_PYATTRIBUTE_RO_FUNCTION("lines", KX_FontObject, pyattr_get_lines),
+	EXP_PYATTRIBUTE_RW_FUNCTION("page", KX_FontObject, pyattr_get_page, pyattr_set_page),
+	EXP_PYATTRIBUTE_RO_FUNCTION("pageCount", KX_FontObject, pyattr_get_page_count),
+	EXP_PYATTRIBUTE_RW_FUNCTION("visibleCharacters", KX_FontObject, pyattr_get_visible_chars, pyattr_set_visible_chars),
+	EXP_PYATTRIBUTE_RO_FUNCTION("characterCount", KX_FontObject, pyattr_get_char_count),
 	/* EXP_PYATTRIBUTE_INT_RW("dpi", 0, 10000, false, KX_FontObject, m_dpi), */// no real need for expose this I think
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
@@ -790,9 +934,95 @@ int KX_FontObject::pyattr_set_text(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBU
 	if (!PyUnicode_Check(value)) {
 		return PY_SET_ATTR_FAIL;
 	}
-	self->SetTextOrProperty(_PyUnicode_AsString(value));
+	const char *text = _PyUnicode_AsString(value);
+	// Same text every frame (HUD scripts): skip the layout and the bounds.
+	if (self->m_text != text) {
+		self->SetTextOrProperty(text);
+	}
 
 	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_FontObject::pyattr_get_text_box(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	return Py_BuildValue("(ff)", self->m_boxSize.x, self->m_boxSize.y);
+}
+
+int KX_FontObject::pyattr_set_text_box(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	mt::vec2 box;
+	if (!PyVecTo(value, box)) {
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_boxSize = mt::vec2(std::max(box.x, 0.0f), std::max(box.y, 0.0f));
+	self->SetText(self->m_text);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_FontObject::pyattr_get_lines(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	PyObject *list = PyList_New(self->m_allLines.size());
+	for (size_t i = 0; i < self->m_allLines.size(); ++i) {
+		PyList_SET_ITEM(list, i, PyUnicode_FromStdString(self->m_allLines[i]));
+	}
+	return list;
+}
+
+PyObject *KX_FontObject::pyattr_get_page(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	return PyLong_FromLong(self->m_page);
+}
+
+int KX_FontObject::pyattr_set_page(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	const long page = PyLong_AsLong(value);
+	if (page == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "KX_FontObject.page = int");
+		return PY_SET_ATTR_FAIL;
+	}
+	// Clamped by the layout to [0, pageCount - 1].
+	self->m_page = (int)page;
+	self->SetText(self->m_text);
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_FontObject::pyattr_get_page_count(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	return PyLong_FromLong(self->PageCount());
+}
+
+PyObject *KX_FontObject::pyattr_get_visible_chars(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	return PyLong_FromLong(self->m_visibleChars);
+}
+
+int KX_FontObject::pyattr_set_visible_chars(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	const long count = PyLong_AsLong(value);
+	if (count == -1 && PyErr_Occurred()) {
+		PyErr_SetString(PyExc_TypeError, "KX_FontObject.visibleCharacters = int (-1: all)");
+		return PY_SET_ATTR_FAIL;
+	}
+	const int visible = count < 0 ? -1 : (int)count;
+	if (visible != self->m_visibleChars) {
+		self->m_visibleChars = visible;
+		self->SetText(self->m_text);
+	}
+	return PY_SET_ATTR_SUCCESS;
+}
+
+PyObject *KX_FontObject::pyattr_get_char_count(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_FontObject *self = static_cast<KX_FontObject *>(self_v);
+	return PyLong_FromLong(self->PageCharCount());
 }
 
 PyObject *KX_FontObject::pyattr_get_dimensions(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

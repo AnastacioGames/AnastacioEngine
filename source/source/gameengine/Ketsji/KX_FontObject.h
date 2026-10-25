@@ -154,6 +154,24 @@ protected:
 	bool m_localeFont;
 	unsigned int m_localeVersion;
 
+	/// Text Box (first box of the text data): width wraps the lines, height limits them in pages.
+	/// 0: no limit. Object units, like the Text Boxes panel.
+	mt::vec2 m_boxSize;
+	/// Every line after the wrap (m_texts holds only the shown page).
+	std::vector<std::string> m_allLines;
+	int m_page;
+	/// Typewriter: number of characters shown (-1: all), counted on the page.
+	int m_visibleChars;
+
+	/// Width of a line in text units (atlas advances or font metrics).
+	float LineWidth(const std::string& line) const;
+	/// Fill m_allLines from m_text (word wrap on m_boxSize.x) and m_texts with the page.
+	void LayoutLines();
+	int LinesPerPage() const;
+	int PageCount() const;
+	/// Characters on the current page (UTF-8 code points, without the line breaks).
+	int PageCharCount() const;
+
 	bool UseAtlas() const
 	{
 		return !m_atlasLookup.empty();
@@ -184,6 +202,15 @@ protected:
 	static int pyattr_set_atlas(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_locale_key(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_locale_key(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_text_box(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_text_box(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_lines(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_page(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_page(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_page_count(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_visible_chars(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static int pyattr_set_visible_chars(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
+	static PyObject *pyattr_get_char_count(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_locale_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_locale_font(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 #endif
