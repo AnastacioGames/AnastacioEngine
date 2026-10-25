@@ -48,6 +48,8 @@ enum CM_TraceModule {
 	CM_TRACE_SCRIPTS = 1 << 5,
 	/// Process memory every second, sounds started and scenes added/removed.
 	CM_TRACE_RUNTIME = 1 << 6,
+	/// CPU time of the process, the main thread and each other thread, every second.
+	CM_TRACE_THREADS = 1 << 7,
 };
 
 /// Bit mask of the modules on; 0 when RANGE_TRACE is unset.
@@ -88,6 +90,9 @@ private:
 
 /// CM_TRACE_RUNTIME: writes a "memory" event (process memory in MB) at most once per second.
 void CM_TraceMemorySample();
+
+/// CM_TRACE_THREADS: writes a "threads" event at most once per second (call from the main thread).
+void CM_TraceThreadsSample();
 
 /// Marks the end of a game run (the editor may start another one in the same file).
 void CM_TraceEnd();

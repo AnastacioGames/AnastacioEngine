@@ -697,6 +697,9 @@ bool KX_KetsjiEngine::NextFrame()
 		if (CM_TraceOn(CM_TRACE_RUNTIME)) {
 			CM_TraceMemorySample();
 		}
+		if (CM_TraceOn(CM_TRACE_THREADS)) {
+			CM_TraceThreadsSample();
+		}
 		CM_TraceSetFrame(++traceFrame);
 	}
 #ifndef __EMSCRIPTEN__

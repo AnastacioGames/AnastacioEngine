@@ -42,6 +42,7 @@ Desligado, cada ponto instrumentado custa um `if`. Num jogo exportado nada muda 
 | `scripts` | Por frame: ms e chamadas de cada componente Python (pela classe) e controlador Python (pelo script), acima de 0,02 ms | Uma linha por frame com script |
 | `runtime` | Memória do processo a cada segundo, cada som iniciado (Sound actuator, Speaker, World Sound) e cada cena adicionada/removida (inclusive replace e async) | Pequeno |
 | `work` | Por frame: draw calls, trocas de material e luz e os contadores de `CM_WorkCounters.h` acima de 0. O launcher liga junto `RANGE_AUDIT_TRANSFORMS` (`objetos.txt`: objetos que mais geram trabalho) | Uma linha por frame |
+| `threads` | A cada segundo: tempo de parede, núcleos, nº de threads, ms de CPU do processo, da thread principal e das 16 outras threads mais ocupadas (Windows: `GetThreadTimes`; Linux: `/proc/self/task`). Mostra se o jogo está preso na thread principal ou esperando a GPU | Pequeno |
 
 Só no launcher (variáveis próprias, gravadas na pasta do trace e resumidas no relatório): `shaders` liga o
 `RANGE_SHADER_LOG` (`shaders.txt`: cada shader, textura e imagem, com frame e ms) e `profile` liga o
@@ -82,7 +83,7 @@ piloto automático; a tecla I continua alternando. Combina com o trilho ou serve
 
 Uma linha JSON por evento: `{"t":segundos,"f":frame,"ev":"tipo",...}`. Tipos: `session`, `scene_load`,
 `load_shaders`, `object`, `mesh`, `material`, `object_left_out`, `convert_object`, `visible`, `image`, `frame`,
-`rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `work`, `scripts`, `memory`, `sound`, `scene_add`,
+`rail_start`, `rail_origin`, `rail_go`, `rail`, `rail_end`, `work`, `scripts`, `memory`, `threads`, `sound`, `scene_add`,
 `scene_remove`, `end`.
 Objetos são casados por nome entre cenas, porque réplicas e objetos On Demand entram na cena de destino com
 o nome do original (os On Demand aparecem primeiro na cena temporária `..ConvertSceneObject..`).

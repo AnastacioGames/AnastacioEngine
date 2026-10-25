@@ -40,10 +40,17 @@
 #    define PSAPI_VERSION 2 /* GetProcessMemoryInfo from kernel32, no psapi.lib */
 #  endif
 #  include <psapi.h>
+#  include <tlhelp32.h>
 #else
+#  include <dirent.h>
+#  include <sys/syscall.h>
+#  include <time.h>
 #  include <unistd.h>
 #endif
+#include <algorithm>
 #include <mutex>
+#include <thread>
+#include <vector>
 #include <sstream>
 
 namespace {
@@ -59,6 +66,7 @@ const struct {
 	{"work", CM_TRACE_WORK},
 	{"scripts", CM_TRACE_SCRIPTS},
 	{"runtime", CM_TRACE_RUNTIME},
+	{"threads", CM_TRACE_THREADS},
 };
 
 struct TraceState
@@ -223,6 +231,126 @@ void CM_TraceMemorySample()
 	char buf[48];
 	snprintf(buf, sizeof(buf), "\"mb\":%.1f", mb);
 	CM_TraceEvent("memory", buf);
+}
+
+namespace {
+
+#ifdef _WIN32
+double FileTimeMs(const FILETIME& time)
+{
+	return (((unsigned long long)time.dwHighDateTime << 32) | time.dwLowDateTime) / 10000.0;
+}
+#endif
+
+/// CPU time (user + kernel) of every thread of the process, in ms, by thread id.
+std::map<unsigned long, double> ThreadCpuTimes()
+{
+	std::map<unsigned long, double> times;
+#ifdef _WIN32
+	const DWORD pid = GetCurrentProcessId();
+	HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPTHREAD, 0);
+	if (snapshot == INVALID_HANDLE_VALUE) {
+		return times;
+	}
+	THREADENTRY32 entry;
+	entry.dwSize = sizeof(entry);
+	for (BOOL ok = Thread32First(snapshot, &entry); ok; ok = Thread32Next(snapshot, &entry)) {
+		if (entry.th32OwnerProcessID != pid) {
+			continue;
+		}
+		HANDLE thread = OpenThread(THREAD_QUERY_LIMITED_INFORMATION, FALSE, entry.th32ThreadID);
+		if (!thread) {
+			continue;
+		}
+		FILETIME creation, exit, kernel, user;
+		if (GetThreadTimes(thread, &creation, &exit, &kernel, &user)) {
+			times[entry.th32ThreadID] = FileTimeMs(kernel) + FileTimeMs(user);
+		}
+		CloseHandle(thread);
+	}
+#else
+	DIR *dir = opendir("/proc/self/task");
+	if (!dir) {
+		return times;
+	}
+	const double tick = 1000.0 / sysconf(_SC_CLK_TCK);
+	while (dirent *item = readdir(dir)) {
+		const unsigned long tid = strtoul(item->d_name, nullptr, 10);
+		if (tid == 0) {
+			continue;
+		}
+		const std::string path = std::string("/proc/self/task/") + item->d_name + "/stat";
+		FILE *stat = fopen(path.c_str(), "r");
+		if (!stat) {
+			continue;
+		}
+		char line[1024];
+		if (fgets(line, sizeof(line), stat)) {
+			// Fields after the ")" of the name: state is field 3, utime 14, stime 15.
+			const char *rest = strrchr(line, ')');
+			unsigned long utime = 0, stime = 0;
+			if (rest && sscanf(rest + 2, "%*c %*d %*d %*d %*d %*d %*u %*u %*u %*u %*u %lu %lu", &utime, &stime) == 2) {
+				times[tid] = (utime + stime) * tick;
+			}
+		}
+		fclose(stat);
+	}
+	closedir(dir);
+#endif
+	return times;
+}
+
+unsigned long CurrentThreadId()
+{
+#ifdef _WIN32
+	return GetCurrentThreadId();
+#else
+	return (unsigned long)syscall(SYS_gettid);
+#endif
+}
+
+}  // namespace
+
+void CM_TraceThreadsSample()
+{
+	static double last = -1.0;
+	static std::map<unsigned long, double> previous;
+	const double now = TraceNowMs();
+	if (last >= 0.0 && now - last < 1000.0) {
+		return;
+	}
+	const std::map<unsigned long, double> current = ThreadCpuTimes();
+	const unsigned long mainId = CurrentThreadId();
+	if (last >= 0.0) {
+		// Busy ms of each thread in the interval; threads that started in it count from zero.
+		double total = 0.0, mainMs = 0.0;
+		std::vector<std::pair<double, unsigned long>> others;
+		for (const std::pair<const unsigned long, double>& item : current) {
+			const std::map<unsigned long, double>::const_iterator old = previous.find(item.first);
+			const double ms = item.second - (old != previous.end() ? old->second : 0.0);
+			total += ms;
+			if (item.first == mainId) {
+				mainMs = ms;
+			}
+			else if (ms > 0.0) {
+				others.emplace_back(ms, item.first);
+			}
+		}
+		std::sort(others.rbegin(), others.rend());
+		std::ostringstream fields;
+		fields.setf(std::ios::fixed);
+		fields.precision(1);
+		fields << "\"wall_ms\":" << now - last << ",\"cores\":" << std::thread::hardware_concurrency()
+		       << ",\"count\":" << current.size() << ",\"process_ms\":" << total << ",\"main_ms\":" << mainMs
+		       << ",\"others\":[";
+		for (size_t i = 0; i < others.size() && i < 16; ++i) {
+			fields << (i ? "," : "") << others[i].first;
+		}
+		fields << "]";
+		CM_TraceEvent("threads", fields.str());
+	}
+	last = now;
+	previous = current;
 }
 
 CM_TraceScriptScope::CM_TraceScriptScope(const std::string& name)
