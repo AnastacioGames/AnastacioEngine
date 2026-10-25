@@ -4120,6 +4120,11 @@ class VIEW3D_PT_snapping(Panel):
                     col.prop(toolsettings, "use_snap_self")
                 if object_mode in {'OBJECT', 'POSE', 'EDIT'}:
                     col.prop(toolsettings, "use_snap_align_rotation", text="Align Rotation to Target")
+            col.prop(toolsettings, "use_snap_backface_culling")
+
+            col.separator()
+            col.label(text="Target Selection")
+            col.prop(toolsettings, "use_snap_selectable", icon='RESTRICT_SELECT_OFF', toggle=True)
 
             if 'FACE' in snap_elements:
                 col.prop(toolsettings, "use_snap_project", text="Project Elements")

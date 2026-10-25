@@ -157,6 +157,8 @@ static void iter_snap_objects(
 	for (Base *base = sctx->scene->base.first; base != NULL; base = base->next) {
 		if ((BASE_VISIBLE_BGMODE(sctx->v3d_data.v3d, sctx->scene, base)) &&
 		    (base->flag & BA_SNAP_FIX_DEPS_FIASCO) == 0 &&
+		    !((sctx->scene->toolsettings->snap_flag & SCE_SNAP_NOT_TO_NONSELECTABLE) &&
+		      (base->object->restrictflag & OB_RESTRICT_SELECT)) &&
 		    !((snap_select == SNAP_NOT_SELECTED && (base->flag & (SELECT | BA_WAS_SEL))) ||
 		      (snap_select == SNAP_NOT_ACTIVE && base == base_act)))
 		{
@@ -314,6 +316,27 @@ static int hit_depth_cmp(const void *arg1, const void *arg2)
 	}
 
 	return val;
+}
+
+/* Snap: ignora faces de costas para o raio (Backface Culling, como no Blender 5). */
+struct RayCastBackface_Data {
+	BVHTree_RayCastCallback raycast_callback;
+	void *bvhdata;
+};
+
+static bool snap_use_backface_culling(const SnapObjectContext *sctx)
+{
+	return (sctx->scene->toolsettings->snap_flag & SCE_SNAP_BACKFACE_CULLING) != 0;
+}
+
+static void raycast_backface_cb(void *userdata, int index, const BVHTreeRay *ray, BVHTreeRayHit *hit)
+{
+	struct RayCastBackface_Data *data = userdata;
+	const BVHTreeRayHit prev = *hit;
+	data->raycast_callback(data->bvhdata, index, ray, hit);
+	if (hit->index == index && prev.index != index && dot_v3v3(ray->direction, hit->no) > 0.0f) {
+		*hit = prev;
+	}
 }
 
 static void raycast_all_cb(void *userdata, int index, const BVHTreeRay *ray, BVHTreeRayHit *hit)
@@ -479,8 +502,15 @@ static bool raycastDerivedMesh(
 	if (r_hit_list) {
 		struct RayCastAll_Data data;
 
-		data.bvhdata = treedata;
-		data.raycast_callback = treedata->raycast_callback;
+		struct RayCastBackface_Data bf = {treedata->raycast_callback, treedata};
+		if (snap_use_backface_culling(sctx)) {
+			data.bvhdata = &bf;
+			data.raycast_callback = raycast_backface_cb;
+		}
+		else {
+			data.bvhdata = treedata;
+			data.raycast_callback = treedata->raycast_callback;
+		}
 		data.obmat = obmat;
 		data.timat = timat;
 		data.len_diff = len_diff;
@@ -498,10 +528,13 @@ static bool raycastDerivedMesh(
 	}
 	else {
 		BVHTreeRayHit hit = {.index = -1, .dist = local_depth};
+		struct RayCastBackface_Data bf = {treedata->raycast_callback, treedata};
+		const bool backface = snap_use_backface_culling(sctx);
 
 		if (BLI_bvhtree_ray_cast(
-		        treedata->tree, ray_start_local, ray_normal_local, 0.0f,
-		        &hit, treedata->raycast_callback, treedata) != -1)
+		        treedata->tree, ray_start_local, ray_normal_local, 0.0f, &hit,
+		        backface ? raycast_backface_cb : treedata->raycast_callback,
+		        backface ? (void *)&bf : (void *)treedata) != -1)
 		{
 			hit.dist += len_diff;
 			hit.dist /= local_scale;
@@ -633,8 +666,15 @@ static bool raycastEditMesh(
 	if (r_hit_list) {
 		struct RayCastAll_Data data;
 
-		data.bvhdata = treedata;
-		data.raycast_callback = treedata->raycast_callback;
+		struct RayCastBackface_Data bf = {treedata->raycast_callback, treedata};
+		if (snap_use_backface_culling(sctx)) {
+			data.bvhdata = &bf;
+			data.raycast_callback = raycast_backface_cb;
+		}
+		else {
+			data.bvhdata = treedata;
+			data.raycast_callback = treedata->raycast_callback;
+		}
 		data.obmat = obmat;
 		data.timat = timat;
 		data.len_diff = len_diff;
@@ -652,10 +692,13 @@ static bool raycastEditMesh(
 	}
 	else {
 		BVHTreeRayHit hit = {.index = -1, .dist = local_depth};
+		struct RayCastBackface_Data bf = {treedata->raycast_callback, treedata};
+		const bool backface = snap_use_backface_culling(sctx);
 
 		if (BLI_bvhtree_ray_cast(
-		        treedata->tree, ray_start_local, ray_normal_local, 0.0f,
-		        &hit, treedata->raycast_callback, treedata) != -1)
+		        treedata->tree, ray_start_local, ray_normal_local, 0.0f, &hit,
+		        backface ? raycast_backface_cb : treedata->raycast_callback,
+		        backface ? (void *)&bf : (void *)treedata) != -1)
 		{
 			hit.dist += len_diff;
 			hit.dist /= local_scale;

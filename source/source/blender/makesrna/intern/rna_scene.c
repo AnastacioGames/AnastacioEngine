@@ -2961,6 +2961,16 @@ static void rna_def_tool_settings(BlenderRNA  *brna)
 	RNA_def_property_ui_icon(prop, ICON_SNAP_GRID, 0);
 	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
 
+	prop = RNA_def_property(srna, "use_snap_selectable", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "snap_flag", SCE_SNAP_NOT_TO_NONSELECTABLE);
+	RNA_def_property_ui_text(prop, "Exclude Non-Selectable", "Exclude objects that are not selectable from snapping");
+	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
+
+	prop = RNA_def_property(srna, "use_snap_backface_culling", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "snap_flag", SCE_SNAP_BACKFACE_CULLING);
+	RNA_def_property_ui_text(prop, "Backface Culling", "Exclude back facing geometry from snapping");
+	RNA_def_property_update(prop, NC_SCENE | ND_TOOLSETTINGS, NULL); /* header redraw */
+
 	prop = RNA_def_property(srna, "snap_element", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "snap_mode");
 	RNA_def_property_enum_items(prop, rna_enum_snap_element_items);
