@@ -653,6 +653,7 @@ GPUTexture *GPU_texture_create_cube(int size, GPUHDRType hdr, char err_out[256])
 	GLenum internalformat = (hdr == GPU_HDR_NONE) ? GL_RGBA8 : GL_RGBA16F_ARB;
 	GLenum type = (hdr == GPU_HDR_NONE) ? GL_UNSIGNED_BYTE : GL_FLOAT;
 
+	tex->internalformat = internalformat;
 	tex->number = 0;
 	glBindTexture(GL_TEXTURE_CUBE_MAP, tex->bindcode);
 	for (int face = 0; face < 6; face++) {
@@ -728,6 +729,7 @@ struct GPUCubeSH9Reader {
 	GLsync fence;
 	int w;
 	size_t size;
+	bool is_float; /* web only: the cube is half float, read as GL_FLOAT */
 };
 
 GPUCubeSH9Reader *GPU_cube_sh9_reader_create(void)
@@ -760,7 +762,9 @@ bool GPU_cube_sh9_reader_request(GPUCubeSH9Reader *reader, GPUTexture *tex)
 		lod++;
 	}
 #ifdef __EMSCRIPTEN__
-	const size_t texel = 4; /* the web cube is RGBA8 */
+	/* The web cube is RGBA8 unless the browser can render to half float. */
+	const bool is_float = tex->internalformat == GL_RGBA16F_ARB;
+	const size_t texel = is_float ? 4 * sizeof(float) : 4;
 #else
 	const size_t texel = 4 * sizeof(float);
 #endif
@@ -774,6 +778,9 @@ bool GPU_cube_sh9_reader_request(GPUCubeSH9Reader *reader, GPUTexture *tex)
 		glBufferData(GL_PIXEL_PACK_BUFFER, reader->size, NULL, GL_STREAM_READ);
 	}
 	reader->w = w;
+#ifdef __EMSCRIPTEN__
+	reader->is_float = is_float;
+#endif
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 #ifdef __EMSCRIPTEN__
 	GLint prev = 0;
@@ -785,7 +792,7 @@ bool GPU_cube_sh9_reader_request(GPUCubeSH9Reader *reader, GPUTexture *tex)
 	for (int f = 0; f < 6; f++) {
 		glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + f,
 		                       tex->bindcode, lod);
-		glReadPixels(0, 0, w, w, GL_RGBA, GL_UNSIGNED_BYTE, (void *)(f * face));
+		glReadPixels(0, 0, w, w, GL_RGBA, is_float ? GL_FLOAT : GL_UNSIGNED_BYTE, (void *)(f * face));
 	}
 	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
@@ -818,12 +825,17 @@ bool GPU_cube_sh9_reader_poll(GPUCubeSH9Reader *reader, float r_coef[9][3])
 	float *rgba = MEM_mallocN(sizeof(float[4]) * 6 * w * w, __func__);
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, reader->pbo);
 #ifdef __EMSCRIPTEN__
+	if (reader->is_float) {
+		glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, reader->size, rgba);
+	}
+	else {
 	unsigned char *bytes = MEM_mallocN(reader->size, __func__);
 	glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, reader->size, bytes);
 	for (size_t i = 0; i < reader->size; i++) {
 		rgba[i] = bytes[i] * (1.0f / 255.0f);
 	}
 	MEM_freeN(bytes);
+	}
 #else
 	glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, reader->size, rgba);
 #endif

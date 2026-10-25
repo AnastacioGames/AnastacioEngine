@@ -30,6 +30,10 @@
 
 #include "KX_Camera.h"
 
+#ifdef __EMSCRIPTEN__
+#  include "RAS_WebGLCompat.h"
+#endif
+
 #include "CM_Message.h"
 
 #include <cmath>
@@ -107,8 +111,9 @@ bool KX_LightProbe::SetupCamera(KX_Camera *sceneCamera, KX_Camera *camera)
 	if (!m_cube) {
 		char err[256] = "";
 #ifdef __EMSCRIPTEN__
-		// WebGL2 can't render to half float without EXT_color_buffer_float.
-		m_cube = GPU_texture_create_cube(m_size, GPU_HDR_NONE, err);
+		// WebGL2 can't render to half float without EXT_color_buffer_float; RGBA8 clips the bright
+		// emitters, so the SH9 comes out dimmer than on desktop.
+		m_cube = GPU_texture_create_cube(m_size, RAS_FloatRenderTargetSupported() ? GPU_HDR_HALF_FLOAT : GPU_HDR_NONE, err);
 #else
 		m_cube = GPU_texture_create_cube(m_size, GPU_HDR_HALF_FLOAT, err);
 #endif
