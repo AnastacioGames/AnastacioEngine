@@ -151,15 +151,16 @@ unsigned int RAS_2DFilterManager::RenderOrderKey(unsigned int passIndex)
 		case FILTERPASS_CLOUDS:       return 16;
 		case FILTERPASS_VFOG:         return 17;
 		case FILTERPASS_VFOG_IMAGE:   return 18;
-		/* The last bloom slot holds the half resolution DOF gather (KX_2DFilterManager): it must
-		 * run right before the DOF pass that blends it. */
-		case FILTERPASS_BLOOM + 7:    return 19;
-		case FILTERPASS_CAMERA_DOF:   return 20;
-		case FILTERPASS_TONEMAP:      return 21;
-		case FILTERPASS_FXAA:         return 22;
-		case FILTERPASS_LENSFLARE:    return 23;
-		case FILTERPASS_CAMERA_LENS:  return 24;
-		default: // 0..14 unchanged, custom filters (>= 24) after the lens pass
+		/* DOF reduction, then the last bloom slot holding the half resolution DOF gather
+		 * (KX_2DFilterManager), right before the DOF pass that blends it. */
+		case FILTERPASS_CAMERA_DOF_REDUCE: return 19;
+		case FILTERPASS_BLOOM + 7:    return 20;
+		case FILTERPASS_CAMERA_DOF:   return 21;
+		case FILTERPASS_TONEMAP:      return 22;
+		case FILTERPASS_FXAA:         return 23;
+		case FILTERPASS_LENSFLARE:    return 24;
+		case FILTERPASS_CAMERA_LENS:  return 25;
+		default: // 0..14 unchanged, custom filters (>= 25) after the lens pass
 			return (passIndex < FILTERPASS_RAIN) ? passIndex : passIndex + 1;
 	}
 }

@@ -99,7 +99,7 @@ static void kx_profile_filter_pass(int pass)
 			/* 5 is the SSAO composite and 12 the half resolution DOF (see the slot constants below). */
 			"ssgi", "ssgi_image", "ssr", "ssr_blur", "ssao", "ssao_image", "bloom_down0", "bloom_down1",
 			"bloom_down2", "bloom_down3", "bloom_up", "bloom_image", "camera_dof_half", "lightscatter", "lightscatter_image", "fxaa", "tonemap", "rain", "clouds",
-			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens"};
+			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens", "camera_dof_reduce"};
 		static std::string storage[257];
 		if (pass < 0) {
 			storage[slot] = "filter.prepare";
@@ -298,7 +298,24 @@ KX_2DFilter *KX_2DFilterManager::EnsureDofHalf()
 			d->UpdateTextureBindCode(0, h->GetOffScreen()->GetColorBindCode(0));
 		}
 	});
-	if (half->GetError()) {
+	/* Reduction: the gather used to read color and depth at full resolution for every sample; now it
+	 * reads this half resolution color + CoC (a in 0..1, so an RGBA8 fallback still holds it). */
+	data.filterPassIndex = FILTERPASS_CAMERA_DOF_REDUCE;
+	data.shaderText = std::string("#define DOF_REDUCE\n") + datatoc_RAS_CameraDof2DFilter_glsl;
+	KX_2DFilter *reduce = static_cast<KX_2DFilter *>(AddFilter(data, true));
+	reduce->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
+	        std::max(1, m_canvas->GetRenderWidth() / 2), std::max(1, m_canvas->GetRenderHeight() / 2),
+	        RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT : RAS_Rasterizer::RAS_HDR_NONE, 2.0f));
+	half->SetTexture(0, reduce->GetOffScreen()->GetColorBindCode(0), "dof_reduce");
+	reduce->GetOffScreen()->SetRebuildCallback([this]() {
+		RAS_2DFilter *r = GetFilterPass(FILTERPASS_CAMERA_DOF_REDUCE, true);
+		KX_2DFilter *h = static_cast<KX_2DFilter *>(GetFilterPass(PASS_CAMERA_DOF_HALF, true));
+		if (r && h && r->GetOffScreen()) {
+			h->UpdateTextureBindCode(0, r->GetOffScreen()->GetColorBindCode(0));
+		}
+	});
+	if (half->GetError() || reduce->GetError()) {
+		reduce->SetEnabled(false);
 		// UpdateCameraFX sees it and keeps the full resolution gather.
 		half->SetEnabled(false);
 		CM_Warning("Camera DOF: half resolution pass unavailable, using the full resolution gather");
@@ -757,6 +774,8 @@ void KX_2DFilterManager::PrefetchCameraFX(KX_Scene *scene)
 			if (passes[i] == FILTERPASS_CAMERA_DOF) {
 				data.shaderText = std::string("#define DOF_HALF_RES\n") + datatoc_RAS_CameraDof2DFilter_glsl;
 				delete NewFilter(data);
+				data.shaderText = std::string("#define DOF_REDUCE\n") + datatoc_RAS_CameraDof2DFilter_glsl;
+				delete NewFilter(data);
 			}
 #endif
 		}
@@ -777,6 +796,9 @@ void KX_2DFilterManager::PrepareCameraFX(KX_Scene *scene)
 				if (passes[i] == FILTERPASS_CAMERA_DOF) {
 					if (RAS_2DFilter *half = EnsureDofHalf()) {
 						half->SetEnabled(false);
+						if (RAS_2DFilter *reduce = GetFilterPass(FILTERPASS_CAMERA_DOF_REDUCE, true)) {
+							reduce->SetEnabled(false);
+						}
 					}
 				}
 			}
@@ -892,13 +914,18 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera, double time)
 	RAS_2DFilter *dofHalf = GetFilterPass(PASS_CAMERA_DOF_HALF, true);
 	/* The program links on the first render, so a pass never enabled is not Ok() yet: only a link
 	 * error (GetError) keeps the full resolution gather. */
-	const bool halfOk = dof && dofHalf && !dofHalf->GetError() && dofHalf->GetOffScreen();
-	if (dofHalf) {
-		dofHalf->SetEnabled(useDof && halfOk);
+	RAS_2DFilter *dofReduce = GetFilterPass(FILTERPASS_CAMERA_DOF_REDUCE, true);
+	const bool halfOk = dof && dofHalf && !dofHalf->GetError() && dofHalf->GetOffScreen() &&
+	                    dofReduce && !dofReduce->GetError() && dofReduce->GetOffScreen();
+	for (RAS_2DFilter *filter : {dofHalf, dofReduce}) {
+		if (filter) {
+			filter->SetEnabled(useDof && halfOk);
+		}
 	}
 	fx[23] = (useDof && halfOk) ? 1.0f : 0.0f;
 	if (useDof && halfOk) {
 		std::copy(fx, fx + 40, dofHalf->GetBuildInFilters()->camera_fx);
+		std::copy(fx, fx + 40, dofReduce->GetBuildInFilters()->camera_fx);
 	}
 
 	RAS_2DFilter *lens = GetFilterPass(FILTERPASS_CAMERA_LENS, true);

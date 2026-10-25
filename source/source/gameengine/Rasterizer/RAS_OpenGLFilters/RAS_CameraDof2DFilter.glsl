@@ -23,6 +23,9 @@ uniform vec4 ge_CameraFX[10];
  * rgb blurred, a = blur radius in pixels) and this full resolution pass only blends it over the
  * sharp image by the circle of confusion of each pixel. */
 uniform sampler2D dof_half;
+/* Reduction (DOF_REDUCE, half resolution, runs before the gather): rgb = 2x2 average of the color,
+ * a = circle of confusion (0..1). The gather reads only this texture, one fetch per sample. */
+uniform sampler2D dof_reduce;
 
 float linearDepth(vec2 uv)
 {
@@ -64,9 +67,25 @@ void main()
 #else
 	vec2 uv = gl_TexCoord[0].st;
 #endif
+	vec2 texel = vec2(1.0 / bgl_RenderedTextureWidth, 1.0 / bgl_RenderedTextureHeight);
+#ifdef DOF_REDUCE
+	/* A half resolution pixel center lies on the corner of 4 full resolution texels: one bilinear
+	 * fetch averages them. The CoC is the average of the 4 depths' CoC. */
+	vec2 h = texel * 0.5;
+	float cocSum = circleOfConfusion(linearDepth(uv + vec2(-h.x, -h.y))) +
+	               circleOfConfusion(linearDepth(uv + vec2(h.x, -h.y))) +
+	               circleOfConfusion(linearDepth(uv + vec2(-h.x, h.y))) +
+	               circleOfConfusion(linearDepth(uv + vec2(h.x, h.y)));
+	gl_FragColor = vec4(texture(bgl_RenderedTexture, uv).rgb, cocSum * 0.25);
+	return;
+#else
+#ifdef DOF_HALF_RES
+	vec4 center = texture(dof_reduce, uv);
+	float coc = center.a;
+#else
 	vec4 center = texture(bgl_RenderedTexture, uv);
-
 	float coc = circleOfConfusion(linearDepth(uv));
+#endif
 	float maxRadius = ge_CameraFX[1].x;
 	float radius = coc * maxRadius;
 #ifndef DOF_HALF_RES
@@ -88,7 +107,6 @@ void main()
 	}
 #endif
 
-	vec2 texel = vec2(1.0 / bgl_RenderedTextureWidth, 1.0 / bgl_RenderedTextureHeight);
 	float aspect = bgl_RenderedTextureWidth / bgl_RenderedTextureHeight;
 	// Cat eye: the aperture is clipped by a disc pushed toward the frame center.
 	vec2 fromCenter = (uv - 0.5) * vec2(aspect, 1.0);
@@ -114,11 +132,17 @@ void main()
 				continue;
 			}
 			vec2 suv = uv + dir * radius * texel;
+#ifdef DOF_HALF_RES
+			vec4 s = texture(dof_reduce, suv);
+			vec3 c = s.rgb;
+			float scoc = s.a * maxRadius;
+#else
+			vec3 c = texture(bgl_RenderedTexture, suv).rgb;
 			float scoc = circleOfConfusion(linearDepth(suv)) * maxRadius;
+#endif
 			// A sample only spreads over this pixel if its own blur reaches it,
 			// so sharp foreground edges do not bleed into the background.
 			float w = clamp(scoc - ringFrac * radius + 1.0, 0.0, 1.0);
-			vec3 c = texture(bgl_RenderedTexture, suv).rgb;
 			// Bright samples weigh more: bokeh highlights.
 			w *= 1.0 + dot(c, vec3(0.3, 0.59, 0.11)) * 2.0;
 			sum += c * w;
@@ -131,4 +155,5 @@ void main()
 #else
 	gl_FragColor = vec4(sum / weight, center.a);
 #endif
+#endif // DOF_REDUCE
 }

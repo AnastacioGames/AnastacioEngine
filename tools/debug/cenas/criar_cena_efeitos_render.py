@@ -146,6 +146,13 @@ def tick(cont):
             scene.restart()
             return
         own["ini"] = True
+        if os.environ.get("TESTE_EFEITOS_DOF"):
+            # TESTE_EFEITOS_DOF=1: foco no alvo e fundo/frente desfocados (mede o passe do DOF).
+            own.useDof = True
+            own.dofBlur = 12.0
+            own.dofQuality = 2
+            own.focusManualDistance = RAIO
+            own.focusRange = 2.0
         Range.logic.globalDict["t0"] = time.time()
         own["ang"] = 0.0
         own["orbita"] = True

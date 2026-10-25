@@ -72,11 +72,14 @@ public:
 		FILTERPASS_LENSFLARE    = 21,
 		/* Camera FX (KX_Camera game_fx), only present while their effects are on */
 		FILTERPASS_CAMERA_DOF   = 22,
-		FILTERPASS_CAMERA_LENS  = 23
+		FILTERPASS_CAMERA_LENS  = 23,
+		/* Half resolution color + circle of confusion read by the half resolution DOF gather
+		 * (desktop); runs right before it, see RenderOrderKey() */
+		FILTERPASS_CAMERA_DOF_REDUCE = 24
 	};
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */
-	const int reservedPassIndex = FILTERPASS_CAMERA_LENS + 1;
+	const int reservedPassIndex = FILTERPASS_CAMERA_DOF_REDUCE + 1;
 
 	enum FILTER_MODE {
 		FILTER_ENABLED = -2,

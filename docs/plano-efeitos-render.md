@@ -37,7 +37,7 @@ JÃ¡ feito em 2026-10-24:
   - SSR da 3D View (`gpu_shader_fx_ssr_frag.glsl`): fresnel de Schlick, sem jitter e com fade de borda, parecido com o do jogo;
   - preset trocado em jogo pelas teclas 1/2/3 da cena de teste funciona.
 - **PendÃªncias:**
-  - **DOF:** ainda lÃª profundidade e cor em resoluÃ§Ã£o cheia (ganhou sÃ³ ~15%); precisa de um passe de reduÃ§Ã£o.
+  - **DOF:** passe de redução feito e aceito com janela (2026-10-25): `FILTERPASS_CAMERA_DOF_REDUCE` (24) grava cor 2x2 + CoC em meia resolução e o gather lê só ela. RX 6800M, cena de efeitos com `TESTE_EFEITOS_DOF=1`: gather 1,76 → 0,57 ms, DOF total ~1,98 → ~0,91 ms.
   - **Preset:** escolher pela UI sobrescreve os valores de cada efeito.
   - **Flipbook de partÃ­culas** (2026-10-25, aceito com janela): `RangeGPUParticleSettings.flipbook_cols/rows/cycles/random`, `particle_texture()` no preÃ¢mbulo do fragment (mistura os 2 quadros vizinhos; looks e shaders custom tambÃ©m podem usar), `object.particles.flipbook = (colunas, linhas, ciclos, aleatÃ³rio)`. Cena: `tools/debug/cenas/criar_cena_flipbook_particulas.py`.
   - **FusÃ£o de tonemap, FXAA e lente:** adiada. O FXAA lÃª ~12 vizinhos (cada um teria de passar pelo tonemap) e o lens flare fica entre eles; o ganho seria sÃ³ 1-2 cÃ³pias de tela.
