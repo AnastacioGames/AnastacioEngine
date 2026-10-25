@@ -97,7 +97,8 @@ std::vector<KX_GameObject *> KX_CullingHandler::Process()
 {
 	CullTask task(m_objects, *this, m_layer);
 #ifdef WITH_TBB
-	tbb::parallel_reduce(tbb::blocked_range<size_t>(0, m_objects->GetCount()), task);
+	// Grain 256: small scenes are tested in one chunk on this thread, no task overhead.
+	tbb::parallel_reduce(tbb::blocked_range<size_t>(0, m_objects->GetCount(), 256), task);
 #else  // WITH_TBB
 	task(0, m_objects->GetCount());
 #endif  // WITH_TBB

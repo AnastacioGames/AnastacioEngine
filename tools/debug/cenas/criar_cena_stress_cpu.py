@@ -2,14 +2,17 @@
 # em CPU, corpos rigidos que nao dormem, sol com CSM + point com sombra, sensores Near/Ray/MouseOver e
 # textos atualizados por propriedade. Encerra sozinha depois de STRESS_SECONDS (padrao 10) e grava em
 # STRESS_LOG o numero de frames, para conferir que o script rodou.
-#   AnastacioEngine.exe -b --factory-startup --python criar_cena_stress_cpu.py -- saida.range
+#   AnastacioEngine.exe -b --factory-startup --python criar_cena_stress_cpu.py -- saida.range [malhas]
+# malhas: quantas malhas deformadas por armature (padrao 1), para medir varios filhos por personagem.
 import bpy
 import bmesh
 import math
 import sys
 from mathutils import Vector
 
-out = sys.argv[sys.argv.index('--') + 1]
+args = sys.argv[sys.argv.index('--') + 1:]
+out = args[0]
+partes = int(args[1]) if len(args) > 1 else 1
 scene = bpy.context.scene
 for ob in list(scene.objects):
     bpy.data.objects.remove(ob, do_unlink=True)
@@ -87,20 +90,21 @@ for i in range(30):
     arm = bpy.data.objects.new('arm%02d' % i, arm_data)
     arm.location = pos
     scene.objects.link(arm)
-    corpo = bpy.data.objects.new('corpo%02d' % i, malha)
-    corpo.location = pos
-    scene.objects.link(corpo)
-    for k in range(3):
-        grupo = corpo.vertex_groups.new('b%d' % k)
-        for v in malha.vertices:
-            peso = max(0.0, 1.0 - abs(v.co.z - (k + 0.5)))
-            if peso > 0:
-                grupo.add([v.index], peso, 'REPLACE')
-    mod = corpo.modifiers.new('arm', 'ARMATURE')
-    mod.object = arm
-    corpo.parent = arm
-    corpo.matrix_parent_inverse = arm.matrix_world.inverted()
-    corpo.game.physics_type = 'NO_COLLISION'
+    for p in range(partes):
+        corpo = bpy.data.objects.new('corpo%02d_%d' % (i, p), malha)
+        corpo.location = pos + Vector((p * 0.3, 0, 0))
+        scene.objects.link(corpo)
+        for k in range(3):
+            grupo = corpo.vertex_groups.new('b%d' % k)
+            for v in malha.vertices:
+                peso = max(0.0, 1.0 - abs(v.co.z - (k + 0.5)))
+                if peso > 0:
+                    grupo.add([v.index], peso, 'REPLACE')
+        mod = corpo.modifiers.new('arm', 'ARMATURE')
+        mod.object = arm
+        corpo.parent = arm
+        corpo.matrix_parent_inverse = arm.matrix_world.inverted()
+        corpo.game.physics_type = 'NO_COLLISION'
     arm.game.physics_type = 'NO_COLLISION'
 
     scene.objects.active = arm
