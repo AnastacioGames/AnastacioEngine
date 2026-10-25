@@ -1063,7 +1063,8 @@ bool KX_AudioManager::ExecuteCommand(const std::string& command)
 		return false;
 	}
 
-	if (!ok) {
+	// A headless server plays nothing: not a mistake in the command, no warning.
+	if (!ok && m_enabled) {
 		CM_Warning("World Sound: \"" << command << "\" failed (sound not found?)");
 	}
 	return ok;
