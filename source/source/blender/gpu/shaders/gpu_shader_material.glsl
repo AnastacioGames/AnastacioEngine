@@ -3811,7 +3811,8 @@ float shadow_depth_from_linear(float z, vec3 clip)
  * the search disk, each compared at the receiver and at two depths closer to the lamp. The share
  * of taps still blocked at each depth gives the receiver-blocker gap, which sets the PCF disk.
  * Sun (parallel rays): gaps in world units, penumbra = gap * light angle. Spot: gap relative to
- * the blocker distance. Soft sets the light size; the disk stops at 8x the plain PCF radius.
+ * the blocker distance. Soft sets the light size; the disk stops at 3x the plain PCF radius, and its taps
+ * compare a bit closer to the lamp as it widens (a wide disk on a sloped receiver self-shadows).
  * Both disks are turned per pixel by IGN like shadow_pcf_poisson(). */
 float test_shadow_pcss(sampler2DShadow shadowmap, vec4 co, float samples, float soft, float samplesize, vec3 clip)
 {
@@ -3829,7 +3830,7 @@ float test_shadow_pcss(sampler2DShadow shadowmap, vec4 co, float samples, float 
 	mat2 rot = mat2(ca, sa, -sa, ca);
 	float texel = 1.0 / float(max(textureSize(shadowmap, 0).x, 1));
 	float pcfradius = samplesize * 0.5 * shadow_pcf_scale(shadowmap);
-	float maxradius = max(pcfradius * 8.0, texel * 2.0);
+	float maxradius = max(pcfradius * 3.0, texel * 2.0);
 
 	bool ortho = clip.z > 0.5;
 	float zr = shadow_linear_depth(co.z, clip);
@@ -3852,15 +3853,23 @@ float test_shadow_pcss(sampler2DShadow shadowmap, vec4 co, float samples, float 
 	/* Mean gap of the blocked taps, from the share in each band (band midpoints). */
 	vec3 mids = ortho ? vec3(0.5, 2.5, 8.0) : vec3(0.12, 0.6, 2.0);
 	float gap = (dot(vec2(blocked.x - blocked.y, blocked.y - blocked.z), mids.xy) + blocked.z * mids.z) / blocked.x;
-	float penumbra = ortho ? gap * samplesize * 0.05 : gap * soft * 0.025;
+	/* Light size from Soft: Sun angle tan = soft * 0.02 (Soft 3 is about 3.4 degrees), map width
+	 * 2 * frustum; Spot of radius soft * 0.1, map width about 2 * distance (90 degree cone). */
+	float penumbra = ortho ? gap * samplesize * 0.01 : gap * soft * 0.05 / max(zr, 1e-3);
 	float radius = clamp(penumbra, texel, maxradius);
 
 	int n = int(clamp(samples * samples, 4.0, 16.0));
 	mat2 disk = rot * radius;
+	vec4 cob = co;
+	/* Disk radius in world units (Sun: map width = 2 * frustum, frustum = soft / samplesize;
+	 * Spot: about 2 * distance for a 90 degree cone); a quarter of it as depth covers gentle
+	 * slopes without lifting the shadow off its caster. */
+	float worldradius = 0.25 * radius * (ortho ? 2.0 * soft / max(samplesize, 1e-4) : 2.0 * zr);
+	cob.z = shadow_depth_from_linear(max(zr - worldradius, clip.x), clip);
 	float result = 0.0;
 	for (int i = 0; i < 16; i++) {
 		if (i >= n) break;
-		result += texture_shadow_offset(shadowmap, co, disk * poisson[i]);
+		result += texture_shadow_offset(shadowmap, cob, disk * poisson[i]);
 	}
 	return result / float(n);
 }

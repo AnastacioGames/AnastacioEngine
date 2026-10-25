@@ -3,7 +3,7 @@ para comparar a largura da penumbra lado a lado (PCF x PCSS).
 Câmera livre: WASD anda, Q/E sobe/desce, setas giram.
 
 Uso:
-  AnastacioEngine.exe -b --factory-startup --python criar_cena_pcss2.py -- saida.range [PCF|PCF_PENUMBRA]
+  AnastacioEngine.exe -b --factory-startup --python criar_cena_pcss2.py -- saida.range [PCF|PCF_PENUMBRA] [soft]
 """
 import bpy
 import math
@@ -12,6 +12,7 @@ import sys
 argv = sys.argv[sys.argv.index('--') + 1:]
 out = argv[0]
 filtro = argv[1] if len(argv) > 1 else 'PCF_PENUMBRA'
+soft = float(argv[2]) if len(argv) > 2 else 3.0
 
 scene = bpy.context.scene
 for ob in list(scene.objects):
@@ -71,7 +72,7 @@ lamp.shadow_buffer_clip_start = 1
 lamp.shadow_buffer_clip_end = 30
 lamp.shadow_buffer_size = 2048
 lamp.shadow_buffer_samples = 4
-lamp.shadow_buffer_soft = 3.0
+lamp.shadow_buffer_soft = soft
 lamp.shadow_filter = filtro
 
 bpy.ops.object.camera_add(location=(0, -14, 13))
