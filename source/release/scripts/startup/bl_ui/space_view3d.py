@@ -95,7 +95,12 @@ class VIEW3D_HT_header(Header):
         # draws the layers grid and the lock-camera-and-layers icon last.
         layout.template_header_3D()
         if view.show_floating_controls_in_header:
+            # Espaços elásticos dos dois lados centralizam os controles (Blender 5).
+            if view.use_header_controls_center:
+                layout.separator_spacer()
             layout.template_header_3D_controls()
+            if view.use_header_controls_center:
+                layout.separator_spacer()
 
         if obj:
             # Particle edit
