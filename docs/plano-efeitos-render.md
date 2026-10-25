@@ -28,19 +28,19 @@ Já feito em 2026-10-24:
   - `quality_preset` em `SCENEFXSettings`, com a tabela em `scene.c`.
   - UI no topo do painel Post Processing.
   - Python: `scene.setQualityPreset()` e `getQualityPreset()`.
+- **2026-10-25, aceito com janela** (cena `tools/debug/cenas/criar_cena_efeitos_render.py`):
+  - SSR sem riscos na borda da esfera, GGX VNDF e blur da composição que respeita profundidade e normal;
+  - SSAO temporal (trace RGBA16F, `TEMPORAL_SSAO`);
+  - Bloom com `GPUBLOOMSettings.quality` (Full/Half), Very Low e Low usam Half;
+  - tonemap: Filmic, AGX e Uncharted voltaram às curvas originais (a cor já chega em gamma; a "gamma única" da Fase 1 deixava a imagem acinzentada), fica só o dither;
+  - crash: o SSR lia as cores do céu de `KX_GetActiveScene()` durante a construção da cena (ponteiro solto); agora vêm do World da própria cena em `KX_Scene`;
+  - SSR da 3D View (`gpu_shader_fx_ssr_frag.glsl`): fresnel de Schlick, sem jitter e com fade de borda, parecido com o do jogo;
+  - preset trocado em jogo pelas teclas 1/2/3 da cena de teste funciona.
 - **Pendências:**
-  - Build limpo do editor e do runtime, porque o DNA mudou (cerca de 45 min). Depois, teste do usuário com a janela, incluindo câmera em movimento para ver rastro, split screen e o jogo dentro do editor.
-  - **SSR:** riscos escuros no reflexo da esfera. Conferir se o temporal liga na iGPU (limite de unidades de textura e MSAA).
-  - **SSAO:** grão leve; o trace precisa virar float e ganhar temporal.
-  - **DOF:** ainda lê profundidade e cor em resolução cheia, por isso ganhou só ~15%.
-  - **Bloom:**
-    - entrar no preset;
-    - o profiler mede só `bloom_image`.
-  - **Preset:**
-    - trocar durante o jogo não muda resolução, sombras, DOF nem céu até `restart`;
-    - escolher pela UI sobrescreve os valores de cada efeito.
-  - **Ainda não feito:** GGX VNDF no SSR, flipbook de partículas, IBL com SH9 e fusão de tonemap, FXAA e lente.
-  - **Medições:** ainda não refeitas na iGPU; o notebook agora está sem placa dedicada.
+  - **DOF:** ainda lê profundidade e cor em resolução cheia (ganhou só ~15%); precisa de um passe de redução.
+  - **Preset:** escolher pela UI sobrescreve os valores de cada efeito.
+  - **Ainda não feito:** flipbook de partículas (campos novos no DNA, build limpo), IBL com SH9 e fusão de tonemap, FXAA e lente.
+  - **Medições:** ainda não refeitas na iGPU. O profiler já separa os passes (`bloom_down0..3`, `bloom_up`, `bloom_image`...).
 
 ## Fase 1: correções baratas (custo de GPU ~0 e risco baixo)
 

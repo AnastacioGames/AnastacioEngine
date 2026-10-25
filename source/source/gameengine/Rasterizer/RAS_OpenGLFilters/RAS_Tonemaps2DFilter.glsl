@@ -44,8 +44,13 @@ vec3 aces_tonemap(vec3 color) { // gamma 2.2 | exposure 1.0
 }
 /* */
 
-/* "AGX" mode: despite the name this is the ACES fit by Krzysztof Narkowicz, not Blender's AgX.
- * The enum/name stays for file compatibility. Linear in, gamma applied once on the way out. */
+/* AGX */
+/* The scene color reaching this pass is already display-encoded, so the curves below keep their
+ * original look on purpose (the "single gamma" attempt washed out the contrast). */
+vec3 sRGBToLinear(vec3 srgb) {
+    return pow(srgb, vec3(2.2));
+}
+
 vec3 applyAGX(vec3 color) {
     color *= ge_TonemapParams.y;
 
@@ -59,6 +64,10 @@ vec3 applyAGX(vec3 color) {
 
     return pow(clamp(color, 0.0, 1.0), vec3(1.0 / ge_TonemapParams.z));
 }
+
+vec3 linearToSRGB(vec3 linear) {
+    return pow(linear, vec3(1.0 / 2.2));
+}
 /* */
 
 /* Filmic */
@@ -69,8 +78,7 @@ vec3 filmicTonemap(vec3 color) {
     color = max(vec3(0.0), color - 0.004);
     color = (color * (6.2 * color + 0.5)) / (color * (6.2 * color + 1.7) + 0.06);
 
-    /* Hejl-Dawson already outputs gamma-encoded (~2.2) color: no extra pow here. */
-    return clamp(color, 0.0, 1.0);
+    return pow(clamp(color, 0.0, 1.0), vec3(1.0 / ge_TonemapParams.z));
 }
 /* */
 
@@ -85,12 +93,11 @@ void main() {
 	// Uncharted Tonemap
 	if (ge_TonemapParams.x == 0.0) {
 		vec3 rgb = color.rgb;
-		/* Hable's reference setup (exposure bias 2, white 11.2), gamma applied once. */
-		rgb *= ge_TonemapParams.y * 2.0;
+		rgb *= ge_TonemapParams.y * 12.70;
 
-		vec3 white_point = vec3(11.2);
+		vec3 white_point = vec3(28.0);
 		rgb = Uncharted2Tonemap(rgb) / Uncharted2Tonemap(white_point);
-		rgb = pow(clamp(rgb, 0.0, 1.0), vec3(1.0 / ge_TonemapParams.z));
+		rgb = pow(rgb, vec3(6.0 / ge_TonemapParams.z));
 
 		gl_FragColor = vec4(rgb, color.a);
 	}
@@ -100,7 +107,9 @@ void main() {
 	}
 	// AGX
 	else if (ge_TonemapParams.x == 2.0) {
-		gl_FragColor = vec4(applyAGX(color.rgb), color.a);
+		vec3 linearColor = sRGBToLinear(color.rgb);
+		vec3 agxColor = applyAGX(linearColor);
+		gl_FragColor = vec4(linearToSRGB(agxColor), color.a);
 	}
 	// Filmic
 	else if (ge_TonemapParams.x == 3.0) {

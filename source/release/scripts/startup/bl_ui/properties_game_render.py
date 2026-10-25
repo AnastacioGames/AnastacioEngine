@@ -528,6 +528,7 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
             subcol.active = scenefx_settings.use_bloom
             subcol.prop(bloom_settings, "intensity")
             subcol.prop(bloom_settings, "threshold")
+            subcol.prop(bloom_settings, "quality")
             
         row = layout.row(align=True)
         row.prop(scenefx_settings, "show_expanded_tonemap", text="Tonemap", emboss=True)

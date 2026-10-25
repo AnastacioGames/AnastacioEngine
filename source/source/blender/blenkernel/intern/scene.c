@@ -237,19 +237,20 @@ typedef struct SceneQualityRow {
 	short dof_quality;
 	short shadow_bufsize, shadow_samples;
 	short sky_quality;
+	short bloom_quality;
 } SceneQualityRow;
 
 static const SceneQualityRow scene_quality_table[5] = {
 	/* Very Low */
-	{4,  1, 4, 4,   8, 4,  12, 8,  0, 2,  2, 0,  0,  256, 1,  WO_SKY_QUALITY_VERY_LOW},
+	{4,  1, 4, 4,   8, 4,  12, 8,  0, 2,  2, 0,  0,  256, 1,  WO_SKY_QUALITY_VERY_LOW, 1},
 	/* Low */
-	{8,  2, 6, 2,  12, 2,  16, 4,  0, 0,  3, 0,  0,  512, 2,  WO_SKY_QUALITY_LOW},
+	{8,  2, 6, 2,  12, 2,  16, 4,  0, 0,  3, 0,  0,  512, 2,  WO_SKY_QUALITY_LOW,      1},
 	/* Medium */
-	{16, 4, 8, 2,  16, 2,  32, 4,  1, 0,  5, 1,  1, 1024, 3,  WO_SKY_QUALITY_AUTO},
+	{16, 4, 8, 2,  16, 2,  32, 4,  1, 0,  5, 1,  1, 1024, 3,  WO_SKY_QUALITY_AUTO,     0},
 	/* High */
-	{24, 6, 12, 1, 32, 1,  48, 2,  2, 0,  6, 2,  2, 2048, 4,  WO_SKY_QUALITY_HIGH},
+	{24, 6, 12, 1, 32, 1,  48, 2,  2, 0,  6, 2,  2, 2048, 4,  WO_SKY_QUALITY_HIGH,     0},
 	/* Ultra */
-	{32, 8, 16, 1, 64, 1,  64, 1,  2, 1,  8, 2,  2, 4096, 6,  WO_SKY_QUALITY_HIGH},
+	{32, 8, 16, 1, 64, 1,  64, 1,  2, 1,  8, 2,  2, 4096, 6,  WO_SKY_QUALITY_HIGH,     0},
 };
 
 static void scene_quality_set_idp_int(Scene *scene, const char *name, int value)
@@ -277,6 +278,9 @@ bool BKE_scene_quality_preset_apply(Scene *scene, int preset)
 
 	if (fx->ssao) {
 		fx->ssao->samples = q->ssao_samples;
+	}
+	if (fx->bloom) {
+		fx->bloom->quality = q->bloom_quality;
 	}
 	if (fx->ssr) {
 		fx->ssr->step_max = q->ssr_steps;

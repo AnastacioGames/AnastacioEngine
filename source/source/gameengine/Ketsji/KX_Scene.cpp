@@ -485,6 +485,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 		filters.useBloom = (scene->scenefx_settings.scenefx_flag & SCENE_FX_FLAG_BLOOM) ? true : false;
 		filters.bloom_intensity = settings.bloom->intensity;
 		filters.bloom_threshold = settings.bloom->threshold;
+		filters.bloom_quality = settings.bloom->quality;
 	}
 	if (settings.tonemap) {
 		filters.useTonemap = (scene->scenefx_settings.scenefx_flag & SCENE_FX_FLAG_TONEMAP) ? true : false;
@@ -561,13 +562,14 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_puddle_reflection = world->rain_puddle_reflection;
 			filters.rain_puddle_distance = world->rain_puddle_distance;
 			filters.rain_puddle_min_up = world->rain_puddle_min_up;
-			filters.rain_sky_horizon[0] = world->horr;
-			filters.rain_sky_horizon[1] = world->horg;
-			filters.rain_sky_horizon[2] = world->horb;
-			filters.rain_sky_zenith[0] = world->zenr;
-			filters.rain_sky_zenith[1] = world->zeng;
-			filters.rain_sky_zenith[2] = world->zenb;
 		}
+		/* World colors: what the puddles reflect and the SSR fallback for rays without a hit. */
+		filters.rain_sky_horizon[0] = world->horr;
+		filters.rain_sky_horizon[1] = world->horg;
+		filters.rain_sky_horizon[2] = world->horb;
+		filters.rain_sky_zenith[0] = world->zenr;
+		filters.rain_sky_zenith[1] = world->zeng;
+		filters.rain_sky_zenith[2] = world->zenb;
 
 		/* Clouds, Sky Layers and Volumetric Clouds share one filter pass (RAS_Clouds2DFilter.glsl). */
 		if (world->weather_flag & WO_WEATHER_CLOUDS || world->sky_layer_flag & WO_SKY_LAYERS_ENABLE ||

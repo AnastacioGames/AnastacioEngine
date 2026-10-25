@@ -57,6 +57,29 @@ float ign(vec2 p, float frame)
 	return fract(52.9829189 * fract(dot(p, vec2(0.06711056, 0.00583715))));
 }
 
+/* GGX VNDF sampling (Heitz 2018, "Sampling the GGX Distribution of Visible Normals"). N faces the
+ * camera, Ve is the direction to the camera, a = roughness^2. u.x is scaled by 0.8 to cut the far
+ * tail of the lobe (rays that would mostly go into the surface or add fireflies). */
+vec3 sampleGGXVNDF(vec3 N, vec3 Ve, float a, vec2 u)
+{
+	vec3 T = normalize(abs(N.z) < 0.99 ? cross(N, vec3(0.0, 0.0, 1.0)) : cross(N, vec3(1.0, 0.0, 0.0)));
+	vec3 B = cross(N, T);
+	vec3 v = vec3(dot(Ve, T), dot(Ve, B), dot(Ve, N));
+	vec3 Vh = normalize(vec3(a * v.x, a * v.y, max(v.z, 0.0)));
+	float lensq = dot(Vh.xy, Vh.xy);
+	vec3 T1 = (lensq > 1e-7) ? vec3(-Vh.y, Vh.x, 0.0) * inversesqrt(lensq) : vec3(1.0, 0.0, 0.0);
+	vec3 T2 = cross(Vh, T1);
+	float r = sqrt(u.x * 0.8);
+	float phi = 6.2831853 * u.y;
+	float t1 = r * cos(phi);
+	float t2 = r * sin(phi);
+	float s = 0.5 * (1.0 + Vh.z);
+	t2 = (1.0 - s) * sqrt(max(0.0, 1.0 - t1 * t1)) + s * t2;
+	vec3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
+	vec3 m = normalize(vec3(a * Nh.x, a * Nh.y, max(Nh.z, 1e-4)));
+	return normalize(T * m.x + B * m.y + N * m.z);
+}
+
 mat4 invProj;
 
 float viewZ(vec2 uv)
@@ -102,21 +125,25 @@ void main() {
 	float frame = float(bgl_Frame % 64);
 	float jitter = ign(pix, frame);
 
-	/* Rough surfaces: jitter the normal inside a cone of roughness^2 (averaged over frames). */
-	vec3 Nr = N;
-	if (rough > 0.02) {
-		float a = rough * rough;
-		float phi = 6.2831853 * ign(pix + 17.0, frame + 3.0);
-		float r = sqrt(ign(pix + 41.0, frame + 7.0)) * a * 0.6;
-		vec3 T = normalize(abs(N.z) < 0.99 ? cross(N, vec3(0.0, 0.0, 1.0)) : cross(N, vec3(1.0, 0.0, 0.0)));
-		vec3 B = cross(N, T);
-		Nr = normalize(N + (T * cos(phi) + B * sin(phi)) * r);
-	}
-	vec3 R = normalize(reflect(V, Nr));
-
-	/* Schlick fresnel: F0 0.04 (dielectric, scaled by spec) up to 1 (metal). */
 	/* The G-buffer normal sign is not guaranteed to face the camera: orient it by the view. */
 	float nSign = (dot(N, V) < 0.0) ? 1.0 : -1.0;
+	vec3 Nf = N * nSign;
+
+	/* Rough surfaces: one GGX microfacet normal per pixel and frame, sampled from the distribution of
+	 * visible normals (Heitz 2018), averaged by the temporal resolve and the roughness blur. */
+	vec3 Nr = Nf;
+	if (rough > 0.02) {
+		Nr = sampleGGXVNDF(Nf, -V, rough * rough,
+		                   vec2(ign(pix + 41.0, frame + 7.0), ign(pix + 17.0, frame + 3.0)));
+	}
+	vec3 R = normalize(reflect(V, Nr));
+	/* At grazing angles (silhouette of a sphere) the rough jitter can send the ray into the surface,
+	 * which then "hits" its own darker side: fall back to the mirror direction there. */
+	if (dot(R, Nf) < 0.02) {
+		R = normalize(reflect(V, N));
+	}
+
+	/* Schlick fresnel: F0 0.04 (dielectric, scaled by spec) up to 1 (metal). */
 	float NdV = clamp(abs(dot(N, V)), 0.0, 1.0);
 	float F0 = mix(0.04 * 2.0 * diff_spec.y, 1.0, rough_metal.y);
 	float fresnel = F0 + (1.0 - F0) * pow(1.0 - NdV, 5.0);
@@ -132,6 +159,9 @@ void main() {
 		vec4 n = invProj * vec4(0.0, 0.0, -1.0, 1.0);
 		near = n.z / n.w; // negative
 	}
+	/* Lift the origin off the surface by its normal, proportional to the distance, so a ray almost
+	 * tangent to a curved surface does not start inside its depth. */
+	P += Nf * (0.002 * -P.z + 0.005);
 	float rayLen = ((P.z + R.z * maxDist) > near) ? (near - 0.001 - P.z) / R.z : maxDist;
 	vec3 Pend = P + R * rayLen;
 
@@ -230,7 +260,11 @@ void main() {
 			 * thickness) is not a hit; keep marching, it may end on the sky fallback. */
 			float gap = abs(viewZ(rUV) - rPos.z);
 			float tRef = (0.02 * -rPos.z + 0.05) * thickBias;
-			if (gap < tRef) {
+			/* A hit a few pixels from the start of a near tangent ray is the surface itself
+			 * (convex silhouette): not a reflection, keep marching. */
+			float startPx = length((rUV - texcoord) * fullSize);
+			bool selfHit = startPx < 3.0 && dot(R, Nf) < 0.25;
+			if (gap < tRef && !selfHit) {
 				hitUV = rUV;
 				hitPos = rPos;
 				confidence = 1.0 - smoothstep(0.5, 1.0, gap / tRef);

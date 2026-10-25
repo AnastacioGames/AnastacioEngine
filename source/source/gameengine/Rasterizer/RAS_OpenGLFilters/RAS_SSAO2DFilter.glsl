@@ -12,6 +12,9 @@ out vec4 fragColor;
 
 // Ambient Occlusion from 3D viewport as a Filter2D
 // ported by Murilo Hilas
+#ifdef SSAO_TEMPORAL
+uniform int bgl_Frame;
+#endif
 uniform vec4 ge_ssaoparams; // Samples, Strength, Distance, Attenuation
 /* Inverse projection from the CPU (was inverse() per pixel). */
 uniform mat4 unfinvprojmat;
@@ -207,7 +210,12 @@ float gtao_visibility(float depth, vec3 albedo)
 	float falloff_add = (radius - falloff_range) / falloff_range + 1.0;
 
 	/* interleaved gradient noise: the per pixel rotation and step jitter average out over 4x4 pixels */
-	float noise_slice = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+	vec2 noise_px = gl_FragCoord.xy;
+#ifdef SSAO_TEMPORAL
+	/* the temporal resolve averages the pattern over frames: move it every frame */
+	noise_px += float(bgl_Frame % 64) * 5.588238;
+#endif
+	float noise_slice = fract(52.9829189 * fract(dot(noise_px, vec2(0.06711056, 0.00583715))));
 	float noise_step = fract(noise_slice + 0.61803398875);
 
 	float visibility = 0.0;

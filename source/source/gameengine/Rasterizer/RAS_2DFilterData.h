@@ -44,6 +44,7 @@ typedef struct BuildInFilters {
 	bool useBloom;
 	float bloom_threshold;
 	float bloom_intensity;
+	int bloom_quality;
 
 	/* Tonemap */
 	bool useTonemap;

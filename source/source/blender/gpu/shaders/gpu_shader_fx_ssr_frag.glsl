@@ -38,17 +38,11 @@ vec3 calculate_ssr_factor() {
 	vec4 camera_space_pos = gl_ProjectionMatrixInverse * vec4(uvcoord.xy * 2.0 - 1.0, depth, 1.0);
 	vec3 pixel_position = camera_space_pos.xyz / camera_space_pos.w;
 
-	vec2 uv = camera_space_pos.xy / length(camera_space_pos);
-
-	vec2 rotX = texture(jitter_tex, uv * 43543.0).xy;
-	vec3 noise = vec3(rotX.y, rotX.x, rotX.x - rotX.y);
-
 	vec3 view_dir = normalize(pixel_position);
 	vec3 reflect_dir = reflect(view_dir, normal);
 
-	if (roughness > 0.05) {
-		reflect_dir += noise * roughness * roughness;
-	}
+	/* No per-pixel jitter here: the viewport has no temporal resolve to average it (it showed as
+	 * grain). Roughness only dims the reflection below. */
 
 	vec3 col = vec3(0.0);
 
@@ -74,7 +68,8 @@ vec3 calculate_ssr_factor() {
 
 		if (length(scene_position) < length(ray_pos)) {
 			if(abs(ray_pos.z - scene_position.z) < stepSize * ssr_params.w) {
-				col = texture(colorbuffer, screen_pos).rgb;
+				vec2 e = smoothstep(vec2(0.0), vec2(0.08), screen_pos) * smoothstep(vec2(0.0), vec2(0.08), 1.0 - screen_pos);
+				col = texture(colorbuffer, screen_pos).rgb * e.x * e.y;
 			}
 
 			break;
@@ -85,11 +80,14 @@ vec3 calculate_ssr_factor() {
 		}
 	}
 
-	float fresnel = pow(1.0 - max(0.0, dot(normal, view_dir)), 2.0);
+	/* Schlick with a dielectric F0 like the game SSR (RAS_SSR2DFilter.glsl): without the G-buffer the
+	 * viewport cannot tell metals or matte walls apart, so it stays on the discreet side. */
+	float NdV = clamp(abs(dot(normal, view_dir)), 0.0, 1.0);
+	float fresnel = 0.04 + 0.96 * pow(1.0 - NdV, 5.0);
 
 	depth = 1.0 - step(1.0, depth);
 
-	return col * fresnel * depth * (1.0 - roughness) * 0.25;
+	return col * fresnel * depth * (1.0 - roughness) * (1.0 - roughness);
 }
 
 void main() {

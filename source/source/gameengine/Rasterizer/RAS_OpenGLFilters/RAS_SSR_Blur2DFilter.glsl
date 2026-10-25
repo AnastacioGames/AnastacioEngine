@@ -1,7 +1,9 @@
 /* Screen Space Reflections, composite pass: blurs the (temporally resolved) SSR buffer by the
  * roughness of the surface and adds it to the image. Golden angle disk whose radius grows with
  * roughness^2; samples from surfaces of a very different roughness (or the sky) are rejected so
- * the glossy floor does not bleed onto a matte wall next to it. */
+ * the glossy floor does not bleed onto a matte wall next to it. Samples across a depth or normal
+ * edge (silhouette of a sphere over the floor) are rejected too: the half resolution buffer would
+ * otherwise mix both reflections into a dotted rim. */
 
 #ifdef USE_CORE_PROFILE
 in vec2 texCoordVarying;
@@ -40,6 +42,10 @@ void main() {
 	float rough = rough_metal.x;
 	float a = rough * rough;
 
+	float depthC = texture(bgl_DepthTexture, texcoord).x;
+	/* 1 - depth is ~ proportional to 1 / z, so its relative difference is the relative depth gap. */
+	float invZC = max(1.0 - depthC, 1e-7);
+
 	vec3 result = texture(ssr_buffer, texcoord).rgb;
 	/* Minimum 1.5 texel radius even on mirrors: single-texel hit/miss disagreements (one ray hits,
 	 * the neighbour misses) are softened instead of showing as streaks. */
@@ -54,7 +60,10 @@ void main() {
 			vec2 uv = texcoord + vec2(cos(ang), sin(ang)) * r * texel;
 			vec2 rm = unpackFloat2(texture(bgl_DataTextures[0], uv).b);
 			float w = 1.0 - smoothstep(0.1, 0.3, abs(rm.x - rough));
-			w *= step(texture(bgl_DepthTexture, uv).x, 0.99999);
+			float du = texture(bgl_DepthTexture, uv).x;
+			w *= step(du, 0.99999);
+			w *= 1.0 - smoothstep(0.01, 0.03, abs(du - depthC) / invZC);
+			w *= 1.0 - smoothstep(0.1, 0.3, length(texture(bgl_DataTextures[0], uv).rg - Gbuff0.rg));
 			result += texture(ssr_buffer, uv).rgb * w;
 			n += w;
 		}

@@ -98,7 +98,7 @@ static void kx_profile_filter_pass(int pass)
 		static const char *const names[] = {
 			/* 5 is the SSAO composite and 12 the half resolution DOF (see the slot constants below). */
 			"ssgi", "ssgi_image", "ssr", "ssr_blur", "ssao", "ssao_image", "bloom_down0", "bloom_down1",
-			"bloom_down2", "bloom_down3", "bloom_up", "bloom_image", "camera_dof_half", "lightscatter", "lightscatter", "fxaa", "tonemap", "rain", "clouds",
+			"bloom_down2", "bloom_down3", "bloom_up", "bloom_image", "camera_dof_half", "lightscatter", "lightscatter_image", "fxaa", "tonemap", "rain", "clouds",
 			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens"};
 		static std::string storage[257];
 		if (pass < 0) {
@@ -222,9 +222,11 @@ void KX_2DFilterManager::EnsureSSAOFilters(BuildInFilters filters)
 	if (!filters.useSSAO || GetFilterPass(PASS_SSAO_IMAGE, true)) {
 		return;
 	}
-	/* GTAO traced at half resolution into an 8 bit buffer (only .r is used: visibility before the
-	 * multi-bounce), then RAS_SSAO_Image2DFilter.glsl blurs it (bilateral, depth aware) and darkens
-	 * the image. Replaces the single full resolution pass of RAS_2DFilterManager. */
+	/* GTAO traced at half resolution (only .r is used: visibility before the multi-bounce), averaged
+	 * over frames by the temporal resolve when float targets exist (16 bit: the 8 bit buffer showed
+	 * grain), then RAS_SSAO_Image2DFilter.glsl blurs it (bilateral, depth aware) and darkens the
+	 * image. Replaces the single full resolution pass of RAS_2DFilterManager. */
+	const bool temporal = RAS_FloatRenderTargetSupported();
 	RemoveReservedFilterPass(FILTERPASS_SSAO);
 
 	RAS_2DFilterData data;
@@ -234,21 +236,28 @@ void KX_2DFilterManager::EnsureSSAOFilters(BuildInFilters filters)
 	data.mipmap = false;
 	data.propertyNames = {};
 	data.buildInFilters = filters;
-	data.shaderText = std::string("#define SSAO_TRACE\n") + datatoc_RAS_SSAO2DFilter_glsl;
+	data.shaderText = std::string(temporal ? "#define SSAO_TRACE\n#define SSAO_TEMPORAL\n" : "#define SSAO_TRACE\n") +
+	        datatoc_RAS_SSAO2DFilter_glsl;
 	KX_2DFilter *trace = static_cast<KX_2DFilter *>(AddFilter(data, true));
 	trace->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
 	        std::max(1, m_canvas->GetRenderWidth() / 2), std::max(1, m_canvas->GetRenderHeight() / 2),
-	        RAS_Rasterizer::RAS_HDR_NONE, 2.0f));
+	        temporal ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT : RAS_Rasterizer::RAS_HDR_NONE, 2.0f));
 
 	data.filterPassIndex = PASS_SSAO_IMAGE;
 	data.shaderText = datatoc_RAS_SSAO_Image2DFilter_glsl;
 	KX_2DFilter *image = static_cast<KX_2DFilter *>(AddFilter(data, true));
-	image->SetTexture(0, trace->GetOffScreen()->GetColorBindCode(0), "ssao_buffer");
-	trace->GetOffScreen()->SetRebuildCallback([this]() {
+	KX_2DFilter *resolve = temporal ? AttachTemporalResolve(trace, TEMPORAL_SSAO, 2.0f, "#define TEMPORAL_ALPHA 0.1\n") : nullptr;
+	RAS_2DFilterOffScreen *composited = resolve ? resolve->GetOffScreen() : trace->GetOffScreen();
+	image->SetTexture(0, composited->GetColorBindCode(0), "ssao_buffer");
+	composited->SetRebuildCallback([this]() {
 		RAS_2DFilter *t = GetFilterPass(FILTERPASS_SSAO, true);
 		KX_2DFilter *img = static_cast<KX_2DFilter *>(GetFilterPass(PASS_SSAO_IMAGE, true));
-		if (t && img && t->GetOffScreen()) {
-			img->UpdateTextureBindCode(0, t->GetOffScreen()->GetColorBindCode(0));
+		if (!t || !img) {
+			return;
+		}
+		RAS_2DFilter *src = t->GetTemporalResolve() ? t->GetTemporalResolve() : t;
+		if (src->GetOffScreen()) {
+			img->UpdateTextureBindCode(0, src->GetOffScreen()->GetColorBindCode(0));
 		}
 	});
 	if (!trace->Ok() || !image->Ok() || !trace->GetOffScreen()->GetValid()) {
@@ -313,14 +322,16 @@ void KX_2DFilterManager::EnsureBloomFilters(BuildInFilters filters)
 	 * 1/4 and 1/2 levels. 6 passes of 5-8 taps each instead of 8 passes of 11-tap gaussians. */
 	const int w = m_canvas->GetWidth();
 	const int h = m_canvas->GetHeight();
+	/* Half quality shifts the whole chain one level down (1/4 .. 1/32). */
+	const int lodShift = (filters.bloom_quality == 1) ? 1 : 0;
 	KX_2DFilter *down[4];
 	for (int i = 0; i < 4; ++i) {
-		down[i] = BloomPass(filters, (i == 0) ? 0 : 1, PASS_BLOOM_FIRST + i, (float)(2 << i), w, h);
+		down[i] = BloomPass(filters, (i == 0) ? 0 : 1, PASS_BLOOM_FIRST + i, (float)(2 << (i + lodShift)), w, h);
 		if (i > 0) {
 			down[i]->SetTexture(0, down[i - 1]->GetOffScreen()->GetColorBindCode(0), "bgl_BloomSource");
 		}
 	}
-	KX_2DFilter *up = BloomPass(filters, 2, PASS_BLOOM_FIRST + 4, 8.0f, w, h);
+	KX_2DFilter *up = BloomPass(filters, 2, PASS_BLOOM_FIRST + 4, (float)(8 << lodShift), w, h);
 	up->SetTexture(0, down[3]->GetOffScreen()->GetColorBindCode(0), "bgl_BloomSource");
 	up->SetTexture(1, down[2]->GetOffScreen()->GetColorBindCode(0), "bgl_BloomAdd");
 
@@ -435,15 +446,8 @@ void KX_2DFilterManager::EnsureSSRFilters(BuildInFilters filters)
 	ssrData.gameObject = nullptr;
 	ssrData.mipmap = false;
 	ssrData.propertyNames = {};
-	/* World colors for the rays without a hit (same uniforms the rain puddles use). */
-	if (KX_Scene *scene = KX_GetActiveScene()) {
-		if (KX_WorldInfo *world = scene->GetWorldInfo()) {
-			for (int i = 0; i < 3; i++) {
-				filters.rain_sky_horizon[i] = world->getHorizonColor()[i];
-				filters.rain_sky_zenith[i] = world->getZenithColor()[i];
-			}
-		}
-	}
+	/* World colors for the rays without a hit come from KX_Scene (rain_sky_*): the active scene
+	 * may still be the one being replaced while this scene is constructed. */
 	ssrData.buildInFilters = filters;
 	ssrData.shaderText = datatoc_RAS_SSR2DFilter_glsl;
 

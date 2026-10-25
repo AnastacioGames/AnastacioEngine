@@ -5625,6 +5625,17 @@ static void rna_def_scene_gpu_bloom_fx(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Bloom Threshold", "Bloom threshold");
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	static const EnumPropertyItem bloom_quality_items[] = {
+		{0, "FULL", 0, "Full", "The bloom chain starts at half resolution"},
+		{1, "HALF", 0, "Half", "The bloom chain starts at quarter resolution (about 4x cheaper, a bit softer)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "quality", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "quality");
+	RNA_def_property_enum_items(prop, bloom_quality_items);
+	RNA_def_property_ui_text(prop, "Bloom Quality", "Resolution of the bloom chain (applies on game start)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_scene_gpu_tonemap_fx(BlenderRNA *brna)

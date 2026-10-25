@@ -96,7 +96,7 @@ private:
 	RAS_2DFilterData CameraFXData(int pass);
 
 	/// Temporal history ids (RAS_2DFilter::SetTemporalResolve), one per effect.
-	enum { TEMPORAL_VFOG = 0, TEMPORAL_SSGI = 1, TEMPORAL_SSR = 2 };
+	enum { TEMPORAL_VFOG = 0, TEMPORAL_SSGI = 1, TEMPORAL_SSR = 2, TEMPORAL_SSAO = 3 };
 	/** Shared temporal resolve (RAS_Temporal2DFilter.glsl) on the low resolution off screen of
 	 * a trace: returns the resolve filter (owned by trace) whose off screen holds the stable
 	 * buffer to composite, or nullptr (WebGL / failure: composite the trace buffer directly). */

@@ -853,7 +853,7 @@ typedef struct RecastData {
 typedef struct GPUBLOOMSettings {
   float intensity;
   float threshold;
-  int pad;
+  int quality; /* 0 Full (chain starts at 1/2), 1 Half (starts at 1/4). Was pad, so old files are Full. */
 } GPUBLOOMSettings;
 
 /* properties for TONEMAP effect */
