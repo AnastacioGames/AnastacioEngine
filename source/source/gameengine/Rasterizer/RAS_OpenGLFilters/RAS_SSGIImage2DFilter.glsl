@@ -65,8 +65,8 @@ void main()
     float plane_tolerance = max(ge_SSGIParams[0].z, 0.004 * abs(p.z));
     vec3 sum = vec3(0.0);
     float total = 0.0;
-    for (int y = -3; y <= 3; ++y) for (int x = -3; x <= 3; ++x) {
-        if (abs(x) > reach || abs(y) > reach) continue;
+    /* Loop over the real reach only (9, 25 or 49 taps), not 7x7 with skips. */
+    for (int y = -reach; y <= reach; ++y) for (int x = -reach; x <= reach; ++x) {
         vec2 cell = center + vec2(float(x), float(y));
         vec2 offset = cell - low_pos;
         vec2 tap = (cell + 0.5) / low_size;

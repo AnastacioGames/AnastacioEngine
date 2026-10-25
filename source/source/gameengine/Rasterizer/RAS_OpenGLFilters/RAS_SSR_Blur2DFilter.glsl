@@ -58,12 +58,13 @@ void main() {
 			float r = sqrt(fi / float(SSR_BLUR_SAMPLES)) * radius;
 			float ang = fi * 2.39996323;
 			vec2 uv = texcoord + vec2(cos(ang), sin(ang)) * r * texel;
-			vec2 rm = unpackFloat2(texture(bgl_DataTextures[0], uv).b);
+			vec4 g = texture(bgl_DataTextures[0], uv);
+			vec2 rm = unpackFloat2(g.b);
 			float w = 1.0 - smoothstep(0.1, 0.3, abs(rm.x - rough));
 			float du = texture(bgl_DepthTexture, uv).x;
 			w *= step(du, 0.99999);
 			w *= 1.0 - smoothstep(0.01, 0.03, abs(du - depthC) / invZC);
-			w *= 1.0 - smoothstep(0.1, 0.3, length(texture(bgl_DataTextures[0], uv).rg - Gbuff0.rg));
+			w *= 1.0 - smoothstep(0.1, 0.3, length(g.rg - Gbuff0.rg));
 			result += texture(ssr_buffer, uv).rgb * w;
 			n += w;
 		}

@@ -122,7 +122,6 @@ texto.write('''import Range, math, os, time
 
 ALVO = (0.0, -1.0, 1.0)
 RAIO = 9.0
-_quadros = [0]
 
 
 def _log(msg):
@@ -137,8 +136,17 @@ def tick(cont):
     scene = Range.logic.getCurrentScene()
     kb = Range.logic.keyboard
     JA = Range.logic.KX_INPUT_JUST_ACTIVATED
-    if "t0" not in own:
-        own["t0"] = time.time()
+    if "ini" not in own:
+        # TESTE_EFEITOS_PRESET=LOW|MEDIUM|...: aplica o preset uma vez (o restart recria a cena).
+        alvo = os.environ.get("TESTE_EFEITOS_PRESET")
+        gd = Range.logic.globalDict
+        if alvo and not gd.get("preset_aplicado"):
+            gd["preset_aplicado"] = True
+            scene.setQualityPreset(alvo)
+            scene.restart()
+            return
+        own["ini"] = True
+        Range.logic.globalDict["t0"] = time.time()
         own["ang"] = 0.0
         own["orbita"] = True
         _log("inicio preset=%s" % scene.getQualityPreset())
@@ -159,10 +167,16 @@ def tick(cont):
                          own.worldPosition[2] - ALVO[2]], 2, 1.0)
     own.alignAxisToVect([0, 0, 1], 1, 0.3)
     seg = float(os.environ.get("TESTE_EFEITOS_SEGUNDOS", "0"))
-    if seg > 0 and time.time() - own["t0"] > seg:
-        _log("fim ok quadros=%d" % _quadros[0])
+    if seg > 0 and time.time() - Range.logic.globalDict["t0"] > seg:
+        # FPS médio sem os 2 primeiros segundos (carga de shaders).
+        gd = Range.logic.globalDict
+        fps = (gd.get("quadros", 0) - gd.get("q2", 0)) / max(seg - 2.0, 0.1)
+        _log("fim ok quadros=%d fps=%.1f" % (gd.get("quadros", 0), fps))
         Range.logic.endGame()
-    _quadros[0] += 1
+    gd = Range.logic.globalDict
+    gd["quadros"] = gd.get("quadros", 0) + 1
+    if "q2" not in gd and time.time() - Range.logic.globalDict["t0"] > 2.0:
+        gd["q2"] = gd["quadros"]
 ''')
 
 scene.objects.active = cam
