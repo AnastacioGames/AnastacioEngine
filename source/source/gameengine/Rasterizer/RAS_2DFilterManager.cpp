@@ -599,8 +599,20 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		if (ProfilePassHook) {
 			ProfilePassHook(-1);
 		}
-		// No need to bind previousofs because a blit is proceeded.
-		rasty->DrawOffScreen(inputofs, previousofs);
+		/* Resolve the extra attachments (SSGI/SSR G-buffer, user attachments) only when an active
+		 * filter samples bgl_DataTextures: each one is a full screen multisample resolve. */
+		bool needData = false;
+		for (const auto &pair : m_filters) {
+			if (pair.second->Ok()) {
+				pair.second->Initialize(canvas);
+				if (pair.second->UsesDataTextures()) {
+					needData = true;
+					break;
+				}
+			}
+		}
+		inputofs->Blit(previousofs, true, needData ? -1 : 1);
+		previousofs->Bind();
 		if (ProfilePassHook) {
 			ProfilePassHook(-2);
 		}

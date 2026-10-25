@@ -98,7 +98,8 @@ public:
 
 	void Bind();
 	/// NOTE: This function has the side effect to leave the destination off screen bound.
-	RAS_OffScreen *Blit(RAS_OffScreen *dstOffScreen, bool depth);
+	/// numColorSlots < 0 blits every color attachment, else only the first numColorSlots.
+	RAS_OffScreen *Blit(RAS_OffScreen *dstOffScreen, bool depth, int numColorSlots = -1);
 
 	void BindColorTexture(unsigned short slot, unsigned short unit);
 	void BindDepthTexture(unsigned short unit);

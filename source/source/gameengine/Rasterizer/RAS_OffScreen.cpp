@@ -27,6 +27,7 @@
 #include "RAS_OffScreen.h"
 
 #include "GPU_framebuffer.h"
+#include <algorithm>
 
 #include "BLI_utildefines.h"
 
@@ -143,9 +144,10 @@ void RAS_OffScreen::Bind()
 	lastOffScreen = this;
 }
 
-RAS_OffScreen *RAS_OffScreen::Blit(RAS_OffScreen *dstOffScreen, bool depth)
+RAS_OffScreen *RAS_OffScreen::Blit(RAS_OffScreen *dstOffScreen, bool depth, int numColorSlots)
 {
-	GPU_framebuffer_blit(m_frameBuffer, dstOffScreen->m_frameBuffer, m_width, m_height, m_numColorSlots, depth);
+	const int slots = (numColorSlots < 0) ? m_numColorSlots : std::min(numColorSlots, (int)m_numColorSlots);
+	GPU_framebuffer_blit(m_frameBuffer, dstOffScreen->m_frameBuffer, m_width, m_height, slots, depth);
 	return dstOffScreen;
 }
 
