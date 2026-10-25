@@ -77,10 +77,11 @@ RAS_ICanvas::RAS_ICanvas(const RAS_OffScreen::AttachmentList& attachments, int n
 	:m_samples(numSamples),
 	m_attachments(attachments),
 	m_swapControl(VSYNC_OFF),
-	m_frame(1)
+	m_frame(1),
+	// Created on the first screenshot: a scheduler starts one thread per core, idle for most games.
+	m_taskscheduler(nullptr),
+	m_taskpool(nullptr)
 {
-	m_taskscheduler = BLI_task_scheduler_create(TASK_SCHEDULER_AUTO_THREADS);
-	m_taskpool = BLI_task_pool_create(m_taskscheduler, nullptr);
 }
 
 RAS_ICanvas::~RAS_ICanvas()
@@ -248,6 +249,11 @@ void RAS_ICanvas::SaveScreeshot(const Screenshot& screenshot, RAS_Rasterizer *ra
 	BLI_path_frame(task->path, m_frame, 0);
 	m_frame++;
 	BKE_image_path_ensure_ext_from_imtype(task->path, task->im_format->imtype);
+
+	if (!m_taskpool) {
+		m_taskscheduler = BLI_task_scheduler_create(TASK_SCHEDULER_AUTO_THREADS);
+		m_taskpool = BLI_task_pool_create(m_taskscheduler, nullptr);
+	}
 
 	BLI_task_pool_push(m_taskpool,
 	                   save_screenshot_thread_func,

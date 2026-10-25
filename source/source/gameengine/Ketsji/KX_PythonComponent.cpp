@@ -232,12 +232,15 @@ void KX_PythonComponent::Update()
 	}
 	// Call Update Function.
 	PyObject *pycomp = GetProxy();
-	if (!PyObject_CallMethod(pycomp, "update", "")) {
+	PyObject *ret = PyObject_CallMethod(pycomp, "update", "");
+	if (!ret) {
 		CM_Error("PythonComponent '" << m_name << "' Update() the function was not initialized correctly.");
 		EXP_ReportPythonDiagnostic("component.update", m_name.c_str());
 		PyErr_Print();
 		m_failed = true;
 	}
+	// The return value was leaked once per component per frame.
+	Py_XDECREF(ret);
 }
 
 void KX_PythonComponent::Dispose()
