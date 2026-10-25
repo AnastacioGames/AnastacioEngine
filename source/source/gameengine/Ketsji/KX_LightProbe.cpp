@@ -54,7 +54,7 @@ KX_LightProbe::KX_LightProbe(KX_GameObject *viewpoint, float radius, int size, f
 	m_size(size),
 	m_radius(radius),
 	m_maxLod(std::log2((float)size)),
-	m_realtime(realtime),
+	m_shReader(nullptr),
 	m_shValid(false)
 {
 }
@@ -67,6 +67,9 @@ KX_LightProbe::~KX_LightProbe()
 			face.DetachTexture(m_cube);
 		}
 		GPU_texture_free(m_cube);
+	}
+	if (m_shReader) {
+		GPU_cube_sh9_reader_free(m_shReader);
 	}
 }
 
@@ -90,8 +93,11 @@ float KX_LightProbe::GetMaxLod() const
 	return m_maxLod;
 }
 
-const float (*KX_LightProbe::GetSH() const)[3]
+const float (*KX_LightProbe::GetSH())[3]
 {
+	if (m_shReader && GPU_cube_sh9_reader_poll(m_shReader, m_sh)) {
+		m_shValid = true;
+	}
 	return m_shValid ? m_sh : nullptr;
 }
 
@@ -136,7 +142,14 @@ void KX_LightProbe::EndRender(RAS_Rasterizer *)
 	GPU_texture_bind(m_cube, 0);
 	GPU_texture_generate_mipmap(m_cube);
 	GPU_texture_unbind(m_cube);
-	/* Smooth diffuse light from a 16 px readback; a realtime probe would stall the GPU every frame. */
+	/* Smooth diffuse light from a 16 px readback. A realtime probe keeps the last SH9 while a copy
+	 * is pending, so the ambient trails the capture by a few frames. */
 	static const bool shOff = getenv("RANGE_PROBE_SH9_OFF") != nullptr;
-	m_shValid = !m_realtime && !shOff && GPU_texture_cube_sh9(m_cube, m_sh);
+	if (shOff) {
+		return;
+	}
+	if (!m_shReader) {
+		m_shReader = GPU_cube_sh9_reader_create();
+	}
+	GPU_cube_sh9_reader_request(m_shReader, m_cube);
 }

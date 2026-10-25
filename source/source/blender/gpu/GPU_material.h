@@ -572,7 +572,7 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
  * unshadowed. */
 #define GPU_MATERIAL_NUM_SHADOW_LAMPS 4
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
-/* sh: the cube's diffuse SH9 (GPU_texture_cube_sh9), or NULL to sample the cube for it */
+/* sh: the cube's diffuse SH9 (GPU_cube_sh9_reader_poll), or NULL to sample the cube for it */
 void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3],
                              const float (*sh)[3]);
 void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3],

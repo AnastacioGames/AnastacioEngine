@@ -121,7 +121,13 @@ int GPU_texture_framebuffer_attachment(GPUTexture *tex);
 void GPU_texture_framebuffer_set(GPUTexture *tex, struct GPUFrameBuffer *fb, int attachment);
 
 int GPU_texture_target(const GPUTexture *tex);
-bool GPU_texture_cube_sh9(GPUTexture *tex, float r_coef[9][3]);
+typedef struct GPUCubeSH9Reader GPUCubeSH9Reader;
+GPUCubeSH9Reader *GPU_cube_sh9_reader_create(void);
+void GPU_cube_sh9_reader_free(GPUCubeSH9Reader *reader);
+/* Starts copying the cube's low mip (<= 16 px); false if one is still pending or tex is no cube. */
+bool GPU_cube_sh9_reader_request(GPUCubeSH9Reader *reader, GPUTexture *tex);
+/* True once the copy is done, with the diffuse SH9 (cosine lobe / pi folded in) in r_coef. */
+bool GPU_cube_sh9_reader_poll(GPUCubeSH9Reader *reader, float r_coef[9][3]);
 int GPU_texture_width(const GPUTexture *tex);
 int GPU_texture_height(const GPUTexture *tex);
 int GPU_texture_depth(const GPUTexture *tex);

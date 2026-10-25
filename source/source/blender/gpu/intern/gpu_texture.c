@@ -43,6 +43,36 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
+#ifdef __EMSCRIPTEN__
+/* The SH9 readback calls: GLEW keeps these in function pointers that stay null on the web, route
+ * them to the WebGL2 entry points (see gpu_framebuffer.c). */
+#  undef glGenBuffers
+#  undef glBindBuffer
+#  undef glBufferData
+#  undef glDeleteBuffers
+#  undef glGetBufferSubData
+#  undef glFenceSync
+#  undef glClientWaitSync
+#  undef glDeleteSync
+#  undef glGenFramebuffers
+#  undef glBindFramebuffer
+#  undef glDeleteFramebuffers
+#  undef glFramebufferTexture2D
+extern void glGenBuffers(GLsizei n, GLuint *buffers);
+extern void glBindBuffer(GLenum target, GLuint buffer);
+extern void glBufferData(GLenum target, GLsizeiptr size, const void *data, GLenum usage);
+extern void glDeleteBuffers(GLsizei n, const GLuint *buffers);
+extern void glGetBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, void *data);
+extern GLsync glFenceSync(GLenum condition, GLbitfield flags);
+extern GLenum glClientWaitSync(GLsync sync, GLbitfield flags, GLuint64 timeout);
+extern void glDeleteSync(GLsync sync);
+extern void glGenFramebuffers(GLsizei n, GLuint *framebuffers);
+extern void glBindFramebuffer(GLenum target, GLuint framebuffer);
+extern void glDeleteFramebuffers(GLsizei n, const GLuint *framebuffers);
+extern void glFramebufferTexture2D(
+    GLenum target, GLenum attachment, GLenum textarget, GLuint texture, GLint level);
+#endif
+
 static struct GPUTextureGlobal {
 	GPUTexture *invalid_tex_1D; /* texture used in place of invalid textures (not loaded correctly, missing) */
 	GPUTexture *invalid_tex_2D;
@@ -644,32 +674,17 @@ GPUTexture *GPU_texture_create_cube(int size, GPUHDRType hdr, char err_out[256])
  * and the basis constants folded in). Reads back the first mip of 16 px or less per face, so call it
  * after GPU_texture_generate_mipmap() and only on captures, not per frame. False on WebGL (no
  * glGetTexImage); the shader then keeps its taps. */
-bool GPU_texture_cube_sh9(GPUTexture *tex, float r_coef[9][3])
+/* Diffuse SH9 of 6 square faces (RGBA, row 0 at tc = -1), cosine lobe / pi folded in. */
+static void gpu_cube_project_sh9(const float *rgba, int w, float r_coef[9][3])
 {
-#ifdef __EMSCRIPTEN__
-	UNUSED_VARS(tex, r_coef);
-	return false;
-#else
-	if (!tex || tex->target != GL_TEXTURE_CUBE_MAP) {
-		return false;
-	}
-	int lod = 0, w = tex->w;
-	while (w > 16) {
-		w >>= 1;
-		lod++;
-	}
-	float *face = MEM_mallocN(sizeof(float[3]) * w * w, __func__);
 	const float band[3] = {1.0f, 2.0f / 3.0f, 0.25f};
 	float acc[9][3] = {{0.0f}};
 	float total = 0.0f;
 
-	glBindTexture(GL_TEXTURE_CUBE_MAP, tex->bindcode);
-	glPixelStorei(GL_PACK_ALIGNMENT, 4);
 	for (int f = 0; f < 6; f++) {
-		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + f, lod, GL_RGB, GL_FLOAT, face);
 		for (int j = 0; j < w; j++) {
 			for (int i = 0; i < w; i++) {
-				/* GL cube face selection inverted: sc, tc in -1..1, row 0 at tc = -1 */
+				/* GL cube face selection inverted: sc, tc in -1..1 */
 				float sc = (i + 0.5f) / w * 2.0f - 1.0f;
 				float tc = (j + 0.5f) / w * 2.0f - 1.0f;
 				float d[3];
@@ -684,7 +699,7 @@ bool GPU_texture_cube_sh9(GPUTexture *tex, float r_coef[9][3])
 				float len2 = 1.0f + sc * sc + tc * tc;
 				float dw = 1.0f / (len2 * sqrtf(len2)); /* texel solid angle, up to a constant */
 				mul_v3_fl(d, 1.0f / sqrtf(len2));
-				const float *c = face + 3 * (j * w + i);
+				const float *c = rgba + 4 * ((f * w + j) * w + i);
 				const float y[9] = {
 					0.282095f,
 					0.488603f * d[1], 0.488603f * d[2], 0.488603f * d[0],
@@ -698,15 +713,124 @@ bool GPU_texture_cube_sh9(GPUTexture *tex, float r_coef[9][3])
 			}
 		}
 	}
-	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-	MEM_freeN(face);
 
 	const float weight = 4.0f * (float)M_PI / total;
 	for (int k = 0; k < 9; k++) {
 		mul_v3_v3fl(r_coef[k], acc[k], weight * band[k == 0 ? 0 : (k < 4 ? 1 : 2)]);
 	}
-	return true;
+}
+
+/* Async readback of a cube's low mip into a pixel buffer: the GPU copies it after the capture and
+ * the projection runs some frames later, when the fence says the copy is done, so nothing stalls. */
+struct GPUCubeSH9Reader {
+	GLuint pbo;
+	GLuint fbo; /* WebGL has no glGetTexImage: faces are read through a framebuffer */
+	GLsync fence;
+	int w;
+	size_t size;
+};
+
+GPUCubeSH9Reader *GPU_cube_sh9_reader_create(void)
+{
+	return MEM_callocN(sizeof(GPUCubeSH9Reader), __func__);
+}
+
+void GPU_cube_sh9_reader_free(GPUCubeSH9Reader *reader)
+{
+	if (reader->fence) {
+		glDeleteSync(reader->fence);
+	}
+	if (reader->pbo) {
+		glDeleteBuffers(1, &reader->pbo);
+	}
+	if (reader->fbo) {
+		glDeleteFramebuffers(1, &reader->fbo);
+	}
+	MEM_freeN(reader);
+}
+
+bool GPU_cube_sh9_reader_request(GPUCubeSH9Reader *reader, GPUTexture *tex)
+{
+	if (reader->fence || !tex || tex->target != GL_TEXTURE_CUBE_MAP) {
+		return false;
+	}
+	int lod = 0, w = tex->w;
+	while (w > 16) {
+		w >>= 1;
+		lod++;
+	}
+#ifdef __EMSCRIPTEN__
+	const size_t texel = 4; /* the web cube is RGBA8 */
+#else
+	const size_t texel = 4 * sizeof(float);
 #endif
+	const size_t face = texel * w * w;
+	if (!reader->pbo) {
+		glGenBuffers(1, &reader->pbo);
+	}
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, reader->pbo);
+	if (reader->size != 6 * face) {
+		reader->size = 6 * face;
+		glBufferData(GL_PIXEL_PACK_BUFFER, reader->size, NULL, GL_STREAM_READ);
+	}
+	reader->w = w;
+	glPixelStorei(GL_PACK_ALIGNMENT, 4);
+#ifdef __EMSCRIPTEN__
+	GLint prev = 0;
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
+	if (!reader->fbo) {
+		glGenFramebuffers(1, &reader->fbo);
+	}
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, reader->fbo);
+	for (int f = 0; f < 6; f++) {
+		glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + f,
+		                       tex->bindcode, lod);
+		glReadPixels(0, 0, w, w, GL_RGBA, GL_UNSIGNED_BYTE, (void *)(f * face));
+	}
+	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0);
+	glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
+#else
+	glBindTexture(GL_TEXTURE_CUBE_MAP, tex->bindcode);
+	for (int f = 0; f < 6; f++) {
+		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + f, lod, GL_RGBA, GL_FLOAT, (void *)(f * face));
+	}
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+#endif
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	reader->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+	glFlush();
+	return true;
+}
+
+bool GPU_cube_sh9_reader_poll(GPUCubeSH9Reader *reader, float r_coef[9][3])
+{
+	if (!reader->fence) {
+		return false;
+	}
+	GLenum status = glClientWaitSync(reader->fence, 0, 0);
+	if (status != GL_ALREADY_SIGNALED && status != GL_CONDITION_SATISFIED) {
+		return false;
+	}
+	glDeleteSync(reader->fence);
+	reader->fence = NULL;
+
+	const int w = reader->w;
+	float *rgba = MEM_mallocN(sizeof(float[4]) * 6 * w * w, __func__);
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, reader->pbo);
+#ifdef __EMSCRIPTEN__
+	unsigned char *bytes = MEM_mallocN(reader->size, __func__);
+	glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, reader->size, bytes);
+	for (size_t i = 0; i < reader->size; i++) {
+		rgba[i] = bytes[i] * (1.0f / 255.0f);
+	}
+	MEM_freeN(bytes);
+#else
+	glGetBufferSubData(GL_PIXEL_PACK_BUFFER, 0, reader->size, rgba);
+#endif
+	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+	gpu_cube_project_sh9(rgba, w, r_coef);
+	MEM_freeN(rgba);
+	return true;
 }
 
 GPUTexture *GPU_texture_create_2D_multisample(
