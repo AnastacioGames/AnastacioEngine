@@ -79,6 +79,8 @@ typedef enum GPUDriverType {
 } GPUDriverType;
 
 bool GPU_type_matches(GPUDeviceType device, GPUOSType os, GPUDriverType driver);
+/* Integrated (or software) GPU guessed from the GL renderer name; valid after GPU init. */
+bool GPU_device_is_integrated(void);
 
 #ifdef __cplusplus
 }

@@ -110,6 +110,7 @@ extern "C" {
 #include "BKE_idprop.h"
 }
 #include "GPU_material.h"
+#include "GPU_extensions.h"
 
 #include "KX_NodeRelationships.h"
 
@@ -435,7 +436,8 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 
 	/* Global quality preset: writes its row into the quality fields before they are read here
 	 * and before the converter reads cameras, lamps and the World. Auto resolves per platform
-	 * (Medium on desktop, Low on Web/Android). Custom changes nothing. */
+	 * (Medium on desktop, Low on an integrated GPU and on Web/Android). Custom changes nothing. */
+	BKE_scene_quality_set_integrated_gpu(GPU_device_is_integrated());
 	BKE_scene_quality_preset_apply(scene, scene->scenefx_settings.quality_preset);
 
 	SCENEFXSettings settings = scene->scenefx_settings;

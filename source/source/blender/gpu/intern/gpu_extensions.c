@@ -75,7 +75,14 @@ static struct GPUGlobal {
 	 * number is factor on screen and second is off-screen */
 	float dfdyfactors[2];
 	float max_anisotropy;
+	/* Integrated or software renderer, from the GL renderer name (GPU_device_is_integrated). */
+	bool integrated;
 } GG = {1, 0};
+
+bool GPU_device_is_integrated(void)
+{
+	return GG.integrated;
+}
 
 /* GPU Types */
 
@@ -224,6 +231,21 @@ void gpu_extensions_init(void)
 	else {
 		GG.device = GPU_DEVICE_ANY;
 		GG.driver = GPU_DRIVER_ANY;
+	}
+
+	/* Best guess from the name: Intel except Arc; AMD APUs are named "... Graphics" (Radeon(TM)
+	 * Graphics, Radeon 780M Graphics, Vega 8 Graphics) while dedicated cards carry RX/Pro. */
+	if (GG.device == GPU_DEVICE_SOFTWARE) {
+		GG.integrated = true;
+	}
+	else if (GG.device == GPU_DEVICE_INTEL) {
+		GG.integrated = !strstr(renderer, "Arc");
+	}
+	else if (GG.device == GPU_DEVICE_ATI) {
+		GG.integrated = strstr(renderer, "Graphics") && !strstr(renderer, " RX ") && !strstr(renderer, "Pro");
+	}
+	else {
+		GG.integrated = false;
 	}
 
 	/* make sure double side isn't used by default and only getting enabled in places where it's

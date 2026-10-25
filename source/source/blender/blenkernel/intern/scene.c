@@ -210,13 +210,20 @@ void BKE_scene_fx_validate(Scene *scene)
 
 /* ---- Global quality preset (SCENEFXSettings.quality_preset) ---- */
 
+static bool scene_quality_integrated_gpu = false;
+
+void BKE_scene_quality_set_integrated_gpu(bool integrated)
+{
+	scene_quality_integrated_gpu = integrated;
+}
+
 int BKE_scene_quality_preset_resolve(int preset)
 {
 	if (preset == SCENE_FX_QUALITY_AUTO) {
 #if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
 		return SCENE_FX_QUALITY_LOW;
 #else
-		return SCENE_FX_QUALITY_MEDIUM;
+		return scene_quality_integrated_gpu ? SCENE_FX_QUALITY_LOW : SCENE_FX_QUALITY_MEDIUM;
 #endif
 	}
 	if (preset < SCENE_FX_QUALITY_CUSTOM || preset > SCENE_FX_QUALITY_AUTO) {

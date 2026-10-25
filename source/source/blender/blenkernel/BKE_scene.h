@@ -109,8 +109,10 @@ void BKE_scene_set_background(struct Main *bmain, struct Scene *sce);
 struct Scene *BKE_scene_set_name(struct Main *bmain, const char *name);
 
 void BKE_scene_fx_validate(struct Scene *scene);
-/* Global quality preset: Auto -> Medium (desktop) or Low (Web/Android); invalid -> Custom. */
+/* Global quality preset: Auto -> Medium (desktop), Low (integrated GPU, Web/Android); invalid -> Custom. */
 int BKE_scene_quality_preset_resolve(int preset);
+/* Set by the game engine from GPU_device_is_integrated() before the preset is applied. */
+void BKE_scene_quality_set_integrated_gpu(bool integrated);
 /* Writes the preset's row into the existing quality fields (Scene FX, SSGI, World, cameras,
  * lamps). Custom does nothing and returns false. */
 bool BKE_scene_quality_preset_apply(struct Scene *scene, int preset);
