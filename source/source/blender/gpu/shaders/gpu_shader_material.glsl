@@ -3462,7 +3462,9 @@ void env_apply(float amb, float refl, float f0, float metal, float opacity, floa
 {
 	vec4 diel = mix(transmit * (1.0 - f0), diffibl * refl * amb, opacity);
 	vec4 base = mix(diel, mirror, metal) * albedo;
-	vec4 coat = mirror * f0 * speccol;
+	/* Metals already get the tinted mirror in base; drop the dielectric coat for them so the
+	 * specular reflection is not counted twice. */
+	vec4 coat = mirror * f0 * speccol * (1.0 - metal);
 	vec4 surf = base * (1.0 - coat * conserv) + coat;
 	outcol = col + surf * energy;
 }
@@ -3587,19 +3589,16 @@ vec4 shadow_proj_coord(vec3 rco, vec3 vn, mat4 shadowpersmat, float bias, float 
 	 * depth bias with tan(angle) (capped), so head-on lighting keeps the shadow attached. */
 	float NL = abs(dot(vn, shadow_light_dir(rco, shadowpersmat)));
 	float sinNL = sqrt(max(1.0 - NL * NL, 0.0));
-	float tanNL = min(sinNL / max(NL, 1e-3), 8.0);
+	float tanNL = min(sinNL / max(NL, 1e-3), 4.0);
 	vec4 lco = shadowpersmat * vec4(rco + vn * (slopebias * (0.5 + sinNL)), 1.0);
 	lco.z -= bias * (1.0 + tanNL) * lco.w;
 	return lco / lco.w;
 }
 
 float dither(float c) {
-	int bayer[64] = int[] (0,32,8,40,2,34,10,42,48,16,56,24,50,18,58,26,12,
-		44,4,36,14,46,6,38,60,28,52,20,62,30,54,22,3,35,11,43,1,33,9,41,51,
-		19,59,27,49,17,57,25,15,47,7,39,13,45,5,37,63,31,55,23,61,29,53,21);
-
-	ivec2 i = ivec2(mod(gl_FragCoord.xy, vec2(8.0)));
-	return floor((c + (float(bayer[i.y * 8 + i.x]) / 64.0 - 0.5)) + 0.5);
+	/* Interleaved gradient noise (Jimenez 2014): uniform in [0,1), no per-call array. */
+	float n = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));
+	return floor(c + n);
 }
 
 void shade_dither(float c, out float outc){
@@ -3613,6 +3612,13 @@ float test_shadow_simple(sampler2DShadow shadowmap, vec4 co, float type)
 				        return shadow2DProj(shadowmap, co).x;
 }
 
+/* PCF radius in texels instead of raw UV: calibrated so a 2048 map matches the old look
+ * (offset * 0.1), and other map sizes/cascades keep the same softness in texels. */
+float shadow_pcf_scale(sampler2DShadow shadowmap)
+{
+	return 0.1 * 2048.0 / float(max(textureSize(shadowmap, 0).x, 1));
+}
+
 float texture_shadow_offset(sampler2DShadow shadowmap, vec4 co, vec2 offset)
 {
 	return shadow2DProj(shadowmap, vec4(co.xy + offset, co.z, co.w)).x;
@@ -3620,6 +3626,7 @@ float texture_shadow_offset(sampler2DShadow shadowmap, vec4 co, vec2 offset)
 
 float test_shadow_pcf_early_bail(sampler2DShadow shadowmap, vec4 co, float samples, float samplesize)
 {
+	float pcfscale = shadow_pcf_scale(shadowmap);
 	float step = samplesize / samples;
 	float fullstep = samplesize - step * 0.98;
 	float halfsample = samplesize * 0.5 - step * 0.49;
@@ -3627,7 +3634,7 @@ float test_shadow_pcf_early_bail(sampler2DShadow shadowmap, vec4 co, float sampl
 	float result = 0.0;
 	for (float y = -halfsample; y <= halfsample; y += fullstep) {
 		for (float x = -halfsample; x <= halfsample; x += fullstep) {
-			result += texture_shadow_offset(shadowmap, co, vec2(x, y) * 0.1);
+			result += texture_shadow_offset(shadowmap, co, vec2(x, y) * pcfscale);
 		}
 	}
 
@@ -3635,12 +3642,12 @@ float test_shadow_pcf_early_bail(sampler2DShadow shadowmap, vec4 co, float sampl
 		float sampleoffset = halfsample - step;
 		for (float y = -sampleoffset; y <= sampleoffset; y += step) {
 			for (float x = -halfsample; x <= halfsample; x += step) {
-				result += texture_shadow_offset(shadowmap, co, vec2(x, y) * 0.1);
+				result += texture_shadow_offset(shadowmap, co, vec2(x, y) * pcfscale);
 			}
 		}
 		for (float y = -halfsample; y <= halfsample; y += fullstep) {
 			for (float x = -sampleoffset; x <= sampleoffset; x += step) {
-				result += texture_shadow_offset(shadowmap, co, vec2(x, y) * 0.1);
+				result += texture_shadow_offset(shadowmap, co, vec2(x, y) * pcfscale);
 			}
 		}
 		result /= (samples * samples);
@@ -3708,13 +3715,14 @@ float test_shadow_pcf_penumbra(sampler2D shadowmap, vec4 co, sampler2D jitter, i
 
 float test_shadow_pcf(sampler2DShadow shadowmap, vec4 co, float samples, float samplesize)
 {
+	float pcfscale = shadow_pcf_scale(shadowmap);
 	float step = samplesize / samples;
 	float halfsample = samplesize * 0.5 - step * 0.49;
 
 	float result = 0.0;
 	for (float y = -halfsample; y <= halfsample; y += step) {
 		for (float x = -halfsample; x <= halfsample; x += step) {
-			result += texture_shadow_offset(shadowmap, co, vec2(x, y) * 0.1);
+			result += texture_shadow_offset(shadowmap, co, vec2(x, y) * pcfscale);
 		}
 	}
 	result /= (samples * samples);
@@ -3724,6 +3732,7 @@ float test_shadow_pcf(sampler2DShadow shadowmap, vec4 co, float samples, float s
 
 float test_shadow_pcf_jitter(sampler2DShadow shadowmap, vec4 co, sampler2D jitter, float samples, float samplesize)
 {
+	float pcfscale = shadow_pcf_scale(shadowmap);
 	float step = samplesize / samples;
 	float halfsample = samplesize * 0.5 - step * 0.49;
 
@@ -3737,7 +3746,7 @@ float test_shadow_pcf_jitter(sampler2DShadow shadowmap, vec4 co, sampler2D jitte
 	for (float y = -halfsample; y <= halfsample; y += step) {
 		for (float x = -halfsample; x <= halfsample; x += step) {
 			vec2 ofs = vec2(x, y) * 0.1;
-			result += texture_shadow_offset(shadowmap, co, (vec2(x, y) * rot) * 0.1);
+			result += texture_shadow_offset(shadowmap, co, (vec2(x, y) * rot) * pcfscale);
 		}
 	}
 	result /= (samples * samples);

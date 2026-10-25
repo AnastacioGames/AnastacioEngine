@@ -122,13 +122,48 @@ void RAS_2DFilterManager::SetFrameTime(float time)
 	m_frameInputs.time = time;
 }
 
-void RAS_2DFilterManager::UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *finalofs)
+/* Copy the viewport rectangle of the bound read frame buffer into the same rectangle of the
+ * bound texture (same coordinates as bgl_RenderedTexture), clamped to both sizes. With split
+ * screen / the game embedded in the editor each camera only refreshes its own area. */
+static void CopyViewportRect(const int viewport[4], int texWidth, int texHeight, int readWidth, int readHeight)
+{
+	const int x = std::max(0, viewport[0]);
+	const int y = std::max(0, viewport[1]);
+	const int w = std::min(viewport[0] + viewport[2], std::min(texWidth, readWidth)) - x;
+	const int h = std::min(viewport[1] + viewport[3], std::min(texHeight, readHeight)) - y;
+	if (w > 0 && h > 0) {
+		glCopyTexSubImage2D(GL_TEXTURE_2D, 0, x, y, x, y, w, h);
+	}
+}
+
+unsigned int RAS_2DFilterManager::RenderOrderKey(unsigned int passIndex)
+{
+	/* HDR effects (rain, clouds, volumetric fog, camera DOF) before Tonemap, FXAA right after
+	 * it (it expects LDR/gamma input), then lens flare and lens FX. Indices themselves never
+	 * change, so saved files, custom filters and Python passIndex keep working. */
+	switch (passIndex) {
+		case FILTERPASS_RAIN:         return 15;
+		case FILTERPASS_CLOUDS:       return 16;
+		case FILTERPASS_VFOG:         return 17;
+		case FILTERPASS_VFOG_IMAGE:   return 18;
+		case FILTERPASS_CAMERA_DOF:   return 19;
+		case FILTERPASS_TONEMAP:      return 20;
+		case FILTERPASS_FXAA:         return 21;
+		case FILTERPASS_LENSFLARE:    return 22;
+		case FILTERPASS_CAMERA_LENS:  return 23;
+		default:                      return passIndex; // 0..14 unchanged, custom filters >= 24
+	}
+}
+
+void RAS_2DFilterManager::UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *finalofs,
+                                                const int viewport[4])
 {
 #ifdef __EMSCRIPTEN__
 	// WebGL can't copy an RGBA8 frame buffer into a float texture, bgl_PreviousTexture stays unbound.
 	(void)rasty;
 	(void)canvas;
 	(void)finalofs;
+	(void)viewport;
 #else
 	const int width = finalofs->GetWidth();
 	const int height = finalofs->GetHeight();
@@ -158,8 +193,7 @@ void RAS_2DFilterManager::UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanv
 	}
 	readofs->Bind();
 	glBindTexture(GL_TEXTURE_2D, m_frameInputs.previousTexture);
-	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, std::min(width, (int)readofs->GetWidth()),
-	                    std::min(height, (int)readofs->GetHeight()));
+	CopyViewportRect(viewport, width, height, (int)readofs->GetWidth(), (int)readofs->GetHeight());
 	glBindTexture(GL_TEXTURE_2D, 0);
 	finalofs->Bind();
 #endif
@@ -187,6 +221,8 @@ void RAS_2DFilterManager::UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScree
 		GLint maxUnits = 0;
 		glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits);
 		if (maxUnits <= 19) {
+			// Not enough texture units for units 18/19: no reuse, every pixel marches.
+			m_frameInputs.cloudHistoryValid = false;
 			return;
 		}
 		glGenTextures(1, &m_frameInputs.cloudHistory);
@@ -194,6 +230,8 @@ void RAS_2DFilterManager::UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScree
 	}
 	const bool resized = (width != m_cloudHistoryWidth || height != m_cloudHistoryHeight);
 	if (resized) {
+		// The old contents don't match the new size; only the copy below makes it valid again.
+		m_frameInputs.cloudHistoryValid = false;
 		glBindTexture(GL_TEXTURE_2D, m_frameInputs.cloudHistory);
 		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -213,11 +251,10 @@ void RAS_2DFilterManager::UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScree
 
 	cloudofs->Bind();
 	glBindTexture(GL_TEXTURE_2D, m_frameInputs.cloudHistory);
-	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, width, height);
+	CopyViewportRect(viewport, width, height, width, height);
 	depthofs->Bind();
 	glBindTexture(GL_TEXTURE_2D, m_frameInputs.cloudHistoryDepth);
-	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, std::min(width, (int)depthofs->GetWidth()),
-	                    std::min(height, (int)depthofs->GetHeight()));
+	CopyViewportRect(viewport, width, height, (int)depthofs->GetWidth(), (int)depthofs->GetHeight());
 	glBindTexture(GL_TEXTURE_2D, 0);
 	cloudofs->Bind();
 
@@ -398,8 +435,15 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	// The filter depth input off scree, unchanged for each filters.
 	RAS_OffScreen *depthofs = previousofs;
 
-	// Used to know if a filter is the last of the container.
-	RAS_PassTo2DFilter::const_iterator pend = std::prev(m_filters.end());
+	/* Render order: the map is keyed by pass index, RenderOrderKey() remaps the reserved
+	 * passes (see the header). Small list, rebuilt per call. */
+	std::vector<std::pair<unsigned int, RAS_2DFilter *> > ordered(m_filters.begin(), m_filters.end());
+	std::stable_sort(ordered.begin(), ordered.end(),
+	                 [](const std::pair<unsigned int, RAS_2DFilter *> &a, const std::pair<unsigned int, RAS_2DFilter *> &b) {
+		                 return RenderOrderKey(a.first) < RenderOrderKey(b.first);
+	                 });
+	// Used to know if a filter is the last of the chain.
+	const auto pend = std::prev(ordered.end());
 
 	++m_frameInputs.frame;
 	bool usesPrevious = false;
@@ -413,10 +457,24 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	                                  m_cloudHistoryHeight == (int)previousofs->GetHeight() &&
 	                                  std::equal(viewport, viewport + 4, m_cloudHistoryViewport);
 
+	/* Previous view-projection of this viewport (cameras sharing the manager don't get each
+	 * other's); not valid on its first frame, so filters see zero motion instead of Identity. */
+	PrevViewProjection *prevVP = nullptr;
+	for (PrevViewProjection &entry : m_prevViewProjections) {
+		if (std::equal(viewport, viewport + 4, entry.viewport)) {
+			prevVP = &entry;
+			break;
+		}
+	}
+	m_frameInputs.prevViewProjectionValid = (prevVP != nullptr);
+	if (prevVP) {
+		m_frameInputs.prevViewProjection = mt::mat4(prevVP->matrix);
+	}
+
 	if (ProfilePassHook) {
 		ProfilePassHook(-1);
 	}
-	for (RAS_PassTo2DFilter::iterator begin = m_filters.begin(), it = begin, end = m_filters.end(); it != end; ++it) {
+	for (auto it = ordered.begin(), end = ordered.end(); it != end; ++it) {
 		RAS_2DFilter *filter = it->second;
 		filter->SetFrameInputs(&m_frameInputs);
 
@@ -479,9 +537,18 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 
 	// Opt-in: nothing is allocated or copied until a filter samples bgl_PreviousTexture.
 	if (usesPrevious) {
-		UpdatePreviousTexture(rasty, canvas, targetofs);
+		UpdatePreviousTexture(rasty, canvas, targetofs, viewport);
 	}
-	m_frameInputs.prevViewProjection = rasty->GetProjectionMatrix() * rasty->GetViewMatrix();
+	if (!prevVP) {
+		// Bounded: a handful of split screen viewports; a resized window adds a new rect.
+		if (m_prevViewProjections.size() >= 8) {
+			m_prevViewProjections.erase(m_prevViewProjections.begin());
+		}
+		m_prevViewProjections.push_back(PrevViewProjection());
+		prevVP = &m_prevViewProjections.back();
+		std::copy(viewport, viewport + 4, prevVP->viewport);
+	}
+	(rasty->GetProjectionMatrix() * rasty->GetViewMatrix()).Pack(prevVP->matrix);
 
 	rasty->Enable(RAS_Rasterizer::RAS_DEPTH_TEST);
 	rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_ENABLED);

@@ -694,7 +694,7 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[BGL_PREV_VIEW_PROJECTION_MATRIX_UNIFORM] != -1) {
 		SetUniform(m_predefinedUniforms[BGL_PREV_VIEW_PROJECTION_MATRIX_UNIFORM],
-		           m_frameInputs ? m_frameInputs->prevViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
+		           (m_frameInputs && m_frameInputs->prevViewProjectionValid) ? m_frameInputs->prevViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
 	}
 	if (m_predefinedUniforms[BGL_RESOLUTION_UNIFORM] != -1) {
 		SetUniform(m_predefinedUniforms[BGL_RESOLUTION_UNIFORM],

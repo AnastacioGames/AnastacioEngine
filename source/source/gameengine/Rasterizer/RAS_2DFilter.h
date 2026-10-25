@@ -136,6 +136,9 @@ public:
 		unsigned int previousTexture = 0;
 		int previousTextureUnit = 17;
 		mt::mat4 prevViewProjection = mt::mat4::Identity();
+		/// False on the first frame of a viewport/camera: the filter then gets the current
+		/// view-projection (zero motion) instead of Identity.
+		bool prevViewProjectionValid = false;
 
 		/// Volumetric Clouds temporal reuse: color/depth the clouds filter output last time,
 		/// with the view-projection it was drawn with (per history, not per manager call, so

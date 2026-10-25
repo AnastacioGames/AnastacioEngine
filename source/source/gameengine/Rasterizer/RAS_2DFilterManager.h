@@ -30,6 +30,7 @@
 #include "RAS_2DFilterData.h"
 #include "RAS_2DFilter.h"
 #include <map>
+#include <vector>
 
 class RAS_ICanvas;
 class RAS_Rasterizer;
@@ -45,7 +46,10 @@ public:
 	/// each filter pass index after it renders, to time every pass on the GPU.
 	static void (*ProfilePassHook)(int pass);
 
-	// Note: Keep it in order of pass index!!
+	/* Note: Keep it in order of pass index!! These values are internal keys (custom filters are
+	 * offset by reservedPassIndex and the profiler reports them); the *render* order is given by
+	 * RenderOrderKey(), which runs fog/clouds/rain/camera DOF before Tonemap (HDR) and FXAA
+	 * after it, without renumbering anything. */
 	enum FILTER_RESERVED_PASS {
 		FILTERPASS_SSGI         = 0,
         FILTERPASS_SSGI_IMAGE   = 1,
@@ -158,7 +162,18 @@ private:
 	int m_previousHeight = 0;
 
 	/// Copy the final image of the chain for bgl_PreviousTexture of the next frame.
-	void UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *finalofs);
+	void UpdatePreviousTexture(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *finalofs, const int viewport[4]);
+
+	/// Render order of a pass index (reserved passes remapped, custom filters keep their order after them).
+	static unsigned int RenderOrderKey(unsigned int passIndex);
+
+	/// Last view-projection of each viewport (split screen cameras / embedded game share this
+	/// manager). Stored unpacked to avoid aligned types in a std::vector.
+	struct PrevViewProjection {
+		int viewport[4];
+		float matrix[16];
+	};
+	std::vector<PrevViewProjection> m_prevViewProjections;
 
 	/// Size and viewport of the Volumetric Clouds history; a different viewport (another
 	/// split screen camera) or size invalidates it so the next frame marches every pixel.

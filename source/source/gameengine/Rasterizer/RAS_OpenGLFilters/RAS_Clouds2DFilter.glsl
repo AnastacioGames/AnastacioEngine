@@ -564,7 +564,10 @@ void main()
 		haveSunDir = true;
 		vec4 raymarch = volumetricCloudsRaymarch(camPos, viewDir, maxDist, sunDir,
 		                                          ge_VCloudsParams1, ge_VCloudsParams2, ge_VCloudsParams3,
-		                                          ge_VCloudsColor, texcoord * vec2(1920.0, 1080.0));
+		                                          ge_VCloudsColor,
+		                                          /* Real pixel position (any resolution), shifted per frame so
+		                                           * the banding of the step offset doesn't stay fixed. */
+		                                          gl_FragCoord.xy + 5.588238 * float(bgl_Frame - 64 * (bgl_Frame / 64)));
 		color = mix(color, raymarch.rgb / max(raymarch.a, 0.0001), raymarch.a * horizonFade);
 	}
 

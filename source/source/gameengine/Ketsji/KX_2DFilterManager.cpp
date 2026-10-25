@@ -28,6 +28,7 @@
 
 #include <cmath>
 #include "RAS_ICanvas.h"
+#include "RAS_WebGLCompat.h"
 
 #include "CM_Message.h"
 
@@ -205,14 +206,15 @@ void KX_2DFilterManager::EnsureBloomFilters(BuildInFilters filters)
 	KX_2DFilter *bloomH1 = BloomPass(filters, 1, filterPassIndex + 3, 4, m_canvas->GetWidth(), m_canvas->GetHeight());
 	KX_2DFilter *bloomV1 = BloomPass(filters, 2, filterPassIndex + 4, 4, m_canvas->GetWidth(), m_canvas->GetHeight());
 
-	bloomH1->SetTexture(0, bloomB0->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomB");
+	// Progressive chain: level 1 blurs level 0's result (downsampled by the bilinear fetch).
+	bloomH1->SetTexture(0, bloomV0->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomB");
 	bloomV1->SetTexture(0, bloomH1->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomH");
 
 	// pass 2
 	KX_2DFilter *bloomH2 = BloomPass(filters, 1, filterPassIndex + 5, 8, m_canvas->GetWidth(), m_canvas->GetHeight());
 	KX_2DFilter *bloomV2 = BloomPass(filters, 2, filterPassIndex + 6, 8, m_canvas->GetWidth(), m_canvas->GetHeight());
 
-	bloomH2->SetTexture(0, bloomB0->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomB");
+	bloomH2->SetTexture(0, bloomV1->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomB");
 	bloomV2->SetTexture(0, bloomH2->GetOffScreen()->GetColorBindCode(0), "bgl_RenderedBloomH");
 
 	// pass final
@@ -250,7 +252,7 @@ void KX_2DFilterManager::RefreshBloomTextures()
 
 	// Same links as EnsureBloomFilters: {filter, texture unit, source off screen}. A missing texture has no bind code.
 	const struct { int filter; int unit; int source; } links[] = {
-		{1, 0, 0}, {2, 0, 1}, {3, 0, 0}, {4, 0, 3}, {5, 0, 0}, {6, 0, 5},
+		{1, 0, 0}, {2, 0, 1}, {3, 0, 2}, {4, 0, 3}, {5, 0, 4}, {6, 0, 5},
 		{7, 0, 2}, {7, 1, 4}, {7, 2, 6}, {7, 3, 0}
 	};
 	for (const auto& link : links) {
@@ -276,7 +278,11 @@ void KX_2DFilterManager::EnsureSSGIFilters(BuildInFilters filters)
     trace->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
         std::max(1, m_canvas->GetRenderWidth() / filters.ssgi_divisor),
         std::max(1, m_canvas->GetRenderHeight() / filters.ssgi_divisor),
-        RAS_Rasterizer::RAS_HDR_HALF_FLOAT, (float)filters.ssgi_divisor));
+        RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT : RAS_Rasterizer::RAS_HDR_NONE,
+        (float)filters.ssgi_divisor));
+    if (!RAS_FloatRenderTargetSupported()) {
+        CM_Warning("Native SSGI: no float render targets, using an 8 bit buffer (lower quality)");
+    }
     data.filterPassIndex = FILTERPASS_SSGI_IMAGE;
     data.shaderText = define + datatoc_RAS_SSGIImage2DFilter_glsl;
     KX_2DFilter *image = static_cast<KX_2DFilter *>(AddFilter(data, true));
@@ -451,7 +457,10 @@ void KX_2DFilterManager::EnsureVFogFilters(BuildInFilters filters)
 	KX_2DFilter *fog = static_cast<KX_2DFilter *>(AddFilter(fogData, true));
 	fog->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
 	        std::max(1, m_canvas->GetRenderWidth() / lod), std::max(1, m_canvas->GetRenderHeight() / lod),
-	        RAS_Rasterizer::RAS_HDR_HALF_FLOAT, (float)lod));
+	        RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT : RAS_Rasterizer::RAS_HDR_NONE, (float)lod));
+	if (!RAS_FloatRenderTargetSupported()) {
+		CM_Warning("Volumetric fog: no float render targets, using an 8 bit buffer (lower quality)");
+	}
 
 	RAS_2DFilterData imageData;
 	imageData.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
@@ -568,8 +577,8 @@ void KX_2DFilterManager::UpdateCameraFX(KX_Camera *camera, double time)
 	const bool grain = m_useGrain && m_grainStrength > 0.0f;
 	if (grain) {
 		// Grain seed; changes every frame, kept small for float precision.
-		static unsigned int grainFrame = 0;
-		grainFrame = (grainFrame + 1) % 1000;
+		// Derived from this manager's own frame time (no global shared between scenes/managers).
+		const unsigned int grainFrame = (unsigned int)std::fmod(std::max(time, 0.0) * 60.0, 1000.0);
 		fx[21] = m_grainStrength;
 		fx[22] = (float)grainFrame * 0.05f;
 		useLens = true;
@@ -696,14 +705,14 @@ KX_2DFilter *KX_2DFilterManager::BloomPass(BuildInFilters filters, int time, int
 	if (time == 0)
 		bloomData.shaderText = datatoc_RAS_Bloom2DFilter_buf_glsl;
 	else if (time == 1)
-		bloomData.shaderText = datatoc_RAS_Bloom2DFilter_bufH_glsl;
+		bloomData.shaderText = "#define BLOOM_LOD " + std::to_string((int)lod) + "\n" + datatoc_RAS_Bloom2DFilter_bufH_glsl;
 	else if (time == 2)
 		bloomData.shaderText = datatoc_RAS_Bloom2DFilter_bufV_glsl;
 
 	bloom = static_cast<KX_2DFilter *>(AddFilter(bloomData, true));
 	// The bloom buffers follow the canvas size divided by lod, so resize/fullscreen do not leave them stale.
 	KX_2DFilterOffScreen *offScreen = new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR, (w / lod), (h / lod),
-																   RAS_Rasterizer::HdrType::RAS_HDR_NONE, lod);
+																   RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::HdrType::RAS_HDR_HALF_FLOAT : RAS_Rasterizer::HdrType::RAS_HDR_NONE, lod);
 	bloom->SetOffScreen(offScreen);
 
 	return bloom;

@@ -29,24 +29,37 @@ void main() {
 	uvcoord = gl_TexCoord[0].xy;
 #endif
 
-	float depth = texture(bgl_DepthTexture, uvcoord).x;
-	depth = step(1.0, depth);
-
 	vec2 delta = (uvcoord - ge_LightScatterSunPos) * ge_LightScatterParams.y;
 
+	/* Each sample is masked by the depth at its own position (sky = 1 lets light through,
+	 * geometry blocks it), so shafts appear between occluders, not only on sky pixels.
+	 * The decay is per ray fraction and the sum is normalized, so the brightness doesn't
+	 * depend on the step count (scaled to match the old look at the default 32 steps). */
+	const float DECAY_TOTAL = 0.194; // 0.95^32: old falloff along the full ray at 32 steps
+	const float REFERENCE_SUM = 15.3; // sum of 0.95^i, i = 1..32
+	int steps = max(1, int(ge_LightScatterParams.x));
+	float invSteps = 1.0 / float(steps);
+
 	vec3 result = vec3(0.0);
-	float weights = 1.0;
+	float weightSum = 0.0;
 
-	for (int i = 0; i < int(ge_LightScatterParams.x); i++) {
-		vec2 offset = uvcoord - delta * (float(i) / ge_LightScatterParams.x);
+	for (int i = 0; i < steps; i++) {
+		float t = float(i) * invSteps;
+		vec2 offset = uvcoord - delta * t;
 
+		float sky = step(1.0, texture(bgl_DepthTexture, offset).x);
 		vec3 color = texture(bgl_RenderedTexture, offset).rgb - ge_LightScatterParams.z;
 
-		weights *= 0.95;
-		result += max(vec3(0.0), color * depth) * weights;
+		float w = pow(DECAY_TOTAL, (float(i) + 1.0) * invSteps);
+		weightSum += w;
+		result += max(vec3(0.0), color * sky) * w;
 	}
+	result *= REFERENCE_SUM / max(weightSum, 1e-4);
 
-	float ocluder = max(0.0, 1.0 - distance(ge_LightScatterSunPos, vec2(0.5)));
+	// Sun distance from the screen center in aspect corrected units (y = 1).
+	vec2 size = vec2(textureSize(bgl_RenderedTexture, 0));
+	vec2 sunFromCenter = (ge_LightScatterSunPos - vec2(0.5)) * vec2(size.x / max(size.y, 1.0), 1.0);
+	float ocluder = max(0.0, 1.0 - length(sunFromCenter));
 
 	gl_FragColor = vec4(saturation(result) * ocluder * ge_LightScatterParams.w, 1.0);
 }
