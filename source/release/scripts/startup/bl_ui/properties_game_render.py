@@ -147,7 +147,7 @@ class RENDER_MT_game_animation_fps(Menu):
     def draw(self, context):
         layout = self.layout
         for value in (24, 25, 30, 60, 120):
-            op = layout.operator("wm.context_set_float", text=str(value))
+            op = layout.operator("wm.context_set_int", text=str(value))
             op.data_path = "scene.render.fps"
             op.value = value
         layout.separator()
