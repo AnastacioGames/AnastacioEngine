@@ -2,6 +2,11 @@
 
 Data: 2026-10-25. Continuação da barra B5 (até 4532c2ce).
 
+**Status (2026-10-25): concluído e enviado.** Grupos 1-2 (ebafdf3e), snap Exclude Non-Selectable +
+Backface Culling (04966276), Selectability & Visibility e Proportional com memória do modo, ícones B5
+(af7bb971), Edge Center/Perpendicular (9b2689bb), botão Material aceso no modo Texture e ícone amarelo
+com PBR ligado, também no toggle PBR Shading Nodes (5cc9fe24, `tools/icons/make_material_pbr_icon.py`).
+
 Regra: aparência e organização do Blender 5, **conteúdo voltado ao jogo**.
 O Blender 5 é ferramenta de modelagem/animação; o que só serve a isso fica fora.
 Shading dos meshes não muda (só menus/overlays).
