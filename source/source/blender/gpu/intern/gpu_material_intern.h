@@ -145,6 +145,7 @@ struct GPUMaterial {
 	int probecubeloc, probeinfoloc, probeposloc;
 	int probecube2loc, probeinfo2loc, probepos2loc;
 	int probeboxloc, probebox2loc;
+	int probeshloc, probesh2loc;
 	/* Only cache absent probes within one material activation. Active textures
 	 * must still bind per object; reactivation resets potentially shared programs. */
 	bool probe_absent_valid[2];

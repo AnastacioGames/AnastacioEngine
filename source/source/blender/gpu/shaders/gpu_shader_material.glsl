@@ -3386,15 +3386,19 @@ vec3 env_irradiance_dir(vec3 n, int k)
 
 /* World image diffuse light from its SH9 (see gpu_world_sh9()): c0..c8 already hold the cosine
  * convolution / pi, so this is the diffuse radiance for the outward normal -wn. */
-void env_sh9(vec3 wn, vec3 c0, vec3 c1, vec3 c2, vec3 c3, vec3 c4, vec3 c5, vec3 c6, vec3 c7, vec3 c8, out vec4 diffibl)
+vec3 sh9_eval(vec3 n, vec3 c0, vec3 c1, vec3 c2, vec3 c3, vec3 c4, vec3 c5, vec3 c6, vec3 c7, vec3 c8)
 {
-	vec3 n = -wn;
 	vec3 r = c0 * 0.282095 +
 	         (c1 * n.y + c2 * n.z + c3 * n.x) * 0.488603 +
 	         (c4 * (n.x * n.y) + c5 * (n.y * n.z) + c7 * (n.x * n.z)) * 1.092548 +
 	         c6 * (0.315392 * (3.0 * n.z * n.z - 1.0)) +
 	         c8 * (0.546274 * (n.x * n.x - n.y * n.y));
-	diffibl = vec4(max(r, vec3(0.0)), 1.0);
+	return max(r, vec3(0.0));
+}
+
+void env_sh9(vec3 wn, vec3 c0, vec3 c1, vec3 c2, vec3 c3, vec3 c4, vec3 c5, vec3 c6, vec3 c7, vec3 c8, out vec4 diffibl)
+{
+	diffibl = vec4(sh9_eval(-wn, c0, c1, c2, c3, c4, c5, c6, c7, c8), 1.0);
 }
 
 /* Split-sum environment BRDF (Karis, mobile fit): specular = F0 * x + y for the
@@ -3442,8 +3446,12 @@ uniform vec4 unfprobepos2;
 /* xyz = half extents of the parallax box around the probe center (world axes), all 0 = sphere */
 uniform vec4 unfprobebox;
 uniform vec4 unfprobebox2;
+/* SH9 of each cube's diffuse light (GPU_texture_cube_sh9), used when unfprobeinfo.z / unfprobeinfo2.z
+ * is 1; otherwise a few taps on a low mip (realtime probes, WebGL). */
+uniform vec3 unfprobesh[9];
+uniform vec3 unfprobesh2[9];
 
-void env_probe_sample(samplerCube cube, vec4 pos, vec4 box, float maxlod, vec3 wpos, vec3 wn, vec3 wr, float rough, out vec4 spec, out vec4 diff)
+void env_probe_sample(samplerCube cube, vec4 pos, vec4 box, float maxlod, float hassh, vec3 wpos, vec3 wn, vec3 wr, float rough, out vec4 spec, out vec4 diff)
 {
 	vec3 dir = wr;
 	if (pos.w > 0.0) {
@@ -3466,6 +3474,10 @@ void env_probe_sample(samplerCube cube, vec4 pos, vec4 box, float maxlod, vec3 w
 		dir = mix(p + r * t, r, clamp(rough * 2.0, 0.0, 1.0));
 	}
 	spec = textureCubeLod(cube, dir, sqrt(rough) * maxlod);
+	if (hassh > 0.5) {
+		diff = vec4(0.0);
+		return;
+	}
 	/* diffuse: a few taps around the normal on a low mip (same as env_cube_tex) */
 	float irrlod = max(maxlod - 3.0, 0.0);
 	diff = vec4(0.0);
@@ -3478,10 +3490,18 @@ void env_probe_mirror(vec4 mirror, vec4 diffibl, vec3 wn, vec3 wr, float rough, 
 {
 	if (unfprobeinfo.x > 0.5) {
 		vec3 wpos = (viewinv * vec4(viewpos, 1.0)).xyz;
-		env_probe_sample(unfprobecube, unfprobepos, unfprobebox, unfprobeinfo.y, wpos, wn, wr, rough, result, result_diff);
+		env_probe_sample(unfprobecube, unfprobepos, unfprobebox, unfprobeinfo.y, unfprobeinfo.z, wpos, wn, wr, rough, result, result_diff);
+		if (unfprobeinfo.z > 0.5) {
+			result_diff = vec4(sh9_eval(-wn, unfprobesh[0], unfprobesh[1], unfprobesh[2], unfprobesh[3], unfprobesh[4],
+			                            unfprobesh[5], unfprobesh[6], unfprobesh[7], unfprobesh[8]), 1.0);
+		}
 		if (unfprobeinfo2.x > 0.0) {
 			vec4 spec2, diff2;
-			env_probe_sample(unfprobecube2, unfprobepos2, unfprobebox2, unfprobeinfo2.y, wpos, wn, wr, rough, spec2, diff2);
+			env_probe_sample(unfprobecube2, unfprobepos2, unfprobebox2, unfprobeinfo2.y, unfprobeinfo2.z, wpos, wn, wr, rough, spec2, diff2);
+			if (unfprobeinfo2.z > 0.5) {
+				diff2 = vec4(sh9_eval(-wn, unfprobesh2[0], unfprobesh2[1], unfprobesh2[2], unfprobesh2[3], unfprobesh2[4],
+				                      unfprobesh2[5], unfprobesh2[6], unfprobesh2[7], unfprobesh2[8]), 1.0);
+			}
 			result = mix(result, spec2, unfprobeinfo2.x);
 			result_diff = mix(result_diff, diff2, unfprobeinfo2.x);
 		}

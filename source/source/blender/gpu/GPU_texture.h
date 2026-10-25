@@ -121,6 +121,7 @@ int GPU_texture_framebuffer_attachment(GPUTexture *tex);
 void GPU_texture_framebuffer_set(GPUTexture *tex, struct GPUFrameBuffer *fb, int attachment);
 
 int GPU_texture_target(const GPUTexture *tex);
+bool GPU_texture_cube_sh9(GPUTexture *tex, float r_coef[9][3]);
 int GPU_texture_width(const GPUTexture *tex);
 int GPU_texture_height(const GPUTexture *tex);
 int GPU_texture_depth(const GPUTexture *tex);

@@ -479,6 +479,8 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->probepos2loc = GPU_shader_get_uniform(shader, "unfprobepos2");
 		material->probeboxloc = GPU_shader_get_uniform(shader, "unfprobebox");
 		material->probebox2loc = GPU_shader_get_uniform(shader, "unfprobebox2");
+		material->probeshloc = GPU_shader_get_uniform(shader, "unfprobesh");
+		material->probesh2loc = GPU_shader_get_uniform(shader, "unfprobesh2");
 		material->planarteximgloc = GPU_shader_get_uniform(shader, "unfplanartex");
 		material->planarviewprojloc = GPU_shader_get_uniform(shader, "unfplanarviewproj");
 		material->planarenabledloc = GPU_shader_get_uniform(shader, "unfplanarenabled");
@@ -6052,7 +6054,8 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 /* Binds the local reflection probe cube map for this object (NULL = none, the World reflection is
  * used). Must run per object with the program bound. The probe uses its own texture unit, right below
  * the shadow map units, so the samplerCube never shares a unit with a sampler2D. */
-void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3])
+void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3],
+                             const float (*sh)[3])
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
 	if (!shader || material->probeinfoloc == -1) {
@@ -6072,6 +6075,10 @@ void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxl
 		GPU_texture_bind(cube, texunit);
 		GPU_shader_uniform_texture(shader, material->probecubeloc, cube);
 		info[0] = 1.0f;
+		if (sh && material->probeshloc != -1) {
+			GPU_shader_uniform_vector(shader, material->probeshloc, 3, 9, sh[0]);
+			info[2] = 1.0f;
+		}
 	}
 	else if (material->probecubeloc != -1) {
 		GPU_shader_uniform_int(shader, material->probecubeloc, texunit);
@@ -6098,7 +6105,8 @@ void GPU_material_bind_probe(GPUMaterial *material, GPUTexture *cube, float maxl
 
 /* Binds the second probe cube, blended over the first one with weight (0 = none). Call after
  * GPU_material_bind_probe(); it uses the texture unit right below the first probe. */
-void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight)
+void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3],
+                              const float (*sh)[3], float weight)
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
 	if (!shader || material->probeinfo2loc == -1) {
@@ -6121,6 +6129,10 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 		GPU_texture_bind(cube, texunit);
 		GPU_shader_uniform_texture(shader, material->probecube2loc, cube);
 		info[0] = weight;
+		if (sh && material->probesh2loc != -1) {
+			GPU_shader_uniform_vector(shader, material->probesh2loc, 3, 9, sh[0]);
+			info[2] = 1.0f;
+		}
 		if (center) {
 			copy_v3_v3(pos, center);
 			pos[3] = radius;

@@ -3,6 +3,8 @@
 # Uso: AnastacioEngine.exe -b --factory-startup --python criar_cena_sh9_ambiente.py -- saida.range
 # Env: TESTE_SH9_MAPA=EQUIRECT (padrão), ANGMAP ou CUBE; TESTE_SH9_LEGADO=1 usa materiais antigos (sem nós);
 #      TESTE_SH9_RELEVO=1 põe um Normal Map em faixas inclinadas para ±X (o ambiente deve seguir o relevo);
+#      TESTE_SH9_NOS_WORLD=1 usa World em nós (Environment Texture): a luz vem da captura do World
+#      (sonda, KX_LightProbe), comparar com RANGE_PROBE_SH9_OFF=1 no runtime;
 #      TESTE_SH9_SHOT=<pasta> tira um screenshot no frame 30 e fecha.
 import bpy
 import math
@@ -15,6 +17,7 @@ mapa = os.environ.get("TESTE_SH9_MAPA", "EQUIRECT")
 legado = os.environ.get("TESTE_SH9_LEGADO") == "1"
 shot = os.environ.get("TESTE_SH9_SHOT", "")
 relevo = os.environ.get("TESTE_SH9_RELEVO") == "1"
+nos_world = os.environ.get("TESTE_SH9_NOS_WORLD") == "1"
 
 scene = bpy.context.scene
 for ob in list(scene.objects):
@@ -124,6 +127,18 @@ slot.texture = tex
 slot.texture_coords = 'EQUIRECT' if mapa in ("EQUIRECT", "CUBE") else 'ANGMAP'
 slot.use_map_horizon = True
 slot.use_map_blend = False
+if nos_world:
+    world.use_nodes = True
+    wn = world.node_tree.nodes
+    for n in list(wn):
+        wn.remove(n)
+    env = wn.new('ShaderNodeTexEnvironment')
+    env.image = img
+    env.projection = 'MIRROR_BALL' if mapa == "ANGMAP" else 'EQUIRECTANGULAR'
+    bg = wn.new('ShaderNodeBackground')
+    wout = wn.new('ShaderNodeOutputWorld')
+    world.node_tree.links.new(env.outputs['Color'], bg.inputs['Color'])
+    world.node_tree.links.new(bg.outputs[0], wout.inputs[0])
 
 
 def material(nome, cor):
@@ -187,7 +202,7 @@ def tick(cont):
         bge.render.makeScreenshot(%r)
     if n == 34:
         bge.logic.endGame()
-''' % (os.path.join(shot, "sh9_%s%s.png" % (mapa.lower(), ("_legado" if legado else "") + ("_relevo" if relevo else "")))))
+''' % (os.path.join(shot, "sh9_%s%s.png" % (mapa.lower(), ("_legado" if legado else "") + ("_relevo" if relevo else "") + ("_nosworld" if nos_world else "") + os.environ.get("TESTE_SH9_SUFIXO", "")))))
     scene.objects.active = cam
     bpy.ops.logic.sensor_add(type='ALWAYS', object=cam.name)
     bpy.ops.logic.controller_add(type='PYTHON', object=cam.name)

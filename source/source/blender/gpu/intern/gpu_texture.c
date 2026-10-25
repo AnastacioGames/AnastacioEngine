@@ -640,6 +640,75 @@ GPUTexture *GPU_texture_create_cube(int size, GPUHDRType hdr, char err_out[256])
 	return tex;
 }
 
+/* Diffuse light of a cube map (probe capture) as SH9, in the layout of env_sh9() (cosine lobe / pi
+ * and the basis constants folded in). Reads back the first mip of 16 px or less per face, so call it
+ * after GPU_texture_generate_mipmap() and only on captures, not per frame. False on WebGL (no
+ * glGetTexImage); the shader then keeps its taps. */
+bool GPU_texture_cube_sh9(GPUTexture *tex, float r_coef[9][3])
+{
+#ifdef __EMSCRIPTEN__
+	UNUSED_VARS(tex, r_coef);
+	return false;
+#else
+	if (!tex || tex->target != GL_TEXTURE_CUBE_MAP) {
+		return false;
+	}
+	int lod = 0, w = tex->w;
+	while (w > 16) {
+		w >>= 1;
+		lod++;
+	}
+	float *face = MEM_mallocN(sizeof(float[3]) * w * w, __func__);
+	const float band[3] = {1.0f, 2.0f / 3.0f, 0.25f};
+	float acc[9][3] = {{0.0f}};
+	float total = 0.0f;
+
+	glBindTexture(GL_TEXTURE_CUBE_MAP, tex->bindcode);
+	glPixelStorei(GL_PACK_ALIGNMENT, 4);
+	for (int f = 0; f < 6; f++) {
+		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + f, lod, GL_RGB, GL_FLOAT, face);
+		for (int j = 0; j < w; j++) {
+			for (int i = 0; i < w; i++) {
+				/* GL cube face selection inverted: sc, tc in -1..1, row 0 at tc = -1 */
+				float sc = (i + 0.5f) / w * 2.0f - 1.0f;
+				float tc = (j + 0.5f) / w * 2.0f - 1.0f;
+				float d[3];
+				switch (f) {
+					case 0: d[0] = 1.0f; d[1] = -tc; d[2] = -sc; break;
+					case 1: d[0] = -1.0f; d[1] = -tc; d[2] = sc; break;
+					case 2: d[0] = sc; d[1] = 1.0f; d[2] = tc; break;
+					case 3: d[0] = sc; d[1] = -1.0f; d[2] = -tc; break;
+					case 4: d[0] = sc; d[1] = -tc; d[2] = 1.0f; break;
+					default: d[0] = -sc; d[1] = -tc; d[2] = -1.0f; break;
+				}
+				float len2 = 1.0f + sc * sc + tc * tc;
+				float dw = 1.0f / (len2 * sqrtf(len2)); /* texel solid angle, up to a constant */
+				mul_v3_fl(d, 1.0f / sqrtf(len2));
+				const float *c = face + 3 * (j * w + i);
+				const float y[9] = {
+					0.282095f,
+					0.488603f * d[1], 0.488603f * d[2], 0.488603f * d[0],
+					1.092548f * d[0] * d[1], 1.092548f * d[1] * d[2], 0.315392f * (3.0f * d[2] * d[2] - 1.0f),
+					1.092548f * d[0] * d[2], 0.546274f * (d[0] * d[0] - d[1] * d[1]),
+				};
+				for (int k = 0; k < 9; k++) {
+					madd_v3_v3fl(acc[k], c, y[k] * dw);
+				}
+				total += dw;
+			}
+		}
+	}
+	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+	MEM_freeN(face);
+
+	const float weight = 4.0f * (float)M_PI / total;
+	for (int k = 0; k < 9; k++) {
+		mul_v3_v3fl(r_coef[k], acc[k], weight * band[k == 0 ? 0 : (k < 4 ? 1 : 2)]);
+	}
+	return true;
+#endif
+}
+
 GPUTexture *GPU_texture_create_2D_multisample(
         int w, int h, const float *fpixels, GPUHDRType hdr, int samples, char err_out[256])
 {

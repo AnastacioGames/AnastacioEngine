@@ -117,6 +117,8 @@ public:
 		float radius = 0.0f;
 		/* Half extents of the parallax box (probe Empty drawn as Cube), all 0 = sphere of radius. */
 		float box[3] = {0.0f, 0.0f, 0.0f};
+		/* Diffuse SH9 of the cube, nullptr = sample the cube. */
+		const float (*sh)[3] = nullptr;
 	};
 
 	/** Find the probes to use for an object at position: r_slots[0] is the one that contains it best,

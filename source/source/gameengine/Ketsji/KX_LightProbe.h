@@ -39,6 +39,10 @@ private:
 	int m_size;
 	float m_radius;
 	float m_maxLod;
+	bool m_realtime;
+	/// Diffuse SH9 of the last capture (GPU_texture_cube_sh9), not made for realtime probes.
+	float m_sh[9][3];
+	bool m_shValid;
 
 public:
 	/** \param radius Influence radius around the viewpoint object.
@@ -54,6 +58,8 @@ public:
 	/// The captured cube map, nullptr before the first capture.
 	GPUTexture *GetCubeTexture() const;
 	float GetMaxLod() const;
+	/// The diffuse SH9 of the capture, or nullptr (the shader samples the cube instead).
+	const float (*GetSH() const)[3];
 
 	virtual bool SetupCamera(KX_Camera *sceneCamera, KX_Camera *camera);
 	virtual void BeginRender(RAS_Rasterizer *rasty);

@@ -186,6 +186,7 @@ static void SetProbeSlot(KX_TextureRendererManager::ProbeSlot& slot, KX_LightPro
 {
 	slot.cube = probe->GetCubeTexture();
 	slot.maxLod = probe->GetMaxLod();
+	slot.sh = probe->GetSH();
 	slot.radius = 0.0f;
 	slot.box[0] = slot.box[1] = slot.box[2] = 0.0f;
 	if (parallax) {

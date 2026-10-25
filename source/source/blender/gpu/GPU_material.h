@@ -572,8 +572,11 @@ void GPU_material_bind_bone_matrices(GPUMaterial *material, const float *matrice
  * unshadowed. */
 #define GPU_MATERIAL_NUM_SHADOW_LAMPS 4
 void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps[GPU_MATERIAL_NUM_SHADOW_LAMPS]);
-void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3]);
-void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3], float weight);
+/* sh: the cube's diffuse SH9 (GPU_texture_cube_sh9), or NULL to sample the cube for it */
+void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3],
+                             const float (*sh)[3]);
+void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3],
+                              const float (*sh)[3], float weight);
 /* Binds the planar reflector's 2D render target and its capturing camera's projection*view matrix
  * (row-major float[16], as mt::mat4::Data() gives) for the Planar Reflection node. tex = NULL when
  * no KX_PlanarReflector exists for this object (node present but not Enabled, or not yet captured):

@@ -33,6 +33,7 @@
 #include "CM_Message.h"
 
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 /// KX_TextureRenderer reads its settings from an EnvMap; a probe has none, so fill one here.
@@ -52,7 +53,9 @@ KX_LightProbe::KX_LightProbe(KX_GameObject *viewpoint, float radius, int size, f
 	m_cube(nullptr),
 	m_size(size),
 	m_radius(radius),
-	m_maxLod(std::log2((float)size))
+	m_maxLod(std::log2((float)size)),
+	m_realtime(realtime),
+	m_shValid(false)
 {
 }
 
@@ -85,6 +88,11 @@ GPUTexture *KX_LightProbe::GetCubeTexture() const
 float KX_LightProbe::GetMaxLod() const
 {
 	return m_maxLod;
+}
+
+const float (*KX_LightProbe::GetSH() const)[3]
+{
+	return m_shValid ? m_sh : nullptr;
 }
 
 bool KX_LightProbe::SetupCamera(KX_Camera *sceneCamera, KX_Camera *camera)
@@ -128,4 +136,7 @@ void KX_LightProbe::EndRender(RAS_Rasterizer *)
 	GPU_texture_bind(m_cube, 0);
 	GPU_texture_generate_mipmap(m_cube);
 	GPU_texture_unbind(m_cube);
+	/* Smooth diffuse light from a 16 px readback; a realtime probe would stall the GPU every frame. */
+	static const bool shOff = getenv("RANGE_PROBE_SH9_OFF") != nullptr;
+	m_shValid = !m_realtime && !shOff && GPU_texture_cube_sh9(m_cube, m_sh);
 }

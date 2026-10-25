@@ -336,8 +336,8 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		const mt::vec3 position = meshUser->GetMatrix().TranslationVector3D();
 		const float pos[3] = {position.x, position.y, position.z};
 		m_scene->GetTextureRendererManager()->FindProbe(pos, probes, &probeWeight2);
-		GPU_material_bind_probe(m_gpuMat, probes[0].cube, probes[0].maxLod, probes[0].center, probes[0].radius, probes[0].box);
-		GPU_material_bind_probe2(m_gpuMat, probes[1].cube, probes[1].maxLod, probes[1].center, probes[1].radius, probes[1].box, probeWeight2);
+		GPU_material_bind_probe(m_gpuMat, probes[0].cube, probes[0].maxLod, probes[0].center, probes[0].radius, probes[0].box, probes[0].sh);
+		GPU_material_bind_probe2(m_gpuMat, probes[1].cube, probes[1].maxLod, probes[1].center, probes[1].radius, probes[1].box, probes[1].sh, probeWeight2);
 
 		/* Planar Reflection node: this object's own mirror (KX_PlanarReflector), not a cubemap probe.
 		 * Skipped for materials that don't use the node (cheap flag check, no lookup). */
