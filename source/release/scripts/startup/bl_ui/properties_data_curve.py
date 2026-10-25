@@ -622,6 +622,23 @@ class DATA_PT_game_text_spacing(GameTextPanel, Panel):
         col.prop(text, "offset_y", text="Y")
 
 
+class DATA_PT_game_text_box(GameTextPanel, Panel):
+    bl_label = "Text Box"
+
+    def draw(self, context):
+        text = context.curve
+        tbox = text.text_boxes[0]
+
+        box = self.layout.box()
+        box.label(text="Text Box (word wrap and pages):", icon="MESH_PLANE")
+        row = box.row(align=True)
+        row.prop(tbox, "width", text="Width")
+        row.prop(tbox, "height", text="Height")
+        col = box.column(align=True)
+        col.label(text="Width wraps the lines, Height splits them in pages.")
+        col.label(text="0 = no limit. Python: page, pageCount, visibleCharacters.")
+
+
 class DATA_PT_game_text_shadow(GameTextPanel, Panel):
     bl_label = "Shadow"
     bl_options = {'DEFAULT_CLOSED'}
@@ -759,6 +776,7 @@ classes = (
     DATA_PT_game_text_translation,
     DATA_PT_game_text_alignment,
     DATA_PT_game_text_spacing,
+    DATA_PT_game_text_box,
     DATA_PT_game_text_shadow,
     DATA_PT_game_text_viewport,
     DATA_PT_game_text_atlas,
@@ -776,8 +794,8 @@ classes = (
 bpy.types.WindowManager.ae_text_panel_category = bpy.props.EnumProperty(
     name="Text Panels",
     items=(
-        ('GAME', "Game Text", "What the game draws: font, size, alignment, spacing, shadow and viewport preview"),
-        ('GEOMETRY', "3D Geometry", "Curve-only settings: extrude, bevel, bold/italic, underline, text boxes; "
+        ('GAME', "Game Text", "What the game draws: font, size, alignment, spacing, text box, shadow and viewport preview"),
+        ('GEOMETRY', "3D Geometry", "Curve-only settings: extrude, bevel, bold/italic, underline; "
                                     "used after Convert to Mesh or when rendering"),
     ),
     default='GAME',
