@@ -71,11 +71,14 @@ def main(cont):
     state.time = now
 
     if owner.text != state.text:
+        # No 1º quadro respeita a visibilidade da cena (NPC escondido até
+        # alguém mostrar); depois, texto novo mostra o objeto de novo.
+        if state.text is not None:
+            owner.visible = True
         state.text = owner.text
         state.shown = 0.0
         state.done = False
         owner.page = 0
-        owner.visible = True
     if state.done or not owner.visible:
         return
 

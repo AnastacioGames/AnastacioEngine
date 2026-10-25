@@ -19,6 +19,7 @@
 # <pep8 compliant>
 import bpy
 from bpy.types import Panel
+from bpy.app.translations import pgettext_iface as iface_
 from rna_prop_ui import PropertyPanel
 
 from bpy.types import Curve, SurfaceCurve, TextCurve
@@ -638,13 +639,14 @@ class DATA_PT_game_text_box(GameTextPanel, Panel):
         # Same rules as KX_FontObject::LayoutLines / LinesPerPage.
         col = box.column(align=True)
         if tbox.width > 0.0:
-            col.label(text="Wraps the lines at %.2f units" % tbox.width, icon="FILE_TICK")
+            col.label(text=iface_("Wraps the lines at %.2f units") % tbox.width, icon="FILE_TICK")
         else:
             col.label(text="No wrap: lines break only on new lines", icon="INFO")
         line_height = text.size * text.space_line
         if tbox.height > 0.0 and line_height > 0.0:
             lines = max(1, int(tbox.height / line_height + 1e-4))
-            col.label(text="%d line%s per page" % (lines, "" if lines == 1 else "s"), icon="FILE_TICK")
+            msg = "%d line per page" if lines == 1 else "%d lines per page"
+            col.label(text=iface_(msg) % lines, icon="FILE_TICK")
         else:
             col.label(text="No pages: every line is shown", icon="INFO")
 

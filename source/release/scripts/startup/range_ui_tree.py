@@ -395,7 +395,7 @@ class UIDialogueNode(UIHudNode, Node):
         description="Dialogue text: | starts a new page, \\n a new line, {prop} shows a property")
     prop_name = StringProperty(name="Property", default="dialogo",
                                description="String property with the text")
-    speaker = StringProperty(name="Speaker", description="Name shown above the text ({prop} works); empty = no name")
+    speaker = StringProperty(name="Speaker Name", description="Name shown above the text ({prop} works); empty = no name")
     speed = FloatProperty(name="Speed", default=40.0, min=0.0, soft_max=200.0,
                           description="Letters per second (0 = the whole page at once)")
     letter_sound = StringProperty(name="Letter Sound", subtype="FILE_PATH",
