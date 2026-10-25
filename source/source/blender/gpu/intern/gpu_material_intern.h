@@ -138,6 +138,7 @@ struct GPUMaterial {
 	int shadowbiasloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowenabledloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowpointloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	int shadowfilterloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowcolorloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowcoloredloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 

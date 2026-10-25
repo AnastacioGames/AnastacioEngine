@@ -469,6 +469,8 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->shadowcoloredloc[i] = GPU_shader_get_uniform(shader, name);
 			BLI_snprintf(name, sizeof(name), "unfshadowpoint[%d]", i);
 			material->shadowpointloc[i] = GPU_shader_get_uniform(shader, name);
+			BLI_snprintf(name, sizeof(name), "unfshadowfilter[%d]", i);
+			material->shadowfilterloc[i] = GPU_shader_get_uniform(shader, name);
 		}
 
 		material->probecubeloc = GPU_shader_get_uniform(shader, "unfprobecube");
@@ -2461,16 +2463,15 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 								 GPU_uniform(&samp), GPU_uniform(&samplesize), GPU_uniform(&twoSidedShadows), inp, &shadfac);
 					}
 					else if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
-						float lamptype = (lamp->type == LA_SUN) ? 0.0f : 1.0f;
-						GPU_link(mat, "shadow_pcf_penumbra",
-								GPU_material_builtin(mat, GPU_VIEW_POSITION),
-								GPU_material_builtin(mat, GPU_VIEW_NORMAL),
-								GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
-								GPU_dynamic_uniform((float*)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
-								GPU_dynamic_texture(GPU_texture_global_jitter_64(), GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL),
-								GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
-								GPU_uniform(&samp), GPU_uniform(&samplesize), GPU_uniform(&lamptype), GPU_uniform(&twoSidedShadows), inp, &shadfac);
-
+						float clip[3] = {lamp->d, lamp->clipend, (lamp->type == LA_SUN) ? 1.0f : 0.0f};
+						GPU_link(mat, "shadow_pcss",
+								 GPU_material_builtin(mat, GPU_VIEW_POSITION),
+								 GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+								 GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
+								 GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+								 GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
+								 GPU_uniform(&samp), GPU_uniform(&lamp->la->soft), GPU_uniform(&samplesize), GPU_uniform(clip),
+								 GPU_uniform(&twoSidedShadows), inp, &shadfac);
 					}
 				}
 				else {
@@ -6015,9 +6016,21 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				const float colored_f = colored ? 1.0f : 0.0f;
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowcoloredloc[i], 1, &colored_f);
 			}
-			if (material->shadowpointloc[i] != -1 && GPU_lamp_has_point_shadow(lamp)) {
-				float point[4] = {lamp->d, lamp->clipend, 1.0f / lamp->size, 0.0f};
+			if (material->shadowpointloc[i] != -1) {
+				/* Point: z = 1 / face size. Sun/Spot: clip range and z = ortho, for PCSS. */
+				float point[4] = {lamp->d, lamp->clipend,
+				                  GPU_lamp_has_point_shadow(lamp) ? 1.0f / lamp->size : (lamp->type == LA_SUN ? 1.0f : 0.0f), 0.0f};
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowpointloc[i], 4, point);
+			}
+			if (material->shadowfilterloc[i] != -1) {
+				/* Only PCSS (PCF Penumbra, samples > 1 and some Soft) is new here: the PCF variants keep
+				 * the plain lookup this loop always had, so existing scenes don't change look. */
+				const Lamp *la = lamp->la;
+				float filter[4] = {(float)la->shadow_filter, (float)la->samp, la->soft, la->soft / max_ff(la->shadow_frustum_size, 1e-3f)};
+				if (la->shadow_filter > LA_SHADOW_FILTER_DITHERING) {
+					filter[0] = (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA && la->samp > 1 && la->soft >= 0.01f) ? 4.0f : 0.0f;
+				}
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowfilterloc[i], 4, filter);
 			}
 		}
 
@@ -6428,6 +6441,17 @@ GPUNodeLink *GPU_lamp_get_data(
 							 GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
 							 GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
 							 GPU_uniform(&samp), GPU_uniform(&samplesize), GPU_uniform(&twoSidedShadows), inp, &shadowfac);
+				}
+				else if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
+					float clip[3] = {lamp->d, lamp->clipend, (lamp->type == LA_SUN) ? 1.0f : 0.0f};
+					GPU_link(mat, "shadow_pcss",
+							 GPU_material_builtin(mat, GPU_VIEW_POSITION),
+							 GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+							 GPU_dynamic_texture(lamp->depthtex, GPU_DYNAMIC_SAMPLER_2DSHADOW, lamp->ob),
+							 GPU_dynamic_uniform((float *)lamp->dynpersmat, GPU_DYNAMIC_LAMP_DYNPERSMAT, lamp->ob),
+							 GPU_uniform(&lamp->bias), GPU_uniform(&lamp->slopebias),
+							 GPU_uniform(&samp), GPU_uniform(&lamp->la->soft), GPU_uniform(&samplesize), GPU_uniform(clip),
+							 GPU_uniform(&twoSidedShadows), inp, &shadowfac);
 				}
 			}
 			else {

@@ -3748,60 +3748,6 @@ float test_shadow_pcf_early_bail(sampler2DShadow shadowmap, vec4 co, float sampl
 	return result;
 }
 
-float test_shadow_pcf_penumbra(sampler2D shadowmap, vec4 co, sampler2D jitter, int samples, float size, float shadowtype)
-{
-	float pixel = size / float(samples) / 2.0;
-
-	const vec2 direct[4] = vec2[](
-		vec2( 1.0, 0.0),
-		vec2(-1.0, 0.0),
-		vec2( 0.0,-1.0),
-		vec2( 0.0, 1.0)
-	);
-
-	vec2 vec = texture(jitter, co.xy * 435.0).xy;
-
-	mat2 rot = mat2(vec.x, vec.y,
-					-vec.y, vec.x);
-
-	float depth = 0.0;
-	float types = (shadowtype == 0.0) ? 2.0 : 0.5;
-
-	for (int i = 0; i < 4; i++)
-	{
-		vec2 offset = direct[i] * pixel * types;
-
-		depth = max(depth, co.z - texture(shadowmap, co.xy + offset * rot).x);
-    }
-
-	depth *= (shadowtype == 0.0) ? 1.0 : 5.0;
-
-	float shadow = 0.0;
-	float weight = 0.0;
-
-	for (int x = -samples; x <= samples; x++)
-	{
-		for (int y = -samples; y <= samples; y++)
-		{
-			vec2 offset = vec2(x, y) * pixel * depth;
-
-			float dist = length(vec2(x, y));
-
-			float expo = exp(-dist * dist / float(samples * samples));
-
-			float shad = co.z - texture(shadowmap, co.xy + offset * rot).x;
-
-			shadow += expo * max(0.0, 1.0 - shad / 0.005);
-			weight += expo;
-		}
-	}
-
-	weight = max(weight, 0.0001);
-
-	return clamp(shadow / weight, 0.0, 1.0);
-}
-
-
 /* Per-pixel rotation for the PCF disk: interleaved gradient noise (same as dither()). */
 float shadow_ign()
 {
@@ -3847,6 +3793,76 @@ float test_shadow_pcf(sampler2DShadow shadowmap, vec4 co, float samples, float s
 float test_shadow_pcf_jitter(sampler2DShadow shadowmap, vec4 co, sampler2D jitter, float samples, float samplesize)
 {
 	return shadow_pcf_poisson(shadowmap, co, samples, samplesize);
+}
+
+/* Shadow map depth [0, 1] to the distance from the lamp and back. clip = (near, far, ortho). */
+float shadow_linear_depth(float d, vec3 clip)
+{
+	return (clip.z > 0.5) ? mix(clip.x, clip.y, d) : clip.x * clip.y / (clip.y - d * (clip.y - clip.x));
+}
+
+float shadow_depth_from_linear(float z, vec3 clip)
+{
+	return (clip.z > 0.5) ? (z - clip.x) / (clip.y - clip.x) : (clip.y - clip.x * clip.y / z) / (clip.y - clip.x);
+}
+
+/* PCSS (Fernando 2005): sharp shadow at the contact, softer away from the caster. The blocker
+ * search uses only depth compares (no raw depth texture, so no extra sampler unit): 16 taps over
+ * the search disk, each compared at the receiver and at two depths closer to the lamp. The share
+ * of taps still blocked at each depth gives the receiver-blocker gap, which sets the PCF disk.
+ * Sun (parallel rays): gaps in world units, penumbra = gap * light angle. Spot: gap relative to
+ * the blocker distance. Soft sets the light size; the disk stops at 8x the plain PCF radius.
+ * Both disks are turned per pixel by IGN like shadow_pcf_poisson(). */
+float test_shadow_pcss(sampler2DShadow shadowmap, vec4 co, float samples, float soft, float samplesize, vec3 clip)
+{
+	const vec2 poisson[16] = vec2[](
+		vec2(-0.94201624, -0.39906216), vec2( 0.94558609, -0.76890725),
+		vec2(-0.09418410, -0.92938870), vec2( 0.34495938,  0.29387760),
+		vec2(-0.91588581,  0.45771432), vec2(-0.81544232, -0.87912464),
+		vec2(-0.38277543,  0.27676845), vec2( 0.97484398,  0.75648379),
+		vec2( 0.44323325, -0.97511554), vec2( 0.53742981, -0.47373420),
+		vec2(-0.26496911, -0.41893023), vec2( 0.79197514,  0.19090188),
+		vec2(-0.24188840,  0.99706507), vec2(-0.81409955,  0.91437590),
+		vec2( 0.19984126,  0.78641367), vec2( 0.14383161, -0.14100790));
+	float a = shadow_ign() * 6.2831853;
+	float ca = cos(a), sa = sin(a);
+	mat2 rot = mat2(ca, sa, -sa, ca);
+	float texel = 1.0 / float(max(textureSize(shadowmap, 0).x, 1));
+	float pcfradius = samplesize * 0.5 * shadow_pcf_scale(shadowmap);
+	float maxradius = max(pcfradius * 8.0, texel * 2.0);
+
+	bool ortho = clip.z > 0.5;
+	float zr = shadow_linear_depth(co.z, clip);
+	/* Gap thresholds: Sun in world units, Spot as (zr - zb) / zb. */
+	vec2 gaps = ortho ? vec2(1.0, 4.0) : vec2(0.25, 1.0);
+	float ref1 = shadow_depth_from_linear(ortho ? zr - gaps.x : zr / (1.0 + gaps.x), clip);
+	float ref2 = shadow_depth_from_linear(ortho ? zr - gaps.y : zr / (1.0 + gaps.y), clip);
+
+	vec3 blocked = vec3(0.0);
+	for (int i = 0; i < 16; i++) {
+		vec2 uv = co.xy + rot * poisson[i] * maxradius;
+		blocked.x += 1.0 - texture(shadowmap, vec3(uv, co.z));
+		blocked.y += 1.0 - texture(shadowmap, vec3(uv, ref1));
+		blocked.z += 1.0 - texture(shadowmap, vec3(uv, ref2));
+	}
+	if (blocked.x < 0.02) {
+		return 1.0;
+	}
+
+	/* Mean gap of the blocked taps, from the share in each band (band midpoints). */
+	vec3 mids = ortho ? vec3(0.5, 2.5, 8.0) : vec3(0.12, 0.6, 2.0);
+	float gap = (dot(vec2(blocked.x - blocked.y, blocked.y - blocked.z), mids.xy) + blocked.z * mids.z) / blocked.x;
+	float penumbra = ortho ? gap * samplesize * 0.05 : gap * soft * 0.025;
+	float radius = clamp(penumbra, texel, maxradius);
+
+	int n = int(clamp(samples * samples, 4.0, 16.0));
+	mat2 disk = rot * radius;
+	float result = 0.0;
+	for (int i = 0; i < 16; i++) {
+		if (i >= n) break;
+		result += texture_shadow_offset(shadowmap, co, disk * poisson[i]);
+	}
+	return result / float(n);
 }
 
 float test_shadow_vsm(sampler2D shadowmap, vec4 co, float bias, float bleedbias)
@@ -3949,9 +3965,9 @@ void shadow_pcf_early_bail(
 	}
 }
 
-void shadow_pcf_penumbra(
-        vec3 rco, vec3 vn, sampler2D shadowmap, mat4 shadowpersmat, sampler2D jitter, float bias, float slopebias,
-		float samples, float samplesize, float shadowtype, float twosided, float inp,
+void shadow_pcss(
+        vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 shadowpersmat, float bias, float slopebias,
+        float samples, float soft, float samplesize, vec3 clip, float twosided, float inp,
         out float result)
 {
 	if (inp <= 0.0) {
@@ -3960,7 +3976,7 @@ void shadow_pcf_penumbra(
 		vec4 co = shadow_proj_coord(rco, vn, shadowpersmat, bias, slopebias);
 
 		if (shadow_visibility(co)) {
-			result = test_shadow_pcf_penumbra(shadowmap, co, jitter, int(samples), samplesize, shadowtype);
+			result = test_shadow_pcss(shadowmap, co, samples, soft, samplesize, clip);
 		} else {
 			result = 1.0;
 		}
@@ -4701,7 +4717,9 @@ uniform sampler2DShadow unfshadowmap[NUM_SHADOW_LIGHTS];
 uniform mat4 unfshadowpersmat[NUM_SHADOW_LIGHTS];
 uniform vec2 unfshadowbias[NUM_SHADOW_LIGHTS]; /* x = bias, y = slopebias, per GPULamp */
 uniform float unfshadowenabled[NUM_SHADOW_LIGHTS]; /* 0 off, 1 Sun/Spot, 2 Point */
-uniform vec4 unfshadowpoint[NUM_SHADOW_LIGHTS]; /* Point: x = clip start, y = clip end, z = 1 / face size */
+uniform vec4 unfshadowpoint[NUM_SHADOW_LIGHTS]; /* x = clip start, y = clip end, z = Point: 1 / face size, Sun/Spot: 1 ortho */
+/* Lamp shadow filter of slot i: x = 0-2 plain (none/clip/dither), 4 PCSS (3 PCF, unused); y = samples, z = soft, w = soft / frustum. */
+uniform vec4 unfshadowfilter[NUM_SHADOW_LIGHTS];
 /* Colored shadows of slot i (GPU_lamp_shadow_color_*), used when unfshadowcolored[i] > 0.5. */
 uniform sampler2D unfshadowcolor[NUM_SHADOW_LIGHTS];
 uniform float unfshadowcolored[NUM_SHADOW_LIGHTS];
@@ -4767,6 +4785,25 @@ void shadow_point_bi(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 lightmat
 	result = shadow_point(rco, vn, shadowmap, lightmat, vec2(bias, slopebias), point, inp);
 }
 
+/* Sun/Spot shadow of a scene-light slot with the lamp's own filter (shadow_simple/shadow_pcf/shadow_pcss). */
+float scene_shadow_filtered(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 persmat, vec2 bias, vec4 filt, vec4 clip, float inp)
+{
+	if (inp <= 0.0) {
+		return 1.0;
+	}
+	vec4 co = shadow_proj_coord(rco, vn, persmat, bias.x, bias.y);
+	if (!shadow_visibility(co)) {
+		return 1.0;
+	}
+	if (filt.x > 3.5) {
+		return test_shadow_pcss(shadowmap, co, filt.y, filt.z, filt.w, clip.xyz);
+	}
+	if (filt.x > 2.5) {
+		return shadow_pcf_poisson(shadowmap, co, filt.y, filt.w);
+	}
+	return test_shadow_simple(shadowmap, co, filt.x);
+}
+
 /* Shadow factor of scene-light slot i. GLSL ES 3.00 only allows constant indices into sampler
  * arrays, so the loop index can't reach unfshadowmap[] directly. */
 float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
@@ -4777,32 +4814,32 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 		                         unfshadowpoint[0], inp);
 	}
 	else if (i == 0 && unfshadowenabled[0] > 0.5) {
-		shadow_simple(rco, vn, unfshadowmap[0], unfshadowpersmat[0], 0.0,
-		              unfshadowbias[0].x, unfshadowbias[0].y, 0.0, inp, shadowfac);
+		shadowfac = scene_shadow_filtered(rco, vn, unfshadowmap[0], unfshadowpersmat[0], unfshadowbias[0],
+		                                  unfshadowfilter[0], unfshadowpoint[0], inp);
 	}
 	else if (i == 1 && unfshadowenabled[1] > 1.5) {
 		shadowfac = shadow_point(rco, vn, unfshadowmap[1], unfshadowpersmat[1], unfshadowbias[1],
 		                         unfshadowpoint[1], inp);
 	}
 	else if (i == 1 && unfshadowenabled[1] > 0.5) {
-		shadow_simple(rco, vn, unfshadowmap[1], unfshadowpersmat[1], 0.0,
-		              unfshadowbias[1].x, unfshadowbias[1].y, 0.0, inp, shadowfac);
+		shadowfac = scene_shadow_filtered(rco, vn, unfshadowmap[1], unfshadowpersmat[1], unfshadowbias[1],
+		                                  unfshadowfilter[1], unfshadowpoint[1], inp);
 	}
 	else if (i == 2 && unfshadowenabled[2] > 1.5) {
 		shadowfac = shadow_point(rco, vn, unfshadowmap[2], unfshadowpersmat[2], unfshadowbias[2],
 		                         unfshadowpoint[2], inp);
 	}
 	else if (i == 2 && unfshadowenabled[2] > 0.5) {
-		shadow_simple(rco, vn, unfshadowmap[2], unfshadowpersmat[2], 0.0,
-		              unfshadowbias[2].x, unfshadowbias[2].y, 0.0, inp, shadowfac);
+		shadowfac = scene_shadow_filtered(rco, vn, unfshadowmap[2], unfshadowpersmat[2], unfshadowbias[2],
+		                                  unfshadowfilter[2], unfshadowpoint[2], inp);
 	}
 	else if (i == 3 && unfshadowenabled[3] > 1.5) {
 		shadowfac = shadow_point(rco, vn, unfshadowmap[3], unfshadowpersmat[3], unfshadowbias[3],
 		                         unfshadowpoint[3], inp);
 	}
 	else if (i == 3 && unfshadowenabled[3] > 0.5) {
-		shadow_simple(rco, vn, unfshadowmap[3], unfshadowpersmat[3], 0.0,
-		              unfshadowbias[3].x, unfshadowbias[3].y, 0.0, inp, shadowfac);
+		shadowfac = scene_shadow_filtered(rco, vn, unfshadowmap[3], unfshadowpersmat[3], unfshadowbias[3],
+		                                  unfshadowfilter[3], unfshadowpoint[3], inp);
 	}
 	return shadowfac;
 }
