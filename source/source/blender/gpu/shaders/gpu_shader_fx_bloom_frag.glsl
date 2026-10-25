@@ -22,16 +22,24 @@ vec3 mixScreen(vec3 base, vec3 blend) {
 	return 1.0 - (1.0 - base) * (1.0 - blend);
 }
 
+/* The game bloom (RAS_Bloom2DFilter_*.glsl) sums 4 widths of blur (1/2 .. 1/16 resolution); here a
+ * narrow and a wide gaussian, each weighted 2x, give about the same energy and spread so the
+ * viewport preview matches the P player. The wide one skips every other tap, so its weights are scaled up (sum ~2). */
 vec3 getBloom() {
-	vec2 pixel = 5.0 / textureSize(colorbuffer, 0);
+	vec2 size = vec2(textureSize(colorbuffer, 0));
+	vec2 narrow = 3.0 / size;
+	vec2 wide = 12.0 / size;
 
 	vec3 result = vec3(0.0);
 
 	for (int x = -8; x <= 8; ++x) {
 		for (int y = -8; y <= 8; ++y) {
-			vec3 col = getCol(uvcoord.xy + vec2(x, y) * pixel).rgb;
-
-			result += col * weights[abs(y)] * weights[abs(x)];
+			result += getCol(uvcoord.xy + vec2(x, y) * narrow).rgb * weights[abs(y)] * weights[abs(x)] * 2.0;
+		}
+	}
+	for (int x = -8; x <= 8; x += 2) {
+		for (int y = -8; y <= 8; y += 2) {
+			result += getCol(uvcoord.xy + vec2(x, y) * wide).rgb * weights[abs(y)] * weights[abs(x)] * 5.0;
 		}
 	}
 
