@@ -48,6 +48,8 @@
 #  include <unistd.h>
 #endif
 #include <algorithm>
+#include <condition_variable>
+#include <cstring>
 #include <mutex>
 #include <thread>
 #include <vector>
@@ -75,6 +77,8 @@ struct TraceState
 	FILE *file = nullptr;
 	int modules = 0;
 	std::atomic<long> frame{0};
+	/// Seconds since origin of the last fflush.
+	double lastFlush = 0.0;
 	std::chrono::steady_clock::time_point origin = std::chrono::steady_clock::now();
 
 	TraceState()
@@ -155,8 +159,12 @@ void CM_TraceEvent(const char *event, const std::string& fields)
 	}
 	fprintf(trace.file, "{\"t\":%.4f,\"f\":%ld,\"ev\":\"%s\"%s%s}\n", t, trace.frame.load(std::memory_order_relaxed),
 	        event, fields.empty() ? "" : ",", fields.c_str());
-	// Flushed per event so a crash keeps the log; events are rare (load and first uses).
-	fflush(trace.file);
+	/* Flushed at most every 0.25 s (and at the end), so a crash loses only the last moment. Flushing
+	 * every event cost ~1.7 ms per frame with the per-frame modules, which skewed what they measure. */
+	if (t - trace.lastFlush >= 0.25 || strcmp(event, "end") == 0) {
+		fflush(trace.file);
+		trace.lastFlush = t;
+	}
 }
 
 namespace {
@@ -313,7 +321,10 @@ unsigned long CurrentThreadId()
 
 }  // namespace
 
-void CM_TraceThreadsSample()
+namespace {
+/// One "threads" event per second. Only one thread calls it at a time (the sampler, or the main
+/// thread on the Web).
+void SampleThreads(unsigned long mainId)
 {
 	static double last = -1.0;
 	static std::map<unsigned long, double> previous;
@@ -322,7 +333,6 @@ void CM_TraceThreadsSample()
 		return;
 	}
 	const std::map<unsigned long, double> current = ThreadCpuTimes();
-	const unsigned long mainId = CurrentThreadId();
 	if (last >= 0.0) {
 		// Busy ms of each thread in the interval; threads that started in it count from zero.
 		double total = 0.0, mainMs = 0.0;
@@ -353,6 +363,67 @@ void CM_TraceThreadsSample()
 	}
 	last = now;
 	previous = current;
+}
+
+#ifndef __EMSCRIPTEN__
+/* Listing the threads walks every thread of the system (Toolhelp on Windows): ~100 ms once per
+ * second, a hitch every second when done on the main thread. A sampler thread does it instead. */
+struct ThreadSampler
+{
+	std::mutex mutex;
+	std::condition_variable wake;
+	std::thread thread;
+	bool stop = false;
+
+	void Stop()
+	{
+		if (!thread.joinable()) {
+			return;
+		}
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			stop = true;
+		}
+		wake.notify_all();
+		thread.join();
+	}
+
+	// An exit without CM_TraceEnd() must not destroy a running std::thread (std::terminate).
+	~ThreadSampler()
+	{
+		Stop();
+	}
+};
+
+ThreadSampler& GetSampler()
+{
+	static ThreadSampler sampler;
+	return sampler;
+}
+#endif
+}  // namespace
+
+void CM_TraceThreadsSample()
+{
+#ifdef __EMSCRIPTEN__
+	SampleThreads(CurrentThreadId());
+#else
+	ThreadSampler& sampler = GetSampler();
+	if (sampler.thread.joinable()) {
+		return;
+	}
+	sampler.stop = false;
+	const unsigned long mainId = CurrentThreadId();
+	sampler.thread = std::thread([&sampler, mainId]() {
+		std::unique_lock<std::mutex> lock(sampler.mutex);
+		while (!sampler.stop) {
+			lock.unlock();
+			SampleThreads(mainId);
+			lock.lock();
+			sampler.wake.wait_for(lock, std::chrono::seconds(1), [&sampler]() { return sampler.stop; });
+		}
+	});
+#endif
 }
 
 CM_TraceScriptScope::CM_TraceScriptScope(const std::string& name)
@@ -394,6 +465,9 @@ std::string CM_TraceStr(const std::string& text)
 
 void CM_TraceEnd()
 {
+#ifndef __EMSCRIPTEN__
+	GetSampler().Stop();
+#endif
 	if (CM_TraceModules()) {
 		CM_TraceEvent("end", "");
 	}
