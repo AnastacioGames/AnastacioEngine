@@ -522,7 +522,7 @@ PyMethodDef KX_GameObject::Methods[] = {
 	EXP_PYMETHODTABLE(KX_GameObject, isPlayingAction),
 
 	// dict style access for props
-	{"get", (PyCFunction)KX_GameObject::sPyget, METH_VARARGS},
+	{"get", (PyCFunction)(void (*)(void))KX_GameObject::sPyget, METH_FASTCALL},
 
 	{nullptr, nullptr} //Sentinel
 };
@@ -1189,7 +1189,7 @@ static PyObject *Map_GetItem(PyObject *self_v, PyObject *item)
 	}
 
 	/* first see if the attributes a string and try get the cvalue attribute */
-	if (attr_str && (resultattr = self->GetProperty(attr_str))) {
+	if (attr_str && (resultattr = self->FindProperty(attr_str))) {
 		pyconvert = resultattr->ConvertValueToPython();
 		return pyconvert ? pyconvert : resultattr->GetProxy();
 	}
@@ -1325,7 +1325,7 @@ static int Seq_Contains(PyObject *self_v, PyObject *value)
 		return -1;
 	}
 
-	if (PyUnicode_Check(value) && self->GetProperty(_PyUnicode_AsString(value))) {
+	if (PyUnicode_Check(value) && self->FindProperty(_PyUnicode_AsString(value))) {
 		return 1;
 	}
 

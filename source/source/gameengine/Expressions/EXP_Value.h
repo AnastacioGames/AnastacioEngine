@@ -28,6 +28,7 @@
 #include <map> // Array functionality for the property list.
 #include <vector>
 #include <string> // std::string class.
+#include <string_view>
 
 #ifndef GEN_NO_TRACE
 #undef  trace
@@ -126,6 +127,12 @@ public:
 	/// Set property <ioProperty>, overwrites and releases a previous property with the same name if needed.
 	virtual void SetProperty(const std::string& name, EXP_Value *ioProperty);
 	virtual EXP_Value *GetProperty(const std::string & inName);
+	/// Same lookup without building a std::string (Python obj.get / obj[name] / "name" in obj).
+	EXP_Value *FindProperty(std::string_view inName) const
+	{
+		const auto it = m_properties.find(inName);
+		return (it != m_properties.end()) ? it->second : nullptr;
+	}
 	/// Get text description of property with name <inName>, returns an empty string if there is no property named <inName>.
 	const std::string GetPropertyText(const std::string & inName);
 	float GetPropertyNumber(const std::string& inName, float defnumber);
@@ -138,7 +145,7 @@ public:
 	/// Get property number <inIndex>. O(n) per call: walks the map from the start, prefer GetProperties() in loops.
 	virtual EXP_Value *GetProperty(int inIndex);
 	/// Direct read-only access to the property map, for O(n) iteration.
-	const std::map<std::string, EXP_Value *>& GetProperties() const
+	const std::map<std::string, EXP_Value *, std::less<>>& GetProperties() const
 	{
 		return m_properties;
 	}
@@ -172,7 +179,8 @@ protected:
 
 private:
 	/// Properties for user/game etc.
-	std::map<std::string, EXP_Value *> m_properties;
+	/// std::less<> lets FindProperty look up by string_view without allocating.
+	std::map<std::string, EXP_Value *, std::less<>> m_properties;
 };
 
 /** EXP_PropValue is a EXP_Value derived class, that implements the identification (String name)

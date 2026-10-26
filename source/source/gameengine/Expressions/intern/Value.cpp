@@ -167,7 +167,7 @@ void EXP_Value::SetProperty(const std::string & name, EXP_Value *ioProperty)
 /// Get pointer to a property with name <inName>, returns nullptr if there is no property named <inName>.
 EXP_Value *EXP_Value::GetProperty(const std::string & inName)
 {
-	std::map<std::string, EXP_Value *>::iterator it = m_properties.find(inName);
+	auto it = m_properties.find(inName);
 	if (it != m_properties.end()) {
 		return it->second;
 	}
@@ -200,7 +200,7 @@ float EXP_Value::GetPropertyNumber(const std::string& inName, float defnumber)
 /// Remove the property named <inName>, returns true if the property was succesfully removed, false if property was not found or could not be removed.
 bool EXP_Value::RemoveProperty(const std::string& inName)
 {
-	std::map<std::string, EXP_Value *>::iterator it = m_properties.find(inName);
+	auto it = m_properties.find(inName);
 	if (it != m_properties.end()) {
 		(*it).second->Release();
 		m_properties.erase(it);

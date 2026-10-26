@@ -1758,19 +1758,23 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, strikeLightning,
 
 
 /* Matches python dict.get(key, [default]) */
-PyObject *KX_GameObject::Pyget(PyObject *args)
+PyObject *KX_GameObject::Pyget(PyObject *const *args, Py_ssize_t nargs)
 {
-	PyObject *key;
-	PyObject *def = Py_None;
-	PyObject *ret;
-
-	if (!PyArg_ParseTuple(args, "O|O:get", &key, &def)) {
+	if (nargs < 1 || nargs > 2) {
+		PyErr_Format(PyExc_TypeError, "get expected 1 or 2 arguments, got %zd", nargs);
 		return nullptr;
 	}
-
+	PyObject *key = args[0];
+	PyObject *def = (nargs == 2) ? args[1] : Py_None;
+	PyObject *ret;
 
 	if (PyUnicode_Check(key)) {
-		EXP_Value *item = GetProperty(_PyUnicode_AsString(key));
+		Py_ssize_t len;
+		const char *name = PyUnicode_AsUTF8AndSize(key, &len);
+		if (!name) {
+			return nullptr;
+		}
+		EXP_Value *item = FindProperty(std::string_view(name, len));
 		if (item) {
 			ret = item->ConvertValueToPython();
 			if (ret) {

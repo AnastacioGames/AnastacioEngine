@@ -1261,7 +1261,17 @@ public:
 	EXP_PYMETHOD_DOC(KX_GameObject, isPlayingAction);
 	
 	/* Dict access */
-	EXP_PYMETHOD_VARARGS(KX_GameObject,get);
+	/* obj.get(name[, default]) is called hundreds of times per frame by game scripts: METH_FASTCALL
+	 * skips building an argument tuple and parsing it. */
+	PyObject *Pyget(PyObject *const *args, Py_ssize_t nargs);
+	static PyObject *sPyget(PyObject *self, PyObject *const *args, Py_ssize_t nargs)
+	{
+		if (EXP_PROXY_REF(self) == nullptr) {
+			PyErr_SetString(PyExc_RuntimeError, "KX_GameObject.get() - " EXP_PROXY_ERROR_MSG);
+			return nullptr;
+		}
+		return ((KX_GameObject *)EXP_PROXY_REF(self))->Pyget(args, nargs);
+	}
 	
 	/* attributes */
 	static PyObject*	pyattr_get_name(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
