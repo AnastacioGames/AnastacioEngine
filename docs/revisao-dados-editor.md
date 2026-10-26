@@ -59,3 +59,32 @@ Validação de DAT-01 a DAT-03: build de editor e player; 12 arquivos de `projec
 
 Nada relevante. O versioning roda uma vez por arquivo aberto e percorre listas pequenas; as ~13
 consultas `DNA_struct_elem_find` são baratas perto do resto da leitura.
+
+## Exportador (2ª rodada)
+
+Leitura integral de `addons/game_engine_save_as_runtime.py` (392), `bl_operators/anastacio_export_assets.py`
+(234) e `range_web/export.py` (52); chamada do export Web em `properties_web.py`; limpeza do Android.
+
+### Corrigido
+
+| ID | Arquivo | Problema | Resultado |
+|---|---|---|---|
+| EXP-01 | game_engine_save_as_runtime.py | Exportar de novo na mesma pasta: `copytree` de datafiles (ligado por padrão) e scripts sem `dirs_exist_ok` dava `FileExistsError` depois de já regravar o executável | Reproduzido em background (2ª rodada falhava); corrigido e repetido OK (d8b25164) |
+| EXP-02 | range_web/export.py | O export Web troca a pasta de destino inteira. Com destino `//`, raiz da unidade ou pasta com outros arquivos, apagaria tudo, inclusive o projeto | Agora só substitui pasta vazia ou export anterior (`index.html` + `manifest.json`), nunca raiz nem pasta que contenha o `.range`; mensagem traduzida; 3 testes novos, suíte Web 136/136 (1f902be8) |
+
+### Conferido e correto
+
+- `anastacio_export_assets`: cada arquivo do projeto é processado num processo separado, o projeto de
+  origem nunca é salvo, bibliotecas fora da pasta são recusadas, handlers de save ficam desligados no
+  snapshot e caminhos do World Sound são reescritos para a cópia.
+- Export Web: gera numa pasta temporária e só troca no fim; falha preserva o export anterior.
+- Android: só grava na pasta de saída; limpa apenas a própria pasta de trabalho no temp.
+
+### Observado, sem mudança
+
+| ID | Observação |
+|---|---|
+| EXP-03 | Opção "Overwrite 'lib' folder" não faz nada: `CopyPythonLibs` não é chamada por ninguém |
+| EXP-04 | Com assets preparados (DDS/áudio), o `.cooked` não vai para o jogo exportado; a primeira carga fica mais lenta. Pode ser intencional, já que os dados mudam |
+| EXP-05 | Com assets preparados, `anastacio-export-report.json` vai para a pasta do jogo publicado |
+| EXP-06 | O player inteiro é lido para a memória antes de gravar; dezenas de MB, sem impacto prático |
