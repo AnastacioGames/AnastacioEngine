@@ -550,6 +550,46 @@ def rule_scripts_every_frame(scene, objects):
              "raise Skip or run it on an event."), sorted(busy, key=lambda o: o.name))]
 
 
+def rule_instancing_unique_meshes(scene, objects):
+    """Geometry Instancing draws the objects that share one mesh in a single call. When every object of
+    the material has its own mesh, each one is a group of one: no gain, and on AMD the first draw of each
+    group stalled the frame for ~0.75 s (alpha-to-coverage trees in RolimaRacer)."""
+    issues = []
+    active = set(_active_objects(scene, objects))
+    users = {}
+    for ob in objects:
+        if ob.type != 'MESH' or ob.data is None:
+            continue
+        for slot in ob.material_slots:
+            mat = slot.material
+            if mat is not None and getattr(mat, "use_instancing", False):
+                users.setdefault(mat, []).append(ob)
+    for mat, obs in users.items():
+        # Objects on inactive layers are AddObject templates: their copies share the mesh.
+        if any(ob not in active for ob in obs):
+            continue
+        meshes = {}
+        for ob in obs:
+            meshes.setdefault(ob.data, set()).add(ob)
+        if any(len(group) > 1 for group in meshes.values()):
+            continue
+
+        def fix(mat=mat):
+            mat.use_instancing = False
+
+            def revert():
+                mat.use_instancing = True
+            return revert
+        issues.append(Issue(
+            "instancing_unique", mat.name, 'MEDIUM',
+            tip_("Material %s uses Geometry Instancing, but each object has its own mesh") % mat.name,
+            tip_("Instancing only joins objects that share the same mesh. Here every object is a group of "
+                 "one: no gain, and on some drivers (AMD) the first draw of each one stalls the frame. "
+                 "Turn it off, or link the objects to one mesh (Ctrl+L > Object Data)."),
+            sorted(obs, key=lambda o: o.name), fix))
+    return issues
+
+
 RULES = (
     rule_textures,
     rule_heavy_meshes,
@@ -557,6 +597,7 @@ RULES = (
     rule_physics_shapes,
     rule_collision_primitive,
     rule_shadows,
+    rule_instancing_unique_meshes,
     rule_sounds,
     rule_scripts_every_frame,
 )

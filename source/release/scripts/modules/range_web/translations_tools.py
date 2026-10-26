@@ -128,6 +128,22 @@ TABLE = (
      'после применения проверьте контакты и зазоры. Отмена восстановит прежнюю форму.'),
     ('%s has a %d shadow buffer', '%s tem um buffer de sombra de %d', '%s tiene un búfer de sombra de %d',
      '%s: буфер теней %d'),
+    ('Material %s uses Geometry Instancing, but each object has its own mesh',
+     'O material %s usa Geometry Instancing, mas cada objeto tem a própria malha',
+     'El material %s usa Geometry Instancing, pero cada objeto tiene su propia malla',
+     'Материал %s использует Geometry Instancing, но у каждого объекта своя сетка'),
+    ('Instancing only joins objects that share the same mesh. Here every object is a group of '
+     'one: no gain, and on some drivers (AMD) the first draw of each one stalls the frame. '
+     'Turn it off, or link the objects to one mesh (Ctrl+L > Object Data).',
+     'O instancing só junta objetos que usam a mesma malha. Aqui cada objeto é um grupo de um: não '
+     'ganha nada e, em alguns drivers (AMD), o primeiro desenho de cada um trava o quadro. Desligue, '
+     'ou ligue os objetos a uma malha só (Ctrl+L > Object Data).',
+     'El instancing solo agrupa objetos que comparten la misma malla. Aquí cada objeto es un grupo de '
+     'uno: no gana nada y, en algunos drivers (AMD), el primer dibujo de cada uno congela el fotograma. '
+     'Desactívalo, o enlaza los objetos a una sola malla (Ctrl+L > Object Data).',
+     'Instancing объединяет только объекты с общей сеткой. Здесь каждый объект — группа из одного: '
+     'выигрыша нет, а на некоторых драйверах (AMD) первая отрисовка каждого подвешивает кадр. '
+     'Отключите его или свяжите объекты с одной сеткой (Ctrl+L > Object Data).'),
     ('Every frame the scene is drawn into it again; %d is usually sharp enough.',
      'A cada quadro a cena é desenhada nele de novo; %d costuma ser nítido o bastante.',
      'Cada fotograma la escena se vuelve a dibujar en él; %d suele ser lo bastante nítido.',
