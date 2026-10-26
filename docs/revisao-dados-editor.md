@@ -123,3 +123,26 @@ chuva/trovão roda em `save_pre`, `save_post` e `game_pre`, e só altera caminho
 
 Observado: no World Sound filtrado (Music/Ambient/Effects), subir/descer um módulo troca com o vizinho na
 lista inteira, que pode ser de outro tipo e estar escondido; o clique parece não fazer nada.
+
+## Plataformas: entrada, janela e encerramento (5ª rodada)
+
+Leitura de `Device/` (`DEV_EventConsumer`, `DEV_InputDevice`, `DEV_Joystick`, `DEV_JoystickEvents`,
+`DEV_JoystickPrivate.h`), do laço e do encerramento em `Launcher/LA_Launcher.cpp` e do ciclo de janela
+em `GamePlayer/GPG_Ghost.cpp`.
+
+| ID | Onde | Resultado |
+|---|---|---|
+| PLT-01 | `LA_Launcher::ExitEngine` | `m_eventConsumer` era apagado sem zerar o ponteiro (todos os outros são zerados). Hoje o Launcher é recriado a cada Restart, então não havia uso; zerado para não virar bug |
+
+Conferido e correto:
+- Teclado/mouse: o controle na tela da Web e a tecla física se somam (soltar uma não solta a outra);
+  o filtro de foco do Play embutido descarta só os "apertos" com o cursor fora, nunca os "soltos".
+- Joystick: o controle virtual ocupa o índice 0 e recebe os limites de eixos e botões; um controle físico
+  que chega se junta a ele; ao desconectar, a busca pelo ID não acerta o virtual (ID inicial -1); o estado
+  ao vivo corrige eventos perdidos na fila única do SDL na Web.
+- Encerramento: `StopEngine` antes de `DEV_Joystick::Close` (ImGui fecha o próprio controle), Python
+  por último; SIGTERM do `--server` vira saída limpa; na Web o laço do navegador não executa o código de
+  saída do player; janela aberta uma vez e reaproveitada no Restart; GPU e ícones só liberados se criados.
+
+Observado: teclas fora da tabela (F20+, teclas de mídia) entram como `NOKEY` no `std::map`, sem efeito;
+no quadro do Cook, a tecla de saída sobrepõe o pedido de Restart do aquecimento de shaders.

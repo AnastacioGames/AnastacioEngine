@@ -588,6 +588,7 @@ void LA_Launcher::ExitEngine()
 	if (m_eventConsumer) {
 		m_system->removeEventConsumer(m_eventConsumer);
 		delete m_eventConsumer;
+		m_eventConsumer = nullptr;
 	}
 	if (m_rasterizer) {
 		delete m_rasterizer;
