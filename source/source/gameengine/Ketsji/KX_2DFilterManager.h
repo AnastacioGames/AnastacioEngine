@@ -138,6 +138,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_2DFilterManager, changeGrainValues);
 
 	/* fxaa* and grain* attributes, one pair dispatched on the attribute name */
+	static PyObject *pyattr_get_compositor(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 

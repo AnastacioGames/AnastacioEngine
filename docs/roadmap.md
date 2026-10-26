@@ -369,8 +369,12 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   Bright/Contrast, Gamma, Invert, Hue Sat Val, Color Balance (LGG/CDL), RGB Curves, Color Ramp, RGB to BW,
   Separate/Combine RGBA, Set Alpha, Math, Box/Ellipse Mask, Blur (7x7 leve), Lens Distortion, Reroute.
   Outros nós passam a entrada adiante com aviso. Árvore padrão (Render Layers → Composite) não cria passo.
-  Valores lidos no load (sem edição ao vivo). Teste: `tools/debug/cenas/criar_cena_compositing_jogo.py`;
-  `RANGE_COMPOSITOR_DUMP=arquivo` grava o shader gerado. Próximas fases: Glare, valores ao vivo, Texture nodes
+  Valores lidos no load; nós Value e RGB viram uniforms `comp_<nome do nó>`, mudados ao vivo com
+  `scene.filterManager.compositor.setUniform(nome, valor)` (2026-10-26). Revisão do Codex aplicada: nó mudo segue
+  o internal link, Alpha Over premultiplicado/Key/Mixed, Divide/Dodge/Burn, Curves com Black/White Level e
+  extrapolação, cor→valor pela média, Modulo = fmod, Depth ortográfico, compositor depois dos filtros custom.
+  Teste: `tools/debug/cenas/criar_cena_compositing_jogo.py`;
+  `RANGE_COMPOSITOR_DUMP=arquivo` grava o shader gerado. Próximas fases: Glare, Texture nodes
   só como bake. Defocus pesado e Denoise ficam fora.
 
 ## Performance

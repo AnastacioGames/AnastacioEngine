@@ -22,7 +22,9 @@
  *  \ingroup ketsji
  *
  * Phase 1 of Compositing in the game: the cheap compositor nodes become GLSL, following the
- * formulas of source/blender/compositor/operations. Values are read once at load (no live edit).
+ * formulas of source/blender/compositor/operations. Values are read once at load, except the Value
+ * and RGB nodes: they are uniforms named "comp_" + node name, set from Python with
+ * scene.filterManager.compositor.setUniform(name, value).
  * Each node output is a function `vec4 cN_S(vec2 uv)`; floats travel in .x. Nodes that sample
  * their input at other places (Blur, Lens Distortion) call the upstream function there, so a
  * blurred mask costs its taps times the mask, which is cheap; a blur over a long chain is not.
@@ -34,6 +36,7 @@
 #include <set>
 #include <sstream>
 #include <cmath>
+#include <cctype>
 
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
@@ -72,8 +75,8 @@ std::string V4(const float v[4])
 class Generator
 {
 public:
-	Generator(bNodeTree *ntree, std::vector<std::string>& skipped)
-		:m_tree(ntree), m_skipped(skipped)
+	Generator(bNodeTree *ntree, std::vector<std::string>& skipped, std::vector<KX_CompositorUniform>& uniforms)
+		:m_tree(ntree), m_skipped(skipped), m_uniforms(uniforms)
 	{
 	}
 
@@ -90,9 +93,12 @@ public:
 		}
 		bNode *from = link->fromnode;
 		bNodeSocket *fromsock = link->fromsock;
-		// Reroutes and muted nodes pass their first input on.
-		while (from && (from->type == NODE_REROUTE || (from->flag & NODE_MUTED))) {
-			bNodeSocket *in = (bNodeSocket *)from->inputs.first;
+		// Reroutes pass their input on, muted nodes the input of their internal link.
+		for (int depth = 0; from && (from->type == NODE_REROUTE || (from->flag & NODE_MUTED)); ++depth) {
+			bNodeSocket *in = (depth < 256) ? PassThrough(from, fromsock) : nullptr;
+			if (!in && from->type != NODE_REROUTE) {
+				return "vec4(0.0)";
+			}
 			bNodeLink *l = in ? FindLink(in) : nullptr;
 			if (!l) {
 				return in ? Convert(Default(in), in->type, sock->type) : Default(sock);
@@ -113,6 +119,30 @@ public:
 	std::string Code() const
 	{
 		return m_code.str();
+	}
+
+	/// Declarations of the uniforms of the Value and RGB nodes.
+	std::string UniformCode() const
+	{
+		std::string s;
+		for (const KX_CompositorUniform& u : m_uniforms) {
+			s += (u.values.size() == 1 ? "uniform float " : "uniform vec4 ") + u.name + ";\n";
+		}
+		return s + "\n";
+	}
+
+	/// Input a reroute or a muted node hands to \a out (the node's internal link), null if none.
+	static bNodeSocket *PassThrough(bNode *node, bNodeSocket *out)
+	{
+		if (node->type == NODE_REROUTE) {
+			return (bNodeSocket *)node->inputs.first;
+		}
+		for (bNodeLink *link = (bNodeLink *)node->internal_links.first; link; link = link->next) {
+			if (link->tosock == out) {
+				return link->fromsock;
+			}
+		}
+		return nullptr;
 	}
 
 private:
@@ -143,11 +173,11 @@ private:
 		}
 	}
 
-	/// Color -> value uses the luminance, like the compositor; value -> color is gray, opaque.
+	/// Color -> value is the RGB average, like the compositor; value -> color is gray, opaque.
 	static std::string Convert(const std::string& expr, int from, int to)
 	{
 		if (from == SOCK_RGBA && to == SOCK_FLOAT) {
-			return "vec4(comp_bw(" + expr + "))";
+			return "vec4(comp_avg(" + expr + "))";
 		}
 		if (from == SOCK_FLOAT && to == SOCK_RGBA) {
 			return "comp_gray(" + expr + ")";
@@ -226,12 +256,13 @@ private:
 			}
 			case CMP_NODE_VALUE: {
 				bNodeSocket *sock = (bNodeSocket *)node->outputs.first;
-				b << "\treturn vec4(" << F(((bNodeSocketValueFloat *)sock->default_value)->value) << ");\n";
+				const float v = ((bNodeSocketValueFloat *)sock->default_value)->value;
+				b << "\treturn vec4(" << AddUniform(node, &v, 1) << ");\n";
 				break;
 			}
 			case CMP_NODE_RGB: {
 				bNodeSocket *sock = (bNodeSocket *)node->outputs.first;
-				b << "\treturn " << V4(((bNodeSocketValueRGBA *)sock->default_value)->value) << ";\n";
+				b << "\treturn " << AddUniform(node, ((bNodeSocketValueRGBA *)sock->default_value)->value, 4) << ";\n";
 				break;
 			}
 			case CMP_NODE_MIX_RGB: {
@@ -250,9 +281,13 @@ private:
 			case CMP_NODE_ALPHAOVER: {
 				b << "\tfloat fac = " << in(0) << ".x;\n";
 				b << "\tvec4 c1 = " << in(1) << ";\n\tvec4 c2 = " << in(2) << ";\n";
-				// Key (straight) alpha over, the default of the node.
-				b << "\tfloat a = clamp(fac * c2.a, 0.0, 1.0);\n";
-				b << "\treturn vec4(mix(c1.rgb, c2.rgb, a), c1.a + a * (1.0 - c1.a));\n";
+				// AlphaOver{Premultiply,Key,Mixed}Operation: Key is Mixed with x = 1, Premultiply with x = 0.
+				NodeTwoFloats *ntf = (NodeTwoFloats *)node->storage;
+				const float x = (ntf && ntf->x != 0.0f) ? ntf->x : (node->custom1 ? 1.0f : 0.0f);
+				b << "\tif (c2.a " << (x == 0.0f ? "<" : "<=") << " 0.0) return c1;\n";
+				b << "\tfloat addfac = " << F(1.0f - x) << " + c2.a * " << F(x) << ";\n";
+				b << "\tfloat mul = 1.0 - fac * c2.a;\n";
+				b << "\treturn vec4(mul * c1.rgb + fac * addfac * c2.rgb, mul * c1.a + fac * c2.a);\n";
 				break;
 			}
 			case CMP_NODE_BRIGHTCONTRAST: {
@@ -332,18 +367,32 @@ private:
 					break;
 				}
 				curvemapping_initialize(cumap);
+				// ColorCurveOperation: channel curve, then the combined one (the premultiplied table).
+				// When the editor left the tables premultiplied, the channel table already holds both.
+				const bool premulled = (cumap->flag & CUMA_PREMULLED) != 0;
+				auto curve = [&](int ch, float x) {
+					const float v = curvemap_evaluateF(&cumap->cm[ch], x);
+					return premulled ? v : curvemap_evaluateF(&cumap->cm[3], v);
+				};
 				float lut[3][LUT_SIZE];
-				for (int i = 0; i < LUT_SIZE; ++i) {
-					const float x = (float)i / (LUT_SIZE - 1);
-					const float vin[3] = {x, x, x};
-					float vout[3];
-					curvemapping_evaluateRGBF(cumap, vout, vin);
-					for (int ch = 0; ch < 3; ++ch) {
-						lut[ch][i] = vout[ch];
+				float ext[3][2];
+				for (int ch = 0; ch < 3; ++ch) {
+					for (int i = 0; i < LUT_SIZE; ++i) {
+						lut[ch][i] = curve(ch, (float)i / (LUT_SIZE - 1));
 					}
+					// Slopes past 0 and 1, so values outside keep following the extended curve.
+					ext[ch][0] = lut[ch][0] - curve(ch, -1.0f);
+					ext[ch][1] = curve(ch, 2.0f) - lut[ch][LUT_SIZE - 1];
 				}
-				b << "\tvec3 r = vec3(comp_lut(" << Lut(lut[0]) << ", c.r), comp_lut(" << Lut(lut[1])
-				  << ", c.g), comp_lut(" << Lut(lut[2]) << ", c.b));\n";
+				b << "\tvec3 bl = " << in(2) << ".rgb;\n";
+				b << "\tvec3 x = (c.rgb - bl) / max(" << in(3) << ".rgb - bl, vec3(1e-5));\n";
+				b << "\tvec3 r;\n";
+				const char *chan = "rgb";
+				for (int ch = 0; ch < 3; ++ch) {
+					b << "\tr." << chan[ch] << " = comp_curve(" << Lut(lut[ch]) << ", x." << chan[ch] << ", "
+					  << F(ext[ch][0]) << ", " << F(ext[ch][1]) << ");\n";
+				}
+				b << "\tfac = clamp(fac, 0.0, 1.0);\n";
 				b << "\treturn vec4(mix(c.rgb, r, fac), c.a);\n";
 				break;
 			}
@@ -471,6 +520,29 @@ private:
 		return b.str();
 	}
 
+	/// Uniform "comp_" + node name (other characters become '_'); a clash gets the node id.
+	std::string AddUniform(bNode *node, const float *values, int count)
+	{
+		std::string name = "comp_";
+		for (const char *c = node->name; *c; ++c) {
+			const unsigned char ch = (unsigned char)*c;
+			name += (ch < 128 && isalnum(ch)) ? *c : '_';
+		}
+		for (const KX_CompositorUniform& u : m_uniforms) {
+			if (u.name == name) {
+				name += "_" + std::to_string(Id(node));
+				break;
+			}
+		}
+		KX_CompositorUniform u;
+		u.name = name;
+		for (int i = 0; i < count; ++i) {
+			u.values.push_back(std::isfinite(values[i]) ? values[i] : 0.0f);
+		}
+		m_uniforms.push_back(u);
+		return name;
+	}
+
 	void Skip(const std::string& name)
 	{
 		m_skipped.push_back(name);
@@ -478,6 +550,7 @@ private:
 
 	bNodeTree *m_tree;
 	std::vector<std::string>& m_skipped;
+	std::vector<KX_CompositorUniform>& m_uniforms;
 	std::map<bNode *, int> m_ids;
 	std::set<std::string> m_done;
 	std::ostringstream m_code;
@@ -505,12 +578,21 @@ vec4 comp_image(vec2 uv)
 float comp_depth(vec2 uv)
 {
 	float ndc = texture(bgl_DepthTexture, uv).r * 2.0 - 1.0;
+	if (bgl_ProjectionMatrix[3][3] == 1.0) {
+		/* Orthographic: ndc = P22 * z + P32. */
+		return (bgl_ProjectionMatrix[3][2] - ndc) / bgl_ProjectionMatrix[2][2];
+	}
 	return bgl_ProjectionMatrix[3][2] / (ndc + bgl_ProjectionMatrix[2][2]);
 }
 
 float comp_bw(vec4 c)
 {
 	return dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+}
+
+float comp_avg(vec4 c)
+{
+	return (c.r + c.g + c.b) / 3.0;
 }
 
 vec4 comp_gray(vec4 v)
@@ -551,6 +633,14 @@ float comp_lut(float lut[33], float x)
 	return mix(lut[i], lut[i + 1], f - float(i));
 }
 
+/* LUT over 0..1 with straight lines outside (slopes per unit below 0 and above 1). */
+float comp_curve(float lut[33], float x, float slopeLow, float slopeHigh)
+{
+	if (x < 0.0) return lut[0] + slopeLow * x;
+	if (x > 1.0) return lut[32] + slopeHigh * (x - 1.0);
+	return comp_lut(lut, x);
+}
+
 /* Blend modes of the Mix node (MA_RAMP_*), the same formulas as the shader nodes. */
 vec3 comp_mix(int type, float fac, vec3 c1, vec3 c2)
 {
@@ -560,8 +650,8 @@ vec3 comp_mix(int type, float fac, vec3 c1, vec3 c2)
 	if (type == 3) return c1 - fac * c2;                                    /* Subtract */
 	if (type == 4) return 1.0 - (facm + fac * (1.0 - c2)) * (1.0 - c1);    /* Screen */
 	if (type == 5) {                                                        /* Divide */
-		vec3 d = vec3(c2.r != 0.0 ? c1.r / c2.r : 0.0, c2.g != 0.0 ? c1.g / c2.g : 0.0, c2.b != 0.0 ? c1.b / c2.b : 0.0);
-		return facm * c1 + fac * d;
+		vec3 d = facm * c1 + fac * c1 / mix(c2, vec3(1.0), vec3(equal(c2, vec3(0.0))));
+		return mix(d, vec3(0.0), vec3(equal(c2, vec3(0.0))));
 	}
 	if (type == 6) return mix(c1, abs(c1 - c2), fac);                       /* Difference */
 	if (type == 7) return min(c1, c2 * fac + c1 * facm);                    /* Darken */
@@ -573,12 +663,13 @@ vec3 comp_mix(int type, float fac, vec3 c1, vec3 c2)
 	}
 	if (type == 10) {                                                       /* Dodge */
 		vec3 t = 1.0 - fac * c2;
-		return vec3(t.r > 0.0 ? c1.r / t.r : 1.0, t.g > 0.0 ? c1.g / t.g : 1.0, t.b > 0.0 ? c1.b / t.b : 1.0);
+		vec3 r = mix(vec3(1.0), min(c1 / max(t, vec3(1e-20)), vec3(1.0)), vec3(greaterThan(t, vec3(0.0))));
+		return mix(r, vec3(0.0), vec3(equal(c1, vec3(0.0))));
 	}
 	if (type == 11) {                                                       /* Burn */
 		vec3 t = facm + fac * c2;
-		return vec3(t.r > 0.0 ? 1.0 - (1.0 - c1.r) / t.r : 0.0, t.g > 0.0 ? 1.0 - (1.0 - c1.g) / t.g : 0.0,
-		            t.b > 0.0 ? 1.0 - (1.0 - c1.b) / t.b : 0.0);
+		vec3 r = clamp(1.0 - (1.0 - c1) / max(t, vec3(1e-20)), 0.0, 1.0);
+		return mix(vec3(0.0), r, vec3(greaterThan(t, vec3(0.0))));
 	}
 	if (type == 12 || type == 13 || type == 14 || type == 15) {             /* Hue, Saturation, Value, Color */
 		vec3 h1 = comp_rgb_to_hsv(c1);
@@ -617,7 +708,7 @@ float comp_math(int op, float a, float b)
 	if (op == 14) return floor(a + 0.5);
 	if (op == 15) return (a < b) ? 1.0 : 0.0;
 	if (op == 16) return (a > b) ? 1.0 : 0.0;
-	if (op == 17) return (b != 0.0) ? mod(a, b) : 0.0;
+	if (op == 17) return (b != 0.0) ? a - b * trunc(a / b) : 0.0;  /* fmod */
 	if (op == 18) return abs(a);
 	if (op == 19) return atan(a, b);
 	if (op == 20) return floor(a);
@@ -665,7 +756,8 @@ bNode *FindOutput(bNodeTree *ntree)
 
 } // namespace
 
-std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& skipped)
+std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& skipped,
+                                     std::vector<KX_CompositorUniform>& uniforms)
 {
 	if (!scene || !scene->use_nodes || !scene->nodetree) {
 		return "";
@@ -691,7 +783,10 @@ std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& ski
 		}
 		bNode *from = found->fromnode;
 		if (from->type == NODE_REROUTE || (from->flag & NODE_MUTED)) {
-			sock = (bNodeSocket *)from->inputs.first;
+			sock = Generator::PassThrough(from, found->fromsock);
+			if (!sock) {
+				break;
+			}
 			continue;
 		}
 		if (from->type == CMP_NODE_R_LAYERS && STREQ(found->fromsock->name, "Image")) {
@@ -700,10 +795,11 @@ std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& ski
 		break;
 	}
 
-	Generator gen(scene->nodetree, skipped);
+	Generator gen(scene->nodetree, skipped, uniforms);
 	const std::string out = gen.Output(output, 0);
 
 	std::string shader = compositorHeader;
+	shader += gen.UniformCode();
 	shader += gen.Code();
 	shader += "void main()\n{\n#ifdef USE_CORE_PROFILE\n\tvec2 uv = texCoordVarying;\n#else\n\tvec2 uv = gl_TexCoord[0].st;\n#endif\n";
 	shader += "\tvec4 c = " + out + "(uv);\n";

@@ -85,6 +85,9 @@ public:
 
 #endif
 
+	/// Same as setUniform() from C++: float values, kept after a recompile. False if the uniform is not active.
+	bool SetNamedUniform(const std::string& name, const std::vector<float>& values);
+
 private:
 	/// Values given to setUniform(), by name so they survive a recompile.
 	struct UniformValue {

@@ -588,7 +588,8 @@ void KX_2DFilterManager::EnsureCompositorFilter(Scene *scene)
 		return;
 	}
 	std::vector<std::string> skipped;
-	const std::string shader = KX_BuildCompositorShader(scene, skipped);
+	std::vector<KX_CompositorUniform> uniforms;
+	const std::string shader = KX_BuildCompositorShader(scene, skipped, uniforms);
 	if (shader.empty()) {
 		return;
 	}
@@ -612,7 +613,11 @@ void KX_2DFilterManager::EnsureCompositorFilter(Scene *scene)
 	data.buildInFilters = m_sceneFilters;
 	data.shaderText = shader;
 	data.sourceName = "Compositing";
-	AddFilter(data, true);
+	KX_2DFilter *filter = static_cast<KX_2DFilter *>(AddFilter(data, true));
+	// Values of the Value and RGB nodes; Python changes them with filterManager.compositor.setUniform().
+	for (const KX_CompositorUniform& u : uniforms) {
+		filter->SetNamedUniform(u.name, u.values);
+	}
 }
 
 void KX_2DFilterManager::EnsureCloudsFilters(BuildInFilters filters)
@@ -1116,8 +1121,20 @@ PyAttributeDef KX_2DFilterManager::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSearchSteps", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("grainEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("grainStrength", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RO_FUNCTION("compositor", KX_2DFilterManager, pyattr_get_compositor),
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
+
+/* The filter of the scene's compositor tree (Use Nodes), None without one. */
+PyObject *KX_2DFilterManager::pyattr_get_compositor(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_2DFilterManager *self = static_cast<KX_2DFilterManager *>(self_v);
+	KX_2DFilter *filter = static_cast<KX_2DFilter *>(self->GetFilterPass(FILTERPASS_COMPOSITOR, true));
+	if (!filter) {
+		Py_RETURN_NONE;
+	}
+	return filter->GetProxy();
+}
 
 /* Scene > Post-process: FXAA and Film Grain, same names and ranges as the panel (rna_scene.c). */
 PyObject *KX_2DFilterManager::pyattr_get_post(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

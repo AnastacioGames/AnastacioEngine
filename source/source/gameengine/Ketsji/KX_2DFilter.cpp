@@ -206,6 +206,21 @@ bool KX_2DFilter::ApplyNamedUniform(const std::string& name, const UniformValue&
 	return false;
 }
 
+bool KX_2DFilter::SetNamedUniform(const std::string& name, const std::vector<float>& values)
+{
+	UniformValue value;
+	value.isInt = false;
+	value.floats = values;
+	for (float f : values) {
+		value.ints.push_back((int)f);
+	}
+	if (!ApplyNamedUniform(name, value)) {
+		return false;
+	}
+	m_namedUniforms[name] = value;
+	return true;
+}
+
 bool KX_2DFilter::Recompile(const std::string& fragment)
 {
 	if (!RAS_2DFilter::Recompile(fragment)) {

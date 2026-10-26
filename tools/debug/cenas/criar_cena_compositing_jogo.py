@@ -4,7 +4,8 @@
 
 Gera PASTA/compositing.range: cubos coloridos, sol e uma árvore com Color Balance, Hue/Sat,
 vinheta (Ellipse Mask -> Blur -> Mix Multiply), Lens Distortion com dispersão, RGB Curves,
-Color Ramp misturado em Overlay, Brilho/Contraste, Gamma e um nó sem suporte (Glare, passa direto).
+Color Ramp misturado em Overlay, Brilho/Contraste, Gamma (pelo nó Value "Exposicao", uniform comp_Exposicao), um Mix mudo e um nó sem suporte
+(Glare, passa direto). O script muda comp_Exposicao ao vivo pelo filterManager.compositor.
 Com janela: a imagem deve sair mais quente, com cantos escuros e franja colorida nas bordas.
 """
 import bpy, sys, os
@@ -41,6 +42,9 @@ ov = N.new('CompositorNodeMixRGB'); ov.blend_type = 'OVERLAY'; ov.inputs[0].defa
 bc = N.new('CompositorNodeBrightContrast'); bc.inputs['Contrast'].default_value = 10
 gm = N.new('CompositorNodeGamma'); gm.inputs['Gamma'].default_value = 1.1
 gl = N.new('CompositorNodeGlare')
+# Fase 2: Value vira uniform (comp_Exposicao), mudado ao vivo pelo script abaixo.
+va = N.new('CompositorNodeValue'); va.name = "Exposicao"; va.outputs[0].default_value = 1.1
+mu = N.new('CompositorNodeMixRGB'); mu.mute = True  # mudo: passa a Image 1, nao o Fac
 L.new(rl.outputs['Image'], cb.inputs['Image'])
 L.new(cb.outputs['Image'], hs.inputs['Image'])
 L.new(hs.outputs['Image'], mix.inputs[1])
@@ -53,12 +57,22 @@ L.new(rl.outputs['Depth'], cr.inputs['Fac'])
 L.new(cr.outputs['Image'], ov.inputs[2])
 L.new(ov.outputs['Image'], bc.inputs['Image'])
 L.new(bc.outputs['Image'], gm.inputs['Image'])
-L.new(gm.outputs['Image'], gl.inputs['Image'])
+L.new(va.outputs[0], gm.inputs['Gamma'])
+L.new(gm.outputs['Image'], mu.inputs[1])
+L.new(mu.outputs['Image'], gl.inputs['Image'])
 L.new(gl.outputs['Image'], comp.inputs['Image'])
 
 T = '''import Range
 own = Range.logic.getCurrentController().owner
 own["f"] = own.get("f", 0) + 1
+comp = Range.logic.getCurrentScene().filterManager.compositor
+if own["f"] == 2:
+    print("COMPOSITOR", comp, comp.sourceName if comp else None)
+try:
+    comp.setUniform("comp_Exposicao", 1.0 + 0.2 * (own["f"] % 2))
+except KeyError as e:
+    if own["f"] == 2:
+        print("sem GL (--server):", e)
 if own["f"] == 5:
     print("COMPOSITING TESTE FIM")
     Range.logic.endGame()
