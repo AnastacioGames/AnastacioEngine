@@ -340,7 +340,10 @@ EXP_Value *EXP_Value::ConvertPythonToValue(PyObject *pyobj, const bool do_type_e
 		}
 	}
 	else if (PyLong_Check(pyobj)) {
-		vallie = new EXP_IntValue((cInt)PyLong_AsLongLong(pyobj));
+		const long long tval = PyLong_AsLongLong(pyobj);
+		// Too big for 64 bits: PyLong_AsLongLong already raised OverflowError, keep it instead of
+		// storing -1 with the exception still pending.
+		vallie = (tval == -1 && PyErr_Occurred()) ? nullptr : new EXP_IntValue((cInt)tval);
 	}
 	else if (PyUnicode_Check(pyobj)) {
 		vallie = new EXP_StringValue(_PyUnicode_AsString(pyobj), "");

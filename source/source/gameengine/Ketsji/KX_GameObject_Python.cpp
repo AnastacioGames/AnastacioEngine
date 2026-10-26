@@ -36,6 +36,9 @@
 #  pragma warning( disable:4786 )
 #endif
 
+#include "EXP_FloatValue.h"
+#include "EXP_IntValue.h"
+#include <cfloat>
 #include <cstring>
 #include <cmath>
 
@@ -1215,6 +1218,48 @@ static PyObject *Map_GetItem(PyObject *self_v, PyObject *item)
 }
 
 
+/* gameOb["prop"] = number on an existing Float/Int property: write the number in place instead of
+ * building a temporary EXP_Value to copy it from. Same results as the general path (float range check,
+ * the float property's zero snap in SetFloat, int -> double -> int); anything else returns false. */
+static bool KX_SetNumberPropertyInPlace(EXP_Value *prop, PyObject *val)
+{
+	const int type = prop->GetValueType();
+	if (type == VALUE_FLOAT_TYPE) {
+		double d;
+		if (PyFloat_CheckExact(val)) {
+			d = PyFloat_AS_DOUBLE(val);
+			if (d > (double)FLT_MAX || d < (double)-FLT_MAX) {
+				return false;
+			}
+		}
+		else if (PyLong_CheckExact(val)) {
+			int overflow = 0;
+			const long long ll = PyLong_AsLongLongAndOverflow(val, &overflow);
+			if (overflow || (ll == -1 && PyErr_Occurred())) {
+				PyErr_Clear();
+				return false;
+			}
+			d = (double)ll;
+		}
+		else {
+			return false;
+		}
+		static_cast<EXP_FloatValue *>(prop)->SetFloat((float)d);
+		return true;
+	}
+	if (type == VALUE_INT_TYPE && PyLong_CheckExact(val)) {
+		int overflow = 0;
+		const long long ll = PyLong_AsLongLongAndOverflow(val, &overflow);
+		if (overflow || (ll == -1 && PyErr_Occurred())) {
+			PyErr_Clear();
+			return false;
+		}
+		static_cast<EXP_IntValue *>(prop)->SetInt((cInt)(double)ll);
+		return true;
+	}
+	return false;
+}
+
 static int Map_SetItem(PyObject *self_v, PyObject *key, PyObject *val)
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>EXP_PROXY_REF(self_v);
@@ -1255,6 +1300,16 @@ static int Map_SetItem(PyObject *self_v, PyObject *key, PyObject *val)
 	}
 	else { /* ob["key"] = value */
 		bool set = false;
+
+		if (attr_str && (PyFloat_CheckExact(val) || PyLong_CheckExact(val))) {
+			EXP_Value *oldprop = self->FindProperty(attr_str);
+			if (oldprop && KX_SetNumberPropertyInPlace(oldprop, val)) {
+				if (self->m_attr_dict && PyDict_DelItem(self->m_attr_dict, key) != 0) {
+					PyErr_Clear();
+				}
+				return 0;
+			}
+		}
 
 		/* as EXP_Value */
 		if (attr_str && PyObject_TypeCheck(val, &EXP_PyObjectPlus::Type) == 0) { /* don't allow GameObjects for eg to be assigned to EXP_Value props */

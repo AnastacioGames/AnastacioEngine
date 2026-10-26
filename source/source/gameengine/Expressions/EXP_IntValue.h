@@ -37,6 +37,10 @@ public:
 	virtual int GetValueType();
 
 	cInt GetInt();
+	void SetInt(cInt i)
+	{
+		m_int = i;
+	}
 
 	virtual EXP_Value *Calc(VALUE_OPERATOR op, EXP_Value *val);
 	virtual EXP_Value *CalcFinal(VALUE_DATA_TYPE dtype, VALUE_OPERATOR op, EXP_Value *val);
