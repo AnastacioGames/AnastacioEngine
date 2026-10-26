@@ -1,4 +1,4 @@
-﻿# Changelog — AnastacioEngine
+# Changelog — AnastacioEngine
 
 Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas antigas preservam o contexto
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
