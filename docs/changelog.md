@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-25 - Sombras: PCSS (filtro PCF Penumbra) no clássico, Principled e CSM
+
+- O filtro **PCF Penumbra** não compilava (lia o mapa de sombra como `sampler2D`). Agora é PCSS: sombra dura no
+  contato e macia longe do objeto. Busca de bloqueadores só com comparações de profundidade (sem textura extra,
+  funciona no WebGL2); Soft define o tamanho da luz (Sun Soft 3 ≈ 3,4°; Soft 6 recomendado); Samples > 1.
+- Funciona em Spot e Sun (com e sem CSM) no material clássico e no Lamp Data; no Principled em Spot e Sun sem CSM
+  (o Principled não recebe sombra de CSM, limite anterior). No Principled os outros filtros PCF continuam com a
+  leitura simples, então cenas existentes não mudam.
+- Compilação: o PCSS do Principled só entra no shader (`#define SHADOW_PCSS`) quando alguma lâmpada usa o filtro;
+  sem isso a 1ª abertura na Web subia de 31 s para 51 s em toda cena com Principled.
+- Custo: 64 leituras de sombra por pixel por lâmpada (PCF 16, sombra dura 1). Commits a6913c0d, 9c1146a6,
+  11e2c055, f9026fb8. Cenas de teste: `tools/debug/cenas/criar_cena_pcss.py`, `criar_cena_pcss2.py`.
+
 ## 2026-10-25 - Diálogos sem código: nó Dialogue Box (UI Tree) e Setup Dialogue no objeto Text
 
 - **UI Tree > HUD > Dialogue Box**: caixa de diálogo 2D que quebra o texto na largura do nó, pagina pela
