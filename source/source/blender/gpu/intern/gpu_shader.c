@@ -731,6 +731,9 @@ static GPUShader *gpu_shader_create_ex_impl_raw(const char *vertexcode,
 	if (flags & GPU_SHADER_FLAGS_SHADOW_PCSS) {
 		strcat(standard_defines, "#define SHADOW_PCSS\n");
 	}
+	if (flags & GPU_SHADER_FLAGS_SHADOW_CSM) {
+		strcat(standard_defines, "#define SHADOW_CSM\n");
+	}
 	gpu_shader_standard_extensions(standard_extensions, geocode != NULL);
 	/* RANGE_SHADER_SALT=<text>: added as a comment to every shader, so the driver cache misses and a run measures
 	 * a first (cold) compile. */

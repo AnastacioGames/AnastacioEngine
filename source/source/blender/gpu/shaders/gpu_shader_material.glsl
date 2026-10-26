@@ -4842,11 +4842,40 @@ float scene_shadow_filtered(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 p
 	return test_shadow_simple(shadowmap, co, filt.x);
 }
 
+#ifdef SHADOW_CSM
+/* Cascaded sun of the light loop: only the first CSM sun among the slots (unfshadowenabled = 3).
+ * Its inner map stays in unfshadowmap[i]; the two outer cascades come here (GPU_material_bind_shadow_lamps). */
+uniform sampler2DShadow unfcsmmap0;
+uniform sampler2DShadow unfcsmmap1;
+uniform mat4 unfcsmpersmat[2];
+uniform vec4 unfcsmbias;   /* cascade 0 bias, slope; cascade 1 bias, slope */
+uniform mat4 unfcsmimat;   /* lamp dynimat */
+uniform vec4 unfcsmsplit;  /* reference, split 0, split 1, outer size */
+uniform vec4 unfcsmfilter; /* filter type as in shade_one_light (4 = PCSS), samples, soft */
+
+float scene_shadow_csm(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 persmat, vec2 bias, float inp)
+{
+	float result;
+	shadow_simple_csm(rco, vn, shadowmap, persmat, bias.x, bias.y,
+	                  unfcsmmap0, unfcsmpersmat[0], unfcsmbias.x, unfcsmbias.y,
+	                  unfcsmmap1, unfcsmpersmat[1], unfcsmbias.z, unfcsmbias.w,
+	                  unfcsmimat, unfcsmsplit.x, unfcsmsplit.y, unfcsmsplit.z, unfcsmsplit.w,
+	                  unfcsmfilter.x, unfcsmfilter.yz, 0.0, inp, result);
+	return result;
+}
+#endif
+
 /* Shadow factor of scene-light slot i. GLSL ES 3.00 only allows constant indices into sampler
  * arrays, so the loop index can't reach unfshadowmap[] directly. */
 float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 {
 	float shadowfac = 1.0;
+#ifdef SHADOW_CSM
+	if (i == 0 && unfshadowenabled[0] > 2.5) {
+		shadowfac = scene_shadow_csm(rco, vn, unfshadowmap[0], unfshadowpersmat[0], unfshadowbias[0], inp);
+	}
+	else
+#endif
 	if (i == 0 && unfshadowenabled[0] > 1.5) {
 		shadowfac = shadow_point(rco, vn, unfshadowmap[0], unfshadowpersmat[0], unfshadowbias[0],
 		                         unfshadowpoint[0], inp);
@@ -4855,6 +4884,11 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 		shadowfac = scene_shadow_filtered(rco, vn, unfshadowmap[0], unfshadowpersmat[0], unfshadowbias[0],
 		                                  unfshadowfilter[0], unfshadowpoint[0], inp);
 	}
+#ifdef SHADOW_CSM
+	else if (i == 1 && unfshadowenabled[1] > 2.5) {
+		shadowfac = scene_shadow_csm(rco, vn, unfshadowmap[1], unfshadowpersmat[1], unfshadowbias[1], inp);
+	}
+#endif
 	else if (i == 1 && unfshadowenabled[1] > 1.5) {
 		shadowfac = shadow_point(rco, vn, unfshadowmap[1], unfshadowpersmat[1], unfshadowbias[1],
 		                         unfshadowpoint[1], inp);
@@ -4863,6 +4897,11 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 		shadowfac = scene_shadow_filtered(rco, vn, unfshadowmap[1], unfshadowpersmat[1], unfshadowbias[1],
 		                                  unfshadowfilter[1], unfshadowpoint[1], inp);
 	}
+#ifdef SHADOW_CSM
+	else if (i == 2 && unfshadowenabled[2] > 2.5) {
+		shadowfac = scene_shadow_csm(rco, vn, unfshadowmap[2], unfshadowpersmat[2], unfshadowbias[2], inp);
+	}
+#endif
 	else if (i == 2 && unfshadowenabled[2] > 1.5) {
 		shadowfac = shadow_point(rco, vn, unfshadowmap[2], unfshadowpersmat[2], unfshadowbias[2],
 		                         unfshadowpoint[2], inp);
@@ -4871,6 +4910,11 @@ float scene_light_shadow(int i, vec3 rco, vec3 vn, float inp)
 		shadowfac = scene_shadow_filtered(rco, vn, unfshadowmap[2], unfshadowpersmat[2], unfshadowbias[2],
 		                                  unfshadowfilter[2], unfshadowpoint[2], inp);
 	}
+#ifdef SHADOW_CSM
+	else if (i == 3 && unfshadowenabled[3] > 2.5) {
+		shadowfac = scene_shadow_csm(rco, vn, unfshadowmap[3], unfshadowpersmat[3], unfshadowbias[3], inp);
+	}
+#endif
 	else if (i == 3 && unfshadowenabled[3] > 1.5) {
 		shadowfac = shadow_point(rco, vn, unfshadowmap[3], unfshadowpersmat[3], unfshadowbias[3],
 		                         unfshadowpoint[3], inp);

@@ -3620,6 +3620,9 @@ GPUPass *GPU_generate_pass(
 	if (stages && stages->shadow_pcss) {
 		flags |= GPU_SHADER_FLAGS_SHADOW_PCSS;
 	}
+	if (stages && stages->shadow_csm) {
+		flags |= GPU_SHADER_FLAGS_SHADOW_CSM;
+	}
 	const unsigned int hash = shader_cache_hash(vertexcode, fragmentcode, geometrycode, flags);
 	const bool use_cache = shader_cache_enabled();
 	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :

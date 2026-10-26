@@ -53,6 +53,8 @@ enum {
 	GPU_SHADER_FLAGS_SKY_VERY_LOW		= (1 << 9),
 	/* Some lamp uses PCSS: the light loop of node_bsdf_principled() gets it (#define SHADOW_PCSS). */
 	GPU_SHADER_FLAGS_SHADOW_PCSS		= (1 << 10),
+	/* Some sun uses cascades: the light loop of node_bsdf_principled() samples them (#define SHADOW_CSM). */
+	GPU_SHADER_FLAGS_SHADOW_CSM			= (1 << 11),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.

@@ -141,6 +141,8 @@ struct GPUMaterial {
 	int shadowfilterloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowcolorloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
 	int shadowcoloredloc[GPU_MATERIAL_NUM_SHADOW_LAMPS];
+	/* Cascaded sun of the loop (SHADOW_CSM): outer maps 0/1, their matrices, bias, imat, splits, filter. */
+	int csmmaploc[2], csmpersmatloc, csmbiasloc, csmimatloc, csmsplitloc, csmfilterloc;
 
 	/* Local reflection probe (unfprobecube/unfprobeinfo), bound per object by GPU_material_bind_probe(). */
 	int probecubeloc, probeinfoloc, probeposloc;

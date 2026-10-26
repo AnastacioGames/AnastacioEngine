@@ -205,6 +205,7 @@ typedef struct GPUPassStages {
 	ListBase *scripts;                 /* GPUScriptCode */
 	int sky_low;                       /* World Sky Quality: 1 = Low (SKY_LOW), 2 = Very Low (+ SKY_VERY_LOW) */
 	bool shadow_pcss;                  /* Some lamp uses PCSS (SHADOW_PCSS) */
+	bool shadow_csm;                   /* Some sun uses cascades (SHADOW_CSM) */
 } GPUPassStages;
 
 GPUPass *GPU_generate_pass(ListBase *nodes, struct GPUNodeLink *outlinks[8],

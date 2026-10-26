@@ -329,7 +329,10 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	for (const Lamp *la = G.main ? G.main->lamp.first : NULL; la; la = la->id.next) {
 		if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
 			stages.shadow_pcss = true;
-			break;
+		}
+		/* Two more shadow samplers in the Principled loop: only when a sun has cascades (16 samplers on the Web). */
+		if (la->type == LA_SUN && la->shadow_cascade_count != 0) {
+			stages.shadow_csm = true;
 		}
 	}
 
@@ -482,6 +485,14 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			BLI_snprintf(name, sizeof(name), "unfshadowfilter[%d]", i);
 			material->shadowfilterloc[i] = GPU_shader_get_uniform(shader, name);
 		}
+
+		material->csmmaploc[0] = GPU_shader_get_uniform(shader, "unfcsmmap0");
+		material->csmmaploc[1] = GPU_shader_get_uniform(shader, "unfcsmmap1");
+		material->csmpersmatloc = GPU_shader_get_uniform(shader, "unfcsmpersmat");
+		material->csmbiasloc = GPU_shader_get_uniform(shader, "unfcsmbias");
+		material->csmimatloc = GPU_shader_get_uniform(shader, "unfcsmimat");
+		material->csmsplitloc = GPU_shader_get_uniform(shader, "unfcsmsplit");
+		material->csmfilterloc = GPU_shader_get_uniform(shader, "unfcsmfilter");
 
 		material->probecubeloc = GPU_shader_get_uniform(shader, "unfprobecube");
 		material->probeinfoloc = GPU_shader_get_uniform(shader, "unfprobeinfo");
@@ -5985,12 +5996,60 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 	}
 
 	int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS;
+	/* Outer cascades of the loop's CSM sun: the free unit between the probes and the colored shadows,
+	 * and the one below the colored shadows. */
+	const int csmunit[2] = {GPU_max_textures() - 2 * GPU_MATERIAL_NUM_SHADOW_LAMPS,
+	                        GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1};
+	bool csm_bound = false;
 
 	for (int i = 0; i < GPU_MATERIAL_NUM_SHADOW_LAMPS; i++) {
 		GPULamp *lamp = lamps[i];
+		/* Only one cascaded sun per draw (one set of csm uniforms), plain depth maps (no VSM). */
+		const bool csm = lamp && !csm_bound && material->csmmaploc[0] != -1 && GPU_lamp_has_shadow_buffer(lamp) &&
+		                 GPU_lamp_has_cascaded_shadow(lamp) && lamp->la->shadowmap_type != LA_SHADMAP_VARIANCE;
 		bool has_shadow = lamp && GPU_lamp_has_shadow_buffer(lamp) &&
-		                   !GPU_lamp_has_cascaded_shadow(lamp) &&
+		                   (!GPU_lamp_has_cascaded_shadow(lamp) || csm) &&
 		                   (GPU_lamp_has_point_shadow(lamp) || lamp->la->shadowmap_type != LA_SHADMAP_VARIANCE);
+		if (csm) {
+			csm_bound = true;
+			GPULamp *cascade[2] = {lamp->cascade[0], lamp->cascade[1]};
+			material->dynproperty |= DYN_LAMP_IMAT;
+			for (int c = 0; c < 2; c++) {
+				if (!BLI_findptr(&material->lamps, cascade[c], offsetof(LinkData, data))) {
+					add_user_list(&material->lamps, cascade[c]);
+				}
+				GPU_texture_bind(cascade[c]->depthtex, csmunit[c]);
+				LIGHT_GL_CALLS += 1 + GPU_shader_uniform_int_cached(shader, material->csmmaploc[c], csmunit[c]);
+			}
+			if (material->csmpersmatloc != -1) {
+				float persmat[2][16];
+				memcpy(persmat[0], cascade[0]->dynpersmat, sizeof(persmat[0]));
+				memcpy(persmat[1], cascade[1]->dynpersmat, sizeof(persmat[1]));
+				GPU_shader_uniform_vector(shader, material->csmpersmatloc, 16, 2, (float *)persmat);
+				LIGHT_GL_CALLS++;
+			}
+			if (material->csmbiasloc != -1) {
+				float bias[4] = {cascade[0]->bias, cascade[0]->slopebias, cascade[1]->bias, cascade[1]->slopebias};
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->csmbiasloc, 4, bias);
+			}
+			if (material->csmimatloc != -1) {
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->csmimatloc, 16, (float *)lamp->dynimat);
+			}
+			if (material->csmsplitloc != -1) {
+				float split[4] = {lamp->cascade_reference, lamp->cascade_split[0], lamp->cascade_split[1],
+				                  lamp->la->shadow_frustum_size};
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->csmsplitloc, 4, split);
+			}
+			if (material->csmfilterloc != -1) {
+				/* Same filter choice as the classic material (shade_one_light). */
+				const Lamp *la = lamp->la;
+				float filter[4] = {(float)la->shadow_filter, (float)la->samp, la->soft, 0.0f};
+				if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
+					filter[0] = (la->samp > 1 && la->soft >= 0.01f) ? 4.0f : 0.0f;
+				}
+				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->csmfilterloc, 4, filter);
+			}
+		}
 
 		if (has_shadow) {
 			/* Keep lamp->dynpersmat refreshed every frame via GPU_material_update_lamps(),
@@ -6021,7 +6080,8 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowbiasloc[i], 2, bias);
 			}
 			/* Colored shadows: below the units of the other lamp samplers (shadow maps, probes...). */
-			const bool colored = lamp->colortex && !GPU_lamp_has_point_shadow(lamp);
+			/* The CSM sun keeps colored shadows only in the classic material for now. */
+			const bool colored = lamp->colortex && !GPU_lamp_has_point_shadow(lamp) && !csm;
 			if (colored && material->shadowcolorloc[i] != -1) {
 				const int colorunit = GPU_max_textures() - 2 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1 - i;
 				GPU_texture_bind(lamp->colortex, colorunit);
@@ -6073,9 +6133,21 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 
 		if (material->shadowenabledloc[i] != -1) {
 			/* 2 = Point lamp: unfshadowpersmat is then view to light space (see shadow_point()). */
-			float enabled = has_shadow ? (GPU_lamp_has_point_shadow(lamp) ? 2.0f : 1.0f) : 0.0f;
+			/* 3 = cascaded sun (unfcsm* uniforms). */
+			float enabled = has_shadow ? (GPU_lamp_has_point_shadow(lamp) ? 2.0f : (csm ? 3.0f : 1.0f)) : 0.0f;
 			LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowenabledloc[i], 1, &enabled);
 		}
+	}
+
+	if (!csm_bound && material->csmmaploc[0] != -1) {
+		/* No cascaded sun in this draw: keep the shadow samplers off unit 0 (see the unused slots above). */
+		for (int c = 0; c < 2; c++) {
+			LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->csmmaploc[c], csmunit[c]);
+			glActiveTexture(GL_TEXTURE0 + csmunit[c]);
+			glBindTexture(GL_TEXTURE_2D, 0);
+		}
+		glActiveTexture(GL_TEXTURE0);
+		LIGHT_GL_CALLS += 5;
 	}
 }
 
