@@ -384,7 +384,12 @@ class INFO_PT_game_performance(Panel):
         box.label(text="Web / Android", icon='WORLD')
         world = context.scene.world
         if world and world.sky_type == 'ATMOSPHERIC':
-            box.prop(world, "sky_quality")
+            preset = context.scene.scenefx_settings.quality_preset
+            row = box.row()
+            row.enabled = preset == 'CUSTOM'
+            row.prop(world, "sky_quality")
+            if preset != 'CUSTOM':
+                box.label(text="Set by Quality Preset", icon='INFO')
             if world.sky_quality == 'HIGH':
                 box.label(text="High sky is ~4x slower on phones.", icon='ERROR')
         col = box.column(align=True)

@@ -343,7 +343,14 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
             col.label(text="")
             col.prop(world, "atmosphere_mie_density")
             col.prop(world, "atmosphere_mie_direction", slider=True)
-            box.prop(world, "sky_quality")
+            # O Quality Preset (Post Processing) escreve o sky_quality ao trocar e ao dar Play;
+            # só fica editável aqui com o preset em Custom.
+            preset = context.scene.scenefx_settings.quality_preset
+            row = box.row()
+            row.enabled = preset == 'CUSTOM'
+            row.prop(world, "sky_quality")
+            if preset != 'CUSTOM':
+                box.label(text="Set by Quality Preset (Post Processing)", icon='INFO')
 
 
 
