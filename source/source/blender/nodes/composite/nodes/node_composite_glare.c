@@ -51,6 +51,8 @@ static void node_composit_init_glare(bNodeTree *UNUSED(ntree), bNode *node)
 	ndg->strength = 1.0f;
 	ndg->saturation = 1.0f;
 	ndg->tint[0] = ndg->tint[1] = ndg->tint[2] = 1.0f;
+	ndg->sun_pos[0] = ndg->sun_pos[1] = 0.5f;
+	ndg->beams_len = 0.2f;
 	node->storage = ndg;
 }
 

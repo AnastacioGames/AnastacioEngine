@@ -697,6 +697,21 @@ private:
 					  << "\t\tglare += s / 16.0;\n"
 					  << "\t}\n\tglare *= " << F(3.0f / (float)maxLod) << ";\n";
 				}
+				else if (g->type == 5) {  // Sun Beams (Blender 5): bright part gathered along the way to the sun
+					float sx = g->sun_pos[0], sy = g->sun_pos[1], len = g->beams_len;
+					if (len == 0.0f && sx == 0.0f && sy == 0.0f) {  // made before the fields existed
+						sx = sy = 0.5f;
+						len = 0.2f;
+					}
+					b << "\tvec2 d = (vec2(" << F(sx) << ", " << F(sy) << ") - uv) * " << F(std::min(std::max(len, 0.0f), 1.0f)) << ";\n"
+					  << "\tfloat ws = 0.0;\n"
+					  << "\tfor (int i = 0; i < 32; ++i) {\n"
+					  << "\t\tfloat t = (float(i) + 0.5) / 32.0;\n"
+					  << "\t\tfloat w = 1.0 - t;\n"
+					  << "\t\tglare += w * " << fn << "(uv + d * t, 1.0);\n"
+					  << "\t\tws += w;\n"
+					  << "\t}\n\tglare /= ws;\n";
+				}
 				else if (g->type == 3) {  // Ghosts: blurred copies mirrored through the center, tinted
 					b << "\tconst float sc[6] = float[6](-1.0, -0.62, -0.35, 0.28, 0.55, 0.85);\n";
 					b << "\tconst vec3 tint[3] = vec3[3](vec3(1.0, 0.6, 0.4), vec3(0.6, 1.0, 0.5), vec3(0.5, 0.6, 1.0));\n";

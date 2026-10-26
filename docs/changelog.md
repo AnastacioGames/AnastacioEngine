@@ -42,6 +42,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   fórmulas da 2.79 (limiar por luminância, MixGlare); Quality/Iterations não são seguidos à risca. ≤ 1,3 ms.
 - Glare tipo Bloom (como no Blender 5, só no jogo; no render vira Fog Glow): soma de todos os níveis de mipmap
   da parte brilhante, cada um suavizado por 9 amostras. Brilho mais largo e macio que o Fog Glow, mesmo custo.
+- Glare tipo Sun Beams (só no jogo; no render vira Fog Glow): raios da parte brilhante no sentido
+  oposto à Sun Position, com Length, como no Blender 5. Campos novos `sun_pos`/`beams_len` no `NodeGlare`
+  (no lugar do `pad_f2`); nó antigo trocado para Sun Beams recebe sol 0.5, 0.5 e Length 0.2.
 - Glare "Blender 5 Style" (só no jogo, chave no nó em modo jogo): limiar pelo valor HSV com Max Brightness e
   mistura aditiva com Strength, Saturation e Tint, como o Glare do Blender 5. Campos novos no `NodeGlare`
   com a chave desligada por padrão: arquivos antigos e da Range original saem idênticos (diferença 0).

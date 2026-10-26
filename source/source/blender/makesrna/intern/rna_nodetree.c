@@ -1575,6 +1575,18 @@ static void rna_NodeGlare_game_b5_set(PointerRNA *ptr, bool value)
 	}
 }
 
+/* Sun Beams on a glare made before its fields existed: start from the Blender 5 defaults. */
+static void rna_NodeGlare_type_set(PointerRNA *ptr, int value)
+{
+	bNode *node = ptr->data;
+	NodeGlare *ndg = node->storage;
+	ndg->type = (char)value;
+	if (value == 5 && ndg->beams_len == 0.0f && ndg->sun_pos[0] == 0.0f && ndg->sun_pos[1] == 0.0f) {
+		ndg->sun_pos[0] = ndg->sun_pos[1] = 0.5f;
+		ndg->beams_len = 0.2f;
+	}
+}
+
 static void rna_Node_parent_set(PointerRNA *ptr, PointerRNA value)
 {
 	bNode *node = ptr->data;
@@ -5986,6 +5998,7 @@ static void def_cmp_glare(StructRNA *srna)
 		{1, "FOG_GLOW",    0, "Fog Glow",    ""},
 		{0, "SIMPLE_STAR", 0, "Simple Star", ""},
 		{4, "BLOOM",       0, "Bloom",       "Wide smooth glow like the Bloom of Blender 5 (game; the render uses Fog Glow)"},
+		{5, "SUN_BEAMS",   0, "Sun Beams",   "Rays from the bright parts toward the sun position, like Blender 5 (game; the render uses Fog Glow)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -6001,7 +6014,22 @@ static void def_cmp_glare(StructRNA *srna)
 	prop = RNA_def_property(srna, "glare_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "type");
 	RNA_def_property_enum_items(prop, type_items);
+	RNA_def_property_enum_funcs(prop, NULL, "rna_NodeGlare_type_set", NULL);
 	RNA_def_property_ui_text(prop, "Glare Type", "");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "sun_position", PROP_FLOAT, PROP_XYZ);
+	RNA_def_property_float_sdna(prop, NULL, "sun_pos");
+	RNA_def_property_array(prop, 2);
+	RNA_def_property_range(prop, -1.0f, 2.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 1.0f, 1, 3);
+	RNA_def_property_ui_text(prop, "Sun Position", "Game, Sun Beams: where the beams go, 0-1 of the image (0.5 = center)");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "sun_beams_length", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "beams_len");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Length", "Game, Sun Beams: length of the beams, fraction of the way to the sun");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	prop = RNA_def_property(srna, "quality", PROP_ENUM, PROP_NONE);

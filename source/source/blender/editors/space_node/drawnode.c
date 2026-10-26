@@ -1560,7 +1560,8 @@ static void node_composit_buts_glare(uiLayout *layout, bContext *C, PointerRNA *
 	uiItemR(layout, ptr, "glare_type", 0, "", ICON_NONE);
 	uiItemR(layout, ptr, "quality", 0, "", ICON_NONE);
 
-	if (RNA_enum_get(ptr, "glare_type") != 1) {
+	const int gtype = RNA_enum_get(ptr, "glare_type");
+	if (gtype != 1 && gtype != 4 && gtype != 5) {
 		uiItemR(layout, ptr, "iterations", 0, NULL, ICON_NONE);
 
 		if (RNA_enum_get(ptr, "glare_type") != 0)
@@ -1582,6 +1583,10 @@ static void node_composit_buts_glare(uiLayout *layout, bContext *C, PointerRNA *
 	}
 	if (RNA_enum_get(ptr, "glare_type") == 1 || RNA_enum_get(ptr, "glare_type") == 4) {
 		uiItemR(layout, ptr, "size", 0, NULL, ICON_NONE);
+	}
+	if (gtype == 5) {
+		uiItemR(layout, ptr, "sun_position", 0, NULL, ICON_NONE);
+		uiItemR(layout, ptr, "sun_beams_length", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 	}
 
 	/* Game: Blender 5 style mix (only the game reads it, see KX_CompositorFilter) */
