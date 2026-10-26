@@ -14,6 +14,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   servidor em vez de ficarem com dono inexistente (e serem herdados por quem pegasse o mesmo id).
 - Kick entrega `ClientLeft`/`ClientExpired` no próximo `update()` da sessão.
 - Manager devolve ao servidor o dono dos objetos de cena quando o jogador expira.
+- ENet limita pacote a 64 KiB e dados em espera a 4 MiB por peer (antes 32 MiB cada).
+- Frente 7 lida inteira: BitStream, mensagens, snapshot, sessão, replicação, RPC, predição, lag
+  compensation, WebSocket, LAN e transportes.
 - [Revisão](revisao-multiplayer.md); `net_tests` 121/121.
 
 ## 2026-10-26 - Frente 2: revisão de SceneGraph e sequência da simulação

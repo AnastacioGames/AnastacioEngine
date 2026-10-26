@@ -80,6 +80,7 @@ public:
 		address.host = ENET_HOST_ANY;
 		address.port = port;
 		m_host = enet_host_create(&address, size_t(maxPeers), kChannelCount, 0, 0);
+		limitHost();
 		return m_host != nullptr;
 	}
 
@@ -93,6 +94,7 @@ public:
 			if (!m_host) {
 				return false;
 			}
+			limitHost();
 		}
 #ifdef ENET_IPV4_ONLY
 		// This build compiles the ENet fork in ENET_IPV4_ONLY mode: ENetAddress keeps the old
@@ -240,6 +242,16 @@ public:
 	}
 
 private:
+	/// ENet accepts 32 MiB packets and 32 MiB of queued data per peer by default; the session drops
+	/// anything above kMaxReliableMessage anyway, so a peer cannot make the host assemble more.
+	void limitHost()
+	{
+		if (m_host) {
+			m_host->maximumPacketSize = kMaxReliableMessage;
+			m_host->maximumWaitingData = 4 * 1024 * 1024;
+		}
+	}
+
 	static PeerId peerId(ENetPeer *peer)
 	{
 		return PeerId(reinterpret_cast<uintptr_t>(peer->data));
