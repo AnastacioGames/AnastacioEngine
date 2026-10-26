@@ -8072,6 +8072,7 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "player_anim_blend", PROP_FLOAT, PROP_TIME);
 	RNA_def_property_float_sdna(prop, NULL, "param_float");
+	RNA_def_property_range(prop, 0.0f, FLT_MAX);
 	RNA_def_property_ui_text(prop, "Blend", "Blend time in seconds for the player animation");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 

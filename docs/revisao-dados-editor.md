@@ -88,3 +88,20 @@ Leitura integral de `addons/game_engine_save_as_runtime.py` (392), `bl_operators
 | EXP-04 | Com assets preparados (DDS/áudio), o `.cooked` não vai para o jogo exportado; a primeira carga fica mais lenta. Pode ser intencional, já que os dados mudam |
 | EXP-05 | Com assets preparados, `anastacio-export-report.json` vai para a pasta do jogo publicado |
 | EXP-06 | O player inteiro é lido para a memória antes de gravar; dezenas de MB, sem impacto prático |
+
+## RNA (3ª rodada)
+
+Varredura de `rna_world.c` e da parte da engine em `rna_scene.c` (rede, cutscene): faixas invertidas,
+faixa de UI fora do limite, atualização ausente ou duplicada; leitura das structs de rede e cutscene.
+
+| ID | Onde | Resultado |
+|---|---|---|
+| RNA-01 | `CutsceneEvent.player_anim_blend` | Aceitava tempo negativo, repassado ao `Action` do script do jogador. Agora mínimo 0, como os outros tempos da cutscene |
+
+Conferido e correto: nenhuma faixa invertida ou fora do limite; no World, só sons e ponteiros ficam
+sem atualização (não mudam a imagem); campos da cutscene que dividem o mesmo membro (`template_object`,
+`param_int`, `param_float`) pertencem a tipos de evento diferentes; índices ativos fora da lista são
+ignorados pelos operadores (`BLI_findlink` devolve nulo).
+
+Observado: o evento Player Anim chama o script com `PyErr_Clear()`, então um erro no `Action` some
+sem aviso no console.
