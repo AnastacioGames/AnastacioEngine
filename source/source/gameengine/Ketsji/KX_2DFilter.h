@@ -88,6 +88,9 @@ public:
 	/// Same as setUniform() from C++: float values, kept after a recompile. False if the uniform is not active.
 	bool SetNamedUniform(const std::string& name, const std::vector<float>& values);
 
+	/// Filters that get the same setUniform() values (the texture passes of the compositor tree).
+	void AddUniformShare(KX_2DFilter *filter);
+
 private:
 	/// Values given to setUniform(), by name so they survive a recompile.
 	struct UniformValue {
@@ -96,6 +99,9 @@ private:
 		std::vector<int> ints;
 	};
 	std::map<std::string, UniformValue> m_namedUniforms;
+	std::vector<KX_2DFilter *> m_uniformShares;
+	/// Gives the value to the shared filters that have the uniform; true if any had it.
+	bool ShareNamedUniform(const std::string& name, const UniformValue& value);
 	virtual void SetObjectUniform(const std::string& uniform, unsigned int loc, const std::string& objectName);
 	bool ApplyNamedUniform(const std::string& name, const UniformValue& value);
 };

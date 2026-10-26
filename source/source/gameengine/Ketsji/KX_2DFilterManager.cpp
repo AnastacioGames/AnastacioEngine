@@ -94,16 +94,20 @@ static void kx_profile_filter_pass(int pass)
 	if (!KX_EngineProfiler::Enabled()) {
 		return;
 	}
-	static int ids[258] = {0};
-	const int slot = (pass == -2) ? 257 : (pass < 0) ? 256 : std::min(pass, 255);
+	static int ids[259] = {0};
+	const bool cache = (unsigned int)pass >= RAS_2DFilterManager::FILTERPASS_COMPOSITOR_CACHE && pass >= 0;
+	const int slot = cache ? 258 : (pass == -2) ? 257 : (pass < 0) ? 256 : std::min(pass, 255);
 	if (!ids[slot]) {
 		static const char *const names[] = {
 			/* 5 is the SSAO composite and 12 the half resolution DOF (see the slot constants below). */
 			"ssgi", "ssgi_image", "ssr", "ssr_blur", "ssao", "ssao_image", "bloom_down0", "bloom_down1",
 			"bloom_down2", "bloom_down3", "bloom_up", "bloom_image", "camera_dof_half", "lightscatter", "lightscatter_image", "fxaa", "tonemap", "rain", "clouds",
 			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens", "camera_dof_reduce", "compositor"};
-		static std::string storage[258];
-		if (pass == -2) {
+		static std::string storage[259];
+		if (cache) {
+			storage[slot] = "filter.compositor_cache";
+		}
+		else if (pass == -2) {
 			storage[slot] = "filter.resolve";
 		}
 		else if (pass < 0) {
@@ -588,35 +592,97 @@ void KX_2DFilterManager::EnsureCompositorFilter(Scene *scene)
 		return;
 	}
 	std::vector<std::string> skipped;
-	std::vector<KX_CompositorUniform> uniforms;
-	const std::string shader = KX_BuildCompositorShader(scene, skipped, uniforms);
-	if (shader.empty()) {
+	const std::vector<KX_CompositorStage> stages = KX_BuildCompositorShaders(scene, skipped);
+	if (stages.empty()) {
 		return;
 	}
 	for (const std::string& name : skipped) {
 		CM_Warning("Compositing in the game: node \"" << name << "\" is not supported, its input passes through");
 	}
-	// Debug: RANGE_COMPOSITOR_DUMP=file writes the generated shader (checked without a window).
+	// Debug: RANGE_COMPOSITOR_DUMP=file writes the generated shaders (checked without a window).
 	if (const char *dump = getenv("RANGE_COMPOSITOR_DUMP")) {
 		if (FILE *f = BLI_fopen(dump, "wb")) {
-			fwrite(shader.data(), 1, shader.size(), f);
+			for (size_t i = 0; i < stages.size(); ++i) {
+				const std::string title = "// ---- stage " + std::to_string(i) +
+				                          ((i + 1 == stages.size()) ? " (frame)" : " (comp_cache)") + "\n";
+				fwrite(title.data(), 1, title.size(), f);
+				fwrite(stages[i].shader.data(), 1, stages[i].shader.size(), f);
+			}
 			fclose(f);
 		}
 	}
 
-	RAS_2DFilterData data;
-	data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
-	data.filterPassIndex = FILTERPASS_COMPOSITOR;
-	data.gameObject = nullptr;
-	data.mipmap = false;
-	data.propertyNames = {};
-	data.buildInFilters = m_sceneFilters;
-	data.shaderText = shader;
-	data.sourceName = "Compositing";
-	KX_2DFilter *filter = static_cast<KX_2DFilter *>(AddFilter(data, true));
-	// Values of the Value and RGB nodes; Python changes them with filterManager.compositor.setUniform().
-	for (const KX_CompositorUniform& u : uniforms) {
-		filter->SetNamedUniform(u.name, u.values);
+	// Texture passes: each draws a Blur / Lens Distortion input once, at full size, so those
+	// nodes read a texture instead of running the chain before them for every tap.
+	const RAS_Rasterizer::HdrType hdr = RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT
+	                                                                     : RAS_Rasterizer::RAS_HDR_NONE;
+	std::vector<KX_2DFilter *> filters;
+	for (size_t i = 0; i < stages.size(); ++i) {
+		const bool last = (i + 1 == stages.size());
+		RAS_2DFilterData data;
+		data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+		data.filterPassIndex = last ? (int)FILTERPASS_COMPOSITOR : (int)(FILTERPASS_COMPOSITOR_CACHE + i);
+		data.gameObject = nullptr;
+		data.mipmap = false;
+		data.propertyNames = {};
+		data.buildInFilters = m_sceneFilters;
+		data.shaderText = stages[i].shader;
+		data.sourceName = last ? "Compositing" : "Compositing cache " + std::to_string(i);
+		KX_2DFilter *filter = static_cast<KX_2DFilter *>(AddFilter(data, true));
+		if (!last) {
+			filter->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
+			        std::max(1, (int)m_canvas->GetRenderWidth()), std::max(1, (int)m_canvas->GetRenderHeight()), hdr, 1.0f));
+		}
+		// Values of the Value and RGB nodes; Python changes them with filterManager.compositor.setUniform().
+		for (const KX_CompositorUniform& u : stages[i].uniforms) {
+			filter->SetNamedUniform(u.name, u.values);
+		}
+		filters.push_back(filter);
+	}
+
+	// Each pass samples the textures of the earlier passes it reads (unit = position in its list).
+	auto passOf = [&](size_t i) {
+		return (i + 1 == stages.size()) ? (unsigned int)FILTERPASS_COMPOSITOR : FILTERPASS_COMPOSITOR_CACHE + (unsigned int)i;
+	};
+	// readers[k]: (pass index, unit) of every pass that samples texture k
+	std::vector<std::vector<std::pair<unsigned int, int>>> readers(stages.size());
+	for (size_t i = 0; i < stages.size(); ++i) {
+		for (size_t unit = 0; unit < stages[i].caches.size(); ++unit) {
+			const int k = stages[i].caches[unit];
+			const std::string sampler = "comp_cache" + std::to_string(k);
+			filters[i]->SetTexture((int)unit, filters[k]->GetOffScreen()->GetColorBindCode(0), (char *)sampler.c_str());
+			readers[k].emplace_back(passOf(i), (int)unit);
+		}
+	}
+	// A resize rebuilds a texture: hand the new one to the passes reading it.
+	for (size_t k = 0; k + 1 < stages.size(); ++k) {
+		const unsigned int sourcePass = passOf(k);
+		const std::vector<std::pair<unsigned int, int>> list = readers[k];
+		filters[k]->GetOffScreen()->SetRebuildCallback([this, sourcePass, list]() {
+			RAS_2DFilter *src = GetFilterPass(sourcePass, true);
+			if (!src || !src->GetOffScreen()) {
+				return;
+			}
+			for (const std::pair<unsigned int, int>& r : list) {
+				KX_2DFilter *reader = static_cast<KX_2DFilter *>(GetFilterPass(r.first, true));
+				if (reader) {
+					reader->UpdateTextureBindCode(r.second, src->GetOffScreen()->GetColorBindCode(0));
+				}
+			}
+		});
+	}
+	// setUniform() on the compositor also reaches the texture passes.
+	for (size_t i = 0; i + 1 < filters.size(); ++i) {
+		filters.back()->AddUniformShare(filters[i]);
+	}
+	for (KX_2DFilter *filter : filters) {
+		if (!filter->Ok() || (filter->GetOffScreen() && !filter->GetOffScreen()->GetValid())) {
+			for (KX_2DFilter *f : filters) {
+				f->SetEnabled(false);
+			}
+			CM_Error("Compositing in the game disabled: shader or framebuffer creation failed");
+			break;
+		}
 	}
 }
 

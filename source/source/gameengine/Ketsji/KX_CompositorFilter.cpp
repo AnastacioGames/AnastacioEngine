@@ -38,6 +38,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cctype>
+#include <cstdlib>
 
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
@@ -76,9 +77,69 @@ std::string V4(const float v[4])
 class Generator
 {
 public:
-	Generator(bNodeTree *ntree, std::vector<std::string>& skipped, std::vector<KX_CompositorUniform>& uniforms)
-		:m_tree(ntree), m_skipped(skipped), m_uniforms(uniforms)
+	/// Node outputs already drawn into a texture by an earlier stage: (node, output) -> cache index.
+	typedef std::map<std::pair<bNode *, int>, int> CacheMap;
+
+	Generator(bNodeTree *ntree, std::vector<std::string>& skipped, std::vector<KX_CompositorUniform>& uniforms,
+	          const CacheMap *caches = nullptr)
+		:m_tree(ntree), m_skipped(skipped), m_uniforms(uniforms), m_caches(caches)
 	{
+	}
+
+	/// Node and output that feed \a sock, past reroutes and muted nodes; false when nothing does.
+	bool Source(bNodeSocket *sock, bNode *& from, bNodeSocket *& fromsock)
+	{
+		bNodeLink *link = sock ? FindLink(sock) : nullptr;
+		if (!link || !link->fromnode || !link->fromsock) {
+			return false;
+		}
+		from = link->fromnode;
+		fromsock = link->fromsock;
+		for (int depth = 0; from && (from->type == NODE_REROUTE || (from->flag & NODE_MUTED)); ++depth) {
+			bNodeSocket *in = (depth < 256) ? PassThrough(from, fromsock) : nullptr;
+			bNodeLink *l = in ? FindLink(in) : nullptr;
+			if (!l || !l->fromnode || !l->fromsock) {
+				return false;
+			}
+			from = l->fromnode;
+			fromsock = l->fromsock;
+		}
+		return from != nullptr;
+	}
+
+	/** Blur and Lens Distortion read their input at many places, and each read runs the whole chain
+	 * before them again (a 7x7 blur after 8 color nodes cost 10 ms at 720p). An input that reads the
+	 * render or another sampling node is drawn once into a texture by an earlier stage instead; a
+	 * plain Render Layers input or a mask made only of math stays inline (cheaper than a pass). */
+	void FindCaches(bNode *node, std::vector<std::pair<bNode *, int>>& order, std::set<bNode *>& seen)
+	{
+		if (!node || seen.count(node)) {
+			return;
+		}
+		seen.insert(node);
+		for (bNodeSocket *sock = (bNodeSocket *)node->inputs.first; sock; sock = sock->next) {
+			bNode *from;
+			bNodeSocket *fromsock;
+			if (Source(sock, from, fromsock)) {
+				FindCaches(from, order, seen);
+			}
+		}
+		if (node->type != CMP_NODE_BLUR && node->type != CMP_NODE_LENSDIST) {
+			return;
+		}
+		bNode *from;
+		bNodeSocket *fromsock;
+		if (!Source((bNodeSocket *)node->inputs.first, from, fromsock) || from->type == CMP_NODE_R_LAYERS) {
+			return;
+		}
+		std::set<bNode *> visited;
+		if (!ReadsTextures(from, visited)) {
+			return;
+		}
+		const std::pair<bNode *, int> key(from, BLI_findindex(&from->outputs, fromsock));
+		if (std::find(order.begin(), order.end(), key) == order.end()) {
+			order.push_back(key);  // post order: a cache comes after the caches it reads
+		}
 	}
 
 	/// Expression (vec4) of the given input socket, at coordinate expression \a uv.
@@ -108,6 +169,14 @@ public:
 			fromsock = l->fromsock;
 		}
 		const int outIndex = BLI_findindex(&from->outputs, fromsock);
+		if (m_caches) {
+			auto it = m_caches->find(std::make_pair(from, outIndex));
+			if (it != m_caches->end()) {
+				m_usedCaches.insert(it->second);
+				return Convert("texture(comp_cache" + std::to_string(it->second) + ", " + uv + ")",
+				               fromsock->type, sock->type);
+			}
+		}
 		const std::string name = Emit(from, outIndex);
 		return Convert(name + "(" + uv + ")", fromsock->type, sock->type);
 	}
@@ -122,10 +191,13 @@ public:
 		return m_code.str();
 	}
 
-	/// Declarations of the uniforms of the Value and RGB nodes.
+	/// Declarations of the uniforms of the Value and RGB nodes and of the cache textures read.
 	std::string UniformCode() const
 	{
 		std::string s;
+		for (int k : m_usedCaches) {
+			s += "uniform sampler2D comp_cache" + std::to_string(k) + ";\n";
+		}
 		for (const KX_CompositorUniform& u : m_uniforms) {
 			s += (u.values.size() == 1 ? "uniform float " : "uniform vec4 ") + u.name + ";\n";
 		}
@@ -146,7 +218,32 @@ public:
 		return nullptr;
 	}
 
+	const std::set<int>& UsedCaches() const
+	{
+		return m_usedCaches;
+	}
+
 private:
+	/// True when the node (or anything before it) reads the render or samples its input elsewhere.
+	bool ReadsTextures(bNode *node, std::set<bNode *>& visited)
+	{
+		if (!node || visited.count(node)) {
+			return false;
+		}
+		visited.insert(node);
+		if (node->type == CMP_NODE_R_LAYERS || node->type == CMP_NODE_BLUR || node->type == CMP_NODE_LENSDIST) {
+			return true;
+		}
+		for (bNodeSocket *sock = (bNodeSocket *)node->inputs.first; sock; sock = sock->next) {
+			bNode *from;
+			bNodeSocket *fromsock;
+			if (Source(sock, from, fromsock) && ReadsTextures(from, visited)) {
+				return true;
+			}
+		}
+		return false;
+	}
+
 	bNodeLink *FindLink(bNodeSocket *sock)
 	{
 		for (bNodeLink *link = (bNodeLink *)m_tree->links.first; link; link = link->next) {
@@ -569,6 +666,8 @@ private:
 	bNodeTree *m_tree;
 	std::vector<std::string>& m_skipped;
 	std::vector<KX_CompositorUniform>& m_uniforms;
+	const CacheMap *m_caches;
+	std::set<int> m_usedCaches;
 	std::map<bNode *, int> m_ids;
 	std::set<std::string> m_done;
 	std::ostringstream m_code;
@@ -774,15 +873,14 @@ bNode *FindOutput(bNodeTree *ntree)
 
 } // namespace
 
-std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& skipped,
-                                     std::vector<KX_CompositorUniform>& uniforms)
+std::vector<KX_CompositorStage> KX_BuildCompositorShaders(Scene *scene, std::vector<std::string>& skipped)
 {
 	if (!scene || !scene->use_nodes || !scene->nodetree) {
-		return "";
+		return {};
 	}
 	bNode *output = FindOutput(scene->nodetree);
 	if (!output) {
-		return "";
+		return {};
 	}
 	bNodeSocket *image = (bNodeSocket *)output->inputs.first;
 	// Nothing linked, or the default tree (Render Layers > Image straight into the output, maybe
@@ -797,7 +895,7 @@ std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& ski
 			}
 		}
 		if (!found || !found->fromnode || !found->fromsock) {
-			return "";
+			return {};
 		}
 		bNode *from = found->fromnode;
 		if (from->type == NODE_REROUTE || (from->flag & NODE_MUTED)) {
@@ -808,20 +906,59 @@ std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& ski
 			continue;
 		}
 		if (from->type == CMP_NODE_R_LAYERS && STREQ(found->fromsock->name, "Image")) {
-			return "";
+			return {};
 		}
 		break;
 	}
 
-	Generator gen(scene->nodetree, skipped, uniforms);
-	const std::string out = gen.Output(output, 0);
+	const char *mainStart =
+	    "void main()\n{\n#ifdef USE_CORE_PROFILE\n\tvec2 uv = texCoordVarying;\n#else\n\tvec2 uv = gl_TexCoord[0].st;\n#endif\n";
 
-	std::string shader = compositorHeader;
-	shader += gen.UniformCode();
-	shader += gen.Code();
-	shader += "void main()\n{\n#ifdef USE_CORE_PROFILE\n\tvec2 uv = texCoordVarying;\n#else\n\tvec2 uv = gl_TexCoord[0].st;\n#endif\n";
-	shader += "\tvec4 c = " + out + "(uv);\n";
-	// The compositor's alpha does not belong on the screen: keep the frame opaque like the render.
-	shader += "\tgl_FragColor = vec4(c.rgb, 1.0);\n}\n";
-	return shader;
+	// Caches first (deeper ones before the ones that read them), then the tree itself.
+	std::vector<std::pair<bNode *, int>> order;
+	{
+		std::vector<KX_CompositorUniform> unusedUniforms;
+		std::vector<std::string> unusedSkipped;
+		Generator scan(scene->nodetree, unusedSkipped, unusedUniforms);
+		std::set<bNode *> seen;
+		scan.FindCaches(output, order, seen);
+	}
+	// Debug: RANGE_COMPOSITOR_NO_CACHE=1 keeps every chain inline (to compare images and timings).
+	if (const char *off = getenv("RANGE_COMPOSITOR_NO_CACHE")) {
+		if (off[0] && off[0] != '0') {
+			order.clear();
+		}
+	}
+	if (order.size() > (size_t)KX_COMPOSITOR_MAX_CACHES) {
+		order.resize(KX_COMPOSITOR_MAX_CACHES);  // past that the rest stays inline (slower, same image)
+	}
+
+	std::vector<KX_CompositorStage> stages;
+	Generator::CacheMap caches;
+	std::set<std::string> skippedSet;
+	for (size_t i = 0; i <= order.size(); ++i) {
+		const bool last = (i == order.size());
+		KX_CompositorStage stage;
+		std::vector<std::string> stageSkipped;
+		Generator gen(scene->nodetree, stageSkipped, stage.uniforms, &caches);
+		const std::string out = last ? gen.Output(output, 0) : gen.Output(order[i].first, order[i].second);
+		stage.shader = compositorHeader;
+		stage.shader += gen.UniformCode();
+		stage.shader += gen.Code();
+		stage.shader += mainStart;
+		stage.shader += "\tvec4 c = " + out + "(uv);\n";
+		// The compositor's alpha does not belong on the screen: keep the frame opaque like the render.
+		stage.shader += last ? "\tgl_FragColor = vec4(c.rgb, 1.0);\n}\n" : "\tgl_FragColor = c;\n}\n";
+		stage.caches.assign(gen.UsedCaches().begin(), gen.UsedCaches().end());
+		for (const std::string& name : stageSkipped) {
+			if (skippedSet.insert(name).second) {
+				skipped.push_back(name);
+			}
+		}
+		stages.push_back(stage);
+		if (!last) {
+			caches[order[i]] = (int)i;
+		}
+	}
+	return stages;
 }

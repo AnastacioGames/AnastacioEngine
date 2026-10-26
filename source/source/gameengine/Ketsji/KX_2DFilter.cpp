@@ -206,6 +206,25 @@ bool KX_2DFilter::ApplyNamedUniform(const std::string& name, const UniformValue&
 	return false;
 }
 
+void KX_2DFilter::AddUniformShare(KX_2DFilter *filter)
+{
+	if (filter && filter != this) {
+		m_uniformShares.push_back(filter);
+	}
+}
+
+bool KX_2DFilter::ShareNamedUniform(const std::string& name, const UniformValue& value)
+{
+	bool any = false;
+	for (KX_2DFilter *filter : m_uniformShares) {
+		if (filter->ApplyNamedUniform(name, value)) {
+			filter->m_namedUniforms[name] = value;
+			any = true;
+		}
+	}
+	return any;
+}
+
 bool KX_2DFilter::SetNamedUniform(const std::string& name, const std::vector<float>& values)
 {
 	UniformValue value;
@@ -476,7 +495,21 @@ EXP_PYMETHODDEF_DOC(KX_2DFilter, setUniform, "setUniform(name, value): set a uni
 		}
 		ApplyNamedUniform(name, value);
 		m_namedUniforms[name] = value;
+		ShareNamedUniform(name, value);
 		Py_RETURN_NONE;
+	}
+
+	// A Value / RGB node read only before a Blur lives in a texture pass of the compositor.
+	if (!m_uniformShares.empty() && !numbers.empty()) {
+		UniformValue value;
+		value.isInt = false;
+		for (double number : numbers) {
+			value.floats.push_back((float)number);
+			value.ints.push_back((int)number);
+		}
+		if (ShareNamedUniform(name, value)) {
+			Py_RETURN_NONE;
+		}
 	}
 
 	PyErr_Format(PyExc_KeyError, "filter.setUniform(name, value): KX_2DFilter, no active uniform \"%s\" (the driver removes unused uniforms, see activeUniforms)", name);

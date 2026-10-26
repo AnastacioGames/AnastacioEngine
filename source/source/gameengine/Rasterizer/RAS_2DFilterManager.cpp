@@ -163,7 +163,10 @@ unsigned int RAS_2DFilterManager::RenderOrderKey(unsigned int passIndex)
 		case FILTERPASS_CAMERA_LENS:  return 25;
 		/* The compositor tree is the last step of the frame, after the custom filters too. */
 		case FILTERPASS_COMPOSITOR:   return UINT_MAX;
-		default: // 0..14 unchanged, custom filters (>= 25) after the lens pass
+		default:
+			if (passIndex >= FILTERPASS_COMPOSITOR_CACHE && passIndex < FILTERPASS_COMPOSITOR_CACHE + 64) {
+				return UINT_MAX - 64 + (passIndex - FILTERPASS_COMPOSITOR_CACHE);
+			} // 0..14 unchanged, custom filters (>= 25) after the lens pass
 			return (passIndex < FILTERPASS_RAIN) ? passIndex : passIndex + 1;
 	}
 }

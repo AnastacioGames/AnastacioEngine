@@ -82,6 +82,9 @@ public:
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */
 	const int reservedPassIndex = FILTERPASS_COMPOSITOR + 1;
+	/* Textures drawn before the compositor pass (input chains of its Blur / Lens Distortion nodes):
+	 * reserved indices far past any custom filter, rendered right before FILTERPASS_COMPOSITOR. */
+	static const unsigned int FILTERPASS_COMPOSITOR_CACHE = 0x40000000;
 
 	enum FILTER_MODE {
 		FILTER_ENABLED = -2,

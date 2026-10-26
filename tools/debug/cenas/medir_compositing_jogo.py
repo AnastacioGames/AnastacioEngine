@@ -2,7 +2,8 @@
 
     AnastacioEngine -b --factory-startup --python tools/debug/cenas/medir_compositing_jogo.py -- PASTA PRESET [segundos]
 
-Gera PASTA/comp_PRESET.range. Ao rodar no AnastacioRuntime, o jogo aquece 2 s, mede o FPS médio
+Gera PASTA/comp_PRESET.range. Com COMP_SHOT=arquivo.png o jogo grava um print aos 1,5 s
+(compare com RANGE_COMPOSITOR_NO_CACHE=1 para ver se as texturas intermediárias mudam a imagem). Ao rodar no AnastacioRuntime, o jogo aquece 2 s, mede o FPS médio
 nos segundos seguintes, grava PASTA/comp_PRESET.txt e fecha sozinho.
 
 Presets:
@@ -118,6 +119,11 @@ if "t0" not in own:
     own["n"] = 0
 own["n"] += 1
 el = t - own["t0"]
+import os
+shot = os.environ.get("COMP_SHOT")
+if shot and "shot" not in own and el >= 1.5:
+    own["shot"] = 1
+    Range.render.makeScreenshot(shot)
 if "m0" not in own and el >= 2.0:
     own["m0"] = el; own["n0"] = own["n"]
 if "m0" in own and el >= 2.0 + %(secs)r:
