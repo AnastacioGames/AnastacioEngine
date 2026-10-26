@@ -35,6 +35,7 @@
 #include <map>
 #include <set>
 #include <sstream>
+#include <algorithm>
 #include <cmath>
 #include <cctype>
 
@@ -285,6 +286,7 @@ private:
 				NodeTwoFloats *ntf = (NodeTwoFloats *)node->storage;
 				const float x = (ntf && ntf->x != 0.0f) ? ntf->x : (node->custom1 ? 1.0f : 0.0f);
 				b << "\tif (c2.a " << (x == 0.0f ? "<" : "<=") << " 0.0) return c1;\n";
+				b << "\tif (fac == 1.0 && c2.a >= 1.0) return c2;\n";
 				b << "\tfloat addfac = " << F(1.0f - x) << " + c2.a * " << F(x) << ";\n";
 				b << "\tfloat mul = 1.0 - fac * c2.a;\n";
 				b << "\treturn vec4(mul * c1.rgb + fac * addfac * c2.rgb, mul * c1.a + fac * c2.a);\n";
@@ -375,14 +377,20 @@ private:
 					return premulled ? v : curvemap_evaluateF(&cumap->cm[3], v);
 				};
 				float lut[3][LUT_SIZE];
-				float ext[3][2];
+				float ext[3][4];
 				for (int ch = 0; ch < 3; ++ch) {
+					// The LUT covers 0..1 or the wider range of the edited curve (Use Clipping off).
+					const CurveMap *cm = &cumap->cm[ch];
+					const float lo = std::min(0.0f, cm->mintable);
+					const float hi = std::max(1.0f, cm->maxtable);
 					for (int i = 0; i < LUT_SIZE; ++i) {
-						lut[ch][i] = curve(ch, (float)i / (LUT_SIZE - 1));
+						lut[ch][i] = curve(ch, lo + (hi - lo) * (float)i / (LUT_SIZE - 1));
 					}
-					// Slopes past 0 and 1, so values outside keep following the extended curve.
-					ext[ch][0] = lut[ch][0] - curve(ch, -1.0f);
-					ext[ch][1] = curve(ch, 2.0f) - lut[ch][LUT_SIZE - 1];
+					ext[ch][0] = lo;
+					ext[ch][1] = hi;
+					// Slopes past the range, so values outside keep following the extended curve.
+					ext[ch][2] = lut[ch][0] - curve(ch, lo - 1.0f);
+					ext[ch][3] = curve(ch, hi + 1.0f) - lut[ch][LUT_SIZE - 1];
 				}
 				b << "\tvec3 bl = " << in(2) << ".rgb;\n";
 				b << "\tvec3 x = (c.rgb - bl) / max(" << in(3) << ".rgb - bl, vec3(1e-5));\n";
@@ -390,7 +398,7 @@ private:
 				const char *chan = "rgb";
 				for (int ch = 0; ch < 3; ++ch) {
 					b << "\tr." << chan[ch] << " = comp_curve(" << Lut(lut[ch]) << ", x." << chan[ch] << ", "
-					  << F(ext[ch][0]) << ", " << F(ext[ch][1]) << ");\n";
+					  << F(ext[ch][0]) << ", " << F(ext[ch][1]) << ", " << F(ext[ch][2]) << ", " << F(ext[ch][3]) << ");\n";
 				}
 				b << "\tfac = clamp(fac, 0.0, 1.0);\n";
 				b << "\treturn vec4(mix(c.rgb, r, fac), c.a);\n";
@@ -528,10 +536,20 @@ private:
 			const unsigned char ch = (unsigned char)*c;
 			name += (ch < 128 && isalnum(ch)) ? *c : '_';
 		}
-		for (const KX_CompositorUniform& u : m_uniforms) {
-			if (u.name == name) {
-				name += "_" + std::to_string(Id(node));
-				break;
+		// A clash gets the node id, then a counter, until no other uniform has the name.
+		auto taken = [&](const std::string& n) {
+			for (const KX_CompositorUniform& u : m_uniforms) {
+				if (u.name == n) {
+					return true;
+				}
+			}
+			return false;
+		};
+		if (taken(name)) {
+			const std::string base = name + "_" + std::to_string(Id(node));
+			name = base;
+			for (int i = 2; taken(name); ++i) {
+				name = base + "_" + std::to_string(i);
 			}
 		}
 		KX_CompositorUniform u;
@@ -633,12 +651,12 @@ float comp_lut(float lut[33], float x)
 	return mix(lut[i], lut[i + 1], f - float(i));
 }
 
-/* LUT over 0..1 with straight lines outside (slopes per unit below 0 and above 1). */
-float comp_curve(float lut[33], float x, float slopeLow, float slopeHigh)
+/* LUT over lo..hi with straight lines outside (slopes per unit below lo and above hi). */
+float comp_curve(float lut[33], float x, float lo, float hi, float slopeLow, float slopeHigh)
 {
-	if (x < 0.0) return lut[0] + slopeLow * x;
-	if (x > 1.0) return lut[32] + slopeHigh * (x - 1.0);
-	return comp_lut(lut, x);
+	if (x < lo) return lut[0] + slopeLow * (x - lo);
+	if (x > hi) return lut[32] + slopeHigh * (x - hi);
+	return comp_lut(lut, (x - lo) / (hi - lo));
 }
 
 /* Blend modes of the Mix node (MA_RAMP_*), the same formulas as the shader nodes. */
