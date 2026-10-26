@@ -26,10 +26,37 @@ Caso `controle` (carregamento assíncrono sem liberação nem remoção): termin
   `RemoveScene` finaliza o status.
 - `FinalizeAsyncLoads` no `StopEngine` termina os carregamentos antes de destruir as cenas.
 
+## Memória em LibLoad/LibFree repetidos
+
+Caso `ciclos`: 150 ciclos de LibLoad síncrono e LibFree da biblioteca de 150 objetos, medindo a
+memória privada do processo a cada ciclo.
+
+| Ciclo | 5 | 50 | 100 | 150 |
+|---|---|---|---|---|
+| MB | 484,2 | 472,8 | 473,8 | 476,0 |
+
+A memória termina abaixo do valor após o aquecimento. Entre os ciclos 50 e 150 sobe cerca de
+3 MB, sem tendência linear clara, o que é compatível com fragmentação do alocador. Não há
+vazamento a corrigir.
+
+## Cache `.cooked`
+
+- O conteúdo é endereçado por hash. Hulls usam o conjunto de vértices; as malhas usam o hash dos
+  loops, as flags dos slots de material, as camadas e as tangentes. Por isso uma malha alterada só
+  deixa de achar a entrada, sem precisar de invalidação explícita.
+- `BL_CookedArrays::Parse` confere limites de loops, primitivas e triângulos. Dado inconsistente
+  volta ao caminho cru, e com BVH rejeitado acontece o mesmo.
+- Cabeçalho desconhecido ou de outro tamanho de `btScalar` é ignorado com aviso. Arquivo truncado
+  para de ler no primeiro registro incompleto e descarta esse registro.
+- Suspeita sem reprodução: `ReadRecords` faz `resize(count2)` com o tamanho lido do arquivo, sem
+  comparar com o tamanho real. Com um `.cooked` forjado (registro de malha de 4 GB), o jogo rodou
+  normalmente em `--server`, então o defeito não foi demonstrado. Se for corrigir, basta limitar
+  `count2` ao que ainda resta no arquivo.
+
 ## Pendente nesta frente
 
-- Comparar o caminho cru com o `.cooked`, incluindo invalidação, cache incompatível e fallback.
-- Medir memória ao repetir LibLoad/LibFree muitas vezes e picos de frame no merge.
+- Medir os picos de frame do merge assíncrono com janela, porque em `--server` os shaders não
+  representam o custo real.
 - Observação: o Python recebe um `KX_LibLoadStatus` que é destruído junto com a biblioteca no
   `LibFree`. Acessar esse status depois da liberação dá exceção de proxy inválido, sem crash. Esse
   é o comportamento esperado, mas não está documentado na API.

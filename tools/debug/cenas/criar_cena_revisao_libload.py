@@ -67,6 +67,43 @@ def run(cont):
     elif f == 6:
         done({'free1': STATE['a'], 'free2': STATE['b'], 'ok': True})
 ''',
+    'ciclos': '''
+import ctypes
+from ctypes import wintypes
+
+class PMC(ctypes.Structure):
+    _fields_ = [('cb', wintypes.DWORD), ('PageFaultCount', wintypes.DWORD)] + [
+        (n, ctypes.c_size_t) for n in ('Peak', 'WorkingSet', 'QPPeak', 'QPaged', 'QNPPeak', 'QNP', 'Private', 'PeakPrivate')]
+
+_k32 = ctypes.WinDLL('kernel32')
+_k32.GetCurrentProcess.restype = wintypes.HANDLE
+_psapi = ctypes.WinDLL('psapi')
+_psapi.GetProcessMemoryInfo.argtypes = [wintypes.HANDLE, ctypes.POINTER(PMC), wintypes.DWORD]
+
+def private_mb():
+    c = PMC()
+    c.cb = ctypes.sizeof(c)
+    _psapi.GetProcessMemoryInfo(_k32.GetCurrentProcess(), ctypes.byref(c), c.cb)
+    return round(c.Private / 1048576.0, 1)
+
+CICLOS = 150
+
+def run(cont):
+    f = STATE['frame']
+    STATE['frame'] += 1
+    # Um ciclo a cada 3 frames: carrega, libera (efetiva no frame seguinte), mede.
+    ciclo, fase = divmod(f, 3)
+    if ciclo >= CICLOS:
+        mem = STATE['mem']
+        done({'mem_mb': mem, 'apos_aquecimento': mem[5], 'final': mem[-1],
+              'cresc_por_ciclo_kb': round((mem[-1] - mem[5]) * 1024 / (len(mem) - 6), 1)})
+    elif fase == 0:
+        Range.logic.LibLoad(LIB, 'Scene')
+    elif fase == 1:
+        Range.logic.LibFree(LIB)
+    else:
+        STATE.setdefault('mem', []).append(private_mb())
+''',
     'controle': '''
 def run(cont):
     f = STATE['frame']
