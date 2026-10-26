@@ -39,6 +39,9 @@ private:
 	short m_users;
 	/// Reference object used to retrieve layer and color.
 	RAS_MeshUser *m_referenceMeshUser;
+	/// First color given to a member: members with another first color leave the batch.
+	mt::vec4 m_firstColor;
+	bool m_firstColorSet;
 
 	/// A batch contained the merged display array for all the display array used for a given material.
 	class Batch
@@ -91,6 +94,9 @@ public:
 	RAS_MeshUser *GetReferenceMeshUser() const;
 	/// Change reference mesh user without error check.
 	void SetReferenceMeshUser(RAS_MeshUser *meshUser);
+
+	/// True when the color matches the first one a member got (recording it if it is the first).
+	bool MatchFirstColor(const mt::vec4& color);
 
 	/** Merge the display array of the mesh slots contained in the mesh user.
 	 * \param meshUser The mesh user to merge mesh slots from.

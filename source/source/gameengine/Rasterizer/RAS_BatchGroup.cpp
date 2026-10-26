@@ -43,7 +43,9 @@ RAS_BatchGroup::Batch::Batch()
 
 RAS_BatchGroup::RAS_BatchGroup()
 	:m_users(0),
-	m_referenceMeshUser(nullptr)
+	m_referenceMeshUser(nullptr),
+	m_firstColor(mt::zero4),
+	m_firstColorSet(false)
 {
 }
 
@@ -79,6 +81,16 @@ RAS_MeshUser *RAS_BatchGroup::GetReferenceMeshUser() const
 void RAS_BatchGroup::SetReferenceMeshUser(RAS_MeshUser *meshUser)
 {
 	m_referenceMeshUser = meshUser;
+}
+
+bool RAS_BatchGroup::MatchFirstColor(const mt::vec4& color)
+{
+	if (!m_firstColorSet) {
+		m_firstColorSet = true;
+		m_firstColor = color;
+		return true;
+	}
+	return m_firstColor == color;
 }
 
 bool RAS_BatchGroup::MergeMeshSlot(RAS_BatchGroup::Batch& batch, RAS_MeshSlot& slot, const mt::mat4& mat)
