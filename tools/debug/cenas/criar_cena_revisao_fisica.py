@@ -8,6 +8,7 @@ Casos:
   end_obj     usar a constraint depois de endObject() num dos corpos.
   veiculo     usar o veiculo depois de endObject() no chassi (controle: ja protegido).
   vivo, suspende  controles: constraint viva ou com a fisica suspensa continua funcionando.
+  suspende_end  corpo suspenso removido: a constraint precisa ser apagada (A suspende/restaura depois).
   junta, junta_sem  Rigid Body Joint do editor segura o corpo; sem a junta ele cai.
 """
 import os
@@ -131,6 +132,26 @@ def run(cont):
         b.restorePhysics()
     elif f == 5:
         done({'suspensa': STATE['suspensa'], 'restaurada': probe(STATE['c'], ['constraint_type', 'enabled']), 'ok': True})
+''',
+    'suspende_end': '''
+def run(cont):
+    f = STATE['frame']
+    STATE['frame'] += 1
+    a, b = pair() if f < 3 else (Range.logic.getCurrentScene().objects['A'], None)
+    if f == 1:
+        STATE['c'] = constraints.createConstraint(a.getPhysicsId(), b.getPhysicsId(), constraints.GENERIC_6DOF_CONSTRAINT)
+        b.suspendPhysics()
+    elif f == 2:
+        b.endObject()
+    elif f == 3:
+        STATE['junk'] = churn()
+        log('suspende A')
+        a.suspendPhysics()
+    elif f == 4:
+        log('restaura A')
+        a.restorePhysics()
+    elif f == 6:
+        done({'depois': probe(STATE['c'], ['constraint_type']), 'ok': True})
 ''',
     'junta': '''
 def run(cont):

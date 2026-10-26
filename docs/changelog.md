@@ -10,12 +10,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 ## 2026-10-26 - Frente 4: constraint apagada não derruba mais o Python
 
-- [Revisão](revisao-fisica.md) FIS-01/02.
+- [Revisão](revisao-fisica.md) FIS-01/02/03.
 - `KX_ConstraintWrapper` guardava o ponteiro da constraint. Usá-lo depois de `removeConstraint` ou
   de `endObject` num dos corpos derrubava o player; agora dá `ReferenceError`, como no veículo.
 - `constraint_id` volta a ser sequencial (1, 2, 3…). Antes saía um pedaço do endereço, porque na
   Bullet o id e o ponteiro do usuário dividem uma `union`.
 - Regressão em `tools/debug/cenas/criar_cena_revisao_fisica.py`; os 8 casos passaram em `--server`.
+- Remover um corpo com a física suspensa agora apaga as constraints dele (FIS-03). Antes elas
+  ficavam vivas apontando para o corpo já liberado.
 
 ## 2026-10-26 - Frente 5: LibLoad/LibFree sem liberação dupla nem merge em cena removida
 

@@ -809,17 +809,19 @@ void CcdPhysicsEnvironment::AddCcdPhysicsController(CcdPhysicsController *ctrl)
 void CcdPhysicsEnvironment::RemoveConstraint(btTypedConstraint *con, bool free)
 {
 	CcdConstraint *userData = (CcdConstraint *)con->getUserConstraintPtr();
-	if (!userData->GetActive()) {
-		return;
-	}
-
 	btRigidBody &rbA = con->getRigidBodyA();
 	btRigidBody &rbB = con->getRigidBodyB();
-	rbA.activate();
-	rbB.activate();
 
-	userData->SetActive(false);
-	m_dynamicsWorld->removeConstraint(con);
+	if (userData->GetActive()) {
+		rbA.activate();
+		rbB.activate();
+		userData->SetActive(false);
+		m_dynamicsWorld->removeConstraint(con);
+	}
+	else if (!free) {
+		return;
+	}
+	// A suspended constraint is out of the world but still must be freed with its body.
 
 	if (free) {
 		if (rbA.getUserPointer()) {
@@ -903,6 +905,13 @@ void CcdPhysicsEnvironment::RestoreConstraint(CcdPhysicsController *ctrl, btType
 	if (IsActiveCcdPhysicsController(other)) {
 		userData->SetActive(true);
 		m_dynamicsWorld->addConstraint(con, userData->GetDisableCollision());
+	}
+}
+
+void CcdPhysicsEnvironment::FreeCcdConstraints(CcdPhysicsController *ctrl)
+{
+	for (int i = ctrl->getNumCcdConstraintRefs() - 1; i >= 0; i--) {
+		RemoveConstraint(ctrl->getCcdConstraintRef(i), true);
 	}
 }
 

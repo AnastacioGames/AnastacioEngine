@@ -1148,6 +1148,8 @@ CcdPhysicsController::~CcdPhysicsController()
 	//will be reference counted, due to sharing
 	if (m_cci.m_physicsEnv) {
 		m_cci.m_physicsEnv->RemoveCcdPhysicsController(this, true);
+		// A suspended body is not registered, so the call above kept its constraints.
+		m_cci.m_physicsEnv->FreeCcdConstraints(this);
 	}
 
 	if (m_MotionState) {

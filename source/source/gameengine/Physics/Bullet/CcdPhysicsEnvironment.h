@@ -259,6 +259,9 @@ public:
 
 	void AddCcdPhysicsController(CcdPhysicsController *ctrl);
 
+	/// Frees the constraints still held by a body being destroyed, also when it is suspended.
+	void FreeCcdConstraints(CcdPhysicsController *ctrl);
+
 	bool RemoveCcdPhysicsController(CcdPhysicsController *ctrl, bool freeConstraints);
 
 	void UpdateCcdPhysicsController(CcdPhysicsController *ctrl, btScalar newMass, float newFriction, int newCollisionFlags, short int newCollisionGroup, short int newCollisionMask);

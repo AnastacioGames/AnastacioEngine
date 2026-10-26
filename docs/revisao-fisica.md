@@ -7,7 +7,7 @@ Arquivos: [CcdPhysicsEnvironment.cpp](../source/source/gameengine/Physics/Bullet
 [CcdConstraint.cpp](../source/source/gameengine/Physics/Bullet/CcdConstraint.cpp),
 [KX_ConstraintWrapper.cpp](../source/source/gameengine/Ketsji/KX_ConstraintWrapper.cpp).
 
-Regressão: [criar_cena_revisao_fisica.py](../tools/debug/cenas/criar_cena_revisao_fisica.py), oito casos
+Regressão: [criar_cena_revisao_fisica.py](../tools/debug/cenas/criar_cena_revisao_fisica.py), nove casos
 rodados com `AnastacioRuntime.exe --server`.
 
 ## Achados corrigidos
@@ -16,6 +16,7 @@ rodados com `AnastacioRuntime.exe --server`.
 |---|---|---|---|---|
 | FIS-01 | `KX_ConstraintWrapper` guardava o ponteiro do `CcdConstraint`, que é apagado em `RemoveConstraint`. O comentário dizia que o wrapper guardava só o id, o que não era verdade | casos `remove_con` e `end_obj`: ler `constraint_id` depois de `removeConstraint` ou de `endObject` num dos corpos derrubava o player | Mesmo padrão do veículo: o `CcdConstraint` avisa seus wrappers no destrutor (`SetInvalidationCallback`), e todo método e atributo do wrapper gera `ReferenceError` | os 7 acessos dão `ReferenceError`, sem crash |
 | FIS-02 | Na Bullet, `m_userConstraintId` e `m_userConstraintPtr` são uma `union`. Gravar o ponteiro sobrescrevia o id, então `constraint_id` virava os 32 bits baixos do endereço (ex.: -2031918448). Duas constraints podiam colidir no mesmo id | caso `vivo`: id negativo e diferente a cada execução | O id sequencial fica no `CcdConstraint`; as três buscas por id (`GetConstraintById`, `RemoveConstraintById`, `GetAppliedImpulse`) comparam com ele | `constraint_id` = 1, e `removeConstraint(1)` acha a constraint |
+| FIS-03 | Remover um corpo suspenso (`suspendPhysics` e depois `endObject`) não apagava as constraints dele: o corpo não estava registrado e `RemoveConstraint` saía cedo para constraint inativa. A constraint ficava viva apontando para o corpo apagado | caso `suspende_end`: depois de remover B, `constraint_type` ainda respondia 12, e suspender e restaurar A lia o corpo de B já liberado | O destrutor do `CcdPhysicsController` chama `FreeCcdConstraints`, e `RemoveConstraint(free=true)` apaga também a constraint suspensa. A troca de cena (`SetPhysicsEnvironment`) não muda | `ReferenceError`, sem leitura de memória liberada |
 
 ## Controles
 
