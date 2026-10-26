@@ -95,6 +95,10 @@ bool RAS_MaterialBucket::UseInstancing() const
 
 void RAS_MaterialBucket::RemoveActiveMeshSlots()
 {
+	if (!m_hasActive) {
+		return;
+	}
+	m_hasActive = false;
 	for (RAS_DisplayArrayBucket *arrayBucket : m_displayArrayBucketList) {
 		arrayBucket->RemoveActiveMeshSlots();
 	}
@@ -113,7 +117,7 @@ void RAS_MaterialBucket::DesactivateMaterial(RAS_Rasterizer *rasty)
 void RAS_MaterialBucket::GenerateTree(RAS_ManagerDownwardNode& downwardRoot, RAS_ManagerUpwardNode& upwardRoot,
                                       RAS_UpwardTreeLeafs& upwardLeafs, RAS_Rasterizer::DrawType drawingMode, bool sort)
 {
-	if (m_displayArrayBucketList.empty()) {
+	if (!m_hasActive || m_displayArrayBucketList.empty()) {
 		return;
 	}
 

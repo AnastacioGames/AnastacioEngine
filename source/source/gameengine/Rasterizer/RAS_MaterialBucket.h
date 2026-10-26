@@ -66,6 +66,10 @@ public:
 	void UnbindNode(const RAS_MaterialNodeTuple& tuple);
 
 	void RemoveActiveMeshSlots();
+	/* Set when a mesh slot of this material becomes visible in the current pass, cleared
+	 * with the slots: lets each pass skip invisible materials without scanning their arrays. */
+	void MarkActive() { m_hasActive = true; }
+	bool HasActive() const { return m_hasActive; }
 
 	void AddDisplayArrayBucket(RAS_DisplayArrayBucket *bucket);
 	void RemoveDisplayArrayBucket(RAS_DisplayArrayBucket *bucket);
@@ -76,6 +80,7 @@ public:
 
 private:
 	RAS_IMaterial *m_material;
+	bool m_hasActive = false;
 	RAS_DisplayArrayBucketList m_displayArrayBucketList;
 
 	RAS_MaterialNodeData m_nodeData;

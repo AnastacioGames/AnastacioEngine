@@ -107,6 +107,9 @@ void RAS_BucketManager::PrepareBuckets(RAS_Rasterizer *rasty, RAS_BucketManager:
 	}
 
 	for (RAS_MaterialBucket *bucket : m_buckets[bucketType]) {
+		if (!bucket->HasActive()) {
+			continue;
+		}
 		const RAS_DisplayArrayBucketList& arrays = bucket->GetDisplayArrayBucketList();
 		// Visibility is rebuilt for each pass. Prepare newly visible materials before
 		// GenerateTree updates attributes; inactive materials need no texture/lamp work.

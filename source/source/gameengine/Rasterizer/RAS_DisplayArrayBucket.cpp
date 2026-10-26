@@ -122,6 +122,7 @@ RAS_MeshMaterial *RAS_DisplayArrayBucket::GetMeshMaterial() const
 void RAS_DisplayArrayBucket::ActivateMesh(RAS_MeshSlot *slot)
 {
 	m_activeMeshSlots.push_back(slot);
+	m_bucket->MarkActive();
 }
 
 void RAS_DisplayArrayBucket::RemoveActiveMeshSlots()
@@ -424,6 +425,9 @@ void RAS_DisplayArrayBucket::RunBatchingNode(const RAS_DisplayArrayNodeTuple& tu
 void RAS_DisplayArrayBucket::ChangeMaterialBucket(RAS_MaterialBucket *bucket)
 {
 	m_bucket = bucket;
+	if (!m_activeMeshSlots.empty()) {
+		bucket->MarkActive();
+	}
 
 	// Change of material update looking.
 	RAS_IMaterial *material = bucket->GetMaterial();

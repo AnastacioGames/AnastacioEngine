@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Buckets: material marca se tem malha visível no passe
+
+- `RAS_MaterialBucket` ganha `MarkActive/HasActive`, ligado em `ActivateMesh` e limpo com os slots. `PrepareBuckets`, `GenerateTree` e a limpeza pulam materiais sem nada visível sem varrer as malhas (antes eram 3 varreduras completas por face de sombra).
+- Perfil com PDB (`tools/debug/sampler`, 900 obj/8 luzes/N mat): sombras ~54% do quadro, driver ~28%; culling por face 20% e montagem da árvore 17% do passe de sombra.
+- A/B 3 rodadas alternadas: 8 de 10 cenas de CPU 1-5% mais rápidas (900o_8l_1m −4,7%), draw calls iguais; 900o_4l_Nm +4,9% dentro do ruído da base (10,5%).
+
 ## 2026-10-26 - TrackLine.locate(): busca global testa todos os segmentos
 
 A busca global (sem `seg`, ou quando o carro se perde) pegava o vértice mais perto e testava só os
