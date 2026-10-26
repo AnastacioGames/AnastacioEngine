@@ -1555,6 +1555,26 @@ static IDProperty *rna_Node_idprops(PointerRNA *ptr, bool create)
 	return node->prop;
 }
 
+/* Turning on the Blender 5 style on a glare made before these fields existed: start from neutral values. */
+static void rna_NodeGlare_game_b5_set(PointerRNA *ptr, bool value)
+{
+	bNode *node = ptr->data;
+	NodeGlare *ndg = node->storage;
+	if (value) {
+		ndg->game_flag |= CMP_NODE_GLARE_GAME_B5;
+		if (ndg->strength == 0.0f && ndg->saturation == 0.0f &&
+		    ndg->tint[0] == 0.0f && ndg->tint[1] == 0.0f && ndg->tint[2] == 0.0f)
+		{
+			ndg->strength = 1.0f;
+			ndg->saturation = 1.0f;
+			ndg->tint[0] = ndg->tint[1] = ndg->tint[2] = 1.0f;
+		}
+	}
+	else {
+		ndg->game_flag &= ~CMP_NODE_GLARE_GAME_B5;
+	}
+}
+
 static void rna_Node_parent_set(PointerRNA *ptr, PointerRNA value)
 {
 	bNode *node = ptr->data;
@@ -6047,6 +6067,45 @@ static void def_cmp_glare(StructRNA *srna)
 	RNA_def_property_range(prop, 6, 9);
 	RNA_def_property_ui_text(prop, "Size",
 	                         "Glow/glare size (not actual size; relative to initial size of bright area of pixels)");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	/* Game: Blender 5 style (KX_CompositorFilter); the render compositor ignores these. */
+	prop = RNA_def_property(srna, "use_game_blender5", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "game_flag", CMP_NODE_GLARE_GAME_B5);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_NodeGlare_game_b5_set");
+	RNA_def_property_ui_text(prop, "Blender 5 Style",
+	                         "Game only: the glare is added to the image with Strength, Saturation and Tint, "
+	                         "like the Glare node of Blender 5, instead of the Mix of this version");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "strength", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "strength");
+	RNA_def_property_range(prop, 0.0f, 100.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 4.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Strength", "Game, Blender 5 Style: how much of the glare is added to the image");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "saturation", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "saturation");
+	RNA_def_property_range(prop, 0.0f, 10.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Saturation", "Game, Blender 5 Style: saturation of the glare (0 = white glare)");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "tint", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "tint");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Tint", "Game, Blender 5 Style: color the glare is multiplied by");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "max_brightness", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "max_brightness");
+	RNA_def_property_range(prop, 0.0f, 1000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 20.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Max Brightness",
+	                         "Game, Blender 5 Style: highlights brighter than this are clamped, so a few very "
+	                         "bright pixels do not flood the glare (0 = no limit)");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	/* TODO */

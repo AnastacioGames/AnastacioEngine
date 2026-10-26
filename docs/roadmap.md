@@ -390,9 +390,9 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   `OB_MBALL` e a metaball some no Play; a saída é Alt+C → Mesh. Proposta: converter a superfície em malha
   estática ao dar Play, como curva/texto (custo só no carregamento). Versão dinâmica (re-tessellar a cada
   frame) descartada por ora: pesada na CPU; só com caso de uso concreto, de preferência na GPU.
-- **Compositing no jogo — próximas fases**: Texture nodes só como bake. Glare com os parâmetros do
-  Blender 5 (força, saturação, tint, brilho máximo, ver `D:\blender5-ref\compositor_glare`) pediria campos
-  novos no `NodeGlare`. Defocus pesado e Denoise ficam fora. O que já roda está no changelog (2026-10-26).
+- **Compositing no jogo — próximas fases**: Texture nodes só como bake. Do Glare do Blender 5
+  (`D:\blender5-ref\compositor_glare`) faltam Bloom/Sun Beams/Kernel e o suavizado do limiar. Defocus pesado e
+  Denoise ficam fora. O que já roda está no changelog (2026-10-26).
 
 ## Performance
 

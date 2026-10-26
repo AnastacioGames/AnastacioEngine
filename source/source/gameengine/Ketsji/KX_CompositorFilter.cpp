@@ -207,9 +207,19 @@ public:
 		NodeGlare *g = (NodeGlare *)node->storage;
 		const float threshold = g ? g->threshold : 1.0f;
 		const std::string src = Input(node, 0, "uv");  // emits the upstream functions first
-		m_code << "vec4 " << name << "(vec2 uv)\n{\n\tvec3 c = " << src << ".rgb;\n"
-		       << "\tif (dot(c, vec3(0.2126, 0.7152, 0.0722)) < " << F(threshold) << ") return vec4(0.0, 0.0, 0.0, 1.0);\n"
-		       << "\treturn vec4(max(c - " << F(threshold) << ", 0.0), 1.0);\n}\n\n";
+		m_code << "vec4 " << name << "(vec2 uv)\n{\n\tvec3 c = " << src << ".rgb;\n";
+		if (g && (g->game_flag & CMP_NODE_GLARE_GAME_B5)) {
+			// Blender 5 (compositor_glare_highlights): brightness = HSV value, clamped to Max Brightness,
+			// then made relative to the threshold, keeping the hue.
+			const float maxb = (g->max_brightness > 0.0f) ? std::max(g->max_brightness, threshold) : 1.0e9f;
+			m_code << "\tfloat val = max(c.r, max(c.g, c.b));\n"
+			       << "\tif (val <= " << F(threshold) << ") return vec4(0.0, 0.0, 0.0, 1.0);\n"
+			       << "\treturn vec4(c * ((min(val, " << F(maxb) << ") - " << F(threshold) << ") / val), 1.0);\n}\n\n";
+		}
+		else {
+			m_code << "\tif (dot(c, vec3(0.2126, 0.7152, 0.0722)) < " << F(threshold) << ") return vec4(0.0, 0.0, 0.0, 1.0);\n"
+			       << "\treturn vec4(max(c - " << F(threshold) << ", 0.0), 1.0);\n}\n\n";
+		}
 		return name;
 	}
 
@@ -700,10 +710,20 @@ private:
 					  << "\t\t}\n\t}\n\tglare *= " << F(2.0f / (float)count) << ";\n";
 				}
 				b << "\tvec4 c1 = " << in(0) << ";\n";
-				b << "\tfloat v = " << F(0.5f + g->mix * 0.5f) << ";\n";
-				b << "\tfloat mf = 2.0 - 2.0 * abs(v - 0.5);\n";
 				b << "\tvec3 base = max(c1.rgb, 0.0);\n";
-				b << "\treturn vec4(mf * max(base + v * (glare - base), 0.0), c1.a);\n";
+				if (g->game_flag & CMP_NODE_GLARE_GAME_B5) {
+					// Blender 5 (compositor_glare_mix): image + glare with its saturation, times tint and strength.
+					b << "\tvec3 hsv = comp_rgb_to_hsv(max(glare, 0.0));\n";
+					b << "\thsv.y = clamp(hsv.y * " << F(g->saturation) << ", 0.0, 1.0);\n";
+					b << "\tglare = comp_hsv_to_rgb(hsv) * " << "vec3(" << F(g->tint[0]) << ", " << F(g->tint[1]) << ", "
+					  << F(g->tint[2]) << ") * " << F(g->strength) << ";\n";
+					b << "\treturn vec4(base + glare, c1.a);\n";
+				}
+				else {
+					b << "\tfloat v = " << F(0.5f + g->mix * 0.5f) << ";\n";
+					b << "\tfloat mf = 2.0 - 2.0 * abs(v - 0.5);\n";
+					b << "\treturn vec4(mf * max(base + v * (glare - base), 0.0), c1.a);\n";
+				}
 				break;
 			}
 			case CMP_NODE_COMPOSITE:

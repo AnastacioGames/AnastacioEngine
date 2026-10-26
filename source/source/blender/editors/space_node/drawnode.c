@@ -1555,7 +1555,7 @@ static void node_composit_buts_defocus(uiLayout *layout, bContext *C, PointerRNA
 }
 
 /* qdn: glare node */
-static void node_composit_buts_glare(uiLayout *layout, bContext *UNUSED(C), PointerRNA *ptr)
+static void node_composit_buts_glare(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
 	uiItemR(layout, ptr, "glare_type", 0, "", ICON_NONE);
 	uiItemR(layout, ptr, "quality", 0, "", ICON_NONE);
@@ -1582,6 +1582,21 @@ static void node_composit_buts_glare(uiLayout *layout, bContext *UNUSED(C), Poin
 	}
 	if (RNA_enum_get(ptr, "glare_type") == 1) {
 		uiItemR(layout, ptr, "size", 0, NULL, ICON_NONE);
+	}
+
+	/* Game: Blender 5 style mix (only the game reads it, see KX_CompositorFilter) */
+	{
+		Scene *scene = CTX_data_scene(C);
+		if (scene && STREQ(scene->r.engine, RE_engine_id_BLENDER_GAME)) {
+			uiItemR(layout, ptr, "use_game_blender5", 0, NULL, ICON_NONE);
+			if (RNA_boolean_get(ptr, "use_game_blender5")) {
+				uiLayout *col = uiLayoutColumn(layout, true);
+				uiItemR(col, ptr, "strength", 0, NULL, ICON_NONE);
+				uiItemR(col, ptr, "saturation", 0, NULL, ICON_NONE);
+				uiItemR(col, ptr, "max_brightness", 0, NULL, ICON_NONE);
+				uiItemR(layout, ptr, "tint", 0, "", ICON_NONE);
+			}
+		}
 	}
 }
 

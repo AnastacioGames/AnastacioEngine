@@ -47,6 +47,10 @@ static void node_composit_init_glare(bNodeTree *UNUSED(ntree), bNode *node)
 	ndg->angle_ofs = 0.0f;
 	ndg->fade = 0.9;
 	ndg->size = 8;
+	/* Blender 5 style values, used in the game when game_flag has CMP_NODE_GLARE_GAME_B5 */
+	ndg->strength = 1.0f;
+	ndg->saturation = 1.0f;
+	ndg->tint[0] = ndg->tint[1] = ndg->tint[2] = 1.0f;
 	node->storage = ndg;
 }
 

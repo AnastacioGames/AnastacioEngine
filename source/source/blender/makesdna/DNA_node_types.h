@@ -687,7 +687,18 @@ typedef struct NodeGlare {
 	char angle DNA_DEPRECATED, pad_c1, size, star_45, streaks;
 	float colmod, mix, threshold, fade;
 	float angle_ofs, pad_f1;
+	/* Game (Compositing in the game): Blender 5 style mix. Off (0) keeps the 2.79 formulas, so old
+	 * files and files of the original Range, which skip our versioning, stay as they were. */
+	char game_flag, pad_c2[3];
+	float strength, saturation, max_brightness;
+	float tint[3];
+	float pad_f2;
 } NodeGlare;
+
+/* NodeGlare.game_flag */
+enum {
+	CMP_NODE_GLARE_GAME_B5 = (1 << 0),
+};
 
 /* qdn: tonemap node */
 typedef struct NodeTonemap {

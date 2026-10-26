@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 2: input, joystick e animação no catch-up
+
+- Terceira rodada da [revisão](revisao-scenegraph-loop.md), IDs INP-01..03 e ANI-01. Leitura dos
+  caminhos de captura, estado e consumo, pose/bone parents e aplicação de taxas durante o lote.
+- Diagnóstico extrai corpos dos métodos atuais e do acumulador, usa CM_Clock real e substitui
+  hardware/pipeline. Compilado com MSVC, vcvars64 e VSLANG=1033; execução passou e hashes conferidos.
+- Reproduzidos estado vazio na soltura, quatro leituras da mesma ativação em quatro passos e
+  descarte de bordas/flags sem consumo lógico. Gate de pose só no último passo conferido no
+  agendamento; efeito em armature/Bullet permanece sem teste integrado.
+- Sem mudança de produto ou abertura de jogo/janelas. Lista/roadmap atualizados; próxima peça é
+  a invariante INP-01. Evidências em `artifacts/revisao-input-catchup-20261026/`.
+
 ## 2026-10-26 - Compositing no jogo: aceite, Blur rápido, Glare e Auto Arrange
 
 - Compositing no jogo aprovado com janela. Com Use Nodes, a árvore do compositor vira 2D Filters no fim da
@@ -18,6 +30,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   (diferença máx. 1-8/255). `RANGE_COMPOSITOR_NO_CACHE=1` compara; profiler `filter.compositor_cache`.
 - Nó Glare no jogo: Fog Glow (soma dos mipmaps da parte brilhante), Streaks, Simple Star e Ghosts, pelas
   fórmulas da 2.79 (limiar por luminância, MixGlare); Quality/Iterations não são seguidos à risca. ≤ 1,3 ms.
+- Glare "Blender 5 Style" (só no jogo, chave no nó em modo jogo): limiar pelo valor HSV com Max Brightness e
+  mistura aditiva com Strength, Saturation e Tint, como o Glare do Blender 5. Campos novos no `NodeGlare`
+  com a chave desligada por padrão: arquivos antigos e da Range original saem idênticos (diferença 0).
 - Node Editor em modo jogo: selo "Not in Game" nos nós do compositor que não rodam no jogo e "~Game" nos
   aproximados (lista única em `BKE_compositor_game.h`, usada também pelo gerador).
 - Botão Auto Arrange ao lado do nome da árvore: colunas pelas ligações; na Logic Tree, um fluxo por faixa
