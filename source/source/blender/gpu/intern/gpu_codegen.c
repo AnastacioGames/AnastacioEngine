@@ -3617,6 +3617,9 @@ GPUPass *GPU_generate_pass(
 			flags |= GPU_SHADER_FLAGS_SKY_VERY_LOW;
 		}
 	}
+	if (stages && stages->shadow_pcss) {
+		flags |= GPU_SHADER_FLAGS_SHADOW_PCSS;
+	}
 	const unsigned int hash = shader_cache_hash(vertexcode, fragmentcode, geometrycode, flags);
 	const bool use_cache = shader_cache_enabled();
 	shader = use_cache ? shader_cache_acquire(vertexcode, fragmentcode, geometrycode, glsl_material_library, flags, hash) :

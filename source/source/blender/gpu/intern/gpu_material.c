@@ -323,6 +323,16 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 #endif
 	}
 
+	/* PCSS in the Principled light loop: 4 inlined copies of its 64-tap search and filter made
+	 * every Principled shader slow to compile on the Web (ANGLE unrolls the loops), so they are
+	 * only compiled when a lamp actually uses it. */
+	for (const Lamp *la = G.main ? G.main->lamp.first : NULL; la; la = la->id.next) {
+		if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
+			stages.shadow_pcss = true;
+			break;
+		}
+	}
+
 	if (used) {
 		material->pass = GPU_generate_pass(&material->nodes, material->outlinks,
 			&material->attribs, &material->builtins, fragcode, vertcode, material->type,

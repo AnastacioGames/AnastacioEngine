@@ -51,6 +51,8 @@ enum {
 	GPU_SHADER_FLAGS_SKY_LOW			= (1 << 8),
 	/* World Sky Quality Very Low (#define SKY_LOW and SKY_VERY_LOW). */
 	GPU_SHADER_FLAGS_SKY_VERY_LOW		= (1 << 9),
+	/* Some lamp uses PCSS: the light loop of node_bsdf_principled() gets it (#define SHADOW_PCSS). */
+	GPU_SHADER_FLAGS_SHADOW_PCSS		= (1 << 10),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.

@@ -83,6 +83,9 @@ lamp.shadow_buffer_soft = soft
 lamp.shadow_filter = filtro
 if csm:
     lamp.use_csm_shadow = True
+    lamp.shadow_buffer_clip_end = 100
+    lamp.shadow_csm_two_buffer_size = 1024
+    lamp.shadow_csm_three_buffer_size = 1024
 
 bpy.ops.object.camera_add(location=(0, -14, 13))
 cam = bpy.context.object

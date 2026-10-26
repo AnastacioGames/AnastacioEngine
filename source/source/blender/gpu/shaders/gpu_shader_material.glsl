@@ -4830,10 +4830,12 @@ float scene_shadow_filtered(vec3 rco, vec3 vn, sampler2DShadow shadowmap, mat4 p
 	if (!shadow_visibility(co)) {
 		return 1.0;
 	}
+#ifdef SHADOW_PCSS
 	if (filt.x > 3.5) {
 		return test_shadow_pcss(shadowmap, co, filt.y, filt.z, filt.w,
 		                        (clip.z > 0.5) ? shadow_ortho_scale(persmat) : clip.xyz);
 	}
+#endif
 	if (filt.x > 2.5) {
 		return shadow_pcf_poisson(shadowmap, co, filt.y, filt.w);
 	}

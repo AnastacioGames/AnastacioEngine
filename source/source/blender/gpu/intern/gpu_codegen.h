@@ -204,6 +204,7 @@ typedef struct GPUPassStages {
 	float explode_factor;              /* Explode: triangles pushed apart along their normal, 0 disables */
 	ListBase *scripts;                 /* GPUScriptCode */
 	int sky_low;                       /* World Sky Quality: 1 = Low (SKY_LOW), 2 = Very Low (+ SKY_VERY_LOW) */
+	bool shadow_pcss;                  /* Some lamp uses PCSS (SHADOW_PCSS) */
 } GPUPassStages;
 
 GPUPass *GPU_generate_pass(ListBase *nodes, struct GPUNodeLink *outlinks[8],
