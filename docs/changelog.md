@@ -30,6 +30,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Corrigidos PY-01 a PY-08: referências dos getters, damping sem mutação em erro de conversão,
   aridade de raycast vazio, representabilidade em float, chaves não textuais e contratos de parsers.
   Keywords dos setters de peso/velocidade de camada também funcionam, com listas próprias por método.
+  Mudança visível: `gameOb[chave]` com chave não-hashável (lista, dict) lança `TypeError`, como um
+  `dict`, em vez de `KeyError`. Docstrings de `setActionLayerWeight`/`Speed` agora dizem que `layer`
+  é obrigatório e o valor é opcional (padrão 0), como o parser sempre fez.
 - O teste de keywords revelou cache compartilhado por tipos no helper comum de parsing. As duas
   chamadas corrigidas usam o parser público; revisão global do helper permanece no roadmap.
 - Build final de editor/player concluído com vcvars64 e VSLANG=1033; CTest 15/15. Sete modos de

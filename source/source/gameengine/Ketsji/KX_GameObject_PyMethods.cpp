@@ -1643,7 +1643,7 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, getActionName,
 }
 
 EXP_PYMETHODDEF_DOC(KX_GameObject, setActionLayerWeight,
-	"setActionLayerWeight(layer=0, layerWeight)\n"
+	"setActionLayerWeight(layer, layerWeight=0.0)\n"
 	"Change layerWeight of a layer\n")
 {
 	short layer = 0;
@@ -1667,7 +1667,7 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, setActionLayerWeight,
 }
 
 EXP_PYMETHODDEF_DOC(KX_GameObject, setActionLayerSpeed,
-	"setActionLayerSpeed(layer=0, speed)\n"
+	"setActionLayerSpeed(layer, speed=0.0)\n"
 	"Change speed of a layer\n")
 {
 	short layer = 0;
