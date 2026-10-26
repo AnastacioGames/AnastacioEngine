@@ -232,7 +232,10 @@ void KX_PythonComponent::Update()
 	}
 	// Call Update Function.
 	PyObject *pycomp = GetProxy();
-	PyObject *ret = PyObject_CallMethod(pycomp, "update", "");
+	// Interned once: PyObject_CallMethod rebuilt the "update" string and an empty argument tuple
+	// for every component every frame.
+	static PyObject *updateName = PyUnicode_InternFromString("update");
+	PyObject *ret = PyObject_CallMethodNoArgs(pycomp, updateName);
 	if (!ret) {
 		CM_Error("PythonComponent '" << m_name << "' Update() the function was not initialized correctly.");
 		EXP_ReportPythonDiagnostic("component.update", m_name.c_str());
