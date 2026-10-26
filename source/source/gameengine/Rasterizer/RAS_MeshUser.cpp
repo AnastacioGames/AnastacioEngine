@@ -167,6 +167,14 @@ void RAS_MeshUser::SetColor(const mt::vec4& color)
 		m_colorSet = true;
 		m_color = color;
 		m_instancingVersion = NextInstancingVersion();
+		// The first color only fills in, unless it differs from the one the batch is drawn with
+		// (the reference member's), e.g. a color set from Python before the first frame.
+		if (m_batchGroup) {
+			RAS_MeshUser *ref = m_batchGroup->GetReferenceMeshUser();
+			if (ref && ref != this && ref->m_colorSet && ref->m_color != color) {
+				m_batchGroup->SplitMeshUser(this);
+			}
+		}
 		return;
 	}
 	if (m_color != color) {
