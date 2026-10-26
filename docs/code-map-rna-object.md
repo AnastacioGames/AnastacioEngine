@@ -4,7 +4,7 @@
 (física de jogo, destruição, explosivo, deformação, partículas GPU, reverb, raio, rede, LOD). Não descreve
 arquitetura.
 
-**Linhas conferidas em 2026-10-23 (`HEAD` `4e25630e`).** Os números envelhecem a cada edição: confirme com
+**Linhas conferidas em 2026-10-26 (`HEAD` `1a63417a`).** Os números envelhecem a cada edição: confirme com
 `grep -n "nome" arquivo`. `python tools/check_docs.py --fix` corrige os números deste mapa.
 
 Cada arquivo tem duas metades: callbacks `rna_*` (get, set, update) dentro de `#ifdef RNA_RUNTIME` e definições
@@ -50,10 +50,10 @@ em `rna_object_game.c`.
 | Definições: coleções e veículo | `rna_def_object_constraints` 2593, `rna_def_object_modifiers` 2641, `rna_def_object_vertex_groups` 2726, `rna_def_object_lodlevel` 2775, `rna_def_object_wheel_settings` 2851, `rna_def_object_gear_ratio` 2965, `rna_def_object_animation_event` 2983 |
 | Definição principal | **`rna_def_object`** 3033 (≈870 linhas), `rna_def_dupli_object` 3901, `rna_def_object_base` 3959, `RNA_def_object` 4004 |
 
-## `source/source/blender/makesrna/intern/rna_object_game.c` (1.586 linhas)
+## `source/source/blender/makesrna/intern/rna_object_game.c` (1.612 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
 | Rede, destruição, explosivo, deformação (callbacks) | `rna_RangeNetObjectSettings_replicate_set` 113, `rna_explosive_style_colors` 130, `rna_RangeExplosiveSettings_use_particle_explosion_set` 163, `rna_RangeDeformSettings_mode_set` 181, `rna_RangeDeformSettings_decal_set` 194, `rna_RangeDestructionSettings_fragments_set` 213, `rna_RangeExplosiveSettings_use_light_flash_set` 245, `rna_RangeExplosiveSettings_use_ground_mark_set` 263 |
 | Partículas GPU, reverb e raio (callbacks) | `rna_GPUParticleSettings_particle_look_update` 283, `rna_reverb_area_apply_preset` 436, `rna_ReverbAreaSettings_preset_update` 491, `rna_Object_lightning_preview_update` 513, `rna_GPUParticles_use_size_curve_update` 521 |
-| Definições: sistemas da engine | `rna_def_object_gpu_particles` 543 (≈300 linhas), `rna_def_object_lightning` 852, `rna_def_object_reverb_area` 966, `rna_def_object_network` 1057, `rna_def_object_destruction` 1116, `rna_def_object_explosive` 1182, `rna_def_object_deform` 1415, `RNA_def_object_game` 1575 |
+| Definições: sistemas da engine | `rna_def_object_gpu_particles` 543 (≈300 linhas), `rna_def_object_lightning` 878, `rna_def_object_reverb_area` 992, `rna_def_object_network` 1083, `rna_def_object_destruction` 1142, `rna_def_object_explosive` 1208, `rna_def_object_deform` 1441, `RNA_def_object_game` 1601 |
