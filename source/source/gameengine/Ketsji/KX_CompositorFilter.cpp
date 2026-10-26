@@ -703,10 +703,16 @@ private:
 						sx = sy = 0.5f;
 						len = 0.2f;
 					}
-					b << "\tvec2 d = (vec2(" << F(sx) << ", " << F(sy) << ") - uv) * " << F(std::min(std::max(len, 0.0f), 1.0f)) << ";\n"
+					// Like Blender 5: the ray goes toward the sun up to Length x image diagonal, never past the sun.
+					// A per-pixel offset (interleaved gradient noise) hides the banding of the 32 fixed samples.
+					b << "\tvec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n"
+					  << "\tvec2 toSun = (vec2(" << F(sx) << ", " << F(sy) << ") - uv) * res;\n"
+					  << "\tfloat dist = length(toSun);\n"
+					  << "\tvec2 d = toSun / max(dist, 1e-4) * min(dist, " << F(std::min(std::max(len, 0.0f), 1.0f)) << " * length(res)) / res;\n"
+					  << "\tfloat jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
 					  << "\tfloat ws = 0.0;\n"
 					  << "\tfor (int i = 0; i < 32; ++i) {\n"
-					  << "\t\tfloat t = (float(i) + 0.5) / 32.0;\n"
+					  << "\t\tfloat t = (float(i) + jit) / 32.0;\n"
 					  << "\t\tfloat w = 1.0 - t;\n"
 					  << "\t\tglare += w * " << fn << "(uv + d * t, 1.0);\n"
 					  << "\t\tws += w;\n"

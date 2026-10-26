@@ -692,7 +692,7 @@ typedef struct NodeGlare {
 	char game_flag, pad_c2[3];
 	float strength, saturation, max_brightness;
 	float tint[3];
-	/* Game: Sun Beams type (5), like Blender 5: beams go toward sun_pos (0-1 of the image) */
+	/* Game: Sun Beams type (5), like Blender 5: beams leave the bright parts away from sun_pos (0-1 of the image) */
 	float sun_pos[2];
 	float beams_len;
 } NodeGlare;
