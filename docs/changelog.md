@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Auto Static Batch (opção da cena)
+
+- Scene > Level of Detail > **Auto Static Batch** (`scene.game_settings.use_auto_static_batch`, bit
+  `SCE_AUTO_STATIC_BATCH` em `gm.lodflag`, nunca usado antes; arquivos antigos ficam desligados). Ligada, a
+  conversão põe no Static Batch, sem marcar um por um, toda malha Static/No Collision sem logic bricks nem
+  componentes, sem pai, sem animação (action, drivers, NLA), com cor de objeto branca e sem LoD/deformador/
+  destruição. Réplicas de grupo entram (ficam na raiz da cena). Objetos marcados à mão seguem iguais.
+- Script que mexe num objeto pelo nome continua funcionando: o membro sai do lote ao se mover (custo de
+  remontar o lote uma vez). Cor de objeto alterada por script num membro não aparece (o lote usa a do primeiro);
+  por isso cor diferente de branco fica fora.
+- Teste sem janela: `tools/debug/cenas/criar_teste_auto_static_batch.py` (ligado e desligado, RESULTADO OK).
+  A saída do lote ao mover só acontece no desenho e não é coberta pelo `--server`.
+
 ## 2026-10-26 - Property Actuator: Add numérico sem alocar
 
 - Cena nova de estresse de lógica: `tools/create_perf_logic_test.py` (500 e 2000 cubos, cada um com

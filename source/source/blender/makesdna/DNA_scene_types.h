@@ -1197,6 +1197,9 @@ enum {
 
 /* GameData.lodflag */
 #define SCE_LOD_USE_HYST		(1 << 0)
+/* Static objects without logic, parent or animation enter the Static Batch on their own when the
+ * scene converts (BL_StaticBatchObjects). Off in old files (bit never used before). */
+#define SCE_AUTO_STATIC_BATCH	(1 << 1)
 
 /* GameData.hdr */
 #define GAME_HDR_NONE		0

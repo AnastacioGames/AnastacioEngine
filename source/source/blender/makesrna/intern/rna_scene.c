@@ -5530,6 +5530,13 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Hysteresis", "Use LoD Hysteresis setting for the scene");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "use_auto_static_batch", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "lodflag", SCE_AUTO_STATIC_BATCH);
+	RNA_def_property_ui_text(prop, "Auto Static Batch",
+	                         "Static objects without logic, parent, animation or object color are drawn "
+	                         "together (one draw per material), as if Static Batch was marked on each one");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "scene_hysteresis_percentage", PROP_INT, PROP_PERCENTAGE);
 	RNA_def_property_int_sdna(prop, NULL, "scehysteresis");
 	RNA_def_property_range(prop, 0, 100);

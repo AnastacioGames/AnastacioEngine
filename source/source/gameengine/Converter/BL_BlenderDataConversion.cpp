@@ -151,6 +151,7 @@ extern "C" {
 #include "BLI_threads.h"
 
 #include "DNA_action_types.h"
+#include "DNA_anim_types.h"
 #include "DNA_actuator_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
@@ -3679,13 +3680,41 @@ static void BL_PrefetchMaterialImages(const std::vector<KX_BlenderMaterial *>& m
  * (one draw per material). Only meshes that never move: a member that moves later is split
  * out by RAS_MeshUser::SetMatrix. Deformed, destructible and physics-driven objects stay out.
  * Runs after the dupli groups are instanced, so group instances (replicas) are batched too. */
-static void BL_StaticBatchObjects(EXP_ListValue<KX_GameObject> *objectlist)
+/* Auto Static Batch (scene option): an unmarked object joins only when nothing can move or recolor
+ * it from the file itself: no logic or components, no parent, no animation, white object color.
+ * A script moving it by name still works (the member is split out), it only costs the rebuild. */
+static bool BL_AutoStaticBatchCandidate(KX_GameObject *gameobj, Object *blenderobj)
+{
+	if (blenderobj->type != OB_MESH || gameobj->GetParent()) {
+		return false;
+	}
+	if (blenderobj->sensors.first || blenderobj->controllers.first || blenderobj->actuators.first ||
+	    blenderobj->components.first)
+	{
+		return false;
+	}
+	AnimData *adt = blenderobj->adt;
+	if (adt && (adt->action || adt->drivers.first || adt->nla_tracks.first)) {
+		return false;
+	}
+	for (int i = 0; i < 4; ++i) {
+		if (blenderobj->col[i] != 1.0f) {
+			return false;
+		}
+	}
+	return true;
+}
+
+static void BL_StaticBatchObjects(EXP_ListValue<KX_GameObject> *objectlist, bool autoBatch)
 {
 	std::vector<KX_GameObject *> batchObjects;
 	for (KX_GameObject *gameobj : objectlist) {
 		Object *blenderobj = gameobj->GetBlenderObject();
-		if (!blenderobj || !(blenderobj->gameflag2 & OB_STATIC_BATCH) || !gameobj->GetMeshUser() ||
-		    gameobj->GetDeformer())
+		if (!blenderobj || !gameobj->GetMeshUser() || gameobj->GetDeformer()) {
+			continue;
+		}
+		if (!(blenderobj->gameflag2 & OB_STATIC_BATCH) &&
+		    !(autoBatch && BL_AutoStaticBatchCandidate(gameobj, blenderobj)))
 		{
 			continue;
 		}
@@ -3911,7 +3940,7 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		}
 	}
 
-	BL_StaticBatchObjects(objectlist);
+	BL_StaticBatchObjects(objectlist, (kxscene->GetBlenderScene()->gm.lodflag & SCE_AUTO_STATIC_BATCH) != 0);
 }
 
 void BL_ConvertCustomMouseCursor(KX_Scene *kxscene, Main *maggie, KX_KetsjiEngine *ketsjiEngine, const char *filepath)

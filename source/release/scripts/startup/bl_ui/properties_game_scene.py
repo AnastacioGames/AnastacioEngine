@@ -139,6 +139,9 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
             row.active = gs.use_scene_hysteresis
             row.prop(gs, "scene_hysteresis_percentage", text="")
 
+            row = box.row()
+            row.prop(gs, "use_auto_static_batch")
+
         # ---- Python Console ----
         row = main_box.row(align=True)
         row.prop(scene, "show_expanded_game_console", text="Python Console",

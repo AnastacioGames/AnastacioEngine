@@ -376,7 +376,8 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   launcher em 2026-10-24). Falta usar num jogo real com som (o `--server` não toca).
 - **Static Batch:** com ele ligado empatamos com a ThunderPlayer no benchmark de 2026-10-09
   ([batching estático e culling](batching-estatico-e-culling.md)). Grupos dupli entram desde 2026-10-21; grupo só
-  RAS ficou impossível (construtor protegido). Próximo passo: tornar o Static Batch automático ou fácil de ligar.
+  RAS ficou impossível (construtor protegido). Opção Auto Static Batch na cena feita em 2026-10-26; falta medir
+  no benchmark da Thunder com ela ligada e decidir se vira padrão em arquivo novo.
 - **Travadas do RolimaRacer (2026-10-10):** `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo. Abertos:
   picos longos no swap sem causa identificada; conferir de novo com 10 pilotos pelo menu (Range Trace, módulos
   `frames`, `shaders` e `profile`).
