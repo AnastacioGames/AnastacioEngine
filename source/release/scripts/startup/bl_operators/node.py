@@ -1023,6 +1023,88 @@ class MATERIAL_OT_show_generated_code(Operator):
         return {'FINISHED'}
 
 
+class NODE_OT_auto_arrange(Operator):
+    """Arrange the nodes of the current tree in columns, following the links (outputs on the right)"""
+    bl_idname = "node.auto_arrange"
+    bl_label = "Auto Arrange"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    gap_x = 60.0
+    gap_y = 30.0
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return space and space.type == 'NODE_EDITOR' and space.edit_tree is not None
+
+    def execute(self, context):
+        tree = context.space_data.edit_tree
+        # frames and nodes inside frames keep their place
+        nodes = [n for n in tree.nodes if n.type != 'FRAME' and n.parent is None]
+        if not nodes:
+            return {'CANCELLED'}
+        ids = {n.name for n in nodes}
+        outs = {n.name: [] for n in nodes}
+        ins = {n.name: [] for n in nodes}
+        for l in tree.links:
+            a, b = l.from_node.name, l.to_node.name
+            if a in ids and b in ids and a != b:
+                outs[a].append(b)
+                ins[b].append(a)
+
+        # column = longest path to an output (0 = rightmost); cycles are cut
+        col = {}
+        visiting = set()
+
+        def depth(name):
+            if name in col:
+                return col[name]
+            if name in visiting:
+                return 0
+            visiting.add(name)
+            d = 0
+            for t in outs[name]:
+                d = max(d, depth(t) + 1)
+            visiting.discard(name)
+            col[name] = d
+            return d
+
+        for n in nodes:
+            depth(n.name)
+
+        by_name = {n.name: n for n in nodes}
+        # anchor: keep the top right of the old layout
+        right = max(n.location.x + n.dimensions.x for n in nodes)
+        top = max(n.location.y for n in nodes)
+
+        ncols = max(col.values()) + 1
+        columns = [[] for _ in range(ncols)]
+        for n in nodes:
+            columns[col[n.name]].append(n)
+
+        order = {}
+        x = right
+        for c in range(ncols):
+            column = columns[c]
+            if c == 0:
+                column.sort(key=lambda n: -n.location.y)
+            else:
+                # follow the order of the nodes they feed, so links cross less
+                def key(n):
+                    tgt = [order[t] for t in outs[n.name] if t in order]
+                    return (sum(tgt) / len(tgt)) if tgt else 1e9
+                column.sort(key=key)
+            width = max(n.dimensions.x for n in column)
+            x -= width
+            y = top
+            for i, n in enumerate(column):
+                order[n.name] = i
+                n.location = (x + (width - n.dimensions.x), y)
+                y -= n.dimensions.y + self.gap_y
+            x -= self.gap_x
+        return {'FINISHED'}
+
+
 classes = (
     NodeSetting,
 
@@ -1034,6 +1116,7 @@ classes = (
     NODE_OT_add_linked,
     NODE_OT_add_node,
     NODE_OT_add_search,
+    NODE_OT_auto_arrange,
     NODE_OT_collapse_hide_unused_toggle,
     NODE_OT_tree_path_parent,
 )

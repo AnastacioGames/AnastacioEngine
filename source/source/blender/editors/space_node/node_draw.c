@@ -1474,7 +1474,7 @@ const float *node_space_tint(const char *tree_idname)
 	return NULL;
 }
 
-static void draw_tree_path(SpaceNode *snode)
+static void draw_tree_path(const bContext *C, ARegion *ar, SpaceNode *snode)
 {
 	char info[256];
 	const float *tint = node_space_tint(snode->tree_idname);
@@ -1499,6 +1499,23 @@ static void draw_tree_path(SpaceNode *snode)
 
 	UI_ThemeColor(TH_TEXT_HI);
 	BLF_draw_default(x, 1.5f * UI_UNIT_Y, 0.0f, info, sizeof(info));
+
+	/* botão Auto Arrange ao lado do caminho, só com árvore aberta */
+	if (snode->edittree) {
+		uiBlock *block;
+		const char *label = IFACE_("Auto Arrange");
+		int w, h = UI_UNIT_Y;
+
+		x += BLF_width_default(info, sizeof(info)) + 0.75f * UI_UNIT_X;
+		w = (int)(BLF_width_default(label, BLF_DRAW_STR_DUMMY_MAX) + 2.5f * UI_UNIT_X);
+
+		block = UI_block_begin(C, ar, "node tree auto arrange", UI_EMBOSS);
+		uiDefIconTextButO(block, UI_BTYPE_BUT, "NODE_OT_auto_arrange", WM_OP_INVOKE_DEFAULT, ICON_NODETREE,
+		                  label, (int)x, (int)(1.5f * UI_UNIT_Y - 0.3f * UI_UNIT_Y), w, h,
+		                  TIP_("Arrange the nodes in columns, following the links"));
+		UI_block_end(C, block);
+		UI_block_draw(C, block);
+	}
 }
 
 static void snode_setup_v2d(SpaceNode *snode, ARegion *ar, const float center[2])
@@ -1676,7 +1693,7 @@ void drawnodespace(const bContext *C, ARegion *ar)
 	}
 
 	/* tree path info */
-	draw_tree_path(snode);
+	draw_tree_path(C, ar, snode);
 
 	/* scrollers */
 	scrollers = UI_view2d_scrollers_calc(C, v2d, NULL, 10, V2D_GRID_CLAMP, V2D_ARG_DUMMY, V2D_ARG_DUMMY);
