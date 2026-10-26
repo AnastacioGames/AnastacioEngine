@@ -320,8 +320,9 @@ void KX_DebugMode::RenderDebugProperties()
       ImGui::EndTable();
     }
 
-	// Show only framerate (no button).
+	// Show only framerate (no button): FPS Counter adds the draw calls of the last frame.
 	if (!KX_GetActiveEngine()->GetFlag(KX_KetsjiEngine::SHOW_PROFILE)) {
+      ImGui::Text("%i draw calls", RAS_Rasterizer::GetLastDrawCalls());
       ImGui::End();
       return;
     }

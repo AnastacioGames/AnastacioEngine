@@ -1200,6 +1200,9 @@ enum {
 /* Static objects without logic, parent or animation enter the Static Batch on their own when the
  * scene converts (BL_StaticBatchObjects). Off in old files (bit never used before). */
 #define SCE_AUTO_STATIC_BATCH	(1 << 1)
+/* Small FPS + draw calls counter in the game (without the full profile). Lives here because
+ * GameData.flag has no free bit left. */
+#define SCE_SHOW_FPS_COUNTER	(1 << 2)
 
 /* GameData.hdr */
 #define GAME_HDR_NONE		0

@@ -806,6 +806,8 @@ class RENDER_PT_game_display(RenderButtonsPanel, Panel):
         col.menu("RENDER_MT_game_refresh_rate", text=str(gs.frequency))
 
         # How the image fits the window when the aspect ratio differs.
+        display_group.prop(gs, "show_fps_counter", icon="TIME")
+
         framing_box = display_group.box()
         framing_box.label(text="Framing:", icon="IMAGE_COL")
         col = framing_box.column()

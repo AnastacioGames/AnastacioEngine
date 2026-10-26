@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - FPS Counter (contador compacto)
+
+- Render > Display e Game > Overlays: **FPS Counter** (`game_settings.show_fps_counter`, bit `SCE_SHOW_FPS_COUNTER`
+  em `gm.lodflag`, pois `gm.flag` não tem bit livre). Liga só a janelinha de taxas (Logic/Render/Animation)
+  com a contagem de draw calls do último quadro, sem o profile completo. Vale também no jogo exportado (o
+  runtime lê a opção da cena). `Show Profile` segue como antes.
+
 ## 2026-10-26 - PCSS vira sombra dura em Low/Very Low + menu simples de filtro
 
 - Presets de qualidade Low e Very Low (e Auto quando resolve para Low: iGPU, Web, Android) desenham lâmpadas

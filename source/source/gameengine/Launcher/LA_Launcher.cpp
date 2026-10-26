@@ -268,7 +268,8 @@ void LA_Launcher::InitEngine()
 
 	// WARNING: Fixed time is the opposite of fixed framerate.
 	bool fixed_framerate = (SYS_GetCommandLineInt(syshandle, "fixedtime", (gm.flag & GAME_ENABLE_ALL_FRAMES)) == 0);
-	bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", (gm.flag & GAME_SHOW_FRAMERATE)) != 0);
+	bool frameRate = (SYS_GetCommandLineInt(syshandle, "show_framerate", (gm.flag & GAME_SHOW_FRAMERATE)) != 0) ||
+	                 (gm.lodflag & SCE_SHOW_FPS_COUNTER);
 	bool renderQueries = (SYS_GetCommandLineInt(syshandle, "show_render_queries", (gm.flag & GAME_SHOW_RENDER_QUERIES)) != 0);
 	short showBoundingBox = SYS_GetCommandLineInt(syshandle, "show_bounding_box", gm.showBoundingBox);
 	short showArmatures = SYS_GetCommandLineInt(syshandle, "show_armatures", gm.showArmatures);

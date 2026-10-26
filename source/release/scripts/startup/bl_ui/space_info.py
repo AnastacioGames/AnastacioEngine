@@ -413,6 +413,7 @@ class INFO_MT_game_overlays(Menu):
     def draw(self, context):
         layout = self.layout
         gs = context.scene.game_settings
+        layout.prop(gs, "show_fps_counter")
         layout.prop(gs, "show_framerate_profile", text="Show Profile")
         layout.prop(gs, "show_render_queries")
         layout.prop(gs, "show_debug_properties")

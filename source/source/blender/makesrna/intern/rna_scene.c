@@ -5537,6 +5537,13 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "together (one draw per material), as if Static Batch was marked on each one");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "show_fps_counter", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "lodflag", SCE_SHOW_FPS_COUNTER);
+	RNA_def_property_ui_text(prop, "FPS Counter",
+	                         "Show a small FPS and draw calls counter in the corner of the game "
+	                         "(also in exported games), without the full profile");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "scene_hysteresis_percentage", PROP_INT, PROP_PERCENTAGE);
 	RNA_def_property_int_sdna(prop, NULL, "scehysteresis");
 	RNA_def_property_range(prop, 0, 100);
