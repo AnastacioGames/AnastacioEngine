@@ -63,7 +63,11 @@
 
 extern "C" {
 #  include "mathutils_bvhtree.h"
+#  include "BKE_library.h"
+#  include "BKE_mesh.h"
 }
+#include "DNA_material_types.h"
+#include "DNA_mesh_types.h"
 
 KX_Mesh::KX_Mesh(KX_Scene *scene, Mesh *mesh, const RAS_Mesh::LayersInfo& layersInfo)
 	:RAS_Mesh(mesh, layersInfo),
@@ -82,7 +86,8 @@ KX_Mesh::KX_Mesh(KX_Scene *scene, const std::string& name, const RAS_Mesh::Layer
 KX_Mesh::KX_Mesh(const KX_Mesh& other)
 	:RAS_Mesh(other),
 	m_scene(other.m_scene),
-	m_bitmapTextValid(false)
+	m_bitmapTextValid(false),
+	m_ownedMesh(other.m_ownedMesh)
 {
 	// Point the bitmap text faces at the display arrays of this copy.
 	for (const BitmapTextFace& face : other.m_bitmapTextFaces) {
@@ -99,6 +104,23 @@ KX_Mesh::KX_Mesh(const KX_Mesh& other)
 
 KX_Mesh::~KX_Mesh()
 {
+}
+
+void KX_Mesh::FreeGameOnlyMesh(Mesh *me)
+{
+	// Give back the material users taken by BKE_mesh_new_from_object.
+	for (short i = 0; i < me->totcol; ++i) {
+		if (me->mat && me->mat[i]) {
+			id_us_min(&me->mat[i]->id);
+		}
+	}
+	BKE_mesh_free(me);
+	MEM_freeN(me);
+}
+
+void KX_Mesh::SetOwnedMesh(Mesh *mesh)
+{
+	m_ownedMesh.reset(mesh, FreeGameOnlyMesh);
 }
 
 KX_Scene *KX_Mesh::GetScene() const

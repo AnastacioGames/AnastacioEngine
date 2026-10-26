@@ -193,6 +193,9 @@ extern "C" {
 #include "BKE_python_component.h"
 #include "BKE_key.h"
 #include "BKE_mesh.h"
+extern "C" {
+#include "BKE_displist.h"
+}
 
 #ifdef WITH_AUDASPACE
 typedef float sample_t;
@@ -2297,6 +2300,39 @@ static KX_GameObject *BL_GameObjectFromBlenderObject(Object *ob, KX_Scene *kxsce
 				lodManager->Release();
 			}
 
+			gameobj->SetOccluder((ob->gameflag & OB_OCCLUDER) != 0, false);
+			gameobj->SetActivityCullingInfo(activityCullingInfoFromBlenderObject(ob));
+			break;
+		}
+
+		case OB_MBALL:
+		{
+			/* Metaballs become a static mesh on Play: the basis metaball is polygonized once (the
+			 * others of its family give nothing and stay as empties). The mesh lives outside Main so
+			 * it never shows in the editor or gets saved; the KX_Mesh frees it. */
+			Main *bmain = G.main;
+			/* The runtime reads files without the editor's display cache, which the render
+			 * polygonize also uses (texture space); build it first. */
+			if (bmain && !ob->curve_cache) {
+				BKE_displist_make_mball(bmain, bmain->eval_ctx, blenderscene, ob);
+			}
+			Mesh *mesh = (bmain && ob->curve_cache) ?
+			             BKE_mesh_new_from_object(bmain, blenderscene, ob, false, eModifierMode_Render, true, false) : nullptr;
+			if (mesh) {
+				BLI_remlink(&bmain->mesh, mesh);
+				if (mesh->totpoly == 0) {
+					KX_Mesh::FreeGameOnlyMesh(mesh);
+					mesh = nullptr;
+				}
+			}
+			if (!mesh) {
+				gameobj = new KX_EmptyObject(kxscene, KX_Scene::m_callbacks);
+				break;
+			}
+			KX_Mesh *meshobj = BL_ConvertMesh(mesh, ob, kxscene, converter);
+			meshobj->SetOwnedMesh(mesh);
+			gameobj = new KX_GameObject(kxscene, KX_Scene::m_callbacks);
+			gameobj->AddMesh(meshobj);
 			gameobj->SetOccluder((ob->gameflag & OB_OCCLUDER) != 0, false);
 			gameobj->SetActivityCullingInfo(activityCullingInfoFromBlenderObject(ob));
 			break;

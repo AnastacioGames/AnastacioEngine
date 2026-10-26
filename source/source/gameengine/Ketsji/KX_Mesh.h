@@ -82,11 +82,19 @@ private:
 	std::string m_bitmapText;
 	bool m_bitmapTextValid;
 
+	/// Blender mesh made only for the game (metaball polygonized on Play), freed with the last copy.
+	std::shared_ptr<Mesh> m_ownedMesh;
+
 public:
 	KX_Mesh(KX_Scene *scene, Mesh *mesh, const LayersInfo& layersInfo);
 	KX_Mesh(KX_Scene *scene, const std::string& name, const LayersInfo& layersInfo);
 	KX_Mesh(const KX_Mesh& other);
 	virtual ~KX_Mesh();
+
+	/// Takes a Blender mesh kept outside Main (see m_ownedMesh); it must be the mesh of this KX_Mesh.
+	void SetOwnedMesh(Mesh *mesh);
+	/// Frees a mesh made by BKE_mesh_new_from_object and already unlinked from Main.
+	static void FreeGameOnlyMesh(Mesh *mesh);
 
 	// stuff for cvalue related things
 	virtual std::string GetName();
