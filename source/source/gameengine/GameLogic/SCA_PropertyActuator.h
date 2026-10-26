@@ -64,6 +64,7 @@ class SCA_PropertyActuator : public SCA_IActuator
 	std::string m_cachedExprText;
 
 	EXP_Expression *GetExpression(EXP_Value *propowner);
+	bool AddInPlace(EXP_Value *oldprop, EXP_Expression *userexpr);
 	void ClearCachedExpression();
 
 public:

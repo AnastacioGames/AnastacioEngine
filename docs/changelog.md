@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Property Actuator: Add numérico sem alocar
+
+- Cena nova de estresse de lógica: `tools/create_perf_logic_test.py` (500 e 2000 cubos, cada um com
+  Always → AND → Motion + Property Add, ou o mesmo num controller Python de módulo). Medir com
+  `tools/run_perf_suite.py projects-teste/perf/logic`.
+- O perfil (com PDB) dos bricks mostrou alocação (`RtlAllocateHeap`/`RtlFreeHeap` ~8,5%) vinda do
+  `SCA_PropertyActuator::Update` no modo Add: montava `EXP_Operator2Expr` + `EXP_ConstExpr` e um valor novo a
+  cada quadro. Agora int + int e float + float somam direto na propriedade (`AddInPlace`), com o mesmo resultado
+  (o float mantém o arredondamento para 0 abaixo de 0,001); tipos misturados seguem o caminho antigo.
+- Conferido: Add int, float, float minúsculo, int + "2.7" e float + "3" dão os mesmos valores nas duas versões
+  após 30 quadros. A/B 3 rodadas alternadas: bricks 2000 obj 6,11 → 4,84 ms (−20,8%), 500 obj −17%; Python
+  não passa por aqui (diferença dentro do ruído).
+
 ## 2026-10-26 - Buckets: material marca se tem malha visível no passe
 
 - `RAS_MaterialBucket` ganha `MarkActive/HasActive`, ligado em `ActivateMesh` e limpo com os slots. `PrepareBuckets`, `GenerateTree` e a limpeza pulam materiais sem nada visível sem varrer as malhas (antes eram 3 varreduras completas por face de sombra).

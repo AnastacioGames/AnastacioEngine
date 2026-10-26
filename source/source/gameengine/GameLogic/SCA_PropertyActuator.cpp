@@ -40,6 +40,8 @@
 #include "EXP_InputParser.h"
 #include "EXP_Operator2Expr.h"
 #include "EXP_ConstExpr.h"
+#include "EXP_IntValue.h"
+#include "EXP_FloatValue.h"
 #include "CM_Format.h"
 #include "KX_WorldInfo.h"
 
@@ -124,6 +126,34 @@ EXP_Expression *SCA_PropertyActuator::GetExpression(EXP_Value *propowner)
 		m_cachedExprText = m_exprtxt;
 	}
 	return expr;
+}
+
+/* Add of a same-type number (int + int, float + float) written straight into the property:
+ * same result as building "old + expr" and calling SetValue, without allocating the
+ * expression tree and the result value every frame. Other types take the general path. */
+bool SCA_PropertyActuator::AddInPlace(EXP_Value *oldprop, EXP_Expression *userexpr)
+{
+	const int oldtype = oldprop->GetValueType();
+	if (oldtype != VALUE_INT_TYPE && oldtype != VALUE_FLOAT_TYPE) {
+		return false;
+	}
+	EXP_Value *add = userexpr->Calculate();
+	bool done = false;
+	if (add && add->GetValueType() == oldtype) {
+		if (oldtype == VALUE_INT_TYPE) {
+			EXP_IntValue *ival = static_cast<EXP_IntValue *>(oldprop);
+			ival->SetInt(static_cast<EXP_IntValue *>(add)->GetInt() + ival->GetInt());
+		}
+		else {
+			EXP_FloatValue *fval = static_cast<EXP_FloatValue *>(oldprop);
+			fval->SetFloat(static_cast<EXP_FloatValue *>(add)->GetFloat() + fval->GetFloat());
+		}
+		done = true;
+	}
+	if (add) {
+		add->Release();
+	}
+	return done;
 }
 
 bool SCA_PropertyActuator::Update()
@@ -260,8 +290,10 @@ bool SCA_PropertyActuator::Update()
 			case KX_ACT_PROP_ADD:
 			{
 				EXP_Value *oldprop = propowner->GetProperty(m_propname);
+				if (oldprop && AddInPlace(oldprop, userexpr)) {
+					break;
+				}
 				if (oldprop) {
-					// int waarde = (int)oldprop->GetNumber();  /*unused*/
 					EXP_Expression *expr = new EXP_Operator2Expr(VALUE_ADD_OPERATOR, new EXP_ConstExpr(oldprop->AddRef()),
 					                                             userexpr->AddRef());
 
