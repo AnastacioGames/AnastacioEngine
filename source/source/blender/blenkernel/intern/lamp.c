@@ -62,7 +62,7 @@ void BKE_lamp_init(Lamp *la)
 	la->clipsta = 0.5f;
 	la->clipend = 40.0f;
 	la->samp = 1;
-	la->bias = 1.0f;
+	la->bias = 0.1f;
 	la->slopebias = 0.0f;
 	la->soft = 0.3f;
 	la->compressthresh = 0.05f;
@@ -111,7 +111,8 @@ void BKE_lamp_init(Lamp *la)
 	la->csm_bufsize[1] = 128;
 	la->csm_soft[0] = 5.0f;
 	la->csm_soft[1] = 8.0f;
-	la->csm_bias[0] = la->csm_bias[1] = 1.0f;
+	la->csm_bias[0] = 0.4f; /* Middle cascade */
+	la->csm_bias[1] = 0.7f; /* Low/far cascade */
 
 	curvemapping_initialize(la->curfalloff);
 }
