@@ -191,6 +191,8 @@ TEST(NetSession, ServerAndTwoClients)
 	ASSERT_TRUE(left != nullptr);
 	EXPECT_EQ(left->disconnectReason, DisconnectReason::Quit);
 	EXPECT_EQ(b.session->players().size(), 1u);
+	// Quit keeps no slot: the objects are released right away.
+	EXPECT_EQ(w.count(SessionEvent::Type::ClientExpired), 1u);
 }
 
 TEST(NetSession, PingPongRtt)
@@ -433,6 +435,14 @@ TEST(NetSession, KickAndShutdown)
 	w.step(20);
 	ASSERT_TRUE(a.find(SessionEvent::Type::Disconnected) != nullptr);
 	EXPECT_EQ(a.find(SessionEvent::Type::Disconnected)->disconnectReason, DisconnectReason::Kicked);
+	// The layers above see the kick as ClientLeft + ClientExpired.
+	bool kickedLeft = false;
+	for (const SessionEvent &e : w.serverEvents) {
+		kickedLeft = kickedLeft || (e.type == SessionEvent::Type::ClientLeft && e.client == 1 &&
+		                            e.disconnectReason == DisconnectReason::Kicked);
+	}
+	EXPECT_TRUE(kickedLeft);
+	EXPECT_EQ(w.count(SessionEvent::Type::ClientExpired), 1u);
 	w.server->stop();
 	w.step(20);
 	ASSERT_TRUE(b.find(SessionEvent::Type::Disconnected) != nullptr);

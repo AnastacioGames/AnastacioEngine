@@ -54,7 +54,7 @@ struct SessionEvent {
 		ClientJoined,  // client, text = name, reconnected
 		ClientReady,  // client loaded the current scene
 		ClientLeft,  // client, disconnectReason; reconnect slot kept unless Quit/Kicked/violation
-		ClientExpired,  // reconnect window closed: despawn or transfer its objects
+		ClientExpired,  // reconnect window closed, or no slot was kept: despawn or transfer its objects
 		/* Both. */
 		Message,  // messageType, channel, body (any message not handled by the session)
 	};
@@ -204,6 +204,8 @@ private:
 	bool m_gameStarted = false;
 	bool m_running = false;
 	uint64_t m_lastNowMs = 0;
+	/// Events from calls outside update() (kick), delivered by the next update().
+	std::vector<SessionEvent> m_deferredEvents;
 };
 
 /** \} */

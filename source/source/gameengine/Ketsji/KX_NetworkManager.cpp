@@ -1643,8 +1643,19 @@ void KX_NetworkManager::HandleServerEvent(const net::SessionEvent &event, uint64
 			/* The replicator already forgot the objects the client had spawned (despawnOnExpire): remove them
 			 * from the game too. */
 			for (auto &pair : m_entries) {
-				if (pair.second.spawned && pair.second.owner == event.client && pair.second.obj && m_scene) {
-					m_scene->DelayedRemoveObject(pair.second.obj);
+				Entry &entry = pair.second;
+				if (entry.owner != event.client) {
+					continue;
+				}
+				if (entry.spawned) {
+					if (entry.obj && m_scene) {
+						m_scene->DelayedRemoveObject(entry.obj);
+					}
+				}
+				else {
+					/* Scene objects went back to the server in the replicator: follow it here, or a new player
+					 * that reuses the id would drive them with its input. */
+					entry.owner = net::kServerClientId;
 				}
 			}
 			break;

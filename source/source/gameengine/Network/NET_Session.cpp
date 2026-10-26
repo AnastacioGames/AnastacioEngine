@@ -156,6 +156,10 @@ void ServerSession::sendTo(PeerId peer, Channel channel, const std::vector<uint8
 void ServerSession::update(uint64_t nowMs, Tick serverTick, std::vector<SessionEvent> &events)
 {
 	m_lastNowMs = nowMs;
+	for (SessionEvent &ev : m_deferredEvents) {
+		events.push_back(std::move(ev));
+	}
+	m_deferredEvents.clear();
 	std::vector<TransportEvent> incoming;
 	m_transport.poll(incoming);
 
@@ -538,8 +542,9 @@ void ServerSession::closeConnection(PeerId peer, DisconnectReason reason, bool s
 	ev.reconnected = keepSlot && conn.state.token != 0;
 	ev.text = conn.state.name;
 	events.push_back(std::move(ev));
-	// A client without token can never come back.
-	if (!ev.reconnected && keepSlot) {
+	// Without a reconnection slot (Quit, Kicked, violation or no token) the client never comes back:
+	// its objects must be released now, or a new player reusing the id would inherit them.
+	if (!ev.reconnected) {
 		SessionEvent expired;
 		expired.type = SessionEvent::Type::ClientExpired;
 		expired.client = conn.state.id;
@@ -591,8 +596,8 @@ void ServerSession::kick(ClientId client, DisconnectReason reason)
 	if (it == m_clients.end()) {
 		return;
 	}
-	std::vector<SessionEvent> ignored;
-	closeConnection(it->second, reason, true, false, m_lastNowMs, ignored);
+	// Delivered by the next update(), so the layers above also see ClientLeft/ClientExpired.
+	closeConnection(it->second, reason, true, false, m_lastNowMs, m_deferredEvents);
 }
 
 void ServerSession::changeScene(const std::string &sceneName, uint64_t sceneHash)

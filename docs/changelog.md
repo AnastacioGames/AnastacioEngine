@@ -8,6 +8,27 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Revisão do multiplayer: saída de jogadores
+
+- `Quit`, kick e violação agora geram `ClientExpired`: os objetos do jogador são removidos ou voltam ao
+  servidor em vez de ficarem com dono inexistente (e serem herdados por quem pegasse o mesmo id).
+- Kick entrega `ClientLeft`/`ClientExpired` no próximo `update()` da sessão.
+- Manager devolve ao servidor o dono dos objetos de cena quando o jogador expira.
+- [Revisão](revisao-multiplayer.md); `net_tests` 121/121.
+
+## 2026-10-26 - Frente 2: revisão de SceneGraph e sequência da simulação
+
+- Lidas 2.354 linhas de 13 arquivos de nós, filas, relações de parenting e pipeline. Consulta seletiva
+  do engine principal; relógio/acumulador ainda pendentes. [Relatório](revisao-scenegraph-loop.md).
+- Harness serial compilou os fontes reais e reproduziu descendente stale no vertex parent,
+  orientação não finita com escala zero, movimento global afetado pela escala do pai e reinserção
+  inválida em QAddFront (sem uso atual encontrado). Movimento zero gerou 50 callbacks em 50 chamadas;
+  setter idêntico gerou zero. Não é benchmark de FPS nem teste de concorrência.
+- Registrado por leitura membro m_modified não inicializado na cópia de SG_Node, sem reprodução
+  do impacto no jogo. Evidências em `artifacts/revisao-scenegraph-20261026/`.
+- Sem alteração de produto ou abertura de janelas/jogo. Modelo local indisponível por conexão
+  recusada; análise direta e selftest do detector concluídos. Mudanças concorrentes preservadas.
+
 ## 2026-10-26 - Segunda revisão da frente 8 pelo Codex
 
 - Conferidos os oito commits de dados/editor/plataformas até 40762df8. Três casos reproduzidos:
