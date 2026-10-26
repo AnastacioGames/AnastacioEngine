@@ -362,13 +362,16 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   `OB_MBALL` e a metaball some no Play; a saída é Alt+C → Mesh. Proposta: converter a superfície em malha
   estática ao dar Play, como curva/texto (custo só no carregamento). Versão dinâmica (re-tessellar a cada
   frame) descartada por ora: pesada na CPU; só com caso de uso concreto, de preferência na GPU.
-- **Compositing no jogo (futuro)**: hoje as árvores Compositing e Texture só valem no render e ficam escondidas
-  no cabeçalho do Node Editor em modo jogo. Proposta: compilar o grafo do compositor numa cadeia de 2D Filters
-  (cada nó vira um trecho de GLSL, como os nós de shader), começando por ~10 nós baratos (Blur leve, Glare,
-  Color Balance, Vinheta, Mix, Curves...). Defocus pesado e Denoise ficam fora. Texture nodes no jogo: sem
-  ganho (os nós de Shader já cobrem), no máximo um bake para imagem.
-  Referência ao implementar: o compositor de GPU do Blender 5 (`source/blender/compositor`, shaders GLSL por
-  nó), que já resolve em tempo real o que o compositor 2.79 faz em CPU; adaptar ao nosso GL e aos 2D Filters.
+- **Compositing no jogo — fase 1 feita (falta aceite com janela)**: com Use Nodes ligado, a árvore do
+  compositor vira um 2D Filter no fim da cadeia (`KX_CompositorFilter`, passo `FILTERPASS_COMPOSITOR`). Cada nó
+  é uma função GLSL da coordenada, então Blur e Lens Distortion leem o que vem antes (vinheta = Ellipse Mask →
+  Blur → Mix). Nós: Render Layers (Image/Alpha/Depth), RGB, Value, Mix (todos os modos), Alpha Over,
+  Bright/Contrast, Gamma, Invert, Hue Sat Val, Color Balance (LGG/CDL), RGB Curves, Color Ramp, RGB to BW,
+  Separate/Combine RGBA, Set Alpha, Math, Box/Ellipse Mask, Blur (7x7 leve), Lens Distortion, Reroute.
+  Outros nós passam a entrada adiante com aviso. Árvore padrão (Render Layers → Composite) não cria passo.
+  Valores lidos no load (sem edição ao vivo). Teste: `tools/debug/cenas/criar_cena_compositing_jogo.py`;
+  `RANGE_COMPOSITOR_DUMP=arquivo` grava o shader gerado. Próximas fases: Glare, valores ao vivo, Texture nodes
+  só como bake. Defocus pesado e Denoise ficam fora.
 
 ## Performance
 

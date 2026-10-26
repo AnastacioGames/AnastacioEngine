@@ -94,8 +94,9 @@ class NODE_HT_header(Header):
                 if getattr(cls, "range_experimental", False):
                     label += " (Experimental)"
                 trees.append((cls.bl_idname, label))
-        # compositing and texture nodes only work in renders: hide them in game mode
-        render_only = {"CompositorNodeTree", "TextureNodeTree"}
+        # texture nodes only work in renders: hide them in game mode (the compositor runs in the
+        # game as a 2D filter, see KX_CompositorFilter)
+        render_only = {"TextureNodeTree"}
         game = scene.render.engine == 'BLENDER_GAME'
         for idname, label in trees:
             if game and idname in render_only and snode.tree_type != idname:

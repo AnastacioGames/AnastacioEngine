@@ -75,11 +75,13 @@ public:
 		FILTERPASS_CAMERA_LENS  = 23,
 		/* Half resolution color + circle of confusion read by the half resolution DOF gather
 		 * (desktop); runs right before it, see RenderOrderKey() */
-		FILTERPASS_CAMERA_DOF_REDUCE = 24
+		FILTERPASS_CAMERA_DOF_REDUCE = 24,
+		/* The scene's compositor nodes (KX_CompositorFilter), last of the built-in passes */
+		FILTERPASS_COMPOSITOR   = 25
 	};
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */
-	const int reservedPassIndex = FILTERPASS_CAMERA_DOF_REDUCE + 1;
+	const int reservedPassIndex = FILTERPASS_COMPOSITOR + 1;
 
 	enum FILTER_MODE {
 		FILTER_ENABLED = -2,

@@ -643,6 +643,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	}
 
 	m_filterManager = new KX_2DFilterManager(canvas, filters);
+	m_filterManager->EnsureCompositorFilter(scene);
 	m_logicmgr = new SCA_LogicManager();
 
 	m_timemgr = new SCA_TimeEventManager(m_logicmgr);

@@ -35,6 +35,7 @@
 
 class KX_Camera;
 class KX_Scene;
+struct Scene;
 
 class KX_2DFilterManager : public RAS_2DFilterManager, public EXP_PyObjectPlus
 {
@@ -71,6 +72,8 @@ public:
 	void EnsureCloudsFilters(BuildInFilters filters);
 	void EnsureVFogFilters(BuildInFilters filters);
 	void EnsureLensFlareFilters(BuildInFilters filters);
+	/// Compositing in the game: the scene compositor tree as one filter (FILTERPASS_COMPOSITOR).
+	void EnsureCompositorFilter(Scene *scene);
 	bool SetBuiltinFilterEnabled(FILTER_MODE mode, bool enabled) override;
 
 	/** Camera FX of the active camera: adds/removes the DOF and Lens passes when the set of enabled

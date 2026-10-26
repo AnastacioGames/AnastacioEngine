@@ -38,6 +38,7 @@
 #include "KX_GameObject.h"
 #include "KX_Globals.h"
 #include "KX_EngineProfiler.h"
+#include "KX_CompositorFilter.h"
 #include "DNA_camera_types.h"
 #include "DNA_scene_types.h" // SCENE_FX_FXAA_* defaults
 #include "BLI_utildefines.h"
@@ -100,7 +101,7 @@ static void kx_profile_filter_pass(int pass)
 			/* 5 is the SSAO composite and 12 the half resolution DOF (see the slot constants below). */
 			"ssgi", "ssgi_image", "ssr", "ssr_blur", "ssao", "ssao_image", "bloom_down0", "bloom_down1",
 			"bloom_down2", "bloom_down3", "bloom_up", "bloom_image", "camera_dof_half", "lightscatter", "lightscatter_image", "fxaa", "tonemap", "rain", "clouds",
-			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens", "camera_dof_reduce"};
+			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens", "camera_dof_reduce", "compositor"};
 		static std::string storage[258];
 		if (pass == -2) {
 			storage[slot] = "filter.resolve";
@@ -579,6 +580,39 @@ void KX_2DFilterManager::EnsureRainFilters(BuildInFilters filters)
 	rainData.shaderText = datatoc_RAS_Rain2DFilter_glsl;
 
 	AddFilter(rainData, true);
+}
+
+void KX_2DFilterManager::EnsureCompositorFilter(Scene *scene)
+{
+	if (GetFilterPass(FILTERPASS_COMPOSITOR, true)) {
+		return;
+	}
+	std::vector<std::string> skipped;
+	const std::string shader = KX_BuildCompositorShader(scene, skipped);
+	if (shader.empty()) {
+		return;
+	}
+	for (const std::string& name : skipped) {
+		CM_Warning("Compositing in the game: node \"" << name << "\" is not supported, its input passes through");
+	}
+	// Debug: RANGE_COMPOSITOR_DUMP=file writes the generated shader (checked without a window).
+	if (const char *dump = getenv("RANGE_COMPOSITOR_DUMP")) {
+		if (FILE *f = BLI_fopen(dump, "wb")) {
+			fwrite(shader.data(), 1, shader.size(), f);
+			fclose(f);
+		}
+	}
+
+	RAS_2DFilterData data;
+	data.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+	data.filterPassIndex = FILTERPASS_COMPOSITOR;
+	data.gameObject = nullptr;
+	data.mipmap = false;
+	data.propertyNames = {};
+	data.buildInFilters = m_sceneFilters;
+	data.shaderText = shader;
+	data.sourceName = "Compositing";
+	AddFilter(data, true);
 }
 
 void KX_2DFilterManager::EnsureCloudsFilters(BuildInFilters filters)

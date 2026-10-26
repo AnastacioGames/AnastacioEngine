@@ -84,6 +84,7 @@ set(SRC
 	BL_Texture.cpp
 	KX_2DFilter.cpp
 	KX_2DFilterManager.cpp
+	KX_CompositorFilter.cpp
 	KX_2DFilterOffScreen.cpp
 	KX_AnimationEvent.cpp
 	KX_AnimationEventManager.cpp
@@ -212,6 +213,7 @@ set(SRC
 	BL_Texture.h
 	KX_2DFilter.h
 	KX_2DFilterManager.h
+	KX_CompositorFilter.h
 	KX_2DFilterOffScreen.h
 	KX_AnimationEvent.h
 	KX_AnimationEventManager.h

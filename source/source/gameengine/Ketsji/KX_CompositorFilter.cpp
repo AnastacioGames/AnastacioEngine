@@ -1,0 +1,713 @@
+/*
+ * ***** BEGIN GPL LICENSE BLOCK *****
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ *
+ * ***** END GPL LICENSE BLOCK *****
+ */
+
+/** \file gameengine/Ketsji/KX_CompositorFilter.cpp
+ *  \ingroup ketsji
+ *
+ * Phase 1 of Compositing in the game: the cheap compositor nodes become GLSL, following the
+ * formulas of source/blender/compositor/operations. Values are read once at load (no live edit).
+ * Each node output is a function `vec4 cN_S(vec2 uv)`; floats travel in .x. Nodes that sample
+ * their input at other places (Blur, Lens Distortion) call the upstream function there, so a
+ * blurred mask costs its taps times the mask, which is cheap; a blur over a long chain is not.
+ */
+
+#include "KX_CompositorFilter.h"
+
+#include <map>
+#include <set>
+#include <sstream>
+#include <cmath>
+
+#include "DNA_node_types.h"
+#include "DNA_scene_types.h"
+#include "DNA_color_types.h"
+#include "DNA_texture_types.h"
+#include "DNA_material_types.h"
+#include "BKE_node.h"
+#include "BLI_listbase.h"
+#include "BLI_utildefines.h"
+
+extern "C" {
+#include "BKE_colortools.h"
+#include "BKE_colorband.h"
+}
+
+namespace {
+
+const int LUT_SIZE = 33;
+
+std::string F(float v)
+{
+	if (!std::isfinite(v)) {
+		v = 0.0f;
+	}
+	std::ostringstream s;
+	s.precision(7);
+	s << std::fixed << v;
+	return s.str();
+}
+
+std::string V4(const float v[4])
+{
+	return "vec4(" + F(v[0]) + ", " + F(v[1]) + ", " + F(v[2]) + ", " + F(v[3]) + ")";
+}
+
+class Generator
+{
+public:
+	Generator(bNodeTree *ntree, std::vector<std::string>& skipped)
+		:m_tree(ntree), m_skipped(skipped)
+	{
+	}
+
+	/// Expression (vec4) of the given input socket, at coordinate expression \a uv.
+	std::string Input(bNode *node, int index, const std::string& uv)
+	{
+		bNodeSocket *sock = (bNodeSocket *)BLI_findlink(&node->inputs, index);
+		if (!sock) {
+			return "vec4(0.0)";
+		}
+		bNodeLink *link = FindLink(sock);
+		if (!link || !link->fromnode || !link->fromsock) {
+			return Default(sock);
+		}
+		bNode *from = link->fromnode;
+		bNodeSocket *fromsock = link->fromsock;
+		// Reroutes and muted nodes pass their first input on.
+		while (from && (from->type == NODE_REROUTE || (from->flag & NODE_MUTED))) {
+			bNodeSocket *in = (bNodeSocket *)from->inputs.first;
+			bNodeLink *l = in ? FindLink(in) : nullptr;
+			if (!l) {
+				return in ? Convert(Default(in), in->type, sock->type) : Default(sock);
+			}
+			from = l->fromnode;
+			fromsock = l->fromsock;
+		}
+		const int outIndex = BLI_findindex(&from->outputs, fromsock);
+		const std::string name = Emit(from, outIndex);
+		return Convert(name + "(" + uv + ")", fromsock->type, sock->type);
+	}
+
+	std::string Output(bNode *node, int index)
+	{
+		return Emit(node, index);
+	}
+
+	std::string Code() const
+	{
+		return m_code.str();
+	}
+
+private:
+	bNodeLink *FindLink(bNodeSocket *sock)
+	{
+		for (bNodeLink *link = (bNodeLink *)m_tree->links.first; link; link = link->next) {
+			if (link->tosock == sock && (link->flag & NODE_LINK_VALID)) {
+				return link;
+			}
+		}
+		return nullptr;
+	}
+
+	static std::string Default(bNodeSocket *sock)
+	{
+		switch (sock->type) {
+			case SOCK_FLOAT:
+				return "vec4(" + F(((bNodeSocketValueFloat *)sock->default_value)->value) + ")";
+			case SOCK_RGBA:
+				return V4(((bNodeSocketValueRGBA *)sock->default_value)->value);
+			case SOCK_VECTOR: {
+				const float *v = ((bNodeSocketValueVector *)sock->default_value)->value;
+				const float v4[4] = {v[0], v[1], v[2], 0.0f};
+				return V4(v4);
+			}
+			default:
+				return "vec4(0.0)";
+		}
+	}
+
+	/// Color -> value uses the luminance, like the compositor; value -> color is gray, opaque.
+	static std::string Convert(const std::string& expr, int from, int to)
+	{
+		if (from == SOCK_RGBA && to == SOCK_FLOAT) {
+			return "vec4(comp_bw(" + expr + "))";
+		}
+		if (from == SOCK_FLOAT && to == SOCK_RGBA) {
+			return "comp_gray(" + expr + ")";
+		}
+		return expr;
+	}
+
+	float SocketFloat(bNode *node, int index)
+	{
+		bNodeSocket *sock = (bNodeSocket *)BLI_findlink(&node->inputs, index);
+		return (sock && sock->type == SOCK_FLOAT) ? ((bNodeSocketValueFloat *)sock->default_value)->value : 0.0f;
+	}
+
+	bool Linked(bNode *node, int index)
+	{
+		bNodeSocket *sock = (bNodeSocket *)BLI_findlink(&node->inputs, index);
+		return sock && FindLink(sock);
+	}
+
+	std::string Emit(bNode *node, int out)
+	{
+		const std::string name = "c" + std::to_string(Id(node)) + "_" + std::to_string(out);
+		if (m_done.count(name)) {
+			return name;
+		}
+		m_done.insert(name);
+		const std::string body = Body(node, out);
+		m_code << "vec4 " << name << "(vec2 uv)\n{\n" << body << "}\n\n";
+		return name;
+	}
+
+	int Id(bNode *node)
+	{
+		auto it = m_ids.find(node);
+		if (it != m_ids.end()) {
+			return it->second;
+		}
+		const int id = (int)m_ids.size();
+		m_ids[node] = id;
+		return id;
+	}
+
+	std::string Lut(const float *values)
+	{
+		std::string s = "float[" + std::to_string(LUT_SIZE) + "](";
+		for (int i = 0; i < LUT_SIZE; ++i) {
+			s += (i ? ", " : "") + F(values[i]);
+		}
+		return s + ")";
+	}
+
+	std::string Body(bNode *node, int out)
+	{
+		std::ostringstream b;
+		// Inputs are evaluated first (each once), so the body below reads locals.
+		auto in = [&](int i) { return Input(node, i, "uv"); };
+
+		switch (node->type) {
+			case CMP_NODE_R_LAYERS: {
+				bNodeSocket *sock = (bNodeSocket *)BLI_findlink(&node->outputs, out);
+				const std::string sname = sock ? sock->name : "";
+				if (sname == "Image") {
+					b << "\treturn comp_image(uv);\n";
+				}
+				else if (sname == "Alpha") {
+					b << "\treturn vec4(comp_image(uv).a);\n";
+				}
+				else if (sname == "Depth") {
+					b << "\treturn vec4(comp_depth(uv));\n";
+				}
+				else {
+					Skip(std::string("Render Layers > ") + sname);
+					b << "\treturn vec4(0.0);\n";
+				}
+				break;
+			}
+			case CMP_NODE_VALUE: {
+				bNodeSocket *sock = (bNodeSocket *)node->outputs.first;
+				b << "\treturn vec4(" << F(((bNodeSocketValueFloat *)sock->default_value)->value) << ");\n";
+				break;
+			}
+			case CMP_NODE_RGB: {
+				bNodeSocket *sock = (bNodeSocket *)node->outputs.first;
+				b << "\treturn " << V4(((bNodeSocketValueRGBA *)sock->default_value)->value) << ";\n";
+				break;
+			}
+			case CMP_NODE_MIX_RGB: {
+				b << "\tfloat fac = " << in(0) << ".x;\n";
+				b << "\tvec4 c1 = " << in(1) << ";\n\tvec4 c2 = " << in(2) << ";\n";
+				if (node->custom2 & SHD_MIXRGB_USE_ALPHA) {
+					b << "\tfac *= c2.a;\n";
+				}
+				b << "\tvec4 r = vec4(comp_mix(" << (int)node->custom1 << ", clamp(fac, 0.0, 1.0), c1.rgb, c2.rgb), c1.a);\n";
+				if (node->custom2 & SHD_MIXRGB_CLAMP) {
+					b << "\tr.rgb = clamp(r.rgb, 0.0, 1.0);\n";
+				}
+				b << "\treturn r;\n";
+				break;
+			}
+			case CMP_NODE_ALPHAOVER: {
+				b << "\tfloat fac = " << in(0) << ".x;\n";
+				b << "\tvec4 c1 = " << in(1) << ";\n\tvec4 c2 = " << in(2) << ";\n";
+				// Key (straight) alpha over, the default of the node.
+				b << "\tfloat a = clamp(fac * c2.a, 0.0, 1.0);\n";
+				b << "\treturn vec4(mix(c1.rgb, c2.rgb, a), c1.a + a * (1.0 - c1.a));\n";
+				break;
+			}
+			case CMP_NODE_BRIGHTCONTRAST: {
+				b << "\tvec4 c = " << in(0) << ";\n";
+				b << "\tfloat bright = " << in(1) << ".x / 100.0;\n";
+				b << "\tfloat contrast = " << in(2) << ".x;\n";
+				b << "\tfloat delta = contrast / 200.0;\n\tfloat a = 1.0 - delta * 2.0;\n\tfloat bb;\n";
+				b << "\tif (contrast > 0.0) { a = 1.0 / a; bb = a * (bright - delta); }\n";
+				b << "\telse { bb = a * (bright - delta); }\n";
+				b << "\treturn vec4(a * c.rgb + bb, c.a);\n";
+				break;
+			}
+			case CMP_NODE_GAMMA: {
+				b << "\tvec4 c = " << in(0) << ";\n\tfloat g = " << in(1) << ".x;\n";
+				b << "\treturn vec4(mix(c.rgb, pow(max(c.rgb, vec3(0.0)), vec3(g)), vec3(greaterThan(c.rgb, vec3(0.0)))), c.a);\n";
+				break;
+			}
+			case CMP_NODE_INVERT: {
+				b << "\tfloat fac = " << in(0) << ".x;\n\tvec4 c = " << in(1) << ";\n";
+				if (node->custom1 & CMP_CHAN_RGB) {
+					b << "\tc.rgb = mix(c.rgb, 1.0 - c.rgb, fac);\n";
+				}
+				if (node->custom1 & CMP_CHAN_A) {
+					b << "\tc.a = mix(c.a, 1.0 - c.a, fac);\n";
+				}
+				b << "\treturn c;\n";
+				break;
+			}
+			case CMP_NODE_HUE_SAT: {
+				b << "\tvec4 c = " << in(0) << ";\n";
+				b << "\tvec3 hsv = comp_rgb_to_hsv(c.rgb);\n";
+				b << "\thsv.x = fract(hsv.x + " << in(1) << ".x + 0.5);\n";
+				b << "\thsv.y = clamp(hsv.y * " << in(2) << ".x, 0.0, 1.0);\n";
+				b << "\thsv.z *= " << in(3) << ".x;\n";
+				b << "\treturn vec4(mix(c.rgb, comp_hsv_to_rgb(hsv), " << in(4) << ".x), c.a);\n";
+				break;
+			}
+			case CMP_NODE_COLORBALANCE: {
+				NodeColorBalance *n = (NodeColorBalance *)node->storage;
+				b << "\tfloat fac = min(" << in(0) << ".x, 1.0);\n\tvec4 c = " << in(1) << ";\n";
+				if (!n) {
+					b << "\treturn c;\n";
+					break;
+				}
+				if (node->custom1 == 0) {
+					float lift[4], gammaInv[4], gain[4];
+					for (int i = 0; i < 3; ++i) {
+						lift[i] = 2.0f - n->lift[i];
+						gammaInv[i] = (n->gamma[i] != 0.0f) ? 1.0f / n->gamma[i] : 1000000.0f;
+						gain[i] = n->gain[i];
+					}
+					lift[3] = gammaInv[3] = gain[3] = 0.0f;
+					b << "\tvec3 lift = " << V4(lift) << ".rgb;\n\tvec3 ginv = " << V4(gammaInv) << ".rgb;\n";
+					b << "\tvec3 gain = " << V4(gain) << ".rgb;\n";
+					b << "\tvec3 x = max(((comp_lin_to_srgb(c.rgb) - 1.0) * lift + 1.0) * gain, vec3(0.0));\n";
+					b << "\tvec3 r = pow(comp_srgb_to_lin(x), ginv);\n";
+				}
+				else {
+					float slope[4], offset[4], power[4];
+					for (int i = 0; i < 3; ++i) {
+						slope[i] = n->slope[i];
+						offset[i] = n->offset[i] + n->offset_basis;
+						power[i] = n->power[i];
+					}
+					slope[3] = offset[3] = power[3] = 0.0f;
+					b << "\tvec3 r = pow(max(c.rgb * " << V4(slope) << ".rgb + " << V4(offset) << ".rgb, vec3(0.0)), "
+					  << V4(power) << ".rgb);\n";
+				}
+				b << "\treturn vec4(mix(c.rgb, r, fac), c.a);\n";
+				break;
+			}
+			case CMP_NODE_CURVE_RGB: {
+				CurveMapping *cumap = (CurveMapping *)node->storage;
+				b << "\tfloat fac = " << in(0) << ".x;\n\tvec4 c = " << in(1) << ";\n";
+				if (!cumap) {
+					b << "\treturn c;\n";
+					break;
+				}
+				curvemapping_initialize(cumap);
+				float lut[3][LUT_SIZE];
+				for (int i = 0; i < LUT_SIZE; ++i) {
+					const float x = (float)i / (LUT_SIZE - 1);
+					const float vin[3] = {x, x, x};
+					float vout[3];
+					curvemapping_evaluateRGBF(cumap, vout, vin);
+					for (int ch = 0; ch < 3; ++ch) {
+						lut[ch][i] = vout[ch];
+					}
+				}
+				b << "\tvec3 r = vec3(comp_lut(" << Lut(lut[0]) << ", c.r), comp_lut(" << Lut(lut[1])
+				  << ", c.g), comp_lut(" << Lut(lut[2]) << ", c.b));\n";
+				b << "\treturn vec4(mix(c.rgb, r, fac), c.a);\n";
+				break;
+			}
+			case CMP_NODE_VALTORGB: {
+				ColorBand *coba = (ColorBand *)node->storage;
+				b << "\tfloat fac = " << in(0) << ".x;\n";
+				if (!coba) {
+					b << "\treturn vec4(fac);\n";
+					break;
+				}
+				float lut[4][LUT_SIZE];
+				for (int i = 0; i < LUT_SIZE; ++i) {
+					float col[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+					BKE_colorband_evaluate(coba, (float)i / (LUT_SIZE - 1), col);
+					for (int ch = 0; ch < 4; ++ch) {
+						lut[ch][i] = col[ch];
+					}
+				}
+				b << "\tvec4 r = vec4(comp_lut(" << Lut(lut[0]) << ", fac), comp_lut(" << Lut(lut[1]) << ", fac), comp_lut("
+				  << Lut(lut[2]) << ", fac), comp_lut(" << Lut(lut[3]) << ", fac));\n";
+				b << (out == 1 ? "\treturn vec4(r.a);\n" : "\treturn r;\n");
+				break;
+			}
+			case CMP_NODE_RGBTOBW:
+				b << "\treturn vec4(comp_bw(" << in(0) << "));\n";
+				break;
+			case CMP_NODE_SEPRGBA:
+				b << "\treturn vec4(" << in(0) << "[" << out << "]);\n";
+				break;
+			case CMP_NODE_COMBRGBA:
+				b << "\treturn vec4(" << in(0) << ".x, " << in(1) << ".x, " << in(2) << ".x, " << in(3) << ".x);\n";
+				break;
+			case CMP_NODE_SETALPHA:
+				b << "\treturn vec4(" << in(0) << ".rgb, " << in(1) << ".x);\n";
+				break;
+			case CMP_NODE_MATH: {
+				b << "\tfloat a = " << in(0) << ".x;\n\tfloat b = " << in(1) << ".x;\n";
+				b << "\tfloat r = comp_math(" << (int)node->custom1 << ", a, b);\n";
+				if (node->custom2 & SHD_MATH_CLAMP) {
+					b << "\tr = clamp(r, 0.0, 1.0);\n";
+				}
+				b << "\treturn vec4(r);\n";
+				break;
+			}
+			case CMP_NODE_MASK_ELLIPSE:
+			case CMP_NODE_MASK_BOX: {
+				NodeEllipseMask *d = (NodeEllipseMask *)node->storage;  // same layout as NodeBoxMask
+				b << "\tfloat mask = " << in(0) << ".x;\n\tfloat value = " << in(1) << ".x;\n";
+				if (!d) {
+					b << "\treturn vec4(mask);\n";
+					break;
+				}
+				const float c = cosf(d->rotation), s = sinf(d->rotation);
+				b << "\tfloat aspect = bgl_RenderedTextureWidth / bgl_RenderedTextureHeight;\n";
+				b << "\tfloat dy = (uv.y - " << F(d->y) << ") / aspect;\n\tfloat dx = uv.x - " << F(d->x) << ";\n";
+				b << "\tfloat rx = " << F(c) << " * dx + " << F(s) << " * dy;\n";
+				b << "\tfloat ry = " << F(-s) << " * dx + " << F(c) << " * dy;\n";
+				const float hw = d->width * 0.5f, hh = d->height * 0.5f;
+				if (node->type == CMP_NODE_MASK_ELLIPSE) {
+					b << "\tbool inside = (rx * rx) / " << F(hw * hw) << " + (ry * ry) / " << F(hh * hh) << " < 1.0;\n";
+				}
+				else {
+					b << "\tbool inside = abs(rx) < " << F(hw) << " && abs(ry) < " << F(hh) << ";\n";
+				}
+				b << "\treturn vec4(comp_mask(" << (int)node->custom1 << ", inside, mask, value));\n";
+				break;
+			}
+			case CMP_NODE_BLUR: {
+				NodeBlurData *d = (NodeBlurData *)node->storage;
+				if (!d) {
+					b << "\treturn " << in(0) << ";\n";
+					break;
+				}
+				// Size in pixels (or percent of the image), times the Size input; a 7x7 gaussian grid
+				// spread over it: a light blur (smooth masks, glow), not the render's exact one.
+				std::string rx, ry;
+				if (d->relative) {
+					rx = F(d->percentx * 0.01f) + " * 0.5";
+					ry = F(d->percenty * 0.01f) + " * 0.5";
+				}
+				else {
+					rx = F((float)d->sizex) + " / bgl_RenderedTextureWidth";
+					ry = F((float)d->sizey) + " / bgl_RenderedTextureHeight";
+				}
+				b << "\tvec2 radius = vec2(" << rx << ", " << ry << ") * " << in(1) << ".x;\n";
+				b << "\tvec4 sum = vec4(0.0);\n\tfloat wsum = 0.0;\n";
+				b << "\tfor (int j = -3; j <= 3; ++j) {\n\t\tfor (int i = -3; i <= 3; ++i) {\n";
+				b << "\t\t\tvec2 o = vec2(float(i), float(j)) / 3.0;\n";
+				b << "\t\t\tfloat w = exp(-2.0 * dot(o, o));\n";
+				b << "\t\t\tvec2 uv2 = uv + o * radius;\n";
+				b << "\t\t\tsum += w * " << Input(node, 0, "uv2") << ";\n\t\t\twsum += w;\n";
+				b << "\t\t}\n\t}\n\treturn sum / wsum;\n";
+				break;
+			}
+			case CMP_NODE_LENSDIST: {
+				// Screen lens distortion with dispersion (per channel radius), as in
+				// ScreenLensDistortionOperation, without the jitter.
+				NodeLensDist *d = (NodeLensDist *)node->storage;
+				const bool fit = d && d->fit;
+				b << "\tfloat dist = clamp(" << in(1) << ".x, -0.999, 1.0);\n";
+				b << "\tfloat disp = 0.25 * clamp(" << in(2) << ".x, 0.0, 1.0);\n";
+				b << "\tvec3 k = clamp(vec3(dist + disp, dist, dist - disp), -0.999, 1.0);\n";
+				b << "\tfloat maxk = max(k.x, max(k.y, k.z));\n";
+				b << "\tfloat sc = " << (fit ? "(maxk > 0.0) ? 1.0 / (1.0 + 2.0 * maxk) : " : "") << "1.0 / (1.0 + maxk);\n";
+				b << "\tvec2 p = sc * (uv - 0.5) * 2.0;\n\tfloat r2 = dot(p, p);\n";
+				b << "\tvec3 t = 1.0 - 4.0 * k * r2;\n";
+				b << "\tif (t.x < 0.0 || t.y < 0.0 || t.z < 0.0) { return vec4(0.0); }\n";
+				b << "\tvec3 dd = 1.0 / (1.0 + sqrt(t));\n";
+				b << "\tvec2 uvr = p * dd.x + 0.5;\n\tvec2 uvg = p * dd.y + 0.5;\n\tvec2 uvb = p * dd.z + 0.5;\n";
+				b << "\treturn vec4(" << Input(node, 0, "uvr") << ".r, " << Input(node, 0, "uvg") << ".g, "
+				  << Input(node, 0, "uvb") << ".b, 1.0);\n";
+				break;
+			}
+			case CMP_NODE_COMPOSITE:
+			case CMP_NODE_VIEWER:
+				b << "\treturn " << in(0) << ";\n";
+				break;
+			default: {
+				Skip(node->name);
+				bNodeSocket *first = (bNodeSocket *)node->inputs.first;
+				b << "\treturn " << (first ? in(0) : std::string("vec4(0.0)")) << ";\n";
+				break;
+			}
+		}
+		return b.str();
+	}
+
+	void Skip(const std::string& name)
+	{
+		m_skipped.push_back(name);
+	}
+
+	bNodeTree *m_tree;
+	std::vector<std::string>& m_skipped;
+	std::map<bNode *, int> m_ids;
+	std::set<std::string> m_done;
+	std::ostringstream m_code;
+};
+
+const char *compositorHeader = R"GLSL(
+#ifdef USE_CORE_PROFILE
+in vec2 texCoordVarying;
+out vec4 fragColor;
+  #define gl_FragColor fragColor
+#endif
+
+uniform sampler2D bgl_RenderedTexture;
+uniform sampler2D bgl_DepthTexture;
+uniform float bgl_RenderedTextureWidth;
+uniform float bgl_RenderedTextureHeight;
+uniform mat4 bgl_ProjectionMatrix;
+
+vec4 comp_image(vec2 uv)
+{
+	return texture(bgl_RenderedTexture, uv);
+}
+
+/* Distance from the camera plane, like the Depth output of the render (perspective). */
+float comp_depth(vec2 uv)
+{
+	float ndc = texture(bgl_DepthTexture, uv).r * 2.0 - 1.0;
+	return bgl_ProjectionMatrix[3][2] / (ndc + bgl_ProjectionMatrix[2][2]);
+}
+
+float comp_bw(vec4 c)
+{
+	return dot(c.rgb, vec3(0.2126, 0.7152, 0.0722));
+}
+
+vec4 comp_gray(vec4 v)
+{
+	return vec4(v.xxx, 1.0);
+}
+
+vec3 comp_lin_to_srgb(vec3 c)
+{
+	return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3(1.0 / 2.4)) - 0.055, vec3(greaterThan(c, vec3(0.0031308))));
+}
+
+vec3 comp_srgb_to_lin(vec3 c)
+{
+	return mix(c / 12.92, pow((c + 0.055) / 1.055, vec3(2.4)), vec3(greaterThan(c, vec3(0.04045))));
+}
+
+vec3 comp_rgb_to_hsv(vec3 c)
+{
+	vec4 K = vec4(0.0, -1.0 / 3.0, 2.0 / 3.0, -1.0);
+	vec4 p = mix(vec4(c.bg, K.wz), vec4(c.gb, K.xy), step(c.b, c.g));
+	vec4 q = mix(vec4(p.xyw, c.r), vec4(c.r, p.yzx), step(p.x, c.r));
+	float d = q.x - min(q.w, q.y);
+	float e = 1.0e-10;
+	return vec3(abs(q.z + (q.w - q.y) / (6.0 * d + e)), d / (q.x + e), q.x);
+}
+
+vec3 comp_hsv_to_rgb(vec3 c)
+{
+	vec3 p = abs(fract(c.xxx + vec3(1.0, 2.0 / 3.0, 1.0 / 3.0)) * 6.0 - 3.0);
+	return c.z * mix(vec3(1.0), clamp(p - 1.0, 0.0, 1.0), c.y);
+}
+
+float comp_lut(float lut[33], float x)
+{
+	float f = clamp(x, 0.0, 1.0) * 32.0;
+	int i = int(min(floor(f), 31.0));
+	return mix(lut[i], lut[i + 1], f - float(i));
+}
+
+/* Blend modes of the Mix node (MA_RAMP_*), the same formulas as the shader nodes. */
+vec3 comp_mix(int type, float fac, vec3 c1, vec3 c2)
+{
+	float facm = 1.0 - fac;
+	if (type == 1) return c1 + fac * c2;                                    /* Add */
+	if (type == 2) return c1 * (facm + fac * c2);                           /* Multiply */
+	if (type == 3) return c1 - fac * c2;                                    /* Subtract */
+	if (type == 4) return 1.0 - (facm + fac * (1.0 - c2)) * (1.0 - c1);    /* Screen */
+	if (type == 5) {                                                        /* Divide */
+		vec3 d = vec3(c2.r != 0.0 ? c1.r / c2.r : 0.0, c2.g != 0.0 ? c1.g / c2.g : 0.0, c2.b != 0.0 ? c1.b / c2.b : 0.0);
+		return facm * c1 + fac * d;
+	}
+	if (type == 6) return mix(c1, abs(c1 - c2), fac);                       /* Difference */
+	if (type == 7) return min(c1, c2 * fac + c1 * facm);                    /* Darken */
+	if (type == 8) return max(c1, c2 * fac);                                /* Lighten */
+	if (type == 9) {                                                        /* Overlay */
+		vec3 lo = c1 * (facm + 2.0 * fac * c2);
+		vec3 hi = 1.0 - (facm + 2.0 * fac * (1.0 - c2)) * (1.0 - c1);
+		return mix(lo, hi, vec3(greaterThanEqual(c1, vec3(0.5))));
+	}
+	if (type == 10) {                                                       /* Dodge */
+		vec3 t = 1.0 - fac * c2;
+		return vec3(t.r > 0.0 ? c1.r / t.r : 1.0, t.g > 0.0 ? c1.g / t.g : 1.0, t.b > 0.0 ? c1.b / t.b : 1.0);
+	}
+	if (type == 11) {                                                       /* Burn */
+		vec3 t = facm + fac * c2;
+		return vec3(t.r > 0.0 ? 1.0 - (1.0 - c1.r) / t.r : 0.0, t.g > 0.0 ? 1.0 - (1.0 - c1.g) / t.g : 0.0,
+		            t.b > 0.0 ? 1.0 - (1.0 - c1.b) / t.b : 0.0);
+	}
+	if (type == 12 || type == 13 || type == 14 || type == 15) {             /* Hue, Saturation, Value, Color */
+		vec3 h1 = comp_rgb_to_hsv(c1);
+		vec3 h2 = comp_rgb_to_hsv(c2);
+		vec3 h = h1;
+		if (type == 12) h.x = h2.x;
+		if (type == 13) h.y = h2.y;
+		if (type == 14) h.z = h2.z;
+		if (type == 15) h.xy = h2.xy;
+		return mix(c1, comp_hsv_to_rgb(h), fac);
+	}
+	if (type == 16) {                                                       /* Soft Light */
+		vec3 scr = 1.0 - (1.0 - c2) * (1.0 - c1);
+		return facm * c1 + fac * ((1.0 - c1) * c2 * c1 + c1 * scr);
+	}
+	if (type == 17) return c1 + fac * (2.0 * c2 - 1.0);                     /* Linear Light */
+	return mix(c1, c2, fac);                                                /* Mix */
+}
+
+float comp_math(int op, float a, float b)
+{
+	if (op == 0) return a + b;
+	if (op == 1) return a - b;
+	if (op == 2) return a * b;
+	if (op == 3) return (b != 0.0) ? a / b : 0.0;
+	if (op == 4) return sin(a);
+	if (op == 5) return cos(a);
+	if (op == 6) return tan(a);
+	if (op == 7) return (a >= -1.0 && a <= 1.0) ? asin(a) : 0.0;
+	if (op == 8) return (a >= -1.0 && a <= 1.0) ? acos(a) : 0.0;
+	if (op == 9) return atan(a);
+	if (op == 10) return (a >= 0.0 || b == floor(b)) ? pow(abs(a), b) * ((a < 0.0 && mod(b, 2.0) != 0.0) ? -1.0 : 1.0) : 0.0;
+	if (op == 11) return (a > 0.0 && b > 0.0) ? log(a) / log(b) : 0.0;
+	if (op == 12) return min(a, b);
+	if (op == 13) return max(a, b);
+	if (op == 14) return floor(a + 0.5);
+	if (op == 15) return (a < b) ? 1.0 : 0.0;
+	if (op == 16) return (a > b) ? 1.0 : 0.0;
+	if (op == 17) return (b != 0.0) ? mod(a, b) : 0.0;
+	if (op == 18) return abs(a);
+	if (op == 19) return atan(a, b);
+	if (op == 20) return floor(a);
+	if (op == 21) return ceil(a);
+	if (op == 22) return fract(a);
+	if (op == 23) return (a > 0.0) ? sqrt(a) : 0.0;
+	return a;
+}
+
+/* Box and Ellipse Mask: Add, Subtract, Multiply, Not. */
+float comp_mask(int type, bool inside, float mask, float value)
+{
+	if (type == 0) return inside ? max(mask, value) : mask;
+	if (type == 1) return inside ? clamp(mask - value, 0.0, 1.0) : mask;
+	if (type == 2) return inside ? mask * value : 0.0;
+	return inside ? ((mask > 0.0) ? 0.0 : value) : mask;
+}
+
+)GLSL";
+
+bNode *FindOutput(bNodeTree *ntree)
+{
+	bNode *viewer = nullptr;
+	for (bNode *node = (bNode *)ntree->nodes.first; node; node = node->next) {
+		if (node->flag & NODE_MUTED) {
+			continue;
+		}
+		if (node->type == CMP_NODE_COMPOSITE && (node->flag & NODE_DO_OUTPUT)) {
+			return node;
+		}
+		if (node->type == CMP_NODE_COMPOSITE && !viewer) {
+			viewer = node;
+		}
+	}
+	if (viewer) {
+		return viewer;
+	}
+	for (bNode *node = (bNode *)ntree->nodes.first; node; node = node->next) {
+		if (node->type == CMP_NODE_VIEWER && !(node->flag & NODE_MUTED) && (node->flag & NODE_DO_OUTPUT)) {
+			return node;
+		}
+	}
+	return nullptr;
+}
+
+} // namespace
+
+std::string KX_BuildCompositorShader(Scene *scene, std::vector<std::string>& skipped)
+{
+	if (!scene || !scene->use_nodes || !scene->nodetree) {
+		return "";
+	}
+	bNode *output = FindOutput(scene->nodetree);
+	if (!output) {
+		return "";
+	}
+	bNodeSocket *image = (bNodeSocket *)output->inputs.first;
+	// Nothing linked, or the default tree (Render Layers > Image straight into the output, maybe
+	// through reroutes): no pass, the frame stays as it is.
+	bNodeSocket *sock = image;
+	for (int depth = 0; sock && depth < 64; ++depth) {
+		bNodeLink *found = nullptr;
+		for (bNodeLink *link = (bNodeLink *)scene->nodetree->links.first; link; link = link->next) {
+			if (link->tosock == sock && (link->flag & NODE_LINK_VALID)) {
+				found = link;
+				break;
+			}
+		}
+		if (!found || !found->fromnode || !found->fromsock) {
+			return "";
+		}
+		bNode *from = found->fromnode;
+		if (from->type == NODE_REROUTE || (from->flag & NODE_MUTED)) {
+			sock = (bNodeSocket *)from->inputs.first;
+			continue;
+		}
+		if (from->type == CMP_NODE_R_LAYERS && STREQ(found->fromsock->name, "Image")) {
+			return "";
+		}
+		break;
+	}
+
+	Generator gen(scene->nodetree, skipped);
+	const std::string out = gen.Output(output, 0);
+
+	std::string shader = compositorHeader;
+	shader += gen.Code();
+	shader += "void main()\n{\n#ifdef USE_CORE_PROFILE\n\tvec2 uv = texCoordVarying;\n#else\n\tvec2 uv = gl_TexCoord[0].st;\n#endif\n";
+	shader += "\tvec4 c = " + out + "(uv);\n";
+	// The compositor's alpha does not belong on the screen: keep the frame opaque like the render.
+	shader += "\tgl_FragColor = vec4(c.rgb, 1.0);\n}\n";
+	return shader;
+}
