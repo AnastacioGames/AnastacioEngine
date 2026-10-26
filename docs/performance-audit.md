@@ -336,6 +336,11 @@ A/B alternado com o mesmo binário (chave temporária, removida), `drawCalls` id
 | 900 obj / 8 luzes / N mat | 4,91 → 0,80 ms | 12,45 → 9,63 (−22,6%) |
 | 900 obj / 4 luzes / N mat | 2,24 → 0,60 ms | 7,39 → 7,08 (−4,1%) |
 
+**Nota (2026-10-26):** os 9,63 ms foram uma rodada única com a máquina num estado rápido; no
+mesmo dia a cena variou de 9,6 a 19 ms entre sessões. Comparação lado a lado em 2026-10-26, 3
+rodadas alternadas, mesma cena e máquina: release 0.5.0 = 16,75 ms, `main` (db4bf0fc) = 16,10 ms
+(−3,9%). Não há regressão; compare números só dentro da mesma sessão de A/B.
+
 **Efeito colateral medido:** nas duas cenas a `MainRender` subiu ~0,8–1,3 ms e a
 `CameraCulling` ~0,26 ms, sem mudança de código nelas. O teste serial anterior (TBB desligado no
 culling) mostrou o mesmo padrão. Leitura: as threads do TBB acordando a cada passe mantinham a CPU
