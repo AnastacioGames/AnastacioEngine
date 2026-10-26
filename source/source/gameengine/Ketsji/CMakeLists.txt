@@ -156,6 +156,7 @@ set(SRC
 	KX_PythonComponentManager.cpp
 	KX_PythonInit.cpp
 	KX_PythonInitTypes.cpp
+	KX_TrackLine.cpp
 	KX_PythonKeyboard.cpp
 	KX_PythonJoystick.cpp
 	KX_PythonMain.cpp
@@ -282,6 +283,7 @@ set(SRC
 	KX_PythonComponentManager.h
 	KX_PythonInit.h
 	KX_PythonInitTypes.h
+	KX_TrackLine.h
 	KX_PythonKeyboard.h
 	KX_PythonJoystick.h
 	KX_PythonMain.h

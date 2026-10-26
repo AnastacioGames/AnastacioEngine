@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-25 - CPU: API Python mais barata e Range.types.TrackLine para IA de corrida
+
+- `obj.get` com METH_FASTCALL e busca de propriedade sem alocar string (0,34 → 0,20 µs); `obj["x"] = número`
+  grava no valor existente (0,55 → 0,33 µs) e inteiro grande dá `OverflowError` em vez de deixar exceção pendente;
+  `update()` dos componentes sem recriar nome/argumentos; grain 256 no culling paralelo.
+- **`Range.types.TrackLine(points)`**: polilinha fechada em C++ para IA de corrida, com `locate(pos, seg, back,
+  ahead, lost)`, `point(s)`, `side(s)`, `setProfile(nome, valores)`/`profile(nome, s)` e `length`. Mesmas contas
+  da versão Python (diferença < 0,1 mm, float32 x double); `locate` 128 → 3,3 µs.
+- RolimaRacer (`pole_position.py` usando o TrackLine + faixa base guardada por carro): Components 8,7 → 6,9 ms
+  por quadro na corrida com 20 pilotos. Física medida por dentro do Bullet: o custo é a colisão carro (composto) ×
+  malha visual da pista (8,4k-8,8k faces); a saída é uma malha de colisão simplificada no jogo.
+
 ## 2026-10-25 - Sombras: PCSS (filtro PCF Penumbra) no clássico, Principled e CSM
 
 - O filtro **PCF Penumbra** não compilava (lia o mapa de sombra como `sampler2D`). Agora é PCSS: sombra dura no

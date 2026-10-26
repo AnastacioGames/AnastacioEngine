@@ -32,6 +32,7 @@
 #ifdef WITH_PYTHON
 
 #include "KX_PythonInitTypes.h"
+#include "KX_TrackLine.h"
 
 /* Only for Class::Parents */
 #include "BL_BlenderShader.h"
@@ -337,6 +338,8 @@ PyMODINIT_FUNC initGameTypesPythonBinding(void)
 		PyType_Ready_Attr(dict, SCA_IController, init_getset);
 		PyType_Ready_Attr(dict, Texture, init_getset);
 	}
+
+	KX_TrackLine_Register(dict);
 
 #ifdef USE_MATHUTILS
 	/* Init mathutils callbacks */
