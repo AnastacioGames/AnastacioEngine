@@ -155,14 +155,27 @@ def _draw_shadow_buffer(layout, lamp):
         split.label("Type:")
         split.row().prop(lamp, "ge_shadow_buffer_type", expand=True)
         if is_simple:
+            # Quick choice for beginners; the full list stays below it.
+            split = layout.split(factor=0.3)
+            split.label("Look:")
+            row = split.row(align=True)
+            row.prop_enum(lamp, "shadow_filter", "NONE", text="Hard")
+            row.prop_enum(lamp, "shadow_filter", "PCF", text="Soft")
+            row.prop_enum(lamp, "shadow_filter", "PCF_PENUMBRA", text="Realistic")
             split = layout.split(factor=0.3)
             split.label("Filter:")
             split.prop(lamp, "shadow_filter", text="")
+            if lamp.shadow_filter == "PCF_PENUMBRA":
+                layout.label("Realistic turns Hard on Low/Very Low quality", icon='INFO')
 
     pcf = lamp.shadow_filter in ("PCF", "PCF_BAIL", "PCF_JITTER", "PCF_PENUMBRA")
     if use_csm:
-        # Cascades read one tap per pixel; per-cascade sizes live in the cascade table.
-        if is_simple and pcf:
+        # Cascades read one tap per pixel (except PCSS); per-cascade sizes live in the cascade table.
+        if is_simple and lamp.shadow_filter == "PCF_PENUMBRA":
+            col = layout.column(align=True)
+            col.prop(lamp, "shadow_buffer_samples", text="Samples")
+            col.prop(lamp, "shadow_buffer_soft", text="Soft")
+        elif is_simple and pcf:
             layout.label("PCF filters are not used with cascades", icon='INFO')
     else:
         col = layout.column(align=True)

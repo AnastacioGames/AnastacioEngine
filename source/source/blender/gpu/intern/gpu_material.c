@@ -86,6 +86,31 @@ typedef enum DynMatProperty {
 	DYN_LAMP_AREAMAT = 16,
 } DynMatProperty;
 
+
+/* PCSS (Penumbra filter) is the most expensive shadow: the Low and Very Low quality presets (and
+ * Auto on an integrated GPU, Web, Android) draw those lamps with the hard shadow instead. */
+static bool gpu_pcss_allowed(const Scene *scene)
+{
+	if (!scene) {
+		return true;
+	}
+	const int q = BKE_scene_quality_preset_resolve(scene->scenefx_settings.quality_preset);
+	return q != SCENE_FX_QUALITY_LOW && q != SCENE_FX_QUALITY_VERY_LOW;
+}
+
+/* True when this lamp is drawn with PCSS (filter 4 in the shaders). */
+static bool gpu_lamp_pcss(const Scene *scene, const Lamp *la)
+{
+	return la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA && la->samp > 1 && la->soft >= 0.01f &&
+	       gpu_pcss_allowed(scene);
+}
+
+/* Penumbra lamp that the quality preset turned into a hard shadow. */
+static bool gpu_lamp_pcss_dropped(const Scene *scene, const Lamp *la)
+{
+	return la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA && !gpu_pcss_allowed(scene);
+}
+
 static struct GPUWorld {
 	float mistenabled;
 	float mistype;
@@ -327,7 +352,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	 * every Principled shader slow to compile on the Web (ANGLE unrolls the loops), so they are
 	 * only compiled when a lamp actually uses it. */
 	for (const Lamp *la = G.main ? G.main->lamp.first : NULL; la; la = la->id.next) {
-		if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
+		if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA && gpu_pcss_allowed(material->scene)) {
 			stages.shadow_pcss = true;
 		}
 		/* Two more shadow samplers in the Principled loop: only when a sun has cascades (16 samplers on the Web). */
@@ -2418,7 +2443,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 					/* PCSS in the cascades (needs samples > 1 and some Soft, like the single map). */
 					float pcss[2] = {(float)lamp->la->samp, lamp->la->soft};
 					if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
-						filtertype = (lamp->la->samp > 1 && lamp->la->soft >= 0.01f) ? 4.0f : 0.0f;
+						filtertype = gpu_lamp_pcss(mat->scene, lamp->la) ? 4.0f : 0.0f;
 					}
 					GPU_link(mat, "shadow_simple_csm",
 					         GPU_material_builtin(mat, GPU_VIEW_POSITION),
@@ -2457,7 +2482,8 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 			}
 			else {
 				float twoSidedShadows = (ma->mode2 & MA_TWOSIDEDSHADOWS) ? 1.0f : 0.0f;
-				if (lamp->la->samp > 1 && lamp->la->soft >= 0.01f && (lamp->la->shadow_filter > LA_SHADOW_FILTER_DITHERING)) {
+				if (lamp->la->samp > 1 && lamp->la->soft >= 0.01f && (lamp->la->shadow_filter > LA_SHADOW_FILTER_DITHERING) &&
+				    !gpu_lamp_pcss_dropped(mat->scene, lamp->la)) {
 					float samp = lamp->la->samp;
 					float samplesize = lamp->la->soft / lamp->la->shadow_frustum_size;
 					if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF) {
@@ -6045,7 +6071,7 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				const Lamp *la = lamp->la;
 				float filter[4] = {(float)la->shadow_filter, (float)la->samp, la->soft, 0.0f};
 				if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
-					filter[0] = (la->samp > 1 && la->soft >= 0.01f) ? 4.0f : 0.0f;
+					filter[0] = gpu_lamp_pcss(material->scene, la) ? 4.0f : 0.0f;
 				}
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->csmfilterloc, 4, filter);
 			}
@@ -6103,7 +6129,7 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				const Lamp *la = lamp->la;
 				float filter[4] = {(float)la->shadow_filter, (float)la->samp, la->soft, la->soft / max_ff(la->shadow_frustum_size, 1e-3f)};
 				if (la->shadow_filter > LA_SHADOW_FILTER_DITHERING) {
-					filter[0] = (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA && la->samp > 1 && la->soft >= 0.01f) ? 4.0f : 0.0f;
+					filter[0] = gpu_lamp_pcss(material->scene, la) ? 4.0f : 0.0f;
 				}
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowfilterloc[i], 4, filter);
 			}
@@ -6467,7 +6493,7 @@ GPUNodeLink *GPU_lamp_get_data(
 				/* PCSS in the cascades (needs samples > 1 and some Soft, like the single map). */
 				float pcss[2] = {(float)lamp->la->samp, lamp->la->soft};
 				if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
-					filtertype = (lamp->la->samp > 1 && lamp->la->soft >= 0.01f) ? 4.0f : 0.0f;
+					filtertype = gpu_lamp_pcss(mat->scene, lamp->la) ? 4.0f : 0.0f;
 				}
 				GPU_link(mat, "shadow_simple_csm",
 				         GPU_material_builtin(mat, GPU_VIEW_POSITION),
@@ -6503,7 +6529,8 @@ GPUNodeLink *GPU_lamp_get_data(
 			         GPU_uniform(&lamp->bias), GPU_uniform(&lamp->la->bleedbias), inp, &shadowfac);
 		}
 		else {
-			if (lamp->la->samp > 1 && lamp->la->soft >= 0.01f && lamp->la->shadow_filter != LA_SHADOW_FILTER_NONE) {
+			if (lamp->la->samp > 1 && lamp->la->soft >= 0.01f && lamp->la->shadow_filter != LA_SHADOW_FILTER_NONE &&
+			    !gpu_lamp_pcss_dropped(mat->scene, lamp->la)) {
 				float samp = lamp->la->samp;
 				float samplesize = lamp->la->soft / lamp->la->shadow_frustum_size;
 				if (lamp->la->shadow_filter == LA_SHADOW_FILTER_PCF) {

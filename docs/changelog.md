@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - PCSS vira sombra dura em Low/Very Low + menu simples de filtro
+
+- Presets de qualidade Low e Very Low (e Auto quando resolve para Low: iGPU, Web, Android) desenham lâmpadas
+  PCF Penumbra com sombra dura e não compilam o código do PCSS (flag `SHADOW_PCSS` some do shader). A escolha
+  da lâmpada não é alterada, então voltar para Medium/High traz o PCSS de volta. Decisão central em
+  `gpu_lamp_pcss()` / `gpu_pcss_allowed()` em `gpu_material.c`.
+- Painel da lâmpada (Use Shadow > Buffer): linha **Look: Hard / Soft / Realistic** (NONE / PCF / PCF Penumbra)
+  acima da lista completa de filtros. Com cascatas e Realistic, Samples e Soft aparecem (o CSM usa PCSS).
+- Teste: `tools/debug/cenas/criar_teste_pcss_preset.py` (Very Low/Low `0x42`, Medium/High `0x442`).
+
 ## 2026-10-26 - Sombra de sol com cascatas (CSM) no Principled
 
 - O laço de luzes do Principled agora recebe a sombra do sol com CSM: slot com `enabled = 3` usa uniforms
