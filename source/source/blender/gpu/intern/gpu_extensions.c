@@ -29,6 +29,7 @@
 #include "BLI_math_vector.h"
 
 #include "BKE_global.h"
+#include "BKE_scene.h"
 
 #include "GPU_basic_shader.h"
 #include "GPU_extensions.h"
@@ -247,6 +248,8 @@ void gpu_extensions_init(void)
 	else {
 		GG.integrated = false;
 	}
+	/* Auto quality preset: same answer in the editor as in the game (KX_Scene sets it too). */
+	BKE_scene_quality_set_integrated_gpu(GG.integrated);
 
 	/* make sure double side isn't used by default and only getting enabled in places where it's
 	 * really needed to prevent different unexpected behaviors like with intel gme965 card (sergey) */

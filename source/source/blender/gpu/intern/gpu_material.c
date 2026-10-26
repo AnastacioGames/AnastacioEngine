@@ -105,6 +105,11 @@ static bool gpu_lamp_pcss(const Scene *scene, const Lamp *la)
 	       gpu_pcss_allowed(scene);
 }
 
+/* Set when a GPU lamp with cascades / Penumbra is created, so lamps of a LibLoad Main (not in
+ * G.main) also turn on the SHADOW_CSM / SHADOW_PCSS shader stages when the materials recompile. */
+static bool gpu_csm_lamp_seen = false;
+static bool gpu_pcss_lamp_seen = false;
+
 /* Penumbra lamp that the quality preset turned into a hard shadow. */
 static bool gpu_lamp_pcss_dropped(const Scene *scene, const Lamp *la)
 {
@@ -351,15 +356,16 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	/* PCSS in the Principled light loop: 4 inlined copies of its 64-tap search and filter made
 	 * every Principled shader slow to compile on the Web (ANGLE unrolls the loops), so they are
 	 * only compiled when a lamp actually uses it. */
+	bool any_pcss = gpu_pcss_lamp_seen, any_csm = gpu_csm_lamp_seen;
 	for (const Lamp *la = G.main ? G.main->lamp.first : NULL; la; la = la->id.next) {
-		if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA && gpu_pcss_allowed(material->scene)) {
-			stages.shadow_pcss = true;
-		}
-		/* Two more shadow samplers in the Principled loop: only when a sun has cascades (16 samplers on the Web). */
-		if (la->type == LA_SUN && la->shadow_cascade_count != 0) {
-			stages.shadow_csm = true;
-		}
+		any_pcss |= la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA;
+		any_csm |= la->type == LA_SUN && la->shadow_cascade_count != 0;
 	}
+	stages.shadow_pcss = any_pcss && gpu_pcss_allowed(material->scene);
+	/* Two more shadow samplers in the Principled loop, on fixed units (csmunit in
+	 * GPU_material_bind_shadow_lamps). With 16 units (Web) those units overlap the material's own
+	 * textures, so there the cascaded sun keeps no shadow in the Principled loop, as before. */
+	stages.shadow_csm = any_csm && GPU_max_textures() >= 32;
 
 	if (used) {
 		material->pass = GPU_generate_pass(&material->nodes, material->outlinks,
@@ -5423,6 +5429,13 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 	}
 
 	lamp = MEM_callocN(sizeof(GPULamp), "GPULamp");
+	{
+		const Lamp *bla = ob->data;
+		if (bla) {
+			gpu_pcss_lamp_seen |= bla->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA;
+			gpu_csm_lamp_seen |= bla->type == LA_SUN && bla->shadow_cascade_count != 0;
+		}
+	}
 
 	link = MEM_callocN(sizeof(LinkData), "GPULampLink");
 	link->data = lamp;
@@ -6070,7 +6083,9 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				/* Same filter choice as the classic material (shade_one_light). */
 				const Lamp *la = lamp->la;
 				float filter[4] = {(float)la->shadow_filter, (float)la->samp, la->soft, 0.0f};
-				if (la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA) {
+				/* Like the plain map below: only PCSS is new, the PCF variants (3-5, 4 would read as
+				 * PCSS in csm_shadow_test) keep the plain lookup. */
+				if (la->shadow_filter > LA_SHADOW_FILTER_DITHERING) {
 					filter[0] = gpu_lamp_pcss(material->scene, la) ? 4.0f : 0.0f;
 				}
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->csmfilterloc, 4, filter);

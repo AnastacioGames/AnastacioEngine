@@ -2297,12 +2297,12 @@ static void rna_SCENEFXSettings_fx_update(Main *UNUSED(bmain), Scene *scene, Poi
 
 static void rna_SCENEFXSettings_quality_preset_update(Main *bmain, Scene *scene, PointerRNA *UNUSED(ptr))
 {
-	if (BKE_scene_quality_preset_apply(scene, scene->scenefx_settings.quality_preset)) {
-		/* Sky quality and shadow buffers live in GPU materials/lamps. */
-		GPU_materials_free(bmain);
-		WM_main_add_notifier(NC_WORLD | ND_WORLD_DRAW, NULL);
-		WM_main_add_notifier(NC_LAMP | ND_LIGHTING, NULL);
-	}
+	BKE_scene_quality_preset_apply(scene, scene->scenefx_settings.quality_preset);
+	/* Sky quality, shadow buffers and the PCSS choice live in GPU materials/lamps; Custom applies
+	 * nothing but still changes what the preset resolves to (PCSS on again after Low). */
+	GPU_materials_free(bmain);
+	WM_main_add_notifier(NC_WORLD | ND_WORLD_DRAW, NULL);
+	WM_main_add_notifier(NC_LAMP | ND_LIGHTING, NULL);
 }
 
 static void rna_SCENEFXSettings_ssr_fx_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
