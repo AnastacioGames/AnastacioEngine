@@ -8,6 +8,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Segunda revisão da frente 8 pelo Codex
+
+- Conferidos os oito commits de dados/editor/plataformas até 40762df8. Três casos reproduzidos:
+  limpeza Web fora do destino protegido, diretórios aceitos como marcadores e seleção bloqueada
+  no Scene Overview. Identificado por leitura desequilíbrio de referências no Player Anim.
+- Cutscene: cópia/remoção preservaram contagem de usuários e independência dos eventos. Sete
+  cópias com metadados de versão alterados passaram; isso não substitui arquivos com DNA antigo.
+  RNA/UI e caminhos relativos/junction testados em background; suíte Web 136/136, saída zero.
+- [Achados, prioridades e limites](revisao-dados-editor.md). Evidências em
+  `artifacts/revisao-cruzada-frente8-20261026/`. Sem mudança de produto, novo build ou execução do jogo.
+- Correção (Claude): export Web usa temporários exclusivos e não apaga pastas vizinhas; marcadores
+  precisam ser arquivos; Overview recusa objeto com seleção bloqueada sem limpar a seleção;
+  Player Anim libera proxy/retorno e mostra o erro do `Action()`. Web 136/136.
+
 ## 2026-10-26 - Revisão e correção do helper de argumentos Python
 
 - Helper comum revisado linha por linha e 25 usos em nove arquivos conferidos quanto a formato,

@@ -798,11 +798,19 @@ void KX_Scene::DispatchCutsceneEvents()
 						if (playerComp) {
 							PyObject *proxy = playerComp->GetProxy();
 							if (proxy) {
-								PyObject_CallMethod(proxy, "Action", "sff",
+								// GetProxy e o retorno da chamada sao referencias novas.
+								PyObject *ret = PyObject_CallMethod(proxy, "Action", "sff",
 									event->m_paramStrA.c_str(),
 									event->m_paramFloat,
 									0.0f);
-								PyErr_Clear();
+								if (ret) {
+									Py_DECREF(ret);
+								}
+								else {
+									CM_Error("cutscene Player Anim: Action() failed on " << player->GetName());
+									PyErr_Print();
+								}
+								Py_DECREF(proxy);
 							}
 						}
 					}

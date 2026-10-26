@@ -792,6 +792,10 @@ class SCENE_OT_overview_select(Operator):
         ob = context.scene.objects.get(self.name)
         if ob is None:
             return {'CANCELLED'}
+        if ob.hide_select:
+            # Nao retira o bloqueio sozinho; mantem a selecao atual e avisa.
+            self.report({'WARNING'}, "'%s' has selection disabled (Restrict Select)" % ob.name)
+            return {'CANCELLED'}
         for o in context.selected_objects:
             o.select = False
         ob.select = True

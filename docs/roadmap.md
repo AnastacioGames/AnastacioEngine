@@ -15,6 +15,7 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Sumário
 
+- [Segunda revisão da frente 8](#segunda-revisão-da-frente-8)
 - [Revisão de KX_Scene](#revisão-de-kx_scene)
 - [Revisão de KX_GameObject](#revisão-de-kx_gameobject)
 
@@ -42,6 +43,10 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 - [Iluminação e gráficos](#iluminação-e-gráficos)
 - [Validações manuais pendentes](#validações-manuais-pendentes)
 - [Fora do escopo atual](#fora-do-escopo-atual)
+
+## Segunda revisão da frente 8
+
+- Definir comportamento efetivo de `overwrite_lib` no export nativo (EXP-03).
 
 ## Revisão de KX_Scene
 

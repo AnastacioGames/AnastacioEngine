@@ -3,6 +3,7 @@
 
 import os
 import shutil
+import tempfile
 
 from .i18n import Msg, _
 
@@ -34,7 +35,11 @@ def check_destination(dest, protected=()):
             raise ValueError(Msg("The Web package folder cannot contain the project: %s", dest))
     if os.path.isdir(dest):
         names = os.listdir(dest)
-        if names and not all(marker in names for marker in PACKAGE_MARKERS):
+        # Marcador precisa ser arquivo comum: pasta ou link com o mesmo nome nao conta.
+        is_package = all(
+            os.path.isfile(os.path.join(dest, m)) and not os.path.islink(os.path.join(dest, m))
+            for m in PACKAGE_MARKERS)
+        if names and not is_package:
             raise ValueError(Msg("The folder is not empty and is not a previous Web export: %s", dest))
 
 
@@ -53,11 +58,9 @@ def export_package(report, dest, build, protected=()):
     check_destination(dest, protected)
     parent = os.path.dirname(dest)
     os.makedirs(parent, exist_ok=True)
-    tmp = dest + ".tmp-export"
-    old = dest + ".old-export"
-    for leftover in (tmp, old):
-        shutil.rmtree(leftover, ignore_errors=True)
-    os.mkdir(tmp)
+    # Temporarios com nome exclusivo: nunca apaga pasta preexistente que nao foi criada aqui.
+    base = os.path.basename(dest)
+    tmp = tempfile.mkdtemp(prefix=base + ".tmp-export-", dir=parent)
     try:
         build(tmp)
         if not os.listdir(tmp):
@@ -66,7 +69,11 @@ def export_package(report, dest, build, protected=()):
         shutil.rmtree(tmp, ignore_errors=True)
         raise
     had_previous = os.path.isdir(dest)
+    old = None
     if had_previous:
+        # Reserva um nome exclusivo e troca a pasta vazia pelo export anterior.
+        old = tempfile.mkdtemp(prefix=base + ".old-export-", dir=parent)
+        os.rmdir(old)
         os.rename(dest, old)
     try:
         os.rename(tmp, dest)
@@ -75,5 +82,6 @@ def export_package(report, dest, build, protected=()):
             os.rename(old, dest)
         shutil.rmtree(tmp, ignore_errors=True)
         raise
-    shutil.rmtree(old, ignore_errors=True)
+    if old:
+        shutil.rmtree(old, ignore_errors=True)
     return dest

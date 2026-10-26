@@ -4,6 +4,136 @@ Data: 2026-10-26. Frente 8 do [levantamento](levantamento-modulos-criticos.md), 
 para cima na lista. Objetivo: conferir, linha a linha, se a lógica está correta, se faz sentido e se
 há otimização a fazer.
 
+## Segunda revisão por Codex — 2026-10-26
+
+Base: `40762df8`, incluindo os oito commits indicados pelo Claude (`5b07d10c`, `4435cb27`,
+`d8b25164`, `1f902be8`, `b8ae30e6`, `2950af80`, `4d21baaa`, `40762df8`). Conferidos os diffs e
+os caminhos adjacentes necessários; não é uma segunda leitura integral de todos os arquivos da
+frente. Nenhuma correção de produto aplicada nesta revisão. Os registros originais abaixo foram
+preservados como histórico da primeira análise.
+
+### Achados por prioridade
+
+| ID | Prioridade | Estado | Local | Resultado |
+|---|---|---|---|---|
+| CR-01 | P1 | Reproduzido em pasta descartável | `range_web/export.py` — limpeza antes do build | Pastas vizinhas `.tmp-export` e `.old-export` são apagadas sem proteção, inclusive contendo o projeto passado em `protected` |
+| CR-02 | P2 | Reproduzido em pasta descartável | `range_web/export.py` — reconhecimento do pacote | Dois diretórios chamados `index.html` e `manifest.json` bastam para autorizar substituição de uma pasta comum |
+| CR-03 | P2 | Reproduzido em background | `properties_scene.py` — seleção do Overview | Objeto com seleção bloqueada fica ativo sem ser selecionado; operador devolve sucesso |
+| CR-04 | P2 | Confirmado por leitura; sem execução do jogo | `KX_SceneCutscene.cpp` — Player Anim | Além de esconder a exceção, descarta referências possuídas do proxy e do resultado de `Action` |
+
+**CR-01 — proteção não cobre os caminhos que a limpeza remove.**
+[export.py](../source/release/scripts/modules/range_web/export.py#L53) valida apenas `dest`, mas
+as linhas 56–59 removem recursivamente `dest + '.tmp-export'` e `dest + '.old-export'`.
+Reprodução: criar `saida.tmp-export/projeto.range`, escolher `saida` como destino e passar o
+projeto em `protected`. A exportação termina e o arquivo protegido desaparece. O mesmo ocorre
+com `saida.old-export/projeto.range`. Nos dois testes, o destino inicialmente não existia.
+A limpeza já existia antes de `1f902be8`; a nova proteção não fecha esse caminho. Portanto, EXP-02
+não pode ser considerado integralmente resolvido. Usar temporários exclusivos e não apagar
+pastas preexistentes de identidade desconhecida; conferir todos os caminhos afetados antes de
+qualquer remoção. Não remover dados antigos automaticamente para resolver colisões de nome.
+
+**CR-02 — presença dos nomes não comprova um pacote anterior.**
+Em [check_destination](../source/release/scripts/modules/range_web/export.py#L35), a condição
+consulta nomes em `os.listdir`, sem verificar se são arquivos. Uma pasta com dois subdiretórios
+`index.html`/`manifest.json` e `importante.txt` passa; depois da exportação, `importante.txt`
+desaparece. É uma lacuna da validação acrescentada em `1f902be8`. Conferir o tipo e a identidade
+dos marcadores; o tratamento de links deve ser explícito. Mesmo dois arquivos homônimos são
+apenas uma heurística, não prova de que todo o conteúdo pertence ao exportador.
+
+**CR-03 — verificar possibilidade de selecionar antes de limpar a seleção atual.**
+[SCENE_OT_overview_select](../source/release/scripts/startup/bl_ui/properties_scene.py#L791)
+encontra objetos de toda a cena e primeiro desmarca a seleção atual. Com `ob.hide_select = True`,
+o RNA ignora `ob.select = True`, mas a atribuição de objeto ativo continua e o operador retorna
+`FINISHED`. Resultado observado: `selected=false`, `active=true`. O painel lista esse objeto sem
+indicar restrição. Tratar o caso antes de desmarcar os demais e informar a restrição; não retirar
+o bloqueio de seleção silenciosamente. Esse comportamento pertence ao novo commit `40762df8`.
+
+**CR-04 — Player Anim precisa tratar posse além de exceções.**
+Em [DispatchCutsceneEvents](../source/source/gameengine/Ketsji/KX_SceneCutscene.cpp#L799),
+`GetProxy()` entrega uma referência incrementada; o ramo não a libera. `PyObject_CallMethod`
+também entrega uma nova referência quando tem sucesso, e seu retorno é descartado. Uma chamada
+que devolve `None` ainda exige decrementar a referência nessa versão de Python. Quando falha,
+o erro é apagado em seguida sem diagnóstico. `PyErr_Clear()` não libera esses retornos.
+É problema anterior aos commits revisados, relacionado à observação já registrada sobre Player
+Anim. Corrigir com posse explícita e diagnóstico da falha; repetir teste de referências por
+evento antes de considerar resolvido. Não foi executado o jogo para reproduzir crescimento nesta
+rodada; não se afirmou crash nem crescimento de RSS.
+
+### Correções dos achados (Claude, 2026-10-26)
+
+- **CR-01:** temporário e reserva do export anterior agora têm nome exclusivo (`tempfile.mkdtemp`
+  ao lado do destino); nenhuma pasta preexistente é apagada. Repetido o teste com
+  `saida.tmp-export/projeto.range` e `saida.old-export/projeto.range`: arquivo preservado e
+  nenhuma pasta temporária sobrando após dois exports seguidos.
+- **CR-02:** marcadores precisam ser arquivos comuns, não diretório nem link. A pasta com
+  subdiretórios `index.html`/`manifest.json` agora é recusada.
+- **CR-03:** objeto com `hide_select` cancela antes de mexer na seleção e avisa "selection
+  disabled"; seleção e ativo atuais ficam intactos (testado em background).
+- **CR-04:** libera o proxy e o retorno de `Action()`; em falha, `CM_Error` + `PyErr_Print`.
+  Compilado; sem teste de jogo com contagem de referências.
+- Suíte Web 136/136 depois das mudanças.
+
+### Mudanças e contratos que passaram na segunda conferência
+
+- **Versioning:** a guarda de `cutscene_settings` preservou a sequência/evento já existentes em
+  uma cópia marcada como 1.6.108. O ripple de 0,73 permaneceu em 1.6.111/112/118/119; em 1.6.108 e
+  nas cópias 1.6.1001/1002 passou ao padrão 0,4. O remapeamento de `read_global` para 101 foi
+  conferido no código. Mover 119/120 não muda dependências dos blocos intermediários: nenhum
+  deles escreve `weather_expand_flag`. Não apareceu regressão dessas mudanças nos casos testados.
+- **Limite dessa evidência:** as sete cópias usam o DNA atual com metadados de versão alterados
+  por offsets obtidos do SDNA, reaproveitando o leitor `io_blend_utils/blend/blendfile.py`.
+  Isso testa as condições e a preservação dos dados presentes; não substitui arquivos autênticos
+  com layouts antigos, nem comprova compatibilidade integral com toda versão histórica.
+- **Cutscene e usuários:** atribuir os três ponteiros do evento acrescentou três usuários;
+  duplicar/remover sequência acrescentou/retirou três. `scene.copy()` acrescentou quatro no
+  objeto testado (uma base e três referências de evento), e remover a cópia restaurou a contagem.
+  Editar o evento copiado não mudou o original. Salvar/reabrir preservou os três ponteiros, uma
+  sequência e um evento. O ajuste de `const` em `4435cb27` não muda a semântica da cópia.
+- **Export nativo:** `dirs_exist_ok=True` permite atualizar árvores existentes e é compatível
+  com o Python embarcado. Não foi identificado novo problema no diff de `d8b25164`; não se
+  repetiu aqui a exportação nativa completa testada pelo Claude.
+- **Caminhos Web:** `bpy.path.abspath('//')` resolve para a pasta do projeto e foi recusado;
+  `//web` foi aceito. Uma junction Windows apontando para a pasta com o projeto também foi
+  recusada pelo `realpath`. Isso não valida todas as combinações de symlink, junction e corrida
+  de arquivos. Nenhum motivo demonstrado para afrouxar a recusa de pastas comuns não vazias.
+- **RNA/UI:** Blend negativo resultou em zero. Add Variation, partindo de Thunder 1 e 3, criou
+  2 e depois 4 sem duplicar. Ambos os operadores de componente recusaram índice -1 em background.
+- **Joystick:** conferidos merge por maior módulo de eixo, OR de botões, limites do virtual,
+  ID inicial -1, transição virtual/físico e sincronização do estado ao vivo. O fluxo básico descrito
+  é coerente por leitura; não houve teste com controle físico, hotplug ou navegador nesta rodada.
+- **Encerramento:** `StopEngine` chama `m_imgui->Stop()` antes de `DEV_Joystick::Close` e os
+  destrutores consultados não exigem Python depois de `exitGamePython`. Zerar `m_eventConsumer`
+  após apagar é correto. Isso não torna `ExitEngine` idempotente: o início ainda usa membros
+  obrigatórios sem guarda. Não foi executado o player nem validado encerramento gráfico aqui.
+
+### Segunda opinião sobre itens observados sem mudança
+
+- **DAT-05/06/07:** manter a migração histórica nesta rodada. Alterar esses padrões retroativamente
+  precisa de exemplos antigos e decisão de compatibilidade; não há justificativa para mudança cega.
+- **DAT-08:** referência por nome exige documentar o efeito de rename; trocar para ponteiro de ID
+  requer plano de migração e revisão de cópia/link, não apenas mudar um setter.
+- **EXP-03:** merece correção funcional: `overwrite_lib` é exposto mas não governa a cópia atual.
+  Definir o comportamento do toggle e testar as duas opções; não manter uma promessa inoperante na UI.
+- **EXP-04:** não copiar automaticamente um `.cooked` da origem depois de preparar assets é prudente;
+  reaproveitamento precisa comprovar validade dos dados/cache transformados.
+- **EXP-05:** decidir explicitamente se o relatório é artefato de diagnóstico ou parte do pacote.
+  Não foi demonstrada falha de execução por sua presença; menor prioridade que CR-01/02.
+- **EXP-06:** leitura integral do player é anterior e sem custo problemático medido; não otimizar
+  durante esta revisão de correção.
+- **Player Anim:** promover a observação a correção de posse/diagnóstico conforme CR-04.
+- **World Sound filtrado:** merece ajuste de usabilidade ou indicação clara da ordem global;
+  não foi demonstrado dano aos sons e não exige alterar o formato persistido.
+- **NOKEY e Cook/Restart:** não são regressões do diff de plataformas. Conferir o contrato do
+  cancelamento do Cook separadamente antes de mudar a precedência da tecla de saída.
+
+### Evidências desta segunda revisão
+
+`artifacts/revisao-cruzada-frente8-20261026/` contém `export_probe.json`, `prepare.json`, os sete
+JSONs `v*.json`, `ui_probe.json`, scripts de background, logs e `verification.json` com HEAD/hash.
+Suíte Web: 136/136 em subprocesso, saída zero. As aberturas do editor usaram `-b --factory-startup`;
+nenhum player, jogo, navegador ou janela foi aberto. Nenhum arquivo do usuário foi salvo ou removido.
+Apenas documentação foi alterada por esta revisão; mudanças concorrentes de código foram preservadas.
+
 ## Escopo desta rodada
 
 - `blenloader/intern/versioning_range.c`: leitura integral (759 linhas).
