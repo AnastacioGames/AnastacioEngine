@@ -8,6 +8,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Revisão integral de KX_Scene e quatro defeitos reproduzidos
+
+- Lidos `KX_Scene.cpp` e `KX_Scene.h` integralmente e seguidos os contratos necessários em objetos,
+  callbacks Python, conversão e simulação. [Relatório](revisao-kx-scene.md) registra compreensão por
+  trecho, achados com referências e limites da revisão.
+- Cena isolada gerada/reaberta/inspecionada: reproduzidos dois crashes `0xC0000005` (lista de callbacks
+  limpa durante execução e sequência ignore que lança em explode), reset de gravidade sem terremoto e
+  busca de template inconsistente após rename. Scripts e logs separados dos projetos do usuário.
+- Nenhuma alteração de C++ nem correção aplicada. Gerador reutilizável em
+  `tools/debug/cenas/criar_cena_revisao_kx_scene.py`; evidências locais em
+  `artifacts/revisao-kx-scene-20261026/`. Pendências registradas no roadmap.
+- Validação documental: `check_docs.py` sem erros/avisos; documentos novos também conferidos
+  explicitamente pelas rotinas do verificador. Casos finais no player: básico termina em oito ticks;
+  as duas reproduções de crash encerram com código 11 e backtraces nos símbolos esperados.
+
+## 2026-10-26 - Levantamento dos módulos críticos para análise de código
+
+- Adicionado [roteiro por módulo](levantamento-modulos-criticos.md), com prioridade arquitetural,
+  tamanho observado, arquivos de entrada, dependências e validações propostas.
+- Conferidos trechos de simulação, culling, componentes, física e mensagens. Registrada a divisão já
+  existente do GameObject e os dois caminhos de registro de componentes (réplica e pós-conversão).
+- Escopo documental e análise estática seletiva; sem alteração de runtime ou benchmark.
+- Atualizadas referências de linhas/tamanhos nos mapas gameengine e GPU com `check_docs.py --fix`;
+  verificação final de 91 documentos e 6 mapas: zero erros e zero avisos.
+
 ## 2026-10-26 - FPS Counter (contador compacto)
 
 - Render > Display e Game > Overlays: **FPS Counter** (`game_settings.show_fps_counter`, bit `SCE_SHOW_FPS_COUNTER`

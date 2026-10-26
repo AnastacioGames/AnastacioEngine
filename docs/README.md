@@ -60,6 +60,10 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   de `source/source/blender`.
 - [Auditoria estruturada de performance](performance-audit.md): taxonomia, evidências atuais e roteiro de
   validação para CPU, memória, GPU e ciclo de vida.
+- [Levantamento dos módulos críticos](levantamento-modulos-criticos.md): prioridades de análise de código,
+  dependências, arquivos de entrada e validação proposta por responsabilidade.
+- [Revisão integral de KX_Scene](revisao-kx-scene.md): compreensão por trecho, contratos de ciclo de vida,
+  quatro defeitos reproduzidos e problemas adicionais observados por leitura.
 
 ### Frentes recentes
 

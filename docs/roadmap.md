@@ -15,6 +15,8 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Sumário
 
+- [Revisão de KX_Scene](#revisão-de-kx_scene)
+
 - [Atlas de materiais](#atlas-de-materiais)
 - [Prioridade atual](#prioridade-atual)
   - [Carregamento mais rápido ("Cozinhar")](#carregamento-mais-rápido-cozinhar)
@@ -39,6 +41,14 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 - [Iluminação e gráficos](#iluminação-e-gráficos)
 - [Validações manuais pendentes](#validações-manuais-pendentes)
 - [Fora do escopo atual](#fora-do-escopo-atual)
+
+## Revisão de KX_Scene
+
+- [Revisão integral e reproduções](revisao-kx-scene.md): corrigir crashes por mutação de lista de callbacks
+  e falha no acesso à sequência `explode(ignore=...)`, restauração indevida da gravidade sem terremoto
+  e índice de templates desatualizado após rename. Os quatro casos foram reproduzidos no standalone.
+- Conferir também posse de referências Python/EXP_Value, transferência de registros no merge e validade
+  de objetos após callbacks de animação; resultados e limites estão no relatório. Sem correções nesta rodada.
 
 ## Atlas de materiais
 
