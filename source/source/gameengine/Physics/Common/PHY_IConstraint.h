@@ -20,6 +20,10 @@ public:
 
 	virtual int GetIdentifier() const = 0;
 	virtual PHY_ConstraintType GetType() const = 0;
+
+	/** Called when the constraint is deleted, so Python wrappers drop their pointer.
+	 * A nullptr callback unregisters only this client. */
+	virtual void SetInvalidationCallback(void (*callback)(void *client), void *client) = 0;
 };
 
 #endif  // __PHY_ICONSTRAINT_H__

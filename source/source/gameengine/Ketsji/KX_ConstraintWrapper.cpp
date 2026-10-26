@@ -36,9 +36,19 @@
 KX_ConstraintWrapper::KX_ConstraintWrapper(PHY_IConstraint *constraint)
 	:m_constraint(constraint)
 {
+	m_constraint->SetInvalidationCallback(&KX_ConstraintWrapper::OnConstraintInvalidated, this);
 }
+
 KX_ConstraintWrapper::~KX_ConstraintWrapper()
 {
+	if (m_constraint) {
+		m_constraint->SetInvalidationCallback(nullptr, this);
+	}
+}
+
+void KX_ConstraintWrapper::OnConstraintInvalidated(void *client)
+{
+	static_cast<KX_ConstraintWrapper *>(client)->m_constraint = nullptr;
 }
 
 std::string KX_ConstraintWrapper::GetName()
@@ -48,8 +58,21 @@ std::string KX_ConstraintWrapper::GetName()
 
 #ifdef WITH_PYTHON
 
+static bool raise_exc_invalid(PHY_IConstraint *constraint, const char *name)
+{
+	if (!constraint) {
+		PyErr_Format(PyExc_ReferenceError,
+		             "constraint.%s: constraint no longer exists (removed, or one of its objects was removed).", name);
+		return true;
+	}
+	return false;
+}
+
+#define CONSTRAINT_VALID_CHECK_OR_RETURN(constraint, name, ret) 	if (raise_exc_invalid(constraint, name)) {return ret;} (void)0
+
 PyObject *KX_ConstraintWrapper::PyGetConstraintId()
 {
+	CONSTRAINT_VALID_CHECK_OR_RETURN(m_constraint, "getConstraintId()", nullptr);
 	return PyLong_FromLong(m_constraint->GetIdentifier());
 }
 
@@ -62,6 +85,7 @@ PyObject *KX_ConstraintWrapper::PyGetParam(PyObject *args, PyObject *kwds)
 	if (!PyArg_ParseTuple(args, "i:getParam", &dof)) {
 		return nullptr;
 	}
+	CONSTRAINT_VALID_CHECK_OR_RETURN(m_constraint, "getParam()", nullptr);
 
 	value = m_constraint->GetParam(dof);
 	return PyFloat_FromDouble(value);
@@ -76,6 +100,7 @@ PyObject *KX_ConstraintWrapper::PySetParam(PyObject *args, PyObject *kwds)
 	if (!PyArg_ParseTuple(args, "iff:setParam", &dof, &minLimit, &maxLimit)) {
 		return nullptr;
 	}
+	CONSTRAINT_VALID_CHECK_OR_RETURN(m_constraint, "setParam()", nullptr);
 
 	m_constraint->SetParam(dof, minLimit, maxLimit);
 	Py_RETURN_NONE;
@@ -123,24 +148,28 @@ PyAttributeDef KX_ConstraintWrapper::Attributes[] = {
 PyObject *KX_ConstraintWrapper::pyattr_get_constraintId(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_ConstraintWrapper *self = static_cast<KX_ConstraintWrapper *>(self_v);
+	CONSTRAINT_VALID_CHECK_OR_RETURN(self->m_constraint, attrdef->m_name.c_str(), nullptr);
 	return PyLong_FromLong(self->m_constraint->GetIdentifier());
 }
 
 PyObject *KX_ConstraintWrapper::pyattr_get_constraintType(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_ConstraintWrapper *self = static_cast<KX_ConstraintWrapper *>(self_v);
+	CONSTRAINT_VALID_CHECK_OR_RETURN(self->m_constraint, attrdef->m_name.c_str(), nullptr);
 	return PyLong_FromLong(self->m_constraint->GetType());
 }
 
 PyObject *KX_ConstraintWrapper::pyattr_get_breakingThreshold(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_ConstraintWrapper *self = static_cast<KX_ConstraintWrapper *>(self_v);
+	CONSTRAINT_VALID_CHECK_OR_RETURN(self->m_constraint, attrdef->m_name.c_str(), nullptr);
 	return PyFloat_FromDouble(self->m_constraint->GetBreakingThreshold());
 }
 
 int KX_ConstraintWrapper::pyattr_set_breakingThreshold(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
 {
 	KX_ConstraintWrapper *self = static_cast<KX_ConstraintWrapper *>(self_v);
+	CONSTRAINT_VALID_CHECK_OR_RETURN(self->m_constraint, attrdef->m_name.c_str(), PY_SET_ATTR_FAIL);
 	float val = PyFloat_AsDouble(value);
 
 	if (val == -1 && PyErr_Occurred()) {
@@ -155,12 +184,14 @@ int KX_ConstraintWrapper::pyattr_set_breakingThreshold(EXP_PyObjectPlus *self_v,
 PyObject *KX_ConstraintWrapper::pyattr_get_enabled(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_ConstraintWrapper *self = static_cast<KX_ConstraintWrapper *>(self_v);
+	CONSTRAINT_VALID_CHECK_OR_RETURN(self->m_constraint, attrdef->m_name.c_str(), nullptr);
 	return PyBool_FromLong(self->m_constraint->GetEnabled());
 }
 
 int KX_ConstraintWrapper::pyattr_set_enabled(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
 {
 	KX_ConstraintWrapper *self = static_cast<KX_ConstraintWrapper *>(self_v);
+	CONSTRAINT_VALID_CHECK_OR_RETURN(self->m_constraint, attrdef->m_name.c_str(), PY_SET_ATTR_FAIL);
 	int val = PyObject_IsTrue(value);
 
 	if (val == -1 && PyErr_Occurred()) {

@@ -59,6 +59,9 @@ public:
 #endif
 
 private:
+	static void OnConstraintInvalidated(void *client);
+
+	/// Set to nullptr when the constraint is deleted (removeConstraint, object removed).
 	PHY_IConstraint *m_constraint;
 };
 

@@ -830,8 +830,8 @@ void CcdPhysicsEnvironment::RemoveConstraint(btTypedConstraint *con, bool free)
 			((CcdPhysicsController *)rbB.getUserPointer())->removeCcdConstraintRef(con);
 		}
 
-		/* Since we remove the constraint in the onwer and the target, we can delete it,
-		 * KX_ConstraintWrapper keep the constraint id not the pointer, so no problems. */
+		/* Since we remove the constraint in the owner and the target, we can delete it.
+		 * Deleting userData invalidates any KX_ConstraintWrapper still held by Python. */
 		delete userData;
 		delete con;
 	}
@@ -1587,7 +1587,7 @@ void CcdPhysicsEnvironment::RemoveConstraintById(int constraintId, bool free)
 	int numConstraints = m_dynamicsWorld->getNumConstraints();
 	for (i = 0; i < numConstraints; i++) {
 		btTypedConstraint *constraint = m_dynamicsWorld->getConstraint(i);
-		if (constraint->getUserConstraintId() == constraintId) {
+		if (CcdConstraint::GetIdentifier(constraint) == constraintId) {
 			RemoveConstraint(constraint, free);
 			break;
 		}
@@ -2595,7 +2595,7 @@ btTypedConstraint *CcdPhysicsEnvironment::GetConstraintById(int constraintId)
 	int i;
 	for (i = 0; i < numConstraints; i++) {
 		btTypedConstraint *constraint = m_dynamicsWorld->getConstraint(i);
-		if (constraint->getUserConstraintId() == constraintId) {
+		if (CcdConstraint::GetIdentifier(constraint) == constraintId) {
 			return constraint;
 		}
 	}
@@ -3127,9 +3127,8 @@ PHY_IConstraint *CcdPhysicsEnvironment::CreateConstraint(class PHY_IPhysicsContr
 
 	c0->addCcdConstraintRef(con);
 	c1->addCcdConstraintRef(con);
-	con->setUserConstraintId(gConstraintUid++);
 	con->setUserConstraintType(type);
-	CcdConstraint *constraintData = new CcdConstraint(con, disableCollisionBetweenLinkedBodies);
+	CcdConstraint *constraintData = new CcdConstraint(con, gConstraintUid++, disableCollisionBetweenLinkedBodies);
 	con->setUserConstraintPtr(constraintData);
 	m_dynamicsWorld->addConstraint(con, disableCollisionBetweenLinkedBodies);
 
@@ -3207,7 +3206,7 @@ float CcdPhysicsEnvironment::GetAppliedImpulse(int constraintid)
 	int numConstraints = m_dynamicsWorld->getNumConstraints();
 	for (i = 0; i < numConstraints; i++) {
 		btTypedConstraint *constraint = m_dynamicsWorld->getConstraint(i);
-		if (constraint->getUserConstraintId() == constraintid) {
+		if (CcdConstraint::GetIdentifier(constraint) == constraintid) {
 			// The solver always stores the impulse; the flag only silences Bullet's debug assert.
 			constraint->enableFeedback(true);
 			return constraint->getAppliedImpulse();

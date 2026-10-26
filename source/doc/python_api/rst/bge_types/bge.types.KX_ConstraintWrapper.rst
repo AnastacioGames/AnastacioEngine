@@ -7,6 +7,11 @@ base class --- :class:`EXP_PyObjectPlus`
 
    KX_ConstraintWrapper
 
+   .. note::
+      When the constraint is deleted (:func:`bge.constraints.removeConstraint` or removing one of
+      its objects), every method and attribute of the wrapper raises ``ReferenceError``.
+      Suspending physics keeps the constraint, so the wrapper still works.
+
    .. method:: getConstraintId(val)
 
       Returns the contraint ID

@@ -4,8 +4,9 @@
 
 #include "btBulletDynamicsCommon.h"
 
-CcdConstraint::CcdConstraint(btTypedConstraint *constraint, bool disableCollision)
+CcdConstraint::CcdConstraint(btTypedConstraint *constraint, int identifier, bool disableCollision)
 	:m_constraint(constraint),
+	m_identifier(identifier),
 	m_disableCollision(disableCollision),
 	m_active(true)
 {
@@ -14,6 +15,29 @@ CcdConstraint::CcdConstraint(btTypedConstraint *constraint, bool disableCollisio
 
 CcdConstraint::~CcdConstraint()
 {
+	// Python may still hold a KX_ConstraintWrapper: tell it the constraint is gone.
+	std::vector<InvalidationCallback> callbacks = std::move(m_invalidationCallbacks);
+	for (const InvalidationCallback &entry : callbacks) {
+		entry.callback(entry.client);
+	}
+}
+
+void CcdConstraint::SetInvalidationCallback(void (*callback)(void *client), void *client)
+{
+	for (std::vector<InvalidationCallback>::iterator it = m_invalidationCallbacks.begin(); it != m_invalidationCallbacks.end(); ++it) {
+		if (it->client == client) {
+			if (callback) {
+				it->callback = callback;
+			}
+			else {
+				m_invalidationCallbacks.erase(it);
+			}
+			return;
+		}
+	}
+	if (callback) {
+		m_invalidationCallbacks.push_back({callback, client});
+	}
 }
 
 bool CcdConstraint::GetDisableCollision() const
@@ -198,7 +222,14 @@ void CcdConstraint::SetBreakingThreshold(float threshold)
 
 int CcdConstraint::GetIdentifier() const
 {
-	return m_constraint->getUserConstraintId();
+	return m_identifier;
+}
+
+int CcdConstraint::GetIdentifier(const btTypedConstraint *constraint)
+{
+	const CcdConstraint *data = static_cast<const CcdConstraint *>(
+		const_cast<btTypedConstraint *>(constraint)->getUserConstraintPtr());
+	return data ? data->m_identifier : 0;
 }
 
 PHY_ConstraintType CcdConstraint::GetType() const
