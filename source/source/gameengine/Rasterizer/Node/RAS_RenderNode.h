@@ -56,6 +56,9 @@ struct RAS_ManagerNodeData
 	RAS_Rasterizer::DrawType m_drawingMode;
 	bool m_sort;
 	bool m_shaderOverride;
+	/* Cull face last set by a material node in this override pass (-1: unknown), so the
+	 * shadow passes don't repeat glEnable/glDisable(GL_CULL_FACE) for every material. */
+	int m_overrideCullFace;
 };
 
 struct RAS_MaterialNodeData

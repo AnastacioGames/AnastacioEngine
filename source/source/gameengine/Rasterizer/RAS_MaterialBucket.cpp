@@ -117,6 +117,19 @@ void RAS_MaterialBucket::GenerateTree(RAS_ManagerDownwardNode& downwardRoot, RAS
 		return;
 	}
 
+	/* Each shadow pass walks every material, and most have nothing visible for a given
+	 * light: skip them before asking the material (virtual calls) about instancing. */
+	bool any = false;
+	for (RAS_DisplayArrayBucket *displayArrayBucket : m_displayArrayBucketList) {
+		if (displayArrayBucket->HasActiveMeshSlots()) {
+			any = true;
+			break;
+		}
+	}
+	if (!any) {
+		return;
+	}
+
 	const bool instancing = UseInstancing();
 	for (RAS_DisplayArrayBucket *displayArrayBucket : m_displayArrayBucketList) {
 		displayArrayBucket->GenerateTree(m_downwardNode, m_upwardNode, upwardLeafs, drawingMode, sort, instancing);
@@ -133,7 +146,13 @@ void RAS_MaterialBucket::BindNode(const RAS_MaterialNodeTuple& tuple)
 {
 	RAS_ManagerNodeData *managerData = tuple.m_managerData;
 	RAS_Rasterizer *rasty = managerData->m_rasty;
-	rasty->SetCullFace(m_nodeData.m_cullFace);
+	if (!managerData->m_shaderOverride) {
+		rasty->SetCullFace(m_nodeData.m_cullFace);
+	}
+	else if (managerData->m_overrideCullFace != (int)m_nodeData.m_cullFace) {
+		rasty->SetCullFace(m_nodeData.m_cullFace);
+		managerData->m_overrideCullFace = (int)m_nodeData.m_cullFace;
+	}
 	/* Slope term alone does nothing on faces seen head-on (decals): add constant depth steps too. */
 	rasty->SetPolygonOffset(managerData->m_drawingMode, -m_nodeData.m_zoffset, -m_nodeData.m_zoffset * 8.0f);
 

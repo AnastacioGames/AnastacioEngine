@@ -1,4 +1,4 @@
-# Changelog — AnastacioEngine
+﻿# Changelog — AnastacioEngine
 
 Registro histórico do que foi feito, alterado ou adicionado no fork. Entradas antigas preservam o contexto
 da época e podem conter hipóteses corrigidas em entradas posteriores. Para o estado vigente, consulte
@@ -7,6 +7,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 **Como está organizado.** Este arquivo guarda as entradas recentes (novas entradas vão no topo). O histórico antigo está em [changelog-arquivo.md](changelog-arquivo.md); não leia inteiro, use grep. Quando este arquivo passar de ~60 KB, mova as entradas mais antigas para o fim do arquivo.
 
 
+
+## 2026-10-26 - CPU: passes de sombra pulam materiais sem nada visível
+
+- `RAS_MaterialBucket::GenerateTree` sai antes de consultar instancing (chamadas virtuais) quando nenhuma malha do material está visível para a luz; cada um dos ~43 passes de sombra percorria os 900 materiais.
+- No passe com shader de sombra único, o cull face só é reenviado ao GL quando muda entre materiais.
+- Cena pbr_900o_8l_Nm_cpu: 16,36 → 15,48 ms (−5,4%); demais cenas −1 a −4%. O custo restante é por malha distinta (900 cópias), não por material.
 
 ## 2026-10-26 - CPU: leitura de arquivos antigos sem casar campos a cada bloco; amostrador de CPU
 

@@ -132,6 +132,7 @@ void RAS_BucketManager::RenderSortedBuckets(RAS_Rasterizer *rasty, RAS_BucketMan
 	}
 
 	m_nodeData.m_sort = true;
+	m_nodeData.m_overrideCullFace = -1;
 
 	if (m_downwardNode.GetValid()) {
 		m_downwardNode.Execute(RAS_DummyNodeTuple());
@@ -169,6 +170,7 @@ void RAS_BucketManager::RenderBasicBuckets(RAS_Rasterizer *rasty, RAS_BucketMana
 
 	if (m_downwardNode.GetValid()) {
 		m_nodeData.m_sort = false;
+		m_nodeData.m_overrideCullFace = -1;
 		m_downwardNode.Execute(RAS_DummyNodeTuple());
 	}
 }
