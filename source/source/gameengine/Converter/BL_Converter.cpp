@@ -1026,6 +1026,9 @@ void BL_Converter::RemoveScene(KX_Scene *scene)
 	Texture::FreeAllTextures(scene);
 #endif  // WITH_PYTHON
 
+	// The loaded data joins the scene and goes away with it, instead of merging into it after the release.
+	FinishMergesInto(scene);
+
 	/* Delete the meshes as some one of them depends to the data owned by the scene
 	 * e.g the display array bucket owned by the meshes and needed to be unregistered
 	 * from the bucket manager in the scene.
@@ -1213,6 +1216,44 @@ bool BL_Converter::StepMerge(PendingMerge& merge, double deadline)
 	return (merge.m_scene >= converters.size());
 }
 
+void BL_Converter::FinishMergesInto(KX_Scene *scene)
+{
+	bool pending = false;
+	m_threadinfo.m_mutex.Lock();
+	for (const auto& item : m_libloadStatus) {
+		if (item.second->GetMergeScene() == scene && !item.second->IsFinished()) {
+			pending = true;
+			break;
+		}
+	}
+	m_threadinfo.m_mutex.Unlock();
+	if (!pending) {
+		return;
+	}
+
+	// A conversion still running would queue its merge after the scene is released.
+	BLI_task_pool_work_and_wait(m_threadinfo.m_pool);
+	m_threadinfo.m_mutex.Lock();
+	for (KX_LibLoadStatus *libload : m_mergequeue) {
+		m_merging.push_back({libload, 0, PendingMerge::STAGE_TEXTURES, 0});
+	}
+	m_mergequeue.clear();
+	m_threadinfo.m_mutex.Unlock();
+
+	for (auto it = m_merging.begin(); it != m_merging.end();) {
+		if (it->m_status->GetMergeScene() != scene) {
+			++it;
+			continue;
+		}
+		StepMerge(*it, DBL_MAX);
+		// A pending light reload of this scene is finished by RemoveScene().
+		if (!IsWaitingReload(it->m_status)) {
+			it->m_status->Finish();
+		}
+		it = m_merging.erase(it);
+	}
+}
+
 bool BL_Converter::IsWaitingReload(KX_LibLoadStatus *status) const
 {
 	for (const auto& item : m_reloads) {
@@ -1295,10 +1336,15 @@ void BL_Converter::ProcessScheduledLibraries()
 		StepReloads(deadline);
 	}
 
-	for (Main *maggie : m_freeQueue) {
-		FreeBlendFileData(maggie);
+	// A library still loading stays queued until its load finishes.
+	for (auto it = m_freeQueue.begin(); it != m_freeQueue.end();) {
+		if (FreeBlendFileData(*it)) {
+			it = m_freeQueue.erase(it);
+		}
+		else {
+			++it;
+		}
 	}
-	m_freeQueue.clear();
 }
 
 void BL_Converter::FinalizeAsyncLoads()
@@ -1585,13 +1631,12 @@ bool BL_Converter::FreeBlendFileData(Main *maggie)
 	const auto it = m_libloadStatus.find(maggie);
 	if (it != m_libloadStatus.end()) {
 		KX_LibLoadStatus *status = it->second.get();
-		// If the given library is currently in loading, we do nothing.
+		// Still loading: the caller keeps the free queued and retries next frame.
 		m_threadinfo.m_mutex.Lock();
 		const bool finished = status->IsFinished();
 		m_threadinfo.m_mutex.Unlock();
 
 		if (!finished) {
-			CM_Error("Library (" << maggie->name << ") is currently being loaded asynchronously, and cannot be freed until this process is done");
 			return false;
 		}
 	}
@@ -1722,6 +1767,10 @@ bool BL_Converter::FreeBlendFile(const std::string& path)
 		return false;
 	}
 
+	// Already queued: a second free would release the same Main twice.
+	if (std::find(m_freeQueue.begin(), m_freeQueue.end(), maggie) != m_freeQueue.end()) {
+		return false;
+	}
 	// Delay library free in ProcessScheduledLibraries.
 	m_freeQueue.push_back(maggie);
 	return true;

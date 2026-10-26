@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 5: LibLoad/LibFree sem liberação dupla nem merge em cena removida
+
+- [Revisão](revisao-conversao-libload.md) LIB-01..03 em `BL_Converter`.
+- `LibFree` repetido no mesmo frame não libera a mesma `Main` duas vezes; antes o heap corrompia.
+- `LibFree` durante um carregamento assíncrono fica na fila até o carregamento acabar; antes era
+  descartado e o Python recebia `True`.
+- Remover a cena de destino conclui antes os merges pendentes para ela (`FinishMergesInto`); antes
+  o merge caía numa cena já liberada e o player travava.
+- Regressão em `tools/debug/cenas/criar_cena_revisao_libload.py`; os 4 casos passaram em `--server`.
+
 ## 2026-10-26 - Frente 2: input, joystick e animação no catch-up
 
 - Terceira rodada da [revisão](revisao-scenegraph-loop.md), IDs INP-01..03 e ANI-01. Leitura dos

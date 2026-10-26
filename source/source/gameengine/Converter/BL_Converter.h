@@ -192,6 +192,8 @@ private:
 
 	/// Advance a library merge until done or the deadline (PIL time) passes, true when finished.
 	bool StepMerge(PendingMerge& merge, double deadline);
+	/// Completes now the async loads merging into scene, before it goes away (they would merge into freed memory).
+	void FinishMergesInto(KX_Scene *scene);
 	/// Advance the light reloads until done or the deadline passes, finishing the waiting libraries.
 	void StepReloads(double deadline);
 	/// The library is merged but still waits for its scene light reload.
