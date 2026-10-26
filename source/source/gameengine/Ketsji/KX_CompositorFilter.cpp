@@ -211,10 +211,31 @@ public:
 		if (g && (g->game_flag & CMP_NODE_GLARE_GAME_B5)) {
 			// Blender 5 (compositor_glare_highlights): brightness = HSV value, clamped to Max Brightness,
 			// then made relative to the threshold, keeping the hue.
+			// Smoothness: adaptive_smooth_clamp of Blender 5 (quadratic smooth min/max, limited so that
+			// values at or below the threshold still give zero).
 			const float maxb = (g->max_brightness > 0.0f) ? std::max(g->max_brightness, threshold) : 1.0e9f;
+			const float sm = std::min(std::max(g->smoothness, 0.0f), 1.0f);
+			const float range = maxb - threshold;
+			const float smMin = std::min(sm, std::min(std::fabs(threshold), range));
+			const float smMax = std::min(sm, std::min(std::fabs(maxb), range));
 			m_code << "\tfloat val = max(c.r, max(c.g, c.b));\n"
-			       << "\tif (val <= " << F(threshold) << ") return vec4(0.0, 0.0, 0.0, 1.0);\n"
-			       << "\treturn vec4(c * ((min(val, " << F(maxb) << ") - " << F(threshold) << ") / val), 1.0);\n}\n\n";
+			       << "\tif (val <= 0.0) return vec4(0.0, 0.0, 0.0, 1.0);\n"
+			       << "\tfloat v = val;\n";
+			if (smMin > 0.0f) {  // smooth max(threshold, v)
+				m_code << "\t{ float h = max(" << F(smMin) << " - abs(v - " << F(threshold) << "), 0.0) / " << F(smMin) << ";\n"
+				       << "\t  v = max(v, " << F(threshold) << ") + h * h * " << F(smMin * 0.25f) << "; }\n";
+			}
+			else {
+				m_code << "\tv = max(v, " << F(threshold) << ");\n";
+			}
+			if (smMax > 0.0f && maxb < 1.0e8f) {  // smooth min(maxb, v)
+				m_code << "\t{ float h = max(" << F(smMax) << " - abs(v - " << F(maxb) << "), 0.0) / " << F(smMax) << ";\n"
+				       << "\t  v = min(v, " << F(maxb) << ") - h * h * " << F(smMax * 0.25f) << "; }\n";
+			}
+			else {
+				m_code << "\tv = min(v, " << F(maxb) << ");\n";
+			}
+			m_code << "\treturn vec4(c * (max(v - " << F(threshold) << ", 0.0) / val), 1.0);\n}\n\n";
 		}
 		else {
 			m_code << "\tif (dot(c, vec3(0.2126, 0.7152, 0.0722)) < " << F(threshold) << ") return vec4(0.0, 0.0, 0.0, 1.0);\n"

@@ -1599,6 +1599,7 @@ static void node_composit_buts_glare(uiLayout *layout, bContext *C, PointerRNA *
 				uiItemR(col, ptr, "strength", 0, NULL, ICON_NONE);
 				uiItemR(col, ptr, "saturation", 0, NULL, ICON_NONE);
 				uiItemR(col, ptr, "max_brightness", 0, NULL, ICON_NONE);
+				uiItemR(col, ptr, "smoothness", UI_ITEM_R_SLIDER, NULL, ICON_NONE);
 				uiItemR(layout, ptr, "tint", 0, "", ICON_NONE);
 			}
 		}

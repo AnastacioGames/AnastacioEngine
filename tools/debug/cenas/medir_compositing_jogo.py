@@ -17,6 +17,7 @@ Presets:
   lente_blur Blur -> Lens Distortion (3 x 49)
   glare_fog / glare_streaks / glare_star / glare_ghosts   Glare sobre a imagem (Threshold 0.5)
   glare_b5   Fog Glow com Blender 5 Style (Strength 2, Saturation 0.5, Tint laranja, Max Brightness 3)
+  glare_b5_suave Fog Glow com Blender 5 Style e Smoothness 1 (Max Brightness 3)
   glare_bloom Bloom (modo do Blender 5, só no jogo)
   glare_sunbeams Sun Beams (Blender 5, só no jogo; sol em 0.7, 0.8, Length 0.4)
   glare_cor  8 nós de cor -> Glare Fog Glow (com textura intermediária)
@@ -103,7 +104,9 @@ if preset != 'off':
         if preset == 'glare_b5':
             g.use_game_blender5 = True
             g.strength = 2.0; g.saturation = 0.5; g.tint = (1.0, 0.7, 0.4); g.max_brightness = 3.0
-        g.glare_type = {'glare_b5': 'FOG_GLOW', 'glare_fog': 'FOG_GLOW', 'glare_cor': 'FOG_GLOW', 'glare_streaks': 'STREAKS',
+        if preset == 'glare_b5_suave':
+            g.use_game_blender5 = True; g.max_brightness = 3.0; g.smoothness = 1.0
+        g.glare_type = {'glare_b5': 'FOG_GLOW', 'glare_b5_suave': 'FOG_GLOW', 'glare_fog': 'FOG_GLOW', 'glare_cor': 'FOG_GLOW', 'glare_streaks': 'STREAKS',
                         'glare_star': 'SIMPLE_STAR', 'glare_ghosts': 'GHOSTS', 'glare_bloom': 'BLOOM',
                         'glare_sunbeams': 'SUN_BEAMS'}[preset]
         if preset == 'glare_sunbeams':

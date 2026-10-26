@@ -1568,6 +1568,7 @@ static void rna_NodeGlare_game_b5_set(PointerRNA *ptr, bool value)
 			ndg->strength = 1.0f;
 			ndg->saturation = 1.0f;
 			ndg->tint[0] = ndg->tint[1] = ndg->tint[2] = 1.0f;
+			ndg->smoothness = 0.1f;
 		}
 	}
 	else {
@@ -6126,6 +6127,14 @@ static void def_cmp_glare(StructRNA *srna)
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Tint", "Game, Blender 5 Style: color the glare is multiplied by");
+	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
+
+	prop = RNA_def_property(srna, "smoothness", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "smoothness");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Smoothness",
+	                         "Game, Blender 5 Style: soft transition at the threshold and at Max Brightness, "
+	                         "so highlights do not start with a hard edge (0 = hard cut)");
 	RNA_def_property_update(prop, NC_NODE | NA_EDITED, "rna_Node_update");
 
 	prop = RNA_def_property(srna, "max_brightness", PROP_FLOAT, PROP_NONE);

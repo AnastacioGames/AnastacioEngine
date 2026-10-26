@@ -695,6 +695,8 @@ typedef struct NodeGlare {
 	/* Game: Sun Beams type (5), like Blender 5: beams leave the bright parts away from sun_pos (0-1 of the image) */
 	float sun_pos[2];
 	float beams_len;
+	/* Game, Blender 5 Style: soft knee at the threshold and at max_brightness (0 = hard cut) */
+	float smoothness, pad_f3;
 } NodeGlare;
 
 /* NodeGlare.game_flag */
