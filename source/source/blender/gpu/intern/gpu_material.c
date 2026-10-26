@@ -107,8 +107,8 @@ static bool gpu_lamp_pcss(const Scene *scene, const Lamp *la)
 
 /* Set when a GPU lamp with cascades / Penumbra is created, so lamps of a LibLoad Main (not in
  * G.main) also turn on the SHADOW_CSM / SHADOW_PCSS shader stages when the materials recompile. */
-static bool gpu_csm_lamp_seen = false;
-static bool gpu_pcss_lamp_seen = false;
+static int gpu_csm_lamp_count = 0;
+static int gpu_pcss_lamp_count = 0;
 
 /* Penumbra lamp that the quality preset turned into a hard shadow. */
 static bool gpu_lamp_pcss_dropped(const Scene *scene, const Lamp *la)
@@ -356,7 +356,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	/* PCSS in the Principled light loop: 4 inlined copies of its 64-tap search and filter made
 	 * every Principled shader slow to compile on the Web (ANGLE unrolls the loops), so they are
 	 * only compiled when a lamp actually uses it. */
-	bool any_pcss = gpu_pcss_lamp_seen, any_csm = gpu_csm_lamp_seen;
+	bool any_pcss = gpu_pcss_lamp_count > 0, any_csm = gpu_csm_lamp_count > 0;
 	for (const Lamp *la = G.main ? G.main->lamp.first : NULL; la; la = la->id.next) {
 		any_pcss |= la->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA;
 		any_csm |= la->type == LA_SUN && la->shadow_cascade_count != 0;
@@ -5432,8 +5432,10 @@ GPULamp *GPU_lamp_from_blender(Scene *scene, Object *ob, Object *par)
 	{
 		const Lamp *bla = ob->data;
 		if (bla) {
-			gpu_pcss_lamp_seen |= bla->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA;
-			gpu_csm_lamp_seen |= bla->type == LA_SUN && bla->shadow_cascade_count != 0;
+			lamp->counted_pcss = bla->shadow_filter == LA_SHADOW_FILTER_PCF_PENUMBRA;
+			lamp->counted_csm = bla->type == LA_SUN && bla->shadow_cascade_count != 0;
+			gpu_pcss_lamp_count += lamp->counted_pcss;
+			gpu_csm_lamp_count += lamp->counted_csm;
 		}
 	}
 
@@ -5587,6 +5589,8 @@ void GPU_lamp_free(Object *ob)
 
 		gpu_lamp_shadow_free(lamp);
 
+		gpu_pcss_lamp_count -= lamp->counted_pcss;
+		gpu_csm_lamp_count -= lamp->counted_csm;
 		MEM_freeN(lamp);
 	}
 

@@ -3621,7 +3621,19 @@ GPUPass *GPU_generate_pass(
 		flags |= GPU_SHADER_FLAGS_SHADOW_PCSS;
 	}
 	if (stages && stages->shadow_csm) {
-		flags |= GPU_SHADER_FLAGS_SHADOW_CSM;
+		/* The cascades use fixed units (csmunit in GPU_material_bind_shadow_lamps); the lowest is
+		 * max - 3 * 4 - 1. A material with that many textures keeps them and loses the CSM sun. */
+		int ntex = 0;
+		for (GPUNode *node = nodes->first; node; node = node->next) {
+			for (GPUInput *input = node->inputs.first; input; input = input->next) {
+				if (codegen_input_has_texture(input) && input->texid + 1 > ntex) {
+					ntex = input->texid + 1;
+				}
+			}
+		}
+		if (ntex <= GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1) {
+			flags |= GPU_SHADER_FLAGS_SHADOW_CSM;
+		}
 	}
 	const unsigned int hash = shader_cache_hash(vertexcode, fragmentcode, geometrycode, flags);
 	const bool use_cache = shader_cache_enabled();

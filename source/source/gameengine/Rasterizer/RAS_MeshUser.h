@@ -51,6 +51,8 @@ private:
 	bool m_frontFace;
 	/// Object color.
 	mt::vec4 m_color;
+	/// False until the first SetColor: that one only fills in the color, it does not leave the batch.
+	bool m_colorSet;
 	/// Object transformation matrix.
 	mt::mat4 m_matrix;
 	/// Bounding box corresponding to a mesh or deformer.

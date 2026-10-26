@@ -52,6 +52,7 @@ RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_De
 	m_random(BLI_hash_int_2d((uintptr_t)clientobj, 0) / ((float)0xFFFFFFFF)),
 	m_frontFace(true),
 	m_color(mt::zero4),
+	m_colorSet(false),
 	m_boundingBox(boundingBox),
 	m_clientObject(clientobj),
 	m_batchGroup(nullptr),
@@ -162,11 +163,17 @@ void RAS_MeshUser::SetFrontFace(bool frontFace)
 
 void RAS_MeshUser::SetColor(const mt::vec4& color)
 {
+	if (!m_colorSet) {
+		m_colorSet = true;
+		m_color = color;
+		m_instancingVersion = NextInstancingVersion();
+		return;
+	}
 	if (m_color != color) {
 		m_color = color;
 		m_instancingVersion = NextInstancingVersion();
 		// The batch draws every member with one color: the recolored one is drawn on its own.
-		if (m_batchGroup) {
+		if (m_batchGroup && m_colorSet) {
 			m_batchGroup->SplitMeshUser(this);
 		}
 	}

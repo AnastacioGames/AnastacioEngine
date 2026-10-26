@@ -177,6 +177,8 @@ struct GPUMaterial {
 };
 
 struct GPULamp {
+	/* Counted in gpu_pcss_lamp_count / gpu_csm_lamp_count while this lamp lives. */
+	bool counted_pcss, counted_csm;
 	Scene *scene;
 	Object *ob;
 	Object *par;
