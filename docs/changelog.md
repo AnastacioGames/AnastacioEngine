@@ -8,6 +8,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - CPU: leitura de arquivos antigos sem casar campos a cada bloco; amostrador de CPU
+
+- **Amostrador sem administrador** (`tools/debug/sampler/range_sampler.cpp`): abre o processo, pausa a thread
+  principal a cada ~1 ms e soma a pilha por função usando o PDB (WPR/xperf exigem admin). `SAMPLER_FILTER=nome`
+  separa fases (ex.: `EngineMainLoop` = quadros, `BLO_read_from_file` = leitura). `run_perf_suite.py --exe
+  tag=caminho` compara dois binários alternando as rodadas.
+- **Leitura de `.range`**: `DNA_struct_reconstruct` era ~94% do tempo de ler a cena perf de 900 objetos — para cada
+  bloco casava de novo os campos pelo nome (`strlen`/`atol`/`strcmp`). Agora `DNA_reconstruct_info_new` monta, uma
+  vez por tipo de struct, os passos (offset, tamanho, cast) com as mesmas regras, guardados no `FileData` (cada
+  arquivo tem o seu; LibLoad assíncrono segue seguro). Conferido byte a byte com o caminho antigo em ~17 mil blocos
+  de 40 arquivos (Rolima, demos, YoFrankie 2.4x, Range Store): zero diferenças. Editor `-b`: cena perf 3,50 → 2,61 s,
+  `_overlay_build_test_out` 4,39 → 3,33 s; arquivos já salvos com o DNA atual não mudam.
+- Achados do perfil dos quadros (cena perf 900 obj/8 luzes): 60% em `KX_ShadowRenderer::Render`; as sombras custam
+  5,3 ms com 1 material e 8,1 ms com 900, mesmo com shader de sombra único e os mesmos draw calls — custo por
+  material (árvore + nós + troca de VAO) em cada um dos 43 passes. Próximo passo: agrupar o passe de sombra por
+  malha. Guardar `UseInstancing` no shader tirou a função do topo mas não mudou o ms/quadro (revertido).
+
 ## 2026-10-25 - CPU: API Python mais barata e Range.types.TrackLine para IA de corrida
 
 - `obj.get` com METH_FASTCALL e busca de propriedade sem alocar string (0,34 → 0,20 µs); `obj["x"] = número`

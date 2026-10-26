@@ -1367,6 +1367,8 @@ void blo_freefiledata(FileData *fd)
 		// Free all BHeadN data blocks
 		BLI_freelistN(&fd->listbase);
 
+		if (fd->reconstruct_info)
+			DNA_reconstruct_info_free(fd->reconstruct_info);
 		if (fd->filesdna)
 			DNA_sdna_free(fd->filesdna);
 		if (fd->compflags)
@@ -1971,7 +1973,11 @@ static void *read_struct(FileData *fd, BHead *bh, const char *blockname)
 
 		if (fd->compflags[bh->SDNAnr] != SDNA_CMP_REMOVED) {
 			if (fd->compflags[bh->SDNAnr] == SDNA_CMP_NOT_EQUAL) {
-				temp = DNA_struct_reconstruct(fd->memsdna, fd->filesdna, fd->compflags, bh->SDNAnr, bh->nr, (bh + 1));
+				/* Field matching is cached per struct type; it was ~94% of reading big older files. */
+				if (fd->reconstruct_info == NULL) {
+					fd->reconstruct_info = DNA_reconstruct_info_new(fd->memsdna, fd->filesdna, fd->compflags);
+				}
+				temp = DNA_struct_reconstruct_ex(fd->reconstruct_info, bh->SDNAnr, bh->nr, (bh + 1));
 			}
 			else {
 				/* SDNA_CMP_EQUAL */

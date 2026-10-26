@@ -92,6 +92,14 @@ void *DNA_struct_reconstruct(
         const struct SDNA *newsdna, const struct SDNA *oldsdna,
         const char *compflags, int oldSDNAnr, int blocks, const void *data);
 
+/* Same result as DNA_struct_reconstruct, but the field matching (string compares of names
+ * and types) is done once per struct type and reused for every block of the file. */
+struct DNA_ReconstructInfo;
+struct DNA_ReconstructInfo *DNA_reconstruct_info_new(
+        const struct SDNA *newsdna, const struct SDNA *oldsdna, const char *compflags);
+void DNA_reconstruct_info_free(struct DNA_ReconstructInfo *info);
+void *DNA_struct_reconstruct_ex(struct DNA_ReconstructInfo *info, int oldSDNAnr, int blocks, const void *data);
+
 int DNA_elem_array_size(const char *str);
 int DNA_elem_offset(struct SDNA *sdna, const char *stype, const char *vartype, const char *name);
 

@@ -68,6 +68,7 @@ typedef struct FileData {
 	struct SDNA *filesdna;
 	const struct SDNA *memsdna;
 	const char *compflags;  /* array of eSDNA_StructCompare */
+	struct DNA_ReconstructInfo *reconstruct_info;  /* field matching cached per struct type */
 
 	int fileversion;
 	int id_name_offs;       /* used to retrieve ID names from (bhead+1) */

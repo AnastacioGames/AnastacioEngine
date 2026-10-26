@@ -1322,6 +1322,258 @@ void *DNA_struct_reconstruct(
 	return cur;
 }
 
+/* -------------------------------------------------------------------- */
+/* Reconstruct with cached field matching.
+ *
+ * reconstruct_struct() matches every field by name for every block read, which made
+ * DNA_struct_reconstruct ~94% of file reading in big scenes. The steps below are built
+ * once per old struct type with exactly the same matching rules, then replayed. */
+
+enum {
+	RS_MEMCPY = 0,
+	RS_MEMCPY_STR,  /* memcpy of a truncated char array: keep it null-terminated */
+	RS_CAST_PTR,
+	RS_CAST_ELEM,
+	RS_STRUCT,
+};
+
+typedef struct ReconstructStep {
+	int kind;
+	int cur_offset, old_offset;
+	int len;                                   /* RS_MEMCPY, RS_MEMCPY_STR */
+	const char *ctype, *otype, *name;          /* RS_CAST_PTR, RS_CAST_ELEM */
+	int old_nr, cur_nr, count, cur_stride, old_stride;  /* RS_STRUCT */
+} ReconstructStep;
+
+typedef struct ReconstructPlan {
+	bool built;
+	int cur_nr;
+	int steps_len;
+	ReconstructStep *steps;
+} ReconstructPlan;
+
+struct DNA_ReconstructInfo {
+	const SDNA *newsdna, *oldsdna;
+	const char *compflags;
+	ReconstructPlan *plans;  /* one per old struct */
+};
+
+struct DNA_ReconstructInfo *DNA_reconstruct_info_new(const SDNA *newsdna, const SDNA *oldsdna, const char *compflags)
+{
+	struct DNA_ReconstructInfo *info = MEM_callocN(sizeof(*info), __func__);
+	info->newsdna = newsdna;
+	info->oldsdna = oldsdna;
+	info->compflags = compflags;
+	info->plans = MEM_callocN(sizeof(ReconstructPlan) * oldsdna->nr_structs, __func__);
+	return info;
+}
+
+void DNA_reconstruct_info_free(struct DNA_ReconstructInfo *info)
+{
+	for (int i = 0; i < info->oldsdna->nr_structs; i++) {
+		if (info->plans[i].steps) {
+			MEM_freeN(info->plans[i].steps);
+		}
+	}
+	MEM_freeN(info->plans);
+	MEM_freeN(info);
+}
+
+/* Mirrors reconstruct_elem(): first old field with the same name, or same base name
+ * when the current field is an array. Returns false when nothing matches. */
+static bool plan_elem(
+        const SDNA *oldsdna, const char *type, const char *name,
+        const short *old, ReconstructStep *step)
+{
+	int countpos = 0;
+	const char *cp = name;
+	while (*cp && *cp != '[') {
+		cp++; countpos++;
+	}
+	if (*cp != '[') countpos = 0;
+
+	const int elemcount = old[1];
+	int old_offset = 0;
+	old += 2;
+	for (int a = 0; a < elemcount; a++, old += 2) {
+		const char *otype = oldsdna->types[old[0]];
+		const char *oname = oldsdna->names[old[1]];
+		const int len = elementsize(oldsdna, old[0], old[1]);
+
+		step->old_offset = old_offset;
+		step->ctype = type;
+		step->otype = otype;
+		if (strcmp(name, oname) == 0) {
+			step->name = name;
+			if (ispointer(name)) {
+				step->kind = RS_CAST_PTR;
+			}
+			else if (strcmp(type, otype) == 0) {
+				step->kind = RS_MEMCPY;
+				step->len = len;
+			}
+			else {
+				step->kind = RS_CAST_ELEM;
+			}
+			return true;
+		}
+		else if (countpos != 0 && oname[countpos] == '[' && strncmp(name, oname, countpos) == 0) {
+			const int cursize = DNA_elem_array_size(name);
+			const int oldsize = DNA_elem_array_size(oname);
+			step->name = cursize > oldsize ? oname : name;
+			if (ispointer(name)) {
+				step->kind = RS_CAST_PTR;
+			}
+			else if (strcmp(type, otype) == 0) {
+				step->len = (len / oldsize) * ((cursize < oldsize) ? cursize : oldsize);
+				step->kind = (oldsize > cursize && strcmp(type, "char") == 0) ? RS_MEMCPY_STR : RS_MEMCPY;
+			}
+			else {
+				step->kind = RS_CAST_ELEM;
+			}
+			return true;
+		}
+		old_offset += len;
+	}
+	return false;
+}
+
+/* Mirrors the field loop of reconstruct_struct(). */
+static void plan_build(struct DNA_ReconstructInfo *info, int oldSDNAnr, int curSDNAnr, ReconstructPlan *plan)
+{
+	const SDNA *newsdna = info->newsdna, *oldsdna = info->oldsdna;
+	const short *spo = oldsdna->structs[oldSDNAnr];
+	const short *spc = newsdna->structs[curSDNAnr];
+	const int firststructtypenr = *(newsdna->structs[0]);
+	const int elemcount = spc[1];
+
+	plan->cur_nr = curSDNAnr;
+	plan->steps = MEM_callocN(sizeof(ReconstructStep) * (elemcount ? elemcount : 1), __func__);
+	plan->steps_len = 0;
+
+	int cur_offset = 0;
+	spc += 2;
+	for (int a = 0; a < elemcount; a++, spc += 2) {
+		const char *type = newsdna->types[spc[0]];
+		const char *name = newsdna->names[spc[1]];
+		const int elen = elementsize(newsdna, spc[0], spc[1]);
+		ReconstructStep *step = &plan->steps[plan->steps_len];
+		step->cur_offset = cur_offset;
+
+		if (spc[0] >= firststructtypenr && !ispointer(name)) {
+			/* Same rule as find_elem(): name equal without array part, then type must be equal. */
+			const short *old = spo + 2;
+			int old_offset = 0;
+			const short *sppo = NULL;
+			for (int b = 0; b < spo[1]; b++, old += 2) {
+				const int len = elementsize(oldsdna, old[0], old[1]);
+				if (elem_strcmp(name, oldsdna->names[old[1]]) == 0) {
+					if (strcmp(type, oldsdna->types[old[0]]) == 0) {
+						sppo = old;
+					}
+					break;
+				}
+				old_offset += len;
+			}
+			if (sppo) {
+				const int old_nr = DNA_struct_find_nr(oldsdna, type);
+				const int cur_nr = DNA_struct_find_nr(newsdna, type);
+				const int mul = DNA_elem_array_size(name);
+				const int mulo = DNA_elem_array_size(oldsdna->names[sppo[1]]);
+				if (old_nr != -1 && cur_nr != -1) {
+					step->kind = RS_STRUCT;
+					step->old_offset = old_offset;
+					step->old_nr = old_nr;
+					step->cur_nr = cur_nr;
+					step->count = (mul < mulo) ? mul : mulo;
+					step->cur_stride = elen / mul;
+					step->old_stride = elementsize(oldsdna, sppo[0], sppo[1]) / mulo;
+					plan->steps_len++;
+				}
+			}
+		}
+		else if (plan_elem(oldsdna, type, name, spo, step)) {
+			plan->steps_len++;
+		}
+		cur_offset += elen;
+	}
+	plan->built = true;
+}
+
+static void reconstruct_struct_planned(
+        struct DNA_ReconstructInfo *info, int oldSDNAnr, const char *data, int curSDNAnr, char *cur)
+{
+	if (oldSDNAnr == -1 || curSDNAnr == -1) return;
+
+	const SDNA *oldsdna = info->oldsdna;
+	if (info->compflags[oldSDNAnr] == SDNA_CMP_EQUAL) {
+		memcpy(cur, data, oldsdna->typelens[oldsdna->structs[oldSDNAnr][0]]);
+		return;
+	}
+
+	ReconstructPlan *plan = &info->plans[oldSDNAnr];
+	if (!plan->built) {
+		plan_build(info, oldSDNAnr, curSDNAnr, plan);
+	}
+
+	const int newptr = info->newsdna->pointerlen, oldptr = oldsdna->pointerlen;
+	for (int i = 0; i < plan->steps_len; i++) {
+		const ReconstructStep *s = &plan->steps[i];
+		char *c = cur + s->cur_offset;
+		const char *o = data + s->old_offset;
+		switch (s->kind) {
+			case RS_MEMCPY:
+				memcpy(c, o, s->len);
+				break;
+			case RS_MEMCPY_STR:
+				memcpy(c, o, s->len);
+				c[s->len - 1] = '\0';
+				break;
+			case RS_CAST_PTR:
+				cast_pointer(newptr, oldptr, s->name, c, o);
+				break;
+			case RS_CAST_ELEM:
+				cast_elem(s->ctype, s->otype, s->name, c, o);
+				break;
+			case RS_STRUCT:
+				for (int n = 0; n < s->count; n++) {
+					reconstruct_struct_planned(info, s->old_nr, o, s->cur_nr, c);
+					o += s->old_stride;
+					c += s->cur_stride;
+				}
+				break;
+		}
+	}
+}
+
+void *DNA_struct_reconstruct_ex(struct DNA_ReconstructInfo *info, int oldSDNAnr, int blocks, const void *data)
+{
+	const SDNA *newsdna = info->newsdna, *oldsdna = info->oldsdna;
+	const short *spo = oldsdna->structs[oldSDNAnr];
+	const int oldlen = oldsdna->typelens[spo[0]];
+	const int curSDNAnr = DNA_struct_find_nr(newsdna, oldsdna->types[spo[0]]);
+	int curlen = 0;
+
+	if (curSDNAnr != -1) {
+		curlen = newsdna->typelens[newsdna->structs[curSDNAnr][0]];
+	}
+	if (curlen == 0) {
+		return NULL;
+	}
+
+	/* 8-byte aligned and zeroed, see DNA_struct_reconstruct. */
+	char *cur = MEM_mallocN_aligned(blocks * curlen, 8, "reconstruct");
+	memset(cur, 0, blocks * curlen);
+	char *cpc = cur;
+	const char *cpo = data;
+	for (int a = 0; a < blocks; a++) {
+		reconstruct_struct_planned(info, oldSDNAnr, cpo, curSDNAnr, cpc);
+		cpc += curlen;
+		cpo += oldlen;
+	}
+	return cur;
+}
+
 /**
  * Returns the offset of the field with the specified name and type within the specified
  * struct type in sdna.

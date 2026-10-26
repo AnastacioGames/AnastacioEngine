@@ -64,12 +64,12 @@ def runs(path):
     return out
 
 
-def play(scene, tag, env_extra):
+def play(scene, tag, env_extra, exe=None):
     env = dict(os.environ)
     env["RANGE_SHOT_TAG"] = tag
     env.update(env_extra)
     print("  [%s] %s" % (tag, os.path.basename(scene)))
-    subprocess.call([RUNTIME, scene], env=env, cwd=ROOT)
+    subprocess.call([exe or RUNTIME, scene], env=env, cwd=ROOT)
 
 
 def stats(values):
@@ -133,6 +133,7 @@ def main():
     ap.add_argument("--filter", default="", help="substring a case name must contain")
     ap.add_argument("--sample-sec", default=None, help="override RANGE_PERF_SAMPLE_SEC")
     ap.add_argument("--report-only", action="store_true", help="re-read existing reports, run nothing")
+    ap.add_argument("--exe", action="append", help="tag=path: runtime used for that tag (default build/bin)")
     args = ap.parse_args()
 
     outdir = os.path.abspath(args.outdir)
@@ -146,6 +147,8 @@ def main():
         if not os.path.exists(RUNTIME):
             sys.exit("missing %s -- build RangeRuntime first" % RUNTIME)
         env_extra = {}
+        # --exe antes=build/bin/AnastacioRuntime_antes.exe: one binary per tag (A/B of two builds).
+        exes = dict(e.split("=", 1) for e in (args.exe or []))
         if args.sample_sec:
             env_extra["RANGE_PERF_SAMPLE_SEC"] = args.sample_sec
         # Old reports would be appended to and mixed into the averages.
@@ -158,7 +161,7 @@ def main():
             print("round %d/%d" % (r + 1, args.rounds))
             for tag in args.tags:          # alternating, see the module docstring
                 for scene in scenes:
-                    play(os.path.join(outdir, scene), tag, env_extra)
+                    play(os.path.join(outdir, scene), tag, env_extra, exes.get(tag))
 
     report(outdir, cases, args.tags)
 
