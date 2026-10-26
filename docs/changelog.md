@@ -40,6 +40,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   (diferença máx. 1-8/255). `RANGE_COMPOSITOR_NO_CACHE=1` compara; profiler `filter.compositor_cache`.
 - Nó Glare no jogo: Fog Glow (soma dos mipmaps da parte brilhante), Streaks, Simple Star e Ghosts, pelas
   fórmulas da 2.79 (limiar por luminância, MixGlare); Quality/Iterations não são seguidos à risca. ≤ 1,3 ms.
+- Glare tipo Bloom (como no Blender 5, só no jogo; no render vira Fog Glow): soma de todos os níveis de mipmap
+  da parte brilhante, cada um suavizado por 9 amostras. Brilho mais largo e macio que o Fog Glow, mesmo custo.
 - Glare "Blender 5 Style" (só no jogo, chave no nó em modo jogo): limiar pelo valor HSV com Max Brightness e
   mistura aditiva com Strength, Saturation e Tint, como o Glare do Blender 5. Campos novos no `NodeGlare`
   com a chave desligada por padrão: arquivos antigos e da Range original saem idênticos (diferença 0).

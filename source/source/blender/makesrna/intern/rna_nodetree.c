@@ -5985,6 +5985,7 @@ static void def_cmp_glare(StructRNA *srna)
 		{2, "STREAKS",     0, "Streaks",     ""},
 		{1, "FOG_GLOW",    0, "Fog Glow",    ""},
 		{0, "SIMPLE_STAR", 0, "Simple Star", ""},
+		{4, "BLOOM",       0, "Bloom",       "Wide smooth glow like the Bloom of Blender 5 (game; the render uses Fog Glow)"},
 		{0, NULL, 0, NULL, NULL}
 	};
 

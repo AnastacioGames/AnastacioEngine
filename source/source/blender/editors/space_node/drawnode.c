@@ -1580,7 +1580,7 @@ static void node_composit_buts_glare(uiLayout *layout, bContext *C, PointerRNA *
 		if (RNA_enum_get(ptr, "glare_type") == 0)
 			uiItemR(layout, ptr, "use_rotate_45", 0, NULL, ICON_NONE);
 	}
-	if (RNA_enum_get(ptr, "glare_type") == 1) {
+	if (RNA_enum_get(ptr, "glare_type") == 1 || RNA_enum_get(ptr, "glare_type") == 4) {
 		uiItemR(layout, ptr, "size", 0, NULL, ICON_NONE);
 	}
 

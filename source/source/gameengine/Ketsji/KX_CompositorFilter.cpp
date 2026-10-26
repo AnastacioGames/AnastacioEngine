@@ -685,6 +685,18 @@ private:
 					  << fn << "(uv + vec2(o.x, -o.y), float(l)) + " << fn << "(uv - vec2(o.x, -o.y), float(l)));\n"
 					  << "\t}\n\tglare *= " << F(2.0f / (float)maxLod) << ";\n";
 				}
+				else if (g->type == 4) {  // Bloom (Blender 5): every mip level, each smoothed by a 9-tap tent
+					const int maxLod = std::min(std::max((int)g->size, 6), 9) - 1;
+					b << "\tfor (int l = 1; l <= " << maxLod << "; ++l) {\n"
+					  << "\t\tfloat L = float(l);\n\t\tvec2 o = px * exp2(L);\n"
+					  << "\t\tvec3 s = 4.0 * " << fn << "(uv, L);\n"
+					  << "\t\ts += 2.0 * (" << fn << "(uv + vec2(o.x, 0.0), L) + " << fn << "(uv - vec2(o.x, 0.0), L) + "
+					  << fn << "(uv + vec2(0.0, o.y), L) + " << fn << "(uv - vec2(0.0, o.y), L));\n"
+					  << "\t\ts += " << fn << "(uv + o, L) + " << fn << "(uv - o, L) + " << fn << "(uv + vec2(o.x, -o.y), L) + "
+					  << fn << "(uv - vec2(o.x, -o.y), L);\n"
+					  << "\t\tglare += s / 16.0;\n"
+					  << "\t}\n\tglare *= " << F(3.0f / (float)maxLod) << ";\n";
+				}
 				else if (g->type == 3) {  // Ghosts: blurred copies mirrored through the center, tinted
 					b << "\tconst float sc[6] = float[6](-1.0, -0.62, -0.35, 0.28, 0.55, 0.85);\n";
 					b << "\tconst vec3 tint[3] = vec3[3](vec3(1.0, 0.6, 0.4), vec3(0.6, 1.0, 0.5), vec3(0.5, 0.6, 1.0));\n";

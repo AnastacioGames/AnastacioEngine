@@ -47,6 +47,7 @@ void GlareNode::convertToOperations(NodeConverter &converter, const CompositorCo
 			glareoperation = new GlareStreaksOperation();
 			break;
 		case 1: // fog glow
+		case 4: // bloom: game only, the render uses fog glow
 			glareoperation = new GlareFogGlowOperation();
 			break;
 		case 0: // simple star
