@@ -22,6 +22,7 @@ from math import cos, radians, sin
 from mathutils import Vector
 from bpy.types import (
     Menu,
+    Operator,
     Panel,
     UIList,
 )
@@ -746,6 +747,130 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         box.label(text="The file must be saved in the project's data/ folder", icon='INFO')
 
 
+# ---------------------------------------------------------------------------
+# Scene Overview: which object uses which script, component, animation or
+# particle emitter. Read-only list; clicking a name selects the object.
+
+def _overview_entries(ob):
+    """Returns a list of (kind, icon, text) describing what the object uses."""
+    out = []
+    game = ob.game
+    for comp in game.components:
+        out.append(('COMPONENTS', 'SCRIPTWIN', "%s.%s" % (comp.module, comp.name)))
+    for cont in game.controllers:
+        if cont.type != 'PYTHON':
+            continue
+        if cont.mode == 'MODULE':
+            if cont.module:
+                out.append(('SCRIPTS', 'SCRIPT', cont.module))
+        elif cont.text:
+            out.append(('SCRIPTS', 'TEXT', cont.text.name))
+    ad = ob.animation_data
+    if ad and ad.action:
+        out.append(('ANIMATION', 'ACTION', ad.action.name))
+    for act in game.actuators:
+        if act.type == 'ACTION' and act.action:
+            out.append(('ANIMATION', 'ACTION', "%s (actuator)" % act.action.name))
+    if getattr(ob, "use_gpu_particles", False):
+        out.append(('PARTICLES', 'PARTICLES', "GPU Particles"))
+        if getattr(ob, "use_gpu_particles_mix", False):
+            out.append(('PARTICLES', 'PARTICLES', "GPU Particles (2nd)"))
+    for psys in ob.particle_systems:
+        out.append(('PARTICLES', 'PARTICLES', psys.name))
+    return out
+
+
+class SCENE_OT_overview_select(Operator):
+    """Select this object and make it active"""
+    bl_idname = "scene.overview_select"
+    bl_label = "Select Object"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    name = bpy.props.StringProperty()
+
+    def execute(self, context):
+        ob = context.scene.objects.get(self.name)
+        if ob is None:
+            return {'CANCELLED'}
+        for o in context.selected_objects:
+            o.select = False
+        ob.select = True
+        context.scene.objects.active = ob
+        return {'FINISHED'}
+
+
+class SCENE_PT_overview(SceneButtonsPanel, Panel):
+    """Overview of the objects that use scripts, components, animation or particles"""
+    bl_label = "Scene Overview"
+    bl_context = "render_layer"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    MAX_ROWS = 300
+
+    def draw(self, context):
+        layout = self.layout
+        wm = context.window_manager
+
+        row = layout.row(align=True)
+        row.prop(wm, "scene_overview_filter", expand=True)
+        layout.prop(wm, "scene_overview_search", text="", icon='VIEWZOOM')
+
+        kinds = wm.scene_overview_filter
+        search = wm.scene_overview_search.lower()
+        active = context.active_object
+
+        shown = 0
+        total = 0
+        col = layout.column(align=True)
+        for ob in sorted(context.scene.objects, key=lambda o: o.name):
+            entries = [e for e in _overview_entries(ob) if e[0] in kinds]
+            if not entries:
+                continue
+            if search and search not in ob.name.lower() and                     not any(search in e[2].lower() for e in entries):
+                continue
+            total += 1
+            if shown >= self.MAX_ROWS:
+                continue
+            shown += 1
+            box = col.box()
+            r = box.row()
+            op = r.operator("scene.overview_select", text=ob.name,
+                            icon='OBJECT_DATA', emboss=(ob == active))
+            op.name = ob.name
+            for _kind, icon, text in entries:
+                sub = box.row()
+                sub.label(text="    " + text, icon=icon, translate=False)
+
+        if total == 0:
+            layout.label(text="No objects found", icon='INFO')
+        else:
+            txt = "%d object(s)" % total
+            if total > shown:
+                txt += " - showing %d, use the search" % shown
+            layout.label(text=txt)
+
+
+def _register_overview_props():
+    wm = bpy.types.WindowManager
+    wm.scene_overview_filter = bpy.props.EnumProperty(
+        name="Show",
+        options={'ENUM_FLAG'},
+        items=(
+            ('SCRIPTS', "Scripts", "Python controllers (script and module)"),
+            ('COMPONENTS', "Components", "Python components"),
+            ('ANIMATION', "Animation", "Actions on the object or in Action actuators"),
+            ('PARTICLES', "Particles", "GPU particles and particle systems"),
+        ),
+        default={'SCRIPTS', 'COMPONENTS', 'ANIMATION', 'PARTICLES'},
+    )
+    wm.scene_overview_search = bpy.props.StringProperty(
+        name="Search", description="Filter by object, script, component or action name")
+
+
+_register_overview_props()
+
+
 classes = (
     SCENE_MT_units_length_presets,
     SCENE_UL_keying_set_paths,
@@ -761,6 +886,8 @@ classes = (
     SCENE_PT_rigid_body_cache,
     SCENE_PT_rigid_body_field_weights,
     SCENE_PT_simplify,
+    SCENE_OT_overview_select,
+    SCENE_PT_overview,
     # SCENE_PT_custom_props,  # disabled: Custom Properties panel unused
     RangeArmorExportSettings,
     SCENE_PT_rangearmor_export,
