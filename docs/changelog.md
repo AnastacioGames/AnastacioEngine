@@ -8,6 +8,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 6: mensagens de Logic Bricks
+
+- `GetMessages` sem destinatário não duplica mais o broadcast (World Sound executava cada comando de
+  áudio 2x). [Revisão](revisao-logica-python.md), LOG-01.
+
+## 2026-10-26 - Frente 2: rel?gio, acumulador e suspens?o
+
+- Continua??o da leitura linha a linha dos trechos de tempo de `KX_KetsjiEngine`, bindings e
+  consumidores de suspens?o. [An?lise e evid?ncias](revisao-scenegraph-loop.md), IDs CLK-01..05.
+- Diagn?stico extrai os corpos atuais de m?todos/bloco do acumulador; compila tamb?m `CM_Clock`
+  e `KX_CutsceneManager` reais, com servi?os substitu?dos por stubs, sem abrir jogo ou janela.
+- MSVC com vcvars64 e VSLANG=1033: build e execu??o passaram. Confirmados quociente n?o finito
+  na pausa zero, rel?gios sem escala versus delta escalado, cap negativo e evento de cutscene
+  atravessado ao retomar com tempo global. Suspens?o de a??es conferida aritmeticamente.
+- Contrato de rel?gio externo registrado por an?lise est?tica. Sem altera??es de produto,
+  build dos execut?veis, benchmark ou alega??o de integra??o. Logs/hashes em
+  `artifacts/revisao-relogio-20261026/`. Roadmap e observa??o antiga do Plano 8 atualizados.
+
 ## 2026-10-26 - Revisão do multiplayer: saída de jogadores
 
 - `Quit`, kick e violação agora geram `ClientExpired`: os objetos do jogador são removidos ou voltam ao

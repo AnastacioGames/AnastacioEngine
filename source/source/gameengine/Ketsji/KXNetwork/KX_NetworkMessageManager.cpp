@@ -53,24 +53,31 @@ const std::vector<KX_NetworkMessageManager::Message> KX_NetworkMessageManager::G
 {
 	std::vector<KX_NetworkMessageManager::Message> messages;
 
-	// look at messages without receiver.
-	std::map<std::string, std::vector<Message> >& messagesNoReceiver = m_messages[1 - m_currentList][""];
-	std::map<std::string, std::vector<Message> >& messagesReceiver = m_messages[1 - m_currentList][to];
-	if (subject.empty()) {
-		// Add all message without receiver and subject.
-		for (const auto& pair : messagesNoReceiver) {
-			messages.insert(messages.end(), pair.second.begin(), pair.second.end());
+	// Read with find: the read list must not gain empty entries for every query.
+	const std::map<std::string, std::map<std::string, std::vector<Message> > >& list = m_messages[1 - m_currentList];
+	const auto addReceiver = [&](const std::string& receiver) {
+		const auto it = list.find(receiver);
+		if (it == list.end()) {
+			return;
 		}
-		// Add all message with the given receiver and no subject.
-		for (const auto& pair : messagesReceiver) {
-			messages.insert(messages.end(), pair.second.begin(), pair.second.end());
+		if (subject.empty()) {
+			for (const auto& pair : it->second) {
+				messages.insert(messages.end(), pair.second.begin(), pair.second.end());
+			}
 		}
-	}
-	else {
-		std::vector<KX_NetworkMessageManager::Message>& messagesNoReceiverSubject = messagesNoReceiver[subject];
-		messages.insert(messages.end(), messagesNoReceiverSubject.begin(), messagesNoReceiverSubject.end());
-		std::vector<KX_NetworkMessageManager::Message>& messagesReceiverSubject = messagesReceiver[subject];
-		messages.insert(messages.end(), messagesReceiverSubject.begin(), messagesReceiverSubject.end());
+		else {
+			const auto sit = it->second.find(subject);
+			if (sit != it->second.end()) {
+				messages.insert(messages.end(), sit->second.begin(), sit->second.end());
+			}
+		}
+	};
+
+	// Messages without receiver, then the ones for the given receiver.
+	addReceiver("");
+	// An empty receiver is the broadcast list itself: reading it twice duplicated every message.
+	if (!to.empty()) {
+		addReceiver(to);
 	}
 
 	return messages;
