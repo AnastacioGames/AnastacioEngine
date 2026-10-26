@@ -224,7 +224,7 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         scripts_folder = os.path.join(bpy.app.version_string.split()[0], "scripts")
         src = os.path.join(blender_dir, scripts_folder)
         dst = os.path.join(runtime_dir, scripts_folder)
-        shutil.copytree(src, dst)
+        shutil.copytree(src, dst, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))
         print("done")
 
     # Reusable multiplayer components must be available even when Copy Scripts is off.
@@ -245,18 +245,11 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
     # And copy datafiles folder
     if copy_datafiles:
         print("Copying datafiles...", end=" ")
-        datafiles_folder = os.path.join(bpy.app.version_string.split()[0], "datafiles", "gamecontroller")
-        src = os.path.join(blender_dir, datafiles_folder)
-        dst = os.path.join(runtime_dir, datafiles_folder)
-        shutil.copytree(src, dst)
-        datafiles_folder = os.path.join(bpy.app.version_string.split()[0], "datafiles", "colormanagement")
-        src = os.path.join(blender_dir, datafiles_folder)
-        dst = os.path.join(runtime_dir, datafiles_folder)
-        shutil.copytree(src, dst)
-        datafiles_folder = os.path.join(bpy.app.version_string.split()[0], "datafiles", "fonts")
-        src = os.path.join(blender_dir, datafiles_folder)
-        dst = os.path.join(runtime_dir, datafiles_folder)
-        shutil.copytree(src, dst)
+        # dirs_exist_ok: exporting again over the same folder must refresh it, not fail.
+        for name in ("gamecontroller", "colormanagement", "fonts"):
+            datafiles_folder = os.path.join(bpy.app.version_string.split()[0], "datafiles", name)
+            shutil.copytree(os.path.join(blender_dir, datafiles_folder),
+                            os.path.join(runtime_dir, datafiles_folder), dirs_exist_ok=True)
         print("done")
 
     return True
