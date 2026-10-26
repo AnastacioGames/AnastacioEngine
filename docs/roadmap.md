@@ -396,7 +396,7 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   - CV3/CV4/CV5/CV6, KX6/KX7/KX8/KX9: corrigidos; falta visual/runtime no jogo (o que falta em cada um está no relatório).
   - GL2/GL3 (replicação): compilados, não testados em rede.
   - Adiados com motivo: PH1, PY7, LP3 (estéreo), LP9/LP10, GP3, GP7, SP6/SP7/SP9/SP10/SP11/SP14/SP15.
-  - RA4: o player não fecha após `endGame()` na cena de teste de instancing.
+  - RA4: em 2026-10-26 a cena de instancing fecha após `endGame()` no `--server` (código 0); falta conferir com janela.
 - **Uploads repetidos de estado no PBR (2026-10-08):** cache de probes ausentes (+20% FPS com 1600 objetos PBR) e
   da camada de objeto. Falta validar o visual no jogo com probes e veículo; sombras e luzes/IES seguem sem cache.
   Procedimento em [engine-profiling.md](engine-profiling.md).
@@ -419,11 +419,9 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   voltar, capturar o processo pelo Restart Manager antes de repetir o link.
 - **SSGI nativo experimental** ([plano](ssgi-native-plan.md)): pendentes avaliação visual no jogo/Play, MSAA,
   core profile completo, VRAM total, temporal/Hi-Z e suporte além de Principled opaco direto.
-- **Compatibilidade UPBGE 0.2.5b adiada:** ao abrir um `.blend` dessa versão, migrar somente quando
-  `upbgeversionfile != 0` e o arquivo ainda não tiver versão Range. Duas conversões verificadas, separadas da
-  correção dos Mouse Logic Bricks: (1) `World.skytype`: `Sky Texture` do bit `1 << 3` para `WO_SKYTEX` (`1 << 5`)
-  e `Zenith Up` de `1 << 4` para `WO_ZENUP` (`1 << 6`); (2) `Lamp.shadow_filter`: PCF `1 → 3`, PCF Bail `2 → 4`,
-  PCF Jitter `3 → 5`. Referência: `tools/arquivo_upbge.blend` e `tools/upbge-0.2.5b-source/`.
+- **Compatibilidade UPBGE 0.2.5b:** feita (9450a3b0): Mouse Logic Bricks, `World.skytype` e
+  `Lamp.shadow_filter` migrados quando `upbgeversionfile != 0`. Conferido em 2026-10-26 com
+  `tools/arquivo_upbge.blend` (sol abre como PCF Bail).
 - **Sombra em Principled/PBR** (opcional): comparar lado a lado com material legado sob as mesmas luzes e ver o
   efeito de `ProcessLighting(true)` em todo material com nodes numa cena maior.
 - **Sombra de CSM no Principled:** feita em 2026-10-26 (primeiro sol com cascata por draw, sem VSM nem sombra
