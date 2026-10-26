@@ -1,0 +1,137 @@
+"""Mede o FPS do Compositing no jogo em vários formatos de árvore.
+
+    AnastacioEngine -b --factory-startup --python tools/debug/cenas/medir_compositing_jogo.py -- PASTA PRESET [segundos]
+
+Gera PASTA/comp_PRESET.range. Ao rodar no AnastacioRuntime, o jogo aquece 2 s, mede o FPS médio
+nos segundos seguintes, grava PASTA/comp_PRESET.txt e fecha sozinho.
+
+Presets:
+  off        Use Nodes desligado (base)
+  padrao     só Render Layers -> Composite (não deve criar passo)
+  cor        cadeia de 8 nós de cor (um passo barato)
+  teste      a árvore da cena criar_cena_compositing_jogo.py
+  blur       Render Layers -> Blur -> Composite
+  blur_cor   8 nós de cor -> Blur (o Blur recalcula a cadeia 49x)
+  blur2      Blur -> Blur (49 x 49 leituras)
+  lente_blur Blur -> Lens Distortion (3 x 49)
+  diamante   6 Mix seguidos que usam o nó anterior nas duas entradas (2^6 chamadas se não houver cache)
+"""
+import bpy, sys, os
+
+argv = sys.argv[sys.argv.index("--") + 1:]
+out, preset = os.path.abspath(argv[0]), argv[1]
+secs = float(argv[2]) if len(argv) > 2 else 8.0
+os.makedirs(out, exist_ok=True)
+
+bpy.ops.wm.read_factory_settings(use_empty=True)
+sc = bpy.context.scene
+sc.render.engine = 'BLENDER_GAME'
+gs = sc.game_settings
+gs.use_frame_rate = False
+gs.vsync = 'OFF'
+sc.render.resolution_x, sc.render.resolution_y = 1280, 720
+gs.resolution_x, gs.resolution_y = 1280, 720
+
+for i, col in enumerate([(1, 0.2, 0.2), (0.2, 1, 0.2), (0.2, 0.2, 1)]):
+    bpy.ops.mesh.primitive_cube_add(location=(i * 3 - 3, 0, 0))
+    m = bpy.data.materials.new("M%d" % i); m.diffuse_color = col
+    bpy.context.object.data.materials.append(m)
+bpy.ops.mesh.primitive_plane_add(location=(0, 0, -1)); bpy.context.object.scale = (10, 10, 1)
+bpy.ops.object.lamp_add(type='SUN', location=(0, 0, 10))
+cam = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera")); sc.objects.link(cam)
+cam.location = (0, -12, 4); cam.rotation_euler = (1.25, 0, 0); sc.camera = cam
+
+if preset != 'off':
+    sc.use_nodes = True
+    nt = sc.node_tree; N = nt.nodes; L = nt.links
+    for n in list(N):
+        if n.type not in ('R_LAYERS', 'COMPOSITE'):
+            N.remove(n)
+    rl = [n for n in N if n.type == 'R_LAYERS'][0]
+    comp = [n for n in N if n.type == 'COMPOSITE'][0]
+
+    def chain_cor(src):
+        """8 nós de cor em fila; devolve o socket de saída"""
+        s = src
+        for t in ('CompositorNodeColorBalance', 'CompositorNodeHueSat', 'CompositorNodeCurveRGB',
+                  'CompositorNodeBrightContrast', 'CompositorNodeGamma', 'CompositorNodeInvert',
+                  'CompositorNodeInvert', 'CompositorNodeGamma'):
+            n = N.new(t)
+            L.new(s, n.inputs['Color'] if 'Color' in n.inputs else n.inputs['Image'])
+            s = n.outputs[0]
+        return s
+
+    def blur(src, size=10):
+        n = N.new('CompositorNodeBlur'); n.size_x = n.size_y = size
+        L.new(src, n.inputs['Image'])
+        return n.outputs[0]
+
+    img = rl.outputs['Image']
+    if preset == 'padrao':
+        s = img
+    elif preset == 'cor':
+        s = chain_cor(img)
+    elif preset == 'blur':
+        s = blur(img)
+    elif preset == 'blur_cor':
+        s = blur(chain_cor(img))
+    elif preset == 'blur2':
+        s = blur(blur(img))
+    elif preset == 'lente_blur':
+        ld = N.new('CompositorNodeLensdist'); ld.inputs['Dispersion'].default_value = 0.15
+        L.new(blur(img), ld.inputs['Image']); s = ld.outputs[0]
+    elif preset == 'diamante':
+        s = img
+        for i in range(6):
+            mx = N.new('CompositorNodeMixRGB'); mx.blend_type = 'ADD'
+            L.new(s, mx.inputs[1]); L.new(s, mx.inputs[2]); s = mx.outputs[0]
+    elif preset == 'teste':
+        # mesma árvore da cena de teste, sem o script dela
+        cb = N.new('CompositorNodeColorBalance'); cb.gain = (1.1, 1.0, 0.85)
+        hs = N.new('CompositorNodeHueSat')
+        el = N.new('CompositorNodeEllipseMask'); el.width = 0.9; el.height = 0.7
+        bl = N.new('CompositorNodeBlur'); bl.use_relative = True; bl.factor_x = 20; bl.factor_y = 20
+        mix = N.new('CompositorNodeMixRGB'); mix.blend_type = 'MULTIPLY'
+        ld = N.new('CompositorNodeLensdist'); ld.inputs['Dispersion'].default_value = 0.15
+        cu = N.new('CompositorNodeCurveRGB')
+        cr = N.new('CompositorNodeValToRGB')
+        ov = N.new('CompositorNodeMixRGB'); ov.blend_type = 'OVERLAY'; ov.inputs[0].default_value = 0.2
+        bc = N.new('CompositorNodeBrightContrast')
+        gm = N.new('CompositorNodeGamma')
+        L.new(img, cb.inputs['Image']); L.new(cb.outputs[0], hs.inputs['Image'])
+        L.new(hs.outputs[0], mix.inputs[1]); L.new(el.outputs[0], bl.inputs['Image'])
+        L.new(bl.outputs[0], mix.inputs[2]); L.new(mix.outputs[0], ld.inputs['Image'])
+        L.new(ld.outputs[0], cu.inputs['Image']); L.new(cu.outputs[0], ov.inputs[1])
+        L.new(rl.outputs['Depth'], cr.inputs['Fac']); L.new(cr.outputs[0], ov.inputs[2])
+        L.new(ov.outputs[0], bc.inputs['Image']); L.new(bc.outputs[0], gm.inputs['Image'])
+        s = gm.outputs[0]
+    else:
+        raise SystemExit("preset desconhecido: " + preset)
+    L.new(s, comp.inputs['Image'])
+
+log = os.path.join(out, "comp_%s.txt" % preset).replace("\\", "/")
+T = '''import Range, time
+own = Range.logic.getCurrentController().owner
+t = time.perf_counter()
+if "t0" not in own:
+    own["t0"] = t
+    own["n"] = 0
+own["n"] += 1
+el = t - own["t0"]
+if "m0" not in own and el >= 2.0:
+    own["m0"] = el; own["n0"] = own["n"]
+if "m0" in own and el >= 2.0 + %(secs)r:
+    fps = (own["n"] - own["n0"]) / (el - own["m0"])
+    c = Range.logic.getCurrentScene().filterManager.compositor
+    open(%(log)r, "w").write("fps %%.1f\\ncompositor %%s\\n" %% (fps, c is not None))
+    Range.logic.endGame()
+''' % {"secs": secs, "log": log}
+t = bpy.data.texts.new("medir.py"); t.write(T)
+ob = cam
+bpy.context.scene.objects.active = ob
+bpy.ops.logic.sensor_add(type='ALWAYS', object=ob.name)
+ob.game.sensors[-1].use_pulse_true_level = True
+bpy.ops.logic.controller_add(type='PYTHON', object=ob.name)
+ob.game.controllers[-1].text = t
+ob.game.sensors[-1].link(ob.game.controllers[-1])
+bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "comp_%s.range" % preset))
