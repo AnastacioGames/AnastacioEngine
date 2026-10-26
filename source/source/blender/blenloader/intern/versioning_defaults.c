@@ -29,6 +29,7 @@
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_object_types.h"
+#include "DNA_lamp_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
@@ -214,6 +215,13 @@ void BLO_update_defaults_startup_blend(Main *bmain)
   /* The embedded startup.blend already holds a World, so BKE_world_init() never runs for it. */
   for (World *wrld = bmain->world.first; wrld; wrld = wrld->id.next) {
     BKE_world_status_props_ensure(wrld);
+  }
+
+  /* Same shadow bias as BKE_lamp_init() for the lamps of the embedded startup.blend. */
+  for (Lamp *la = bmain->lamp.first; la; la = la->id.next) {
+    la->bias = 0.1f;
+    la->csm_bias[0] = 0.4f;
+    la->csm_bias[1] = 0.7f;
   }
 
   for (Scene *scene = bmain->scene.first; scene; scene = scene->id.next) {
