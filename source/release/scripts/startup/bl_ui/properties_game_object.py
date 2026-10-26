@@ -277,7 +277,7 @@ class LOGIC_OT_component_field_tool(Operator):
         import range_args
         import range_component_editor as rce
         ob = context.active_object
-        if self.index >= len(ob.game.components):
+        if not 0 <= self.index < len(ob.game.components):
             return {'CANCELLED'}
         comp = ob.game.components[self.index]
         prop = comp.properties.get(self.field)
@@ -387,7 +387,7 @@ class LOGIC_OT_component_editor_button(Operator):
     def execute(self, context):
         import range_component_editor as rce
         ob = context.active_object
-        if self.index >= len(ob.game.components):
+        if not 0 <= self.index < len(ob.game.components):
             return {'CANCELLED'}
         error = rce.run_button(context, ob, ob.game.components[self.index], self.method)
         if error:

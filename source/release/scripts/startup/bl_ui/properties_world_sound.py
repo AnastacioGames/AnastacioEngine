@@ -387,7 +387,11 @@ class WORLD_OT_sound_entry_variation(Operator):
             return {'CANCELLED'}
         source = module.sounds[self.sound]
         base = source.name.rstrip("0123456789").rstrip() or source.name
-        number = sum(1 for sound in module.sounds if sound.event == source.event) + 1
+        # Primeiro numero livre: contar os sons repetia um nome quando um do meio foi apagado.
+        names = {sound.name for sound in module.sounds}
+        number = 2
+        while "%s %d" % (base, number) in names:
+            number += 1
         sound = module.sounds.new("%s %d" % (base, number), filepath="")
         sound.event = source.event
         sound.volume = source.volume

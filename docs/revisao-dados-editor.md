@@ -105,3 +105,21 @@ ignorados pelos operadores (`BLI_findlink` devolve nulo).
 
 Observado: o evento Player Anim chama o script com `PyErr_Clear()`, então um erro no `Action` some
 sem aviso no console.
+
+## Interface Python (4ª rodada)
+
+Leitura de `properties_cutscene.py`, `properties_world_sound.py`, `properties_game.py` e dos operadores de
+componentes em `properties_game_object.py`. Checagem automática no editor: todo campo e operador citado
+em `prop`/`operator` nesses painéis (e em `properties_scene.py`, `properties_web.py`,
+`properties_video_player.py`) existe de fato.
+
+| ID | Onde | Resultado |
+|---|---|---|
+| UI-01 | World Sound, Add Variation | Numerava pela contagem: com Thunder 1 e 3, criava outro "Thunder 3", e Use Engine Sounds punha o mesmo arquivo nos dois. Agora usa o primeiro número livre; testado em background (Thunder 1-4 sem repetir) |
+| UI-02 | Componentes, Field Tool e Component Button | Só conferiam o limite de cima do índice; negativo pegava o componente do fim. Agora `0 <= index < len` |
+
+Conferido e correto: botões da cutscene e do World Sound validam índice antes de agir; o som automático de
+chuva/trovão roda em `save_pre`, `save_post` e `game_pre`, e só altera caminhos, nunca no desenho do painel.
+
+Observado: no World Sound filtrado (Music/Ambient/Effects), subir/descer um módulo troca com o vizinho na
+lista inteira, que pode ser de outro tipo e estar escondido; o clique parece não fazer nada.
