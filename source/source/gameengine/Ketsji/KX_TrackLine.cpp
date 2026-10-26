@@ -110,22 +110,13 @@ void Project(const TrackLineData &d, const Vec3d &pos, int i, double &d2, double
 	s = d.cum[i] + t * std::sqrt(l2);
 }
 
+/* Every segment is tested: the nearest vertex is not always on the nearest segment
+ * (uneven point spacing), so a vertex-first search could pick a segment meters away. */
 void LocateGlobal(const TrackLineData &d, const Vec3d &pos, double &bestD2, double &bestS, int &bestI)
 {
 	const int n = (int)d.points.size();
-	int idx = 0;
-	double near2 = -1.0;
-	for (int i = 0; i < n; i++) {
-		const Vec3d &p = d.points[i];
-		const double dx = p.x - pos.x, dy = p.y - pos.y, dz = p.z - pos.z;
-		const double q = dx * dx + dy * dy + dz * dz;
-		if (near2 < 0.0 || q < near2) {
-			near2 = q;
-			idx = i;
-		}
-	}
 	bestI = -1;
-	for (int i : {(idx - 1 + n) % n, idx}) {
+	for (int i = 0; i < n; i++) {
 		double d2, s;
 		Project(d, pos, i, d2, s);
 		if (bestI < 0 || d2 < bestD2) {

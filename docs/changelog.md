@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - TrackLine.locate(): busca global testa todos os segmentos
+
+A busca global (sem `seg`, ou quando o carro se perde) pegava o vértice mais perto e testava só os
+dois segmentos ligados a ele. Com pontos de espaçamento desigual isso escolhia o segmento errado:
+`TrackLine([(0,0,0),(100,0,0),(50,10,0),(50,11,0)]).locate((50,0,0))` dava o segmento 1 a ~9,8 m
+em vez do 0 a 0 m (achado pela revisão do Codex). Agora projeta em todos os segmentos; o custo é o
+mesmo laço O(n) que já existia. A busca local com `seg` não mudou.
+
 ## 2026-10-26 - CPU: passes de sombra pulam materiais sem nada visível
 
 - `RAS_MaterialBucket::GenerateTree` sai antes de consultar instancing (chamadas virtuais) quando nenhuma malha do material está visível para a luz; cada um dos ~43 passes de sombra percorria os 900 materiais.
