@@ -1182,7 +1182,13 @@ PyObject *KX_GameObject::PyReplacePhysicsShape(PyObject *value)
 static PyObject *Map_GetItem(PyObject *self_v, PyObject *item)
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>EXP_PROXY_REF(self_v);
-	const char *attr_str = _PyUnicode_AsString(item);
+	const char *attr_str = nullptr;
+	if (PyUnicode_Check(item)) {
+		attr_str = PyUnicode_AsUTF8(item);
+		if (!attr_str) {
+			return nullptr;
+		}
+	}
 	EXP_Value *resultattr;
 	PyObject *pyconvert;
 
@@ -1197,15 +1203,14 @@ static PyObject *Map_GetItem(PyObject *self_v, PyObject *item)
 		return pyconvert ? pyconvert : resultattr->GetProxy();
 	}
 	/* no EXP_Value attribute, try get the python only m_attr_dict attribute */
-	else if (self->m_attr_dict && (pyconvert = PyDict_GetItem(self->m_attr_dict, item))) {
-
-		if (attr_str) {
-			PyErr_Clear();
-		}
+	else if (self->m_attr_dict && (pyconvert = PyDict_GetItemWithError(self->m_attr_dict, item))) {
 		Py_INCREF(pyconvert);
 		return pyconvert;
 	}
 	else {
+		if (PyErr_Occurred()) {
+			return nullptr;
+		}
 		if (attr_str) {
 			PyErr_Format(PyExc_KeyError, "value = gameOb[key]: KX_GameObject, key \"%s\" does not exist", attr_str);
 		}
@@ -2530,6 +2535,9 @@ int KX_GameObject::pyattr_set_linearDamping(EXP_PyObjectPlus *self_v, const EXP_
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 	float val = PyFloat_AsDouble(value);
+	if (PyErr_Occurred()) {
+		return PY_SET_ATTR_FAIL;
+	}
 	self->SetLinearDamping(val);
 	return PY_SET_ATTR_SUCCESS;
 }
@@ -2544,6 +2552,9 @@ int KX_GameObject::pyattr_set_angularDamping(EXP_PyObjectPlus *self_v, const EXP
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 	float val = PyFloat_AsDouble(value);
+	if (PyErr_Occurred()) {
+		return PY_SET_ATTR_FAIL;
+	}
 	self->SetAngularDamping(val);
 	return PY_SET_ATTR_SUCCESS;
 }
@@ -2613,7 +2624,6 @@ PyObject *KX_GameObject::pyattr_get_meshes(EXP_PyObjectPlus *self_v, const EXP_P
 	for (i = 0; i < (int)self->m_meshes.size(); i++)
 	{
 		PyObject *item = self->m_meshes[i]->GetProxy();
-		Py_INCREF(item);
 		PyList_SET_ITEM(meshes, i, item);
 	}
 
@@ -2816,7 +2826,10 @@ PyObject *KX_GameObject::pyattr_get_lodManager(EXP_PyObjectPlus *self_v, const E
 {
 	KX_GameObject *self = static_cast<KX_GameObject *>(self_v);
 
-	return (self->m_lodManager) ? self->m_lodManager->GetProxy() : Py_None;
+	if (self->m_lodManager) {
+		return self->m_lodManager->GetProxy();
+	}
+	Py_RETURN_NONE;
 }
 
 int KX_GameObject::pyattr_set_lodManager(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)

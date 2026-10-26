@@ -58,6 +58,12 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
   caches de luz/probe/camada, resolução dinâmica, Range Trace e Performance Report, Scene Doctor.
 - **Lógica:** Logic Bricks → Python completo (F1–F12), Logic Bricks 2.0, Highlight Active, Logic Tree (F1–F6),
   Smart Components e Smart Wizard, Smart 2D Filter, UI Tree (menus 2D).
+- **Estabilidade de objetos:** autoatribuição segura de LOD, retomada da lógica ao desligar culling,
+  proteção de escala singular e correções de referências/conversões nos bindings;
+  [validação](docs/revisao-kx-gameobject-python.md).
+- **Argumentos Python:** helper comum sem cache compartilhado entre métodos; keywords de parenting
+  e troca de mesh independem da ordem de chamada. Editor/player compilados e validados.
+  [Revisão e limites](docs/revisao-parser-python.md).
 - **Jogo:** multiplayer nativo (ENet + WebSocket, servidor headless, predição, RPC) e complemento Steam no
   Windows, World Sound (Music/Ambient, chuva e trovão), VR no celular, deformação por impacto, ragdoll,
   veículos (controle arcade, Smart Component), idiomas do jogo (`Range.locale`), screencast, Start Asleep.

@@ -8,6 +8,65 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Revisão e correção do helper de argumentos Python
+
+- Helper comum revisado linha por linha e 25 usos em nove arquivos conferidos quanto a formato,
+  nomes, tipos e destinos. Cache estático por tipos confundia keywords de setParent/replaceMesh;
+  ambas as ordens foram reproduzidas. Lista temporária de nomes também era retida pelo cache.
+- Helper usa array local de nomes e parser público, sem estado compartilhado. Testes alternados
+  passaram nas duas ordens: 41 verificações em cada processo. Sete regressões anteriores passaram;
+  CTest 15/15 em 46,41 s. Player atualizado e hash estável nas nove execuções.
+- Build inicial interrompido por LNK1104 de objeto temporariamente ausente, com outro ninja observado
+  na mesma pasta. Após a concorrência terminar, alvo RangeRuntime passou. O usuário fechou o editor;
+  build final de RangeEngine/RangeRuntime passou. Editor atualizado reabriu a cena em background,
+  com inspeção de nove objetos e três controladores; runtime preservou o hash já testado.
+- [Relatório](revisao-parser-python.md) separa o que foi validado das pendências de LibLoad/lookAt.
+  Evidências em `artifacts/revisao-parser-python-20261026/`; frente 8 preservada.
+
+## 2026-10-26 - Correções de KX_GameObject e regressões validadas
+
+- Corrigidos OBJ-01/02/03: autoatribuição de LOD, retomada da lógica ao retirar o último culling de
+  física e divisão por eixo de escala singular. Parenting singular é rejeitado antes de mudar a hierarquia.
+- Corrigidos PY-01 a PY-08: referências dos getters, damping sem mutação em erro de conversão,
+  aridade de raycast vazio, representabilidade em float, chaves não textuais e contratos de parsers.
+  Keywords dos setters de peso/velocidade de camada também funcionam, com listas próprias por método.
+- O teste de keywords revelou cache compartilhado por tipos no helper comum de parsing. As duas
+  chamadas corrigidas usam o parser público; revisão global do helper permanece no roadmap.
+- Build final de editor/player concluído com vcvars64 e VSLANG=1033; CTest 15/15. Sete modos de
+  regressão completaram com saída zero, inclusive o caso de LOD que antes terminava em corrupção de heap.
+  Verificador estático/selftest passaram; cinco contadores de atualização em zero na cena parada
+  após aquecimento. Evidências em `artifacts/correcoes-gameobject-20261026/`.
+- Relatórios do [núcleo](revisao-kx-gameobject.md) e [bindings](revisao-kx-gameobject-python.md)
+  preservam o diagnóstico original e acrescentam o estado corrigido. Hipóteses e contratos de réplica
+  continuam abertos. Nenhuma alteração na frente 8 ou nos projetos do usuário.
+
+## 2026-10-26 - Revisão integral dos bindings de KX_GameObject
+
+- Lidas 4.728 linhas dos dois arquivos de bindings. Com o núcleo/header da rodada anterior, são
+  8.881 linhas da classe revisadas; [relatório](revisao-kx-gameobject-python.md) documenta contratos,
+  compreensão por trecho, achados e limites. Sem alterações de C++.
+- Reproduzidos: referência extra por consulta de malha; referência ausente de None no LOD vazio;
+  damping alterado mesmo com falha de conversão; retorno do raycast degenerado com tamanho incorreto;
+  parâmetro de veículo finito convertido em infinito; consulta de chave inteira divergente entre APIs.
+- Identificados dois contratos incorretos do parser C. As chamadas de pose matching e half animations
+  completaram normalmente; não há crash reproduzido nesses testes. Riscos estáticos ficam separados.
+- Cena gerada, reaberta e inspecionada. Quatro modos completaram dez frames com saída zero no player
+  instalado (Python 3.11.7). Gerador em `tools/debug/cenas/criar_cena_revisao_gameobject_python.py`;
+  resultados e hashes em `artifacts/revisao-gameobject-python-20261026/`. Frente 8 preservada.
+
+## 2026-10-26 - Revisão do núcleo de KX_GameObject
+
+- Leitura integral de 4.153 linhas do núcleo C++ e header, com contratos e compreensão por trecho no
+  [relatório](revisao-kx-gameobject.md). Bindings consultados seletivamente, ainda sem revisão integral.
+- Cena controlada gerada, reaberta e inspecionada. Reproduzidos: corrupção de heap na autoatribuição
+  do LOD, lógica suspensa após desligar culling de física e valores infinitos com escala singular do pai.
+  Controle de LOD sem atribuição e os outros dois modos completaram 45 frames com saída zero.
+- Confirmados compartilhamento da lista de callbacks de colisão e reset dos parâmetros armazenados
+  de veículo nas réplicas; contrato esperado ainda pendente. Riscos estáticos registrados separadamente.
+- Gerador em `tools/debug/cenas/criar_cena_revisao_gameobject.py`; evidências, hashes e resultados em
+  `artifacts/revisao-gameobject-20261026/`. Sem mudanças de C++ ou novo build. Trabalho concorrente
+  na frente 8 (dados/editor/exportação) preservado.
+
 ## 2026-10-26 - Revisão integral de KX_Scene e quatro defeitos reproduzidos
 
 - Lidos `KX_Scene.cpp` e `KX_Scene.h` integralmente e seguidos os contratos necessários em objetos,

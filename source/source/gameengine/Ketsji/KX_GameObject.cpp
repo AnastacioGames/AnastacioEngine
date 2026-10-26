@@ -615,7 +615,8 @@ void KX_GameObject::SetParent(KX_GameObject *obj, bool addToCompound, bool ghost
 	// Make sure the objects have some scale
 	mt::vec3 scale1 = NodeGetWorldScaling();
 	mt::vec3 scale2 = obj->NodeGetWorldScaling();
-	if (mt::FuzzyZero(scale1) || mt::FuzzyZero(scale2)) {
+	if (mt::FuzzyZero(scale1) || mt::FuzzyZero(scale2[0]) ||
+	    mt::FuzzyZero(scale2[1]) || mt::FuzzyZero(scale2[2])) {
 		return;
 	}
 
@@ -1508,6 +1509,10 @@ bool KX_GameObject::Renderable(int layer) const
 
 void KX_GameObject::SetLodManager(KX_LodManager *lodManager)
 {
+	if (lodManager == m_lodManager) {
+		return;
+	}
+
 	// Reset lod level to avoid overflow index in KX_LodManager::GetLevel.
 	m_currentLodLevel = 0;
 
@@ -2219,7 +2224,7 @@ void KX_GameObject::NodeSetWorldScale(const mt::vec3& scale)
 	if (parent) {
 		// Make sure the objects have some scale
 		mt::vec3 p_scale = parent->GetWorldScaling();
-		if (mt::FuzzyZero(p_scale)) {
+		if (mt::FuzzyZero(p_scale[0]) || mt::FuzzyZero(p_scale[1]) || mt::FuzzyZero(p_scale[2])) {
 			return;
 		}
 
@@ -2240,7 +2245,7 @@ void KX_GameObject::NodeSetWorldPosition(const mt::vec3& trans)
 	if (parent != nullptr) {
 		// Make sure the objects have some scale
 		mt::vec3 scale = parent->GetWorldScaling();
-		if (mt::FuzzyZero(scale)) {
+		if (mt::FuzzyZero(scale[0]) || mt::FuzzyZero(scale[1]) || mt::FuzzyZero(scale[2])) {
 			return;
 		}
 
@@ -2425,6 +2430,8 @@ void KX_GameObject::SetActivityCulling(ActivityCullingInfo::Flag flag, bool enab
 
 			// The object may have been culled while it was tracked; nothing else restores it now.
 			if (!m_bRender) {
+				// Physics culling suspends logic too, even without ACTIVITY_LOGIC.
+				ResumeLogic();
 				m_bRender = true;
 				m_cullingNode.SetCulled(false);
 				if (m_bVisible) {

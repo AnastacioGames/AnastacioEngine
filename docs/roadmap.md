@@ -16,6 +16,7 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 ## Sumário
 
 - [Revisão de KX_Scene](#revisão-de-kx_scene)
+- [Revisão de KX_GameObject](#revisão-de-kx_gameobject)
 
 - [Atlas de materiais](#atlas-de-materiais)
 - [Prioridade atual](#prioridade-atual)
@@ -49,6 +50,18 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   e índice de templates desatualizado após rename. Os quatro casos foram reproduzidos no standalone.
 - Conferir também posse de referências Python/EXP_Value, transferência de registros no merge e validade
   de objetos após callbacks de animação; resultados e limites estão no relatório. Sem correções nesta rodada.
+
+## Revisão de KX_GameObject
+
+- Definir contratos de herança das listas de callbacks de colisão e parâmetros armazenados de veículo.
+  Validar separadamente remoção do chão das partículas e liberação de bibliotecas com LOD;
+  [análise e correções do núcleo](revisao-kx-gameobject.md).
+- Helper comum de parsing corrigido e 25 usos conferidos; [revisão](revisao-parser-python.md).
+  Editor/player compilados e validados; regressões passaram.
+  Reproduzir o caminho de buffer não liberado em erro de `LibLoad`, conferir signedness de
+  `load_scripts` e ajustar o nome informado em erros de argumentos de `lookAt`.
+- Validar o wrapper de partículas retido após remoção/reconstrução do buffer e sincronização imediata
+  após atribuição de matrizes completas; [análise e correções dos bindings](revisao-kx-gameobject-python.md).
 
 ## Atlas de materiais
 

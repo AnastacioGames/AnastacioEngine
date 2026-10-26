@@ -38,6 +38,7 @@
 
 #include <cstring>
 #include <cmath>
+#include <cfloat>
 
 #include "CM_WorkCounters.h"
 #include "CM_Trace.h"
@@ -643,11 +644,11 @@ PyObject *KX_GameObject::PySetClusterSolverIterations(PyObject *args)
 
 PyObject *KX_GameObject::PySetSoftPoseMatching(PyObject *args)
 {
-    bool enableShapeMatching;
+    int enableShapeMatching;
     if (!PyArg_ParseTuple(args, "p:setSoftPoseMatching", &enableShapeMatching)) {
         return nullptr;
     }
-    SetSoftPoseMatching(enableShapeMatching);
+    SetSoftPoseMatching(enableShapeMatching != 0);
     Py_RETURN_NONE;
 }
 
@@ -671,7 +672,7 @@ PyObject *KX_GameObject::PySetVisible(PyObject *args)
 PyObject *KX_GameObject::PySetHalfAnimations(PyObject *args)
 {
 	int halfanimations = 0;
-	if (!PyArg_ParseTuple(args, "i|i:setHalfAnimations", &halfanimations)) {
+	if (!PyArg_ParseTuple(args, "i:setHalfAnimations", &halfanimations)) {
 		return nullptr;
 	}
 
@@ -1040,6 +1041,10 @@ static bool py_vehicle_float(PyObject *value, const char *name, float *out)
 		PyErr_Format(PyExc_ValueError, "gameOb.%s(value): value must be a finite number >= 0", name);
 		return false;
 	}
+	if (v > FLT_MAX) {
+		PyErr_Format(PyExc_OverflowError, "gameOb.%s(value): value exceeds the float range", name);
+		return false;
+	}
 	*out = (float)v;
 	return true;
 }
@@ -1079,6 +1084,11 @@ PyObject *KX_GameObject::PySetVehicleGearRatios(PyObject *value)
 			if (!PyErr_Occurred()) {
 				PyErr_SetString(PyExc_ValueError, "gameOb.setVehicleGearRatios(ratios): ratios must be finite numbers");
 			}
+			return nullptr;
+		}
+		if (r < -FLT_MAX || r > FLT_MAX) {
+			Py_DECREF(seq);
+			PyErr_SetString(PyExc_OverflowError, "gameOb.setVehicleGearRatios(ratios): ratio exceeds the float range");
 			return nullptr;
 		}
 		ratios.push_back((float)r);
@@ -1364,6 +1374,11 @@ static PyObject *none_tuple_5()
 	return ret;
 }
 
+static PyObject *raycast_no_hit(int poly)
+{
+	return (poly == 2) ? none_tuple_5() : poly ? none_tuple_4() : none_tuple_3();
+}
+
 EXP_PYMETHODDEF_DOC(KX_GameObject, rayCast,
                     "rayCast(to,from,dist,prop,face,xray,poly,mask): cast a ray and return 3-tuple (object,hit,normal) or 4-tuple (object,hit,normal,polygon) or 4-tuple (object,hit,normal,polygon,hituv) of contact point with object within dist that matches prop.\n"
                     " If no hit, return (None,None,None) or (None,None,None,None) or (None,None,None,None,None).\n"
@@ -1441,14 +1456,14 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, rayCast,
 		mt::vec3 toDir = toPoint - fromPoint;
 		if (mt::FuzzyZero(toDir)) {
 			//return Py_BuildValue("OOO", Py_None, Py_None, Py_None);
-			return none_tuple_3();
+			return raycast_no_hit(poly);
 		}
 		toDir.Normalize();
 		toPoint = fromPoint + (dist) * toDir;
 	}
 	else if (mt::FuzzyZero(toPoint - fromPoint)) {
 		//return Py_BuildValue("OOO", Py_None, Py_None, Py_None);
-		return none_tuple_3();
+		return raycast_no_hit(poly);
 	}
 
 	PHY_IPhysicsEnvironment *pe = GetScene()->GetPhysicsEnvironment();
@@ -1506,15 +1521,7 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, rayCast,
 		KX_RasterizerDrawDebugLine(fromPoint, toPoint, mt::vec4(1.0f, 0.0f, 0.0f, 1.0f));
 	}
 	// no hit
-	if (poly == 2) {
-		return none_tuple_5();
-	}
-	else if (poly) {
-		return none_tuple_4();
-	}
-	else {
-		return none_tuple_3();
-	}
+	return raycast_no_hit(poly);
 }
 
 EXP_PYMETHODDEF_DOC(KX_GameObject, sendMessage,
@@ -1642,7 +1649,9 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, setActionLayerWeight,
 	short layer = 0;
 	float layerWeight = 0.0f;
 
-	if (!PyArg_ParseTuple(args, "h|f:setActionLayerWeight", &layer, &layerWeight)) {
+	static const char *keywords[] = {"layer", "layerWeight", nullptr};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "h|f:setActionLayerWeight",
+	                                const_cast<char **>(keywords), &layer, &layerWeight)) {
 		return nullptr;
 	}
 
@@ -1664,7 +1673,9 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, setActionLayerSpeed,
 	short layer = 0;
 	float speed = 0.0f;
 
-	if (!PyArg_ParseTuple(args, "h|f:setActionLayerSpeed", &layer, &speed)) {
+	static const char *keywords[] = {"layer", "speed", nullptr};
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "h|f:setActionLayerSpeed",
+	                                const_cast<char **>(keywords), &layer, &speed)) {
 		return nullptr;
 	}
 

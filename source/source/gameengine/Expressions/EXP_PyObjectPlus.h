@@ -40,6 +40,7 @@
 #include "BLI_utildefines.h"
 
 #include <string>
+#include <array>
 #include <initializer_list>
 #include <cstddef> // For offsetof.
 #include "mathfu.h"
@@ -520,8 +521,14 @@ template <class ... Args>
 inline bool EXP_ParseTupleArgsAndKeywords(PyObject *pyargs, PyObject *pykwds, const char *format, std::initializer_list<const char *> keyword, Args ... args)
 {
 	BLI_assert((keyword.size() - 1) == (sizeof...(Args)));
-	static _PyArg_Parser _parser = {format, keyword.begin(), 0};
-	return _PyArg_ParseTupleAndKeywordsFast(pyargs, pykwds, &_parser, args ...);
+	// A template static is shared by all call sites with the same destination types.
+	// Keep names local: the initializer_list only lives for the current call.
+	std::array<char *, sizeof...(Args) + 1> names;
+	size_t index = 0;
+	for (const char *name : keyword) {
+		names[index++] = const_cast<char *>(name);
+	}
+	return PyArg_ParseTupleAndKeywords(pyargs, pykwds, format, names.data(), args ...);
 }
 
 /*------------------------------

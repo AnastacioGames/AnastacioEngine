@@ -64,6 +64,12 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   dependências, arquivos de entrada e validação proposta por responsabilidade.
 - [Revisão integral de KX_Scene](revisao-kx-scene.md): compreensão por trecho, contratos de ciclo de vida,
   quatro defeitos reproduzidos e problemas adicionais observados por leitura.
+- [Revisão do núcleo de KX_GameObject](revisao-kx-gameobject.md): leitura integral do C++ e header,
+  três defeitos reproduzidos, contratos de réplica e riscos ainda sem reprodução.
+- [Revisão dos bindings de KX_GameObject](revisao-kx-gameobject-python.md): leitura integral dos dois
+  arquivos Python/C++, seis problemas reproduzidos e contratos incorretos do parser C.
+- [Revisão do helper de argumentos Python](revisao-parser-python.md): cache compartilhado corrigido,
+  conferência de 25 usos e regressão com ordens de chamada invertidas.
 
 ### Frentes recentes
 
