@@ -423,8 +423,8 @@ CutsceneSettings *BKE_cutscene_settings_copy(const CutsceneSettings *settings)
 	CutsceneSettings *settings_copy = MEM_dupallocN(settings);
 	BLI_duplicatelist(&settings_copy->sequences, &settings->sequences);
 
-	for (const CutsceneSequence *sequence_src = settings->sequences.first,
-	                            *sequence_dst = settings_copy->sequences.first;
+	CutsceneSequence *sequence_dst = settings_copy->sequences.first;
+	for (const CutsceneSequence *sequence_src = settings->sequences.first;
 	     sequence_src;
 	     sequence_src = sequence_src->next, sequence_dst = sequence_dst->next)
 	{

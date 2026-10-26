@@ -1,0 +1,61 @@
+# Revisão da frente 8: dados, versioning e leitura/gravação
+
+Data: 2026-10-26. Frente 8 do [levantamento](levantamento-modulos-criticos.md), analisada de baixo
+para cima na lista. Objetivo: conferir, linha a linha, se a lógica está correta, se faz sentido e se
+há otimização a fazer.
+
+## Escopo desta rodada
+
+- `blenloader/intern/versioning_range.c`: leitura integral (759 linhas).
+- `blenloader/intern/readfile.c`: trechos da engine em `read_global` (versão do arquivo),
+  `direct_link_world`/`lib_link_world`, `direct_link_object` (propriedades, logic bricks,
+  componentes, partículas GPU), `direct_link_scene`/`lib_link_scene` (cutscene).
+- `blenloader/intern/writefile.c`: gravação de World, componentes e cutscene, para comparar com a leitura.
+- Elos consultados: `bpath.c` e `world.c` (World Sound), `library_query.c`, `rna_world.c`,
+  `rna_scene.c`, `scene.c` e `object_cutscene.c` (contagem de usuários da cutscene), conversor.
+
+Fora desta rodada: o restante do `readfile.c`/`writefile.c` herdado do Blender, o RNA completo, a UI
+Python, o exportador e as plataformas. São as próximas etapas da frente.
+
+## Corrigido
+
+| ID | Arquivo | Problema | Correção |
+|---|---|---|---|
+| DAT-01 | versioning_range.c | Bloco 1.6.112 gravava `rain_ripple = 0.4` de novo, apagando o valor escolhido em arquivos salvos na 1.6.111 | Bloco removido; a 1.6.111 já dá o mesmo padrão |
+| DAT-02 | versioning_range.c | 1.6.109 criava `cutscene_settings` sem conferir se já existia (vazamento/perda se existisse) | Só cria quando é nulo |
+| DAT-03 | versioning_range.c | Blocos 1.6.119/1.6.120 antes do 1.6.109 | Movidos para depois do 1.6.118 (sem efeito no resultado) |
+| DAT-04 | scene.c | `BKE_cutscene_settings_copy` escrevia por um ponteiro declarado `const` | Ponteiro de destino sem `const` |
+
+Validação de DAT-01 a DAT-03: build de editor e player; 12 arquivos de `projects-teste` e
+`tools/debug/cenas` abertos em background, todos com `cutscene_settings` presente, exceto
+`WEB_TESTE_2D.range`, que já é de versão nova (a migração não roda nele) e é aceito pelo conversor
+(`BL_ConvertCutscene` testa nulo).
+
+## Conferido e correto
+
+- **Arquivos da Range original (1.6.1001/1002):** `read_global` reclassifica para 1.6.101, então toda
+  a migração da 1.6.102 em diante roda neles. Cobre o caso antigo de `shadowCulling` zerado.
+- **Blocos por existência de campo** (`DNA_struct_elem_find`, linhas finais do versioning): forma mais
+  segura, funciona para arquivos salvos entre duas versões.
+- **Migração do UPBGE:** eventos do mouse, bits do céu e filtro de sombra remapeados corretamente.
+- **Sentinelas em `direct_link_world`** (nuvens, sky layers, nuvens volumétricas, névoa, morning boost,
+  detail): todos os campos usados como "zero = arquivo antigo" têm mínimo maior que zero no RNA.
+- **World Sound:** guarda caminhos, não ponteiros; `bpath.c` e o exportador percorrem esses caminhos;
+  cópia, localização e liberação do World duplicam e liberam a lista corretamente; gravação e leitura batem.
+- **Componentes:** gravação e leitura batem (propriedades e enum). Campos Object/Scene guardam o nome.
+- **Cutscene:** leitura com `newlibadr_us`, `library_query` com `IDWALK_CB_USER`, RNA com
+  `PROP_ID_REFCOUNT` e operadores com incremento/decremento ao duplicar/apagar: contagem coerente.
+
+## Observado, sem mudança
+
+| ID | Onde | Observação | Por que ficou |
+|---|---|---|---|
+| DAT-05 | versioning 1.5.100 / 1.6.100 | Todo material com `ref == 0.8` vira 1.0; IOR 4.0 vira 1.5 | Suposição antiga; mudar agora altera arquivos já migrados |
+| DAT-06 | versioning 1.6.100 | Renomeia fonte "Bfont" para "Roboto-Medium" sem checar nome repetido | Risco baixo, só arquivos muito antigos |
+| DAT-07 | versioning 1.6.100 | Cor do sensor vem do tema do usuário; sem tema (player) fica preta | Só aparência no editor |
+| DAT-08 | componentes | Campos Object/Scene guardam o nome: renomear o objeto quebra a referência | Decisão de design; trocar por ponteiro exige DNA novo |
+
+## Otimização
+
+Nada relevante. O versioning roda uma vez por arquivo aberto e percorre listas pequenas; as ~13
+consultas `DNA_struct_elem_find` são baratas perto do resto da leitura.

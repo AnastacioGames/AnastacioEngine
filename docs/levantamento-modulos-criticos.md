@@ -9,6 +9,8 @@ Não houve alteração de comportamento, build, benchmark ou execução de jogo 
 
 Rodada posterior: a [revisão integral de KX_Scene](revisao-kx-scene.md) aprofunda a primeira frente,
 com compreensão por trecho e quatro defeitos reproduzidos em cena isolada.
+A [revisão da frente 8](revisao-dados-editor.md) começa a análise de baixo para cima: versioning e
+leitura/gravação dos dados da engine.
 
 ## Ordem de análise
 
