@@ -40,6 +40,10 @@ mesmo laço O(n) que já existia. A busca local com `seg` não mudou.
   arquivo tem o seu; LibLoad assíncrono segue seguro). Conferido byte a byte com o caminho antigo em ~17 mil blocos
   de 40 arquivos (Rolima, demos, YoFrankie 2.4x, Range Store): zero diferenças. Editor `-b`: cena perf 3,50 → 2,61 s,
   `_overlay_build_test_out` 4,39 → 3,33 s; arquivos já salvos com o DNA atual não mudam.
+  Diferença única (achada na revisão do Codex): campo que é array de structs e cresceu (`arr[1]` → `arr[3]`). O
+  código antigo só avançava pelos elementos copiados e gravava os campos seguintes dentro do array; o plano avança
+  pelo campo inteiro, então eles vão para o lugar certo e o resto do array fica zerado. Nenhum dos 40 arquivos
+  tinha esse caso.
 - Achados do perfil dos quadros (cena perf 900 obj/8 luzes): 60% em `KX_ShadowRenderer::Render`; as sombras custam
   5,3 ms com 1 material e 8,1 ms com 900, mesmo com shader de sombra único e os mesmos draw calls — custo por
   material (árvore + nós + troca de VAO) em cada um dos 43 passes. Próximo passo: agrupar o passe de sombra por
