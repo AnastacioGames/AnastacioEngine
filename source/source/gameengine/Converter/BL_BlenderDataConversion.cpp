@@ -3717,8 +3717,51 @@ static void BL_PrefetchMaterialImages(const std::vector<KX_BlenderMaterial *>& m
  * out by RAS_MeshUser::SetMatrix. Deformed, destructible and physics-driven objects stay out.
  * Runs after the dupli groups are instanced, so group instances (replicas) are batched too. */
 /* Auto Static Batch (scene option): an unmarked object joins only when nothing can move or recolor
- * it from the file itself: no logic or components, no parent, no animation, white object color.
+ * it from the file itself: no logic or components, no parent, no animation, white object color,
+ * no mirroring and no material reading per-object data. A color set later splits it out.
  * A script moving it by name still works (the member is split out), it only costs the rebuild. */
+/* Node tree reading per-object data the batch can't keep (one draw shares the reference object's
+ * uniforms and an identity object matrix): Object Info (Random, Object/Material Index, Location)
+ * or the Object output of Texture Coordinate. */
+static bool BL_NodeTreeUsesObjectData(bNodeTree *ntree, int depth)
+{
+	if (!ntree || depth > 8) {
+		return false;
+	}
+	for (bNode *node = (bNode *)ntree->nodes.first; node; node = node->next) {
+		if (node->type == SH_NODE_OBJECT_INFO) {
+			return true;
+		}
+		if (node->type == NODE_GROUP && BL_NodeTreeUsesObjectData((bNodeTree *)node->id, depth + 1)) {
+			return true;
+		}
+	}
+	for (bNodeLink *link = (bNodeLink *)ntree->links.first; link; link = link->next) {
+		if (link->fromnode && link->fromnode->type == SH_NODE_TEX_COORD && link->fromsock &&
+		    STREQ(link->fromsock->name, "Object"))
+		{
+			return true;
+		}
+	}
+	return false;
+}
+
+static bool BL_MaterialUsesObjectData(Material *ma)
+{
+	if (!ma) {
+		return false;
+	}
+	if (ma->use_nodes && BL_NodeTreeUsesObjectData(ma->nodetree, 0)) {
+		return true;
+	}
+	for (int i = 0; i < MAX_MTEX; ++i) {
+		if (ma->mtex[i] && ma->mtex[i]->tex && (ma->mtex[i]->texco & TEXCO_OBJECT)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 static bool BL_AutoStaticBatchCandidate(KX_GameObject *gameobj, Object *blenderobj)
 {
 	if (blenderobj->type != OB_MESH || gameobj->GetParent()) {
@@ -3735,6 +3778,17 @@ static bool BL_AutoStaticBatchCandidate(KX_GameObject *gameobj, Object *blendero
 	}
 	for (int i = 0; i < 4; ++i) {
 		if (blenderobj->col[i] != 1.0f) {
+			return false;
+		}
+	}
+	/* Mirrored (negative scale): the merge bakes the vertices but keeps the winding, so culled
+	 * faces would flip. */
+	const mt::vec3& scale = gameobj->NodeGetWorldScaling();
+	if (scale.x * scale.y * scale.z < 0.0f) {
+		return false;
+	}
+	for (int i = 1; i <= blenderobj->totcol; ++i) {
+		if (BL_MaterialUsesObjectData(give_current_material(blenderobj, i))) {
 			return false;
 		}
 	}

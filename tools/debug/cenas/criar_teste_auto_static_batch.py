@@ -1,7 +1,8 @@
 """Teste do Auto Static Batch (Scene > Level of Detail > Auto Static Batch), sem janela.
 
 Gera duas cenas: auto_on.range (opção ligada) e auto_off.range (desligada). Cada uma tem 6 cubos simples
-(mesmo material) e 4 que devem ficar fora do lote: com logic brick, com cor de objeto, com pai e animado.
+(mesmo material) e 6 que devem ficar fora do lote: com logic brick, com cor de objeto, com pai, animado,
+espelhado (escala negativa) e com Object Info no material (Random por objeto).
 A saída do lote de um objeto movido acontece no desenho (UpdateBuckets), que o --server não faz;
 por isso o teste só confere quem entra no lote.
 
@@ -29,7 +30,7 @@ try:
             n = "Plain%d" % i
             log.append("%s lote=%s" % (n, batched(n)))
             ok = ok and batched(n) == auto
-        for n in ("WithLogic", "WithColor", "Child", "Animated"):
+        for n in ("WithLogic", "WithColor", "Child", "Animated", "Mirrored", "ObjInfo", "ObjInfo2"):
             log.append("%s lote=%s" % (n, batched(n)))
             ok = ok and not batched(n)
         log.append("Marked lote=%s" % batched("Marked"))
@@ -63,6 +64,12 @@ def build(auto):
     anim = cube("Animated", 9, 4)
     anim.keyframe_insert("location", frame=1)
     cube("Marked", 12, 4).use_static_batch = True
+    cube("Mirrored", 15, 4).scale.x = -1
+    oi = cube("ObjInfo", 18, 4)
+    mi = bpy.data.materials.new("ObjInfoMat"); mi.use_nodes = True
+    mi.node_tree.nodes.new('ShaderNodeObjectInfo')
+    oi.data = oi.data.copy(); oi.data.materials[0] = mi
+    oi2 = cube("ObjInfo2", 21, 4); oi2.data = oi.data  # dois com o mesmo material: lote possível sem o filtro
     cam = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera")); sc.objects.link(cam)
     cam.location = (8, -20, 5); sc.camera = cam
     sc.objects.active = cam

@@ -165,6 +165,10 @@ void RAS_MeshUser::SetColor(const mt::vec4& color)
 	if (m_color != color) {
 		m_color = color;
 		m_instancingVersion = NextInstancingVersion();
+		// The batch draws every member with one color: the recolored one is drawn on its own.
+		if (m_batchGroup) {
+			m_batchGroup->SplitMeshUser(this);
+		}
 	}
 }
 
