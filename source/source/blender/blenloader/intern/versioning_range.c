@@ -482,30 +482,14 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
-  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 119)) {
-    /* Keep the new Rain sub-panels open for existing files, preserving the previous
-     * fully expanded presentation on their first load in this version. */
-    LISTBASE_FOREACH (World *, wo, &main->world) {
-      wo->weather_expand_flag |= (WO_WEATHER_RAIN_DROPLETS | WO_WEATHER_RAIN_RIPPLE |
-                                  WO_WEATHER_RAIN_PUDDLES | WO_WEATHER_RAIN_AURA |
-                                  WO_WEATHER_RAIN_LIGHTNING);
-    }
-  }
-
-  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 120)) {
-    /* Splash now has its own Rain sub-panel. Open it for existing files so the
-     * change does not hide its settings on first load. */
-    LISTBASE_FOREACH (World *, wo, &main->world) {
-      wo->weather_expand_flag |= WO_WEATHER_RAIN_SPLASH;
-    }
-  }
-
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 109)) {
     /* Cutscene settings are new scene-owned data. Older files have no settings block,
      * so create an empty one instead of leaving later RNA/UI access to handle a NULL
      * pointer. The empty list deliberately preserves their prior behavior. */
     LISTBASE_FOREACH (Scene *, scene, &main->scene) {
-      scene->cutscene_settings = BKE_cutscene_settings_new();
+      if (!scene->cutscene_settings) {
+        scene->cutscene_settings = BKE_cutscene_settings_new();
+      }
     }
   }
 
@@ -529,12 +513,6 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
       wo->rain_ripple = 0.4f;
       wo->rain_ripple_distance = 20.0f;
       wo->rain_ripple_min_up = 0.5f;
-    }
-  }
-
-  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 112)) {
-    LISTBASE_FOREACH (World *, wo, &main->world) {
-      wo->rain_ripple = 0.4f;
     }
   }
 
@@ -619,6 +597,24 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
           la->mode |= LA_SHAD_RAY;
         }
       }
+    }
+  }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 119)) {
+    /* Keep the new Rain sub-panels open for existing files, preserving the previous
+     * fully expanded presentation on their first load in this version. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->weather_expand_flag |= (WO_WEATHER_RAIN_DROPLETS | WO_WEATHER_RAIN_RIPPLE |
+                                  WO_WEATHER_RAIN_PUDDLES | WO_WEATHER_RAIN_AURA |
+                                  WO_WEATHER_RAIN_LIGHTNING);
+    }
+  }
+
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 120)) {
+    /* Splash now has its own Rain sub-panel. Open it for existing files so the
+     * change does not hide its settings on first load. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->weather_expand_flag |= WO_WEATHER_RAIN_SPLASH;
     }
   }
 
