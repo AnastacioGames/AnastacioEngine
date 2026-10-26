@@ -390,20 +390,9 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   `OB_MBALL` e a metaball some no Play; a saída é Alt+C → Mesh. Proposta: converter a superfície em malha
   estática ao dar Play, como curva/texto (custo só no carregamento). Versão dinâmica (re-tessellar a cada
   frame) descartada por ora: pesada na CPU; só com caso de uso concreto, de preferência na GPU.
-- **Compositing no jogo — fase 1 feita (falta aceite com janela)**: com Use Nodes ligado, a árvore do
-  compositor vira um 2D Filter no fim da cadeia (`KX_CompositorFilter`, passo `FILTERPASS_COMPOSITOR`). Cada nó
-  é uma função GLSL da coordenada, então Blur e Lens Distortion leem o que vem antes (vinheta = Ellipse Mask →
-  Blur → Mix). Nós: Render Layers (Image/Alpha/Depth), RGB, Value, Mix (todos os modos), Alpha Over,
-  Bright/Contrast, Gamma, Invert, Hue Sat Val, Color Balance (LGG/CDL), RGB Curves, Color Ramp, RGB to BW,
-  Separate/Combine RGBA, Set Alpha, Math, Box/Ellipse Mask, Blur (7x7 leve), Lens Distortion, Reroute.
-  Outros nós passam a entrada adiante com aviso. Árvore padrão (Render Layers → Composite) não cria passo.
-  Valores lidos no load; nós Value e RGB viram uniforms `comp_<nome do nó>`, mudados ao vivo com
-  `scene.filterManager.compositor.setUniform(nome, valor)` (2026-10-26). Revisão do Codex aplicada: nó mudo segue
-  o internal link, Alpha Over premultiplicado/Key/Mixed, Divide/Dodge/Burn, Curves com Black/White Level e
-  extrapolação, cor→valor pela média, Modulo = fmod, Depth ortográfico, compositor depois dos filtros custom.
-  Teste: `tools/debug/cenas/criar_cena_compositing_jogo.py`;
-  `RANGE_COMPOSITOR_DUMP=arquivo` grava o shader gerado. Próximas fases: Glare, Texture nodes
-  só como bake. Defocus pesado e Denoise ficam fora.
+- **Compositing no jogo — próximas fases**: Texture nodes só como bake. Glare com os parâmetros do
+  Blender 5 (força, saturação, tint, brilho máximo, ver `D:\blender5-ref\compositor_glare`) pediria campos
+  novos no `NodeGlare`. Defocus pesado e Denoise ficam fora. O que já roda está no changelog (2026-10-26).
 
 ## Performance
 

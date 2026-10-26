@@ -124,11 +124,21 @@ public:
 				FindCaches(from, order, seen);
 			}
 		}
+		bNode *from;
+		bNodeSocket *fromsock;
+		if (node->type == CMP_NODE_GLARE) {
+			// The bright part of a Glare is drawn into a mipmapped texture: Fog Glow sums its levels,
+			// Streaks and Ghosts read it slightly blurred. Key: (glare node, -1).
+			const std::pair<bNode *, int> key(node, -1);
+			if (Source((bNodeSocket *)node->inputs.first, from, fromsock) &&
+			    std::find(order.begin(), order.end(), key) == order.end()) {
+				order.push_back(key);
+			}
+			return;
+		}
 		if (node->type != CMP_NODE_BLUR && node->type != CMP_NODE_LENSDIST) {
 			return;
 		}
-		bNode *from;
-		bNodeSocket *fromsock;
 		if (!Source((bNodeSocket *)node->inputs.first, from, fromsock) || from->type == CMP_NODE_R_LAYERS) {
 			return;
 		}
@@ -183,7 +193,24 @@ public:
 
 	std::string Output(bNode *node, int index)
 	{
-		return Emit(node, index);
+		return (index == -1) ? EmitGlareBright(node) : Emit(node, index);
+	}
+
+	/// vec4 function of the bright part of a Glare input (GlareThresholdOperation).
+	std::string EmitGlareBright(bNode *node)
+	{
+		const std::string name = "g" + std::to_string(Id(node)) + "_bright";
+		if (m_done.count(name)) {
+			return name;
+		}
+		m_done.insert(name);
+		NodeGlare *g = (NodeGlare *)node->storage;
+		const float threshold = g ? g->threshold : 1.0f;
+		const std::string src = Input(node, 0, "uv");  // emits the upstream functions first
+		m_code << "vec4 " << name << "(vec2 uv)\n{\n\tvec3 c = " << src << ".rgb;\n"
+		       << "\tif (dot(c, vec3(0.2126, 0.7152, 0.0722)) < " << F(threshold) << ") return vec4(0.0, 0.0, 0.0, 1.0);\n"
+		       << "\treturn vec4(max(c - " << F(threshold) << ", 0.0), 1.0);\n}\n\n";
+		return name;
 	}
 
 	std::string Code() const
@@ -231,7 +258,8 @@ private:
 			return false;
 		}
 		visited.insert(node);
-		if (node->type == CMP_NODE_R_LAYERS || node->type == CMP_NODE_BLUR || node->type == CMP_NODE_LENSDIST) {
+		if (node->type == CMP_NODE_R_LAYERS || node->type == CMP_NODE_BLUR || node->type == CMP_NODE_LENSDIST ||
+		    node->type == CMP_NODE_GLARE) {
 			return true;
 		}
 		for (bNodeSocket *sock = (bNodeSocket *)node->inputs.first; sock; sock = sock->next) {
@@ -611,6 +639,73 @@ private:
 				  << Input(node, 0, "uvb") << ".b, 1.0);\n";
 				break;
 			}
+			case CMP_NODE_GLARE: {
+				// Bright part (GlareThresholdOperation) spread by the glare type, then MixGlareOperation.
+				// Fixed sample counts: Quality and Iterations of the render are not followed exactly.
+				NodeGlare *g = (NodeGlare *)node->storage;
+				if (!g) {
+					b << "\treturn " << in(0) << ";\n";
+					break;
+				}
+				// fn(p, lod): bright part at p, from the mipmapped texture when there is one.
+				const std::string fn = "g" + std::to_string(Id(node)) + "_b";
+				{
+					std::string sample;
+					if (m_caches) {
+						auto it = m_caches->find(std::make_pair(node, -1));
+						if (it != m_caches->end()) {
+							m_usedCaches.insert(it->second);
+							sample = "textureLod(comp_cache" + std::to_string(it->second) + ", p, lod).rgb";
+						}
+					}
+					if (sample.empty()) {
+						sample = EmitGlareBright(node) + "(p).rgb";  // no texture: no levels, lod unused
+					}
+					m_code << "vec3 " << fn << "(vec2 p, float lod)\n{\n\treturn " << sample << ";\n}\n\n";
+				}
+				b << "\tvec2 px = 1.0 / vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n";
+				b << "\tvec3 glare = vec3(0.0);\n";
+				const float colmod = std::min(std::max(g->colmod, 0.0f), 1.0f);
+				const float fade = std::min(std::max(g->fade, 0.75f), 1.0f);
+				if (g->type == 1) {  // Fog Glow: wide soft glow, sum of the mip levels up to 2^size pixels
+					const int maxLod = std::min(std::max((int)g->size, 6), 9) - 3;
+					b << "\tfor (int l = 1; l <= " << maxLod << "; ++l) {\n"
+					  << "\t\tvec2 o = px * exp2(float(l)) * 0.5;\n"
+					  << "\t\tglare += 0.25 * (" << fn << "(uv + o, float(l)) + " << fn << "(uv - o, float(l)) + "
+					  << fn << "(uv + vec2(o.x, -o.y), float(l)) + " << fn << "(uv - vec2(o.x, -o.y), float(l)));\n"
+					  << "\t}\n\tglare *= " << F(2.0f / (float)maxLod) << ";\n";
+				}
+				else if (g->type == 3) {  // Ghosts: blurred copies mirrored through the center, tinted
+					b << "\tconst float sc[6] = float[6](-1.0, -0.62, -0.35, 0.28, 0.55, 0.85);\n";
+					b << "\tconst vec3 tint[3] = vec3[3](vec3(1.0, 0.6, 0.4), vec3(0.6, 1.0, 0.5), vec3(0.5, 0.6, 1.0));\n";
+					b << "\tfor (int i = 0; i < 6; ++i) {\n"
+					  << "\t\tvec2 p = 0.5 + (uv - 0.5) * sc[i];\n"
+					  << "\t\tvec3 s = " << fn << "(p, 3.0);\n"
+					  << "\t\tglare += s * mix(vec3(1.0), tint[i - 3 * (i / 3)], " << F(colmod) << ") * pow(" << F(fade) << ", float(i) * 4.0);\n"
+					  << "\t}\n\tglare *= 0.3;\n";
+				}
+				else {  // Streaks / Simple Star: lines of light fading away from each bright pixel
+					const bool star = (g->type == 0);
+					const int count = star ? 4 : std::min(std::max((int)g->streaks, 1), 16);
+					const float offset = star ? (g->star_45 ? 0.7853982f : 0.0f) : g->angle_ofs;
+					const float length = std::min(std::pow(4.0f, (float)std::min(std::max((int)g->iter, 2), 5)), 512.0f);
+					b << "\tfor (int s = 0; s < " << count << "; ++s) {\n"
+					  << "\t\tfloat a = " << F(offset) << " + float(s) * " << F(6.2831853f / (float)count) << ";\n"
+					  << "\t\tvec2 dir = vec2(cos(a), sin(a)) * px;\n"
+					  << "\t\tfor (int i = 1; i <= 16; ++i) {\n"
+					  << "\t\t\tfloat t = float(i) / 16.0;\n"
+					  << "\t\t\tfloat w = pow(" << F(fade) << ", t * 64.0);\n"
+					  << "\t\t\tvec3 tint = mix(vec3(1.0), vec3(1.0, 0.5 + 0.5 * (1.0 - t), 0.25 + 0.75 * (1.0 - t)), " << F(colmod) << ");\n"
+					  << "\t\t\tglare += w * tint * " << fn << "(uv + dir * t * " << F(length) << ", 1.0);\n"
+					  << "\t\t}\n\t}\n\tglare *= " << F(2.0f / (float)count) << ";\n";
+				}
+				b << "\tvec4 c1 = " << in(0) << ";\n";
+				b << "\tfloat v = " << F(0.5f + g->mix * 0.5f) << ";\n";
+				b << "\tfloat mf = 2.0 - 2.0 * abs(v - 0.5);\n";
+				b << "\tvec3 base = max(c1.rgb, 0.0);\n";
+				b << "\treturn vec4(mf * max(base + v * (glare - base), 0.0), c1.a);\n";
+				break;
+			}
 			case CMP_NODE_COMPOSITE:
 			case CMP_NODE_VIEWER:
 				b << "\treturn " << in(0) << ";\n";
@@ -950,6 +1045,7 @@ std::vector<KX_CompositorStage> KX_BuildCompositorShaders(Scene *scene, std::vec
 		// The compositor's alpha does not belong on the screen: keep the frame opaque like the render.
 		stage.shader += last ? "\tgl_FragColor = vec4(c.rgb, 1.0);\n}\n" : "\tgl_FragColor = c;\n}\n";
 		stage.caches.assign(gen.UsedCaches().begin(), gen.UsedCaches().end());
+		stage.mipmap = !last && order[i].second == -1;
 		for (const std::string& name : stageSkipped) {
 			if (skippedSet.insert(name).second) {
 				skipped.push_back(name);

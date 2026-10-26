@@ -15,6 +15,8 @@ Presets:
   blur_cor   8 nós de cor -> Blur (o Blur recalcula a cadeia 49x)
   blur2      Blur -> Blur (49 x 49 leituras)
   lente_blur Blur -> Lens Distortion (3 x 49)
+  glare_fog / glare_streaks / glare_star / glare_ghosts   Glare sobre a imagem (Threshold 0.5)
+  glare_cor  8 nós de cor -> Glare Fog Glow (com textura intermediária)
   diamante   6 Mix seguidos que usam o nó anterior nas duas entradas (2^6 chamadas se não houver cache)
 """
 import bpy, sys, os
@@ -41,6 +43,18 @@ bpy.ops.mesh.primitive_plane_add(location=(0, 0, -1)); bpy.context.object.scale 
 bpy.ops.object.lamp_add(type='SUN', location=(0, 0, 10))
 cam = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera")); sc.objects.link(cam)
 cam.location = (0, -12, 4); cam.rotation_euler = (1.25, 0, 0); sc.camera = cam
+
+if preset.startswith('glare'):
+    # fundo escuro e cubos que brilham (emit), para o Glare ter só pontos claros
+    for ob in sc.objects:
+        if ob.type == 'MESH':
+            m = ob.data.materials[0] if ob.data.materials else None
+            if m is None:
+                m = bpy.data.materials.new("Chao"); ob.data.materials.append(m)
+                m.diffuse_color = (0.05, 0.05, 0.05)
+            else:
+                m.emit = 1.5
+    w = bpy.data.worlds.new("W"); w.horizon_color = (0.01, 0.01, 0.02); sc.world = w
 
 if preset != 'off':
     sc.use_nodes = True
@@ -81,6 +95,11 @@ if preset != 'off':
     elif preset == 'lente_blur':
         ld = N.new('CompositorNodeLensdist'); ld.inputs['Dispersion'].default_value = 0.15
         L.new(blur(img), ld.inputs['Image']); s = ld.outputs[0]
+    elif preset.startswith('glare'):
+        g = N.new('CompositorNodeGlare'); g.threshold = 0.5
+        g.glare_type = {'glare_fog': 'FOG_GLOW', 'glare_cor': 'FOG_GLOW', 'glare_streaks': 'STREAKS',
+                        'glare_star': 'SIMPLE_STAR', 'glare_ghosts': 'GHOSTS'}[preset]
+        L.new(chain_cor(img) if preset == 'glare_cor' else img, g.inputs['Image']); s = g.outputs[0]
     elif preset == 'diamante':
         s = img
         for i in range(6):
@@ -129,7 +148,9 @@ if "m0" not in own and el >= 2.0:
 if "m0" in own and el >= 2.0 + %(secs)r:
     fps = (own["n"] - own["n0"]) / (el - own["m0"])
     c = Range.logic.getCurrentScene().filterManager.compositor
-    open(%(log)r, "w").write("fps %%.1f\\ncompositor %%s\\n" %% (fps, c is not None))
+    m = getattr(Range.render, "getGraphicsCardRenderer", None) or getattr(Range.logic, "getGraphicsCardRenderer", None)
+    gpu = m() if m else "?"
+    open(%(log)r, "w").write("fps %%.1f\\ncompositor %%s\\ngpu %%s\\n" %% (fps, c is not None, gpu))
     Range.logic.endGame()
 ''' % {"secs": secs, "log": log}
 t = bpy.data.texts.new("medir.py"); t.write(T)

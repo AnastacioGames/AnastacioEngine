@@ -43,6 +43,7 @@
 #include "BKE_main.h"
 #include "BKE_node.h"
 #include "BKE_scene.h"
+#include "BKE_compositor_game.h"
 
 #include "GPU_material.h"
 
@@ -843,6 +844,27 @@ static bool node_engine_badge(const bContext *C, bNodeTree *ntree, bNode *node,
 
 	*r_badge = NULL;
 	*r_tip = NULL;
+
+	/* Compositing in the game: the tree becomes a 2D Filter, only some nodes have GLSL. */
+	if (scene && ntree->type == NTREE_COMPOSIT && node->typeinfo && node->type != NODE_FRAME &&
+	    STREQ(scene->r.engine, RE_engine_id_BLENDER_GAME))
+	{
+		switch (BKE_compositor_game_support(node->type)) {
+			case 0:
+				*r_badge = "Not in Game";
+				*r_tip = "This node does not run in the game: its first input passes through unchanged";
+				return true;
+			case 2:
+				*r_badge = "~Game";
+				*r_tip = (node->type == CMP_NODE_BLUR) ?
+				         "Approximated in Game: light 7x7 gaussian spread over the size" :
+				         (node->type == CMP_NODE_GLARE) ?
+				         "Approximated in Game: fixed number of samples, Quality and Iterations are ignored" :
+				         "Approximated in Game: no Jitter";
+				return false;
+		}
+		return false;
+	}
 
 	if (!scene || ntree->type != NTREE_SHADER || !node->typeinfo)
 		return false;

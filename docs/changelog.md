@@ -8,6 +8,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Compositing no jogo: aceite, Blur rápido, Glare e Auto Arrange
+
+- Compositing no jogo aprovado com janela. Com Use Nodes, a árvore do compositor vira 2D Filters no fim da
+  cadeia (`KX_CompositorFilter`); nós Value/RGB mudam ao vivo com `scene.filterManager.compositor.setUniform()`.
+- Blur, Lens Distortion e Glare que recebem uma cadeia leem uma textura intermediária desenhada uma vez
+  (antes recalculavam a cadeia a cada amostra). GPU 720p, RX 6800M: Blur após 8 nós de cor 10,1 → 0,82 ms,
+  Blur sobre Blur 12,3 → 1,17 ms. iGPU (Radeon do 5900HX): 15,2 → 1,8 ms e 78,7 → 3,0 ms. Imagem igual
+  (diferença máx. 1-8/255). `RANGE_COMPOSITOR_NO_CACHE=1` compara; profiler `filter.compositor_cache`.
+- Nó Glare no jogo: Fog Glow (soma dos mipmaps da parte brilhante), Streaks, Simple Star e Ghosts, pelas
+  fórmulas da 2.79 (limiar por luminância, MixGlare); Quality/Iterations não são seguidos à risca. ≤ 1,3 ms.
+- Node Editor em modo jogo: selo "Not in Game" nos nós do compositor que não rodam no jogo e "~Game" nos
+  aproximados (lista única em `BKE_compositor_game.h`, usada também pelo gerador).
+- Botão Auto Arrange ao lado do nome da árvore: colunas pelas ligações; na Logic Tree, um fluxo por faixa
+  (sensor / controller / actuator).
+- Medição: `tools/debug/cenas/medir_compositing_jogo.py` (presets, `COMP_SHOT` grava print). Para a iGPU:
+  valor `GpuPreference=1;` em `HKCU\Software\Microsoft\DirectX\UserGpuPreferences` para o runtime
+  (remover depois). O FPS trava no campo FPS (Game Rate); medir pelo tempo de GPU do profiler.
+
 ## 2026-10-26 - Frente 6: mensagens de Logic Bricks
 
 - `GetMessages` sem destinatário não duplica mais o broadcast (World Sound executava cada comando de

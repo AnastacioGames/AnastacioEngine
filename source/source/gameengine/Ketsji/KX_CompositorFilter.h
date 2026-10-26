@@ -46,6 +46,7 @@ struct KX_CompositorStage {
 	std::string shader;
 	std::vector<KX_CompositorUniform> uniforms;  ///< Value and RGB nodes this pass reads.
 	std::vector<int> caches;                     ///< Earlier stages whose texture this pass reads.
+	bool mipmap = false;                         ///< The texture gets mipmaps (bright part of a Glare).
 };
 
 /** Builds the fragment shaders of the scene's compositor tree (Scene > Use Nodes), from the

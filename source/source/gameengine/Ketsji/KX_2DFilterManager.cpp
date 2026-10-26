@@ -630,7 +630,8 @@ void KX_2DFilterManager::EnsureCompositorFilter(Scene *scene)
 		data.sourceName = last ? "Compositing" : "Compositing cache " + std::to_string(i);
 		KX_2DFilter *filter = static_cast<KX_2DFilter *>(AddFilter(data, true));
 		if (!last) {
-			filter->SetOffScreen(new KX_2DFilterOffScreen(1, RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR,
+			const int flag = RAS_2DFilterOffScreen::RAS_CANVAS_DIVISOR | (stages[i].mipmap ? RAS_2DFilterOffScreen::RAS_MIPMAP : 0);
+			filter->SetOffScreen(new KX_2DFilterOffScreen(1, (RAS_2DFilterOffScreen::Flag)flag,
 			        std::max(1, (int)m_canvas->GetRenderWidth()), std::max(1, (int)m_canvas->GetRenderHeight()), hdr, 1.0f));
 		}
 		// Values of the Value and RGB nodes; Python changes them with filterManager.compositor.setUniform().
