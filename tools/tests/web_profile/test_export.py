@@ -22,6 +22,7 @@ def writer(text):
     def build(tmp):
         with open(os.path.join(tmp, "index.html"), "w") as f:
             f.write(text)
+        open(os.path.join(tmp, "manifest.json"), "w").close()
     return build
 
 
@@ -67,6 +68,27 @@ class ExportTests(unittest.TestCase):
         self.assertFalse(os.path.exists(self.dest))
         with self.assertRaises(ValueError):
             export.export_package(None, self.dest, writer("x"))
+
+    def test_refuses_folder_with_other_files(self):
+        os.makedirs(self.dest)
+        other = os.path.join(self.dest, "importante.txt")
+        open(other, "w").close()
+        with self.assertRaises(ValueError):
+            export.export_package(make_report(), self.dest, writer("v1"))
+        self.assertTrue(os.path.isfile(other))
+
+    def test_refuses_folder_containing_project(self):
+        os.makedirs(self.dest)
+        game = os.path.join(self.dest, "jogo.range")
+        open(game, "w").close()
+        with self.assertRaises(ValueError):
+            export.export_package(make_report(), self.dest, writer("v1"), protected=(game,))
+        self.assertTrue(os.path.isfile(game))
+
+    def test_refuses_drive_root(self):
+        root = os.path.abspath(os.sep)
+        with self.assertRaises(ValueError):
+            export.check_destination(root)
 
 
 if __name__ == "__main__":

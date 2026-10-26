@@ -387,9 +387,13 @@ class SCENE_OT_range_web_export(Operator):
                     shutil.move(os.path.join(scratch, name, entry), os.path.join(out, entry))
 
         try:
-            export.export_package(_last_report, dest, build)
+            export.export_package(_last_report, dest, build, protected=(game,))
         except export.ExportBlocked as exc:
             self.report({'WARNING'}, _("%s Fix and validate again.") % tr(exc.args[0]))
+            return {'CANCELLED'}
+        except ValueError as exc:
+            # Destino recusado (check_destination): nada foi gerado nem apagado.
+            self.report({'WARNING'}, tr(exc.args[0]))
             return {'CANCELLED'}
         except Exception as exc:
             self.report({'WARNING'}, _("Export failed; the previous one was preserved: %s") % exc)
