@@ -426,8 +426,8 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   PCF Jitter `3 → 5`. Referência: `tools/arquivo_upbge.blend` e `tools/upbge-0.2.5b-source/`.
 - **Sombra em Principled/PBR** (opcional): comparar lado a lado com material legado sob as mesmas luzes e ver o
   efeito de `ProcessLighting(true)` em todo material com nodes numa cena maior.
-- **Sombra de CSM no Principled:** o laço de luzes do Principled não recebe sombra do sol com cascatas (só
-  clássico e Lamp Data). PCSS já funciona nos dois caminhos (2026-10-25). Ideias pendentes: menu de filtros
+- **Sombra de CSM no Principled:** feita em 2026-10-26 (primeiro sol com cascata por draw, sem VSM nem sombra
+  colorida no slot CSM); falta aceite visual com janela. PCSS já funciona nos dois caminhos (2026-10-25). Ideias pendentes: menu de filtros
   simplificado (Dura/Macia/Realista) e PCSS cair para sombra dura nos presets Low/Very Low.
 - **Nós de material Game × Cycles × BI** ([matriz](node-material-support.md)): fases 1–6 feitas e validadas.
   Sem suporte: Point Density e Script.

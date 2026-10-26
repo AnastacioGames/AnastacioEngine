@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Sombra de sol com cascatas (CSM) no Principled
+
+- O laço de luzes do Principled agora recebe a sombra do sol com CSM: slot com `enabled = 3` usa uniforms
+  `unfcsm*` (mapas das cascatas de fora, matrizes, bias, imat, splits, filtro igual ao clássico, PCSS incluso).
+  O shader só ganha os samplers extras (flag `SHADOW_CSM`) quando algum sol tem cascatas, por causa do limite
+  de 16 samplers na Web. Unidades de textura: max-8 e max-13.
+- Limites: um sol CSM por draw; sol com VSM continua sem sombra no Principled; sombra colorida no CSM só no
+  material clássico; sem fade entre cascatas.
+- Teste: `tools/debug/cenas/criar_teste_csm_principled.py` (shaders `0x842` compilam sem erro no `--server`).
+
 ## 2026-10-26 - Auto Static Batch (opção da cena)
 
 - Scene > Level of Detail > **Auto Static Batch** (`scene.game_settings.use_auto_static_batch`, bit
