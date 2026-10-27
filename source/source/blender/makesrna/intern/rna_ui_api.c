@@ -224,7 +224,7 @@ static PointerRNA rna_uiItemOPreview(uiLayout *layout, const char *opname, int i
 	UI_block_layout_set_current(block, layout);
 	const int size = (int)(UI_UNIT_X * scale);
 	uiBut *but = uiDefIconButO_ptr(block, UI_BTYPE_BUT, ot, uiLayoutGetOperatorContext(layout), icon_value,
-	                               0, 0, size, size, description[0] ? description : NULL);
+	                               0, 0, size, size, (description && description[0]) ? description : NULL);
 	UI_but_flag_enable(but, UI_BUT_ICON_PREVIEW);
 	return *UI_but_operator_ptr_get(but);
 }
