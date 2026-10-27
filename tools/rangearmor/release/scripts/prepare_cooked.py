@@ -31,9 +31,16 @@ def prepare(data):
         fresh = Path(work) / 'game.cooked'
         env = dict(os.environ, ANASTACIO_COOK=str(fresh))
         print('> Cooking protected snapshot:', main, flush=True)
-        result = subprocess.run([str(runtime), '-w', '320', '180', str(main)],
-                                cwd=str(data_dir), env=env, capture_output=True,
-                                text=True, errors='replace', timeout=600)
+        # The runtime writes imgui.ini in its working folder; one made by the cook must not ship.
+        imgui_ini = data_dir / 'imgui.ini'
+        had_imgui_ini = imgui_ini.exists()
+        try:
+            result = subprocess.run([str(runtime), '-w', '320', '180', str(main)],
+                                    cwd=str(data_dir), env=env, capture_output=True,
+                                    text=True, errors='replace', timeout=600)
+        finally:
+            if not had_imgui_ini and imgui_ini.is_file():
+                imgui_ini.unlink()
         if result.returncode:
             raise RuntimeError('Cook failed (%d): %s' % (result.returncode, result.stdout + result.stderr))
         if fresh.is_file():
