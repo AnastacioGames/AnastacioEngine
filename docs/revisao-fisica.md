@@ -7,8 +7,9 @@ Arquivos: [CcdPhysicsEnvironment.cpp](../source/source/gameengine/Physics/Bullet
 [CcdConstraint.cpp](../source/source/gameengine/Physics/Bullet/CcdConstraint.cpp),
 [KX_ConstraintWrapper.cpp](../source/source/gameengine/Ketsji/KX_ConstraintWrapper.cpp).
 
-Regressão: [criar_cena_revisao_fisica.py](../tools/debug/cenas/criar_cena_revisao_fisica.py), nove casos
-rodados com `AnastacioRuntime.exe --server`.
+Regressão: [criar_cena_revisao_fisica.py](../tools/debug/cenas/criar_cena_revisao_fisica.py), nove casos, e
+[criar_cena_revisao_colisao.py](../tools/debug/cenas/criar_cena_revisao_colisao.py), cinco casos de callbacks de
+colisão e personagem, rodados com `AnastacioRuntime.exe --server`.
 
 ## Achados corrigidos
 
@@ -17,6 +18,8 @@ rodados com `AnastacioRuntime.exe --server`.
 | FIS-01 | `KX_ConstraintWrapper` guardava o ponteiro do `CcdConstraint`, que é apagado em `RemoveConstraint`. O comentário dizia que o wrapper guardava só o id, o que não era verdade | casos `remove_con` e `end_obj`: ler `constraint_id` depois de `removeConstraint` ou de `endObject` num dos corpos derrubava o player | Mesmo padrão do veículo: o `CcdConstraint` avisa seus wrappers no destrutor (`SetInvalidationCallback`), e todo método e atributo do wrapper gera `ReferenceError` | os 7 acessos dão `ReferenceError`, sem crash |
 | FIS-02 | Na Bullet, `m_userConstraintId` e `m_userConstraintPtr` são uma `union`. Gravar o ponteiro sobrescrevia o id, então `constraint_id` virava os 32 bits baixos do endereço (ex.: -2031918448). Duas constraints podiam colidir no mesmo id | caso `vivo`: id negativo e diferente a cada execução | O id sequencial fica no `CcdConstraint`; as três buscas por id (`GetConstraintById`, `RemoveConstraintById`, `GetAppliedImpulse`) comparam com ele | `constraint_id` = 1, e `removeConstraint(1)` acha a constraint |
 | FIS-03 | Remover um corpo suspenso (`suspendPhysics` e depois `endObject`) não apagava as constraints dele: o corpo não estava registrado e `RemoveConstraint` saía cedo para constraint inativa. A constraint ficava viva apontando para o corpo apagado | caso `suspende_end`: depois de remover B, `constraint_type` ainda respondia 12, e suspender e restaurar A lia o corpo de B já liberado | O destrutor do `CcdPhysicsController` chama `FreeCcdConstraints`, e `RemoveConstraint(free=true)` apaga também a constraint suspensa. A troca de cena (`SetPhysicsEnvironment`) não muda | `ReferenceError`, sem leitura de memória liberada |
+| FIS-04 | `KX_CharacterWrapper` (de `constraints.getCharacter`) guardava o ponteiro do `CcdCharacter`, apagado junto com o objeto | caso `char_end`: ler `onGround` depois de `endObject` no personagem abortava o player (código 0x16) | Mesmo padrão do FIS-01, com a lista de avisos na própria `PHY_ICharacter`; os 18 acessos e os 3 métodos dão `ReferenceError` | `ReferenceError`, sem crash |
+| FIS-05 | `CcdCollData` guardava só o ponteiro do manifold da Bullet. Quando um callback de colisão suspendia ou removia um corpo, o manifold era liberado e os callbacks seguintes do frame (e a destruição nativa) liam memória liberada | caso `suspende`: o callback do Chao suspende A, e o de A recebia 0 contatos lidos de um manifold já devolvido ao pool | Os pontos (até 4) são copiados ao criar o evento e atualizados nos subpassos seguintes do mesmo frame, então o callback continua vendo o último subpasso, como antes | A recebe o contato do frame (impulso 3,14, o mesmo que o Chao viu) |
 
 ## Controles
 
@@ -26,6 +29,10 @@ rodados com `AnastacioRuntime.exe --server`.
 - `junta` e `junta_sem`: um Rigid Body Joint criado no editor segura o cubo pendurado em z = 3,0;
   sem a junta, o cubo cai até z = 1,0.
 - `veiculo`: o wrapper do veículo já era protegido e dá `ReferenceError` depois de `endObject` no chassi.
+- `end_ambos`: o callback remove os dois objetos do par (e chama `endObject` duas vezes no mesmo); a
+  remoção é adiada para o fim do frame e nada quebra.
+- `add_obj`: 464 contatos adicionando objetos com física dentro do callback, sem erro.
+- `char_susp`: o personagem não anda suspenso e volta a andar (3,0) depois de `restorePhysics`.
 
 ## Conferido sem mudança
 
@@ -39,5 +46,8 @@ rodados com `AnastacioRuntime.exe --server`.
 
 - `removeConstraint(id)` de uma constraint suspensa não a encontra, porque a busca é feita só no
   mundo. Ela volta no `restorePhysics`. Comportamento antigo, sem crash.
-- Ainda não revisados: personagem, sensores de colisão (callbacks que removem objetos), soft body
-  e o tempo de física com muitos corpos e contatos.
+- Observação sem mudança: no par Chao/cubo, `localPointA` do Chao veio no espaço do cubo (0, 0, -1) e
+  o do cubo veio no espaço do Chao. A ordem `ctrl1, ctrl0` passada em `CallbackTriggers` com o
+  `first` do `ctrl0` parece trocar os lados. Mudar isso altera o que jogos existentes leem, então
+  fica para decidir com teste próprio.
+- Ainda não revisados: soft body e o tempo de física com muitos corpos e contatos.

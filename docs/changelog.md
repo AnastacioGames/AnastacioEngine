@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 4: personagem removido e callbacks de colisão sem memória liberada
+
+- [Revisão](revisao-fisica.md) FIS-04/05.
+- `constraints.getCharacter()` guardado e usado depois de `endObject` no personagem abortava o
+  player; agora dá `ReferenceError`.
+- Os pontos de contato de um evento de colisão são copiados. Antes, um callback que suspendia ou
+  removia um corpo fazia os callbacks seguintes do frame (e a destruição nativa) lerem o contato
+  já liberado pela Bullet.
+- Regressão em `tools/debug/cenas/criar_cena_revisao_colisao.py`; 5 casos, mais os 9 de física, passaram em `--server`.
+
 ## 2026-10-26 - Frente 4: constraint apagada não derruba mais o Python
 
 - [Revisão](revisao-fisica.md) FIS-01/02/03.

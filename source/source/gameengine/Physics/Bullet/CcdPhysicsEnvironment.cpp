@@ -2683,9 +2683,15 @@ void CcdPhysicsEnvironment::CallbackTriggers()
 		// e o consumidor (KX_CollisionEventManager::RemoveNewCollisions) continua dono e da delete.
 		auto it = std::lower_bound(m_callbackCounter.begin(), m_callbackCounter.end(), pair);
 		if (it == m_callbackCounter.end() || pair < *it) {
+			CcdCollData *coll_data = new CcdCollData(manifold);
+			pair.manifold = manifold;
+			pair.collData = coll_data;
 			m_callbackCounter.insert(it, pair);
-			const CcdCollData *coll_data = new CcdCollData(manifold);
 			m_triggerCallbacks[PHY_OBJECT_RESPONSE](m_triggerCallbacksUserPtrs[PHY_OBJECT_RESPONSE], ctrl1, ctrl0, coll_data, first);
+		}
+		else if (it->manifold == manifold) {
+			// The event is read after the last substep: keep the points of that substep.
+			it->collData->Update(manifold);
 		}
 	}
 }
@@ -4014,63 +4020,86 @@ void CcdPhysicsEnvironment::SetupObjectConstraints(KX_GameObject *obj_src, KX_Ga
 }
 
 CcdCollData::CcdCollData(const btPersistentManifold *manifoldPoint)
-	:m_manifoldPoint(manifoldPoint)
+	:m_numContacts(0)
 {
+	Update(manifoldPoint);
+}
+
+void CcdCollData::Update(const btPersistentManifold *manifoldPoint)
+{
+	const int num = std::min(manifoldPoint->getNumContacts(), (int)ARRAY_SIZE(m_points));
+	for (int i = 0; i < num; ++i) {
+		const btManifoldPoint& src = manifoldPoint->getContactPoint(i);
+		Point& dst = m_points[i];
+		dst.localA = ToMt(src.m_localPointA);
+		dst.localB = ToMt(src.m_localPointB);
+		dst.worldOnB = ToMt(src.m_positionWorldOnB);
+		dst.normalOnB = ToMt(src.m_normalWorldOnB);
+		dst.friction = src.m_combinedFriction;
+		dst.rollingFriction = src.m_combinedRollingFriction;
+		dst.restitution = src.m_combinedRestitution;
+		dst.impulse = src.m_appliedImpulse;
+	}
+	m_numContacts = num;
+	if (num == 0) {
+		// Callers read point 0 without checking the count: keep it a zero point.
+		m_points[0] = Point{mt::zero3, mt::zero3, mt::zero3, mt::zero3, 0.0f, 0.0f, 0.0f, 0.0f};
+	}
 }
 
 CcdCollData::~CcdCollData()
 {
 }
 
+const CcdCollData::Point& CcdCollData::GetPoint(unsigned int index) const
+{
+	return m_points[(index < m_numContacts) ? index : 0];
+}
+
 unsigned int CcdCollData::GetNumContacts() const
 {
-	return m_manifoldPoint->getNumContacts();
+	return m_numContacts;
 }
 
 mt::vec3 CcdCollData::GetLocalPointA(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return ToMt(first ? point.m_localPointA : point.m_localPointB);
+	const Point& point = GetPoint(index);
+	return first ? point.localA : point.localB;
 }
 
 mt::vec3 CcdCollData::GetLocalPointB(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return ToMt(first ? point.m_localPointB : point.m_localPointA);
+	const Point& point = GetPoint(index);
+	return first ? point.localB : point.localA;
 }
 
 mt::vec3 CcdCollData::GetWorldPoint(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return ToMt(point.m_positionWorldOnB);
+	return GetPoint(index).worldOnB;
 }
 
 mt::vec3 CcdCollData::GetNormal(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return ToMt(first ? point.m_normalWorldOnB : -point.m_normalWorldOnB);
+	const Point& point = GetPoint(index);
+	return first ? point.normalOnB : -point.normalOnB;
 }
 
 float CcdCollData::GetCombinedFriction(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return point.m_combinedFriction;
+	return GetPoint(index).friction;
 }
 
 float CcdCollData::GetCombinedRollingFriction(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return point.m_combinedRollingFriction;
+	return GetPoint(index).rollingFriction;
 }
 
 float CcdCollData::GetCombinedRestitution(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return point.m_combinedRestitution;
+	return GetPoint(index).restitution;
 }
 
 float CcdCollData::GetAppliedImpulse(unsigned int index, bool first) const
 {
-	const btManifoldPoint& point = m_manifoldPoint->getContactPoint(index);
-	return point.m_appliedImpulse;
+	return GetPoint(index).impulse;
 }

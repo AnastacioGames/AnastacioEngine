@@ -100,6 +100,9 @@ protected:
 	struct CollisionPair {
 		CcdPhysicsController* ctrl1;
 		CcdPhysicsController* ctrl2;
+		/// Event already sent for this pair, refreshed in the next substeps (not part of the order).
+		const btPersistentManifold *manifold;
+		class CcdCollData *collData;
 
 		bool operator<(const CollisionPair& other) const {
 			if (ctrl1 != other.ctrl1)
@@ -352,9 +355,26 @@ protected:
 
 class CcdCollData : public PHY_ICollData
 {
-	const btPersistentManifold *m_manifoldPoint;
+	/// Copy of the manifold points: a Python callback can suspend or remove a body during the
+	/// collision dispatch, which releases the manifold before the other callbacks read it.
+	struct Point {
+		mt::vec3 localA;
+		mt::vec3 localB;
+		mt::vec3 worldOnB;
+		mt::vec3 normalOnB;
+		float friction;
+		float rollingFriction;
+		float restitution;
+		float impulse;
+	};
+	Point m_points[4];
+	unsigned int m_numContacts;
+
+	const Point& GetPoint(unsigned int index) const;
 public:
 	CcdCollData(const btPersistentManifold *manifoldPoint);
+	/// Copies the points again (later substep of the same frame).
+	void Update(const btPersistentManifold *manifoldPoint);
 	virtual ~CcdCollData();
 
 	virtual unsigned int GetNumContacts() const;

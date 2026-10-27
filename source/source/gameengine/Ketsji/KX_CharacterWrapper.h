@@ -48,6 +48,9 @@ public:
 #endif // WITH_PYTHON
 
 private:
+	static void OnCharacterInvalidated(void *client);
+
+	/// Set to nullptr when the character is deleted (object removed).
 	PHY_ICharacter*			 m_character;
 };
 

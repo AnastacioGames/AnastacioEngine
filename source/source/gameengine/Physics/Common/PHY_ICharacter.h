@@ -8,11 +8,39 @@
 
 //PHY_ICharacter provides a generic interface for "character" controllers
 
+#include <utility>
+#include <vector>
+
 class PHY_ICharacter
 {
 public:
 	virtual ~PHY_ICharacter()
 	{
+		// Python may still hold a KX_CharacterWrapper: tell it the character is gone.
+		std::vector<std::pair<void (*)(void *), void *> > callbacks = std::move(m_invalidationCallbacks);
+		for (const std::pair<void (*)(void *), void *>& entry : callbacks) {
+			entry.first(entry.second);
+		}
+	}
+
+	/** Called when the character is deleted, so Python wrappers drop their pointer.
+	 * A nullptr callback unregisters only this client. */
+	void SetInvalidationCallback(void (*callback)(void *client), void *client)
+	{
+		for (auto it = m_invalidationCallbacks.begin(); it != m_invalidationCallbacks.end(); ++it) {
+			if (it->second == client) {
+				if (callback) {
+					it->first = callback;
+				}
+				else {
+					m_invalidationCallbacks.erase(it);
+				}
+				return;
+			}
+		}
+		if (callback) {
+			m_invalidationCallbacks.emplace_back(callback, client);
+		}
 	}
 
 	virtual void Jump() = 0;
@@ -47,6 +75,9 @@ public:
 	virtual void SetVelocity(const mt::vec3& vel, float time, bool local) = 0;
 
 	virtual void Reset() = 0;
+
+private:
+	std::vector<std::pair<void (*)(void *), void *> > m_invalidationCallbacks;
 };
 
 #endif //__PHY_ICHARACTER_H__
