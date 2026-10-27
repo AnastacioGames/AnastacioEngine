@@ -696,6 +696,13 @@ class RangeArmorExportSettings(bpy.types.PropertyGroup):
         default="",
         subtype='FILE_PATH',
     )
+    compile_scripts: bpy.props.BoolProperty(
+        name="Compile Scripts",
+        description="Ship the .py files of data/ as compiled .pyc only, so players don't get the readable "
+                    "source (it only makes reading harder: .pyc can be decompiled). "
+                    "Scripts inside the .range are already protected by the .rasec",
+        default=False,
+    )
     keep_debug_overlays: bpy.props.BoolProperty(
         name="Keep debug overlays",
         description="Keeps the framerate/profile and debug properties overlays in the exported game "
@@ -742,6 +749,7 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
         box.label(text="Export:", icon="EXPORT")
         box.prop(export, "cook_before_export")
         box.prop(export, "keep_debug_overlays")
+        box.prop(export, "compile_scripts")
         box.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
         box.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
         box.label(text="The file must be saved in the project's data/ folder", icon='INFO')

@@ -2804,6 +2804,7 @@ def _rangearmor_write_export_preset(context):
         config_data["IconPath"] = bpy.path.abspath(export_settings.icon_path)
     config_data["ExportWindows64"] = export_settings.export_windows64
     config_data["ExportLinux64"] = export_settings.export_linux64
+    config_data["CompileScripts"] = export_settings.compile_scripts
 
     try:
         with open(config_path, "w", encoding="utf-8") as config_file:

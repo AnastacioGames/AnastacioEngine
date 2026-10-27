@@ -71,6 +71,26 @@ def build(data, args):
               ". Set both Windows and Linux runtimes in the Paths tab.")
 
 
+def _compile_scripts(data_dir):
+    """Troca cada .py da entrega por um .pyc ao lado (sem __pycache__), que o
+    import do jogo carrega sem o fonte. Roda com o Python do pacote (3.11),
+    o mesmo do runtime, entao o .pyc bate com o interpretador do jogo.
+    So mexe na copia da entrega; o projeto do autor fica com os .py."""
+    import py_compile
+    sources = [path for path in data_dir.rglob("*.py") if path.is_file()]
+    for source in sources:
+        try:
+            py_compile.compile(str(source), cfile=str(source.with_suffix(".pyc")),
+                               dfile=source.relative_to(data_dir).as_posix(), doraise=True)
+        except py_compile.PyCompileError as error:
+            raise RuntimeError("Compile Scripts: " + str(error.msg).strip())
+    for source in sources:
+        source.unlink()
+    for cache in [path for path in data_dir.rglob("__pycache__") if path.is_dir()]:
+        shutil.rmtree(str(cache))
+    print("> Compiled scripts:", len(sources))
+
+
 def _deliver(release, destination, targets, data, project, use_cooked, archive_ext):
     with tempfile.TemporaryDirectory(prefix=".rangearmor-stage-", dir=str(release)) as temp:
         stage = Path(temp) / destination.name
@@ -83,6 +103,8 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
             raise RuntimeError('Prepared assets must exist inside the project')
         shutil.copytree(str(asset_source), str(stage / "data"),
                         ignore=shutil.ignore_patterns(*exclusions))
+        if data.get("CompileScripts", False):
+            _compile_scripts(stage / "data")
         (stage / "launcher").mkdir()
         shutil.copy2(str(data["ProjectFile"]), str(stage / "launcher/config.json"))
         delivered_config = stage / 'launcher/config.json'
