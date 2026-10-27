@@ -98,6 +98,10 @@ ARegion *node_has_effects_region(ScrArea *sa)
 	arnew->regiontype = RGN_TYPE_TOOL_PROPS;
 	arnew->alignment = RGN_ALIGN_BOTTOM;
 	/* on by default: every tree shows its ready-made presets */
+	/* created from the space init, after ED_area_initialize already set the region types */
+	if (sa->type) {
+		arnew->type = BKE_regiontype_from_id(sa->type, RGN_TYPE_TOOL_PROPS);
+	}
 	return arnew;
 }
 
