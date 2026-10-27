@@ -1334,6 +1334,16 @@ void uiItemFullO(uiLayout *layout, const char *idname, const char *name, int ico
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (uiItemFullO_ptr) */
 void uiItemFullO_ptr(struct uiLayout *layout, struct wmOperatorType *ot, const char *name, int icon, struct IDProperty *properties, int context, int flag, struct PointerRNA *r_opptr) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* duplicate: real impl now linked (UI_but_operator_ptr_get) */
+struct PointerRNA *UI_but_operator_ptr_get(uiBut *but) RET_NULL
+#endif
+/* Used by the Node Editor preset strip (rna_ui_api.c); UI code is not linked in the player. */
+#ifndef WITH_BLENDER
+uiBlock *uiLayoutGetBlock(uiLayout *layout) RET_NULL
+void UI_block_layout_set_current(uiBlock *block, uiLayout *layout) RET_NONE
+uiBut *uiDefIconButO_ptr(uiBlock *block, int type, struct wmOperatorType *ot, int opcontext, int icon, int x, int y, short width, short height, const char *tip) RET_NULL
+void UI_but_flag_enable(uiBut *but, int flag) RET_NONE
+#endif
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (uiItemFullOMenuHold_ptr) */
 void uiItemFullOMenuHold_ptr( uiLayout *layout, struct wmOperatorType *ot, const char *name, int icon, struct IDProperty *properties, int context, int flag, const char *menu_id,  /* extra menu arg. */ PointerRNA *r_opptr) RET_NONE
 #endif
