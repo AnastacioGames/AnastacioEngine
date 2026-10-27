@@ -133,7 +133,7 @@ Resultados:
 
 Depois do Linux, no Windows: `git pull` (traz `ef7ba789`, `6e82c8ab`, `9d966d1e`), `ninja install`, recompilar o runtime Web (ou copiar o do Linux) para `build-web-release/bin`, rodar de novo
 `stage_release_web.py` na pasta e `stage_release_windows.py 0.6.0 --zip-only`; refazer o zip da RangeArmor (`prepare_cooked.py` mudou em `9d966d1e`) e o que mais
-algo mudar; extrair os zips numa pasta limpa e testar; `SHA256SUMS.txt`, README e site.
+mudar; extrair os zips numa pasta limpa e testar; `SHA256SUMS.txt`, README e site.
 
 ## 0.5.4
 
