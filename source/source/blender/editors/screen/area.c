@@ -1922,6 +1922,7 @@ static void ui_area_type_menu_item(uiLayout *layout, ScrArea *sa, const EditorTy
 static void ui_area_type_menu_column(uiLayout *layout, ScrArea *sa, const char *title, const EditorTypeItem *items)
 {
 	uiItemL(layout, title, ICON_NONE);
+	uiItemS_type(layout, 1.0f, false);
 	for (int i = 0; items[i].label != NULL; i++) {
 		ui_area_type_menu_item(layout, sa, &items[i]);
 	}
@@ -1942,6 +1943,8 @@ static void ui_area_type_menu_main(bContext *C, uiLayout *layout, void *arg1)
 	uiLayout *row = uiLayoutRow(layout, false);
 
 	UI_block_flag_enable(uiLayoutGetBlock(layout), UI_BLOCK_DELAY_MOUSEOUT_QUIT);
+	/* The switch button is a plain menu button (not a pulldown), which would open upwards by default. */
+	UI_block_direction_set(uiLayoutGetBlock(layout), UI_DIR_DOWN);
 
 	ui_area_type_menu_column(uiLayoutColumn(row, false), sa, "General", general_editors);
 	ui_area_type_menu_column(uiLayoutColumn(row, false), sa, "Animation", animation_editors);
@@ -1985,15 +1988,18 @@ int ED_area_header_switchbutton(const bContext *C, uiBlock *block, int yco)
 	/* Keep this as a direct menu button, like the File button in the header.
 	 * Creating a second layout inside the absolute header block leaves the item
 	 * outside the header's resolved bounds on Blender 2.79. */
-	uiDefIconMenuBut(block,
-	                 ui_area_type_menu_main,
-	                 sa,
-	                 ui_area_type_icon(sa),
-	                 xco,
-	                 yco,
-	                 1.6 * U.widget_unit,
-	                 U.widget_unit,
-	                 TIP_("Change editor type"));
+	uiBut *but = uiDefIconMenuBut(block,
+	                              ui_area_type_menu_main,
+	                              sa,
+	                              ui_area_type_icon(sa),
+	                              xco,
+	                              yco,
+	                              1.6 * U.widget_unit,
+	                              U.widget_unit,
+	                              TIP_("Change editor type"));
+	/* Like Blender 5: a menu button (icon + arrow) instead of a pulldown, so hovering
+	 * View/Add in the header no longer slides to those menus and closes this one. */
+	UI_but_type_set_menu_from_pulldown(but);
 
 	return xco + 1.7 * U.widget_unit;
 }

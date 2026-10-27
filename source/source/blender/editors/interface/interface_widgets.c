@@ -4198,6 +4198,8 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 					/* we could use a flag for this, but for now just check size,
 					 * add updown arrows if there is room. */
 					if ((!but->str[0] && but->icon && (BLI_rcti_size_x(rect) < BLI_rcti_size_y(rect) + 2)) ||
+					    /* icon-only menu from a create func (editor type switch), Blender 5 style */
+					    (but->type == UI_BTYPE_MENU && !but->str[0] && but->icon && but->menu_create_func && !but->rnaprop) ||
 					    /* disable for brushes also */
 					    (but->flag & UI_BUT_ICON_PREVIEW))
 					{
