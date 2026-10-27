@@ -8,14 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
-## 2026-10-27 - Faixa de efeitos no Compositing (estilo Blender 5)
+## 2026-10-27 - Faixa de efeitos e presets no Node Editor (estilo Blender 5)
 
-- Node Editor ganha uma faixa embaixo (região TOOL_PROPS, aberta por padrão no Compositing, View > Effects Shelf) com miniaturas de efeitos prontos e abas All/Camera & Lens/Color/Glow/Style.
-- 11 efeitos, todos com nós que rodam no jogo: Vignette, Chromatic Aberration, Fisheye, Sepia, Split Toning, Tune Image, Bloom, Sun Beams, Pixel Art, Outline, Motion Blur. Entram como nós soltos dentro de um Frame (o jogo não lê grupos), entre a imagem e o Composite/Viewer.
-- Miniaturas em `release/scripts/startup/node_effects/<id>.png` (256x256, prints do jogo); trocar o PNG troca a miniatura. Efeito novo: função em `bl_operators/node_effects.py` + linha em `EFFECTS`.
+- Node Editor ganha uma faixa embaixo (região TOOL_PROPS, aberta por padrão em todas as árvores) com miniaturas de itens prontos e abas por categoria. Liga/desliga pelo botão com ícone ao lado do Auto Arrange ou em View > Effects Shelf.
+- **Compositing:** 12 efeitos que rodam no jogo (Vignette, Chromatic Aberration, Fisheye, Film Grain, Sepia, Split Toning, Tune Image, Bloom, Sun Beams, Pixel Art, Outline, Motion Blur). Abas All/Camera & Lens/Color/Glow/Style. Entram como nós soltos num Frame (o jogo não lê grupos), entre a imagem e o Composite/Viewer.
+- **Shader:** os 9 presets de `node.shader_preset_add` (abas Stylized/Nature/Surface). **Logic Tree:** as 6 receitas de `node.range_logic_tree_recipe` (Movement/Gameplay). **UI Tree:** templates Menu + Options e HUD (Screens/HUD).
+- Miniaturas em `release/scripts/startup/node_effects/` (256x256; `<id>.png` no Compositing, `shader_`/`logic_`/`ui_<id>.png` nas outras). Geradas por `tools/debug/gerar_miniaturas_efeitos.py` e `gerar_miniaturas_presets.py`; trocar o PNG troca a miniatura. Novo item: entrada em `EFFECTS` ou em `_shelf_items`/`_SHELF_CATEGORY` (`bl_operators/node_effects.py`).
 - `UILayout.operator_preview(operator, icon_value, scale, description)`: botão de prévia grande para operador.
-- Film Grain ficou de fora: falta um nó de ruído no compositor do jogo.
-
+- Abas de categoria do Node Editor (Input, Output, Color...) abrem ao passar o mouse (`UI_BLOCK_POPOVER_HOVER_OPEN`).
+- Correção: trocar uma área para o Node Editor fechava o programa (região da faixa criada sem tipo no `node_init`), cc551a39.
+- Aprovado com janela e enviado até 5ee15752. Próximo: prévia ao vivo ao passar o mouse na miniatura.
 
 ## 2026-10-27 - Cutscene: espera congela a linha do tempo
 

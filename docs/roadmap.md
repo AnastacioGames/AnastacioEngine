@@ -417,6 +417,9 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   frame) descartada por ora: pesada na CPU; só com caso de uso concreto, de preferência na GPU.
 - **Compositing no jogo**: lotes aceitos com janela (2026-10-27). Texture nodes só como bake; Glare Kernel,
   Defocus pesado e Denoise ficam fora.
+- **Faixa de efeitos/presets no Node Editor**: feita em todas as árvores (Compositing, Shader, Logic, UI),
+  com abas e miniaturas; aprovada e enviada 2026-10-27. Falta: prévia ao vivo ao passar o mouse na
+  miniatura, controles de 1-2 sliders por efeito e "Salvar como preset" (biblioteca do usuário).
 
 ## Performance
 
