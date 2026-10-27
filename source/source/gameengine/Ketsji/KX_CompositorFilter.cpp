@@ -52,11 +52,23 @@
 extern "C" {
 #include "BKE_colortools.h"
 #include "BKE_colorband.h"
+
+extern "C" {
+#include "GPU_extensions.h"
+}
 }
 
 namespace {
 
 const int LUT_SIZE = 33;
+
+/** Radius of the read grid of Dilate/Erode and Bilateral Blur: 9x9 reads, 7x7 on an iGPU
+ * (the mask preset paid 3 ms there at 720p). */
+int GridRadius()
+{
+	static const int radius = GPU_device_is_integrated() ? 3 : 4;
+	return radius;
+}
 
 std::string F(float v)
 {
@@ -1135,7 +1147,7 @@ private:
 			}
 			case CMP_NODE_DILATEERODE: {
 				// DilateErode{Step,Distance,Threshold}Operation and the feather blur, over a grid of at most
-				// 9x9 reads: exact up to 4 pixels, spaced past that (thin lines can slip between reads).
+				// 9x9 reads (7x7 on an iGPU): exact up to 4 (3) pixels, spaced past that (thin lines can slip between reads).
 				const int mode = node->custom1;
 				const float dist = (float)node->custom2;
 				const float inset = node->custom3;
@@ -1148,7 +1160,7 @@ private:
 					b << "\treturn " << in(0) << ";\n";
 					break;
 				}
-				const int n = std::min((int)std::ceil(scope), 4);
+				const int n = std::min((int)std::ceil(scope), GridRadius());
 				const float step = scope / (float)n;
 				b << "\tvec2 px = " << F(step) << " / vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n";
 				// clamped to the image, like the search window of the 2.79 (no erosion from the screen edges)
@@ -1198,14 +1210,14 @@ private:
 			}
 			case CMP_NODE_BILATERALBLUR: {
 				// BilateralBlurOperation: average of the pixels around (Sigma Space + Iterations) whose
-				// Determinator color is within Sigma Color of this one. Grid of at most 9x9 reads.
+				// Determinator color is within Sigma Color of this one. Grid of at most 9x9 reads (7x7 on an iGPU).
 				NodeBilateralBlurData *d = (NodeBilateralBlurData *)node->storage;
 				const float space = d ? d->sigma_space + (float)d->iter : 0.0f;
 				if (space < 1.0f) {
 					b << "\treturn " << in(0) << ";\n";
 					break;
 				}
-				const int n = std::min((int)std::ceil(space), 4);
+				const int n = std::min((int)std::ceil(space), GridRadius());
 				b << "\tvec2 px = " << F(space / (float)n) << " / vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n"
 				  << "\tvec3 ref = " << in(1) << ".rgb;\n"
 				  << "\tvec4 sum = vec4(0.0);\n\tfloat count = 0.0;\n"

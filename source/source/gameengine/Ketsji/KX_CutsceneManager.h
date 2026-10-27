@@ -96,7 +96,10 @@ public:
 	 * a step the scene skips (suspended) is not counted (CLK-04).
 	 */
 	DispatchedEvents Advance(double deltaTime);
+	/** Timeline position; it does not move while a wait is active. */
 	double GetTime() const;
+	/** Time played since Start(), waits included; drives camera paths and Wait Time. */
+	double GetPlayTime() const;
 
 	bool IsPlaying() const;
 	int GetActiveSequenceIndex() const;
@@ -105,7 +108,8 @@ public:
 	void RegisterSpawnedObjects(KX_GameObject *primary, KX_GameObject *dependent);
 	SpawnedObjectList TakeSpawnedObjects();
 
-	/* Wait state machine: pause timeline until condition is met */
+	/* Wait state machine: pause timeline until condition is met.
+	 * StartWaitTime() takes a GetPlayTime() deadline. */
 	void StartWaitTime(double untilTime);
 	void StartWaitTrigger(const std::string &triggerName);
 	void StartWaitCameraEnd();
@@ -127,6 +131,7 @@ private:
 	int m_activeSequenceIndex;
 	std::size_t m_nextEventIndex;
 	double m_time;
+	double m_playTime;
 	bool m_isPlaying;
 	SpawnedObjectList m_spawnedObjects;
 

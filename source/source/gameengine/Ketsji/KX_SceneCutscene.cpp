@@ -202,7 +202,7 @@ void KX_Scene::UpdateCutscene(double deltaTime)
 		m_pendingCutsceneEvents.end(), dispatchedEvents.begin(), dispatchedEvents.end());
 
 	if (!m_cutscenePaths.empty()) {
-		UpdateCutscenePaths(m_cutsceneManager->GetTime());
+		UpdateCutscenePaths(m_cutsceneManager->GetPlayTime());
 		if (m_cutscenePaths.empty() &&
 		    m_cutsceneManager->GetWaitType() == KX_CutsceneManager::WAIT_CAMERA_END) {
 			m_cutsceneManager->ClearWait();
@@ -836,7 +836,7 @@ void KX_Scene::DispatchCutsceneEvents()
 
 		case CUTSCENE_EVENT_WAIT_TIME:
 			if (m_cutsceneManager && event->m_paramFloat > 0.0f) {
-				m_cutsceneManager->StartWaitTime(m_cutsceneManager->GetTime() + event->m_paramFloat);
+				m_cutsceneManager->StartWaitTime(m_cutsceneManager->GetPlayTime() + event->m_paramFloat);
 			}
 			break;
 
@@ -866,12 +866,12 @@ void KX_Scene::DispatchCutsceneEvents()
 						break;
 					}
 				}
-				m_cutscenePaths.push_back({event, m_cutsceneManager->GetTime()});
+				m_cutscenePaths.push_back({event, m_cutsceneManager->GetPlayTime()});
 
 				if (event->m_paramInt && event->m_templateObject->GetGameObjectType() == SCA_IObject::OBJ_CAMERA) {
 					SetActiveCamera(static_cast<KX_Camera *>(event->m_templateObject));
 				}
-				UpdateCutscenePaths(m_cutsceneManager->GetTime());
+				UpdateCutscenePaths(m_cutsceneManager->GetPlayTime());
 			}
 			break;
 

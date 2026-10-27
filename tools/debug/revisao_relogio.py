@@ -3,8 +3,8 @@
 Run with Python, then compile the generated .cpp with MSVC (vcvars64 +
 VSLANG=1033), CM_Clock.cpp and KX_CutsceneManager.cpp. This isolates arithmetic;
 it does not instantiate KX_KetsjiEngine or run the game. Invalid float-to-int
-conversions are inspected before conversion, never deliberately executed.
-Exit zero means the documented observations were reproduced, not fixed.
+conversions are guarded by the engine source itself.
+Exit zero means the corrected contract (CLK-01..05) holds.
 """
 import hashlib
 import json
@@ -48,7 +48,7 @@ def main():
 template<class... T> void KX_AnimLog(const char *, T...) {}
 struct Inputs { void ClearInputs() {} void ReleaseMoveEvent() {} };
 struct Messages { void ClearMessages() {} };
-struct Pipeline { int calls = 0; void Update() { ++calls; } };
+struct Pipeline { int calls = 0; void Update(bool = true) { ++calls; } };
 void process_audio_messages(Messages *, void *) {}
 struct ClockProbe {
     CM_Clock m_clock;
@@ -64,6 +64,7 @@ struct ClockProbe {
     void *m_audioManager=nullptr;
     Pipeline pipeline;
     Pipeline *m_simulationPipeline=&pipeline;
+    void clearJoystickEvents() {}
     ClockProbe() { m_clock.SetManualTime(0); }
     METHODS
     int Step() {
@@ -75,14 +76,15 @@ struct ClockProbe {
 static void require(bool ok) { if (!ok) std::exit(1); }
 static bool near(double a, double b) { return std::abs(a-b)<1e-10; }
 int main() {
-    // Do not execute the undefined conversion in Step when the divisor is zero.
+    // CLK-01: zero time scale pauses without dividing by the zero step.
     ClockProbe zero;
     zero.SetTimeScale(0);
     zero.FrameTiming();
-    double quotient=zero.m_simAccumulator/zero.m_framestep;
-    require(!std::isfinite(quotient));
-    std::cout << "pause divisor=" << zero.m_framestep
-              << " quotient_finite=" << std::isfinite(quotient) << '\n';
+    zero.m_clock.SetManualTime(1.0);
+    int zeroSteps=zero.Step();
+    require(zeroSteps==0 && zero.pipeline.calls==0 && zero.m_frameTime==0);
+    std::cout << "pause steps=" << zeroSteps << " updates=" << zero.pipeline.calls << '\n';
+    // CLK-02: every game clock advances by the scaled step.
     for (double scale : {0.5, 1.0, 2.0}) {
         ClockProbe p;
         p.SetTimeScale(scale);
@@ -92,37 +94,60 @@ int main() {
             p.m_clock.SetManualTime(i/64.0);
             integrated+=p.Step()*p.m_physicsTime;
         }
-        require(p.pipeline.calls==64 && near(p.m_frameTime,1) && near(integrated,scale));
+        require(p.pipeline.calls==64 && near(p.m_frameTime,scale) && near(p.m_animationsTime,scale) &&
+                near(integrated,scale));
         std::cout << "scale=" << scale << " updates=" << p.pipeline.calls
                   << " clock=" << p.m_frameTime << " integrated_dt=" << integrated << '\n';
     }
+    // CLK-03: a negative cap is raised to one step.
     ClockProbe negative;
     negative.SetMaxLogicFrame(-1);
     negative.FrameTiming();
     negative.m_clock.SetManualTime(1.0/64);
     int steps=negative.Step();
-    require(steps==-1 && negative.pipeline.calls==0 && negative.m_simAccumulator<0);
-    std::cout << "negative_cap steps=" << steps << " updates=" << negative.pipeline.calls
-              << " accumulator=" << negative.m_simAccumulator << '\n';
-    // The cast occurs before the cap in the source; inspect range without casting.
+    require(steps==1 && negative.pipeline.calls==1);
+    std::cout << "negative_cap steps=" << steps << '\n';
+    // A huge gap is capped before any conversion.
     ClockProbe gap;
     gap.FrameTiming();
-    double owed=1e8/gap.m_framestep;
-    require(owed>std::numeric_limits<int>::max());
-    std::cout << "large_gap owed=" << owed << " exceeds_int=1\n";
-    // Use the real manager, but drive it as the pipeline does: global logic time,
-    // no Update during suspension, then global time again when resuming.
-    KX_CutsceneManager::Sequence seq{};
+    gap.m_clock.SetManualTime(1e8);
+    steps=gap.Step();
+    require(steps>=1 && steps<=gap.m_maxLogicFrame);
+    std::cout << "large_gap steps=" << steps << '\n';
+    // CLK-04: the cutscene counts only the steps it is given, from zero at Start().
     KX_CutsceneManager::Event event{};
     event.m_time=2;
-    event.m_type=0;
+    KX_CutsceneManager::Sequence seq{};
     seq.m_events.push_back(event);
     KX_CutsceneManager cutscene({seq});
-    require(cutscene.Start(0) && cutscene.Update(1).empty());
-    auto events=cutscene.Update(3);
-    require(events.size()==1);
-    std::cout << "cutscene_resume before=1 after=3 crossed_events=" << events.size() << '\n';
-    // Exact suspension bookkeeping expressions; scene/action objects are not instantiated.
+    require(cutscene.Start(0) && cutscene.Advance(1).empty());
+    // Suspension: no Advance() calls; the next step is still before the event.
+    require(cutscene.Advance(0.5).empty() && cutscene.Advance(0.5).size()==1);
+    std::cout << "cutscene_resume crossed_at=" << cutscene.GetTime() << '\n';
+    // A wait freezes the timeline: events after it keep their spacing.
+    KX_CutsceneManager::Sequence waits{};
+    KX_CutsceneManager::Event wait{};
+    wait.m_type=15;  // WAIT_TRIGGER
+    KX_CutsceneManager::Event a{}, b{};
+    a.m_time=1;
+    b.m_time=2;
+    waits.m_events={wait, a, b};
+    KX_CutsceneManager trigger({waits});
+    require(trigger.Start(0) && trigger.Advance(0.1).size()==1);
+    trigger.StartWaitTrigger("go");
+    require(trigger.Advance(10).empty() && trigger.ReleaseTrigger("go"));
+    require(trigger.Advance(1).size()==1 && trigger.Advance(1).size()==1);
+    std::cout << "wait_trigger events_spaced=1 timeline=" << trigger.GetTime()
+              << " played=" << trigger.GetPlayTime() << '\n';
+    waits.m_events[0].m_type=14;  // WAIT_TIME
+    KX_CutsceneManager timed({waits});
+    require(timed.Start(0) && timed.Advance(0.5).size()==1);
+    timed.StartWaitTime(timed.GetPlayTime()+2);
+    // Deadline at played=2.5; only the 0.5 s past it moves the timeline, reaching A at 1.0.
+    require(timed.Advance(1.5).empty() && timed.Advance(1).size()==1 && timed.GetTime()==1.0);
+    require(timed.Advance(0.5).empty() && timed.Advance(0.5).size()==1);
+    std::cout << "wait_time timeline=" << timed.GetTime() << " played=" << timed.GetPlayTime() << '\n';
+    // Suspension bookkeeping: the action clock does not move across a suspension.
     for (double scale : {0.5,1.0,2.0}) {
         ClockProbe p;
         p.SetTimeScale(scale);
@@ -133,7 +158,7 @@ int main() {
             suspended+=p.m_framestep;
         }
         double actionTime=p.m_animationsTime-suspended;
-        require(near(actionTime,1-scale));
+        require(near(actionTime,0));
         std::cout << "suspension scale=" << scale << " action_clock_delta=" << actionTime << '\n';
     }
 }

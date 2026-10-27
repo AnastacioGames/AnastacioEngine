@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-27 - Cutscene: espera congela a linha do tempo
+
+- Wait Trigger, Wait Time e Wait Camera End param a linha do tempo da cutscene; os eventos seguintes mantêm o espaçamento em vez de dispararem juntos ao fim da espera.
+- Novo `KX_CutsceneManager::GetPlayTime()` (tempo tocado, com esperas) para caminhos de câmera e prazo do Wait Time.
+- `tools/debug/revisao_relogio.py` convertido para conferir o contrato corrigido do relógio (CLK-01 a 05).
+
 ## 2026-10-27 - Export: Compile Scripts funciona e o .range aberto sai do pacote
 
 - **Compile Scripts:** o `build_release.py` ignorava a chave, que só o antigo `build_data.py` (data.dat) lia. Agora a cópia da entrega troca cada .py de `data/` por um .pyc ao lado, compilado com o Python 3.11 do pacote. O painel Export (RangeArmor) da engine tem a caixa nova. Um erro de sintaxe para o export.
@@ -31,6 +37,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Z Combine sem o anti-aliasing da máscara (borda dura).
 - Presets `nos_dblur`, `nos_cor2`, `nos_tonemap_r`, `nos_mascara` e `nos_zcombine` em `medir_compositing_jogo.py`. Na RX 6800M a 720p, sem trava, todos ficam entre 906 e 947 fps (base 931).
 - Revisão (/code-review): a chave automática do Photoreceptor ficava NaN quando a média passava do máximo amostrado (agora limitada a 0..1); o log no alpha do cache vai codificado em 0..1 (log/24 + 0,5), então um alvo de 8 bits sem float não corta mais a parte negativa; o Determinator do Bilateral Blur também ganha textura intermediária quando é uma cadeia; o Dilate/Erode lê presa à imagem, sem erodir a partir das bordas da tela. Medido de novo: 893 a 914 fps (base 915).
+- iGPU: Dilate/Erode e Bilateral Blur usam grade de até 7x7 leituras (9x9 na placa dedicada); o preset nos_mascara foi de +3,0 para +1,9 ms a 720p, mesma imagem. Medidos também nos_filtro (+0,66 ms) e nos_tonemap_r (+1,1 ms, quase tudo no passo com mipmap, igual ao Glare).
 
 ## 2026-10-26 - Frente 2: fila QAddFront e m_modified na réplica (SG-04, SG-05)
 

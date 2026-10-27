@@ -19,6 +19,7 @@ KX_CutsceneManager::KX_CutsceneManager(Sequences sequences)
 	  m_activeSequenceIndex(-1),
 	  m_nextEventIndex(0),
 	  m_time(0.0),
+	  m_playTime(0.0),
 	  m_isPlaying(false),
 	  m_waitType(WAIT_NONE),
 	  m_waitUntilTime(0.0)
@@ -47,6 +48,7 @@ bool KX_CutsceneManager::Start(int sequenceIndex)
 	});
 	m_nextEventIndex = 0;
 	m_time = 0.0;
+	m_playTime = 0.0;
 	ClearWait();
 	m_latchedTriggers.clear();
 	m_isPlaying = true;
@@ -59,6 +61,7 @@ void KX_CutsceneManager::Stop()
 	m_eventOrder.clear();
 	m_nextEventIndex = 0;
 	m_time = 0.0;
+	m_playTime = 0.0;
 	ClearWait();
 	m_latchedTriggers.clear();
 	m_isPlaying = false;
@@ -89,14 +92,9 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Update(double time)
 		return dispatchedEvents;
 	}
 
-	/* Pause timeline while waiting for condition */
+	/* The timeline is frozen while a wait is active; Advance() ends Wait Time. */
 	if (m_waitType != WAIT_NONE) {
-		if (m_waitType == WAIT_TIME && time >= m_waitUntilTime) {
-			m_waitType = WAIT_NONE;
-		} else {
-			m_time = time;
-			return dispatchedEvents;
-		}
+		return dispatchedEvents;
 	}
 
 	while (m_nextEventIndex < m_eventOrder.size() &&
@@ -119,7 +117,25 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Advance(double deltaTim
 	if (!m_isPlaying || deltaTime <= 0.0) {
 		return DispatchedEvents();
 	}
-	return Update(m_time + deltaTime);
+	m_playTime += deltaTime;
+
+	/* A wait freezes the timeline, so events after it keep their spacing instead of
+	 * firing together when the wait ends. Only the time left past a Wait Time's
+	 * deadline moves the timeline in this step. */
+	double timelineDelta = deltaTime;
+	if (m_waitType == WAIT_TIME && m_playTime >= m_waitUntilTime) {
+		timelineDelta = m_playTime - m_waitUntilTime;
+		ClearWait();
+	}
+	else if (m_waitType != WAIT_NONE) {
+		return DispatchedEvents();
+	}
+	return Update(m_time + timelineDelta);
+}
+
+double KX_CutsceneManager::GetPlayTime() const
+{
+	return m_playTime;
 }
 
 double KX_CutsceneManager::GetTime() const

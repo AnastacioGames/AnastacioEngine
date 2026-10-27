@@ -627,4 +627,14 @@ Decisão do usuário (2026-10-27): a escala de tempo vale para todos os relógio
 - Cutscene com evento em 1 s: `play_cutscene` no frame 30, A suspensa de 45 a 165, spawn no frame 210, ou seja, 60 frames de cena ativa (1,0 s). Antes, disparava na retomada.
 - Física (8), colisão (5) e vertex parent deram resultados idênticos aos anteriores, e a animação passou nos 4 casos.
 
-`tools/debug/revisao_relogio.py` continua reproduzindo o estado antigo, sem conversão.
+`tools/debug/revisao_relogio.py` foi convertido e agora confere o contrato corrigido (ver abaixo).
+
+## Continuação: espera da cutscene congela a linha do tempo
+
+Achado da revisão do 3fde104b, já existente antes dele: durante Wait Trigger e Wait Camera End o tempo da sequência seguia andando com os eventos retidos, e ao fim da espera todos os eventos vencidos disparavam no mesmo frame.
+
+`KX_CutsceneManager` separa agora dois relógios: `GetTime()` é a posição na linha do tempo e fica parada durante qualquer espera; `GetPlayTime()` conta todo o tempo tocado desde o `Start()` e move os caminhos de câmera e o prazo do Wait Time. Ao vencer o prazo do Wait Time, só a sobra do passo avança a linha do tempo. Os eventos depois de uma espera mantêm o espaçamento de autoria, o que atrasa cutscenes antigas que contavam com o disparo em lote.
+
+Validação: `tools/debug/revisao_relogio.py` gera o diagnóstico, compilado com `CM_Clock.cpp` e `KX_CutsceneManager.cpp` reais. Passaram pausa por escala zero, relógios em 0,5/1/2, limite negativo, lacuna grande, suspensão da cutscene, Wait Trigger (eventos a 1 s de intervalo depois de 10 s de espera), Wait Time e o relógio da ação sem salto na suspensão. A biblioteca `ge_ketsji` compilou; o link dos executáveis ficou bloqueado pelo editor aberto, então o teste `--server` com cena fica para depois.
+
+Estado da frente: os 15 achados e este estão corrigidos; resta a conferência com janela.
