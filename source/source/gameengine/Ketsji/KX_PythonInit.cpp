@@ -560,6 +560,10 @@ static PyObject *gPySetMaxLogicFrame(PyObject *, PyObject *args)
 	if (!PyArg_ParseTuple(args, "i:setMaxLogicFrame", &frame)) {
 		return nullptr;
 	}
+	if (frame < 1) {
+		PyErr_SetString(PyExc_ValueError, "setMaxLogicFrame(frame): frame must be at least 1");
+		return nullptr;
+	}
 
 	KX_GetActiveEngine()->SetMaxLogicFrame(frame);
 	Py_RETURN_NONE;

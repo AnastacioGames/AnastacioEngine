@@ -832,7 +832,12 @@ bool KX_KetsjiEngine::NextFrame()
 		m_accumulatorPreviousRealTime = now;
 		m_simAccumulator += realDelta * m_timescale;
 
-		steps = std::min((int)(m_simAccumulator / m_framestep), m_maxLogicFrame);
+		// Time scale 0 pauses: no step is owed. Limit in double before the cast, so a huge
+		// backlog never converts an out-of-range quotient to int (CLK-01).
+		steps = 0;
+		if (m_framestep > 0.0) {
+			steps = (int)std::min(std::floor(m_simAccumulator / m_framestep), (double)m_maxLogicFrame);
+		}
 		for (int i = 0; i < steps; ++i) {
 			if (i > 0) {
 				// The previous step consumed this frame's edge events (JUSTACTIVATED etc.);
@@ -1389,7 +1394,8 @@ int KX_KetsjiEngine::GetMaxLogicFrame()
 
 void KX_KetsjiEngine::SetMaxLogicFrame(int frame)
 {
-	m_maxLogicFrame = frame;
+	// At least one step, otherwise the simulation stops and the backlog goes negative (CLK-03).
+	m_maxLogicFrame = std::max(frame, 1);
 }
 
 bool KX_KetsjiEngine::GetUseFixedTimestep() const
