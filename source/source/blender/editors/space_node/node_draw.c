@@ -1525,13 +1525,9 @@ static void draw_tree_path(const bContext *C, ARegion *ar, SpaceNode *snode)
 		                  label, (int)x, (int)(1.5f * UI_UNIT_Y - 0.3f * UI_UNIT_Y), w, h,
 		                  TIP_("Arrange the nodes in columns, following the links"));
 		/* e o botão da faixa de efeitos (o mesmo do menu View) */
-		{
-			const char *fx_label = IFACE_("Effects Shelf");
-			const int fx_w = (int)(BLF_width_default(fx_label, BLF_DRAW_STR_DUMMY_MAX) + 2.5f * UI_UNIT_X);
-			uiDefIconTextButO(block, UI_BTYPE_BUT, "NODE_OT_effects_shelf", WM_OP_INVOKE_DEFAULT, ICON_IMAGE_COL,
-			                  fx_label, (int)x + w + (int)(0.4f * UI_UNIT_X), (int)(1.5f * UI_UNIT_Y - 0.3f * UI_UNIT_Y),
-			                  fx_w, h, TIP_("Show or hide the strip of ready-made effects"));
-		}
+		uiDefIconButO(block, UI_BTYPE_BUT, "NODE_OT_effects_shelf", WM_OP_INVOKE_DEFAULT, ICON_IMAGE_COL,
+		              (int)x + w + (int)(0.4f * UI_UNIT_X), (int)(1.5f * UI_UNIT_Y - 0.3f * UI_UNIT_Y), UI_UNIT_X + UI_UNIT_X / 2, h,
+		              TIP_("Effects Shelf: show or hide the strip of ready-made effects"));
 		UI_block_end(C, block);
 		UI_block_draw(C, block);
 	}
