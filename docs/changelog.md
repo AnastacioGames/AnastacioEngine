@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 2: movimento global com pai escalado e movimento zero (SG-03, SG-06)
+
+`SG_Node::RelativeTranslate` global desfazia só a rotação do pai; com pai em escala 2 um `applyMovement((1,0,0))` andava 2. Agora divide também pela escala do pai (eixo zero fica sem divisão), e o vertex parent, que herda só a posição, recebe o deslocamento direto. `RelativeTranslate`, `RelativeRotate` e `RelativeScale` com valor neutro (zero, identidade, um) não marcam mais o nó como modificado. Teste serial: `world_delta=1`, 0 callbacks em 50 movimentos zero; pai girado com escala não uniforme e negativa e vertex parent deslocam exatamente o pedido. Física, colisão, vertex parent e animação no player passaram (o player de animação falhou uma vez logo após o link e passou em 4 repetições; o teste depende de atrasos de 90 ms).
+
 ## 2026-10-26 - Frente 2: escala zero não gera orientação inválida (SG-02)
 
 As relações normal, slow parent e bone parent extraíam a rotação dividindo por cada eixo da escala mundial; com um eixo zerado a orientação do filho virava NaN/inf. A função `KX_RotationWithoutScale` (KX_NodeRelationships.h) mantém a última orientação do filho quando a escala tem eixo zero ou o resultado não é finito; posição e escala seguem calculadas. Teste serial: `orientation_finite=true`. Regressões de física, colisão e as 4 cenas de animação no player passaram.

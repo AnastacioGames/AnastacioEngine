@@ -598,4 +598,8 @@ Estado: INP-01/02/03 e ANI-01 corrigidos nos limites descritos; 11 achados SG/CL
 
 `KX_RotationWithoutScale` substitui a divisão por eixo nas relações normal, slow parent e bone parent. Com um eixo de escala zero (ou resultado não finito), o filho mantém a última orientação; posição e escala continuam vindo da transformação. Escalas não nulas seguem exatamente o cálculo antigo. Teste serial: `orientation_finite=true`. Restam 9 achados (SG-03..06, CLK-01..05).
 
-Próxima peça: deslocamento global com pai escalado (SG-03).
+## Continuação: movimento global e movimento zero (SG-03, SG-06)
+
+`RelativeTranslate` global agora aplica a rotação inversa e divide pela escala mundial do pai por eixo (eixo zero não divide). Relação vertex recebe o deslocamento sem conversão, porque herda só a posição. As três operações relativas retornam cedo com valor neutro exato (zero, identidade, um), sem `SetModified`. Teste serial: `world_delta=1` e `zero_movement_callbacks=0`; teste extra com pai girado 0,7 rad em escala (2; 0,5; 3), pai em escala (-2,1,1) e vertex parent: erro < 3e-7. Restam 7 achados (SG-04, SG-05, CLK-01..05).
+
+Próxima peça: fila `QAddFront` (SG-04) e `m_modified` na cópia de nó (SG-05).

@@ -88,7 +88,7 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   zero/um/quatro passos e modo variável passaram, incluindo Evaluate dos sensores e duas cenas
   simuladas com hardware/pipeline substituídos; editor/player compilados e smoke em segundo plano
   passaram após a liberação dos testes do Claude.
-- SG-01 e SG-02 corrigidos (vertex parent avisa os descendentes; escala zero mantém a última orientação). Próxima peça: deslocamento global (SG-03), seguida das demais correções SG/CLK por partes.
+- SG-01, SG-02, SG-03 e SG-06 corrigidos (vertex parent avisa os descendentes; escala zero mantém a última orientação; movimento global respeita a escala do pai; movimento zero não atualiza). Próxima peça: SG-04/SG-05, seguida das demais correções SG/CLK por partes.
   Definir fronteira de aplicação das taxas alteradas por callback antes das correções de relógio.
   INP-01 corrigido com regressão dos 15 botões e rebuild editor/player; teste físico,
   concorrência e FPS pendentes.

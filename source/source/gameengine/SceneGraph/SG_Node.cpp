@@ -365,12 +365,28 @@ bool SG_Node::UpdateSpatialData(const SG_Node *parent, bool& parentUpdated)
  */
 void SG_Node::RelativeTranslate(const mt::vec3& trans, const SG_Node *parent, bool local)
 {
+	// A zero move changes nothing; skip the update and its callbacks.
+	if (trans == mt::zero3) {
+		return;
+	}
 	if (local) {
 		m_localPosition += m_localRotation * trans;
 	}
 	else {
-		if (parent) {
-			m_localPosition += trans * parent->GetWorldOrientation();
+		if (parent && m_parent_relation && m_parent_relation->IsVertexRelation()) {
+			// Vertex parents inherit only the parent position: world and local deltas match.
+			m_localPosition += trans;
+		}
+		else if (parent) {
+			// Undo the parent rotation and scale so the world displacement is exactly trans.
+			mt::vec3 delta = trans * parent->GetWorldOrientation();
+			const mt::vec3& scale = parent->GetWorldScaling();
+			for (int i = 0; i < 3; ++i) {
+				if (scale[i] != 0.0f) {
+					delta[i] /= scale[i];
+				}
+			}
+			m_localPosition += delta;
 		}
 		else {
 			m_localPosition += trans;
@@ -416,6 +432,9 @@ void SG_Node::SetWorldPosition(const mt::vec3& trans)
  */
 void SG_Node::RelativeRotate(const mt::mat3& rot, bool local)
 {
+	if (SG_SameMatrix(rot, mt::mat3::Identity())) {
+		return;
+	}
 	m_localRotation = m_localRotation * (
 		local ?
 		rot
@@ -440,6 +459,9 @@ void SG_Node::SetWorldOrientation(const mt::mat3& rot)
 
 void SG_Node::RelativeScale(const mt::vec3& scale)
 {
+	if (scale == mt::one3) {
+		return;
+	}
 	m_localScaling = m_localScaling * scale;
 	SetModified();
 }
