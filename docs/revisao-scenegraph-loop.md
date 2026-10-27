@@ -604,6 +604,6 @@ Estado: INP-01/02/03 e ANI-01 corrigidos nos limites descritos; 11 achados SG/CL
 
 ## Continuação: fila e réplica (SG-04, SG-05)
 
-`QAddFront` usa `QEmpty()` como `QAddBack`, e o comentário diz "front". O construtor de cópia inicializa `m_modified(true)`: a réplica força a primeira atualização, igual ao construtor comum. O harness serial agora valida as correções e sai 0 só com SG-01/02/03/04/06 corrigidos. Rodado com as mudanças: todos os valores esperados. **Pendente para retomar:** build completo `RangeEngine RangeRuntime` e as regressões em `--server` (física, colisão, vertex parent, animação no player). Restam CLK-01..05.
+`QAddFront` usa `QEmpty()` como `QAddBack`, e o comentário diz "front". O construtor de cópia inicializa `m_modified(true)`: a réplica força a primeira atualização, igual ao construtor comum. O harness serial agora valida as correções e sai 0 só com SG-01/02/03/04/06 corrigidos. Rodado com as mudanças: todos os valores esperados. Validado em 2026-10-27: build completo `RangeEngine RangeRuntime` OK; regressões em `--server` com o binário novo — física (8 cenas) e colisão (5) com resultados idênticos aos anteriores, vertex parent (neto a 2 do filho) e animação (4 casos, `ANI_PLAYER_ALL_CASES_PASSED`). Restam CLK-01..05.
 
 Próxima peça: validar SG-04/05 no build, depois relógio (CLK-01).
