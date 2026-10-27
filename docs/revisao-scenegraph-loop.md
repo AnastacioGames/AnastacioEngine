@@ -637,4 +637,10 @@ Achado da revisão do 3fde104b, já existente antes dele: durante Wait Trigger e
 
 Validação: `tools/debug/revisao_relogio.py` gera o diagnóstico, compilado com `CM_Clock.cpp` e `KX_CutsceneManager.cpp` reais. Passaram pausa por escala zero, relógios em 0,5/1/2, limite negativo, lacuna grande, suspensão da cutscene, Wait Trigger (eventos a 1 s de intervalo depois de 10 s de espera), Wait Time e o relógio da ação sem salto na suspensão. A biblioteca `ge_ketsji` compilou; o link dos executáveis ficou bloqueado pelo editor aberto, então o teste `--server` com cena fica para depois.
 
-Estado da frente: os 15 achados e este estão corrigidos; resta a conferência com janela.
+Validado em `--server` em 2026-10-27 com `RangeEngine RangeRuntime` religados. Foram geradas duas cenas com Spawn Object em 1 s e 2 s, com taxa de lógica de 64 Hz:
+- Wait Trigger em 0 s, liberado no tick 320: os objetos surgiram nos ticks 383 e 447, ou seja, 1 s depois da liberação e 1 s entre eles.
+- Wait Time de 2 s em 0,5 s: os objetos surgiram nos ticks 192 e 256, ou seja, em 3 s e 4 s de tempo tocado.
+
+As regressões de animação ANI-01 deram de novo `ANI_PLAYER_ALL_CASES_PASSED`.
+
+Estado da frente: os 15 achados e este estão corrigidos. Falta a conferência com janela: joystick com controle real, `setTimeScale` no RolimaRacer e o render da recuperação de passos atrasados numa cena parada.
