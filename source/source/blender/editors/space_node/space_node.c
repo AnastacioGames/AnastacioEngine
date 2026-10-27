@@ -694,10 +694,12 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 	}
 
 	const float dpi_fac = UI_DPI_FAC;
-	const int cell = round_fl_to_int(UI_UNIT_Y * 1.5f);
+	const int cell = round_fl_to_int(UI_UNIT_Y * 1.3f);
 	const int pad = round_fl_to_int(4.0f * dpi_fac);
-	const float icon_aspect = 1.0f / (dpi_fac * 1.35f);
+	/* native icon size: scaled bitmap icons came out blurry */
+	const float icon_aspect = 1.0f / dpi_fac;
 	const int icon_size = round_fl_to_int(ICON_DEFAULT_HEIGHT / icon_aspect);
+	const int inset = round_fl_to_int(2.0f * dpi_fac);
 	rcti rect;
 	ED_region_visible_rect(ar, &rect);
 
@@ -707,10 +709,13 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 	const int ytop = rect.ymax - UI_UNIT_Y / 2;
 	int x = xstart, top = ytop, xmax_used = xstart;
 	const uiFontStyle *fstyle = &UI_style_get()->widget;
-	struct { int icon; float x, y; const char *name; } icons[ARRAY_SIZE(categories)];
+	struct { int icon; int x, y; const char *name; } icons[ARRAY_SIZE(categories)];
 	int icons_len = 0;
+	rcti tabs[ARRAY_SIZE(categories)];
+	int tabs_len = 0;
 
-	uiBlock *block = UI_block_begin(C, ar, "node_tabs_bar", UI_EMBOSS);
+	/* flat items with a hover highlight (Blender 5 header look), no box per tab */
+	uiBlock *block = UI_block_begin(C, ar, "node_tabs_bar", UI_EMBOSS_PULLDOWN);
 
 	/* icon + name: the icons alone were hard to tell apart */
 	for (int i = 0; i < categories_len; i++) {
@@ -724,12 +729,15 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 			x = xstart;
 			top -= cell;
 		}
-		uiDefPopoverCategoryBut(block, categories[i], (icon != ICON_NONE) ? "" : name,
-		                        x, top - cell, w, cell, name);
+		uiBut *but = uiDefPopoverCategoryBut(block, categories[i], (icon != ICON_NONE) ? "" : name,
+		                                     x + inset, top - cell + inset, w - inset * 2, cell - inset * 2, name);
+		/* pulldown emboss adds a submenu arrow to menu buttons */
+		UI_but_flag_disable(but, UI_BUT_ICON_SUBMENU);
+		BLI_rcti_init(&tabs[tabs_len++], x + inset, x + w - inset, top - cell + inset, top - inset);
 		if (icon != ICON_NONE) {
 			icons[icons_len].icon = icon;
-			icons[icons_len].x = x + (cell - icon_size) * 0.5f;
-			icons[icons_len].y = top - cell + (cell - icon_size) * 0.5f;
+			icons[icons_len].x = x + (cell - icon_size) / 2;
+			icons[icons_len].y = top - cell + (cell - icon_size) / 2;
 			icons[icons_len].name = name;
 			icons_len++;
 		}
@@ -754,31 +762,46 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 		if (tint) {
 			interp_v3_v3v3(col, col, tint, 0.18f);
 		}
-		add_v3_fl(col, 0.06f);
+		add_v3_fl(col, 0.04f);
+		const float x1 = (float)(xstart + shift) - 0.5f, x2 = (float)(xmax_used + shift) + 0.5f;
+		const float y1 = (float)(top - cell) - 0.5f, y2 = (float)ytop + 0.5f;
+		const float radius = 0.25f * U.widget_unit;
 		glEnable(GL_BLEND);
 		glColor4f(col[0], col[1], col[2], 1.0f);
 		UI_draw_roundbox_corner_set(UI_CNR_ALL);
-		UI_draw_roundbox_gl_mode(GL_POLYGON, (float)(xstart + shift), (float)(top - cell), (float)(xmax_used + shift),
-		                         (float)ytop, 0.2f * U.widget_unit);
+		UI_draw_roundbox_gl_mode(GL_POLYGON, x1, y1, x2, y2, radius);
+		/* thin light outline, antialiased */
+		glEnable(GL_LINE_SMOOTH);
+		glColor4f(1.0f, 1.0f, 1.0f, 0.10f);
+		UI_draw_roundbox_gl_mode(GL_LINE_LOOP, x1, y1, x2, y2, radius);
+		/* soft rounded tile per tab keeps them apart; hover draws over it */
+		glColor4f(1.0f, 1.0f, 1.0f, 0.06f);
+		for (int i = 0; i < tabs_len; i++) {
+			UI_draw_roundbox_gl_mode(GL_POLYGON, tabs[i].xmin + shift, tabs[i].ymin, tabs[i].xmax + shift,
+			                         tabs[i].ymax, 0.2f * U.widget_unit);
+		}
+		glDisable(GL_LINE_SMOOTH);
 		glDisable(GL_BLEND);
 	}
 	UI_block_draw(C, block);
 
-	/* bigger icons than the buttons would draw */
+	/* icons drawn here so they stay centered in the full cell */
 	glEnable(GL_BLEND);
 	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 	for (int i = 0; i < icons_len; i++) {
-		UI_icon_draw_aspect(icons[i].x, icons[i].y, icons[i].icon, icon_aspect, 1.0f, NULL);
+		UI_icon_draw_aspect((float)icons[i].x, (float)icons[i].y, icons[i].icon, icon_aspect, 1.0f, NULL);
 	}
 	glDisable(GL_BLEND);
 	{
 		bTheme *btheme = UI_GetTheme();
-		glColor3ubv((unsigned char *)btheme->tui.wcol_tool.text);
+		glColor3ubv((unsigned char *)btheme->tui.wcol_menu_item.text);
 		for (int i = 0; i < icons_len; i++) {
 			/* back from the icon corner to the button corner (the rows may wrap) */
-			const float bx = icons[i].x - (cell - icon_size) * 0.5f;
-			const float by = icons[i].y - (cell - icon_size) * 0.5f;
-			UI_fontstyle_draw_simple(fstyle, bx + cell - pad, by + (cell - fstyle->points * UI_DPI_FAC) * 0.5f,
+			const int bx = icons[i].x - (cell - icon_size) / 2;
+			const int by = icons[i].y - (cell - icon_size) / 2;
+			/* whole pixels: fractional text positions looked soft */
+			UI_fontstyle_draw_simple(fstyle, (float)(bx + cell - pad),
+			                         (float)(by + round_fl_to_int((cell - fstyle->points * UI_DPI_FAC) * 0.5f)),
 			                         icons[i].name);
 		}
 	}

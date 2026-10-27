@@ -90,18 +90,26 @@ class MFTPanelPlaykot(bpy.types.Panel):
         layout = self.layout
         mifthTools = context.scene.mifthTools
 
-        layout.operator("mft.render_scene_2x", text="ScaleCrop")
-        layout.operator("mft.cropnoderegion", text="CropNodeRegion")
-        layout.operator("mft.crop_to_viewport", text="CropToViewport")
+        col = layout.column(align=True)
+        col.operator("mft.render_scene_2x", text="Scale Crop")
+        col.operator("mft.cropnoderegion", text="Crop Node Region")
+        col.operator("mft.crop_to_viewport", text="Crop To Viewport")
 
         layout.separator()
         layout.operator("mft.outputcreator", text="Create Output")
-        layout.prop(mifthTools, "outputFolder")
-        row = layout.row()
-        row.prop(mifthTools, "outputSubFolder")
-        row.prop(mifthTools, "doOutputSubFolder", text='')
-        layout.prop(mifthTools, "outputSequence")
-        layout.prop(mifthTools, "outputSequenceSize")
+        # rótulo acima do campo: ao lado, o popover estreito cortava os nomes
+        col = layout.column()
+        col.label(text="Output Folder:")
+        col.prop(mifthTools, "outputFolder", text="")
+        row = col.row()
+        row.label(text="Sub Folder:")
+        row.prop(mifthTools, "doOutputSubFolder", text="Use")
+        sub = col.row()
+        sub.active = mifthTools.doOutputSubFolder
+        sub.prop(mifthTools, "outputSubFolder", text="")
+        col.label(text="Sequence Name:")
+        col.prop(mifthTools, "outputSequence", text="")
+        col.prop(mifthTools, "outputSequenceSize", text="Sequence Size")
 
 
 class MFTSceneRender2X(bpy.types.Operator):

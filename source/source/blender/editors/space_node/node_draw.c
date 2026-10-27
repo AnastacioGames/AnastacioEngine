@@ -1481,19 +1481,8 @@ void node_draw_nodetree(const bContext *C, ARegion *ar, SpaceNode *snode, bNodeT
  * NULL = fundo do tema sem tinta. */
 const float *node_space_tint(const char *tree_idname)
 {
-	static const struct { const char *idname; float col[3]; } tints[] = {
-		{"ShaderNodeTree", {0.30f, 0.55f, 0.95f}},
-		{"CompositorNodeTree", {0.35f, 0.85f, 0.75f}},
-		{"TextureNodeTree", {0.85f, 0.45f, 0.45f}},
-		{"RangeLogicTree", {1.00f, 0.62f, 0.15f}},
-		{"RangeUITree", {0.70f, 0.40f, 1.00f}},
-	};
-	for (int i = 0; i < ARRAY_SIZE(tints); i++) {
-		if (STREQ(tints[i].idname, tree_idname)) {
-			return tints[i].col;
-		}
-	}
-	return NULL;
+	/* a tabela fica na interface: os botões de tipo de árvore do cabeçalho usam a mesma cor */
+	return UI_node_tree_tint(tree_idname);
 }
 
 static void draw_tree_path(const bContext *C, ARegion *ar, SpaceNode *snode)

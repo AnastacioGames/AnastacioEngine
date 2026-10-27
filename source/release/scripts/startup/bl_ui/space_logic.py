@@ -243,11 +243,12 @@ class LOGIC_HT_header(Header):
             LOGIC_MT_editor_menus.draw_collapsible(context, layout)
 
         layout.separator()
-        layout.operator("logic.convert_to_component", text="Convert to Python", icon='SCRIPT')
+        # cada botão na sua própria linha para ficar arredondado (a linha alinhada junta os cantos)
+        layout.row().operator("logic.convert_to_component", text="Convert to Python", icon='SCRIPT')
         layout.separator()
         space = context.space_data
         if space is not None and space.type == 'LOGIC_EDITOR':
-            layout.prop(space, "show_highlight_active", text="Highlight Active", icon='LIGHTPAINT')
+            layout.row().prop(space, "show_highlight_active", text="Highlight Active", icon='LIGHTPAINT')
 
 
 class LOGIC_MT_editor_menus(Menu):

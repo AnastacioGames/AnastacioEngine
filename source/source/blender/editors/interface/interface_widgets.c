@@ -4011,6 +4011,62 @@ static void node_add_draw_dots(const bNodeType *ntype, const rcti *rect, float s
 	glDisable(GL_BLEND);
 }
 
+/* Cor de cada módulo de nós: fundo do Node Editor e botões de tipo de árvore. NULL = sem tinta. */
+const float *UI_node_tree_tint(const char *tree_idname)
+{
+	static const struct { const char *idname; float col[3]; } tints[] = {
+		{"ShaderNodeTree", {0.30f, 0.55f, 0.95f}},
+		{"CompositorNodeTree", {0.35f, 0.85f, 0.75f}},
+		{"TextureNodeTree", {0.85f, 0.45f, 0.45f}},
+		{"RangeLogicTree", {1.00f, 0.62f, 0.15f}},
+		{"RangeUITree", {0.58f, 0.32f, 0.88f}},
+	};
+	if (tree_idname == NULL) {
+		return NULL;
+	}
+	for (int i = 0; i < ARRAY_SIZE(tints); i++) {
+		if (STREQ(tints[i].idname, tree_idname)) {
+			return tints[i].col;
+		}
+	}
+	return NULL;
+}
+
+static void ui_widget_tint_color(char col[4], const float tint[3], float fac)
+{
+	for (int i = 0; i < 3; i++) {
+		col[i] = (char)round_fl_to_int(interpf(tint[i] * 255.0f, (float)(uchar)col[i], fac));
+	}
+}
+
+/* Botões de tipo de árvore no cabeçalho do Node Editor (Shader, Compositing, Logic, UI):
+ * cada um com a cor do seu módulo, forte no ativo e suave nos outros. */
+static void ui_widget_tree_type_tint(const bContext *C, uiBut *but, uiWidgetType *wt)
+{
+	if (but->type != UI_BTYPE_ROW || but->rnaprop == NULL || but->rnapoin.type != &RNA_SpaceNodeEditor ||
+	    !STREQ(RNA_property_identifier(but->rnaprop), "tree_type"))
+	{
+		return;
+	}
+	const char *idname = NULL;
+	if (!RNA_property_enum_identifier((bContext *)C, &but->rnapoin, but->rnaprop, (int)but->hardmax, &idname)) {
+		return;
+	}
+	const float *tint = UI_node_tree_tint(idname);
+	if (tint == NULL) {
+		return;
+	}
+	const bool is_set = (but->flag & UI_SELECT) != 0;
+	ui_widget_tint_color(wt->wcol.inner, tint, is_set ? 0.70f : 0.28f);
+	if (is_set) {
+		/* texto claro ou escuro conforme a cor forte (o verde-água claro some sob branco) */
+		const uchar *in = (const uchar *)wt->wcol.inner;
+		const float lum = (0.299f * in[0] + 0.587f * in[1] + 0.114f * in[2]) / 255.0f;
+		const char t = (lum > 0.6f) ? (char)20 : (char)255;
+		wt->wcol.text[0] = wt->wcol.text[1] = wt->wcol.text[2] = t;
+	}
+}
+
 void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rcti *rect)
 {
 	bTheme *btheme = UI_GetTheme();
@@ -4284,6 +4340,7 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 			ui_widget_color_disabled(wt);
 
 		wt->state(wt, state, drawflag);
+		ui_widget_tree_type_tint(C, but, wt);
 		if (wt->custom)
 			wt->custom(but, &wt->wcol, rect, state, roundboxalign);
 		else if (wt->draw)
