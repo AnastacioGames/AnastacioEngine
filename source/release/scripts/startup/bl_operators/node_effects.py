@@ -276,6 +276,25 @@ class NODE_OT_effect_add(Operator):
 SHELF_TREES = {'CompositorNodeTree', 'ShaderNodeTree', 'RangeLogicTree', 'RangeUITree'}
 
 
+# category of each preset id, per tree; the tabs of the shelf come from these
+SHELF_TABS = {
+    'ShaderNodeTree': (('ALL', "All", ""), ('STYLE', "Stylized", ""), ('NATURE', "Nature", ""),
+                       ('SURFACE', "Surface", "")),
+    'RangeLogicTree': (('ALL', "All", ""), ('MOVE', "Movement", ""), ('GAME', "Gameplay", "")),
+    'RangeUITree': (('ALL', "All", ""), ('SCREEN', "Screens", ""), ('HUD', "HUD", "")),
+}
+_SHELF_CATEGORY = {
+    'TOON_RIM': 'STYLE', 'TOON_OUTLINE': 'STYLE', 'HOLOGRAM': 'STYLE', 'DISSOLVE': 'STYLE',
+    'FUR': 'NATURE', 'GRASS': 'NATURE', 'WATER_WAVES': 'NATURE', 'WIND_LEAVES': 'NATURE',
+    'TRIPLANAR': 'SURFACE',
+    'WALK': 'MOVE', 'JUMP': 'MOVE', 'PLATFORM': 'MOVE',
+    'COLLECT': 'GAME', 'HEALTH': 'GAME', 'DOOR': 'GAME',
+    'MENU': 'SCREEN', 'HUD': 'HUD',
+}
+_TAB_PROP = {'ShaderNodeTree': "node_shelf_tab_shader", 'RangeLogicTree': "node_shelf_tab_logic",
+             'RangeUITree': "node_shelf_tab_ui"}
+
+
 def _shelf_items(tree_type):
     """(operator, property, value, name, tooltip, preview) of each preset of the tree."""
     if tree_type == 'ShaderNodeTree':
@@ -321,9 +340,14 @@ class NODE_PT_effects_shelf(Panel):
         layout = self.layout
         tree_type = context.space_data.tree_type
         if tree_type != 'CompositorNodeTree':
+            wm = context.window_manager
+            prop = _TAB_PROP[tree_type]
+            layout.row(align=True).prop(wm, prop, expand=True)
+            tab = getattr(wm, prop)
             row = layout.row()
             for item in _shelf_items(tree_type):
-                self._item(row, *item)
+                if tab in {'ALL', _SHELF_CATEGORY.get(item[2])}:
+                    self._item(row, *item)
             return
 
         wm = context.window_manager
@@ -341,6 +365,10 @@ def register_props():
     bpy.types.WindowManager.node_effects_tab = EnumProperty(
         name="Category", items=CATEGORIES, default='ALL',
         description="Kind of effect shown in the shelf")
+    for tree_type, prop in _TAB_PROP.items():
+        setattr(bpy.types.WindowManager, prop, EnumProperty(
+            name="Category", items=SHELF_TABS[tree_type], default='ALL',
+            description="Kind of preset shown in the shelf"))
 
 
 def unregister_props():
@@ -349,6 +377,8 @@ def unregister_props():
         bpy.utils.previews.remove(_previews)
         _previews = None
     del bpy.types.WindowManager.node_effects_tab
+    for prop in _TAB_PROP.values():
+        delattr(bpy.types.WindowManager, prop)
 
 
 classes = (

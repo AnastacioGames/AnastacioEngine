@@ -192,6 +192,27 @@ EFEITOS = {
 }
 
 
+def cartao(img, margem=26, raio=22):
+    """Põe a imagem num cartão de cantos redondos com sombra, sobre o fundo escuro
+    das miniaturas das outras árvores (mesmo estilo da faixa inteira)."""
+    y = np.linspace(0, 1, S, dtype=np.float32)[:, None, None]
+    fundo = np.array([0.24, 0.27, 0.36]) * (1 - y) + np.array([0.10, 0.11, 0.16]) * y
+    lado = S - 2 * margem
+    foto = Image.fromarray((img * 255 + 0.5).astype(np.uint8)).resize((lado, lado), Image.LANCZOS)
+    n = S * SS
+    mascara = Image.new("L", (n, n), 0)
+    ImageDraw.Draw(mascara).rounded_rectangle(
+        [margem * SS, margem * SS, (S - margem) * SS, (S - margem) * SS], raio * SS, fill=255)
+    mascara = mascara.resize((S, S), Image.LANCZOS)
+    sombra = np.asarray(mascara.filter(ImageFilter.GaussianBlur(7))).astype(np.float32) / 255
+    sombra = np.roll(sombra, 5, axis=0)
+    out = fundo * (1 - 0.55 * sombra[..., None])
+    camada = np.zeros((S, S, 3), np.float32)
+    camada[margem:margem + lado, margem:margem + lado] = np.asarray(foto).astype(np.float32) / 255
+    m = (np.asarray(mascara).astype(np.float32) / 255)[..., None]
+    return out * (1 - m) + camada * m
+
+
 def main():
     base = paisagem()
     # a base fica um pouco apagada para o Tune Image mostrar diferença
@@ -199,7 +220,7 @@ def main():
     base = l + (base - l) * 0.85
     os.makedirs(OUT, exist_ok=True)
     for nome, f in EFEITOS.items():
-        img = np.clip(f(base), 0, 1)
+        img = cartao(np.clip(f(base), 0, 1))
         Image.fromarray((img * 255 + 0.5).astype(np.uint8)).save(os.path.join(OUT, nome + ".png"))
         print("ok", nome)
 
