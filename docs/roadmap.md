@@ -415,9 +415,11 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   `OB_MBALL` e a metaball some no Play; a saída é Alt+C → Mesh. Proposta: converter a superfície em malha
   estática ao dar Play, como curva/texto (custo só no carregamento). Versão dinâmica (re-tessellar a cada
   frame) descartada por ora: pesada na CPU; só com caso de uso concreto, de preferência na GPU.
-- **Compositing no jogo — próximas fases**: Texture nodes só como bake. Glare do Blender 5 feito
-  (Bloom, Sun Beams, Blender 5 Style com Smoothness); o tipo Kernel (convolução/FFT) fica fora. Defocus pesado e
-  Denoise ficam fora. O que já roda está no changelog (2026-10-26).
+- **Compositing no jogo — próximas fases**: nós que ainda faltam, em lotes baratos: Directional Blur,
+  Color Correction, Tonemap, Dilate/Erode, Z Combine, Crop, Bilateral Blur; medir o Filter na iGPU.
+  Falta aceite com janela do lote Filter/Transform/Map/HSVA/Sun Beams (presets `nos_*` do
+  `medir_compositing_jogo.py`). Texture nodes só como bake; Glare Kernel, Defocus pesado e Denoise ficam
+  fora. O que já roda está no changelog (2026-10-26).
 
 ## Performance
 
