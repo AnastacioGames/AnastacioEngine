@@ -14,6 +14,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `tools/linux/testar-release.sh <versao>`: extrai o tar numa pasta limpa e confere `ldd`, arquivos que já faltaram, Python 3.11 do pacote, os `tools/test_*.py` e o `AnastacioRuntime --server` numa cena de 60 frames (`tools/linux/release_smoke_scene.py`, conferida no Windows). Roteiro em `docs/releases.md` (0.6.0).
 - Pré-conferência no Windows: `ctest` 15/15, `tools/test_*.py` OK (`test_baked_static_smoke.py` atualizado para o texto em inglês), 80 traduções novas (pt_BR/es/ru) em `translations_more.py` e 6 cenas dos recursos novos rodando 120 frames no `--server`. O `testar-release.sh` foi conferido no WSL com o pacote 0.5.1; libs de som/OpenGL/X11 do sistema viram aviso.
 - Pacotes Windows: `tools/stage_rangearmor_windows.py` monta o zip da RangeArmor a partir do zip anterior (painel recompilado, 26 testes OK, mesma lista de 19 arquivos); `stage_release_windows.py` passou a ignorar `.log`.
+- Linux (2026-10-27): pacote 0.6.0 montado e `testar-release.sh` 23/23 OK (com janela). Três correções no caminho: stubs Web de UI (`UI_but_operator_ptr_get` e mais quatro, usados pela faixa de presets em `rna_ui_api.c`) que quebravam o link do runtime Web; `#include <cstring>` em `KX_CompositorFilter.cpp` (GCC não compilava); `prepare_cooked.py` da RangeArmor apaga o `imgui.ini` que o cook criava em `data/` e ia em todo pacote. Export Web e Universal com Compile Scripts conferidos no Linux.
 
 ## 2026-10-27 - Faixa de efeitos e presets no Node Editor (estilo Blender 5)
 

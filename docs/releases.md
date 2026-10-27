@@ -30,8 +30,8 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.6.0
 
-Estado: **em preparo (2026-10-27).** Windows pré-conferido (build, testes, traduções, cenas novas); falta o
-teste do pacote Linux e montar os zips. Só publicar depois do teste Linux.
+Estado: **em preparo (2026-10-27).** Windows pré-conferido; **Linux testado e pacotes Linux prontos** (ver
+"Teste Linux"). Falta no Windows: recompilar com os 3 commits do Linux, runtime Web novo, zips finais e teste.
 
 ### Notas para o usuário (rascunho)
 
@@ -104,8 +104,35 @@ Pacotes Windows montados (2026-10-27), ainda sem zip final da engine:
 - RangeArmor: novo `tools/stage_rangearmor_windows.py` monta o zip a partir do da versão anterior (launchers,
   Godot de backup) com painel recompilado e `release/` do git.
 
-Depois do Linux, no Windows: copiar o runtime Web novo para `build-web-release/bin`, rodar de novo
-`stage_release_web.py` na pasta e `stage_release_windows.py 0.6.0 --zip-only`; refazer o zip da RangeArmor se
+### Teste Linux (2026-10-27, notebook Linux, clone `~/AnastacioEngine-build050`)
+
+Pacotes em `~/AnastacioEngine-build050/build-linux/dist/` (main `6e82c8ab`; a RangeArmor com `9d966d1e`):
+
+- `AnastacioEngine-0.6.0-linux-x86_64.tar.xz` (281 MB) sha256 `ef2669c5364ecb221e055a9046211cfc6606dcd136304177ff0bc60a3ab3b064`
+- `RangeArmor-0.6.0-linux-x86_64.tar.xz` (7,4 MB) sha256 `282b9dc5331568056136ec1aac944d785cedda7667148e217a0d8bb5d33bf123`
+
+Resultados:
+
+1. Runtime Web (`web-runtime-release-linux`, com `PYTHON_WASM_ROOT_DIR=~/web-python-poc/python-wasm-web`)
+   **não linkava**: a faixa de presets chama UI em `rna_ui_api.c` (`UI_but_operator_ptr_get`, `uiLayoutGetBlock`,
+   `UI_block_layout_set_current`, `uiDefIconButO_ptr`, `UI_but_flag_enable`). Stubs em
+   `bad_level_call_stubs/stubs.c` (`ef7ba789`). O Windows vai bater no mesmo erro se ainda não tiver
+   recompilado o runtime Web.
+2. Build do container **falhou** em `KX_CompositorFilter.cpp` (`strcmp` sem `<cstring>`; o MSVC aceita).
+   Corrigido em `6e82c8ab`. Depois disso, build e pacote OK.
+3. `testar-release.sh 0.6.0`: **23/23 OK** (ldd, arquivos, Python 3.11.9, os 14 `tools/test_*.py`, runtime
+   `--server` 60 frames e `test_material_atlas_modal` com janela, via `DISPLAY`).
+4. Export Web pelo editor do pacote (`validate-web.py --export`) com a cena de Compositing: preflight sem
+   problemas; pacote rodou no Chrome headless (`verify-package.cjs`, rc 0), filtro do Compositing criado.
+5. RangeArmor Linux: painel recompilado em `rust:1.95-bullseye` (GLIBC máx. 2.30), launcher `3cb1ade9…`
+   conferido. Export **Universal com Compile Scripts**: `data/` só com `.rasec`, `.cooked` e `.pyc`;
+   `test_universal_linux.py --run` 7/7 OK e o jogo rodou o módulo a partir do `.pyc` (marcador
+   `MARKER_PYC frames=60`). O lado Windows do Universal foi um `.exe` falso (não há runtime Windows aqui).
+   Bug achado e corrigido (`9d966d1e`): o cook rodava com `cwd=data/` e o `imgui.ini` criado ia no pacote.
+6. Não feito: abrir o editor e o jogo com janela pelo launcher (passo 6), à espera do usuário.
+
+Depois do Linux, no Windows: `git pull` (traz `ef7ba789`, `6e82c8ab`, `9d966d1e`), `ninja install`, recompilar o runtime Web (ou copiar o do Linux) para `build-web-release/bin`, rodar de novo
+`stage_release_web.py` na pasta e `stage_release_windows.py 0.6.0 --zip-only`; refazer o zip da RangeArmor (`prepare_cooked.py` mudou em `9d966d1e`) e o que mais
 algo mudar; extrair os zips numa pasta limpa e testar; `SHA256SUMS.txt`, README e site.
 
 ## 0.5.4
