@@ -30,8 +30,8 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.6.0
 
-Estado: **em preparo (2026-10-27).** Versão trocada no código; falta testar o pacote Linux e montar o Windows.
-Só publicar depois do teste Linux.
+Estado: **em preparo (2026-10-27).** Windows pré-conferido (build, testes, traduções, cenas novas); falta o
+teste do pacote Linux e montar os zips. Só publicar depois do teste Linux.
 
 ### Notas para o usuário (rascunho)
 
@@ -65,7 +65,21 @@ Downloads: `AnastacioEngine-0.6.0-windows-x64.zip`, `AnastacioEngine-0.6.0-linux
 Feito (2026-10-27): `ANASTACIO_VERSION_STRING`, About (`wm.py`) e exemplos/padrões dos scripts de release em
 0.6.0. Novo `tools/linux/testar-release.sh` (pacote extraído: `ldd`, arquivos, Python 3.11, os 14
 `tools/test_*.py`, e `AnastacioRuntime --server` numa cena que roda 60 frames, de
-`tools/linux/release_smoke_scene.py`; a cena foi conferida no build Windows).
+`tools/linux/release_smoke_scene.py`; a cena foi conferida no build Windows). O script foi conferido no WSL com
+o pacote antigo 0.5.1: acusou o que de fato falta nele (nomes `RangeEngine`, sem `python3.11`, sem sons). As
+bibliotecas de som/OpenGL/X11 do sistema ausentes na máquina viram aviso, não falha.
+
+Pré-conferência no Windows (2026-10-27), antes do Linux:
+
+- Build incremental com a 0.6.0 + `ninja install`; `ctest` 15/15; os 13 `tools/test_*.py` headless OK.
+  `test_baked_static_smoke.py` estava velho (procurava o texto em português trocado na 0.5.4) e foi corrigido.
+- Traduções: 80 textos novos desde a 0.5.4 em `translations_more.py` (pt_BR, es, ru), achados pelas auditorias
+  `tools/tests/web_profile/i18n_*.py` cruzadas com o diff `v0.5.4..HEAD`. pt_BR sem tradução: RNA 1166 → 1110,
+  layouts 121 → 100. O que sobra são nomes próprios, códigos e enums antigos. es/ru pedem revisão nativa.
+- Runtime `--server` com marcador de 120 frames: Compositing (sem o fim no frame 5 da própria cena), Bricks 2.0
+  (tutorial), Flipbook, HLOD (616 objetos), PCSS e UI Tree. Todas chegaram aos 120 frames.
+- Não feito aqui: export Universal com Compile Scripts (precisa do player Linux na RangeArmor, que não existe
+  neste PC; o Compile Scripts já foi validado no Windows) e runtime Web (o build é feito em container).
 
 Na máquina Linux, num clone separado com o main atualizado:
 
@@ -80,7 +94,7 @@ Na máquina Linux, num clone separado com o main atualizado:
    ligado: o player Linux tem de rodar só com `.rasec` e `.pyc` (só foi testado no Windows).
 6. Com janela: editor abre, jogo exportado roda pelo launcher.
 
-Depois, no Windows: `ninja install`, `ctest`, traduções do que é novo desde a 0.5.4 (pt_BR/es/ru), zip com
+Depois, no Windows: rebuild se algo mudar no Linux, zip com
 `tools/stage_release_windows.py 0.6.0` + `stage_release_web.py`, RangeArmor Windows, `SHA256SUMS.txt`,
 README e site.
 

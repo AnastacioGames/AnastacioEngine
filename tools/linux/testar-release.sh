@@ -27,10 +27,19 @@ editor="$root/AnastacioEngine"
 runtime="$root/AnastacioRuntime"
 sha256sum "$tar_file" | tee -a "$log"
 
-# 1. Bibliotecas: nada "not found" nos executáveis e nas .so do pacote.
-missing=$(for f in "$editor" "$runtime" "$root"/lib/*.so* "$root"/libae_*.so; do
-    [ -f "$f" ] && ldd "$f" 2>/dev/null | grep "not found" | sed "s|^|$(basename "$f"): |"
-done | sort -u)
+# 1. Bibliotecas: nada "not found" nos executáveis e nas .so do pacote. As .so de lib/ não têm RPATH próprio
+# (acham as vizinhas pelo RPATH do executável), então são checadas com lib/ no LD_LIBRARY_PATH.
+missing=$( { for f in "$editor" "$runtime"; do
+        [ -f "$f" ] && ldd "$f" 2>/dev/null | grep "not found" | sed "s|^|$(basename "$f"): |"
+    done
+    for f in "$root"/lib/*.so* "$root"/libae_*.so; do
+        [ -f "$f" ] && LD_LIBRARY_PATH="$root/lib:$root" ldd "$f" 2>/dev/null | grep "not found" | sed "s|^|$(basename "$f"): |"
+    done; } | sort -u)
+# Som, OpenGL e X11 vêm do sistema do usuário (o pacote não leva); sem eles é só aviso.
+system_libs='lib(asound|pulse|OpenGL|GL|GLX|EGL|X[a-z0-9]*|xcb[a-z0-9-]*|wayland[a-z-]*)\.so'
+sys_missing=$(echo "$missing" | grep -E "=> *not found" | grep -E "	$system_libs" )
+missing=$(echo "$missing" | grep -v -E "	$system_libs" | grep . )
+[ -n "$sys_missing" ] && echo "AVISO bibliotecas do sistema ausentes nesta máquina: $sys_missing" | tee -a "$log"
 [ -z "$missing" ] && ok "ldd sem bibliotecas faltando" || fail "ldd: $missing"
 
 # 2. Arquivos que já faltaram em releases anteriores.

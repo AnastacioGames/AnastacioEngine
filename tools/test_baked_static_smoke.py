@@ -81,7 +81,7 @@ settings.volume_spacing = float(os.environ.get('AE_TEST_VOLUME_SPACING', '20.0')
 from bl_operators.anastacio_lightmap import lightmap_objects, lightmap_excluded_counts
 assert len(lightmap_objects(scene)) == 2
 assert floor in lightmap_objects(scene) and cube in lightmap_objects(scene)
-assert lightmap_excluded_counts(scene)["Física dinâmica (use Static para gerar o bake)"] == 1
+assert lightmap_excluded_counts(scene)["Dynamic physics (use Static to bake)"] == 1
 cube.ae_lightmap_include = False
 assert cube not in lightmap_objects(scene)
 cube.ae_lightmap_include = True
