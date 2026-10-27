@@ -3,6 +3,7 @@
     AnastacioEngine -b --factory-startup --python tools/debug/cenas/medir_compositing_jogo.py -- PASTA PRESET [segundos]
 
 Gera PASTA/comp_PRESET.range. Com COMP_SHOT=arquivo.png o jogo grava um print aos 1,5 s
+Com COMP_UNCAP=1 a cena sai sem a trava do Game Rate (fps 1000).
 (compare com RANGE_COMPOSITOR_NO_CACHE=1 para ver se as texturas intermediárias mudam a imagem). Ao rodar no AnastacioRuntime, o jogo aquece 2 s, mede o FPS médio
 nos segundos seguintes, grava PASTA/comp_PRESET.txt e fecha sozinho.
 
@@ -36,6 +37,8 @@ sc.render.engine = 'BLENDER_GAME'
 gs = sc.game_settings
 gs.use_frame_rate = False
 gs.vsync = 'OFF'
+if os.environ.get('COMP_UNCAP'):
+    gs.fps = 1000  # tira a trava do Game Rate para ver o custo real (sem isso o FPS fica no campo FPS)
 sc.render.resolution_x, sc.render.resolution_y = 1280, 720
 gs.resolution_x, gs.resolution_y = 1280, 720
 
