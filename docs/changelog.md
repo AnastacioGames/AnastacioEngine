@@ -107,6 +107,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   fórmulas da 2.79 (limiar por luminância, MixGlare); Quality/Iterations não são seguidos à risca. ≤ 1,3 ms.
 - Glare tipo Bloom (como no Blender 5, só no jogo; no render vira Fog Glow): soma de todos os níveis de mipmap
   da parte brilhante, cada um suavizado por 9 amostras. Brilho mais largo e macio que o Fog Glow, mesmo custo.
+- Glare Bloom e Sun Beams mais leves: o Bloom lê 4 pontos bilineares por nível no lugar de 9 (mesmo
+  filtro 1-2-1); o Sun Beams usa 16 amostras com deslocamento por pixel, lidas no mipmap 2. iGPU (Radeon
+  do 5900HX, 720p): Bloom +2,3 → +1,4 ms, Sun Beams +2,4 → +1,5 ms; RX 6800M ≤ 0,1 ms. Imagem igual a
+  olho (diferença média 1-2/255). `COMP_UNCAP=1` no `medir_compositing_jogo.py` tira a trava do Game Rate.
 - Glare Blender 5 Style: campo Smoothness (padrão 0.1 em nós novos), clamp suave e adaptativo no limiar e no
   Max Brightness como o `adaptive_smooth_clamp` do Blender 5. Nós antigos ficam com 0 (corte seco, igual antes).
   O tipo Kernel do Blender 5 (convolução por imagem/FFT) fica fora do jogo.

@@ -706,16 +706,15 @@ private:
 					  << fn << "(uv + vec2(o.x, -o.y), float(l)) + " << fn << "(uv - vec2(o.x, -o.y), float(l)));\n"
 					  << "\t}\n\tglare *= " << F(2.0f / (float)maxLod) << ";\n";
 				}
-				else if (g->type == 4) {  // Bloom (Blender 5): every mip level, each smoothed by a 9-tap tent
+				else if (g->type == 4) {  // Bloom (Blender 5): every mip level, each smoothed by a 3x3 tent
+					// The 1-2-1 tent of a level equals 4 bilinear reads at half a texel of that level:
+					// same image as 9 reads, less than half the cost (the iGPU paid 2.3 ms for 9).
 					const int maxLod = std::min(std::max((int)g->size, 6), 9) - 1;
 					b << "\tfor (int l = 1; l <= " << maxLod << "; ++l) {\n"
-					  << "\t\tfloat L = float(l);\n\t\tvec2 o = px * exp2(L);\n"
-					  << "\t\tvec3 s = 4.0 * " << fn << "(uv, L);\n"
-					  << "\t\ts += 2.0 * (" << fn << "(uv + vec2(o.x, 0.0), L) + " << fn << "(uv - vec2(o.x, 0.0), L) + "
-					  << fn << "(uv + vec2(0.0, o.y), L) + " << fn << "(uv - vec2(0.0, o.y), L));\n"
-					  << "\t\ts += " << fn << "(uv + o, L) + " << fn << "(uv - o, L) + " << fn << "(uv + vec2(o.x, -o.y), L) + "
+					  << "\t\tfloat L = float(l);\n\t\tvec2 o = px * exp2(L) * 0.5;\n"
+					  << "\t\tvec3 s = " << fn << "(uv + o, L) + " << fn << "(uv - o, L) + " << fn << "(uv + vec2(o.x, -o.y), L) + "
 					  << fn << "(uv - vec2(o.x, -o.y), L);\n"
-					  << "\t\tglare += s / 16.0;\n"
+					  << "\t\tglare += s * 0.25;\n"
 					  << "\t}\n\tglare *= " << F(3.0f / (float)maxLod) << ";\n";
 				}
 				else if (g->type == 5) {  // Sun Beams (Blender 5): bright part gathered along the way to the sun
@@ -725,17 +724,17 @@ private:
 						len = 0.2f;
 					}
 					// Like Blender 5: the ray goes toward the sun up to Length x image diagonal, never past the sun.
-					// A per-pixel offset (interleaved gradient noise) hides the banding of the 32 fixed samples.
+					// A per-pixel offset (interleaved gradient noise) hides the banding of the 16 samples.
 					b << "\tvec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n"
 					  << "\tvec2 toSun = (vec2(" << F(sx) << ", " << F(sy) << ") - uv) * res;\n"
 					  << "\tfloat dist = length(toSun);\n"
 					  << "\tvec2 d = toSun / max(dist, 1e-4) * min(dist, " << F(std::min(std::max(len, 0.0f), 1.0f)) << " * length(res)) / res;\n"
 					  << "\tfloat jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
 					  << "\tfloat ws = 0.0;\n"
-					  << "\tfor (int i = 0; i < 32; ++i) {\n"
-					  << "\t\tfloat t = (float(i) + jit) / 32.0;\n"
+					  << "\tfor (int i = 0; i < 16; ++i) {\n"
+					  << "\t\tfloat t = (float(i) + jit) / 16.0;\n"
 					  << "\t\tfloat w = 1.0 - t;\n"
-					  << "\t\tglare += w * " << fn << "(uv + d * t, 1.0);\n"
+					  << "\t\tglare += w * " << fn << "(uv + d * t, 2.0);\n"  // level 2: beams are soft, smaller reads
 					  << "\t\tws += w;\n"
 					  << "\t}\n\tglare /= ws;\n";
 				}
