@@ -223,28 +223,26 @@ class NODE_OT_effect_add(Operator):
             return {'CANCELLED'}
         tree, composite = _ensure_tree(context.scene)
         source = composite.inputs[0].links[0].from_socket
-        before = set(tree.nodes)
-
         frame = tree.nodes.new('NodeFrame')
         frame.label = effect[1]
         frame.shrink = True
 
+        nodes = []  # in creation order, which follows the chain
+
         def new(idname):
             node = tree.nodes.new(idname)
             node.parent = frame
+            nodes.append(node)
             return node
 
         out = effect[3](tree, new, tree.links.new, source)
 
-        # every link that read the image (Composite, Viewer...) now reads the effect
-        added = set(tree.nodes) - before
+        # only the outputs (Composite, Viewer) now read the effect; other branches keep the image
         for l in list(tree.links):
-            if l.from_socket == source and l.to_node not in added:
+            if l.from_socket == source and l.to_node.type in {'COMPOSITE', 'VIEWER'}:
                 tree.links.new(out, l.to_socket)
 
         # the new nodes in a row, the Composite moves right to make room
-        nodes = [n for n in added if n != frame]
-        nodes.sort(key=lambda n: n.name)
         x0 = composite.location.x
         for i, node in enumerate(nodes):
             node.location = (x0 + i * 200.0, composite.location.y - (i % 2) * 40.0)
@@ -252,7 +250,7 @@ class NODE_OT_effect_add(Operator):
         composite.location.x = x0 + len(nodes) * 200.0 + 60.0
         for node in tree.nodes:
             if node.type == 'VIEWER' and node.location.x < composite.location.x:
-                node.location.x = composite.location.x
+                node.location = (composite.location.x, composite.location.y - 180.0)
         return {'FINISHED'}
 
 
@@ -264,7 +262,8 @@ class NODE_PT_effects_shelf(Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.space_data.tree_type == 'CompositorNodeTree'
+        space = context.space_data
+        return space and space.type == 'NODE_EDITOR' and space.tree_type == 'CompositorNodeTree'
 
     def draw(self, context):
         layout = self.layout
