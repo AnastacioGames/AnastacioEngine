@@ -126,9 +126,10 @@ public:
 		}
 		bNode *from;
 		bNodeSocket *fromsock;
-		if (node->type == CMP_NODE_GLARE) {
+		if (node->type == CMP_NODE_GLARE || node->type == CMP_NODE_TONEMAP) {
 			// The bright part of a Glare is drawn into a mipmapped texture: Fog Glow sums its levels,
-			// Streaks and Ghosts read it slightly blurred. Key: (glare node, -1).
+			// Streaks and Ghosts read it slightly blurred. The Tonemap draws its input with the log of
+			// the luminance in alpha: the last level is the average of the image. Key: (node, -1).
 			const std::pair<bNode *, int> key(node, -1);
 			if (Source((bNodeSocket *)node->inputs.first, from, fromsock) &&
 			    std::find(order.begin(), order.end(), key) == order.end()) {
@@ -195,7 +196,31 @@ public:
 
 	std::string Output(bNode *node, int index)
 	{
-		return (index == -1) ? EmitGlareBright(node) : Emit(node, index);
+		if (index == -1) {
+			return (node->type == CMP_NODE_TONEMAP) ? EmitTonemapLog(node) : EmitGlareBright(node);
+		}
+		return Emit(node, index);
+	}
+
+	/// Render size the pixel values of the nodes refer to (Crop); the game image may differ.
+	void SetRenderSize(float width, float height)
+	{
+		m_renderW = width;
+		m_renderH = height;
+	}
+
+	/// vec4 function of the Tonemap input with log(luminance) in alpha (AvgLogLum of the 2.79).
+	std::string EmitTonemapLog(bNode *node)
+	{
+		const std::string name = "t" + std::to_string(Id(node)) + "_log";
+		if (m_done.count(name)) {
+			return name;
+		}
+		m_done.insert(name);
+		const std::string src = Input(node, 0, "uv");
+		m_code << "vec4 " << name << "(vec2 uv)\n{\n\tvec3 c = " << src << ".rgb;\n"
+		       << "\treturn vec4(c, log(max(comp_bw(vec4(c, 1.0)), 0.0) + 1e-5));\n}\n\n";
+		return name;
 	}
 
 	/// vec4 function of the bright part of a Glare input (GlareThresholdOperation).
@@ -291,6 +316,9 @@ private:
 			case CMP_NODE_BLUR:
 			case CMP_NODE_LENSDIST:
 			case CMP_NODE_SUNBEAMS:
+			case CMP_NODE_DBLUR:
+			case CMP_NODE_DILATEERODE:
+			case CMP_NODE_BILATERALBLUR:
 				return 0;
 			case CMP_NODE_FILTER:
 				return 1;
@@ -965,6 +993,285 @@ private:
 				  << "\t}\n\treturn acc / ws;\n";
 				break;
 			}
+			case CMP_NODE_DBLUR: {
+				// DirectionalBlurOperation: 2^iterations copies, each moved, scaled and turned a step more
+				// around the center. Up to 32 copies; fewer steps of the same total reach past that.
+				NodeDBlurData *d = (NodeDBlurData *)node->storage;
+				if (!d || (d->distance == 0.0f && d->zoom == 0.0f && d->spin == 0.0f)) {
+					b << "\treturn " << in(0) << ";\n";
+					break;
+				}
+				const int count = 1 << std::min(std::max((int)d->iter, 1), 5);
+				const float itsc = 1.0f / (float)count;
+				b << "\tvec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n"
+				  << "\tvec2 ctr = vec2(" << F(d->center_x) << ", " << F(d->center_y) << ") * res;\n"
+				  << "\tvec2 d = uv * res - ctr;\n"
+				  << "\tvec2 t = vec2(" << F(itsc * d->distance * cosf(d->angle)) << ", " << F(-itsc * d->distance * sinf(d->angle))
+				  << ") * length(res);\n"
+				  << "\tvec4 acc = " << in(0) << ";\n"
+				  << "\tfor (int i = 1; i <= " << count << "; ++i) {\n"
+				  << "\t\tfloat k = float(i);\n"
+				  << "\t\tfloat rot = k * " << F(itsc * d->spin) << ";\n"
+				  << "\t\tvec2 w = d / (1.0 + k * " << F(itsc * d->zoom) << ") + k * t;\n"
+				  << "\t\tvec2 q = (vec2(cos(rot) * w.x + sin(rot) * w.y, cos(rot) * w.y - sin(rot) * w.x) + ctr) / res;\n"
+				  << "\t\tif (all(greaterThanEqual(q, vec2(0.0))) && all(lessThanEqual(q, vec2(1.0)))) acc += "
+				  << Input(node, 0, "q") << ";\n"
+				  << "\t}\n\treturn acc / " << F((float)(count + 1)) << ";\n";
+				break;
+			}
+			case CMP_NODE_COLORCORRECTION: {
+				// ColorCorrectionOperation: master values times the shadows / midtones / highlights ones,
+				// blended by the level (RGB average) with a 0.1 margin around the midtone limits.
+				NodeColorCorrection *n = (NodeColorCorrection *)node->storage;
+				b << "\tvec4 c = " << in(0) << ";\n\tfloat value = min(" << in(1) << ".x, 1.0);\n";
+				if (!n) {
+					b << "\treturn c;\n";
+					break;
+				}
+				const float sm = n->startmidtones, em = n->endmidtones;
+				b << "\tfloat level = (c.r + c.g + c.b) / 3.0;\n"
+				  << "\tfloat ls = 0.0, lm = 0.0, lh = 0.0;\n"
+				  << "\tif (level < " << F(sm - 0.1f) << ") ls = 1.0;\n"
+				  << "\telse if (level < " << F(sm + 0.1f) << ") { lm = (level - " << F(sm) << ") * 5.0 + 0.5; ls = 1.0 - lm; }\n"
+				  << "\telse if (level < " << F(em - 0.1f) << ") lm = 1.0;\n"
+				  << "\telse if (level < " << F(em + 0.1f) << ") { lh = (level - " << F(em) << ") * 5.0 + 0.5; lm = 1.0 - lh; }\n"
+				  << "\telse lh = 1.0;\n";
+				auto zone = [&](float sh, float mid, float hi) {
+					return "(ls * " + F(sh) + " + lm * " + F(mid) + " + lh * " + F(hi) + ")";
+				};
+				b << "\tfloat contrast = " << F(n->master.contrast) << " * "
+				  << zone(n->shadows.contrast, n->midtones.contrast, n->highlights.contrast) << ";\n"
+				  << "\tfloat sat = " << F(n->master.saturation) << " * "
+				  << zone(n->shadows.saturation, n->midtones.saturation, n->highlights.saturation) << ";\n"
+				  << "\tfloat gamma = " << F(n->master.gamma) << " * "
+				  << zone(n->shadows.gamma, n->midtones.gamma, n->highlights.gamma) << ";\n"
+				  << "\tfloat gain = " << F(n->master.gain) << " * "
+				  << zone(n->shadows.gain, n->midtones.gain, n->highlights.gain) << ";\n"
+				  << "\tfloat lift = " << F(n->master.lift) << " + "
+				  << zone(n->shadows.lift, n->midtones.lift, n->highlights.lift) << ";\n"
+				  << "\tfloat luma = comp_bw(c);\n"
+				  << "\tvec3 r = luma + sat * (c.rgb - luma);\n"
+				  << "\tr = 0.5 + (r - 0.5) * contrast;\n"
+				  << "\tr = pow(max(r * gain + lift, vec3(0.0)), vec3(1.0 / max(gamma, 1e-5)));\n"
+				  << "\tr = mix(c.rgb, r, value);\n";
+				const char *chan = "rgb";
+				for (int ch = 0; ch < 3; ++ch) {
+					if (!(node->custom1 & (1 << ch))) {
+						b << "\tr." << chan[ch] << " = c." << chan[ch] << ";\n";
+					}
+				}
+				b << "\treturn vec4(r, c.a);\n";
+				break;
+			}
+			case CMP_NODE_TONEMAP: {
+				// TonemapOperation (Rh Simple) / PhotoreceptorTonemapOperation. The image averages come from
+				// the last mip level of the input texture (alpha: log of the luminance); the lowest and
+				// highest log luminance of the Photoreceptor auto key from 16 reads of a coarse level.
+				NodeTonemap *t = (NodeTonemap *)node->storage;
+				b << "\tvec4 c = " << in(0) << ";\n";
+				if (!t) {
+					b << "\treturn c;\n";
+					break;
+				}
+				std::string at;  // expression of the log texture at p, level lod
+				if (m_caches) {
+					auto it = m_caches->find(std::make_pair(node, -1));
+					if (it != m_caches->end()) {
+						m_usedCaches.insert(it->second);
+						at = "textureLod(comp_cache" + std::to_string(it->second) + ", p, lod)";
+					}
+				}
+				const bool photo = (t->type == 1);
+				const bool autoKey = photo && t->m <= 0.0f;
+				b << "\tvec4 avg = vec4(0.0);\n\tfloat maxl = -1e10, minl = 1e10;\n";
+				if (!at.empty()) {
+					b << "\t{ vec2 p = vec2(0.5); float lod = 20.0; avg = " << at << "; }\n";
+				}
+				if (at.empty() || autoKey) {
+					// no texture: the 16 reads also give the average (slower, same look)
+					const std::string fn = at.empty() ? EmitTonemapLog(node) + "(p)" : at;
+					b << "\tvec4 sum = vec4(0.0);\n"
+					  << "\tfor (int j = 0; j < 4; ++j) {\n\t\tfor (int i = 0; i < 4; ++i) {\n"
+					  << "\t\t\tvec2 p = (vec2(float(i), float(j)) + 0.5) / 4.0;\n\t\t\tfloat lod = 4.0;\n"
+					  << "\t\t\tvec4 s = " << fn << ";\n"
+					  << "\t\t\tsum += s;\n\t\t\tmaxl = max(maxl, s.a);\n\t\t\tminl = min(minl, s.a);\n"
+					  << "\t\t}\n\t}\n";
+					if (at.empty()) {
+						b << "\tavg = sum / 16.0;\n";
+					}
+				}
+				if (!photo) {
+					const float igm = (t->gamma == 0.0f) ? 1.0f : 1.0f / t->gamma;
+					b << "\tfloat al = exp(avg.a);\n\tal = (al == 0.0) ? 0.0 : " << F(t->key) << " / al;\n"
+					  << "\tvec3 o = c.rgb * al;\n\tvec3 dd = o + " << F(t->offset) << ";\n"
+					  << "\to /= mix(dd, vec3(1.0), vec3(equal(dd, vec3(0.0))));\n";
+					if (igm != 0.0f) {
+						b << "\to = pow(max(o, vec3(0.0)), vec3(" << F(igm) << "));\n";
+					}
+					b << "\treturn vec4(o, c.a);\n";
+					break;
+				}
+				b << "\tfloat m = ";
+				if (autoKey) {
+					b << "0.3 + 0.7 * pow((maxl > minl) ? (maxl - avg.a) / (maxl - minl) : 1.0, 1.4);\n";
+				}
+				else {
+					b << F(t->m) << ";\n";
+				}
+				b << "\tfloat L = comp_bw(c);\n\tfloat lav = comp_bw(vec4(avg.rgb, 1.0));\n"
+				  << "\tvec3 Il = c.rgb + " << F(1.0f - t->c) << " * (L - c.rgb);\n"
+				  << "\tvec3 Ig = avg.rgb + " << F(1.0f - t->c) << " * (lav - avg.rgb);\n"
+				  << "\tvec3 Ia = Il + " << F(1.0f - t->a) << " * (Ig - Il);\n"
+				  << "\treturn vec4(c.rgb / (c.rgb + pow(max(" << F(expf(-t->f)) << " * Ia, vec3(0.0)), vec3(m))), c.a);\n";
+				break;
+			}
+			case CMP_NODE_DILATEERODE: {
+				// DilateErode{Step,Distance,Threshold}Operation and the feather blur, over a grid of at most
+				// 9x9 reads: exact up to 4 pixels, spaced past that (thin lines can slip between reads).
+				const int mode = node->custom1;
+				const float dist = (float)node->custom2;
+				const float inset = node->custom3;
+				float scope = std::fabs(dist);
+				if (mode == CMP_NODE_DILATEERODE_DISTANCE_THRESH) {
+					scope = (dist < 0.0f) ? -dist + inset : (inset * 2.0f > dist ? std::max(inset * 2.0f - dist, dist) : dist);
+					scope = std::max(scope, 3.0f);
+				}
+				if (scope < 1.0f) {
+					b << "\treturn " << in(0) << ";\n";
+					break;
+				}
+				const int n = std::min((int)std::ceil(scope), 4);
+				const float step = scope / (float)n;
+				b << "\tvec2 px = " << F(step) << " / vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n";
+				const std::string read = Input(node, 0, "uv + vec2(float(i), float(j)) * px") + ".x";
+				const std::string loop = "\tfor (int j = -" + std::to_string(n) + "; j <= " + std::to_string(n) +
+				                         "; ++j) {\n\t\tfor (int i = -" + std::to_string(n) + "; i <= " + std::to_string(n) +
+				                         "; ++i) {\n\t\t\tfloat d2 = dot(vec2(float(i), float(j)), vec2(float(i), float(j))) * " +
+				                         F(step * step) + ";\n";
+				const bool dilate = dist > 0.0f;
+				if (mode == CMP_NODE_DILATEERODE_DISTANCE_THRESH) {
+					b << "\tfloat v0 = " << in(0) << ".x;\n\tfloat mindist = " << F(scope * scope * 2.0f) << ";\n"
+					  << loop
+					  << "\t\t\tfloat v = " << read << ";\n"
+					  << "\t\t\tif ((v0 > 0.5) ? (v < 0.5) : (v > 0.5)) mindist = min(mindist, d2);\n"
+					  << "\t\t}\n\t}\n"
+					  << "\tfloat pv = (v0 > 0.5) ? -sqrt(mindist) : sqrt(mindist);\n";
+					if (dilate) {
+						b << "\tfloat delta = " << F(dist) << " - pv;\n"
+						  << "\tif (delta < 0.0) return vec4(0.0);\n"
+						  << "\treturn vec4((delta >= " << F(inset) << ") ? 1.0 : delta / " << F(std::max(inset, 1e-5f)) << ");\n";
+					}
+					else {
+						b << "\tfloat delta = " << F(-dist) << " + pv;\n"
+						  << "\tif (delta >= 0.0) return vec4(0.0);\n"
+						  << "\treturn vec4((delta < " << F(-inset) << ") ? 1.0 : -delta / " << F(std::max(inset, 1e-5f)) << ");\n";
+					}
+					break;
+				}
+				const std::string r2 = F(scope * scope);
+				b << "\tfloat value = " << ((mode == CMP_NODE_DILATEERODE_STEP) ? in(0) + ".x" : (dilate ? "0.0" : "1.0")) << ";\n"
+				  << loop;
+				if (mode == CMP_NODE_DILATEERODE_STEP) {  // square
+					b << "\t\t\tvalue = " << (dilate ? "max" : "min") << "(value, " << read << ");\n";
+				}
+				else if (mode == CMP_NODE_DILATEERODE_DISTANCE) {  // disk
+					b << "\t\t\tif (d2 <= " << r2 << ") value = " << (dilate ? "max" : "min") << "(value, " << read << ");\n";
+				}
+				else {  // feather: smooth falloff away from the center
+					b << "\t\t\tif (d2 <= " << r2 << ") {\n"
+					  << "\t\t\t\tfloat f = 1.0 - sqrt(d2) / " << F(scope) << ";\n\t\t\t\tf = f * f * (3.0 - 2.0 * f);\n"
+					  << (dilate ? "\t\t\t\tvalue = max(value, " + read + " * f);\n"
+					             : "\t\t\t\tvalue = min(value, 1.0 - (1.0 - " + read + ") * f);\n")
+					  << "\t\t\t}\n";
+				}
+				b << "\t\t}\n\t}\n\treturn vec4(value);\n";
+				break;
+			}
+			case CMP_NODE_BILATERALBLUR: {
+				// BilateralBlurOperation: average of the pixels around (Sigma Space + Iterations) whose
+				// Determinator color is within Sigma Color of this one. Grid of at most 9x9 reads.
+				NodeBilateralBlurData *d = (NodeBilateralBlurData *)node->storage;
+				const float space = d ? d->sigma_space + (float)d->iter : 0.0f;
+				if (space < 1.0f) {
+					b << "\treturn " << in(0) << ";\n";
+					break;
+				}
+				const int n = std::min((int)std::ceil(space), 4);
+				b << "\tvec2 px = " << F(space / (float)n) << " / vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n"
+				  << "\tvec3 ref = " << in(1) << ".rgb;\n"
+				  << "\tvec4 sum = vec4(0.0);\n\tfloat count = 0.0;\n"
+				  << "\tfor (int j = -" << n << "; j <= " << n << "; ++j) {\n"
+				  << "\t\tfor (int i = -" << n << "; i <= " << n << "; ++i) {\n"
+				  << "\t\t\tvec2 q = uv + vec2(float(i), float(j)) * px;\n"
+				  << "\t\t\tvec3 dc = abs(ref - " << Input(node, 1, "q") << ".rgb);\n"
+				  << "\t\t\tif (dc.r + dc.g + dc.b < " << F(d->sigma_color) << ") { sum += " << Input(node, 0, "q")
+				  << "; count += 1.0; }\n"
+				  << "\t\t}\n\t}\n"
+				  << "\treturn (count > 0.0) ? sum / count : vec4(0.0, 0.0, 0.0, 1.0);\n";
+				break;
+			}
+			case CMP_NODE_ZCOMBINE: {
+				// ZCombine{,Alpha,Mask,MaskAlpha}Operation, without the anti-aliasing of the mask.
+				b << "\tfloat z1 = " << in(1) << ".x;\n\tfloat z2 = " << in(3) << ".x;\n";
+				if (out == 1) {
+					b << "\treturn vec4(min(z1, z2));\n";
+					break;
+				}
+				b << "\tvec4 c1 = " << in(0) << ";\n\tvec4 c2 = " << in(2) << ";\n";
+				const bool alpha = node->custom1 != 0;
+				if (node->custom2) {  // Anti-Alias Z off: plain comparison
+					if (!alpha) {
+						b << "\treturn (z1 < z2) ? c1 : c2;\n";
+					}
+					else {
+						b << "\tvec4 a = (z1 <= z2) ? c1 : c2;\n\tvec4 o = (z1 <= z2) ? c2 : c1;\n"
+						  << "\treturn vec4(a.a * a.rgb + (1.0 - a.a) * o.rgb, max(a.a, o.a));\n";
+					}
+				}
+				else if (!alpha) {
+					b << "\treturn mix(c1, c2, (z1 < z2) ? 0.0 : 1.0);\n";
+				}
+				else {
+					b << "\tfloat mask = (z1 > z2) ? 1.0 : 0.0;\n"
+					  << "\tfloat fac = (1.0 - mask) * (1.0 - c1.a) + mask * c2.a;\n"
+					  << "\treturn vec4(c1.rgb * (1.0 - fac) + c2.rgb * fac, max(c1.a, c2.a));\n";
+				}
+				break;
+			}
+			case CMP_NODE_CROP: {
+				// CropOperation: transparent outside the box. Crop Image Size makes the box the whole
+				// image; in the game the frame keeps its size, so the box is stretched over the screen.
+				NodeTwoXYs *s = (NodeTwoXYs *)node->storage;
+				const float w = (m_renderW > 0.0f) ? m_renderW : 1920.0f;
+				const float h = (m_renderH > 0.0f) ? m_renderH : 1080.0f;
+				if (!s) {
+					b << "\treturn " << in(0) << ";\n";
+					break;
+				}
+				float x1 = s->x1, x2 = s->x2, y1 = s->y1, y2 = s->y2;
+				if (node->custom2) {
+					x1 = (float)(short)(w * s->fac_x1);
+					x2 = (float)(short)(w * s->fac_x2);
+					y1 = (float)(short)(h * s->fac_y1);
+					y2 = (float)(short)(h * s->fac_y2);
+				}
+				x1 = std::min(x1, w - 1.0f);
+				x2 = std::min(x2, w - 1.0f);
+				y1 = std::min(y1, h - 1.0f);
+				y2 = std::min(y2, h - 1.0f);
+				const float xmin = std::min(x1, x2) / w, xmax = (std::max(x1, x2) + 1.0f) / w;
+				const float ymin = std::min(y1, y2) / h, ymax = (std::max(y1, y2) + 1.0f) / h;
+				if (node->custom1) {
+					b << "\treturn " << Input(node, 0, "vec2(" + F(xmin) + ", " + F(ymin) + ") + uv * vec2(" + F(xmax - xmin) +
+					                                       ", " + F(ymax - ymin) + ")") << ";\n";
+				}
+				else {
+					b << "\tif (uv.x < " << F(xmin) << " || uv.x >= " << F(xmax) << " || uv.y < " << F(ymin) << " || uv.y >= "
+					  << F(ymax) << ") return vec4(0.0);\n"
+					  << "\treturn " << in(0) << ";\n";
+				}
+				break;
+			}
 			case CMP_NODE_COMPOSITE:
 			case CMP_NODE_VIEWER:
 				b << "\treturn " << in(0) << ";\n";
@@ -1021,6 +1328,7 @@ private:
 	std::vector<std::string>& m_skipped;
 	std::vector<KX_CompositorUniform>& m_uniforms;
 	const CacheMap *m_caches;
+	float m_renderW = 0.0f, m_renderH = 0.0f;
 	std::set<int> m_usedCaches;
 	std::map<bNode *, int> m_ids;
 	std::set<std::string> m_done;
@@ -1295,6 +1603,7 @@ std::vector<KX_CompositorStage> KX_BuildCompositorShaders(Scene *scene, std::vec
 		KX_CompositorStage stage;
 		std::vector<std::string> stageSkipped;
 		Generator gen(scene->nodetree, stageSkipped, stage.uniforms, &caches);
+		gen.SetRenderSize(scene->r.xsch * scene->r.size / 100.0f, scene->r.ysch * scene->r.size / 100.0f);
 		const std::string out = last ? gen.Output(output, 0) : gen.Output(order[i].first, order[i].second);
 		stage.shader = compositorHeader;
 		stage.shader += gen.UniformCode();

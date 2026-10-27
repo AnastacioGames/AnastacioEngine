@@ -27,6 +27,11 @@ Presets:
   nos_pixel     Scale 1/16 -> Pixelate -> Scale 16
   nos_valores   Map Range da profundidade, Map Value, Switch e Separate/Combine HSVA (matiz +0.3)
   nos_sunbeams  nó Sun Beams (fonte 0.7, 0.8; Ray Length 0.3)
+  nos_dblur     Directional Blur (4 iterações, distância 0.05, zoom e giro 0.1)
+  nos_cor2      Color Correction -> Tonemap Rh Simple
+  nos_tonemap_r Tonemap Photoreceptor (chave automática)
+  nos_mascara   Ellipse -> Dilate/Erode Distance e Feather -> multiplica Bilateral Blur -> Crop relativo
+  nos_zcombine  Z Combine da imagem com uma cor chapada a 13 m
   diamante   6 Mix seguidos que usam o nó anterior nas duas entradas (2^6 chamadas se não houver cache)
 """
 import bpy, sys, os
@@ -161,6 +166,38 @@ if preset != 'off':
     elif preset == 'nos_sunbeams':
         sb = N.new('CompositorNodeSunBeams'); sb.source = (0.7, 0.8); sb.ray_length = 0.3
         L.new(img, sb.inputs[0]); s = sb.outputs[0]
+    elif preset == 'nos_dblur':
+        db = N.new('CompositorNodeDBlur'); db.iterations = 4; db.distance = 0.05; db.zoom = 0.1; db.spin = 0.1
+        L.new(img, db.inputs[0]); s = db.outputs[0]
+    elif preset == 'nos_cor2':
+        # Color Correction (sombras azuis, altas quentes) -> Tonemap Rh Simple
+        cc = N.new('CompositorNodeColorCorrection'); cc.master_saturation = 1.3
+        cc.shadows_gain = 0.8; cc.highlights_gain = 1.2; cc.master_contrast = 1.1
+        tm = N.new('CompositorNodeTonemap'); tm.tonemap_type = 'RH_SIMPLE'; tm.key = 0.18
+        L.new(img, cc.inputs[0]); L.new(cc.outputs[0], tm.inputs[0]); s = tm.outputs[0]
+    elif preset == 'nos_tonemap_r':
+        tm = N.new('CompositorNodeTonemap'); tm.tonemap_type = 'RD_PHOTORECEPTOR'
+        L.new(img, tm.inputs[0]); s = tm.outputs[0]
+    elif preset == 'nos_mascara':
+        # Ellipse Mask -> Dilate/Erode (Distance -6, Feather 8) -> Bilateral Blur da imagem -> Crop
+        el = N.new('CompositorNodeEllipseMask'); el.width = 0.5; el.height = 0.4
+        de = N.new('CompositorNodeDilateErode'); de.mode = 'DISTANCE'; de.distance = -6
+        fe = N.new('CompositorNodeDilateErode'); fe.mode = 'FEATHER'; fe.distance = 8
+        bb = N.new('CompositorNodeBilateralblur'); bb.iterations = 2; bb.sigma_space = 4; bb.sigma_color = 0.3
+        mix = N.new('CompositorNodeMixRGB'); mix.blend_type = 'MULTIPLY'
+        cr = N.new('CompositorNodeCrop'); cr.relative = True
+        cr.rel_min_x, cr.rel_max_x, cr.rel_min_y, cr.rel_max_y = 0.05, 0.95, 0.1, 0.9
+        L.new(el.outputs[0], de.inputs[0]); L.new(de.outputs[0], fe.inputs[0])
+        L.new(img, bb.inputs[0]); L.new(img, bb.inputs[1])
+        L.new(bb.outputs[0], mix.inputs[1]); L.new(fe.outputs[0], mix.inputs[2]); L.new(mix.outputs[0], cr.inputs[0])
+        s = cr.outputs[0]
+    elif preset == 'nos_zcombine':
+        # a cena com uma cor chapada a 10 m: o que estiver mais perto que isso aparece
+        rgb = N.new('CompositorNodeRGB'); rgb.outputs[0].default_value = (0.9, 0.5, 0.1, 1)
+        zc = N.new('CompositorNodeZcombine')
+        L.new(img, zc.inputs[0]); L.new(rl.outputs['Depth'], zc.inputs[1])
+        L.new(rgb.outputs[0], zc.inputs[2]); zc.inputs[3].default_value = 13.0
+        s = zc.outputs[0]
     elif preset == 'diamante':
         s = img
         for i in range(6):

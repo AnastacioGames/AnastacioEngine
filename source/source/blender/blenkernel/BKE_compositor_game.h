@@ -70,11 +70,18 @@ static inline int BKE_compositor_game_support(int type)
 		case CMP_NODE_SWITCH:
 		case CMP_NODE_SEPHSVA:
 		case CMP_NODE_COMBHSVA:
+		case CMP_NODE_COLORCORRECTION:
+		case CMP_NODE_CROP:
 			return 1;
 		case CMP_NODE_BLUR:
 		case CMP_NODE_LENSDIST:
 		case CMP_NODE_GLARE:
 		case CMP_NODE_SUNBEAMS:
+		case CMP_NODE_DBLUR:
+		case CMP_NODE_TONEMAP:
+		case CMP_NODE_DILATEERODE:
+		case CMP_NODE_BILATERALBLUR:
+		case CMP_NODE_ZCOMBINE:
 			return 2;
 		default:
 			return 0;

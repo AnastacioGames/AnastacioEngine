@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-27 - Compositing no jogo: Directional Blur, Color Correction, Tonemap, Dilate/Erode, Z Combine, Crop e Bilateral Blur
+
+- Color Correction e Crop seguem a 2.79 (selo de jogo cheio). Crop Image Size estica a caixa na tela, porque o quadro do jogo mantém o tamanho.
+- Directional Blur: até 32 cópias (2^Iterations), com o mesmo alcance total quando passa disso.
+- Tonemap (Rh Simple e Photoreceptor): a média da imagem sai do último mipmap de uma textura intermediária (log da luminância no alpha). A chave automática usa máximo e mínimo de 16 leituras de um nível grosso.
+- Dilate/Erode (Step, Distance, Threshold, Feather) e Bilateral Blur: grade de até 9x9 leituras, exata até 4 px e espaçada depois disso. Feather aproximado por queda suave.
+- Z Combine sem o anti-aliasing da máscara (borda dura).
+- Presets `nos_dblur`, `nos_cor2`, `nos_tonemap_r`, `nos_mascara` e `nos_zcombine` em `medir_compositing_jogo.py`. Na RX 6800M a 720p, sem trava, todos ficam entre 906 e 947 fps (base 931).
+
 ## 2026-10-26 - Frente 2: fila QAddFront e m_modified na réplica (SG-04, SG-05)
 
 `SG_QList::QAddFront` conferia a lista errada (`Empty` em vez de `QEmpty`); agora recusa item já na fila secundária. O construtor de cópia de `SG_Node` inicializa `m_modified = true`, então a réplica calcula a transformação no primeiro update, como um nó novo. O teste serial `tools/debug/revisao_scenegraph.cpp` passou a exigir as correções (sai 0 e imprime `SG_ALL_FIXED`); com SG-04/05 aplicados os valores conferiram (`admitted=false shared_item=false`). Build completo e regressões no player ainda não rodados para este commit: rodar no próximo passo.
