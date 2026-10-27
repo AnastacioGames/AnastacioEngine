@@ -57,7 +57,8 @@ public:
 
 	/// Run one simulation frame for every scene: activity, animation, logic, scenegraph and
 	/// physics update, then GPU particle emitters.
-	void Update();
+	/// Catch-up steps may defer mesh deformation while still evaluating poses/events.
+	void Update(bool deformAnimations = true);
 };
 
 #endif  // __KX_SIMULATIONPIPELINE_H__

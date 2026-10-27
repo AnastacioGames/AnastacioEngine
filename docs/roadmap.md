@@ -18,6 +18,7 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 - [Segunda revisão da frente 8](#segunda-revisão-da-frente-8)
 - [Revisão de KX_Scene](#revisão-de-kx_scene)
 - [Revisão de KX_GameObject](#revisão-de-kx_gameobject)
+- [Revisão de SceneGraph e loop](#revisão-de-scenegraph-e-loop)
 
 - [Atlas de materiais](#atlas-de-materiais)
 - [Prioridade atual](#prioridade-atual)
@@ -67,6 +68,30 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   `load_scripts` e ajustar o nome informado em erros de argumentos de `lookAt`.
 - Validar o wrapper de partículas retido após remoção/reconstrução do buffer e sincronização imediata
   após atribuição de matrizes completas; [análise e correções dos bindings](revisao-kx-gameobject-python.md).
+
+## Revisão de SceneGraph e loop
+
+- [Primeira rodada da frente 2](revisao-scenegraph-loop.md): corrigir e validar por integração
+  propagação do vertex parent (SG-01), orientação sob escala singular (SG-02) e movimento global
+  com pai escalado (SG-03). As reproduções atuais compilam os fontes reais em harness serial.
+- Conferir estado inicial de `m_modified` na cópia de nó (SG-05), eliminar sincronização no
+  movimento zero (SG-06) e corrigir guarda de fila secundária no método sem uso atual (SG-04).
+- Segunda rodada no mesmo relatório: definir pausa zero antes da conversão de passos (CLK-01),
+  unificar relógios/delta e desconto de suspensão (CLK-02), validar limite de catch-up (CLK-03),
+  pausar tempo local da cutscene (CLK-04) e conferir contrato de relógio externo (CLK-05).
+  Diagnóstico aritmético compilado/executado; integração na engine ainda pendente.
+- ANI-01 corrigido: ações/poses/eventos por passo elegível e deformação ao fim do catch-up.
+  Quatro casos no player `--server` passaram com armature e filho de osso. Pendentes: skinning
+  e ImageRender no jogo com render, interação com corpos dinâmicos, auditoria em cena parada
+  com render e medição do custo de CPU do catch-up. Nenhuma janela aberta nesta revisão.
+- Validar INP-01/02/03 com controle físico e integração do joystick no jogo. Regressões de
+  zero/um/quatro passos e modo variável passaram, incluindo Evaluate dos sensores e duas cenas
+  simuladas com hardware/pipeline substituídos; editor/player compilados e smoke em segundo plano
+  passaram após a liberação dos testes do Claude.
+- Próxima peça: propagação do vertex parent (SG-01), seguida das demais correções SG/CLK por partes.
+  Definir fronteira de aplicação das taxas alteradas por callback antes das correções de relógio.
+  INP-01 corrigido com regressão dos 15 botões e rebuild editor/player; teste físico,
+  concorrência e FPS pendentes.
 
 ## Atlas de materiais
 

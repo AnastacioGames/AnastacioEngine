@@ -406,7 +406,9 @@ bool ImageRender::Render()
 	const SG_Frustum camFrustum(projmat * viewmat);
 	const std::vector<KX_GameObject *> objects = m_scene->CalculateVisibleMeshes(m_camera, camFrustum, 0, false);
 
-	if (m_engine->UpdateAnimations(m_scene)) {
+	if (!m_scene->IsSuspended()) {
+		m_engine->UpdateAnimations(m_scene);
+		// A restricted pose pass may still have work pending from a simulation step.
 		m_scene->UpdateAnimationDeformers();
 	}
 

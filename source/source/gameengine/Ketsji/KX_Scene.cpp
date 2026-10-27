@@ -1773,6 +1773,9 @@ void KX_Scene::RemoveEuthanasyObjects()
 
 bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 {
+	// Deferred deformation must never outlive the object, including between catch-up steps.
+	m_pendingAnimationDeformers.erase(gameobj);
+	m_animNeedsUpdateCache.erase(gameobj);
 	// Multiplayer: the replication layer forgets the object before it is destroyed.
 	if (gameobj->GetNetId() != 0) {
 		KX_NetworkManager *network = KX_GetActiveEngine()->GetNetworkManager();
@@ -2701,6 +2704,14 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 
 	BLI_task_pool_work_and_wait(m_animationPool);
 
+	// Keep work from earlier catch-up steps even if the next pose pass skips this object.
+	// Workers have finished; insertions and removal callbacks stay on the main thread.
+	for (const auto &entry : m_animNeedsUpdateCache) {
+		if (entry.second) {
+			m_pendingAnimationDeformers.insert(entry.first);
+		}
+	}
+
 	// Animation Events: the animation tasks above queue the reached triggers per object, so the
 	// Python functions are called only now, on the main thread, once every task finished.
 	// Collected first, the callbacks may change the animated objects list.
@@ -2764,15 +2775,15 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 	return true;
 }
 
-void KX_Scene::UpdateAnimationDeformers()
+void KX_Scene::UpdateAnimationDeformers(bool applyToMesh)
 {
-	for (const auto &entry : m_animNeedsUpdateCache) {
-		if (entry.second) {
-			BLI_task_pool_push(m_animationPool, UpdateAnimDeformTask, entry.first, false, TASK_PRIORITY_LOW);
+	if (applyToMesh) {
+		for (KX_GameObject *gameobj : m_pendingAnimationDeformers) {
+			BLI_task_pool_push(m_animationPool, UpdateAnimDeformTask, gameobj, false, TASK_PRIORITY_LOW);
 		}
+		BLI_task_pool_work_and_wait(m_animationPool);
 	}
-
-	BLI_task_pool_work_and_wait(m_animationPool);
+	m_pendingAnimationDeformers.clear();
 }
 
 void KX_Scene::LogicUpdateFrame(double curtime)

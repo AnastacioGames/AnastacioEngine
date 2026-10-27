@@ -73,7 +73,7 @@ class DEV_Joystick
 	 */
 	int m_axis_array[JOYAXIS_MAX];
 
-	/** live SDL state seen on the previous frame, see SyncLiveState() */
+	/** live SDL state seen on the previous capture, see SyncLiveState() */
 	int m_live_axis[JOYAXIS_MAX];
 	bool m_live_button[32];
 
@@ -150,6 +150,8 @@ public:
 
 	static DEV_Joystick *GetInstance(short joyindex);
 	static bool HandleEvents(short (&addrem)[JOYINDEX_MAX]);
+	/** Consume sensor flags after every scene of a simulation step has evaluated. */
+	static void ClearEvents();
 	void ReleaseInstance(short joyindex);
 	static void Init();
 	static void Close();

@@ -89,6 +89,15 @@ void DEV_Joystick::OnNothing(SDL_Event *sdl_event)
 	m_istrig_axis = m_istrig_button = 0;
 }
 
+void DEV_Joystick::ClearEvents()
+{
+	for (int i = 0; i < JOYINDEX_MAX; i++) {
+		if (m_instance[i]) {
+			m_instance[i]->OnNothing(nullptr);
+		}
+	}
+}
+
 /* The sensors only evaluate when IsTrigAxis()/IsTrigButton() is set, and those were only set by
  * consuming an SDL event. On the Web build GHOST's unfiltered SDL_PollEvent() can drain the
  * controller events first (see below), so a press or a release could be missed: the axis sensor
@@ -143,12 +152,6 @@ bool DEV_Joystick::HandleEvents(short(&addrem)[JOYINDEX_MAX])
 
 	if (SDL_PumpEvents == (void *)0 || SDL_PeepEvents == (void *)0) {
 		return 0;
-	}
-
-	for (int i = 0; i < JOYINDEX_MAX; i++) {
-		if (DEV_Joystick::m_instance[i]) {
-			DEV_Joystick::m_instance[i]->OnNothing(&sdl_event);
-		}
 	}
 
 	SDL_PumpEvents();

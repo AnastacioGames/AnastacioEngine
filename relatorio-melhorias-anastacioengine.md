@@ -117,6 +117,10 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 
 - Por padrão, 1 `Update()` por frame com o catch-up por sleep herdado; com v-sync, `FrameOver()` zera o atraso.
   Fixed Timestep (opcional e sempre ligado no multiplayer) usa o acumulador do Plano 8, sem interpolação no render.
+- Bordas do joystick são acumuladas na captura e consumidas uma vez por passo lógico, após todas as cenas.
+  No catch-up, ações/poses/eventos seguem cada passo elegível e a deformação fica para o fim do lote,
+  preservando taxas de animação e half animations; servidor não faz skinning. Validações e limites na
+  [revisão do loop](docs/revisao-scenegraph-loop.md).
 - `import bge` e submódulos são aliases de `Range`; scripts novos usam `Range`. A inicialização restaura em
   `collections` as ABCs antigas e expõe `aud.Factory` como alias de `aud.Sound`.
 - `object.particles.enabled` segue a Game Property `GPU_Particles_Enabled`; scripts que precisam persistir o

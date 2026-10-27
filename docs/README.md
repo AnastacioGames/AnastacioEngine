@@ -70,6 +70,8 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   arquivos Python/C++, seis problemas reproduzidos e contratos incorretos do parser C.
 - [Revisão do helper de argumentos Python](revisao-parser-python.md): cache compartilhado corrigido,
   conferência de 25 usos e regressão com ordens de chamada invertidas.
+- [Revisão de SceneGraph e sequência da simulação](revisao-scenegraph-loop.md): propagação de
+  transformações, filas e relações de parenting; achados reproduzidos em teste C++ serial.
 
 ### Frentes recentes
 

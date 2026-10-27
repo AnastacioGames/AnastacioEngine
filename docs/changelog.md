@@ -8,6 +8,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 2: poses e eventos durante catch-up (ANI-01)
+
+- Animação avaliada em cada passo elegível do lote, preservando o gate da taxa global, restrição
+  de FPS da cena e half animations. Apenas a deformação é adiada para o último passo.
+- Conjunto de deformações pendentes conserva poses de passos anteriores quando o último é
+  restringido. Remoção retira o objeto antes de liberar referências; servidor descarta o conjunto
+  sem skinning; ImageRender consome trabalho pendente mesmo se a pose atual for restringida.
+- Probes C++ de política e acumulador passaram, incluindo input anterior, half animations,
+  restrição no último passo, suspensão, servidor, remoção e duplicação de entradas.
+- Quatro cenas `--server` passaram (224 passos), com ações, armature/filho de osso e eventos.
+  No caso normal, 54 triggers uma vez cada, antes da leitura da lógica. Gerador salva/reabre
+  as cenas e inspeciona os dados. Evidências em `artifacts/revisao-animacao-20261026/`.
+- Editor/player compilados, instalados e executados em segundo plano. Detector de trabalho
+  repetido e selftest passaram sem novos achados nos C++ alterados. Nenhuma janela aberta.
+- Pendentes: validação com render/skinning/ImageRender, auditoria parada, contatos dinâmicos e
+  custo de CPU. [Relatório e ferramentas](revisao-scenegraph-loop.md). Restam 11 achados SG/CLK.
+
 ## 2026-10-26 - Frente 4: personagem removido e callbacks de colisão sem memória liberada
 
 - [Revisão](revisao-fisica.md) FIS-04/05.
@@ -28,6 +45,33 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Regressão em `tools/debug/cenas/criar_cena_revisao_fisica.py`; os 8 casos passaram em `--server`.
 - Remover um corpo com a física suspensa agora apaga as constraints dele (FIS-03). Antes elas
   ficavam vivas apontando para o corpo já liberado.
+
+## 2026-10-26 - Frente 2: captura e consumo do joystick por passo (INP-02/03)
+
+- Captura Python antes da lógica, com bordas acumuladas até o consumo. Limpeza após todas
+  as cenas de cada passo, nos modos fixo e variável; zero passos preserva as bordas.
+- Flags dos sensores deixam de ser limpas na captura SDL e passam a ser consumidas ao fim
+  do passo. Mantida a detecção por estado vivo, inclusive controle virtual.
+- Diagnóstico C++ passou com zero/um/quatro passos, modo variável, soltura/reaperto acumulados,
+  duas cenas simuladas, Evaluate real de botão/eixo e regressão dos 15 botões INP-01.
+  Hardware/pipeline substituídos; manifesto de 13 arquivos conferido.
+- Build completo de editor/player e instalação passaram após aguardar os testes e builds do
+  Claude; nenhum processo dele foi interrompido. O bloqueio inicial LNK1104 e uma colisão de
+  instalação com outro Ninja estão detalhados no relatório.
+- Editor executou Python em background e encerrou com saída zero; player permaneceu ativo dez
+  segundos em `--server`, encerrado pelo smoke. Inicialização validada, não input físico.
+- [Relatório e limites](revisao-scenegraph-loop.md). Nenhuma janela aberta; joystick físico pendente.
+
+## 2026-10-26 - Frente 2: soltura e reaperto do joystick (INP-01)
+
+- `KX_PythonJoystick::UpdateJoystickEvents` preserva um estado NONE/ACTIVE por botão e limpa
+  as bordas anteriores com Clear; soltar não esvazia mais o estado nem reapertar conserva soltura antiga.
+- Diagnóstico C++ atualizado: 15 botões, segurar/soltar/reapertar e 100 ciclos por botão passaram;
+  usa corpos extraídos dos fontes atuais, com hardware substituído e manifesto conferido.
+- Editor/player recompilados; editor executou Python em background com saída zero; player
+  permaneceu ativo por 10 segundos em `--server`, encerrado pelo smoke conforme pre_release.
+- [Relatório e limites](revisao-scenegraph-loop.md): joystick físico pendente; INP-02/03 e ANI-01
+  continuam reproduzidos. Próxima peça: captura e consumo de bordas por passo lógico.
 
 ## 2026-10-26 - Frente 5: LibLoad/LibFree sem liberação dupla nem merge em cena removida
 

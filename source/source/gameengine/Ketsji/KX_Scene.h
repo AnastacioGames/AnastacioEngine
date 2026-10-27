@@ -55,6 +55,7 @@
 #include <memory>
 #include <set>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 template <class T>
@@ -431,10 +432,11 @@ private:
 	AnimationPoolData m_animationPoolData;
 	TaskPool *m_animationPool;
 	double m_previousAnimTime;
-	/// Which animated objects need a deformer (skinning) update this frame, filled by UpdateAnimations()
-	/// on the main thread before dispatching, then read (never inserted into) by the parallel pose pass
-	/// and consumed by UpdateAnimationDeformers(). See KX_Scene.cpp for why this split is thread-safe.
+	/// Pose-pass results: entries created on the main thread, assigned (never inserted)
+	/// by workers, then collected into pending deformation after all workers finish.
 	std::unordered_map<KX_GameObject *, bool> m_animNeedsUpdateCache;
+	/// Poses changed since the last deformation; maintained only on the main thread.
+	std::unordered_set<KX_GameObject *> m_pendingAnimationDeformers;
 
 	/// Animation task-pool callbacks. Static members (not free functions) because they need access to
 	/// m_animNeedsUpdateCache above. See KX_Scene.cpp for the pose/deform split this implements.
@@ -515,7 +517,7 @@ public:
 	void LogicBeginFrame(double curtime, double framestep);
 	void LogicUpdateFrame(double curtime);
 	bool UpdateAnimations(double curtime, bool restrict);
-	void UpdateAnimationDeformers();
+	void UpdateAnimationDeformers(bool applyToMesh = true);
 
 	void LogicEndFrame();
 

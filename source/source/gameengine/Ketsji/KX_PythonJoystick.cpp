@@ -70,6 +70,7 @@ SCA_InputEvent& KX_PythonJoystick::GetJoyStickInput(KX_PythonJoystick::JOYSTICK_
 }
 
 // Handle this way because we cannot pass the current input method to the joysticks
+// Captures append transitions; only a completed simulation step consumes them.
 void KX_PythonJoystick::UpdateJoystickEvents() 
 {
   const int button_number = JOYBUT_MAX;
@@ -78,17 +79,10 @@ void KX_PythonJoystick::UpdateJoystickEvents()
   for (int i = 0; i < button_number; i++) {
     SCA_InputEvent &event = m_joystickInputsTable[start_joystick_inputs + i];
     
-    // ACTIVATED in last frame
-    if (event.Find(SCA_InputEvent::JUSTACTIVATED)) {
-      event.m_queue.pop_back();
-    }
-
     // Button Pressed
     if (m_joystick->aButtonPressIsPositive(i)) {
       if (!event.Find(SCA_InputEvent::ACTIVE)) {
-        if (event.m_status.size() > 0)
-          event.m_status.pop_back();
-        event.m_status.push_back(SCA_InputEvent::ACTIVE);
+        event.m_status.back() = SCA_InputEvent::ACTIVE;
         event.m_queue.push_back(SCA_InputEvent::JUSTACTIVATED);
       }
     }
@@ -96,13 +90,15 @@ void KX_PythonJoystick::UpdateJoystickEvents()
     else if (event.Find(SCA_InputEvent::ACTIVE)) {
       // Set Released
       event.m_queue.push_back(SCA_InputEvent::JUSTRELEASED);
-      event.m_status.pop_back();
+      event.m_status.back() = SCA_InputEvent::NONE;
     }
-    // JUSTRELEASED
-    else if (event.Find(SCA_InputEvent::JUSTRELEASED)) {
-      event.m_queue.pop_back();
-      event.m_status.push_back(SCA_InputEvent::NONE);
-    }
+  }
+}
+
+void KX_PythonJoystick::ClearJoystickEvents()
+{
+  for (int i = BEGINJOYSTICK + 1; i < ENDJOYSTICK; ++i) {
+    m_joystickInputsTable[i].Clear();
   }
 }
 

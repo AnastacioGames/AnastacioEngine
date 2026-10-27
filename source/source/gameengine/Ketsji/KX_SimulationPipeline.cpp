@@ -38,7 +38,7 @@ KX_SimulationPipeline::KX_SimulationPipeline(KX_KetsjiEngine *engine)
 {
 }
 
-void KX_SimulationPipeline::Update()
+void KX_SimulationPipeline::Update(bool deformAnimations)
 {
 	/* Multiplayer: one Update() is one fixed logic step = one network tick (the manager turns the fixed
 	 * timestep on while a session is open). Before the step the received state is applied to the objects;
@@ -65,12 +65,14 @@ void KX_SimulationPipeline::Update()
 
 			if (!scene->IsSuspended()) {
 				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations);
-				const bool animationsRan = m_engine->UpdateAnimations(scene);
+				m_engine->UpdateAnimations(scene);
 				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations_deform);
 				/* A headless server (--server) keeps the poses (bone parents, logic) but skips the mesh
 				 * skinning: nobody sees the vertices and it was most of the idle server's CPU. */
-				if (animationsRan && !m_engine->IsServerMode()) {
-					scene->UpdateAnimationDeformers();
+				if (deformAnimations || m_engine->IsServerMode()) {
+					// A restricted last pose pass can still have deformation pending from an
+					// earlier step. Servers discard that work instead of retaining it forever.
+					scene->UpdateAnimationDeformers(!m_engine->IsServerMode());
 				}
 			}
 		}

@@ -180,9 +180,10 @@ existir.
 
 - Próximo passo possível: interpolação de transform no render (opcional, só
   para estados com par anterior/atual definido).
-- Com `timescale = 0` e passo fixo ligado, o laço pode rodar `m_maxLogicFrame`
-  `Update()` vazios por frame (achado de 2026-09-07). Conferir no código atual
-  se a correção de 2026-10-06 mudou isso.
+- A revisão de 2026-10-26 confirmou que `timescale = 0` gera divisão não finita antes
+  do cast da contagem de passos no código atual; a observação antiga de updates vazios
+  não descreve mais esse caminho. Definir pausa e coerência entre relógios/delta;
+  [achados CLK-01 a CLK-05 e limites da reprodução](revisao-scenegraph-loop.md).
 - Requisitos do modelo-alvo que seguem: limites reais de catch-up para lógica
   e física, política para excesso de tempo, pause/time scale/render desligado
   bem definidos, reprodutibilidade medida (sem prometer determinismo bit a

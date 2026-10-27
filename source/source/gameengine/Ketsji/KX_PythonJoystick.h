@@ -90,6 +90,8 @@ class KX_PythonJoystick : public EXP_Value {
 
   /* Manage joystick buttons (released, active .. etc) */
   virtual void UpdateJoystickEvents();
+  // Consume edges only after all scenes of a simulation step have read them.
+  void ClearJoystickEvents();
 
   virtual int GetAxisValue(int axis_index);
 

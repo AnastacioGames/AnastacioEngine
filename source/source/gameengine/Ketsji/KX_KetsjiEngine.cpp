@@ -800,6 +800,25 @@ bool KX_KetsjiEngine::NextFrame()
 		}
 	}
 
+	// Capture button transitions even when this outer frame owes no simulation step.
+	for (unsigned short i = 0; i < JOYINDEX_MAX; ++i) {
+		KX_PythonJoystick *joystick = (KX_PythonJoystick *)getPythonJoystick(i);
+		if (joystick) {
+			joystick->UpdateJoystickEvents();
+		}
+	}
+	auto clearJoystickEvents = []() {
+		for (unsigned short i = 0; i < JOYINDEX_MAX; ++i) {
+			KX_PythonJoystick *joystick = (KX_PythonJoystick *)getPythonJoystick(i);
+			if (joystick) {
+				joystick->ClearJoystickEvents();
+			}
+		}
+#ifdef WITH_SDL
+		DEV_Joystick::ClearEvents();
+#endif
+	};
+
 	// for each scene, call the proceed functions
 	int steps = 1;
 	if (m_useFixedTimestep) {
@@ -814,7 +833,6 @@ bool KX_KetsjiEngine::NextFrame()
 		m_simAccumulator += realDelta * m_timescale;
 
 		steps = std::min((int)(m_simAccumulator / m_framestep), m_maxLogicFrame);
-		const bool frameNeedsAnimation = m_needsAnimation;
 		for (int i = 0; i < steps; ++i) {
 			if (i > 0) {
 				// The previous step consumed this frame's edge events (JUSTACTIVATED etc.);
@@ -826,14 +844,13 @@ bool KX_KetsjiEngine::NextFrame()
 				m_networkMessageManager->ClearMessages();
 				process_audio_messages(m_networkMessageManager, m_audioManager);
 			}
-			// Animations are time based, so evaluating them once (on the last step) is enough
-			// for the drawn pose and avoids paying the skinning per catch-up step.
-			m_needsAnimation = frameNeedsAnimation && (i == steps - 1);
+			// Keep poses/events in step with logic; defer mesh deformation to the last step.
+			// The outer animation-rate gate remains unchanged for the whole batch.
 			AdvanceStepTime();
-			m_simulationPipeline->Update();
+			m_simulationPipeline->Update(i == steps - 1);
+			clearJoystickEvents();
 			m_simAccumulator -= m_framestep;
 		}
-		m_needsAnimation = frameNeedsAnimation;
 		KX_AnimLog("F real_dt=%.4f steps=%d acc=%.4f timescale=%.3f frameT=%.3f animT=%.3f", realDelta, steps,
 		           m_simAccumulator, m_timescale, m_frameTime, m_animationsTime);
 		double maxBacklog = m_framestep * m_maxLogicFrame;
@@ -843,6 +860,7 @@ bool KX_KetsjiEngine::NextFrame()
 	}
 	else {
 		m_simulationPipeline->Update();
+		clearJoystickEvents();
 		KX_AnimLog("F variable dt=%.4f timescale=%.3f frameT=%.3f animT=%.3f", m_deltatime, m_timescale, m_frameTime,
 		           m_animationsTime);
 	}
@@ -851,15 +869,6 @@ bool KX_KetsjiEngine::NextFrame()
 		m_logger.StartLog(tc_overhead);
 		// update system devices
 		m_inputDevice->ClearInputs();
-	}
-	// Process PythonJoystick Inputs
-	for (unsigned short i = 0; i < JOYINDEX_MAX; ++i) {
-		KX_PythonJoystick *joystick = (KX_PythonJoystick*)getPythonJoystick(i);
-		if (!joystick) {
-			continue;
-		}
-		
-		joystick->UpdateJoystickEvents();
 	}
 	
 

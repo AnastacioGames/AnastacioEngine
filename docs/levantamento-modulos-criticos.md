@@ -12,6 +12,39 @@ com compreensão por trecho e quatro defeitos reproduzidos em cena isolada.
 A [revisão da frente 8](revisao-dados-editor.md) começa a análise de baixo para cima: versioning e
 leitura/gravação dos dados da engine.
 
+## Andamento consolidado — 2026-10-26
+
+Estado conferido nos relatórios e commits locais. A coluna de responsável identifica quem registrou
+o trabalho; não presume que o outro agente esteja executando agora. Uma rodada de leitura concluída
+não encerra a frente enquanto houver correções ou validações pendentes.
+
+| Frente | Trabalho registrado | Situação e validação | Próximo passo |
+|---|---|---|---|
+| **1. Cenas e objetos — Codex** | Leitura integral de `KX_Scene`, núcleo e bindings de `KX_GameObject`; helper de argumentos Python e seus 25 usos conferidos. | Quatro defeitos de cena reproduzidos, ainda sem correção. OBJ-01..03, PY-01..08 e helper corrigidos (`06a10024`); editor/player compilados, CTest 15/15, 82 verificações do parser e sete cenários de regressão passaram. | Corrigir os quatro casos de cena; resolver contratos de réplica e validar os riscos restantes de referências, LOD, partículas e LibLoad. |
+| **2. Loop, SceneGraph e animação — Codex, frente atual** | Três rodadas: nós/filas/parenting/pipeline; relógio/acumulador/suspensão; input/joystick e animação durante catch-up. Conferida aplicação adiada de taxas durante o lote. | Quinze achados: SG-01..06, CLK-01..05, INP-01..03 e ANI-01. INP-01/02/03 e ANI-01 corrigidos. Regressões de input passaram; quatro cenas de animação no player passaram com ação, osso/filho, eventos e restrições de taxa. Editor/player compilados e editor validado em background. Outros 11 achados sem correção. | **Corrigir vertex parent (SG-01)** e seguir SG/CLK por partes. Joystick físico, skinning/ImageRender com render, auditoria parada e custo de CPU pendentes; limites no relatório. |
+| **3. Renderização e materiais** | Roteiro e arquivos de entrada mapeados. Há melhorias de render no histórico, mas elas não equivalem à revisão desta frente. | Sem relatório específico desta revisão registrado nesta lista. | Iniciar leitura do pipeline de render, sombras, buckets e materiais, apoiada em perfil CPU/GPU. |
+| **4. Física — Claude** | Duas rodadas: ciclo de vida de constraints e veículos; personagem e callbacks de colisão que suspendem/removem objetos ([revisão](revisao-fisica.md)). | FIS-01..05 corrigidos: constraint e personagem apagados derrubavam o player, `constraint_id` era pedaço de ponteiro, corpo suspenso removido deixava constraint viva, contato lido de manifold liberado. 14 casos `--server` passaram. | Soft body e tempo de física com muitos corpos; decidir o lado de `localPointA` nos callbacks. |
+| **5. Conversão e carregamento — Claude** | Primeira rodada: ciclo LibLoad → merge assíncrono → LibFree → remoção de cena ([revisão](revisao-conversao-libload.md)). | LIB-01..03 corrigidos: LibFree duplo corrompia o heap, LibFree durante carga assíncrona era descartado, remover a cena de destino deixava merge em cena liberada. 4 casos `--server` passaram. | Memória estável em 150 ciclos e `.cooked` conferido (hash + validação de limites). Resta medir picos do merge com janela. |
+| **6. Lógica e Python — Claude; bindings de objetos por Codex** | Claude revisou componentes e mensagens; confirmou que sensores, controladores e atuadores não foram lidos individualmente. Codex revisou os bindings de objetos e o helper citados na frente 1. | LOG-01 corrigido em `fc55dc8c`: broadcast sem destinatário não é duplicado. Claude confirmou teste em segundo plano com os números esperados. | Claude segue para a frente 5; fica pendente a leitura individual de sensores, controladores e atuadores da frente 6. |
+| **7. Multiplayer — Claude** | Relatório cobre sessão, mensagens, replicação, RPC, predição, compensação de lag e transportes; Steam e cliente WebSocket tiveram escopo limitado. | NET-01..04 corrigidos (`7ff15741`, `7115be4c`); `net_tests` 121/121. Claude confirmou recompilação posterior do editor e player, atualizando a pendência de relink do relatório. | Testar host/cliente com janela: saída por Quit/kick, entrada com o mesmo ID e devolução dos objetos de cena ao servidor. Teste com janela depende de pedido do usuário. |
+| **8. Dados, editor e plataformas — Claude; segunda revisão por Codex** | Versioning, dados de cutscene, exportadores, RNA, UI e encerramento revisados. Codex conferiu os oito commits informados e registrou CR-01..04. | Correções iniciais commitadas; CR-01..04 corrigidos por Claude em `f4ba9cb0`. Build editor/player e validações em background registrados; Web 136/136. Isso não substitui validação visual e em outras plataformas. | Definir o comportamento de `overwrite_lib` no export nativo (EXP-03), pendência ainda aberta no roadmap. |
+
+Relatórios para conferir os detalhes e limites:
+
+- Frente 1: [cena](revisao-kx-scene.md), [núcleo do objeto](revisao-kx-gameobject.md),
+  [bindings](revisao-kx-gameobject-python.md) e [parser](revisao-parser-python.md).
+- Frente 2: [SceneGraph, loop e relógio](revisao-scenegraph-loop.md).
+- Frente 6: [lógica, componentes e Python](revisao-logica-python.md).
+- Frente 7: [multiplayer](revisao-multiplayer.md).
+- Frente 8: [dados, editor e plataformas](revisao-dados-editor.md).
+
+**Retomada do Codex:** continuar a frente 2 no ponto indicado acima, sem iniciar outra frente
+antes de registrar o resultado dessa leitura. As correções abertas da frente 1 continuam pendentes.
+**Retomada do Claude:** frente 5, conforme atualização encaminhada pelo usuário. Claude informou
+concluídas suas rodadas nas frentes 8, 7 e 6; permanecem as pendências específicas registradas acima.
+Este quadro é o ponto de coordenação entre agentes; cada um deve atualizar sua linha com evidências,
+pendências e próximo passo, preservando a distinção entre análise, correção e validação.
+
 ## Ordem de análise
 
 | Ordem | Frente | Impacto principal | Motivo para analisar |
@@ -66,6 +99,12 @@ Navegação: [mapa de cena](code-map-gameengine.md) e [mapa do objeto](code-map-
 já ficam em `KX_SceneCutscene.cpp`. A análise deve respeitar essas extrações existentes.
 
 ## 2. Loop, transformações e animação
+
+Três rodadas registradas: [SceneGraph, relógio, input e animação durante catch-up](revisao-scenegraph-loop.md).
+Quinze achados com evidências e limites documentados: INP-01/02/03 e ANI-01 corrigidos, com
+regressões, build completo e execução editor/player em segundo plano passando. Outros 11 achados
+SG/CLK sem correção; joystick físico, skinning/ImageRender com render e medições ainda pendentes.
+Integração dos casos ainda pendente; a frente não está encerrada.
 
 **Entrada:** [KX_KetsjiEngine.cpp](../source/source/gameengine/Ketsji/KX_KetsjiEngine.cpp),
 [KX_SimulationPipeline.cpp](../source/source/gameengine/Ketsji/KX_SimulationPipeline.cpp),
