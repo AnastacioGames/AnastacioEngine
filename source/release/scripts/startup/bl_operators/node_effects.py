@@ -25,6 +25,7 @@
 
 import os
 import bpy
+import bpy.utils.previews
 from bpy.types import Operator, Panel
 from bpy.props import EnumProperty, StringProperty
 
@@ -180,8 +181,7 @@ def preview_icon(effect_id):
     if not os.path.isfile(path):
         return 0
     if _previews is None:
-        import bpy.utils.previews
-        _previews = bpy.utils.previews.new()
+        _previews =bpy.utils.previews.new()
     if effect_id not in _previews:
         _previews.load(effect_id, path, 'IMAGE')
     return _previews[effect_id].icon_id
@@ -296,7 +296,6 @@ def register_props():
 def unregister_props():
     global _previews
     if _previews is not None:
-        import bpy.utils.previews
         bpy.utils.previews.remove(_previews)
         _previews = None
     del bpy.types.WindowManager.node_effects_tab

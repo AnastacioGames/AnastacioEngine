@@ -321,7 +321,8 @@ def unregister():
     from bpy.utils import unregister_class
     for mod in reversed(_modules_loaded):
         for cls in reversed(mod.classes):
-            if getattr(cls, "is_registered", False):
+            # Operator classes have no is_registered here; bl_rna marks any registered class
+            if "bl_rna" in cls.__dict__:
                 unregister_class(cls)
 
 # Define a default UIList, when a list does not need any custom drawing...

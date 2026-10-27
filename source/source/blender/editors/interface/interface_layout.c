@@ -2314,7 +2314,10 @@ void uiItemPopoverPanel(
 	PanelType *pt = WM_paneltype_find(panel_type, true);
 
 	if (pt == NULL) {
-		RNA_warning("Panel type not found '%s'", panel_type);
+		/* no F8 (Reload Scripts) o cabeçalho redesenha antes dos painéis voltarem a ser registrados */
+		if (G.debug & G_DEBUG) {
+			RNA_warning("Panel type not found '%s'", panel_type);
+		}
 		return;
 	}
 	uiItemPopoverPanel_ptr(layout, C, pt, name, icon);
