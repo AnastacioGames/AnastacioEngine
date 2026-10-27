@@ -14,13 +14,13 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.6.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.6.0)** (Linux; Windows chega em breve na mesma página, use a 0.5.4 até lá)
+Versão atual: **[AnastacioEngine 0.6.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.6.0)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
+| [Windows x64 (0.6.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/AnastacioEngine-0.6.0-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
 | [Linux x86_64 (0.6.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/AnastacioEngine-0.6.0-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. |
-| [Windows x64 (0.5.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/AnastacioEngine-0.5.4-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). A 0.6.0 para Windows sai em breve. |
-| [RangeArmor 0.6.0 Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/RangeArmor-0.6.0-linux-x86_64.tar.xz) · [Windows (0.5.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/RangeArmor-0.5.4-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
+| [RangeArmor 0.6.0 Windows](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/RangeArmor-0.6.0-windows-x64.zip) · [Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/RangeArmor-0.6.0-linux-x86_64.tar.xz) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
 | [SHA-256 dos pacotes 0.6.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/SHA256SUMS.txt) | Hashes para conferir o download. |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `AnastacioEngine` (Linux).

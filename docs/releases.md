@@ -6,7 +6,6 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## Pendências abertas
 
-- **0.6.0 Windows pendente:** Linux publicada; subir os zips Windows e o `SHA256SUMS.txt` completo na mesma release (`gh release upload v0.6.0 ... --clobber`) e trocar no README a linha do Windows.
 - Web: o feixe do Spot na Volumetric Fog não aparece no navegador (no desktop aparece).
 - Linux: o OIDN não está no apt do container; o bake de lightmap usa box blur. Não é bug.
 - Testes que precisam de janela (`test_material_atlas_modal.py`, `test_material_atlas_integration.py -- --undo`)
@@ -30,8 +29,8 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.6.0
 
-Estado: **Linux publicada em 2026-10-27** (tag `v0.6.0`, com o splash novo `47b71d9e`). **Windows pendente:**
-os zips entram na mesma release depois do teste no Windows (ver o fim desta seção).
+Estado: **publicada completa em 2026-10-27** (tag `v0.6.0`, splash novo `47b71d9e`). Linux primeiro; Windows
+anexado no mesmo dia (ver "Windows final").
 
 ### Notas para o usuário (rascunho)
 
@@ -143,6 +142,19 @@ Resultados:
 Depois do Linux, no Windows: `git pull` (traz `ef7ba789`, `6e82c8ab`, `9d966d1e` e as correções do Rec), `ninja install`, recompilar o runtime Web (ou copiar o do Linux) para `build-web-release/bin`, rodar de novo
 `stage_release_web.py` na pasta e `stage_release_windows.py 0.6.0 --zip-only`; refazer o zip da RangeArmor (`prepare_cooked.py` mudou em `9d966d1e`) e o que mais
 mudar; extrair os zips numa pasta limpa e testar; `SHA256SUMS.txt`, README e site.
+
+### Windows final (2026-10-27)
+
+`git pull` até `458c5a95`; `ninja RangeEngine RangeRuntime install`; runtime Web recompilado em
+`build-web-release` (vcvars64 + `emsdk_env.bat`, manifesto regenerado); `stage_release_windows.py 0.6.0 --no-zip`,
+`stage_release_web.py` e `--zip-only`; RangeArmor refeita com `stage_rangearmor_windows.py` (19 arquivos, como a
+0.5.4). Zips sem `\` nem `.log`/`imgui.ini`. Extraídos em pasta limpa: editor `-b` abre (0.6.0 no binário) e
+`AnastacioRuntime --server` na `release_smoke_scene.py` grava `ok 60 3.11.7`.
+
+- `AnastacioEngine-0.6.0-windows-x64.zip` (203 MiB) sha256 `d15f8e5d1626c117d2d0ba6dc537dc166ad732a38b1c39a379b84afa17cea9b4`
+- `RangeArmor-0.6.0-windows-x64.zip` sha256 `3f061d39bb6c7c149fee3747b620eec0b2be77db2ab2bb865702ab3fdcfa8251`
+
+`SHA256SUMS.txt` da release ganhou as duas linhas (mantidas as do Linux); notas e README sem o "Windows em breve".
 
 ## 0.5.4
 
