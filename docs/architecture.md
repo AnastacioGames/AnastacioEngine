@@ -109,6 +109,10 @@ consumidos por ele. Esses ~24-30 membros `m_*time*` e as três funções (`Updat
 comportamental do módulo — decisão do usuário foi priorizar limpeza de comentários/nomes e esta
 documentação primeiro.
 
+Desde 2026-10-27 há um relógio único: frame, lógica, animação e física avançam pelo passo escalado
+(`m_framestep`), então `setTimeScale` afeta tudo junto e escala 0 pausa. A cutscene tem relógio próprio
+(`KX_CutsceneManager::Advance`), parado com a cena suspensa; `setUseExternalClock` foi descontinuado.
+
 O profiling de cada trecho usa `KX_TimeCategoryLogger` (`m_logger.StartLog(tc_XXX)`), com
 categorias no enum `KX_TimeCategory` (`KX_KetsjiEngine.h`) rotuladas em paralelo por
 `m_profileLabels[]` (`KX_KetsjiEngine.cpp`), que é o que `GetPyProfileDict()` expõe a Python. A categoria
