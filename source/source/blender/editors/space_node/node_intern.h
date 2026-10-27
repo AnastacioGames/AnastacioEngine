@@ -58,6 +58,7 @@ typedef struct bNodeLinkDrag {
 /* space_node.c */
 ARegion *node_has_buttons_region(ScrArea *sa);
 ARegion *node_has_tools_region(ScrArea *sa);
+ARegion *node_has_effects_region(ScrArea *sa);
 
 /* transform between View2Ds in the tree path */
 void snode_group_offset(struct SpaceNode *snode, float *x, float *y);
@@ -93,6 +94,7 @@ void NODE_OT_properties(struct wmOperatorType *ot);
 /* node_toolbar.c */
 void node_toolbar_register(struct ARegionType *art);
 void NODE_OT_toolbar(struct wmOperatorType *ot);
+void NODE_OT_effects_shelf(struct wmOperatorType *ot);
 
 /* node_ops.c */
 void node_operatortypes(void);

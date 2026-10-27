@@ -210,6 +210,25 @@ static PointerRNA rna_uiItemO(
 	return opptr;
 }
 
+/* Big preview button (effects shelf of the Node Editor): the icon fills a square of
+ * scale x scale units, the label goes in its own item below. */
+static PointerRNA rna_uiItemOPreview(uiLayout *layout, const char *opname, int icon_value, float scale,
+                                     const char *description)
+{
+	wmOperatorType *ot = WM_operatortype_find(opname, 0);
+	if (!ot || !ot->srna) {
+		RNA_warning("%s '%s'", ot ? "unknown operator" : "operator missing srna", opname);
+		return PointerRNA_NULL;
+	}
+	uiBlock *block = uiLayoutGetBlock(layout);
+	UI_block_layout_set_current(block, layout);
+	const int size = (int)(UI_UNIT_X * scale);
+	uiBut *but = uiDefIconButO_ptr(block, UI_BTYPE_BUT, ot, uiLayoutGetOperatorContext(layout), icon_value,
+	                               0, 0, size, size, description[0] ? description : NULL);
+	UI_but_flag_enable(but, UI_BUT_ICON_PREVIEW);
+	return *UI_but_operator_ptr_get(but);
+}
+
 static PointerRNA rna_uiItemOMenuHold(
         uiLayout *layout, const char *opname, const char *name, const char *text_ctxt,
         bool translate, int icon, bool emboss, bool depress, int icon_value,
@@ -665,6 +684,19 @@ void RNA_api_ui_layout(StructRNA *srna)
 		RNA_def_function_return(func, parm);
 		RNA_def_function_ui_description(func, "Item. Places a button into the layout to call an Operator");
 	}
+
+	func = RNA_def_function(srna, "operator_preview", "rna_uiItemOPreview");
+	parm = RNA_def_string(func, "operator", NULL, 0, "", "Identifier of the operator");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_property(func, "icon_value", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_ui_text(parm, "Icon Value", "Preview icon (bpy.utils.previews)");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_float(func, "scale", 5.0f, 1.0f, 20.0f, "", "Size of the square, in button units", 1.0f, 20.0f);
+	RNA_def_string(func, "description", NULL, 0, "", "Tooltip");
+	parm = RNA_def_pointer(func, "properties", "OperatorProperties", "", "Operator properties to fill in");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED | PARM_RNAPTR);
+	RNA_def_function_return(func, parm);
+	RNA_def_function_ui_description(func, "Item. Big preview button that calls an Operator");
 
 	func = RNA_def_function(srna, "operator_enum", "uiItemsEnumO");
 	parm = RNA_def_string(func, "operator", NULL, 0, "", "Identifier of the operator");

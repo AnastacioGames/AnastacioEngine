@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-27 - Faixa de efeitos no Compositing (estilo Blender 5)
+
+- Node Editor ganha uma faixa embaixo (região TOOL_PROPS, aberta por padrão no Compositing, View > Effects Shelf) com miniaturas de efeitos prontos e abas All/Camera & Lens/Color/Glow/Style.
+- 11 efeitos, todos com nós que rodam no jogo: Vignette, Chromatic Aberration, Fisheye, Sepia, Split Toning, Tune Image, Bloom, Sun Beams, Pixel Art, Outline, Motion Blur. Entram como nós soltos dentro de um Frame (o jogo não lê grupos), entre a imagem e o Composite/Viewer.
+- Miniaturas em `release/scripts/startup/node_effects/<id>.png` (256x256, prints do jogo); trocar o PNG troca a miniatura. Efeito novo: função em `bl_operators/node_effects.py` + linha em `EFFECTS`.
+- `UILayout.operator_preview(operator, icon_value, scale, description)`: botão de prévia grande para operador.
+- Film Grain ficou de fora: falta um nó de ruído no compositor do jogo.
+
+
 ## 2026-10-27 - Cutscene: espera congela a linha do tempo
 
 - Wait Trigger, Wait Time e Wait Camera End param a linha do tempo da cutscene; os eventos seguintes mantêm o espaçamento em vez de dispararem juntos ao fim da espera.

@@ -54,6 +54,7 @@ _modules = [
     "mask",
     "mesh",
     "node",
+    "node_effects",
     "object_align",
     "object",
     "object_randomize_transform",

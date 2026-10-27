@@ -21,9 +21,14 @@
  *  \ingroup nodes
  */
 
+#include "MEM_guardedalloc.h"
+
 #include "BLI_utildefines.h"
+#include "BLI_listbase.h"
 
 #include "DNA_node_types.h"
+#include "DNA_screen_types.h"
+#include "DNA_space_types.h"
 
 #include "BKE_context.h"
 #include "BKE_screen.h"
@@ -72,5 +77,51 @@ void NODE_OT_toolbar(wmOperatorType *ot)
 	ot->poll = node_toolbar_poll;
 
 	/* flags */
+	ot->flag = 0;
+}
+
+/* ********** effects shelf: strip of ready-made effects at the bottom (Python panels) */
+
+ARegion *node_has_effects_region(ScrArea *sa)
+{
+	ARegion *ar = BKE_area_find_region_type(sa, RGN_TYPE_TOOL_PROPS);
+	if (ar) {
+		return ar;
+	}
+	/* after the main region, so it takes the bottom of the whole area */
+	ar = BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
+	if (ar == NULL) {
+		return NULL;
+	}
+	SpaceNode *snode = sa->spacedata.first;
+	ARegion *arnew = MEM_callocN(sizeof(ARegion), "node effects shelf");
+	BLI_insertlinkbefore(&sa->regionbase, ar, arnew);
+	arnew->regiontype = RGN_TYPE_TOOL_PROPS;
+	arnew->alignment = RGN_ALIGN_BOTTOM;
+	/* shown at first only where the effects apply */
+	if (!STREQ(snode->tree_idname, "CompositorNodeTree")) {
+		arnew->flag = RGN_FLAG_HIDDEN;
+	}
+	return arnew;
+}
+
+static int node_effects_toggle_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	ARegion *ar = node_has_effects_region(CTX_wm_area(C));
+	if (ar) {
+		ED_region_toggle_hidden(C, ar);
+	}
+	return OPERATOR_FINISHED;
+}
+
+void NODE_OT_effects_shelf(wmOperatorType *ot)
+{
+	ot->name = "Effects Shelf";
+	ot->description = "Toggles the strip of ready-made effects";
+	ot->idname = "NODE_OT_effects_shelf";
+
+	ot->exec = node_effects_toggle_exec;
+	ot->poll = node_toolbar_poll;
+
 	ot->flag = 0;
 }

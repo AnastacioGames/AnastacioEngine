@@ -377,9 +377,10 @@ static void node_free(SpaceLink *sl)
 
 
 /* spacetype; init callback */
-static void node_init(struct wmWindowManager *UNUSED(wm), ScrArea *UNUSED(sa))
+static void node_init(struct wmWindowManager *UNUSED(wm), ScrArea *sa)
 {
-
+	/* older files have no effects shelf */
+	node_has_effects_region(sa);
 }
 
 static void node_area_listener(bScreen *sc, ScrArea *sa, wmNotifier *wmn)
@@ -1092,6 +1093,16 @@ void ED_spacetype_node(void)
 	BLI_addhead(&st->regiontypes, art);
 
 	node_toolbar_register(art);
+
+	/* regions: effects shelf (strip at the bottom, panels from Python) */
+	art = MEM_callocN(sizeof(ARegionType), "spacetype node effects region");
+	art->regionid = RGN_TYPE_TOOL_PROPS;
+	art->prefsizey = 130;
+	art->keymapflag = ED_KEYMAP_UI | ED_KEYMAP_FRAMES;
+	art->listener = node_region_listener;
+	art->init = node_toolbar_region_init;
+	art->draw = node_toolbar_region_draw;
+	BLI_addhead(&st->regiontypes, art);
 
 	BKE_spacetype_register(st);
 }

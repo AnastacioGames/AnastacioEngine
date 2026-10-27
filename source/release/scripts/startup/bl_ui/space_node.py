@@ -239,6 +239,8 @@ class NODE_MT_view(Menu):
 
         layout.operator("node.properties", icon='MENU_PANEL')
         layout.operator("node.toolbar", icon='MENU_PANEL')
+        if context.space_data.tree_type == 'CompositorNodeTree':
+            layout.operator("node.effects_shelf", icon='MENU_PANEL')
 
         layout.separator(factor=1)
 

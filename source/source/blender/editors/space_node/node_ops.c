@@ -43,6 +43,7 @@ void node_operatortypes(void)
 {
 	WM_operatortype_append(NODE_OT_properties);
 	WM_operatortype_append(NODE_OT_toolbar);
+	WM_operatortype_append(NODE_OT_effects_shelf);
 
 	WM_operatortype_append(NODE_OT_select);
 	WM_operatortype_append(NODE_OT_select_all);
