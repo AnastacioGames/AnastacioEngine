@@ -1524,9 +1524,9 @@ static void draw_tree_path(const bContext *C, ARegion *ar, SpaceNode *snode)
 		uiDefIconTextButO(block, UI_BTYPE_BUT, "NODE_OT_auto_arrange", WM_OP_INVOKE_DEFAULT, ICON_NODETREE,
 		                  label, (int)x, (int)(1.5f * UI_UNIT_Y - 0.3f * UI_UNIT_Y), w, h,
 		                  TIP_("Arrange the nodes in columns, following the links"));
-		/* e o botão da faixa de efeitos, onde ela se aplica */
-		if (STREQ(snode->tree_idname, "CompositorNodeTree")) {
-			const char *fx_label = IFACE_("Effects");
+		/* e o botão da faixa de efeitos (o mesmo do menu View) */
+		{
+			const char *fx_label = IFACE_("Effects Shelf");
 			const int fx_w = (int)(BLF_width_default(fx_label, BLF_DRAW_STR_DUMMY_MAX) + 2.5f * UI_UNIT_X);
 			uiDefIconTextButO(block, UI_BTYPE_BUT, "NODE_OT_effects_shelf", WM_OP_INVOKE_DEFAULT, ICON_IMAGE_COL,
 			                  fx_label, (int)x + w + (int)(0.4f * UI_UNIT_X), (int)(1.5f * UI_UNIT_Y - 0.3f * UI_UNIT_Y),
