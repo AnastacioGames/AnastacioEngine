@@ -39,6 +39,7 @@
 #include <cmath>
 #include <cctype>
 #include <cstdlib>
+#include <cstring>
 
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
