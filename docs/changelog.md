@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 2: vertex parent avisa os descendentes (SG-01)
+
+`KX_VertexParentRelation::UpdateChildCoordinates` recalculava o filho mas não ligava `parentUpdated`, então um neto com relação normal não acompanhava quando o filho de vertex parent mudava. Agora liga, como a relação normal. Validado no teste serial (`tools/debug/revisao_scenegraph.cpp`: neto em 4) e numa cena `--server` com pai, filho por vértice e neto: mover o filho em +3 levou o neto junto.
+
 ## 2026-10-26 - Frente 2: poses e eventos durante catch-up (ANI-01)
 
 - Animação avaliada em cada passo elegível do lote, preservando o gate da taxa global, restrição
@@ -107,6 +111,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   fórmulas da 2.79 (limiar por luminância, MixGlare); Quality/Iterations não são seguidos à risca. ≤ 1,3 ms.
 - Glare tipo Bloom (como no Blender 5, só no jogo; no render vira Fog Glow): soma de todos os níveis de mipmap
   da parte brilhante, cada um suavizado por 9 amostras. Brilho mais largo e macio que o Fog Glow, mesmo custo.
+- Compositing no jogo, nós novos: Filter (Soften, Sharpen, Laplace, Sobel, Prewitt, Kirsch, Shadow, com os
+  kernels da 2.79), Pixelate, Translate (com Wrap e Relative), Rotate, Scale (Relative/Absolute), Flip,
+  Transform, Map Value, Map Range, Switch, Separate/Combine HSVA e o nó Sun Beams (~Game: 32 amostras).
+  Fora da imagem fica transparente, como no render. O Filter e o Sun Beams leem a cadeia anterior de uma
+  textura intermediária. Presets `nos_*` no `medir_compositing_jogo.py`.
 - Glare Bloom e Sun Beams mais leves: o Bloom lê 4 pontos bilineares por nível no lugar de 9 (mesmo
   filtro 1-2-1); o Sun Beams usa 16 amostras com deslocamento por pixel, lidas no mipmap 2. iGPU (Radeon
   do 5900HX, 720p): Bloom +2,3 → +1,4 ms, Sun Beams +2,4 → +1,5 ms; RX 6800M ≤ 0,1 ms. Imagem igual a

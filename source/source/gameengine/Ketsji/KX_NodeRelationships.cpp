@@ -95,6 +95,9 @@ bool KX_VertexParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_No
 		return false;
 	}
 
+	// Like the normal relation: descendants must recompute from the new world transform.
+	parentUpdated = true;
+
 	child->SetWorldScale(child->GetLocalScale());
 
 	if (parent) {

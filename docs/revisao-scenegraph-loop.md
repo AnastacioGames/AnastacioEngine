@@ -590,4 +590,8 @@ os contadores publicados em BeginFrame não aferem esse custo num servidor sem r
 Interação da pose com contatos de corpos dinâmicos também não foi medida nesta cena.
 
 Estado: INP-01/02/03 e ANI-01 corrigidos nos limites descritos; 11 achados SG/CLK sem correção.
-Próxima peça: propagação de vertex parent (SG-01), com reprodução e validação isoladas.
+## Continuação: vertex parent propaga para os descendentes (SG-01)
+
+`KX_VertexParentRelation::UpdateChildCoordinates` agora liga `parentUpdated = true` quando recalcula, como a relação normal. No teste serial o neto passou de 1 para 4; numa cena `--server` (pai, filho por vértice, neto normal), mover o filho em +3 manteve o neto a 2 unidades dele. Restam 10 achados (SG-02..06, CLK-01..05).
+
+Próxima peça: orientação sob escala singular (SG-02).
