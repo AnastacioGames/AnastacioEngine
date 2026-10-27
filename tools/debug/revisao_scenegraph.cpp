@@ -99,6 +99,11 @@ int main()
     first.resetSecondary();
     second.resetSecondary();
 
-    return (before == 1 && after == 1 && !zeroFinite && delta == 2 && admitted && stale &&
-            identicalUpdates == 0 && zeroUpdates == 50) ? 0 : 1;
+    // Exit 0 only with SG-01/02/03/04/06 fixed (the original reproduction expected the defects).
+    const bool fixed = before == 1 && std::fabs(after - 4.0f) < 1e-5f && zeroFinite &&
+                       std::fabs(delta - 1.0f) < 1e-5f && !admitted && !stale &&
+                       identicalUpdates == 0 && zeroUpdates == 0;
+    std::printf("%s
+", fixed ? "SG_ALL_FIXED" : "SG_REGRESSION");
+    return fixed ? 0 : 1;
 }

@@ -602,4 +602,8 @@ Estado: INP-01/02/03 e ANI-01 corrigidos nos limites descritos; 11 achados SG/CL
 
 `RelativeTranslate` global agora aplica a rotação inversa e divide pela escala mundial do pai por eixo (eixo zero não divide). Relação vertex recebe o deslocamento sem conversão, porque herda só a posição. As três operações relativas retornam cedo com valor neutro exato (zero, identidade, um), sem `SetModified`. Teste serial: `world_delta=1` e `zero_movement_callbacks=0`; teste extra com pai girado 0,7 rad em escala (2; 0,5; 3), pai em escala (-2,1,1) e vertex parent: erro < 3e-7. Restam 7 achados (SG-04, SG-05, CLK-01..05).
 
-Próxima peça: fila `QAddFront` (SG-04) e `m_modified` na cópia de nó (SG-05).
+## Continuação: fila e réplica (SG-04, SG-05)
+
+`QAddFront` usa `QEmpty()` como `QAddBack`, e o comentário diz "front". O construtor de cópia inicializa `m_modified(true)`: a réplica força a primeira atualização, igual ao construtor comum. O harness serial agora valida as correções e sai 0 só com SG-01/02/03/04/06 corrigidos. Rodado com as mudanças: todos os valores esperados. **Pendente para retomar:** build completo `RangeEngine RangeRuntime` e as regressões em `--server` (física, colisão, vertex parent, animação no player). Restam CLK-01..05.
+
+Próxima peça: validar SG-04/05 no build, depois relógio (CLK-01).

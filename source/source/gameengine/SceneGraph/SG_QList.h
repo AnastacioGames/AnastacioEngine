@@ -122,9 +122,9 @@ public:
 		m_bqlink = item;
 		return true;
 	}
-	bool QAddFront(SG_QList *item)    // Add to the back
+	bool QAddFront(SG_QList *item)    // Add to the front
 	{
-		if (!item->Empty()) {
+		if (!item->QEmpty()) {
 			return false;
 		}
 		item->m_fqlink = m_fqlink;

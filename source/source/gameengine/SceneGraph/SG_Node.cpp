@@ -74,6 +74,8 @@ SG_Node::SG_Node(const SG_Node & other)
 	m_worldScaling(other.m_worldScaling),
 	m_parent_relation(other.m_parent_relation ? other.m_parent_relation->NewCopy() : nullptr),
 	m_familly(new SG_Familly()),
+	// A new replica computes its world transform on the first update, like a new node.
+	m_modified(true),
 	m_dirty(DIRTY_NONE)
 {
 }
