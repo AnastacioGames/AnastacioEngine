@@ -106,9 +106,9 @@ Pacotes Windows montados (2026-10-27), ainda sem zip final da engine:
 
 ### Teste Linux (2026-10-27, notebook Linux, clone `~/AnastacioEngine-build050`)
 
-Pacotes em `~/AnastacioEngine-build050/build-linux/dist/` (main `6e82c8ab`; a RangeArmor com `9d966d1e`):
+Pacotes em `~/AnastacioEngine-build050/build-linux/dist/` (engine em `0079d62f`; a RangeArmor com `9d966d1e`):
 
-- `AnastacioEngine-0.6.0-linux-x86_64.tar.xz` (281 MB) sha256 `ef2669c5364ecb221e055a9046211cfc6606dcd136304177ff0bc60a3ab3b064`
+- `AnastacioEngine-0.6.0-linux-x86_64.tar.xz` (281 MB) sha256 `eef34d8496e77c0230652b34b385a9dd56685f786d4ed692439d0600de938242`
 - `RangeArmor-0.6.0-linux-x86_64.tar.xz` (7,4 MB) sha256 `282b9dc5331568056136ec1aac944d785cedda7667148e217a0d8bb5d33bf123`
 
 Resultados:
@@ -129,9 +129,18 @@ Resultados:
    `test_universal_linux.py --run` 7/7 OK e o jogo rodou o módulo a partir do `.pyc` (marcador
    `MARKER_PYC frames=60`). O lado Windows do Universal foi um `.exe` falso (não há runtime Windows aqui).
    Bug achado e corrigido (`9d966d1e`): o cook rodava com `cwd=data/` e o `imgui.ini` criado ia no pacote.
-6. Não feito: abrir o editor e o jogo com janela pelo launcher (passo 6), à espera do usuário.
+6. Com janela (pedido do usuário): editor abre; jogo de Compositing roda com o efeito visível; Node Editor
+   troca de área para Shader/Compositing/Logic Tree/UI Tree sem crash.
+7. **Rec fechava o editor no Linux** (achado pelo usuário): sem FFmpeg e sem AVI, `BKE_movie_handle_get`
+   devolvia NULL e `BKE_screencast_begin` o copiava. Correções (`f2638a71` e `0079d62f`): checagem de
+   NULL, `WITH_CODEC_AVI` ligado nos presets Linux (grava `.avi` MJPEG; MP4 H.264 segue só no Windows),
+   índice AVI sem buracos, nome `.avi` (antes `.mp40001-0001.avi`, e o Play Last do Standalone não achava),
+   parada em 1,9 GB, buffer `FILE_MAX` no `start_avi`. **Vale também no Windows:** a captura agora arredonda
+   o tamanho para baixo (arredondar para cima perdia todos os quadros com janela de largura/altura ímpar).
+   Conferido: gravação de 3,8 s → 114 quadros a 30 fps, índice sem entradas vazias, janela 1854x1131.
+   `testar-release.sh` de novo 23/23.
 
-Depois do Linux, no Windows: `git pull` (traz `ef7ba789`, `6e82c8ab`, `9d966d1e`), `ninja install`, recompilar o runtime Web (ou copiar o do Linux) para `build-web-release/bin`, rodar de novo
+Depois do Linux, no Windows: `git pull` (traz `ef7ba789`, `6e82c8ab`, `9d966d1e` e as correções do Rec), `ninja install`, recompilar o runtime Web (ou copiar o do Linux) para `build-web-release/bin`, rodar de novo
 `stage_release_web.py` na pasta e `stage_release_windows.py 0.6.0 --zip-only`; refazer o zip da RangeArmor (`prepare_cooked.py` mudou em `9d966d1e`) e o que mais
 mudar; extrair os zips numa pasta limpa e testar; `SHA256SUMS.txt`, README e site.
 
