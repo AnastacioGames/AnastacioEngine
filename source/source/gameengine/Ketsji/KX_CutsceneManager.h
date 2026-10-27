@@ -87,7 +87,7 @@ public:
 	/**
 	 * Advance to an absolute runtime time in seconds and return each event crossed
 	 * since the preceding call. Events with equal times retain their authoring
-	 * order. Moving backwards restores the cursor without replaying events.
+	 * order. Earlier times are ignored; dispatch stops at a wait event.
 	 */
 	DispatchedEvents Update(double time);
 	/**
@@ -100,6 +100,8 @@ public:
 	double GetTime() const;
 	/** Time played since Start(), waits included; drives camera paths and Wait Time. */
 	double GetPlayTime() const;
+	/** Played time at which the last dispatched wait event was reached. */
+	double GetWaitStartPlayTime() const;
 
 	bool IsPlaying() const;
 	int GetActiveSequenceIndex() const;
@@ -138,6 +140,7 @@ private:
 	/* Wait state: pause timeline during cutscene transitions */
 	WaitType m_waitType;
 	double m_waitUntilTime;
+	double m_waitStartPlayTime;
 	std::string m_waitTriggerName;
 	std::vector<std::string> m_latchedTriggers;
 };

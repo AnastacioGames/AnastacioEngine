@@ -142,11 +142,20 @@ int main() {
     waits.m_events[0].m_type=14;  // WAIT_TIME
     KX_CutsceneManager timed({waits});
     require(timed.Start(0) && timed.Advance(0.5).size()==1);
-    timed.StartWaitTime(timed.GetPlayTime()+2);
-    // Deadline at played=2.5; only the 0.5 s past it moves the timeline, reaching A at 1.0.
+    // The wait was reached at played=0 (the step overshot it by 0.5), so the deadline is 2.0.
+    require(timed.GetTime()==0.0 && timed.GetWaitStartPlayTime()==0.0);
+    timed.StartWaitTime(timed.GetWaitStartPlayTime()+2);
     require(timed.Advance(1.5).empty() && timed.Advance(1).size()==1 && timed.GetTime()==1.0);
     require(timed.Advance(0.5).empty() && timed.Advance(0.5).size()==1);
     std::cout << "wait_time timeline=" << timed.GetTime() << " played=" << timed.GetPlayTime() << '\n';
+    // An event right after a wait keeps its spacing even when one step crosses both.
+    waits.m_events[0].m_type=15;
+    waits.m_events[1].m_time=0.01;
+    KX_CutsceneManager close({waits});
+    require(close.Start(0) && close.Advance(0.5).size()==1);
+    close.StartWaitTrigger("go");
+    require(close.ReleaseTrigger("go") && close.Advance(0.005).empty() && close.Advance(0.005).size()==1);
+    std::cout << "wait_spacing kept timeline=" << close.GetTime() << '\n';
     // Suspension bookkeeping: the action clock does not move across a suspension.
     for (double scale : {0.5,1.0,2.0}) {
         ClockProbe p;

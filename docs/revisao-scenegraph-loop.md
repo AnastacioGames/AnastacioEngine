@@ -655,4 +655,6 @@ Custo de CPU da recuperação de passos atrasados (ANI-01), medido em `--server`
 
 Com a restrição, a deformação fica só para o último passo do lote, que custa cerca de 2,5 ms (p90). Assim um lote de 5 passos sai de cerca de 12 ms para cerca de 2,6 ms. A pose e os eventos continuam sendo calculados em todos os passos.
 
+Ajuste final da revisão de código: a linha do tempo para no instante do evento de espera, e não no fim do passo que o cruzou. Assim um evento colado depois da espera mantém o espaçamento, e o prazo do Wait Time conta a partir de quando a espera foi alcançada (`GetWaitStartPlayTime()`). O trecho de `Update()` para tempo voltando, que nunca rodava, saiu. `tools/debug/revisao_relogio.py` ganhou o caso `wait_spacing` (exit 0); em `--server`, Wait Trigger deu A/B em +64/+128 ticks da liberação e Wait Time deu 3,0 s e 4,0 s.
+
 Estado da frente: os 15 achados e este estão corrigidos. Falta a conferência com janela: joystick com controle real, `setTimeScale` no RolimaRacer e o render da recuperação de passos atrasados numa cena parada.

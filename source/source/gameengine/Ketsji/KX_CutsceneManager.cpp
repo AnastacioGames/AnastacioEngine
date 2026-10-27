@@ -22,7 +22,8 @@ KX_CutsceneManager::KX_CutsceneManager(Sequences sequences)
 	  m_playTime(0.0),
 	  m_isPlaying(false),
 	  m_waitType(WAIT_NONE),
-	  m_waitUntilTime(0.0)
+	  m_waitUntilTime(0.0),
+	  m_waitStartPlayTime(0.0)
 {
 }
 
@@ -82,13 +83,8 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Update(double time)
 	}
 
 	const std::vector<Event>& events = m_sequences[m_activeSequenceIndex].m_events;
+	/* Advance() only moves forward. */
 	if (time < m_time) {
-		m_nextEventIndex = 0;
-		while (m_nextEventIndex < m_eventOrder.size() &&
-		       events[m_eventOrder[m_nextEventIndex]].m_time <= time) {
-			++m_nextEventIndex;
-		}
-		m_time = time;
 		return dispatchedEvents;
 	}
 
@@ -105,7 +101,11 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Update(double time)
 
 		/* Pause after WAIT_* events; will be resumed by scene check */
 		if (event->m_type == 14 || event->m_type == 15 || event->m_type == 16) { // WAIT_TIME, WAIT_TRIGGER, WAIT_CAMERA_END
-			break;
+			/* The timeline stops at the wait, so the rest of the step is not credited to the
+			 * events after it; the wait itself began that much earlier in played time. */
+			m_waitStartPlayTime = m_playTime - (time - event->m_time);
+			m_time = event->m_time;
+			return dispatchedEvents;
 		}
 	}
 	m_time = time;
@@ -136,6 +136,11 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Advance(double deltaTim
 double KX_CutsceneManager::GetPlayTime() const
 {
 	return m_playTime;
+}
+
+double KX_CutsceneManager::GetWaitStartPlayTime() const
+{
+	return m_waitStartPlayTime;
 }
 
 double KX_CutsceneManager::GetTime() const

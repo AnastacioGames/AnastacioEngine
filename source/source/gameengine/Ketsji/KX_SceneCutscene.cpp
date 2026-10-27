@@ -836,7 +836,7 @@ void KX_Scene::DispatchCutsceneEvents()
 
 		case CUTSCENE_EVENT_WAIT_TIME:
 			if (m_cutsceneManager && event->m_paramFloat > 0.0f) {
-				m_cutsceneManager->StartWaitTime(m_cutsceneManager->GetPlayTime() + event->m_paramFloat);
+				m_cutsceneManager->StartWaitTime(m_cutsceneManager->GetWaitStartPlayTime() + event->m_paramFloat);
 			}
 			break;
 
