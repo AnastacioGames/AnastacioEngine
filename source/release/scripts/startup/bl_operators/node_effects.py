@@ -287,9 +287,19 @@ class NODE_PT_effects_shelf(Panel):
             col.label(text=name)
 
 
-bpy.types.WindowManager.node_effects_tab = EnumProperty(
-    name="Category", items=CATEGORIES, default='ALL',
-    description="Kind of effect shown in the shelf")
+def register_props():
+    bpy.types.WindowManager.node_effects_tab = EnumProperty(
+        name="Category", items=CATEGORIES, default='ALL',
+        description="Kind of effect shown in the shelf")
+
+
+def unregister_props():
+    global _previews
+    if _previews is not None:
+        import bpy.utils.previews
+        bpy.utils.previews.remove(_previews)
+        _previews = None
+    del bpy.types.WindowManager.node_effects_tab
 
 
 classes = (
