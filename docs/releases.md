@@ -6,7 +6,7 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## Pendências abertas
 
-- **0.6.0 em preparo** (ver a seção abaixo). A 0.5.4 Linux não sai: a 0.6.0 a substitui.
+- **0.6.0 Windows pendente:** Linux publicada; subir os zips Windows e o `SHA256SUMS.txt` completo na mesma release (`gh release upload v0.6.0 ... --clobber`) e trocar no README a linha do Windows.
 - Web: o feixe do Spot na Volumetric Fog não aparece no navegador (no desktop aparece).
 - Linux: o OIDN não está no apt do container; o bake de lightmap usa box blur. Não é bug.
 - Testes que precisam de janela (`test_material_atlas_modal.py`, `test_material_atlas_integration.py -- --undo`)
@@ -30,8 +30,8 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.6.0
 
-Estado: **em preparo (2026-10-27).** Windows pré-conferido; **Linux testado e pacotes Linux prontos** (ver
-"Teste Linux"). Falta no Windows: recompilar com os 3 commits do Linux, runtime Web novo, zips finais e teste.
+Estado: **Linux publicada em 2026-10-27** (tag `v0.6.0`, com o splash novo `47b71d9e`). **Windows pendente:**
+os zips entram na mesma release depois do teste no Windows (ver o fim desta seção).
 
 ### Notas para o usuário (rascunho)
 
@@ -108,7 +108,7 @@ Pacotes Windows montados (2026-10-27), ainda sem zip final da engine:
 
 Pacotes em `~/AnastacioEngine-build050/build-linux/dist/` (engine em `0079d62f`; a RangeArmor com `9d966d1e`):
 
-- `AnastacioEngine-0.6.0-linux-x86_64.tar.xz` (281 MB) sha256 `eef34d8496e77c0230652b34b385a9dd56685f786d4ed692439d0600de938242`
+- `AnastacioEngine-0.6.0-linux-x86_64.tar.xz` (281 MB) sha256 `43cdca3eb355834ea3a8eee2ecbcb6fecd05f4f7abefa3787fc0853a2b05a826` (rebuild com o splash novo, 23/23)
 - `RangeArmor-0.6.0-linux-x86_64.tar.xz` (7,4 MB) sha256 `282b9dc5331568056136ec1aac944d785cedda7667148e217a0d8bb5d33bf123`
 
 Resultados:

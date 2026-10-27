@@ -10,24 +10,40 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 > **Para baixar a engine, use a seção [Download](#download) ou a página de [Releases](https://github.com/AnastacioGames/AnastacioEngine/releases).**
 > O botão verde **Code → Download ZIP** baixa só o código-fonte, sem os executáveis.
 
-![Splash Screen da AnastacioEngine](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.5.0/splash.png)
+![Splash Screen da AnastacioEngine](https://raw.githubusercontent.com/AnastacioGames/AnastacioEngine/main/release-images/v0.6.0/splash.png)
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.5.4](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.5.4)** (Windows; Linux em breve, use a 0.5.3 até lá)
+Versão atual: **[AnastacioEngine 0.6.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.6.0)** (Linux; Windows chega em breve na mesma página, use a 0.5.4 até lá)
 
 | Pacote | Conteúdo |
 |---|---|
-| [Windows x64 (0.5.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/AnastacioEngine-0.5.4-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
-| [Linux x86_64 (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/AnastacioEngine-0.5.3-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. A 0.5.4 para Linux sai em breve. |
-| [RangeArmor 0.5.4 Windows](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/RangeArmor-0.5.4-windows-x64.zip) · [Linux (0.5.3)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.3/RangeArmor-0.5.3-linux-x86_64.tar.xz) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
-| [SHA-256 dos pacotes 0.5.4](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/SHA256SUMS.txt) | Hashes para conferir o download. |
+| [Linux x86_64 (0.6.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/AnastacioEngine-0.6.0-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. |
+| [Windows x64 (0.5.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/AnastacioEngine-0.5.4-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). A 0.6.0 para Windows sai em breve. |
+| [RangeArmor 0.6.0 Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/RangeArmor-0.6.0-linux-x86_64.tar.xz) · [Windows (0.5.4)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.5.4/RangeArmor-0.5.4-windows-x64.zip) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
+| [SHA-256 dos pacotes 0.6.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.0/SHA256SUMS.txt) | Hashes para conferir o download. |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `AnastacioEngine` (Linux).
 Para rodar um jogo exportado, use `AnastacioRuntime.exe` (Windows) ou `AnastacioRuntime` (Linux). Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
 No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
+
+## Novidades da 0.6.0
+
+- **Logic Tree:** lógica por nós no Node Editor (todos os bricks, Run Python, receitas, Frames de Estado e
+  destaque ao vivo dos nós que dispararam).
+- **UI Tree:** menus e HUD 2D por nós, também na Web/Android; Dialogue Box e Text Boxes no jogo.
+- **Compositing no jogo:** Blur, Glare, Directional Blur, Color Correction, Tonemap, Dilate/Erode, Z Combine,
+  Crop e Bilateral Blur; Node Editor com faixa de efeitos e presets no estilo Blender 5.
+- **Render:** sombra de sol em cascatas (CSM), PCSS, SH9 em sondas, partículas flipbook, Sky Quality, HLOD e
+  Auto Static Batch.
+- **Ferramentas:** Scene Doctor, Performance Report, FPS Counter, Range Trace e barra/menus no estilo Blender 5.
+- **Export:** Compile Scripts entrega só `.pyc`; pacote Universal (Windows + Linux numa pasta).
+- **Gravação de tela no Linux:** grava em AVI (o MP4 com som segue no Windows).
+- Revisão ampla do núcleo e muitas correções.
+
+Lista completa em [docs/releases.md](docs/releases.md#060).
 
 ## Novidades da 0.5.4
 
