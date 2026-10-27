@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-27 - Export: Compile Scripts funciona e o .range aberto sai do pacote
+
+- **Compile Scripts:** o `build_release.py` ignorava a chave, que só o antigo `build_data.py` (data.dat) lia. Agora a cópia da entrega troca cada .py de `data/` por um .pyc ao lado, compilado com o Python 3.11 do pacote. O painel Export (RangeArmor) da engine tem a caixa nova. Um erro de sintaxe para o export.
+- **.range aberto no pacote:** desde 3074d8af a entrega copiava `data/` inteira, inclusive o .range ao lado do .rasec cifrado. Agora sai todo .range/.blend que tem .rasec ao lado (o player troca para o .rasec sozinho), além dos backups `.range1`/`.rasec1`/`.blend1`. Um .range sem .rasec fica, porque pode ser LibLoad.
+- **Validação:** export completo em background, com o zip extraído numa pasta limpa e o jogo rodando no player do pacote (`--server`) só com .rasec e .pyc. `scripts/teste.pyc` importa `scripts/ajuda.pyc`. Só Windows; não havia player Linux para testar.
+
 ## 2026-10-27 - Frente 2: relógio único com escala de tempo, cutscene pausa com a cena (CLK-01 a CLK-05)
 
 - **CLK-01 e CLK-03:** escala 0 pausa sem divisão inválida. O limite de passos é no mínimo 1, e `setMaxLogicFrame(<1)` dá `ValueError`.

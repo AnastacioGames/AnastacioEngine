@@ -71,6 +71,18 @@ def build(data, args):
               ". Set both Windows and Linux runtimes in the Paths tab.")
 
 
+def _drop_protected_sources(data_dir):
+    """Tira da entrega o .range/.blend aberto que ja tem o .rasec cifrado ao
+    lado. O player troca .range por .rasec sozinho quando o aberto falta
+    (KX_PythonInit/KX_Scene), entao o jogo carrega igual. Os .range sem
+    .rasec ficam: podem ser LibLoad que o jogo precisa."""
+    for pattern in ("*.range", "*.blend"):
+        for source in [path for path in data_dir.rglob(pattern) if path.is_file()]:
+            if source.with_suffix(".rasec").is_file():
+                source.unlink()
+                print("> Left out (protected .rasec ships instead):", source.relative_to(data_dir).as_posix())
+
+
 def _compile_scripts(data_dir):
     """Troca cada .py da entrega por um .pyc ao lado (sem __pycache__), que o
     import do jogo carrega sem o fonte. Roda com o Python do pacote (3.11),
@@ -95,7 +107,9 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
     with tempfile.TemporaryDirectory(prefix=".rangearmor-stage-", dir=str(release)) as temp:
         stage = Path(temp) / destination.name
         stage.mkdir()
-        exclusions = ['*.export-tmp', '*.cooked.tmp']
+        # Backups do editor (.range1, .blend1...) nunca sao lidos pelo jogo e
+        # entregariam o arquivo aberto.
+        exclusions = ['*.export-tmp', '*.cooked.tmp', '*.range[0-9]*', '*.rasec[0-9]*', '*.blend[0-9]*']
         if not use_cooked:
             exclusions.append('*.cooked')
         asset_source = (project / data.get('PreparedDataSource', 'data')).resolve()
@@ -103,6 +117,7 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
             raise RuntimeError('Prepared assets must exist inside the project')
         shutil.copytree(str(asset_source), str(stage / "data"),
                         ignore=shutil.ignore_patterns(*exclusions))
+        _drop_protected_sources(stage / "data")
         if data.get("CompileScripts", False):
             _compile_scripts(stage / "data")
         (stage / "launcher").mkdir()
