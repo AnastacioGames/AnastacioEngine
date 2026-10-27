@@ -53,6 +53,8 @@ const EnumPropertyItem rna_enum_icon_items[] = {
 
 #include "BLI_math_color.h"
 
+#include "BKE_idprop.h"
+
 const char *rna_translate_ui_text(
         const char *text, const char *text_ctxt, StructRNA *type, PropertyRNA *prop, bool translate)
 {
@@ -226,7 +228,13 @@ static PointerRNA rna_uiItemOPreview(uiLayout *layout, const char *opname, int i
 	uiBut *but = uiDefIconButO_ptr(block, UI_BTYPE_BUT, ot, uiLayoutGetOperatorContext(layout), icon_value,
 	                               0, 0, size, size, (description && description[0]) ? description : NULL);
 	UI_but_flag_enable(but, UI_BUT_ICON_PREVIEW);
-	return *UI_but_operator_ptr_get(but);
+	/* like uiItemFullO: python only fills the properties when the group exists */
+	PointerRNA *opptr = UI_but_operator_ptr_get(but);
+	if (opptr->data == NULL) {
+		IDPropertyTemplate val = {0};
+		opptr->data = IDP_New(IDP_GROUP, &val, "wmOperatorProperties");
+	}
+	return *opptr;
 }
 
 static PointerRNA rna_uiItemOMenuHold(

@@ -98,8 +98,8 @@ ARegion *node_has_effects_region(ScrArea *sa)
 	BLI_insertlinkbefore(&sa->regionbase, ar, arnew);
 	arnew->regiontype = RGN_TYPE_TOOL_PROPS;
 	arnew->alignment = RGN_ALIGN_BOTTOM;
-	/* shown at first only where the effects apply */
-	if (!STREQ(snode->tree_idname, "CompositorNodeTree")) {
+	/* on by default; hidden at first only in trees the effects don't apply to */
+	if (snode && snode->tree_idname[0] && !STREQ(snode->tree_idname, "CompositorNodeTree")) {
 		arnew->flag = RGN_FLAG_HIDDEN;
 	}
 	return arnew;
