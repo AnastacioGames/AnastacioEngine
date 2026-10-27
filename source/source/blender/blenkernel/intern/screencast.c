@@ -103,6 +103,9 @@ struct Screencast {
 	ListBase pool;
 	int pool_total;
 	ScreencastFrame *last_frame;  /* owned by the encoder thread while it runs */
+#ifndef WITH_FFMPEG
+	int avi_next;  /* AVI has no timestamps: next index, frames repeated to fill gaps */
+#endif
 
 	bMovieHandle mh;  /* copy: BKE_movie_handle_get() returns a shared static */
 	void *mh_context;
@@ -211,6 +214,7 @@ static void screencast_encode(Screencast *sc, ScreencastFrame *frame)
 	if (sc->encoder_failed) {
 		return;
 	}
+#ifdef WITH_FFMPEG
 	if (!sc->mh.append_movie(sc->mh_context, &sc->rd, 0, frame->pts, (int *)frame->pixels,
 	                          sc->w, sc->h, "", &sc->encoder_reports))
 	{
@@ -218,6 +222,31 @@ static void screencast_encode(Screencast *sc, ScreencastFrame *frame)
 		return;
 	}
 	sc->frames_written++;
+#else
+	/* AVI plays one index entry per tick: repeat the frame up to its timestamp (capped, the
+	 * JPEG is encoded again each time) so the index has no holes. */
+	if (frame->pts < sc->avi_next) {
+		return;
+	}
+	const int first = max_ii(sc->avi_next, frame->pts - sc->fps * 2);
+	for (int i = first; i <= frame->pts; i++) {
+		if (!sc->mh.append_movie(sc->mh_context, &sc->rd, 0, sc->avi_next, (int *)frame->pixels,
+		                          sc->w, sc->h, "", &sc->encoder_reports))
+		{
+			sc->encoder_failed = true;
+			return;
+		}
+		sc->avi_next++;
+		sc->frames_written++;
+	}
+	/* Classic AVI uses 32-bit sizes: stop before 2 GB or the file is lost. */
+	if (sc->frames_written % (sc->fps * 2) == 0 &&
+	    BLI_file_size(sc->filepath) > (size_t)1900 * 1024 * 1024)
+	{
+		BKE_report(&sc->encoder_reports, RPT_WARNING, "Recording stopped at the 2 GB AVI limit");
+		sc->encoder_failed = true;
+	}
+#endif
 }
 
 static void *screencast_thread(void *data)
@@ -473,8 +502,9 @@ Screencast *BKE_screencast_begin(
         const char *filepath, ReportList *reports)
 {
 	/* H.264 with 4:2:0 chroma needs even dimensions. */
-	w = (w + 1) & ~1;
-	h = (h + 1) & ~1;
+	/* Round down: rounding up made full-window captures of odd size skip every frame. */
+	w &= ~1;
+	h &= ~1;
 	if (w < 16 || h < 16) {
 		BKE_report(reports, RPT_ERROR, "Area too small to record");
 		return NULL;
@@ -506,7 +536,12 @@ Screencast *BKE_screencast_begin(
 	}
 	BKE_ffmpeg_screencast_settings(&sc->rd, sc->fps, crf, sc->audio ? SCREENCAST_AUDIO_RATE : 0);
 #else
-	UNUSED_VARS(crf, audio);
+	UNUSED_VARS(crf);
+	if (audio) {
+		BKE_report(reports, RPT_WARNING, "Recording without sound: this build records AVI video only");
+	}
+	/* .avi name: otherwise the AVI writer appends a frame range to the .mp4 name. */
+	BLI_path_extension_replace(sc->rd.pic, sizeof(sc->rd.pic), ".avi");
 	sc->rd.im_format.imtype = R_IMF_IMTYPE_AVIJPEG;
 	sc->rd.im_format.quality = 90;
 	sc->rd.frs_sec = (short)sc->fps;

@@ -64,10 +64,12 @@ def standalone_env(context):
         return None, ""
     # Named like the editor recordings (screencast_default_filepath in screendump.c).
     stamp = time.strftime("%Y%m%d-%H%M%S")
+    # Builds without FFmpeg (Linux) record AVI and the player writes an .avi file.
+    ext = ".mp4" if bpy.app.build_options.codec_ffmpeg else ".avi"
     if bpy.data.is_saved:
-        name = "%s_standalone_%s.mp4" % (os.path.splitext(os.path.basename(bpy.data.filepath))[0], stamp)
+        name = "%s_standalone_%s%s" % (os.path.splitext(os.path.basename(bpy.data.filepath))[0], stamp, ext)
     else:
-        name = "standalone_%s.mp4" % stamp
+        name = "standalone_%s%s" % (stamp, ext)
     filepath = os.path.join(screencast_directory(context), name)
     try:
         os.makedirs(os.path.dirname(filepath), exist_ok=True)

@@ -174,7 +174,7 @@ static int start_avi(void *context_v, Scene *UNUSED(scene), RenderData *rd, int 
                      ReportList *reports, bool preview, const char *suffix)
 {
 	int x, y;
-	char name[256];
+	char name[FILE_MAX];
 	AviFormat format;
 	int quality;
 	double framerate;
