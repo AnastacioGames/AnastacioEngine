@@ -22,6 +22,11 @@ Presets:
   glare_bloom Bloom (modo do Blender 5, só no jogo)
   glare_sunbeams Sun Beams (Blender 5, só no jogo; sol em 0.7, 0.8, Length 0.4)
   glare_cor  8 nós de cor -> Glare Fog Glow (com textura intermediária)
+  nos_filtro    Filter Sobel (Fac 0.5) -> Sharpen
+  nos_transform Transform (gira/escala/desloca) -> Flip X -> Translate com Wrap X
+  nos_pixel     Scale 1/16 -> Pixelate -> Scale 16
+  nos_valores   Map Range da profundidade, Map Value, Switch e Separate/Combine HSVA (matiz +0.3)
+  nos_sunbeams  nó Sun Beams (fonte 0.7, 0.8; Ray Length 0.3)
   diamante   6 Mix seguidos que usam o nó anterior nas duas entradas (2^6 chamadas se não houver cache)
 """
 import bpy, sys, os
@@ -115,6 +120,47 @@ if preset != 'off':
         if preset == 'glare_sunbeams':
             g.sun_position = (0.7, 0.8); g.sun_beams_length = 0.4
         L.new(chain_cor(img) if preset == 'glare_cor' else img, g.inputs['Image']); s = g.outputs[0]
+    elif preset == 'nos_filtro':
+        # Sobel nas bordas misturado meio a meio, depois Sharpen
+        f1 = N.new('CompositorNodeFilter'); f1.filter_type = 'SOBEL'; f1.inputs['Fac'].default_value = 0.5
+        f2 = N.new('CompositorNodeFilter'); f2.filter_type = 'SHARPEN'
+        L.new(img, f1.inputs['Image']); L.new(f1.outputs[0], f2.inputs['Image']); s = f2.outputs[0]
+    elif preset == 'nos_transform':
+        # Transform (gira 0.3, escala 0.8, desloca) -> Flip X -> Translate com Wrap X
+        tf = N.new('CompositorNodeTransform'); tf.inputs['Angle'].default_value = 0.3
+        tf.inputs['Scale'].default_value = 0.8; tf.inputs['X'].default_value = 80
+        fl = N.new('CompositorNodeFlip'); fl.axis = 'X'
+        tr = N.new('CompositorNodeTranslate'); tr.wrap_axis = 'XAXIS'; tr.inputs['X'].default_value = 300
+        L.new(img, tf.inputs['Image']); L.new(tf.outputs[0], fl.inputs['Image'])
+        L.new(fl.outputs[0], tr.inputs['Image']); s = tr.outputs[0]
+    elif preset == 'nos_pixel':
+        # Scale 1/16 -> Pixelate -> Scale 16: blocos de 16 px
+        a = N.new('CompositorNodeScale'); a.inputs['X'].default_value = a.inputs['Y'].default_value = 1 / 16
+        px = N.new('CompositorNodePixelate')
+        b = N.new('CompositorNodeScale'); b.inputs['X'].default_value = b.inputs['Y'].default_value = 16
+        L.new(img, a.inputs['Image']); L.new(a.outputs[0], px.inputs['Color'])
+        L.new(px.outputs[0], b.inputs['Image']); s = b.outputs[0]
+    elif preset == 'nos_valores':
+        # Map Range da profundidade (5..25 -> 1..0) multiplica a imagem; Map Value e Switch no caminho;
+        # Separate/Combine HSVA gira o matiz em 0.3
+        mr = N.new('CompositorNodeMapRange'); mr.use_clamp = True
+        mr.inputs[1].default_value = 5; mr.inputs[2].default_value = 25
+        mr.inputs[3].default_value = 1; mr.inputs[4].default_value = 0
+        mv = N.new('CompositorNodeMapValue'); mv.size = [1.0]; mv.offset = [0.0]
+        sw = N.new('CompositorNodeSwitch'); sw.check = True
+        sep = N.new('CompositorNodeSepHSVA'); comb = N.new('CompositorNodeCombHSVA')
+        ad = N.new('CompositorNodeMath'); ad.operation = 'ADD'; ad.inputs[1].default_value = 0.3
+        md = N.new('CompositorNodeMath'); md.operation = 'MODULO'; md.inputs[1].default_value = 1.0
+        mul = N.new('CompositorNodeMixRGB'); mul.blend_type = 'MULTIPLY'; mul.inputs[0].default_value = 1.0
+        L.new(rl.outputs['Depth'], mr.inputs[0]); L.new(mr.outputs[0], mv.inputs[0])
+        L.new(img, sep.inputs[0]); L.new(sep.outputs[0], ad.inputs[0]); L.new(ad.outputs[0], md.inputs[0])
+        L.new(md.outputs[0], comb.inputs[0]); L.new(sep.outputs[1], comb.inputs[1])
+        L.new(sep.outputs[2], comb.inputs[2]); L.new(sep.outputs[3], comb.inputs[3])
+        L.new(img, sw.inputs[0]); L.new(comb.outputs[0], sw.inputs[1])
+        L.new(sw.outputs[0], mul.inputs[1]); L.new(mv.outputs[0], mul.inputs[2]); s = mul.outputs[0]
+    elif preset == 'nos_sunbeams':
+        sb = N.new('CompositorNodeSunBeams'); sb.source = (0.7, 0.8); sb.ray_length = 0.3
+        L.new(img, sb.inputs[0]); s = sb.outputs[0]
     elif preset == 'diamante':
         s = img
         for i in range(6):

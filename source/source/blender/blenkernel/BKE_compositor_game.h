@@ -58,10 +58,23 @@ static inline int BKE_compositor_game_support(int type)
 		case CMP_NODE_MATH:
 		case CMP_NODE_MASK_BOX:
 		case CMP_NODE_MASK_ELLIPSE:
+		case CMP_NODE_FILTER:
+		case CMP_NODE_PIXELATE:
+		case CMP_NODE_FLIP:
+		case CMP_NODE_TRANSLATE:
+		case CMP_NODE_ROTATE:
+		case CMP_NODE_SCALE:
+		case CMP_NODE_TRANSFORM:
+		case CMP_NODE_MAP_VALUE:
+		case CMP_NODE_MAP_RANGE:
+		case CMP_NODE_SWITCH:
+		case CMP_NODE_SEPHSVA:
+		case CMP_NODE_COMBHSVA:
 			return 1;
 		case CMP_NODE_BLUR:
 		case CMP_NODE_LENSDIST:
 		case CMP_NODE_GLARE:
+		case CMP_NODE_SUNBEAMS:
 			return 2;
 		default:
 			return 0;

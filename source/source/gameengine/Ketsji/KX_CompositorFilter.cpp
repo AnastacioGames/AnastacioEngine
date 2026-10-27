@@ -136,10 +136,12 @@ public:
 			}
 			return;
 		}
-		if (node->type != CMP_NODE_BLUR && node->type != CMP_NODE_LENSDIST) {
+		const int sampled = SampledInput(node);
+		if (sampled < 0) {
 			return;
 		}
-		if (!Source((bNodeSocket *)node->inputs.first, from, fromsock) || from->type == CMP_NODE_R_LAYERS) {
+		if (!Source((bNodeSocket *)BLI_findlink(&node->inputs, sampled), from, fromsock) ||
+		    from->type == CMP_NODE_R_LAYERS) {
 			return;
 		}
 		std::set<bNode *> visited;
@@ -282,6 +284,21 @@ public:
 	}
 
 private:
+	/// Input that the node reads at many places (-1: none). That input gets a texture when it is a chain.
+	static int SampledInput(bNode *node)
+	{
+		switch (node->type) {
+			case CMP_NODE_BLUR:
+			case CMP_NODE_LENSDIST:
+			case CMP_NODE_SUNBEAMS:
+				return 0;
+			case CMP_NODE_FILTER:
+				return 1;
+			default:
+				return -1;
+		}
+	}
+
 	/// True when the node (or anything before it) reads the render or samples its input elsewhere.
 	bool ReadsTextures(bNode *node, std::set<bNode *>& visited)
 	{
@@ -289,8 +306,7 @@ private:
 			return false;
 		}
 		visited.insert(node);
-		if (node->type == CMP_NODE_R_LAYERS || node->type == CMP_NODE_BLUR || node->type == CMP_NODE_LENSDIST ||
-		    node->type == CMP_NODE_GLARE) {
+		if (node->type == CMP_NODE_R_LAYERS || node->type == CMP_NODE_GLARE || SampledInput(node) >= 0) {
 			return true;
 		}
 		for (bNodeSocket *sock = (bNodeSocket *)node->inputs.first; sock; sock = sock->next) {
@@ -777,6 +793,176 @@ private:
 					b << "\tfloat mf = 2.0 - 2.0 * abs(v - 0.5);\n";
 					b << "\treturn vec4(mf * max(base + v * (glare - base), 0.0), c1.a);\n";
 				}
+				break;
+			}
+			case CMP_NODE_FILTER: {
+				// ConvolutionFilterOperation / ConvolutionEdgeFilterOperation of the 2.79 (FilterNode kernels).
+				static const float kernels[7][9] = {
+					{1 / 16.0f, 2 / 16.0f, 1 / 16.0f, 2 / 16.0f, 4 / 16.0f, 2 / 16.0f, 1 / 16.0f, 2 / 16.0f, 1 / 16.0f},
+					{-1, -1, -1, -1, 9, -1, -1, -1, -1},
+					{-1 / 8.0f, -1 / 8.0f, -1 / 8.0f, -1 / 8.0f, 1.0f, -1 / 8.0f, -1 / 8.0f, -1 / 8.0f, -1 / 8.0f},
+					{1, 2, 1, 0, 0, 0, -1, -2, -1},
+					{1, 1, 1, 0, 0, 0, -1, -1, -1},
+					{5, 5, 5, -3, -3, -3, -2, -2, -2},
+					{1, 2, 1, 0, 1, 0, -1, -2, -1},
+				};
+				const int type = (node->custom1 >= 0 && node->custom1 < 7) ? node->custom1 : -1;
+				b << "\tfloat fac = " << in(0) << ".x;\n\tvec4 c = " << in(1) << ";\n";
+				if (type < 0) {
+					b << "\treturn c;\n";
+					break;
+				}
+				const float *k = kernels[type];
+				const bool edge = (type >= 2 && type <= 5);
+				b << "\tvec2 px = 1.0 / vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n";
+				// rows from y - 1 to y + 1, like the operation (y up, same as uv)
+				const char *off[9] = {"vec2(-1.0, -1.0)", "vec2(0.0, -1.0)", "vec2(1.0, -1.0)",
+				                      "vec2(-1.0, 0.0)", "", "vec2(1.0, 0.0)",
+				                      "vec2(-1.0, 1.0)", "vec2(0.0, 1.0)", "vec2(1.0, 1.0)"};
+				for (int i = 0; i < 9; ++i) {
+					if (i == 4) {
+						b << "\tvec4 s4 = c;\n";
+					}
+					else {
+						b << "\tvec4 s" << i << " = " << Input(node, 1, std::string("clamp(uv + ") + off[i] + " * px, 0.0, 1.0)") << ";\n";
+					}
+				}
+				if (edge) {
+					// the second kernel is the first one transposed
+					static const int tr[9] = {0, 3, 6, 1, 4, 7, 2, 5, 8};
+					b << "\tvec3 r1 = vec3(0.0), r2 = vec3(0.0);\n";
+					for (int i = 0; i < 9; ++i) {
+						b << "\tr1 += s" << i << ".rgb * " << F(k[i]) << ";\n";
+						b << "\tr2 += s" << i << ".rgb * " << F(k[tr[i]]) << ";\n";
+					}
+					b << "\tvec3 r = sqrt(r1 * r1 + r2 * r2);\n";
+					b << "\treturn max(vec4(r * fac + c.rgb * (1.0 - fac), c.a), 0.0);\n";
+				}
+				else {
+					b << "\tvec4 r = vec4(0.0);\n";
+					for (int i = 0; i < 9; ++i) {
+						if (k[i] != 0.0f) {
+							b << "\tr += s" << i << " * " << F(k[i]) << ";\n";
+						}
+					}
+					b << "\treturn max(r * fac + c * (1.0 - fac), 0.0);\n";
+				}
+				break;
+			}
+			case CMP_NODE_PIXELATE:
+				// The 2.79 node snaps to whole pixels of its input (used after a Scale down).
+				b << "\tvec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n";
+				b << "\treturn " << Input(node, 0, "(floor(uv * res) + 0.5) / res") << ";\n";
+				break;
+			case CMP_NODE_FLIP: {
+				const char *p = (node->custom1 == 0) ? "vec2(1.0 - uv.x, uv.y)" :
+				                (node->custom1 == 1) ? "vec2(uv.x, 1.0 - uv.y)" : "1.0 - uv";
+				b << "\treturn " << Input(node, 0, p) << ";\n";
+				break;
+			}
+			case CMP_NODE_TRANSLATE:
+			case CMP_NODE_ROTATE:
+			case CMP_NODE_SCALE:
+			case CMP_NODE_TRANSFORM: {
+				// Where this pixel reads its input, in pixels around the center (inverse of the transform).
+				// Outside the input the render gives transparent black; Translate can wrap instead.
+				b << "\tvec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n";
+				b << "\tvec2 p = uv * res;\n";
+				bool wrapX = false, wrapY = false;
+				if (node->type == CMP_NODE_TRANSLATE) {
+					NodeTranslateData *t = (NodeTranslateData *)node->storage;
+					const bool rel = t && t->relative;
+					wrapX = t && (t->wrap_axis & 1);
+					wrapY = t && (t->wrap_axis & 2);
+					b << "\tp -= vec2(" << in(1) << ".x, " << in(2) << ".x)" << (rel ? " * res" : "") << ";\n";
+				}
+				else if (node->type == CMP_NODE_ROTATE) {
+					b << "\tfloat a = " << in(1) << ".x;\n\tvec2 d = p - 0.5 * res;\n";
+					b << "\tp = 0.5 * res + vec2(cos(a) * d.x + sin(a) * d.y, -sin(a) * d.x + cos(a) * d.y);\n";
+				}
+				else if (node->type == CMP_NODE_SCALE) {
+					b << "\tvec2 sc = vec2(" << in(1) << ".x, " << in(2) << ".x);\n";
+					if (node->custom1 == CMP_SCALE_ABSOLUTE) {
+						b << "\tsc /= res;\n";
+					}
+					else if (node->custom1 != CMP_SCALE_RELATIVE) {
+						b << "\tsc = vec2(1.0);\n";  // scene/render size: the game image is already that size
+					}
+					b << "\tp = 0.5 * res + (p - 0.5 * res) / max(sc, vec2(1e-4));\n";
+				}
+				else {
+					// TransformNode: scale, then rotate, then translate
+					b << "\tfloat a = " << in(3) << ".x;\n\tfloat sc = max(" << in(4) << ".x, 1e-4);\n";
+					b << "\tvec2 d = p - 0.5 * res - vec2(" << in(1) << ".x, " << in(2) << ".x);\n";
+					b << "\tp = 0.5 * res + vec2(cos(a) * d.x + sin(a) * d.y, -sin(a) * d.x + cos(a) * d.y) / sc;\n";
+				}
+				b << "\tvec2 q = p / res;\n";
+				if (wrapX) {
+					b << "\tq.x = fract(q.x);\n";
+				}
+				if (wrapY) {
+					b << "\tq.y = fract(q.y);\n";
+				}
+				b << "\tif (any(lessThan(q, vec2(0.0))) || any(greaterThan(q, vec2(1.0)))) return vec4(0.0);\n";
+				b << "\treturn " << Input(node, 0, "q") << ";\n";
+				break;
+			}
+			case CMP_NODE_MAP_VALUE: {
+				TexMapping *t = (TexMapping *)node->storage;
+				b << "\tfloat v = " << in(0) << ".x;\n";
+				if (t) {
+					b << "\tv = (v + " << F(t->loc[0]) << ") * " << F(t->size[0]) << ";\n";
+					if (t->flag & TEXMAP_CLIP_MIN) {
+						b << "\tv = max(v, " << F(t->min[0]) << ");\n";
+					}
+					if (t->flag & TEXMAP_CLIP_MAX) {
+						b << "\tv = min(v, " << F(t->max[0]) << ");\n";
+					}
+				}
+				b << "\treturn vec4(v);\n";
+				break;
+			}
+			case CMP_NODE_MAP_RANGE:
+				b << "\tfloat v = " << in(0) << ".x;\n\tfloat fmin = " << in(1) << ".x;\n\tfloat fmax = " << in(2) << ".x;\n";
+				b << "\tfloat tmin = " << in(3) << ".x;\n\tfloat tmax = " << in(4) << ".x;\n";
+				b << "\tif (abs(fmax - fmin) < 1e-6) return vec4(0.0);\n";
+				b << "\tv = tmin + (v - fmin) / (fmax - fmin) * (tmax - tmin);\n";
+				if (node->custom1) {
+					b << "\tv = clamp(v, min(tmin, tmax), max(tmin, tmax));\n";
+				}
+				b << "\treturn vec4(v);\n";
+				break;
+			case CMP_NODE_SWITCH:
+				b << "\treturn " << in(node->custom1 ? 1 : 0) << ";\n";
+				break;
+			case CMP_NODE_SEPHSVA:
+				b << "\tvec4 c = " << in(0) << ";\n";
+				b << "\treturn vec4(" << (out == 3 ? std::string("c.a") : "comp_rgb_to_hsv(c.rgb)[" + std::to_string(out) + "]") << ");\n";
+				break;
+			case CMP_NODE_COMBHSVA:
+				b << "\treturn vec4(comp_hsv_to_rgb(vec3(" << in(0) << ".x, " << in(1) << ".x, " << in(2) << ".x)), "
+				  << in(3) << ".x);\n";
+				break;
+			case CMP_NODE_SUNBEAMS: {
+				// SunBeamsOperation: each pixel gathers the image on the way to the source, up to Ray Length
+				// x the larger side, weaker farther away. 32 samples with a per-pixel offset: the node smears the
+				// whole image (not a blurred bright part like the Glare), so fewer samples show grain.
+				NodeSunBeams *d = (NodeSunBeams *)node->storage;
+				const float sx = d ? d->source[0] : 0.5f, sy = d ? d->source[1] : 0.5f;
+				const float len = d ? std::min(std::max(d->ray_length, 0.0f), 1.0f) : 0.2f;
+				b << "\tvec2 res = vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n"
+				  << "\tvec2 toSun = (vec2(" << F(sx) << ", " << F(sy) << ") - uv) * res;\n"
+				  << "\tfloat dist = length(toSun);\n"
+				  << "\tvec2 d = toSun / max(dist, 1e-4) * min(dist, " << F(len) << " * max(res.x, res.y)) / res;\n"
+				  << "\tfloat jit = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715))));\n"
+				  << "\tvec4 acc = vec4(0.0);\n\tfloat ws = 0.0;\n"
+				  << "\tfor (int i = 0; i < 32; ++i) {\n"
+				  << "\t\tfloat t = (float(i) + jit) / 32.0;\n"
+				  << "\t\tfloat w = 1.0 - t;\n"
+				  << "\t\tvec2 p = uv + d * t;\n"
+				  << "\t\tacc += w * " << Input(node, 0, "p") << ";\n"
+				  << "\t\tws += w;\n"
+				  << "\t}\n\treturn acc / ws;\n";
 				break;
 			}
 			case CMP_NODE_COMPOSITE:
