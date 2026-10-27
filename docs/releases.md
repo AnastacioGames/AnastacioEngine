@@ -94,9 +94,19 @@ Na máquina Linux, num clone separado com o main atualizado:
    ligado: o player Linux tem de rodar só com `.rasec` e `.pyc` (só foi testado no Windows).
 6. Com janela: editor abre, jogo exportado roda pelo launcher.
 
-Depois, no Windows: rebuild se algo mudar no Linux, zip com
-`tools/stage_release_windows.py 0.6.0` + `stage_release_web.py`, RangeArmor Windows, `SHA256SUMS.txt`,
-README e site.
+Pacotes Windows montados (2026-10-27), ainda sem zip final da engine:
+
+- `build/release-staging/AnastacioEngine-0.6.0-windows-x64/` com `tools/stage_release_windows.py 0.6.0 --no-zip`
+  + `stage_release_web.py`. Lista igual à do zip 0.5.4 mais 56 arquivos novos de `2.79/scripts` e
+  `rgbcx-license.txt`; nada sumiu. Logs de depuração (`_props.log` etc.) entravam: o script agora exclui `.log`.
+  Pasta conferida: `blender.crt/`, `0.6.0` no executável e runtime rodando a cena de teste com Python 3.11.
+  O `web/runtime` dela ainda é o de 2026-10-25.
+- RangeArmor: novo `tools/stage_rangearmor_windows.py` monta o zip a partir do da versão anterior (launchers,
+  Godot de backup) com painel recompilado e `release/` do git.
+
+Depois do Linux, no Windows: copiar o runtime Web novo para `build-web-release/bin`, rodar de novo
+`stage_release_web.py` na pasta e `stage_release_windows.py 0.6.0 --zip-only`; refazer o zip da RangeArmor se
+algo mudar; extrair os zips numa pasta limpa e testar; `SHA256SUMS.txt`, README e site.
 
 ## 0.5.4
 

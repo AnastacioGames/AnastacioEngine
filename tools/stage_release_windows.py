@@ -22,7 +22,7 @@ DIST_DIR = ROOT / "build" / "dist"
 
 EXCLUDE_DIR_NAMES = {"__pycache__", "rangearmor", "demos", "Release"}
 
-EXCLUDE_FILE_SUFFIXES = (".pdb", ".map", ".lib", ".exp", ".err")
+EXCLUDE_FILE_SUFFIXES = (".pdb", ".map", ".lib", ".exp", ".err", ".log")
 
 EXCLUDE_FILE_NAMES = {
     "imgui.ini",
