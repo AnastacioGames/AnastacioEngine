@@ -151,6 +151,8 @@ enum {
 #define UI_BLOCK_SHOW_SHORTCUT_ALWAYS (1 << 23)
 /** Delay mouse-move quit when leaving the popup bounds. */
 #define UI_BLOCK_DELAY_MOUSEOUT_QUIT (1 << 24)
+/** Popover buttons open when the mouse rests on them (no click). */
+#define UI_BLOCK_POPOVER_HOVER_OPEN (1 << 25)
 
 /* uiPopupBlockHandle->menuretval */
 #define UI_RETURN_CANCEL     (1 << 0)   /* cancel all menus cascading */

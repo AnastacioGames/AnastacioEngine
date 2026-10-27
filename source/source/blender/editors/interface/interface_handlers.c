@@ -7398,7 +7398,9 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 		button_tooltip_timer_reset(C, but);
 
 		/* automatic open pulldown block timer */
-		if (ELEM(but->type, UI_BTYPE_BLOCK, UI_BTYPE_PULLDOWN)) {
+		if (ELEM(but->type, UI_BTYPE_BLOCK, UI_BTYPE_PULLDOWN) ||
+		    (but->type == UI_BTYPE_POPOVER && (but->block->flag & UI_BLOCK_POPOVER_HOVER_OPEN)))
+		{
 			if (data->used_mouse && !data->autoopentimer) {
 				int time;
 
@@ -7410,7 +7412,7 @@ static void button_activate_state(bContext *C, uiBut *but, uiHandleButtonState s
 				{
 					time = 5 * U.menuthreshold2;
 				}
-				else if (U.uiflag & USER_MENUOPENAUTO) {
+				else if ((U.uiflag & USER_MENUOPENAUTO) || but->type == UI_BTYPE_POPOVER) {
 					time = 5 * U.menuthreshold1;
 				}
 				else {

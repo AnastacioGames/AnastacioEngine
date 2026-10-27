@@ -716,6 +716,8 @@ static void node_draw_tabs_bar(const bContext *C, ARegion *ar)
 
 	/* flat items with a hover highlight (Blender 5 header look), no box per tab */
 	uiBlock *block = UI_block_begin(C, ar, "node_tabs_bar", UI_EMBOSS_PULLDOWN);
+	/* the tabs open on hover, like a menu bar */
+	UI_block_flag_enable(block, UI_BLOCK_POPOVER_HOVER_OPEN);
 
 	/* icon + name: the icons alone were hard to tell apart */
 	for (int i = 0; i < categories_len; i++) {
