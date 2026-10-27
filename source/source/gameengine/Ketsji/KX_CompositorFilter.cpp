@@ -1293,6 +1293,19 @@ private:
 				}
 				break;
 			}
+			case CMP_NODE_TEXTURE: {
+				// Only the Noise texture: like the render, a random value per pixel, new every frame
+				// (film grain). Other textures would need the texture evaluated on the GPU.
+				Tex *tex = (Tex *)node->id;
+				if (!tex || tex->type != TEX_NOISE) {
+					Skip(node->name);
+					b << "\treturn vec4(0.0);\n";
+					break;
+				}
+				b << "\tfloat n = comp_noise(floor(uv * vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight)));\n";
+				b << "\treturn " << (out == 0 ? "vec4(n)" : "vec4(vec3(n), 1.0)") << ";\n";
+				break;
+			}
 			case CMP_NODE_COMPOSITE:
 			case CMP_NODE_VIEWER:
 				b << "\treturn " << in(0) << ";\n";
@@ -1368,6 +1381,18 @@ uniform sampler2D bgl_DepthTexture;
 uniform float bgl_RenderedTextureWidth;
 uniform float bgl_RenderedTextureHeight;
 uniform mat4 bgl_ProjectionMatrix;
+uniform int bgl_Frame;
+
+/* Random value in [0, 1) for a pixel, different each frame (Texture node > Noise). */
+float comp_noise(vec2 px)
+{
+	uvec3 v = uvec3(uvec2(px), uint(bgl_Frame));
+	v = v * 1664525u + 1013904223u;
+	v.x += v.y * v.z; v.y += v.z * v.x; v.z += v.x * v.y;
+	v ^= v >> 16u;
+	v.x += v.y * v.z;
+	return float(v.x) * (1.0 / 4294967296.0);
+}
 
 vec4 comp_image(vec2 uv)
 {

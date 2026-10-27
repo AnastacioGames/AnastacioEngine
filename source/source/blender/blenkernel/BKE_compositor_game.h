@@ -82,6 +82,7 @@ static inline int BKE_compositor_game_support(int type)
 		case CMP_NODE_DILATEERODE:
 		case CMP_NODE_BILATERALBLUR:
 		case CMP_NODE_ZCOMBINE:
+		case CMP_NODE_TEXTURE:  /* only the Noise texture */
 			return 2;
 		default:
 			return 0;

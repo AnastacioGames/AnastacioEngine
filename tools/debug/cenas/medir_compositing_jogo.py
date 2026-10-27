@@ -32,6 +32,7 @@ Presets:
   nos_tonemap_r Tonemap Photoreceptor (chave automática)
   nos_mascara   Ellipse -> Dilate/Erode Distance e Feather -> multiplica Bilateral Blur -> Crop relativo
   nos_zcombine  Z Combine da imagem com uma cor chapada a 13 m
+  nos_grao      Film Grain: Texture Noise -> Mix Overlay 0.15
   diamante   6 Mix seguidos que usam o nó anterior nas duas entradas (2^6 chamadas se não houver cache)
 """
 import bpy, sys, os
@@ -198,6 +199,13 @@ if preset != 'off':
         L.new(img, zc.inputs[0]); L.new(rl.outputs['Depth'], zc.inputs[1])
         L.new(rgb.outputs[0], zc.inputs[2]); zc.inputs[3].default_value = 13.0
         s = zc.outputs[0]
+    elif preset == 'nos_grao':
+        # Film Grain da faixa de efeitos: Texture Noise -> Mix Overlay 0.15
+        tex = bpy.data.textures.new("Film Grain", 'NOISE')
+        nz = N.new('CompositorNodeTexture'); nz.texture = tex
+        mx = N.new('CompositorNodeMixRGB'); mx.blend_type = 'OVERLAY'; mx.inputs[0].default_value = 0.15
+        L.new(img, mx.inputs[1]); L.new(nz.outputs[1], mx.inputs[2])
+        s = mx.outputs[0]
     elif preset == 'diamante':
         s = img
         for i in range(6):

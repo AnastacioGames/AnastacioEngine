@@ -76,6 +76,21 @@ def _fisheye(tree, new, link, image):
     return lens.outputs[0]
 
 
+def _film_grain(tree, new, link, image):
+    # Noise texture: a random value per pixel, new every frame in the game
+    tex = bpy.data.textures.get("Film Grain")
+    if tex is None or tex.type != 'NOISE':
+        tex = bpy.data.textures.new("Film Grain", 'NOISE')
+    noise = new('CompositorNodeTexture')
+    noise.texture = tex
+    mix = new('CompositorNodeMixRGB')
+    mix.blend_type = 'OVERLAY'
+    mix.inputs[0].default_value = 0.15
+    link(image, mix.inputs[1])
+    link(noise.outputs[1], mix.inputs[2])
+    return mix.outputs[0]
+
+
 def _sepia(tree, new, link, image):
     bw = new('CompositorNodeRGBToBW')
     ramp = new('CompositorNodeValToRGB')
@@ -159,6 +174,7 @@ EFFECTS = (
     ('vignette', "Vignette", 'LENS', _vignette, "Darkens the corners of the image"),
     ('chromatic', "Chromatic Aberration", 'LENS', _chromatic, "Colors split at the borders, like a cheap lens"),
     ('fisheye', "Fisheye", 'LENS', _fisheye, "Bulges the image like a wide lens"),
+    ('film_grain', "Film Grain", 'LENS', _film_grain, "Fine moving grain, like old film"),
     ('sepia', "Sepia", 'COLOR', _sepia, "Old photo: brown shades"),
     ('split_toning', "Split Toning", 'COLOR', _split_toning, "Blue shadows and warm highlights"),
     ('tune', "Tune Image", 'COLOR', _tune, "More saturation and contrast"),
@@ -183,7 +199,8 @@ def preview_icon(effect_id):
     if _previews is None:
         _previews =bpy.utils.previews.new()
     if effect_id not in _previews:
-        _previews.load(effect_id, path, 'IMAGE')
+        # load the pixels now: the deferred loading is not always run by the shelf
+        _previews.load(effect_id, path, 'IMAGE').image_size[:]
     return _previews[effect_id].icon_id
 
 
@@ -283,7 +300,7 @@ class NODE_PT_effects_shelf(Panel):
             else:
                 sub = col.column(align=True)
                 sub.scale_y = 4.0
-                sub.operator("node.effect_add", text="", icon='NODE_COMPOSITING').effect = effect_id
+                sub.operator("node.effect_add", text="", icon='NODETREE').effect = effect_id
             col.label(text=name)
 
 
