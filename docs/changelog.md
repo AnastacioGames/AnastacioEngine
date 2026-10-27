@@ -24,6 +24,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Dilate/Erode (Step, Distance, Threshold, Feather) e Bilateral Blur: grade de até 9x9 leituras, exata até 4 px e espaçada depois disso. Feather aproximado por queda suave.
 - Z Combine sem o anti-aliasing da máscara (borda dura).
 - Presets `nos_dblur`, `nos_cor2`, `nos_tonemap_r`, `nos_mascara` e `nos_zcombine` em `medir_compositing_jogo.py`. Na RX 6800M a 720p, sem trava, todos ficam entre 906 e 947 fps (base 931).
+- Revisão (/code-review): a chave automática do Photoreceptor ficava NaN quando a média passava do máximo amostrado (agora limitada a 0..1); o log no alpha do cache vai codificado em 0..1 (log/24 + 0,5), então um alvo de 8 bits sem float não corta mais a parte negativa; o Determinator do Bilateral Blur também ganha textura intermediária quando é uma cadeia; o Dilate/Erode lê presa à imagem, sem erodir a partir das bordas da tela. Medido de novo: 893 a 914 fps (base 915).
 
 ## 2026-10-26 - Frente 2: fila QAddFront e m_modified na réplica (SG-04, SG-05)
 

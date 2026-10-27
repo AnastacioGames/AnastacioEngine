@@ -141,17 +141,21 @@ public:
 		if (sampled < 0) {
 			return;
 		}
-		if (!Source((bNodeSocket *)BLI_findlink(&node->inputs, sampled), from, fromsock) ||
-		    from->type == CMP_NODE_R_LAYERS) {
-			return;
-		}
-		std::set<bNode *> visited;
-		if (!ReadsTextures(from, visited)) {
-			return;
-		}
-		const std::pair<bNode *, int> key(from, BLI_findindex(&from->outputs, fromsock));
-		if (std::find(order.begin(), order.end(), key) == order.end()) {
-			order.push_back(key);  // post order: a cache comes after the caches it reads
+		// the Bilateral Blur also reads its Determinator at every tap
+		const int last = (node->type == CMP_NODE_BILATERALBLUR) ? 1 : sampled;
+		for (int idx = sampled; idx <= last; ++idx) {
+			if (!Source((bNodeSocket *)BLI_findlink(&node->inputs, idx), from, fromsock) ||
+			    from->type == CMP_NODE_R_LAYERS) {
+				continue;
+			}
+			std::set<bNode *> visited;
+			if (!ReadsTextures(from, visited)) {
+				continue;
+			}
+			const std::pair<bNode *, int> key(from, BLI_findindex(&from->outputs, fromsock));
+			if (std::find(order.begin(), order.end(), key) == order.end()) {
+				order.push_back(key);  // post order: a cache comes after the caches it reads
+			}
 		}
 	}
 
@@ -219,7 +223,7 @@ public:
 		m_done.insert(name);
 		const std::string src = Input(node, 0, "uv");
 		m_code << "vec4 " << name << "(vec2 uv)\n{\n\tvec3 c = " << src << ".rgb;\n"
-		       << "\treturn vec4(c, log(max(comp_bw(vec4(c, 1.0)), 0.0) + 1e-5));\n}\n\n";
+		       << "\treturn vec4(c, log(max(comp_bw(vec4(c, 1.0)), 0.0) + 1e-5) / 24.0 + 0.5);\n}\n\n";
 		return name;
 	}
 
@@ -1087,18 +1091,22 @@ private:
 				if (!at.empty()) {
 					b << "\t{ vec2 p = vec2(0.5); float lod = 20.0; avg = " << at << "; }\n";
 				}
+				// alpha holds log(lum) / 24 + 0.5, which also fits an 8-bit cache (no float target)
 				if (at.empty() || autoKey) {
-					// no texture: the 16 reads also give the average (slower, same look)
+					// no texture: the average comes from 16 single pixels (rougher, follows small objects)
 					const std::string fn = at.empty() ? EmitTonemapLog(node) + "(p)" : at;
 					b << "\tvec4 sum = vec4(0.0);\n"
 					  << "\tfor (int j = 0; j < 4; ++j) {\n\t\tfor (int i = 0; i < 4; ++i) {\n"
 					  << "\t\t\tvec2 p = (vec2(float(i), float(j)) + 0.5) / 4.0;\n\t\t\tfloat lod = 4.0;\n"
-					  << "\t\t\tvec4 s = " << fn << ";\n"
+					  << "\t\t\tvec4 s = " << fn << ";\n\t\t\ts.a = s.a * 24.0 - 12.0;\n"
 					  << "\t\t\tsum += s;\n\t\t\tmaxl = max(maxl, s.a);\n\t\t\tminl = min(minl, s.a);\n"
 					  << "\t\t}\n\t}\n";
 					if (at.empty()) {
 						b << "\tavg = sum / 16.0;\n";
 					}
+				}
+				if (!at.empty()) {
+					b << "\tavg.a = avg.a * 24.0 - 12.0;\n";
 				}
 				if (!photo) {
 					const float igm = (t->gamma == 0.0f) ? 1.0f : 1.0f / t->gamma;
@@ -1113,7 +1121,7 @@ private:
 				}
 				b << "\tfloat m = ";
 				if (autoKey) {
-					b << "0.3 + 0.7 * pow((maxl > minl) ? (maxl - avg.a) / (maxl - minl) : 1.0, 1.4);\n";
+					b << "0.3 + 0.7 * pow((maxl > minl) ? clamp((maxl - avg.a) / (maxl - minl), 0.0, 1.0) : 1.0, 1.4);\n";
 				}
 				else {
 					b << F(t->m) << ";\n";
@@ -1143,7 +1151,8 @@ private:
 				const int n = std::min((int)std::ceil(scope), 4);
 				const float step = scope / (float)n;
 				b << "\tvec2 px = " << F(step) << " / vec2(bgl_RenderedTextureWidth, bgl_RenderedTextureHeight);\n";
-				const std::string read = Input(node, 0, "uv + vec2(float(i), float(j)) * px") + ".x";
+				// clamped to the image, like the search window of the 2.79 (no erosion from the screen edges)
+				const std::string read = Input(node, 0, "clamp(uv + vec2(float(i), float(j)) * px, 0.0, 1.0)") + ".x";
 				const std::string loop = "\tfor (int j = -" + std::to_string(n) + "; j <= " + std::to_string(n) +
 				                         "; ++j) {\n\t\tfor (int i = -" + std::to_string(n) + "; i <= " + std::to_string(n) +
 				                         "; ++i) {\n\t\t\tfloat d2 = dot(vec2(float(i), float(j)), vec2(float(i), float(j))) * " +

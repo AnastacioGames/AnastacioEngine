@@ -192,7 +192,7 @@ if preset != 'off':
         L.new(bb.outputs[0], mix.inputs[1]); L.new(fe.outputs[0], mix.inputs[2]); L.new(mix.outputs[0], cr.inputs[0])
         s = cr.outputs[0]
     elif preset == 'nos_zcombine':
-        # a cena com uma cor chapada a 10 m: o que estiver mais perto que isso aparece
+        # a cena com uma cor chapada a 13 m: o que estiver mais perto que isso aparece
         rgb = N.new('CompositorNodeRGB'); rgb.outputs[0].default_value = (0.9, 0.5, 0.1, 1)
         zc = N.new('CompositorNodeZcombine')
         L.new(img, zc.inputs[0]); L.new(rl.outputs['Depth'], zc.inputs[1])
