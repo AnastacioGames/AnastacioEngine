@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-27 - Frente 2: relógio único com escala de tempo, cutscene pausa com a cena (CLK-01 a CLK-05)
+
+- **CLK-01 e CLK-03:** escala 0 pausa sem divisão inválida. O limite de passos é no mínimo 1, e `setMaxLogicFrame(<1)` dá `ValueError`.
+- **CLK-02:** os relógios de frame, lógica e animação avançam pelo passo escalado (`m_framestep`), o mesmo da física e do desconto de suspensão. Com isso, `setTimeScale` deixa animações, cutscenes e efeitos que leem `getFrameTime` em câmera lenta ou rápida, junto com a física.
+- **CLK-04:** a cutscene tem relógio próprio (`KX_CutsceneManager::Advance`), que começa em 0 no início da sequência e para enquanto a cena está suspensa.
+- **CLK-05:** `setUseExternalClock` foi descontinuado e emite `DeprecationWarning`.
+- **Validação:** feita em `--server`, com física, colisão, vertex parent e animação iguais aos resultados anteriores. Detalhes em `docs/revisao-scenegraph-loop.md`.
+
 ## 2026-10-27 - Compositing no jogo: Directional Blur, Color Correction, Tonemap, Dilate/Erode, Z Combine, Crop e Bilateral Blur
 
 - Color Correction e Crop seguem a 2.79 (selo de jogo cheio). Crop Image Size estica a caixa na tela, porque o quadro do jogo mantém o tamanho.

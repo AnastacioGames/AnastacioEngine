@@ -648,6 +648,12 @@ static PyObject *gPySetUseExternalClock(PyObject *, PyObject *args)
 		return nullptr;
 	}
 
+	// No code path reads this flag: the simulation always paces itself (CLK-05).
+	if (PyErr_WarnEx(PyExc_DeprecationWarning,
+	                 "setUseExternalClock() is deprecated and has no effect on the simulation", 1) < 0) {
+		return nullptr;
+	}
+
 	KX_GetActiveEngine()->SetFlag(KX_KetsjiEngine::USE_EXTERNAL_CLOCK, (bool)bUseExternalClock);
 	Py_RETURN_NONE;
 }
@@ -1348,8 +1354,8 @@ static struct PyMethodDef game_methods[] = {
 	{"setExitKey", (PyCFunction)gPySetExitKey, METH_VARARGS, (const char *)"Sets the key used to exit the game engine"},
 	{"setRender", (PyCFunction)gPySetRender, METH_VARARGS, (const char *)"Set the global render flag"},
 	{"getRender", (PyCFunction)gPyGetRender, METH_NOARGS, (const char *)"get the global render flag value"},
-	{"getUseExternalClock", (PyCFunction)gPyGetUseExternalClock, METH_NOARGS, (const char *)"Get if we use the time provided by an external clock"},
-	{"setUseExternalClock", (PyCFunction)gPySetUseExternalClock, METH_VARARGS, (const char *)"Set if we use the time provided by an external clock"},
+	{"getUseExternalClock", (PyCFunction)gPyGetUseExternalClock, METH_NOARGS, (const char *)"Deprecated: returns the stored flag, which has no effect"},
+	{"setUseExternalClock", (PyCFunction)gPySetUseExternalClock, METH_VARARGS, (const char *)"Deprecated: has no effect on the simulation"},
 	{"getClockTime", (PyCFunction)gPyGetClockTime, METH_NOARGS, (const char *)"Get the last BGE render time. "
 	 "The BGE render time is the simulated time corresponding to the next scene that will be renderered"},
 	{"setClockTime", (PyCFunction)gPySetClockTime, METH_VARARGS, (const char *)"Set the BGE render time. "

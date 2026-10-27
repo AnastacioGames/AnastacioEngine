@@ -78,11 +78,11 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 		}
 
 		if (!scene->IsSuspended()) {
-			// Cutscene time is game logic time, so pause/suspend and fixed-timestep
-			// behavior match the rest of the scene simulation. The scene retains
+			// Cutscene time advances by the scaled game step and only while the scene
+			// runs, so suspend and time scale pause/slow it with the rest (CLK-04). The scene retains
 			// crossed events until the native action dispatcher consumes them.
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_logic);
-			scene->UpdateCutscene(m_engine->GetLogicTime());
+			scene->UpdateCutscene(m_engine->GetFrameStep());
 			scene->DispatchCutsceneEvents();
 
 			// Process sensors, and controllers

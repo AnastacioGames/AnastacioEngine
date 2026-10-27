@@ -754,7 +754,7 @@ public:
 	void StopCutscene();
 	bool RestartCutscene();
 	/** Advance the scene-owned Cutscene clock and retain crossed events. */
-	void UpdateCutscene(double time);
+	void UpdateCutscene(double deltaTime);
 	/** Transfer events accumulated by UpdateCutscene() to the native dispatcher. */
 	KX_CutsceneManager::DispatchedEvents TakePendingCutsceneEvents();
 	/** Instantiate the currently pending native Cutscene events. */

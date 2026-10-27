@@ -90,6 +90,12 @@ public:
 	 * order. Moving backwards restores the cursor without replaying events.
 	 */
 	DispatchedEvents Update(double time);
+	/**
+	 * Advance the sequence's own clock by one step of game time. The clock starts at
+	 * zero on Start(), so a sequence started mid-game begins at its first event, and
+	 * a step the scene skips (suspended) is not counted (CLK-04).
+	 */
+	DispatchedEvents Advance(double deltaTime);
 	double GetTime() const;
 
 	bool IsPlaying() const;

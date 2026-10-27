@@ -611,3 +611,20 @@ Próxima peça: validar SG-04/05 no build, depois relógio (CLK-01).
 ## Continuação: pausa zero e limite de passos (CLK-01, CLK-03)
 
 `NextFrame` só divide quando `m_framestep > 0` e limita o quociente em `double` antes do cast; escala 0 pausa com zero passos, sem consumir input nem acumular saldo. `SetMaxLogicFrame` guarda no mínimo 1 (cobre também o valor lido do arquivo) e `Range.logic.setMaxLogicFrame` recusa valores < 1 com `ValueError`. Cena `--server` com `RANGE_ANIM_LOG`: -1 e 0 recusados, limite segue 5; após `setTimeScale(0)`, 175 frames com `steps=0 acc=0.0000` e relógios parados, sem crash. Física (8), colisão (5) idênticas e animação (4 casos) passaram. O harness `tools/debug/revisao_relogio.py` ainda reproduz o estado antigo e não foi convertido. Retomar a pausa exige chamada externa à lógica (thread Python não ganha o GIL com a lógica parada); contrato de retomada fica com CLK-02. Restam CLK-02, CLK-04 e CLK-05.
+
+## Continuação: contrato único do relógio (CLK-02, CLK-04, CLK-05)
+
+Decisão do usuário (2026-10-27): a escala de tempo vale para todos os relógios, a cutscene pausa com a cena e o relógio externo é descontinuado.
+
+- **CLK-02:** `AdvanceStepTime` soma `m_framestep` (passo × escala), a mesma duração da física, dos timers e do `SuspendedDelta`. Frame, lógica e animação andam juntos, e a suspensão desconta exatamente o que o relógio avançou. Por isso não há dupla aplicação nas ações: `BL_Action` não tinha fator de escala próprio.
+- **CLK-04:** `KX_CutsceneManager::Advance(dt)` avança o relógio da própria sequência, que começa em 0 no `Start`. A cena passa `GetFrameStep()` só quando não está suspensa. Uma sequência iniciada no meio do jogo começa no primeiro evento, e WAIT_TIME e paths continuam relativos a `GetTime()`.
+- **CLK-05:** `setUseExternalClock` emite `DeprecationWarning` e não tem efeito, e a doc da API foi atualizada. `setClockTime`/`getClockTime` continuam como estão (tempo real usado por vídeo e Camera FX).
+- **Efeitos visuais** que leem `GetFrameTime` (chuva, flicker, terremoto, tempo de shader) passam a seguir a escala. Camera FX e vídeo usam `GetClockTime` (tempo real).
+- **Retomada da pausa por escala 0:** fica documentada em `setTimeScale`. A lógica não roda, então a retomada precisa vir de fora da lógica do jogo; para pausar com scripts ativos, use `scene.suspend()` em outra cena.
+
+**Validação (`--server`, cena com cena A e overlay B):**
+- `getFrameTime` avança 0,5 / 1,0 / 2,0 passo por passo com escala 0,5 / 1 / 2. Antes eram 1,0 nas três.
+- Cutscene com evento em 1 s: `play_cutscene` no frame 30, A suspensa de 45 a 165, spawn no frame 210, ou seja, 60 frames de cena ativa (1,0 s). Antes, disparava na retomada.
+- Física (8), colisão (5) e vertex parent deram resultados idênticos aos anteriores, e a animação passou nos 4 casos.
+
+`tools/debug/revisao_relogio.py` continua reproduzindo o estado antigo, sem conversão.

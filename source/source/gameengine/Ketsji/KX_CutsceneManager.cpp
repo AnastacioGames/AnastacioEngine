@@ -114,6 +114,14 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Update(double time)
 	return dispatchedEvents;
 }
 
+KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Advance(double deltaTime)
+{
+	if (!m_isPlaying || deltaTime <= 0.0) {
+		return DispatchedEvents();
+	}
+	return Update(m_time + deltaTime);
+}
+
 double KX_CutsceneManager::GetTime() const
 {
 	return m_time;

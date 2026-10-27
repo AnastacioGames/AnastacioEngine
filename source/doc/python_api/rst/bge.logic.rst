@@ -455,20 +455,24 @@ Time related functions
     real-time. Note that a too large value may lead to some physics
     instabilities.
 
+    The scale applies to every game clock: physics, timers, :func:`getFrameTime`,
+    actions and cutscenes. A value of 0.0 pauses the logic, so no logic brick or
+    script runs until the scale changes again; resume it from outside the game
+    logic, or pause with :meth:`KX_Scene.suspend` instead.
+
     :arg time_scale: The new time multiplier.
 
 .. function:: getUseExternalClock()
 
-    Get if the BGE use the inner BGE clock, or rely or on an external
-    clock. The default is to use the inner BGE clock.
+    .. deprecated:: 0.5.5
+       The flag has no effect; the simulation always uses its own clock.
 
     :rtype: bool
 
 .. function:: setUseExternalClock(use_external_clock)
 
-    Set if the BGE use the inner BGE clock, or rely or on an external
-    clock. If the user selects the use of an external clock, he should call
-    regularly the setClockTime method.
+    .. deprecated:: 0.5.5
+       Has no effect on the simulation and emits a ``DeprecationWarning``.
 
     :arg use_external_clock: the new setting
 

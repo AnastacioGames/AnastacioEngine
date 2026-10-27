@@ -1227,9 +1227,11 @@ void KX_KetsjiEngine::FrameTiming()
 
 void KX_KetsjiEngine::AdvanceStepTime()
 {
-	m_frameTime += m_timestep;
-	m_logicTime += m_timestep;
-	m_animationsTime += m_timestep;
+	// Game clocks advance by the scaled step, the same duration physics, timers and the
+	// suspended delta use, so time scale slows animations and cutscenes too (CLK-02).
+	m_frameTime += m_framestep;
+	m_logicTime += m_framestep;
+	m_animationsTime += m_framestep;
 }
 
 

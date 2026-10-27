@@ -182,7 +182,7 @@ bool KX_Scene::RestartCutscene()
 	return m_cutsceneManager->Restart();
 }
 
-void KX_Scene::UpdateCutscene(double time)
+void KX_Scene::UpdateCutscene(double deltaTime)
 {
 	if (!m_cutsceneManager) {
 		return;
@@ -197,7 +197,7 @@ void KX_Scene::UpdateCutscene(double time)
 		}
 	}
 
-	KX_CutsceneManager::DispatchedEvents dispatchedEvents = m_cutsceneManager->Update(time);
+	KX_CutsceneManager::DispatchedEvents dispatchedEvents = m_cutsceneManager->Advance(deltaTime);
 	m_pendingCutsceneEvents.insert(
 		m_pendingCutsceneEvents.end(), dispatchedEvents.begin(), dispatchedEvents.end());
 
