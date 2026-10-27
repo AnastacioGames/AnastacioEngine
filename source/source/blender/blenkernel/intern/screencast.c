@@ -518,12 +518,14 @@ Screencast *BKE_screencast_begin(
 	sc->rd.size = 100;
 	sc->rd.sfra = sc->rd.efra = 1;
 
-	sc->mh = *BKE_movie_handle_get(sc->rd.im_format.imtype);
-	if (sc->mh.start_movie == NULL) {
+	/* NULL when the build has no movie writer (e.g. no FFmpeg and no AVI). */
+	const bMovieHandle *mh = BKE_movie_handle_get(sc->rd.im_format.imtype);
+	if (mh == NULL || mh->start_movie == NULL) {
 		BKE_report(reports, RPT_ERROR, "No video writer available for screen recording");
 		screencast_free(sc);
 		return NULL;
 	}
+	sc->mh = *mh;
 	if (sc->mh.context_create) {
 		sc->mh_context = sc->mh.context_create();
 	}
