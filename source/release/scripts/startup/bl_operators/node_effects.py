@@ -271,6 +271,29 @@ class NODE_OT_effect_add(Operator):
         return {'FINISHED'}
 
 
+# The other trees show the ready-made presets they already have; the previews are
+# <prefix>_<id>.png in the same folder.
+SHELF_TREES = {'CompositorNodeTree', 'ShaderNodeTree', 'RangeLogicTree', 'RangeUITree'}
+
+
+def _shelf_items(tree_type):
+    """(operator, property, value, name, tooltip, preview) of each preset of the tree."""
+    if tree_type == 'ShaderNodeTree':
+        from bl_operators.node import shader_presets
+        return [("node.shader_preset_add", "preset", i, n, t, "shader_" + i.lower())
+                for i, n, t in shader_presets()]
+    if tree_type == 'RangeLogicTree':
+        from range_logic_tree import RECIPES
+        return [("node.range_logic_tree_recipe", "recipe", i, n, "Ready-made logic: " + n,
+                 "logic_" + i.lower()) for i, n, _f in RECIPES]
+    if tree_type == 'RangeUITree':
+        return [("node.range_ui_tree_template", "kind", "MENU", "Menu + Options",
+                 "Play/Options/Quit menu and an options screen", "ui_menu"),
+                ("node.range_ui_tree_template", "kind", "HUD", "HUD",
+                 "Health bar, speedometer, Pause/A/B buttons and a dialogue box", "ui_hud")]
+    return []
+
+
 class NODE_PT_effects_shelf(Panel):
     bl_space_type = 'NODE_EDITOR'
     bl_region_type = 'TOOL_PROPS'
@@ -280,10 +303,29 @@ class NODE_PT_effects_shelf(Panel):
     @classmethod
     def poll(cls, context):
         space = context.space_data
-        return space and space.type == 'NODE_EDITOR' and space.tree_type == 'CompositorNodeTree'
+        return space and space.type == 'NODE_EDITOR' and space.tree_type in SHELF_TREES
+
+    @staticmethod
+    def _item(row, op, prop, value, name, tip, preview):
+        col = row.column(align=True)
+        icon = preview_icon(preview)
+        if icon:
+            setattr(col.operator_preview(op, icon_value=icon, scale=4.0, description=tip), prop, value)
+        else:
+            sub = col.column(align=True)
+            sub.scale_y = 4.0
+            setattr(sub.operator(op, text="", icon='NODETREE'), prop, value)
+        col.label(text=name)
 
     def draw(self, context):
         layout = self.layout
+        tree_type = context.space_data.tree_type
+        if tree_type != 'CompositorNodeTree':
+            row = layout.row()
+            for item in _shelf_items(tree_type):
+                self._item(row, *item)
+            return
+
         wm = context.window_manager
         row = layout.row(align=True)
         row.prop(wm, "node_effects_tab", expand=True)
@@ -292,16 +334,7 @@ class NODE_PT_effects_shelf(Panel):
         for effect_id, name, category, _build, tip in EFFECTS:
             if wm.node_effects_tab not in {'ALL', category}:
                 continue
-            col = row.column(align=True)
-            icon = preview_icon(effect_id)
-            if icon:
-                col.operator_preview("node.effect_add", icon_value=icon, scale=4.0,
-                                     description=tip).effect = effect_id
-            else:
-                sub = col.column(align=True)
-                sub.scale_y = 4.0
-                sub.operator("node.effect_add", text="", icon='NODETREE').effect = effect_id
-            col.label(text=name)
+            self._item(row, "node.effect_add", "effect", effect_id, name, tip, effect_id)
 
 
 def register_props():
