@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-26 - Frente 2: escala zero não gera orientação inválida (SG-02)
+
+As relações normal, slow parent e bone parent extraíam a rotação dividindo por cada eixo da escala mundial; com um eixo zerado a orientação do filho virava NaN/inf. A função `KX_RotationWithoutScale` (KX_NodeRelationships.h) mantém a última orientação do filho quando a escala tem eixo zero ou o resultado não é finito; posição e escala seguem calculadas. Teste serial: `orientation_finite=true`. Regressões de física, colisão e as 4 cenas de animação no player passaram.
+
 ## 2026-10-26 - Frente 2: vertex parent avisa os descendentes (SG-01)
 
 `KX_VertexParentRelation::UpdateChildCoordinates` recalculava o filho mas não ligava `parentUpdated`, então um neto com relação normal não acompanhava quando o filho de vertex parent mudava. Agora liga, como a relação normal. Validado no teste serial (`tools/debug/revisao_scenegraph.cpp`: neto em 4) e numa cena `--server` com pai, filho por vértice e neto: mover o filho em +3 levou o neto junto.

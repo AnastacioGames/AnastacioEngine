@@ -56,9 +56,8 @@ bool KX_NormalParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_No
 	if (parent) {
 		const mt::mat3x4 trans = parent->GetWorldTransform() * child->GetLocalTransform();
 		const mt::vec3 scale = trans.ScaleVector3D();
-		const mt::vec3 invscale(1.0f / scale.x, 1.0f / scale.y, 1.0f / scale.z);
 		const mt::vec3 pos = trans.TranslationVector3D();
-		const mt::mat3 rot = trans.RotationMatrix().Scale(invscale);
+		const mt::mat3 rot = KX_RotationWithoutScale(trans, scale, child->GetWorldOrientation());
 
 		child->SetWorldScale(scale);
 		child->SetWorldPosition(pos);
@@ -149,9 +148,8 @@ bool KX_SlowParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_Node
 		 * first compute the normal child world coordinates. */
 		const mt::mat3x4 ntrans = parent->GetWorldTransform() * child->GetLocalTransform();
 		const mt::vec3 nscale = ntrans.ScaleVector3D();
-		const mt::vec3 ninvscale(1.0f / nscale.x, 1.0f / nscale.y, 1.0f / nscale.z);
 		const mt::vec3 npos = ntrans.TranslationVector3D();
-		const mt::mat3 nrot = ntrans.RotationMatrix().Scale(ninvscale);
+		const mt::mat3 nrot = KX_RotationWithoutScale(ntrans, nscale, previousOrientation);
 
 		if (m_initialized) {
 			// Get the current world transform.

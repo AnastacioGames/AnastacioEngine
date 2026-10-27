@@ -32,6 +32,7 @@
 #include "KX_BoneParentNodeRelationship.h"
 
 #include "BL_ArmatureObject.h"
+#include "KX_NodeRelationships.h"
 
 #include "mathfu.h"
 
@@ -74,9 +75,8 @@ bool KX_BoneParentRelation::UpdateChildCoordinates(SG_Node *child, const SG_Node
 
 				// Recompute the child transform components from the transform.
 				const mt::vec3 scale = trans.ScaleVector3D();
-				const mt::vec3 invscale(1.0f / scale.x, 1.0f / scale.y, 1.0f / scale.z);
 				const mt::vec3 pos = trans.TranslationVector3D();
-				const mt::mat3 rot = trans.RotationMatrix().Scale(invscale);
+				const mt::mat3 rot = KX_RotationWithoutScale(trans, scale, child->GetWorldOrientation());
 
 				child->SetWorldScale(scale);
 				child->SetWorldPosition(pos);

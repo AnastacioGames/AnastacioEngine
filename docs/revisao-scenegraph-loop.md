@@ -594,4 +594,8 @@ Estado: INP-01/02/03 e ANI-01 corrigidos nos limites descritos; 11 achados SG/CL
 
 `KX_VertexParentRelation::UpdateChildCoordinates` agora liga `parentUpdated = true` quando recalcula, como a relação normal. No teste serial o neto passou de 1 para 4; numa cena `--server` (pai, filho por vértice, neto normal), mover o filho em +3 manteve o neto a 2 unidades dele. Restam 10 achados (SG-02..06, CLK-01..05).
 
-Próxima peça: orientação sob escala singular (SG-02).
+## Continuação: escala zero mantém a orientação (SG-02)
+
+`KX_RotationWithoutScale` substitui a divisão por eixo nas relações normal, slow parent e bone parent. Com um eixo de escala zero (ou resultado não finito), o filho mantém a última orientação; posição e escala continuam vindo da transformação. Escalas não nulas seguem exatamente o cálculo antigo. Teste serial: `orientation_finite=true`. Restam 9 achados (SG-03..06, CLK-01..05).
+
+Próxima peça: deslocamento global com pai escalado (SG-03).

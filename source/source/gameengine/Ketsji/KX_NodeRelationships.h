@@ -44,6 +44,29 @@
 
 #include "SG_ParentRelation.h"
 
+#include "mathfu.h"
+
+#include <cmath>
+
+/** Rotation part of a world transform with the scale removed. With a zero scale axis the
+ * rotation cannot be recovered, so the caller's fallback (its last orientation) is kept
+ * instead of writing non-finite values. */
+inline mt::mat3 KX_RotationWithoutScale(const mt::mat3x4& trans, const mt::vec3& scale, const mt::mat3& fallback)
+{
+	if (scale.x == 0.0f || scale.y == 0.0f || scale.z == 0.0f) {
+		return fallback;
+	}
+	const mt::mat3 rot = trans.RotationMatrix().Scale(mt::vec3(1.0f / scale.x, 1.0f / scale.y, 1.0f / scale.z));
+	for (int col = 0; col < 3; ++col) {
+		for (int row = 0; row < 3; ++row) {
+			if (!std::isfinite(rot(row, col))) {
+				return fallback;
+			}
+		}
+	}
+	return rot;
+}
+
 class KX_NormalParentRelation : public SG_ParentRelation
 {
 public:
