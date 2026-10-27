@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-27 - Preparação da 0.6.0 e teste do pacote Linux
+
+- Versão 0.6.0 em `ANASTACIO_VERSION_STRING`, About e scripts de release. A 0.5.4 Linux não sai; a 0.6.0 a substitui.
+- `tools/linux/testar-release.sh <versao>`: extrai o tar numa pasta limpa e confere `ldd`, arquivos que já faltaram, Python 3.11 do pacote, os `tools/test_*.py` e o `AnastacioRuntime --server` numa cena de 60 frames (`tools/linux/release_smoke_scene.py`, conferida no Windows). Roteiro em `docs/releases.md` (0.6.0).
+
 ## 2026-10-27 - Faixa de efeitos e presets no Node Editor (estilo Blender 5)
 
 - Node Editor ganha uma faixa embaixo (região TOOL_PROPS, aberta por padrão em todas as árvores) com miniaturas de itens prontos e abas por categoria. Liga/desliga pelo botão com ícone ao lado do Auto Arrange ou em View > Effects Shelf.

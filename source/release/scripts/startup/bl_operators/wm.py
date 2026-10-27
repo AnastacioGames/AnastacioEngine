@@ -2585,7 +2585,7 @@ class WM_MT_splash_about(Menu):
         
         col = split.column(align=True)
         col.scale_y = 0.8
-        col.label(text="Anastacio Engine 0.5.4", translate=False)
+        col.label(text="Anastacio Engine 0.6.0", translate=False)
         col.label(text="Fork of Range Engine 1.6 / Blender {version}".format(version=bpy.app.version_string), translate=False)
         col.separator(factor=2.5)
         col.label(text="Powered by Anastacio Games", translate=False)

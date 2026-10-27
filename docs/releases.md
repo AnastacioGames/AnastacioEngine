@@ -6,10 +6,7 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## Pendências abertas
 
-- **0.5.4 Linux não publicada.** Os pacotes de `build-linux/dist/` estão desatualizados. Refazer com o main
-  atual (`VERSION=0.5.4`), RangeArmor Linux com `tools/linux/stage_rangearmor_linux.sh` (launchers do
-  `RangeArmor-0.5.4-windows-x64.zip`), acrescentar as linhas no `SHA256SUMS.txt` da release e subir com
-  `--clobber`. Depois atualizar as notas (Downloads) e o README.
+- **0.6.0 em preparo** (ver a seção abaixo). A 0.5.4 Linux não sai: a 0.6.0 a substitui.
 - Web: o feixe do Spot na Volumetric Fog não aparece no navegador (no desktop aparece).
 - Linux: o OIDN não está no apt do container; o bake de lightmap usa box blur. Não é bug.
 - Testes que precisam de janela (`test_material_atlas_modal.py`, `test_material_atlas_integration.py -- --undo`)
@@ -30,6 +27,62 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
   `3cb1ade9…`; o legado `c4f0f3e4…` não acha o `AnastacioRuntime`. Os launchers não ficam no git: vêm do
   zip Windows publicado da RangeArmor.
 - Abra janelas do jogo/editor só quando o usuário pedir; o resto valide em background.
+
+## 0.6.0
+
+Estado: **em preparo (2026-10-27).** Versão trocada no código; falta testar o pacote Linux e montar o Windows.
+Só publicar depois do teste Linux.
+
+### Notas para o usuário (rascunho)
+
+Primeira versão grande depois da 0.5.4. Novidades:
+
+- **Logic Tree:** lógica por nós no Node Editor (árvore, Then, Frames de Estado, todos os bricks, Run Python,
+  receitas, depuração e destaque ao vivo dos nós que dispararam).
+- **UI Tree:** menus e HUD 2D por nós, também na Web/Android; nó **Dialogue Box** e Setup Dialogue no objeto
+  Text. **Text Boxes** no jogo (quebra de linha, páginas, máquina de escrever).
+- **Compositing no jogo:** Blur, Glare, Directional Blur, Color Correction, Tonemap, Dilate/Erode, Z Combine,
+  Crop e Bilateral Blur. Node Editor com faixa de efeitos e presets (Shader, Logic, UI) no estilo Blender 5.
+- **Render:** sombra de sol em cascatas (CSM) no Principled, PCSS (sombra suave por distância), SH9 em sondas,
+  partículas flipbook, Sky Quality (céu leve no celular), HLOD com troca por célula, Auto Static Batch.
+- **Ferramentas:** Scene Doctor (colisão simplificada, DDS, Prepare Audio), Performance Report
+  (Game ▸ Performance), FPS Counter, Range Trace por módulos, barra e menus da 3D View no estilo Blender 5.
+- **Smart 2D Filter:** uniforms Bool, Choice e Object; Custom Filter com Smart Filter.
+- **Python:** `Range.types.TrackLine` para IA de corrida, `setBoneRotationOffset`, World Sound por mensagem,
+  Start Asleep na física, escala de tempo que vale para animação, cutscene e física juntas.
+- **Export:** Compile Scripts entrega os scripts de `data/` só como `.pyc`; o `.range` aberto sai do pacote
+  quando há `.rasec`; pacote Universal (Windows + Linux numa pasta); player acha o jogo na própria pasta.
+
+Correções: revisão ampla do núcleo (KX_GameObject, KX_Scene, SceneGraph, relógio, joystick no catch-up,
+LibLoad/LibFree, callbacks de colisão, mensagens de bricks), crash do Logic Editor com armaduras, cutscene
+com espera, relatório de crash sem PDB, menos CPU na leitura de arquivos e nos passes de sombra.
+
+Downloads: `AnastacioEngine-0.6.0-windows-x64.zip`, `AnastacioEngine-0.6.0-linux-x86_64.tar.xz`,
+`RangeArmor-0.6.0-windows-x64.zip`, `RangeArmor-0.6.0-linux-x86_64.tar.xz` e `SHA256SUMS.txt`.
+
+### Montagem
+
+Feito (2026-10-27): `ANASTACIO_VERSION_STRING`, About (`wm.py`) e exemplos/padrões dos scripts de release em
+0.6.0. Novo `tools/linux/testar-release.sh` (pacote extraído: `ldd`, arquivos, Python 3.11, os 14
+`tools/test_*.py`, e `AnastacioRuntime --server` numa cena que roda 60 frames, de
+`tools/linux/release_smoke_scene.py`; a cena foi conferida no build Windows).
+
+Na máquina Linux, num clone separado com o main atualizado:
+
+1. Runtime Web: recompilar o preset `web-runtime-release` com o main atual (o de `build-web-release/` é de
+   2026-10-25, antes do Compositing e das revisões de relógio/KX). Conferir o manifesto regenerado.
+2. `VERSION=0.6.0 WEB_RUNTIME_DIR=/work/build-web-release/bin bash tools/linux/container-build.sh`.
+3. `bash tools/linux/testar-release.sh 0.6.0` (com `xvfb-run` instalado roda também o runtime e o teste modal).
+4. Export Web pelo editor do pacote (`tools/web/validate-web.py --export`).
+5. RangeArmor Linux: painel em `rust:1.95-bullseye` e `tools/linux/stage_rangearmor_linux.sh 0.6.0`
+   (launchers do `RangeArmor-0.5.4-windows-x64.zip`; o launcher não mudou). Rodar
+   `tools/rangearmor/release/scripts/test_universal_linux.py` e exportar um jogo com **Compile Scripts**
+   ligado: o player Linux tem de rodar só com `.rasec` e `.pyc` (só foi testado no Windows).
+6. Com janela: editor abre, jogo exportado roda pelo launcher.
+
+Depois, no Windows: `ninja install`, `ctest`, traduções do que é novo desde a 0.5.4 (pt_BR/es/ru), zip com
+`tools/stage_release_windows.py 0.6.0` + `stage_release_web.py`, RangeArmor Windows, `SHA256SUMS.txt`,
+README e site.
 
 ## 0.5.4
 
