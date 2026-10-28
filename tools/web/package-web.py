@@ -100,6 +100,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   button { font-size: 18px; padding: 12px 32px; border: 0; border-radius: 6px; background: #e8862a; color: #111; cursor: pointer; }
   button:disabled { background: #555; color: #999; cursor: default; }
   progress { width: min(360px, 80vw); }
+  #gpu { font-size: 11px; opacity: .6; }
   #error { color: #ff8a80; white-space: pre-wrap; max-width: 90vw; }
   #log { display: none; position: fixed; left: 0; right: 0; bottom: 0; max-height: 35%; overflow: auto; margin: 0;
          background: rgba(0,0,0,.8); color: #9f9; font: 11px monospace; padding: 6px; white-space: pre-wrap; }
@@ -152,6 +153,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     <button id="play" disabled>Jogar</button>
     <button id="vr" disabled hidden>Entrar em VR</button>
     <div id="error" hidden></div>
+    <div id="gpu"></div>
   </div>
 </div>
 <button id="fs" hidden>Tela cheia</button>
@@ -176,7 +178,7 @@ __PERF_SCRIPT__
       try { files[n] = Module.FS.readFile(REPORT_DIR + "/" + n, { encoding: "utf8" }); } catch (e) {}
     });
     if (!files["trace.jsonl"]) return;
-    var body = JSON.stringify({ id: REPORT_ID, ua: navigator.userAgent, files: files });
+    var body = JSON.stringify({ id: REPORT_ID, ua: navigator.userAgent, gpu: GPU, files: files });
     fetch("__report", { method: "POST", body: body }).catch(function () {});
   }
   var REPORT_ID = new Date().toISOString().replace(/[:.]/g, "-");
@@ -187,6 +189,15 @@ __PERF_SCRIPT__
   }
   if (debug) document.body.classList.add("debug");
   function log(s) { if (debug) el("log").textContent += s + "\\n"; }
+
+  // GPU que o navegador usa para o WebGL (notebook com 2 placas costuma cair na integrada).
+  var GPU = "";
+  try {
+    var g = document.createElement("canvas").getContext("webgl2"), gi = g && g.getExtension("WEBGL_debug_renderer_info");
+    if (g) GPU = String(g.getParameter(gi ? gi.UNMASKED_RENDERER_WEBGL : g.RENDERER));
+    if (g && g.getExtension("WEBGL_lose_context")) g.getExtension("WEBGL_lose_context").loseContext();
+  } catch (e) {}
+  if (GPU) { el("gpu").textContent = "GPU: " + GPU; log("[gpu] " + GPU); }
 
   var failed = false;
   function fail(msg) {
@@ -632,7 +643,8 @@ __PERF_SCRIPT__
     if (c.size) b.classList.add(c.size);
     if (c.left) b.style.left = "calc(var(--sl) + var(--u) * " + (1.35 + c.at[0]) + ")";
     else b.style.right = "calc(var(--sr) + var(--u) * " + (1.35 - c.at[0]) + ")";
-    if (c.top) b.style.top = "calc(var(--u) * " + (c.at[1] - 0.6) + ")";
+    // Abaixo do botao "Controles" (#touch-toggle, 44px + 8px no canto superior direito) e do notch.
+    if (c.top) b.style.top = "calc(env(safe-area-inset-top, 0px) + 56px + var(--u) * " + (c.at[1] - 0.6) + ")";
     else b.style.bottom = "calc(var(--sb) + var(--u) * " + (1.35 - c.at[1]) + ")";
   }
   function makeButton(c) {
