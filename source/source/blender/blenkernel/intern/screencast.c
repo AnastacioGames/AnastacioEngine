@@ -37,6 +37,7 @@
  */
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <math.h>
 
@@ -116,6 +117,8 @@ struct Screencast {
 	ScreencastAudio *audio;  /* NULL: video without sound */
 
 	int frames_written, frames_dropped, frames_skipped;
+	int frames_captured;   /* readbacks started (RANGE_SCREENCAST_STATS) */
+	double encode_time;    /* seconds spent in the encoder thread */
 	char filepath[FILE_MAX];
 };
 
@@ -259,7 +262,9 @@ static void *screencast_thread(void *data)
 		if (sc->show_cursor && frame->cursor.visible) {
 			screencast_draw_cursor(sc, frame);
 		}
+		const double t0 = PIL_check_seconds_timer();
 		screencast_encode(sc, frame);
+		sc->encode_time += PIL_check_seconds_timer() - t0;
 
 		/* Kept to close the video at the stop time (the last frame may be long). */
 		if (sc->last_frame) {
@@ -378,6 +383,7 @@ void BKE_screencast_capture(Screencast *sc, int x, int y, const ScreencastCursor
 	glPixelStorei(GL_PACK_SKIP_PIXELS, 0);
 	glPixelStorei(GL_PACK_SKIP_ROWS, 0);
 
+	sc->frames_captured++;
 	if (sc->use_pbo) {
 		screencast_collect(sc, false);
 
@@ -667,6 +673,18 @@ void BKE_screencast_end(Screencast *sc, ReportList *reports)
 	       sc->filepath, duration, sc->frames_written, sc->frames_dropped, sc->frames_skipped,
 	       sc->audio ? "with sound" : "no sound",
 	       sc->encoder_failed ? ", encoder failed" : "");
+	/* RANGE_SCREENCAST_STATS=<file>: the same line plus encoder cost, for the standalone player
+	 * (its stdout is not visible). */
+	const char *stats = getenv("RANGE_SCREENCAST_STATS");
+	if (stats && stats[0]) {
+		FILE *f = BLI_fopen(stats, "a");
+		if (f) {
+			fprintf(f, "%s: %.1f s, %d captured, %d written, %d dropped, %d skipped, encode %.1f ms/frame\n",
+			        sc->filepath, duration, sc->frames_captured, sc->frames_written, sc->frames_dropped,
+			        sc->frames_skipped, sc->frames_written ? sc->encode_time * 1000.0 / sc->frames_written : 0.0);
+			fclose(f);
+		}
+	}
 
 	screencast_free(sc);
 }

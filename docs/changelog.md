@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-28 - Gravação de tela: x264 com vários núcleos e preset rápido de verdade
+
+- `writeffmpeg.c`: o libx264 declara `AV_CODEC_CAP_AUTO_THREADS` e caía no ramo que forçava `thread_count = 1`
+  (vale também para o render de vídeo do editor). Na gravação ao vivo, `x264-params subme=1`: o `subq` padrão do
+  libavcodec (8) passava por cima do preset superfast.
+- `screencast.c`: `RANGE_SCREENCAST_STATS=<arquivo>` grava quadros capturados/gravados/perdidos e o custo do
+  codificador (o stdout do player não aparece).
+- Medido no RolimaRacer (1280x720, 60 fps, CRF 16, 3 pilotos): 136 ms → ~20 ms por quadro, vídeo de 7 para ~48 fps.
+  Ainda perde quadros enquanto a pista carrega. Mais threads (núcleos − 2) piorou (21,5 ms); ficou metade.
+
 ## 2026-10-28 - Online: pista trocada pela rede entra como cena de fundo
 
 - `KX_NetworkManager` (`ChangeScene` no host e `SceneChange` no cliente): a cena nova é removida/adicionada como

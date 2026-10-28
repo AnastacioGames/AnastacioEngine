@@ -678,7 +678,8 @@ static AVStream *alloc_video_stream(FFMpegContext *context, RenderData *rd, int 
 	else if (codec->capabilities & AV_CODEC_CAP_SLICE_THREADS) {
 		c->thread_type = FF_THREAD_SLICE;
 	}
-	else {
+	else if (!(codec->capabilities & AV_CODEC_CAP_AUTO_THREADS)) {
+		/* libx264 manages its own threads (AUTO_THREADS): forcing 1 made it encode on one core. */
 		c->thread_count = 1;
 	}
 
@@ -758,6 +759,11 @@ static AVStream *alloc_video_stream(FFMpegContext *context, RenderData *rd, int 
 	 * they override the fast preset and can't keep up with real time. */
 	if (!context->realtime) {
 		set_ffmpeg_properties(rd, c, "video", &opts);
+	}
+	else {
+		/* libavcodec's default subq (8) overrides the preset's subpixel search in libx264: at 8 one
+		 * 720p frame took ~136 ms. x264-params is applied last, so the fast value wins. */
+		av_dict_set(&opts, "x264-params", "subme=1", 0);
 	}
 
 	if (avcodec_open2(c, codec, &opts) < 0) {
