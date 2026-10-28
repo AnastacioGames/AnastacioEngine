@@ -1041,6 +1041,8 @@ class NODE_OT_auto_arrange(Operator):
 
     def execute(self, context):
         tree = context.space_data.edit_tree
+        if tree.bl_idname == "RangeUITree":
+            return {'FINISHED'} if self.arrange_ui(tree) else {'CANCELLED'}
         logic = tree.bl_idname == "RangeLogicTree"
         # each frame is arranged on its own (child locations are relative to the frame)
         groups = {}
@@ -1189,6 +1191,49 @@ class NODE_OT_auto_arrange(Operator):
                 y_bottom = min(y_bottom, y)
                 x -= self.gap_x
             top = y_bottom - self.gap_flow
+
+    def arrange_ui(self, tree):
+        """UI Tree: widgets inside the screen frames are the screen layout and stay put;
+        only the action nodes outside the frames go in a column right of the screens,
+        each one at the height of the widget that triggers it"""
+        def absolute_y(n):
+            y = n.location.y
+            p = n.parent
+            while p:
+                y += p.location.y
+                p = p.parent
+            return y
+
+        frames = [n for n in tree.nodes if n.type == 'FRAME']
+        free = [n for n in tree.nodes if n.type != 'FRAME' and n.parent is None]
+        if not free:
+            return False
+        names = {n.name for n in free}
+        source_y = {}
+        for l in tree.links:
+            b = l.to_node.name
+            if b in names and l.from_node.name not in names:
+                source_y.setdefault(b, []).append(absolute_y(l.from_node))
+        if frames:
+            left = max(f.location.x + f.dimensions.x for f in frames) + self.gap_x * 1.5
+            top = max(f.location.y for f in frames)
+        else:
+            left = min(n.location.x for n in free)
+            top = max(n.location.y for n in free)
+
+        def key(n):
+            ys = source_y.get(n.name)
+            return (0, -max(ys)) if ys else (1, -n.location.y)
+
+        free.sort(key=key)
+        y_prev = top + self.gap_y
+        for n in free:
+            ys = source_y.get(n.name)
+            want = max(ys) + n.dimensions.y * 0.5 if ys else y_prev
+            y = min(want, y_prev)
+            n.location = (left, y)
+            y_prev = y - n.dimensions.y - self.gap_y
+        return True
 
 classes = (
     NodeSetting,
