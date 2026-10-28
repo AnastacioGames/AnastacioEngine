@@ -18,6 +18,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Erro de enum desconhecido com mais de 30 opções não despeja mais a lista inteira: mostra a quantidade e os nomes parecidos (`enum "DECIMAT" not found (56 options); similar: 'DECIMATE'`). Listas curtas seguem completas.
 
 - Acabamento (mesmo dia): botão "Measure ( Play StandAlone )" traduzível (o sufixo do simulador também); selo com desenho de PC antigo no topo do relatório quando o simulador está ligado; ícones de traço nas seções e na navegação do relatório; opção 32x e descrições corrigidas (no notebook do usuário, RX 6800M, 16x ficou perto de um i5 antigo com HD 4400); estimativa padrão do relatório passou para 16x.
+- Céu como etapa própria de GPU (`render.sky`, com `render.camera_setup` antes) e dica no relatório quando céu + lens flare passam de ~4 ms na GPU fraca, citando o que está ligado (estrelas realistas, lua, lens flare, Sky Quality High; o Measure grava em `settings.json`). Testado pelo usuário: apontou os principais pesos. Lens flare com o sol fora da tela custa <0,05 ms (saída antecipada) e some da tabela.
 ## 2026-10-28 - Céu e lens flare mais leves em GPU integrada
 
 - Motivo: no Intel HD 4400 (notebook sem placa de vídeo) a cena inicial vazia rodava a ~10 fps, com GPU Latency de ~100 ms; o usuário isolou lens flare e estrelas/lua.

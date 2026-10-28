@@ -823,7 +823,17 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 		KX_WorldInfo *worldInfo = scene->GetWorldInfo();
 		// Update background and render it.
 		worldInfo->UpdateBackGround(rasterizer, scene->GetWorldSun());
+		/* Sky on its own GPU stage (Performance Report): stars, moon and atmosphere cost per pixel
+		 * and would otherwise hide inside render.cameras with the objects. */
+		if (KX_EngineProfiler::Enabled()) {
+			static const int beforeSkyId = KX_EngineProfiler::Register("render.camera_setup");
+			KX_EngineProfiler::GpuStamp(beforeSkyId);
+		}
 		{ SlowPhaseNote note("cam.background", scene); worldInfo->RenderBackground(rasterizer); }
+		if (KX_EngineProfiler::Enabled()) {
+			static const int skyId = KX_EngineProfiler::Register("render.sky");
+			KX_EngineProfiler::GpuStamp(skyId);
+		}
 	}
 
 	// The following actually reschedules all vertices to be

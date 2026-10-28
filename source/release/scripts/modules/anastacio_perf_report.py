@@ -40,7 +40,9 @@ WEAK_GPU_DEFAULT = 16
 GPU_STEP_NAMES = {
     'render.begin': 'Frame start (clear, sky)',
     'render.shadows': 'Shadows',
-    'render.cameras': 'Scene (objects, materials, sky)',
+    'render.camera_setup': 'Camera setup',
+    'render.sky': 'Sky (background, stars, moon)',
+    'render.cameras': 'Objects and materials',
     'render.filters': '2D filters and effects',
     'render.present': 'Final copy to the screen',
 }
@@ -378,6 +380,33 @@ def _gpu_section(steps, weak):
     head = (_('Step'), _('GPU ms'), '%', _('Weak GPU ms (x%d)') % factor)
     return '<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>' % (
         _esc(_('GPU time by step')), _table(head, rows, numeric=(1, 2, 3)), _esc(note))
+
+
+def sky_advice(steps, settings, weak):
+    """Tip naming the costly sky options when the sky alone is heavy on a weak GPU."""
+    sky = dict(steps).get('render.sky', 0.0)
+    flare = dict(steps).get('filter.lensflare', 0.0)
+    factor = weak if weak > 1 else WEAK_GPU_DEFAULT
+    world = settings.get('world', {})
+    if (sky + flare) * factor < GPU_BUDGET_MS / 4:
+        return None
+    on = []
+    if world.get('use_sky_stars'):
+        on.append(_('realistic stars') if world.get('star_style') in ('REAL', 'REALISTIC', 'CONSTELLATIONS') else _('stars'))
+    if world.get('use_sky_moon'):
+        on.append(_('moon'))
+    if world.get('use_lens_flare') or flare > 0.0:
+        on.append(_('lens flare'))
+    if world.get('sky_quality') == 'HIGH':
+        on.append(_('High sky quality'))
+    level = 'bad' if (sky + flare) * factor >= GPU_BUDGET_MS / 2 else 'warn'
+    text = _('The sky costs %.2f ms on this GPU (sky %.2f + lens flare %.2f), about %.0f ms on a GPU %dx slower.') % (
+        sky + flare, sky, flare, (sky + flare) * factor, factor)
+    if on:
+        text += ' ' + _('Turned on: %s. Turn them off for weak PCs or set Sky Quality to Low.') % ', '.join(on)
+    else:
+        text += ' ' + _('Set Sky Quality to Low for weak PCs.')
+    return level, text
 
 
 def read_shader_log(folder, load_end=LOAD_FRAMES):
@@ -751,6 +780,10 @@ def write_html(folder, title=None):
     w.append('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
     w.append('<title>%s</title><style>%s</style><script>%s</script></head><body><main>' % (_esc(_('Performance Report')), CSS, THEME_JS))
     tips = advice(a, shader_items)
+    sky_tip = sky_advice(read_gpu_profile(folder), settings, weak)
+    if sky_tip:
+        tips.insert(0, sky_tip)
+        tips.sort(key=lambda t: {'bad': 0, 'warn': 1}.get(t[0], 2))
     worst_level = tips[0][0] if tips else 'good'
     verdict = {'good': _('Runs smoothly'), 'warn': _('Some things worth a look'), 'bad': _('Needs work')}[worst_level]
     w.append('<header class="hero"><button class="theme" onclick="toggleTheme()" title="%s">&#9680;</button>'

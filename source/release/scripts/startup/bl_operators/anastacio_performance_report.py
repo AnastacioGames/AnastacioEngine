@@ -87,7 +87,7 @@ class GAME_OT_performance_report(Operator):
             env["RANGE_WEAK_GPU"] = str(weak)
         import json
         with open(os.path.join(self._folder, "settings.json"), "w", encoding="utf-8") as f:
-            json.dump({"weak_gpu": weak}, f)
+            json.dump({"weak_gpu": weak, "world": world_settings(context.scene)}, f)
         self._process = subprocess.Popen([runtime, game], env=env, cwd=os.path.dirname(game))
 
         wm = context.window_manager
@@ -146,6 +146,21 @@ class GAME_OT_performance_report_last(Operator):
         last = max(reports, key=os.path.getmtime)
         bpy.ops.wm.url_open(url="file:///" + last.replace("\\", "/"))
         return {'FINISHED'}
+
+
+def world_settings(scene):
+    """Sky options that cost per pixel, for the report's sky advice."""
+    world = scene.world
+    if not world:
+        return {}
+    out = {}
+    for prop in ("sky_type", "use_sky_stars", "star_style", "use_sky_moon", "sky_quality"):
+        if hasattr(world, prop):
+            out[prop] = getattr(world, prop)
+    weather = getattr(world, "weather_settings", None)
+    if weather is not None and hasattr(weather, "use_lens_flare"):
+        out["use_lens_flare"] = weather.use_lens_flare
+    return out
 
 
 def register_props():
