@@ -17,7 +17,9 @@ Fixed Timestep e menos custo de GPU em placas integradas.
   fica certo também no Wine e com o timer de 15 ms do Windows.
 - **Qualidade do lens flare e das estrelas** (Low/Medium/High) no World, com o sol do flare escolhido entre as
   Lamps da cena. O Quality Preset ajusta as duas junto com o resto.
-- **Céu e lens flare mais leves em GPUs integradas.**
+- **Céu e lens flare mais leves em GPUs integradas.** A cena inicial e os Worlds novos começam sem lens flare,
+  lua e estrelas realistas (custavam muito por pixel: uma cena vazia rodava a ~10 fps numa Intel HD 4400);
+  ligue no World quando quiser.
 - **Performance Report:** simulador de PC fraco (GPU até 32x mais lenta), tempo de GPU por etapa do desenho,
   céu como etapa própria com dica do que custa, selo de PC antigo e menu Performance em submenus.
 
