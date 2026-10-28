@@ -29,8 +29,8 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.6.1
 
-Estado: **em preparo** (versão `0.6.1` no executável, About e scripts de release). O pacote só será montado
-depois do retorno do teste no Linux nativo e no Wine (`tools/timing_linux.sh`, [timing-linux.md](timing-linux.md)).
+Estado: **em preparo** (versão `0.6.1` no executável, About e scripts de release). Pacotes Linux montados e
+testados em 2026-10-28 (seção "Linux" abaixo); Windows e Wine pendentes.
 
 Notas para o usuário:
 
@@ -47,7 +47,33 @@ Notas para o usuário:
 
 Texto da página do GitHub: [release-notes-0.6.1.md](release-notes-0.6.1.md).
 
-Pendente: resultado do Linux/Wine, montagem e teste dos pacotes (Windows, Linux, Web, RangeArmor).
+### Linux (2026-10-28, notebook Linux, clone `~/AnastacioEngine-build050` em `034f480a`)
+
+Pacotes em `~/AnastacioEngine-build050/build-linux/dist/` (não publicados):
+
+- `AnastacioEngine-0.6.1-linux-x86_64.tar.xz` (264 MB) sha256 `71494a7f5179d2f6eb8d41d29e00f827d8dcd1db08810b939d3b71fd00f0264b`
+- `RangeArmor-0.6.1-linux-x86_64.tar.xz` (7,1 MB) sha256 `bfa3cf146bd72801fb842c258cefca19d12e1ff4e177fdfdefbc1836cf23eefc`
+
+Resultados:
+
+1. Timing nativo (Intel RPL-P, 60/120 fps, [timing_linux_result.txt](../timing_linux_result.txt)): sem câmera
+   lenta nem diferença de física; o modo legado ficou liso (`step_cv` 4,2 → 0,1). Com a interpolação ligada o
+   `fixed` fica um pouco menos liso quando a tela e a lógica têm o mesmo ritmo (`step_cv` 0,3–0,5 contra
+   0,0–0,1 com `RANGE_NO_INTERP=1`). Wine não testado: não há build Windows atual nesta máquina.
+2. Runtime Web recompilado (`web-runtime-release-linux`, manifesto com 242 módulos) e incluído no pacote.
+3. Container (`VERSION=0.6.1`): build e pacote OK. `ctest` 10/10.
+4. `testar-release.sh 0.6.1`: tudo OK (ldd, arquivos, Python 3.11.9, versão 0.6.1 no binário, os 13
+   `tools/test_*.py`, runtime `--server` 60 frames e `test_material_atlas_modal` com janela).
+5. Export Web pelo editor do pacote com a cena de Compositing: preflight sem problemas; pacote rodou no Chrome
+   headless (`verify-package.cjs`, rc 0) e o filtro do Compositing foi criado. Sem GPU no headless, precisa de
+   `--use-angle=swiftshader --enable-unsafe-swiftshader`; sem isso o runtime não cria a janela.
+6. RangeArmor: painel recompilado em `rust:1.95-bullseye`; launchers do pacote 0.6.0 (não mudaram,
+   `3cb1ade9…`). Export **Universal com Compile Scripts** de um projeto de teste: `data/` só com `.rasec`,
+   `.cooked` e `.pyc`; `test_universal_linux.py --run` OK e o jogo rodou o módulo a partir do `.pyc`
+   (`MARKER_PYC frames=60`). Lado Windows do Universal foi um `.exe` falso.
+
+Pendente: Wine, pacotes Windows (o runtime Web pode ser copiado de `build-web-release/bin` do Linux),
+`SHA256SUMS.txt` com os quatro arquivos, README/site e publicação.
 
 ## 0.6.0
 
