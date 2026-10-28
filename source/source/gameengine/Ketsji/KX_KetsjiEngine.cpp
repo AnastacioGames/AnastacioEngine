@@ -957,11 +957,19 @@ void KX_KetsjiEngine::UpdateSleepTime()
 		// With v-sync the swap has usually taken that long already, so the wait is ~0.
 		m_overframetime = 0.0;
 		if (m_timescale > 0.0) {
-			const double owed = m_simAccumulator +
-			                    (m_clock.GetTimeSecond() - m_accumulatorPreviousRealTime) * m_timescale;
-			const double wait = (m_framestep - owed) / m_timescale - 0.0005;
-			if (wait > 0.0) {
-				std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+			// Hybrid wait: sleep half of what is left (shorter slices near the deadline, so the
+			// CPU does not drop its clock on one long sleep), then spin the last 0.5 ms.
+			for (;;) {
+				const double owed = m_simAccumulator +
+				                    (m_clock.GetTimeSecond() - m_accumulatorPreviousRealTime) * m_timescale;
+				const double remaining = (m_framestep - owed) / m_timescale;
+				if (remaining <= 0.0) {
+					break;
+				}
+				if (remaining > 0.0005) {
+					const double wait = std::min(remaining * 0.5, remaining - 0.0005);
+					std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+				}
 			}
 			ClockTiming();
 		}
