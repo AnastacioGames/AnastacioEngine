@@ -1,4 +1,4 @@
-"""A/B test of frame pacing (spin/sleep mix vs. sleep-only), with and without the 1 ms Windows timer.
+﻿"""A/B test of frame pacing (spin/sleep mix vs. sleep-only), with and without the 1 ms Windows timer.
 
 Usage (Windows, from the repo root, after building RangeRuntime and RangeEngine):
   python tools/timing_ab.py [build\\bin]
@@ -11,8 +11,8 @@ import json, os, statistics, subprocess, sys, tempfile, time
 
 BIN = sys.argv[1] if len(sys.argv) > 1 else os.path.join("build", "bin")
 EXE = ".exe" if os.name == "nt" else ""
-RUNTIME = os.path.join(BIN, "RangeRuntime" + EXE)
-EDITOR = os.path.join(BIN, "RangeEngine" + EXE)
+RUNTIME = os.path.join(BIN, "AnastacioRuntime" + EXE)
+EDITOR = os.path.join(BIN, "AnastacioEngine" + EXE)
 SECONDS = os.environ.get("FT_SECONDS", "15")
 WORK = os.environ.get("FT_SLEEP", "0.004")  # simulated game work per frame
 TARGET_MS = 1000.0 / 60.0
