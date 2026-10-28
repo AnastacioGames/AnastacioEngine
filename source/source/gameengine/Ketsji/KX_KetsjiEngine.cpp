@@ -44,6 +44,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 
@@ -932,17 +933,46 @@ void KX_KetsjiEngine::ServerSleep()
 	}
 }
 
-void KX_KetsjiEngine::SleepUnderRate()
+void KX_KetsjiEngine::WaitUntil(double deadline)
 {
-	/* m_timeUnderRate is in seconds; it used to be cast to whole milliseconds, so the usual ~0.02 became
-	 * sleep(0) and the catch-up loop spun on a full core. Sleep in microseconds, never past the time still
-	 * owed for this frame (minus a margin the loop then spins). */
-	const double owed = m_timestep - m_deltatime + m_overframetime - 0.0005;
-	const double wait = std::min(m_timeUnderRate, owed);
-	if (wait > 0.0) {
-		std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+	/* Spin/sleep mix: spin half of the time left, then sleep half of what is left, looped.
+	 * Spinning keeps the CPU clock up (one long sleep lets it drop and adds lag on fast PCs);
+	 * sleeping keeps it from overheating. Under the minimum sleep (Windows timer is ~1 ms even
+	 * with timeBeginPeriod(1)) a sleep could overshoot the frame, so the end is pure spin. */
+	const double minSleep = 0.0015;
+	// RANGE_PACING=sleep: previous method (shrinking sleeps, spin only the last 0.5 ms), for A/B tests.
+	static const bool sleepOnly = getenv("RANGE_PACING") && strcmp(getenv("RANGE_PACING"), "sleep") == 0;
+	if (sleepOnly) {
+		for (;;) {
+			const double remaining = deadline - m_clock.GetTimeSecond();
+			if (remaining <= 0.0) {
+				return;
+			}
+			if (remaining > 0.0005) {
+				const double wait = std::min(remaining * 0.5, remaining - 0.0005);
+				std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+			}
+		}
 	}
-	ClockTiming();
+	for (;;) {
+		double remaining = deadline - m_clock.GetTimeSecond();
+		if (remaining <= 0.0) {
+			return;
+		}
+		if (remaining < minSleep) {
+			while (m_clock.GetTimeSecond() < deadline) {
+			}
+			return;
+		}
+		const double spinEnd = m_clock.GetTimeSecond() + remaining * 0.5;
+		while (m_clock.GetTimeSecond() < spinEnd) {
+		}
+		remaining = deadline - m_clock.GetTimeSecond();
+		const double sleep = remaining * 0.5;
+		if (sleep >= minSleep) {
+			std::this_thread::sleep_for(std::chrono::microseconds((long long)(sleep * 1e6)));
+		}
+	}
 }
 
 void KX_KetsjiEngine::UpdateSleepTime()
@@ -959,40 +989,13 @@ void KX_KetsjiEngine::UpdateSleepTime()
 		if (m_timescale > 0.0) {
 			const double owed = m_simAccumulator +
 			                    (m_clock.GetTimeSecond() - m_accumulatorPreviousRealTime) * m_timescale;
-			const double wait = (m_framestep - owed) / m_timescale - 0.0005;
-			if (wait > 0.0) {
-				std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
-			}
+			WaitUntil(m_clock.GetTimeSecond() + (m_framestep - owed) / m_timescale);
 			ClockTiming();
 		}
 	}
 	else if (m_timestep > m_deltatime - m_overframetime + 6e-6) {
-		while (m_timestep > m_deltatime - m_overframetime + 6e-6) {
-			if (m_timestep > (m_deltatime * 1.5)) {
-				m_sleeptime += 2.0;
-				m_timeUnderRate = (((m_timestep - m_deltatime) * m_maxLogicFrame) / m_sleeptime);
-				if (m_timeUnderRate < 1e-6) {
-					m_timeUnderRate = 1e-6;
-				}
-				SleepUnderRate();
-			}
-			else if (m_timestep > (m_deltatime * 1.2)) {
-				m_sleeptime += 4.0;
-				m_timeUnderRate = (((m_timestep - m_deltatime) * m_maxLogicFrame) / m_sleeptime);
-				if (m_timeUnderRate < 1e-6) {
-					m_timeUnderRate = 1e-6;
-				}
-				SleepUnderRate();
-			}
-			else {
-				m_sleeptime += 40.0;
-				m_timeUnderRate = (((m_timestep - m_deltatime) * m_maxLogicFrame) / m_sleeptime);
-				if (m_timeUnderRate < 1e-6) {
-					m_timeUnderRate = 1e-6;
-				}
-				SleepUnderRate();
-			}
-		}
+		WaitUntil(m_clock.GetTimeSecond() + (m_timestep - m_deltatime + m_overframetime - 6e-6));
+		ClockTiming();
 		// Caught up: clear the accumulated logic-frame overtime.
 		m_overframetime = 0.0;
 	}
