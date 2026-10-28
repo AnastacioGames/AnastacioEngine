@@ -320,6 +320,8 @@ void BLO_update_defaults_startup_blend(Main *bmain)
     scene->gm.scehysteresis = 10;
     /* MSAA minimo que o jogo aceita (alpha-to-coverage da folhagem Hashed); ver LA_Launcher.cpp. */
     scene->gm.aasamples = 2;
+    /* Fixed timestep: game speed follows real time even when the PC draws under the tic rate. */
+    scene->gm.flag |= GAME_USE_FIXED_TIMESTEP;
 
     scene->r.ffcodecdata.audio_mixrate = 48000;
   }

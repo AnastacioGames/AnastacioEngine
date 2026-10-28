@@ -861,6 +861,9 @@ bool KX_KetsjiEngine::NextFrame()
 			}
 			// Keep poses/events in step with logic; defer mesh deformation to the last step.
 			// The outer animation-rate gate remains unchanged for the whole batch.
+			if (i == steps - 1) {
+				SnapshotInterpolation();
+			}
 			AdvanceStepTime();
 			m_simulationPipeline->Update(i == steps - 1);
 			clearJoystickEvents();
@@ -1082,7 +1085,85 @@ void KX_KetsjiEngine::UpdateSleepTime()
 
 void KX_KetsjiEngine::Render()
 {
+	ApplyInterpolation();
 	m_renderPipeline->Render();
+	RestoreInterpolation();
+}
+
+// RANGE_NO_INTERP=1 draws the plain step positions, for A/B tests.
+static bool InterpolationEnabled()
+{
+	static const bool enabled = !getenv("RANGE_NO_INTERP");
+	return enabled;
+}
+
+void KX_KetsjiEngine::SnapshotInterpolation()
+{
+	m_interpPrevious.clear();
+	if (!m_useFixedTimestep || !InterpolationEnabled()) {
+		return;
+	}
+	for (KX_Scene *scene : m_scenes) {
+		for (KX_GameObject *gameobj : *scene->GetObjectList()) {
+			SG_Node *node = gameobj->GetNode();
+			m_interpPrevious[node] = {node->GetWorldPosition(), node->GetWorldOrientation(), node->GetWorldScaling()};
+		}
+	}
+}
+
+void KX_KetsjiEngine::ApplyInterpolation()
+{
+	m_interpSaved.clear();
+	if (!m_useFixedTimestep || m_interpPrevious.empty() || m_framestep <= 0.0) {
+		return;
+	}
+	// Drawn one step behind: alpha 0 shows the state before the last step, 1 the current one.
+	const float alpha = (float)std::min(std::max(m_simAccumulator / m_framestep, 0.0), 1.0);
+	if (alpha >= 1.0f) {
+		return;
+	}
+	for (KX_Scene *scene : m_scenes) {
+		for (KX_GameObject *gameobj : *scene->GetObjectList()) {
+			SG_Node *node = gameobj->GetNode();
+			const auto it = m_interpPrevious.find(node);
+			if (it == m_interpPrevious.end()) {
+				continue;  // Added during the last step.
+			}
+			const InterpTransform& prev = it->second;
+			const InterpTransform cur = {node->GetWorldPosition(), node->GetWorldOrientation(), node->GetWorldScaling()};
+			const mt::vec3 move = cur.position - prev.position;
+			bool turned = false;
+			for (int k = 0; k < 9 && !turned; ++k) {
+				turned = cur.orientation(k / 3, k % 3) != prev.orientation(k / 3, k % 3);
+			}
+			if (move == mt::zero3 && !turned && cur.scaling == prev.scaling) {
+				continue;
+			}
+			// A jump of more than 10 m in one step is a teleport (setWorldPosition, respawn): no blend.
+			if (move.LengthSquared() > 100.0f) {
+				continue;
+			}
+			const mt::quat q0 = mt::quat::FromMatrix(prev.orientation).Normalized();
+			const mt::quat q1 = mt::quat::FromMatrix(cur.orientation).Normalized();
+			m_interpSaved.emplace_back(node, cur);
+			node->SetWorldPosition(prev.position + move * alpha);
+			node->SetWorldOrientation(mt::quat::Slerp(q0, q1, alpha).ToMatrix());
+			node->SetWorldScale(prev.scaling + (cur.scaling - prev.scaling) * alpha);
+			node->ClearModified();  // Marks it dirty for the render matrix and culling.
+		}
+	}
+}
+
+void KX_KetsjiEngine::RestoreInterpolation()
+{
+	for (const auto& saved : m_interpSaved) {
+		SG_Node *node = saved.first;
+		node->SetWorldPosition(saved.second.position);
+		node->SetWorldOrientation(saved.second.orientation);
+		node->SetWorldScale(saved.second.scaling);
+		node->ClearModified();
+	}
+	m_interpSaved.clear();
 }
 
 void KX_KetsjiEngine::RequestExit(KX_ExitInfo::Code code)

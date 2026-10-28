@@ -50,10 +50,12 @@
 
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct TaskScheduler;
 class KX_Scene;
+class SG_Node;
 class KX_Camera;
 class KX_LightObject;
 class RAS_ILightObject;
@@ -287,6 +289,16 @@ private:
 	/// the elapsed real time fed into m_simAccumulator. Independent of m_previousRealTime,
 	/// which belongs to the legacy sleep-based catch-up in UpdateSleepTime()/FrameOver().
 	double m_accumulatorPreviousRealTime;
+	/// Render interpolation (fixed timestep): world transforms before the last step, drawn blended
+	/// with the current ones by the time left in the accumulator, so a frame between steps moves
+	/// smoothly instead of 0/1/2 steps. m_interpSaved holds the real transforms while drawing.
+	struct InterpTransform {
+		mt::vec3 position;
+		mt::mat3 orientation;
+		mt::vec3 scaling;
+	};
+	std::unordered_map<SG_Node *, InterpTransform> m_interpPrevious;
+	std::vector<std::pair<SG_Node *, InterpTransform>> m_interpSaved;
 	/// Deprecated: legacy Python-facing catch-up limit (getMaxPhysicsFrame/setMaxPhysicsFrame).
 	/// No longer consumed anywhere; kept only for that API's backward compatibility. Shadow
 	/// culling has its own state, m_shadowCullingEnabled, below.
@@ -382,6 +394,9 @@ private:
 	void FrameTiming();
 	/// Advance the logic, frame and animation clocks by one logic step.
 	void AdvanceStepTime();
+	void SnapshotInterpolation();
+	void ApplyInterpolation();
+	void RestoreInterpolation();
 	void UpdateDynamicResolution();
 public:
 	/// It is necessary to make the function public so that the debug mode can use it

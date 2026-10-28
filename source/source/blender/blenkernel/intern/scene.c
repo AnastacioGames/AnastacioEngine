@@ -1054,6 +1054,7 @@ void BKE_scene_init(Scene *sce)
 	sce->gm.occlusionRes = 128;
 	sce->gm.ticrate = 60;
 	sce->gm.maxlogicstep = 5;
+	sce->gm.flag |= GAME_USE_FIXED_TIMESTEP;
 	sce->gm.physubstep = 1;
 	sce->gm.maxphystep = 5;
 	sce->gm.shadowCulling = 1;
