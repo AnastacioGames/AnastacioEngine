@@ -29,6 +29,8 @@
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
 
+#include "BL_Converter.h"
+
 #include "EXP_BoolValue.h"
 #include "EXP_FloatValue.h"
 #include "EXP_IntValue.h"
@@ -1294,6 +1296,18 @@ void KX_NetworkManager::OnSceneRemoved(KX_Scene *scene)
 	}
 }
 
+/* The new scene goes in as a background scene, not in place of the old one: the session usually starts
+ * from a lobby overlay, and only the first scene draws its World (sky, ambient, fog). */
+static bool LoadMatchScene(KX_KetsjiEngine *engine, const std::string &oldName, const std::string &name)
+{
+	if (!engine->GetConverter()->GetBlenderSceneForName(name)) {
+		return false;
+	}
+	engine->RemoveScene(oldName);
+	engine->ConvertAndAddScene(name, false);
+	return true;
+}
+
 bool KX_NetworkManager::ChangeScene(const std::string &name, std::string &error)
 {
 	if (m_role != Role::SERVER || !m_scene) {
@@ -1304,7 +1318,7 @@ bool KX_NetworkManager::ChangeScene(const std::string &name, std::string &error)
 		error = "already in scene '" + name + "'";
 		return false;
 	}
-	if (!m_engine->ReplaceScene(m_sceneName, name)) {
+	if (!LoadMatchScene(m_engine, m_sceneName, name)) {
 		error = "no scene named '" + name + "'";
 		return false;
 	}
@@ -1807,7 +1821,7 @@ void KX_NetworkManager::HandleClientEvent(const net::SessionEvent &event, uint64
 			m_targetScene = event.text;
 			m_targetHash = event.sceneHash;
 			CM_Message("network: the server moved to scene '" << event.text << "', loading it");
-			if (!m_sceneDetached && !m_engine->ReplaceScene(m_sceneName, event.text)) {
+			if (!m_sceneDetached && !LoadMatchScene(m_engine, m_sceneName, event.text)) {
 				CM_Error("network: this game has no scene '" << event.text << "', leaving the session");
 				CloseSession(true);
 				Event e;

@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-28 - Online: pista trocada pela rede entra como cena de fundo
+
+- `KX_NetworkManager` (`ChangeScene` no host e `SceneChange` no cliente): a cena nova é removida/adicionada como
+  background em vez de `ReplaceScene` na mesma posição. A sessão nasce da sala (`_network_menu`, overlay); a pista
+  entrava como overlay e o céu/World desenhado era o da primeira cena (`0_SCN_System` no RolimaRacer).
+  Testado no RolimaRacer como host (sala criada pela `_network_menu`, largada na Pista_1): lista de cenas
+  `['Pista_1', '0_SCN_System', ...]` e céu da pista. Falta: cliente real e a volta à sala (`return_to_lobby`
+  agora traz a sala como background).
+
 ## 2026-10-28 - Simulador de PC fraco, GPU por etapa no relatório e menu Performance em submenus
 
 - Simulador (`KX_WeakGpu`, `RANGE_WEAK_GPU=N`): mede o tempo de GPU do frame com timestamps e gasta (N - 1) vezes isso numa passada de tela cheia que não muda a imagem; FPS, GPU Latency e resolução dinâmica reagem como numa placa N vezes mais lenta. Também força a GPU a ser tratada como integrada (Auto = Low). Detalhes e limites em [weak-pc-simulator.md](weak-pc-simulator.md).
