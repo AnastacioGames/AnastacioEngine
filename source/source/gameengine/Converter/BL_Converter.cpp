@@ -676,6 +676,12 @@ Object *BL_Converter::GetFlashLamp(Scene *blenderscene)
 		GPU_material_free(&ma->gpumaterialinstancing);
 		GPU_material_free(&ma->gpumaterialskinning);
 	}
+	/* Scenes already converted (the menu, a preloaded scene) still point at the freed shaders. */
+	for (auto& pair : m_sceneSlots) {
+		for (std::unique_ptr<KX_BlenderMaterial>& mat : pair.second.m_materials) {
+			mat->ReloadMaterial();
+		}
+	}
 	return ob;
 }
 
