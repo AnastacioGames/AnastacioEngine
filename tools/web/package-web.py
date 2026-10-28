@@ -105,7 +105,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   #log { display: none; position: fixed; left: 0; right: 0; bottom: 0; max-height: 35%; overflow: auto; margin: 0;
          background: rgba(0,0,0,.8); color: #9f9; font: 11px monospace; padding: 6px; white-space: pre-wrap; }
   body.debug #log { display: block; }
-  #fs { position: fixed; left: 8px; top: 8px; z-index: 10; font-size: 14px; padding: 8px 12px;
+  #fs { position: fixed; left: calc(8px + env(safe-area-inset-left, 0px)); top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 10; font-size: 14px; padding: 8px 12px;
         background: rgba(0,0,0,.5); color: #fff; border: 1px solid rgba(255,255,255,.35); }
   #fs[hidden] { display: none; }
   #touch-toggle { position: fixed; right: calc(8px + env(safe-area-inset-right, 0px));
@@ -1094,7 +1094,9 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     with open(os.path.join(folder, name), "w", encoding="utf-8", newline="") as f:
                         f.write(text)
             with open(os.path.join(folder, "device.txt"), "w", encoding="utf-8") as f:
-                f.write(data.get("ua", ""))
+                f.write(data.get("ua", "") + "
+" + "GPU: " + data.get("gpu", "") + "
+")
             if REPORT_TOOL:
                 subprocess.run([sys.executable, REPORT_TOOL, folder], capture_output=True)
             print("[report] " + folder, flush=True)
