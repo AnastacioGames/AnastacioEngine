@@ -215,6 +215,11 @@ void BLO_update_defaults_startup_blend(Main *bmain)
   /* The embedded startup.blend already holds a World, so BKE_world_init() never runs for it. */
   for (World *wrld = bmain->world.first; wrld; wrld = wrld->id.next) {
     BKE_world_status_props_ensure(wrld);
+    /* Light default scene: realistic stars, moon and lens flare cost a lot per pixel on
+     * integrated GPUs (an empty scene ran at ~10 fps on an Intel HD 4400). Opt-in instead. */
+    wrld->skytype &= ~WO_SKYATMOSPHERIC_STARS;
+    wrld->moon_enabled = 0.0f;
+    wrld->weather_flag &= ~WO_WEATHER_LENSFLARE;
   }
 
   /* Same shadow bias as BKE_lamp_init() for the lamps of the embedded startup.blend. */

@@ -96,6 +96,13 @@ void main()
 		visibility = 0.0;
 	}
 
+	/* Sun hidden or off screen: every pixel takes this branch together, so the
+	 * flare math below (pow/noise per pixel) costs nothing on weak GPUs. */
+	if (visibility <= 0.0) {
+		gl_FragColor = renderedTex;
+		return;
+	}
+
 	float xconv = bgl_RenderedTextureWidth / bgl_RenderedTextureHeight;
 	vec2 sunPos = vec2((ge_LensFlareSunPos.x - 0.5) * xconv, ge_LensFlareSunPos.y - 0.5);
 	vec2 uv = vec2((texcoord.x - 0.5) * xconv, texcoord.y - 0.5);

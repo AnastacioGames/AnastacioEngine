@@ -4,7 +4,7 @@ Guia de navegação para os arquivos de material e shader da GPU, que mais mudam
 engine (sombra, céu, Filmic, SSGI, nós de shader, sondas, lightmap). Não descreve arquitetura; é só um
 índice para achar a função certa sem ler 7 mil linhas.
 
-**Linhas conferidas em 2026-10-26 (`HEAD` `37e1fccf`).** Os números envelhecem a cada edição: use-os como
+**Linhas conferidas em 2026-10-28 (`HEAD` `7f346be9`).** Os números envelhecem a cada edição: use-os como
 ponto de partida e confirme com `grep -n "nome_da_funcao" arquivo`. `python tools/check_docs.py --fix`
 corrige os números deste mapa.
 
@@ -67,7 +67,7 @@ Structs `GPUMaterial`/`GPULamp` ficam em `gpu_material_intern.h`, compartilhado 
 
 Definições internas de `struct GPUMaterial` e `struct GPULamp` e o protótipo de `gpu_ies_atlas` (usado pelo bind de luzes da cena).
 
-## `source/source/blender/gpu/shaders/gpu_shader_material.glsl` (7.712 linhas)
+## `source/source/blender/gpu/shaders/gpu_shader_material.glsl` (7.726 linhas)
 
 Funções GLSL chamadas pelos nós via `GPU_stack_link`/`GPU_link`. Nomes com o mesmo prefixo ficam juntos.
 
@@ -77,18 +77,18 @@ Funções GLSL chamadas pelos nós via `GPU_stack_link`/`GPU_link`. Nomes com o 
 | Atributos, coordenadas e mapping | `vcol_attribute` 277, `uv_attribute` 282, `particle_info` 304, `mapping_point` 457, `texco_uv` 1297, `texco_object` 1321 |
 | Math, mix e conversores | `math_add` 495 … `math_sqrt` 650, `vec_math_add` 663, `curves_rgb` 752, `mix_blend` 835 … `mix_linear` 1090, `hue_sat` 1128, `separate_rgb` 1143 |
 | Texturas legadas (mtex) | `mtex_rgb_blend` 1365 … `mtex_value_blend` 1548, `mtex_cube_map` 1757, `mtex_bump_init_objspace` 1862, `mtex_nspace_tangent` 2127 |
-| Lâmpada legada | `lamp_visibility_sun` 2150, `lamp_falloff_invlinear` 2178, `shade_diffuse_oren_nayar` 2983, `shade_phong_spec` 3159, `shade_toon_spec` 3231 |
-| Mundo, estrelas e céu | `world_paper_view` 2320, `world_stars` 2334, `sky_atmosphere` 2548, `sky_aurora` 2670, `sky_moon` 2694, `do_sky_simple` 2729, `do_sky_atmospheric` 2778, `world_blend_paper_real` 2811 |
-| Ambiente e sondas | `env_sky` 3343, `env_irradiance_dir` 3376, `env_brdf_approx` 3406, `env_cube_tex` 3415, `env_probe_sample` 3454, `env_apply` 3549, `probe_cube_tex` 4402 |
-| Sombras | `test_shadow_simple` 3697, `test_shadow_pcf` 3786, `test_shadow_vsm` 3892, `shadow_pcf` 3932, `csm_reference_distance` 4037, `csm_debug_tint` 4191, `shadow_fade` 4211, `shadow_color_output` 4232, `shadow_color_tint` 4276, `csm_shadow_color_tint` 4281, `shade_shadow_tint` 4291, `shade_shadow_tint_csm` 4299, `shadow_point` 4764 |
-| Névoa, exposição e saída | `shade_exposure_correct` 4437, `shade_mist_factor` 4467, `shade_alpha_opaque` 4508, `shade_gbuffer0` 4520 |
-| Luz da cena (nós novos) | `scene_light_shadow` 4870, `scene_light_shadow_tint` 4930, `scene_light_ies` 4957, `scene_light_dir` 4969, `scene_light_visibility` 5007 |
-| BSDFs | `node_bsdf_diffuse_ambient` 5022, `node_bsdf_diffuse_ambient_ssgi` 5042, `node_bsdf_diffuse` 5079, `node_bsdf_glossy` 5089, `node_bsdf_glass` 5240, `node_bsdf_toon` 5280, `node_bsdf_principled` 5375, `node_bsdf_translucent` 5570, `node_bsdf_hair` 5664, `node_bsdf_refraction` 5800 |
-| Lightmap e light volume | `lightmap_sample` 5320, `lightmap_mark_ao` 5330, `lightvol_sample` 5359 |
-| Emissão, mix e SSGI | `node_emission` 5831, `node_background` 5862, `node_mix_shader` 5869, `ssgi_blend_closures` 5880, `ssgi_approximate_closure` 5909, `node_fresnel` 5923, `node_layer_weight` 5934 |
-| Entradas | `node_attribute` 5968, `node_uvmap` 5975, `node_geometry` 5980, `node_tex_coord` 6000, `node_light_path` 7011, `node_object_info` 7055 |
-| Texturas procedurais e imagem | `node_tex_gradient` 6090, `node_tex_checker` 6099, `node_tex_brick` 6156, `node_tex_image` 6206, `node_tex_image_box` 6212, `node_tex_noise` 6467, `node_tex_musgrave` 6680, `node_tex_sky` 6824, `node_tex_voronoi` 6885, `node_tex_wave` 6982 |
-| Vetor, volume e saída | `node_bump` 7068, `node_displacement_object` 7099, `node_vector_displacement_tangent` 7111, `node_volume_absorption` 7208, `node_output_material` 7249, `node_output_world` 7254 |
-| Parallax e preview | `mtex_parallax` 7259, `parallax_uv_in` 7334, `material_preview_matcap` 7346 |
-| Valores por objeto (user) | `user_get_A` 7379, `user_get` 7404, `user_set_material` 7450, `user_set_world` 7485 |
-| Vértice e geometria (nós da engine) | `node_damage` 7497, `node_vertex_offset` 7535, `node_vertex_wind` 7565, `node_vertex_wave` 7577, `node_shell_layer` 7592, `node_fur_shells` 7607, `node_outline` 7627, `node_billboard` 7638, `node_strands_info` 7665, `node_explode` 7673, `node_planar_reflection` 7696 |
+| Lâmpada legada | `lamp_visibility_sun` 2150, `lamp_falloff_invlinear` 2178, `shade_diffuse_oren_nayar` 2997, `shade_phong_spec` 3173, `shade_toon_spec` 3245 |
+| Mundo, estrelas e céu | `world_paper_view` 2320, `world_stars` 2334, `sky_atmosphere` 2560, `sky_aurora` 2682, `sky_moon` 2706, `do_sky_simple` 2741, `do_sky_atmospheric` 2791, `world_blend_paper_real` 2825 |
+| Ambiente e sondas | `env_sky` 3357, `env_irradiance_dir` 3390, `env_brdf_approx` 3420, `env_cube_tex` 3429, `env_probe_sample` 3468, `env_apply` 3563, `probe_cube_tex` 4416 |
+| Sombras | `test_shadow_simple` 3711, `test_shadow_pcf` 3800, `test_shadow_vsm` 3906, `shadow_pcf` 3946, `csm_reference_distance` 4051, `csm_debug_tint` 4205, `shadow_fade` 4225, `shadow_color_output` 4246, `shadow_color_tint` 4290, `csm_shadow_color_tint` 4295, `shade_shadow_tint` 4305, `shade_shadow_tint_csm` 4313, `shadow_point` 4778 |
+| Névoa, exposição e saída | `shade_exposure_correct` 4451, `shade_mist_factor` 4481, `shade_alpha_opaque` 4522, `shade_gbuffer0` 4534 |
+| Luz da cena (nós novos) | `scene_light_shadow` 4884, `scene_light_shadow_tint` 4944, `scene_light_ies` 4971, `scene_light_dir` 4983, `scene_light_visibility` 5021 |
+| BSDFs | `node_bsdf_diffuse_ambient` 5036, `node_bsdf_diffuse_ambient_ssgi` 5056, `node_bsdf_diffuse` 5093, `node_bsdf_glossy` 5103, `node_bsdf_glass` 5254, `node_bsdf_toon` 5294, `node_bsdf_principled` 5389, `node_bsdf_translucent` 5584, `node_bsdf_hair` 5678, `node_bsdf_refraction` 5814 |
+| Lightmap e light volume | `lightmap_sample` 5334, `lightmap_mark_ao` 5344, `lightvol_sample` 5373 |
+| Emissão, mix e SSGI | `node_emission` 5845, `node_background` 5876, `node_mix_shader` 5883, `ssgi_blend_closures` 5894, `ssgi_approximate_closure` 5923, `node_fresnel` 5937, `node_layer_weight` 5948 |
+| Entradas | `node_attribute` 5982, `node_uvmap` 5989, `node_geometry` 5994, `node_tex_coord` 6014, `node_light_path` 7025, `node_object_info` 7069 |
+| Texturas procedurais e imagem | `node_tex_gradient` 6104, `node_tex_checker` 6113, `node_tex_brick` 6170, `node_tex_image` 6220, `node_tex_image_box` 6226, `node_tex_noise` 6481, `node_tex_musgrave` 6694, `node_tex_sky` 6838, `node_tex_voronoi` 6899, `node_tex_wave` 6996 |
+| Vetor, volume e saída | `node_bump` 7082, `node_displacement_object` 7113, `node_vector_displacement_tangent` 7125, `node_volume_absorption` 7222, `node_output_material` 7263, `node_output_world` 7268 |
+| Parallax e preview | `mtex_parallax` 7273, `parallax_uv_in` 7348, `material_preview_matcap` 7360 |
+| Valores por objeto (user) | `user_get_A` 7393, `user_get` 7418, `user_set_material` 7464, `user_set_world` 7499 |
+| Vértice e geometria (nós da engine) | `node_damage` 7511, `node_vertex_offset` 7549, `node_vertex_wind` 7579, `node_vertex_wave` 7591, `node_shell_layer` 7606, `node_fur_shells` 7621, `node_outline` 7641, `node_billboard` 7652, `node_strands_info` 7679, `node_explode` 7687, `node_planar_reflection` 7710 |

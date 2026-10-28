@@ -90,6 +90,12 @@ void main()
 	float sunDepth = texture(depthbuffer, clamp(sunScreenPos, 0.0, 1.0)).x;
 	visibility *= smoothstep(0.995, 1.0, sunDepth);
 
+	/* Sun hidden or off screen: same branch for every pixel, skip the flare math. */
+	if (visibility <= 0.0) {
+		gl_FragColor = vec4(image, 1.0);
+		return;
+	}
+
 	float xconv = viewport_size.x / viewport_size.y;
 	vec2 pos = vec2((sunScreenPos.x - 0.5) * xconv, sunScreenPos.y - 0.5);
 	vec2 uv = vec2((uvcoord.x - 0.5) * xconv, uvcoord.y - 0.5);

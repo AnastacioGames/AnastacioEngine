@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-28 - Céu e lens flare mais leves em GPU integrada
+
+- Motivo: no Intel HD 4400 (notebook sem placa de vídeo) a cena inicial vazia rodava a ~10 fps, com GPU Latency de ~100 ms; o usuário isolou lens flare e estrelas/lua.
+- Cena inicial (`BLO_update_defaults_startup_blend`): o World do `startup.blend` não liga mais estrelas, lua e lens flare. Mundos novos já vinham com tudo desligado; AA 2× fica (folhagem Hashed).
+- Lens flare (`RAS_LensFlare2DFilter.glsl` e `gpu_shader_fx_lensflare_frag.glsl`): sai cedo quando o sol está escondido ou fora da tela; o ramo é igual em todos os pixels.
+- Estrelas realistas (`world_stars_real`): retorna antes de tudo de dia (`night <= 0`); as 58 estrelas nomeadas viram direções pré-calculadas (o laço por pixel ficou sem trigonometria); o ruído da Via Láctea só roda perto da faixa. `do_sky_simple`/`do_sky_atmospheric` pulam as estrelas quando `env_sky > 0.001` em vez de multiplicar por zero.
+- Validado: `glslangValidator` sem erro nos três shaders (biblioteca de material com `SKY_LOW`/`SKY_VERY_LOW`). Falta: build no CI e o usuário medir FPS e conferir o céu noturno no jogo real.
+
 ## 2026-10-27 - Preparação da 0.6.0 e teste do pacote Linux
 
 - Versão 0.6.0 em `ANASTACIO_VERSION_STRING`, About e scripts de release. A 0.5.4 Linux não sai; a 0.6.0 a substitui.
