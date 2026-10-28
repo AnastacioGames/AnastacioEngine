@@ -27,6 +27,26 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
   zip Windows publicado da RangeArmor.
 - Abra janelas do jogo/editor só quando o usuário pedir; o resto valide em background.
 
+## 0.6.1
+
+Estado: **em preparo** (versão `0.6.1` no executável, About e scripts de release). O pacote só será montado
+depois do retorno do teste no Linux nativo e no Wine (`tools/timing_linux.sh`, [timing-linux.md](timing-linux.md)).
+
+Notas para o usuário:
+
+- **Tempo de jogo:** espera entre quadros no estilo spin/sleep (sugestão do Kitsuy), com a precisão do sleep
+  medida ao abrir; no Wine e com timer de 15 ms o jogo não fica mais lento.
+- **Fixed Timestep suave:** o desenho é interpolado entre os passos de lógica, então a imagem fica lisa mesmo
+  quando o PC desenha num ritmo diferente do jogo (`RANGE_NO_INTERP=1` desliga, para comparar).
+- **Fixed Timestep ligado por padrão nas cenas novas.** Jogos existentes mantêm a opção como estava; no modo
+  legado, um PC que desenha abaixo da taxa de lógica deixa o jogo em câmera lenta.
+- **Desempenho em iGPU:** céu e lens flare mais leves, qualidade de lens flare e estrelas.
+- **Performance Report:** simulador de PC fraco, tempo de GPU por etapa, céu como etapa própria e selo de PC antigo.
+- **Correções:** troca de cena online desenha o World da cena nova; recarga de shaders após o clarão de explosão;
+  UI Tree mantém o layout ao organizar; botões de toque e tela de carregamento na Web; gravação de tela mais rápida.
+
+Pendente: resultado do Linux/Wine, montagem e teste dos pacotes (Windows, Linux, Web, RangeArmor).
+
 ## 0.6.0
 
 Estado: **publicada completa em 2026-10-27** (tag `v0.6.0`, splash novo `47b71d9e`). Linux primeiro; Windows

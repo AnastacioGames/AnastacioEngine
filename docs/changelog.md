@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-28 - Versão 0.6.1 em preparo: tempo de jogo no Wine e Fixed Timestep suave
+
+- Versão `0.6.1` em `ANASTACIO_VERSION_STRING`, About e scripts de release; seção em `docs/releases.md`. O pacote espera o retorno do Linux/Wine.
+- `WaitUntil` mede ao abrir quanto um sleep de 1 ms atrasa e só dorme quando não pode passar do quadro (`c8d9d76b`). Windows com timer de 15 ms no modo legado: velocidade 96% → 100%.
+- Interpolação de desenho no Fixed Timestep (`982173b1`): transformações antes do último passo, misturadas pelo tempo que sobra no acumulador; saltos acima de 10 m não misturam; `RANGE_NO_INTERP=1` desliga. A ~33 fps a variação do passo por quadro cai de 18,7% para 0,6%. RolimaRacer roda a corrida inteira com e sem.
+- Fixed Timestep ligado por padrão em cenas novas (`scene.c` e `versioning_defaults.c`). O modo legado avança 1 passo por quadro desenhado, então fica em câmera lenta quando o PC desenha abaixo da taxa de lógica (Wine sem GPU: ~50%).
+- Linux nativo (Intel, 60/120 fps): tudo na velocidade certa, volta no mesmo lugar ([timing-linux.md](timing-linux.md)).
+
 ## 2026-10-28 - Gravação de tela: x264 com vários núcleos e preset rápido de verdade
 
 - `writeffmpeg.c`: o libx264 declara `AV_CODEC_CAP_AUTO_THREADS` e caía no ramo que forçava `thread_count = 1`

@@ -21,9 +21,9 @@ cmake --install build-linux-editor
 cmake --preset linux-runtime -S source $launcher
 cmake --build build-linux --target RangeRuntime -j$(nproc)
 cmake --install build-linux
-BIN_DIR=build-linux-editor/bin EXTRA_BIN_DIR=build-linux/bin bash tools/linux/package-runtime.sh "${VERSION:-0.6.0}"
+BIN_DIR=build-linux-editor/bin EXTRA_BIN_DIR=build-linux/bin bash tools/linux/package-runtime.sh "${VERSION:-0.6.1}"
 # O pacote tem que levar a libsndfile com MP3 (ver acima).
-pkg=AnastacioEngine-"${VERSION:-0.6.0}"-linux-x86_64
+pkg=AnastacioEngine-"${VERSION:-0.6.1}"-linux-x86_64
 tar -xOJf build-linux/dist/$pkg.tar.xz $pkg/lib/libsndfile.so.1 > /tmp/libsndfile-pkg.so
 grep -aq 'libsndfile-1\.2\.2' /tmp/libsndfile-pkg.so
 # E a OCIO 1.1.1 do apt (libopencolorio-dev, a API 1.x que o intern/opencolorio usa): biblioteca e configs.

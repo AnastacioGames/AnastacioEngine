@@ -6,7 +6,7 @@
 #   podman run --rm -v $PWD/tools/rangearmor:/ra:Z -v <target>:/target:Z -e CARGO_TARGET_DIR=/target \
 #     docker.io/library/rust:1.95-bullseye bash -c "cd /ra/source/gui-rs && cargo build --release --locked"
 #   TARGET_DIR=<target> WIN_LAUNCHER_DIR=<zip extraido>/release/launcher \
-#     bash tools/linux/stage_rangearmor_linux.sh 0.6.0
+#     bash tools/linux/stage_rangearmor_linux.sh 0.6.1
 set -euo pipefail
 version="${1:?uso: stage_rangearmor_linux.sh <versao>}"
 repo_root="$(cd "$(dirname "$0")/../.." && pwd)"

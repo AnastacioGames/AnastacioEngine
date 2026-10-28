@@ -6,7 +6,7 @@ launcher.py minificado), godot_backup/ e release/tools/ResourceHacker.ini. Do re
 Versão Linux: tools/linux/stage_rangearmor_linux.sh. Ver docs/releases.md.
 
 Uso:
-    python tools/stage_rangearmor_windows.py 0.6.0 build/dist/RangeArmor-0.5.4-windows-x64.zip
+    python tools/stage_rangearmor_windows.py 0.6.1 build/dist/RangeArmor-0.5.4-windows-x64.zip
 """
 import hashlib
 import sys

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Testa o pacote Linux de uma release extraído numa pasta limpa (nunca a pasta de build).
 # Uso, na raiz do repo, depois do container-build-22.04.sh:
-#   bash tools/linux/testar-release.sh 0.6.0
+#   bash tools/linux/testar-release.sh 0.6.1
 # Variáveis: PKG_TAR (padrão build-linux/dist/AnastacioEngine-<versao>-linux-x86_64.tar.xz),
 #            WORK (padrão /tmp/anastacio-release-<versao>).
 # Os testes que precisam de janela rodam com DISPLAY ou xvfb-run; sem os dois, são pulados e listados.

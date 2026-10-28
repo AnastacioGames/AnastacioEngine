@@ -29,6 +29,12 @@ No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
 
+## Em preparo: 0.6.1
+
+Tempo de jogo mais estável (Windows, Linux e Wine), Fixed Timestep suave e ligado por padrão nas cenas novas,
+céu e lens flare mais leves em iGPU e simulador de PC fraco no Performance Report. Detalhes em
+[docs/releases.md](docs/releases.md#061).
+
 ## Novidades da 0.6.0
 
 - **Logic Tree:** lógica por nós no Node Editor (todos os bricks, Run Python, receitas, Frames de Estado e
