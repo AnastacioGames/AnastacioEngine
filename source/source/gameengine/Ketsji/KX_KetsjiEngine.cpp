@@ -939,7 +939,17 @@ void KX_KetsjiEngine::WaitUntil(double deadline)
 	 * Spinning keeps the CPU clock up (one long sleep lets it drop and adds lag on fast PCs);
 	 * sleeping keeps it from overheating. Under the minimum sleep (Windows timer is ~1 ms even
 	 * with timeBeginPeriod(1)) a sleep could overshoot the frame, so the end is pure spin. */
-	const double minSleep = 0.0015;
+	/* How late a 1 ms sleep wakes up on this system (Windows with timeBeginPeriod(1) and Linux ~0.1 ms,
+	 * Wine or a 15 ms timer much more). Sleeps shorter than twice that could overshoot the frame. */
+	static const double minSleep = [this]() {
+		double grain = 0.0;
+		for (int i = 0; i < 5; i++) {
+			const double start = m_clock.GetTimeSecond();
+			std::this_thread::sleep_for(std::chrono::milliseconds(1));
+			grain = std::max(grain, m_clock.GetTimeSecond() - start - 0.001);
+		}
+		return std::max(0.0015, 2.0 * grain);
+	}();
 	// RANGE_PACING=sleep: previous method (shrinking sleeps, spin only the last 0.5 ms), for A/B tests.
 	static const bool sleepOnly = getenv("RANGE_PACING") && strcmp(getenv("RANGE_PACING"), "sleep") == 0;
 	if (sleepOnly) {
