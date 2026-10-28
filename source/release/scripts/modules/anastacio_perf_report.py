@@ -34,8 +34,9 @@ MAX_ROWS = 40
 
 # GPU budget per frame at 60 FPS; a step above a quarter of it on a weak GPU is worth a look.
 GPU_BUDGET_MS = 1000.0 / 60.0
-# Without the simulator, the weak GPU column assumes an old notebook next to this card.
-WEAK_GPU_DEFAULT = 8
+# Without the simulator, the weak GPU column assumes an old notebook (Intel HD 4400) next to a
+# strong dedicated card: ~16x measured on an RX 6800M.
+WEAK_GPU_DEFAULT = 16
 GPU_STEP_NAMES = {
     'render.begin': 'Frame start (clear, sky)',
     'render.shadows': 'Shadows',
@@ -43,6 +44,47 @@ GPU_STEP_NAMES = {
     'render.filters': '2D filters and effects',
     'render.present': 'Final copy to the screen',
 }
+
+
+# Old beige PC (CRT monitor + tower) for the weak PC simulator badge in the report header.
+OLD_PC_SVG = (
+    '<svg viewBox="0 0 58 46" aria-hidden="true">'
+    '<rect x="1" y="2" width="36" height="30" rx="4" fill="#e9e2cf" stroke="#8a826d" stroke-width="1.5"/>'
+    '<rect x="6" y="6" width="26" height="20" rx="3" fill="#1d3a2a"/>'
+    '<path d="M9 11h12M9 15h17M9 19h8" stroke="#7dff9e" stroke-width="1.6" stroke-linecap="round"/>'
+    '<rect x="17" y="21" width="4" height="2" fill="#7dff9e"><animate attributeName="opacity" values="1;0;1" dur="1s" repeatCount="indefinite"/></rect>'
+    '<rect x="12" y="32" width="14" height="4" fill="#d6ceb8" stroke="#8a826d" stroke-width="1"/>'
+    '<rect x="6" y="36" width="26" height="5" rx="1.5" fill="#e9e2cf" stroke="#8a826d" stroke-width="1.2"/>'
+    '<rect x="41" y="8" width="15" height="33" rx="2" fill="#e9e2cf" stroke="#8a826d" stroke-width="1.5"/>'
+    '<rect x="44" y="12" width="9" height="3" rx="1" fill="#bdb49c"/>'
+    '<rect x="44" y="18" width="9" height="2" rx="1" fill="#bdb49c"/>'
+    '<circle cx="48.5" cy="35" r="1.6" fill="#ffb347"/>'
+    '</svg>')
+
+
+# Small line icons for the section titles and the navigation bar (24x24, drawn in currentColor).
+SECTION_ICONS = {
+    'What to do': '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2.1h5c0-.9.4-1.6 1-2.1A6 6 0 0 0 12 3z"/>',
+    'Compared with the previous run': '<path d="M4 7h13l-3-3M20 17H7l3 3"/>',
+    'Frame time': '<path d="M3 17l5-6 4 4 4-7 5 5"/><path d="M3 21h18"/>',
+    'Memory': '<rect x="4" y="7" width="16" height="10" rx="1.5"/><path d="M8 7V4M12 7V4M16 7V4M8 20v-3M12 20v-3M16 20v-3"/>',
+    'Where the frame time goes (average)': '<path d="M12 3v9l6.5 6.5"/><circle cx="12" cy="12" r="9"/>',
+    'GPU time by step': '<rect x="3" y="7" width="18" height="11" rx="1.5"/><circle cx="9" cy="12.5" r="2.5"/><circle cx="16" cy="12.5" r="2.5"/><path d="M6 18v3"/>',
+    'Scripts': '<path d="M8 8l-4 4 4 4M16 8l4 4-4 4M14 5l-4 14"/>',
+    'Spikes': '<path d="M3 15h4l2-9 4 14 2-7h6"/>',
+    'Loading during play': '<path d="M12 3v12M7 10l5 5 5-5M4 20h16"/>',
+    'Shaders and images prepared during play': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/>',
+    'Scene loading': '<path d="M3 7l9-4 9 4-9 4-9-4z"/><path d="M3 12l9 4 9-4M3 17l9 4 9-4"/>',
+    'Heaviest objects': '<path d="M12 3l8 4.5v9L12 21l-8-4.5v-9L12 3z"/><path d="M12 12l8-4.5M12 12v9M12 12L4 7.5"/>',
+    'Loaded but never drawn': '<path d="M3 3l18 18M10.6 6.1A10 10 0 0 1 12 6c5 0 9 6 9 6a17 17 0 0 1-3 3.5M6.5 7.6C4.3 9.2 3 12 3 12s4 6 9 6c1.5 0 2.9-.5 4.1-1.2"/>',
+    'Sounds': '<path d="M4 9h4l5-4v14l-5-4H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12"/>',
+    'Work per frame': '<path d="M9 5h6M9 12h6M9 19h6"/><rect x="3" y="3" width="4" height="4" rx="1"/><rect x="3" y="10" width="4" height="4" rx="1"/><rect x="3" y="17" width="4" height="4" rx="1"/>',
+}
+
+
+def _section_icon(paths):
+    return ('<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" '
+            'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">%s</svg>' % paths)
 
 
 def _(text):
@@ -644,13 +686,18 @@ main{max-width:1120px;margin:0 auto;padding:0 16px 64px}
 .hero h1{font-size:24px;margin:0;letter-spacing:.2px}.hero .sub{opacity:.9;margin-top:4px;font-size:13px}
 .verdict{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:6px 12px;border-radius:999px;background:rgba(255,255,255,.18);font-weight:600}
 .verdict i{width:10px;height:10px;border-radius:50%;display:inline-block}
+.weakpc{display:flex;align-items:center;gap:12px;margin-top:12px;padding:8px 14px 8px 10px;border-radius:14px;background:rgba(0,0,0,.16);width:max-content;max-width:100%}
+.weakpc svg{width:58px;height:46px;flex:none}.weakpc span{display:flex;flex-direction:column;font-size:13px;line-height:1.35}
+.weakpc b{font-size:14px}
 .verdict.good i{background:#5cf09a}.verdict.warn i{background:#ffd27a}.verdict.bad i{background:#ff9aa8}
 .theme{position:absolute;top:18px;right:18px;border:0;border-radius:999px;padding:7px 12px;background:rgba(255,255,255,.2);color:#fff;cursor:pointer;font:inherit}
 .theme:hover{background:rgba(255,255,255,.3)}
 nav{position:sticky;top:0;z-index:5;background:var(--bg);padding:10px 0;margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;border-bottom:1px solid var(--line)}
 nav a{color:var(--mut);text-decoration:none;font-size:12px;padding:4px 10px;border-radius:999px;background:var(--card);border:1px solid var(--line)}
 nav a:hover{color:var(--fg);border-color:var(--acc)}
-h2{font-size:16px;margin:30px 0 10px;scroll-margin-top:60px}
+h2{font-size:16px;margin:30px 0 10px;scroll-margin-top:60px;display:flex;align-items:center;gap:8px}
+h2 .ic{width:20px;height:20px;color:var(--acc);flex:none}
+nav a{display:inline-flex;align-items:center;gap:5px}nav a .ic{width:13px;height:13px;flex:none}
 .mut,.note{color:var(--mut)}.note{font-size:12px;margin:8px 0 0}
 .kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-top:18px}
 .kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:var(--shadow);border-top:4px solid var(--line)}
@@ -712,7 +759,8 @@ def write_html(folder, title=None):
              % (_esc(_('Light / dark theme')), _esc(_('Performance Report')), _esc(os.path.basename(game)), a['duration'],
                 len(a['play']), _esc(_('frames')), _esc(_('start-up (not counted): %.1f s') % a['startup_s']),
                 worst_level, _esc(verdict),
-                ('<div class="sub">%s</div>' % _esc(_('Weak PC simulator: GPU about %dx slower') % weak)) if weak > 1 else ''))
+                ('<div class="weakpc">%s<span><b>%s</b>%s</span></div>'
+                 % (OLD_PC_SVG, _esc(_('Weak PC simulator')), _esc(_('GPU about %dx slower') % weak))) if weak > 1 else ''))
 
     kpis = [
         (_('Typical FPS'), '%.0f' % fps, _level(a['median'], 1000 / 55, 1000 / 30)),
@@ -871,11 +919,13 @@ def write_html(folder, title=None):
     # Anchors on the section titles and the navigation bar under the header.
     links = []
 
+    icons = {_esc(_(title)): _section_icon(paths) for title, paths in SECTION_ICONS.items()}
+
     def anchor(m):
         links.append(m.group(1))
-        return '<h2 id="s%d">%s</h2>' % (len(links), m.group(1))
+        return '<h2 id="s%d">%s%s</h2>' % (len(links), icons.get(m.group(1), ''), m.group(1))
     page = re.sub(r'<h2>(.*?)</h2>', anchor, page)
-    nav = '<nav>' + ''.join('<a href="#s%d">%s</a>' % (i + 1, t) for i, t in enumerate(links)) + '</nav>'
+    nav = '<nav>' + ''.join('<a href="#s%d">%s%s</a>' % (i + 1, icons.get(t, ''), t) for i, t in enumerate(links)) + '</nav>'
     page = page.replace('<!--NAV-->', nav, 1)
     w = [page]
     with open(os.path.join(folder, 'summary.json'), 'w', encoding='utf-8') as f:

@@ -17,6 +17,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Ícone inválido em parâmetro de função (`layout.menu(icon='MEMORY')`) quebrava o menu: o makesrna dá aos parâmetros uma cópia da lista de ícones, e `pyrna_icon_fallback` só comparava o ponteiro. Agora reconhece também pelo nome `icon` e cai no ícone ERROR com aviso de uma linha.
 - Erro de enum desconhecido com mais de 30 opções não despeja mais a lista inteira: mostra a quantidade e os nomes parecidos (`enum "DECIMAT" not found (56 options); similar: 'DECIMATE'`). Listas curtas seguem completas.
 
+- Acabamento (mesmo dia): botão "Measure ( Play StandAlone )" traduzível (o sufixo do simulador também); selo com desenho de PC antigo no topo do relatório quando o simulador está ligado; ícones de traço nas seções e na navegação do relatório; opção 32x e descrições corrigidas (no notebook do usuário, RX 6800M, 16x ficou perto de um i5 antigo com HD 4400); estimativa padrão do relatório passou para 16x.
 ## 2026-10-28 - Céu e lens flare mais leves em GPU integrada
 
 - Motivo: no Intel HD 4400 (notebook sem placa de vídeo) a cena inicial vazia rodava a ~10 fps, com GPU Latency de ~100 ms; o usuário isolou lens flare e estrelas/lua.

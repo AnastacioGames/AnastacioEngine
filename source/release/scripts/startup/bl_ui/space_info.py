@@ -415,7 +415,11 @@ class INFO_PT_game_performance(Panel):
         col.scale_y = 1.3
         col.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
         weak = context.window_manager.range_weak_gpu
-        col.operator("game.performance_report", text="Measure" if weak == '1' else "Measure (GPU %sx slower)" % weak,
+        iface_ = bpy.app.translations.pgettext_iface
+        text = iface_("Measure ( Play StandAlone )")
+        if weak != '1':
+            text += " - " + iface_("GPU %sx slower") % weak
+        col.operator("game.performance_report", text=text,
                      icon='PLAY')
 
         layout.separator()

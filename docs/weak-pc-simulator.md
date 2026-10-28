@@ -3,7 +3,7 @@
 Deixa a GPU desta máquina umas N vezes mais lenta, para sentir e medir o jogo como num notebook com vídeo
 integrado (ex.: Intel HD 4400) sem ter um.
 
-- Uso no editor: **Performance > Simulate Weak PC** (Off, 2x, 4x, 8x, 16x) e depois **Measure**. O botão
+- Uso no editor: **Performance > Simulate Weak PC** (Off, 2x, 4x, 8x, 16x, 32x) e depois **Measure**. O botão
   mostra o fator ("Measure (GPU 8x slower)"), e o relatório traz o aviso no topo.
 - Uso direto: `RANGE_WEAK_GPU=8 AnastacioRuntime.exe jogo.range`. Vale também para o jogo dentro do editor
   se a variável estiver no ambiente ao abrir o editor.
@@ -32,5 +32,10 @@ integrado (ex.: Intel HD 4400) sem ter um.
 
 O Measure liga também `RANGE_PROFILE` (`profile.txt` na pasta do relatório). A seção **GPU time by step**
 mostra a média de GPU de cada etapa (início, sombras, cena, filtros 2D com cada passada, cópia final) e uma
-coluna estimada para uma GPU 8x mais lenta (ou o fator do simulador, se ligado). Vermelho: a etapa sozinha
+coluna estimada para uma GPU 16x mais lenta (ou o fator do simulador, se ligado). Vermelho: a etapa sozinha
 passaria de metade do orçamento de 60 FPS lá.
+
+## Calibração medida
+
+Notebook do usuário (Ryzen 9 5900HX + RX 6800M): precisou de **16x** para ficar perto de um i5 antigo sem placa
+de vídeo (Intel HD 4400). Bate com os números: ~30x em poder de cálculo e ~15x em banda de memória.

@@ -24,7 +24,8 @@ WEAK_GPU_ITEMS = (
     ('2', "2x Slower GPU", "A GPU about half as fast as this one"),
     ('4', "4x Slower GPU", "Roughly a recent integrated GPU next to a mid-range card"),
     ('8', "8x Slower GPU", "Roughly an old notebook (Intel HD 4000/4400) next to a mid-range card"),
-    ('16', "16x Slower GPU", "Roughly an old notebook next to a high-end card"),
+    ('16', "16x Slower GPU", "Roughly an old notebook (Intel HD 4000/4400) next to a strong dedicated card (RX 6800M, RTX 3070)"),
+    ('32', "32x Slower GPU", "Roughly an old notebook next to a high-end desktop card"),
 )
 
 
