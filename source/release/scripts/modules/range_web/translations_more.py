@@ -2826,6 +2826,22 @@ TABLE = (
     ('Viewport Overlays', 'Sobreposições da viewport', 'Superposiciones de la vista', 'Наложения вьюпорта'),
     ('What the game draws: font, size, alignment, spacing, text box, shadow and viewport preview', 'O que o jogo desenha: fonte, tamanho, alinhamento, espaçamento, caixa de texto, sombra e prévia na viewport', 'Lo que dibuja el juego: fuente, tamaño, alineación, espaciado, caja de texto, sombra y vista previa', 'Что рисует игра: шрифт, размер, выравнивание, интервалы, текстовое поле, тень и предпросмотр во вьюпорте'),
     ('Wide smooth glow like the Bloom of Blender 5 (game; the render uses Fog Glow)', 'Brilho largo e suave como o Bloom do Blender 5 (jogo; o render usa Fog Glow)', 'Resplandor amplio y suave como el Bloom de Blender 5 (juego; el render usa Fog Glow)', 'Широкое мягкое свечение как Bloom в Blender 5 (игра; рендер использует Fog Glow)'),
+    # 0.6.1: qualidade do lens flare e das estrelas, sol do flare por Lamp.
+    ('Flare Quality', 'Qualidade do flare', 'Calidad del destello', 'Качество блика'),
+    ('Cost of the lens flare on the GPU', 'Custo do lens flare na GPU', 'Coste del destello de lente en la GPU', 'Нагрузка бликов объектива на GPU'),
+    ('Star Quality', 'Qualidade das estrelas', 'Calidad de las estrellas', 'Качество звёзд'),
+    ('Cost of the Realistic and Constellations stars on the GPU', 'Custo das estrelas Realistic e Constellations na GPU', 'Coste de las estrellas Realistic y Constellations en la GPU', 'Нагрузка звёзд Realistic и Constellations на GPU'),
+    ('Glow and the big ghosts only, no noise (phones, integrated GPUs)', 'Só o brilho e os reflexos grandes, sem ruído (celulares, GPUs integradas)', 'Solo el brillo y los reflejos grandes, sin ruido (móviles, GPU integradas)', 'Только свечение и крупные блики, без шума (телефоны, встроенные GPU)'),
+    ('Glow with rays and the main ghosts', 'Brilho com raios e os reflexos principais', 'Brillo con rayos y los reflejos principales', 'Свечение с лучами и основные блики'),
+    ('Every ghost and the noisy rays', 'Todos os reflexos e os raios com ruído', 'Todos los reflejos y los rayos con ruido', 'Все блики и шумные лучи'),
+    ('Smooth Milky Way and only the brighter stars (phones, integrated GPUs)', 'Via Láctea suave e só as estrelas mais brilhantes (celulares, GPUs integradas)', 'Vía Láctea suave y solo las estrellas más brillantes (móviles, GPU integradas)', 'Гладкий Млечный Путь и только яркие звёзды (телефоны, встроенные GPU)'),
+    ('Milky Way without the dark dust lanes', 'Via Láctea sem as faixas escuras de poeira', 'Vía Láctea sin las bandas oscuras de polvo', 'Млечный Путь без тёмных пылевых полос'),
+    ('Full Milky Way with dust lanes and every star layer', 'Via Láctea completa com faixas de poeira e todas as camadas de estrelas', 'Vía Láctea completa con bandas de polvo y todas las capas de estrellas', 'Полный Млечный Путь с пылевыми полосами и всеми слоями звёзд'),
+    ('Set Flare Sun', 'Definir sol do flare', 'Definir sol del destello', 'Задать солнце блика'),
+    ("Use this Lamp as the lens flare's sun", 'Usa esta Lamp como o sol do lens flare', 'Usa esta Lamp como sol del destello de lente', 'Использовать эту лампу как солнце блика'),
+    ("Only the scene's Lamps can be the lens flare's sun", 'Só as Lamps da cena podem ser o sol do lens flare', 'Solo las Lamps de la escena pueden ser el sol del destello', 'Солнцем блика могут быть только лампы сцены'),
+    ('No Lamp in the scene', 'Nenhuma Lamp na cena', 'No hay Lamp en la escena', 'В сцене нет ламп'),
+    ('Sun Object must be a Lamp', 'Sun Object precisa ser uma Lamp', 'Sun Object debe ser una Lamp', 'Sun Object должен быть лампой'),
 )
 
 PT_BR = {en: pt for en, pt, _es, _ru in TABLE if pt}

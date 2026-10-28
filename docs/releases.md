@@ -45,6 +45,8 @@ Notas para o usuário:
 - **Correções:** troca de cena online desenha o World da cena nova; recarga de shaders após o clarão de explosão;
   UI Tree mantém o layout ao organizar; botões de toque e tela de carregamento na Web; gravação de tela mais rápida.
 
+Texto da página do GitHub: [release-notes-0.6.1.md](release-notes-0.6.1.md).
+
 Pendente: resultado do Linux/Wine, montagem e teste dos pacotes (Windows, Linux, Web, RangeArmor).
 
 ## 0.6.0
