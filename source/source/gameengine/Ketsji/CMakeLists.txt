@@ -110,6 +110,7 @@ set(SRC
 	KX_DestructionManager.cpp
 	KX_DebugMode.cpp
 	KX_EngineProfiler.cpp
+	KX_WeakGpu.cpp
 	KX_EmptyObject.cpp
 	KX_FontObject.cpp
 	KX_GameActuator.cpp
@@ -238,6 +239,7 @@ set(SRC
 	KX_DestructionManager.h
 	KX_DebugMode.h
 	KX_EngineProfiler.h
+	KX_WeakGpu.h
 	KX_EmptyObject.h
 	KX_FontObject.h
 	KX_GameActuator.h

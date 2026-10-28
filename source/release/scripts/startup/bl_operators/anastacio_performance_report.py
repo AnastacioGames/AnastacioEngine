@@ -15,7 +15,17 @@ import os
 import time
 
 import bpy
+from bpy.props import EnumProperty
 from bpy.types import Operator
+
+# Weak PC simulator (RANGE_WEAK_GPU, KX_WeakGpu in the engine): the GPU runs about N times slower.
+WEAK_GPU_ITEMS = (
+    ('1', "Off", "Measure with this computer as it is"),
+    ('2', "2x Slower GPU", "A GPU about half as fast as this one"),
+    ('4', "4x Slower GPU", "Roughly a recent integrated GPU next to a mid-range card"),
+    ('8', "8x Slower GPU", "Roughly an old notebook (Intel HD 4000/4400) next to a mid-range card"),
+    ('16', "16x Slower GPU", "Roughly an old notebook next to a high-end card"),
+)
 
 
 def reports_dir():
@@ -67,7 +77,16 @@ class GAME_OT_performance_report(Operator):
         env = dict(os.environ,
                    RANGE_TRACE=self._folder,
                    RANGE_TRACE_MODULES="load,usage,frames,work,scripts,runtime",
-                   RANGE_SHADER_LOG=os.path.join(self._folder, "shaders.txt"))
+                   RANGE_SHADER_LOG=os.path.join(self._folder, "shaders.txt"),
+                   # GPU time per render step (KX_EngineProfiler), for the report's GPU section.
+                   RANGE_PROFILE=os.path.join(self._folder, "profile.txt"))
+        weak = int(context.window_manager.range_weak_gpu)
+        env.pop("RANGE_WEAK_GPU", None)
+        if weak > 1:
+            env["RANGE_WEAK_GPU"] = str(weak)
+        import json
+        with open(os.path.join(self._folder, "settings.json"), "w", encoding="utf-8") as f:
+            json.dump({"weak_gpu": weak}, f)
         self._process = subprocess.Popen([runtime, game], env=env, cwd=os.path.dirname(game))
 
         wm = context.window_manager
@@ -126,6 +145,17 @@ class GAME_OT_performance_report_last(Operator):
         last = max(reports, key=os.path.getmtime)
         bpy.ops.wm.url_open(url="file:///" + last.replace("\\", "/"))
         return {'FINISHED'}
+
+
+def register_props():
+    bpy.types.WindowManager.range_weak_gpu = EnumProperty(
+        name="Simulate Weak PC",
+        description="Measure runs the game with a GPU about this many times slower than this one",
+        items=WEAK_GPU_ITEMS, default='1')
+
+
+def unregister_props():
+    del bpy.types.WindowManager.range_weak_gpu
 
 
 classes = (

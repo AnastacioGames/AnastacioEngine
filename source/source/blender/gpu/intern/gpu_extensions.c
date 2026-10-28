@@ -248,6 +248,13 @@ void gpu_extensions_init(void)
 	else {
 		GG.integrated = false;
 	}
+	/* Weak PC simulator (RANGE_WEAK_GPU, KX_WeakGpu): behave like an integrated GPU. */
+	{
+		const char *weak = getenv("RANGE_WEAK_GPU");
+		if (weak && atof(weak) >= 1.01) {
+			GG.integrated = true;
+		}
+	}
 	/* Auto quality preset: same answer in the editor as in the game (KX_Scene sets it too). */
 	BKE_scene_quality_set_integrated_gpu(GG.integrated);
 

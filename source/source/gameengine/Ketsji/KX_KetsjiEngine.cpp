@@ -112,6 +112,7 @@ extern "C" {
 #endif
 #include "KX_SceneScheduler.h"
 #include "KX_DebugRenderer.h"
+#include "KX_WeakGpu.h"
 #include "CM_Trace.h"
 #include "GPU_shader.h" // GPU_profile_image_hook
 #include "GPU_glew.h"
@@ -214,6 +215,7 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_networkManager(nullptr),
 	m_sceneScheduler(new KX_SceneScheduler(this)),
 	m_debugRenderer(new KX_DebugRenderer(this)),
+	m_weakGpu(KX_WeakGpu::EnvFactor() > 0.0f ? new KX_WeakGpu(KX_WeakGpu::EnvFactor()) : nullptr),
 	m_flags(AUTO_ADD_DEBUG_PROPERTIES),
 	m_frameTime(0.0f),
 	m_logicTime(0.0f),
@@ -513,6 +515,9 @@ void KX_KetsjiEngine::BeginFrame()
 
 	m_canvas->BeginDraw();
 	UpdateDynamicResolution();
+	if (m_weakGpu) {
+		m_weakGpu->FrameStart();
+	}
 }
 
 void KX_KetsjiEngine::EndFrame()
@@ -520,6 +525,10 @@ void KX_KetsjiEngine::EndFrame()
 	if (m_needsRender) {
 		m_logger.StartLog(tc_rasterizer);
 		m_rasterizer->MotionBlur();
+		/* Before the dynamic resolution timer ends, so it sees the slower GPU too. */
+		if (m_weakGpu) {
+			m_weakGpu->Burn(m_rasterizer);
+		}
 	}
 	/* Dynamic resolution: end the GPU timer before the frame cap sleep. Ended after it, the
 	 * timer counted the sleep as GPU time (~16 ms at 60 FPS), so the scale only ever went down. */

@@ -330,6 +330,76 @@ class INFO_MT_file_previews(Menu):
         layout.operator("wm.previews_batch_clear")
 
 
+class INFO_MT_game_performance_reports(Menu):
+    bl_label = "Reports"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("game.performance_report_last", text="Open Last Report", icon='TEXT')
+        layout.operator("game.performance_reports_folder", text="Open Reports Folder", icon='FILE_FOLDER')
+
+
+class INFO_MT_game_performance_weak_pc(Menu):
+    bl_label = "Simulate Weak PC"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.props_enum(context.window_manager, "range_weak_gpu")
+        layout.separator()
+        layout.label(text="Used by Measure: the GPU runs")
+        layout.label(text="slower and reports as integrated.")
+
+
+class INFO_MT_game_performance_optimize(Menu):
+    bl_label = "Optimize Scene"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("game.lod_generate_batch", text="Generate LODs", icon='MOD_DECIM')
+        layout.operator("game.hlod_build", text="Build HLOD", icon='GROUP')
+        layout.operator("game.collision_proxy_generate", text="Collision Proxies", icon='MOD_PHYSICS')
+        layout.separator()
+        layout.operator("game.lod_clear_generated", text="Clear LODs", icon='X')
+        layout.operator("game.hlod_clear", text="Clear HLOD", icon='X')
+        layout.operator("game.collision_proxy_clear", text="Clear Collision Proxies", icon='X')
+        layout.separator()
+        layout.label(text="Lighter meshes and collision.")
+
+
+class INFO_MT_game_performance_export(Menu):
+    bl_label = "Prepare for Export"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator("game.prepare_textures", text="Textures (DDS)", icon='IMAGE_DATA')
+        layout.operator("game.revert_prepared_textures", text="Revert Textures", icon='LOOP_BACK')
+        layout.operator("game.prepare_audio", text="Audio (OGG)", icon='SOUND')
+        layout.separator()
+        layout.label(text="Used on export; originals stay.")
+
+
+class INFO_MT_game_performance_web(Menu):
+    bl_label = "Web / Android"
+
+    # Dicas medidas num celular Android: o GPU do celular é o gargalo.
+    def draw(self, context):
+        layout = self.layout
+        world = context.scene.world
+        if world and world.sky_type == 'ATMOSPHERIC':
+            preset = context.scene.scenefx_settings.quality_preset
+            row = layout.row()
+            row.enabled = preset == 'CUSTOM'
+            row.prop(world, "sky_quality")
+            if preset != 'CUSTOM':
+                layout.label(text="Set by Quality Preset", icon='INFO')
+            if world.sky_quality == 'HIGH':
+                layout.label(text="High sky is ~4x slower on phones.", icon='ERROR')
+            layout.separator()
+        layout.label(text="Phone GPU is the limit: fewer")
+        layout.label(text="full-screen effects and filters.")
+        layout.label(text="Measure on the phone: ?report=1")
+
+
 class INFO_PT_game_performance(Panel):
     bl_space_type = 'INFO'
     bl_region_type = 'HEADER'
@@ -341,61 +411,20 @@ class INFO_PT_game_performance(Panel):
         layout = self.layout
         layout.label(text="Performance", icon='TIME')
 
-        box = layout.box()
-        box.label(text="Analyze")
-        row = box.row(align=True)
-        row.scale_y = 1.3
-        row.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
-        row.operator("game.performance_report", text="Measure", icon='PLAY')
-        row = box.row(align=True)
-        row.operator("game.performance_report_last", text="Last", icon='TEXT')
-        row.operator("game.performance_reports_folder", text="Folder", icon='FILE_FOLDER')
-        box.label(text="What costs load, memory, frame.")
+        col = layout.column(align=True)
+        col.scale_y = 1.3
+        col.operator("game.scene_doctor", text="Scene Doctor", icon='VIEWZOOM')
+        weak = context.window_manager.range_weak_gpu
+        col.operator("game.performance_report", text="Measure" if weak == '1' else "Measure (GPU %sx slower)" % weak,
+                     icon='PLAY')
 
-        box = layout.box()
-        box.label(text="Optimize Scene")
-        row = box.row(align=True)
-        row.scale_y = 1.3
-        row.operator("game.lod_generate_batch", text="Generate LODs", icon='MOD_DECIM')
-        row.operator("game.lod_clear_generated", text="", icon='X')
-        row = box.row(align=True)
-        row.scale_y = 1.3
-        row.operator("game.hlod_build", text="Build HLOD", icon='GROUP')
-        row.operator("game.hlod_clear", text="", icon='X')
-        row = box.row(align=True)
-        row.scale_y = 1.3
-        row.operator("game.collision_proxy_generate", text="Collision Proxies", icon='MOD_PHYSICS')
-        row.operator("game.collision_proxy_clear", text="", icon='X')
-        box.label(text="Lighter meshes and collision.")
-
-        box = layout.box()
-        box.label(text="Prepare for Export")
-        row = box.row(align=True)
-        row.scale_y = 1.3
-        row.operator("game.prepare_textures", text="Textures (DDS)", icon='IMAGE_DATA')
-        row.operator("game.revert_prepared_textures", text="", icon='LOOP_BACK')
-        row = box.row(align=True)
-        row.scale_y = 1.3
-        row.operator("game.prepare_audio", text="Audio (OGG)", icon='SOUND')
-        box.label(text="Used on export; originals stay.")
-
-        # Dicas medidas num celular Android: o GPU do celular é o gargalo.
-        box = layout.box()
-        box.label(text="Web / Android", icon='WORLD')
-        world = context.scene.world
-        if world and world.sky_type == 'ATMOSPHERIC':
-            preset = context.scene.scenefx_settings.quality_preset
-            row = box.row()
-            row.enabled = preset == 'CUSTOM'
-            row.prop(world, "sky_quality")
-            if preset != 'CUSTOM':
-                box.label(text="Set by Quality Preset", icon='INFO')
-            if world.sky_quality == 'HIGH':
-                box.label(text="High sky is ~4x slower on phones.", icon='ERROR')
-        col = box.column(align=True)
-        col.label(text="Phone GPU is the limit: fewer")
-        col.label(text="full-screen effects and filters.")
-        col.label(text="Measure on the phone: ?report=1")
+        layout.separator()
+        col = layout.column()
+        col.menu("INFO_MT_game_performance_weak_pc", icon='DESKTOP')
+        col.menu("INFO_MT_game_performance_reports", icon='TEXT')
+        col.menu("INFO_MT_game_performance_optimize", icon='MOD_DECIM')
+        col.menu("INFO_MT_game_performance_export", icon='EXPORT')
+        col.menu("INFO_MT_game_performance_web", icon='WORLD')
 
 
 class INFO_MT_game(Menu):
@@ -569,6 +598,11 @@ classes = (
     INFO_MT_file_export,
     INFO_MT_file_external_data,
     INFO_MT_file_previews,
+    INFO_MT_game_performance_reports,
+    INFO_MT_game_performance_weak_pc,
+    INFO_MT_game_performance_optimize,
+    INFO_MT_game_performance_export,
+    INFO_MT_game_performance_web,
     INFO_PT_game_performance,
     INFO_MT_game,
     INFO_MT_game_overlays,

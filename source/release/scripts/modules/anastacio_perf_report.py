@@ -32,6 +32,19 @@ IDLE = ('Sleeping',)
 MAX_ROWS = 40
 
 
+# GPU budget per frame at 60 FPS; a step above a quarter of it on a weak GPU is worth a look.
+GPU_BUDGET_MS = 1000.0 / 60.0
+# Without the simulator, the weak GPU column assumes an old notebook next to this card.
+WEAK_GPU_DEFAULT = 8
+GPU_STEP_NAMES = {
+    'render.begin': 'Frame start (clear, sky)',
+    'render.shadows': 'Shadows',
+    'render.cameras': 'Scene (objects, materials, sky)',
+    'render.filters': '2D filters and effects',
+    'render.present': 'Final copy to the screen',
+}
+
+
 def _(text):
     """Translated text when running inside the editor."""
     try:
@@ -259,6 +272,70 @@ def analyze(events):
                 unused_meshes=unused_meshes, unused_mats=unused_mats, unused_imgs=unused_imgs, images=images,
                 meshes=meshes, heavy=heavy, late=late, work=work_rows,
                 duration=events[-1]['t'] if events else 0.0)
+
+
+def read_gpu_profile(folder):
+    """Average GPU ms per render step from the AVG lines of RANGE_PROFILE (KX_EngineProfiler)."""
+    path = os.path.join(folder, 'profile.txt')
+    if not os.path.isfile(path):
+        return []
+    sums, lines = {}, 0
+    with open(path, encoding='utf-8', errors='replace') as f:
+        for line in f:
+            if not line.startswith('AVG ') or ' | gpu:' not in line:
+                continue
+            lines += 1
+            part = line.split(' | gpu:', 1)[1].split(' | ', 1)[0]
+            for item in part.split():
+                name, _sep, value = item.partition('=')
+                try:
+                    sums[name] = sums.get(name, 0.0) + float(value)
+                except ValueError:
+                    pass
+    if not lines:
+        return []
+    steps = [(name, total / lines) for name, total in sums.items()]
+    # filter.* passes are already inside render.filters: list them under it, not as extra time.
+    steps.sort(key=lambda s: (s[0].startswith('filter.'), -s[1]))
+    return steps
+
+
+def read_settings(folder):
+    try:
+        with open(os.path.join(folder, 'settings.json'), encoding='utf-8') as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def _gpu_section(steps, weak):
+    factor = weak if weak > 1 else WEAK_GPU_DEFAULT
+    total = sum(ms for name, ms in steps if not name.startswith('filter.')) or 1.0
+    filters = [s for s in steps if s[0].startswith('filter.')]
+    ordered = []
+    for step in steps:
+        if not step[0].startswith('filter.'):
+            ordered.append(step)
+            if step[0] == 'render.filters':
+                ordered += filters
+                filters = []
+    rows = []
+    for name, ms in ordered + filters:
+        sub = name.startswith('filter.')
+        est = ms * factor
+        label = ('&nbsp;&nbsp;&nbsp;' + _esc(name[7:])) if sub else _esc(_(GPU_STEP_NAMES.get(name, name)))
+        rows.append((Markup(label), _colored('%.2f' % ms, _level(ms, GPU_BUDGET_MS / 8, GPU_BUDGET_MS / 4)),
+                     '-' if sub else '%.0f%%' % (ms / total * 100),
+                     _colored('%.1f' % est, _level(est, GPU_BUDGET_MS / 4, GPU_BUDGET_MS / 2))))
+    if weak > 1:
+        note = _('Measured with the weak PC simulator on (GPU about %dx slower): FPS and frame times above are '
+                 'those of the slower GPU; the ms here are this GPU, the last column the slower one.') % weak
+    else:
+        note = _('GPU time of each render step on this computer. The last column estimates a GPU %dx slower '
+                 '(an old notebook): red steps would not fit 60 FPS there. Turn on Simulate Weak PC to feel it.') % factor
+    head = (_('Step'), _('GPU ms'), '%', _('Weak GPU ms (x%d)') % factor)
+    return '<h2>%s</h2><div class="card">%s<p class="note">%s</p></div>' % (
+        _esc(_('GPU time by step')), _table(head, rows, numeric=(1, 2, 3)), _esc(note))
 
 
 def read_shader_log(folder, load_end=LOAD_FRAMES):
@@ -620,6 +697,8 @@ def write_html(folder, title=None):
     shader_items = read_shader_log(folder, a['load_end'])
     game = title or a['session'].get('file') or os.path.basename(folder)
     fps = 1000.0 / a['median'] if a['median'] > 0 else 0.0
+    settings = read_settings(folder)
+    weak = int(settings.get('weak_gpu', 1))
 
     w = []
     w.append('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
@@ -629,10 +708,11 @@ def write_html(folder, title=None):
     verdict = {'good': _('Runs smoothly'), 'warn': _('Some things worth a look'), 'bad': _('Needs work')}[worst_level]
     w.append('<header class="hero"><button class="theme" onclick="toggleTheme()" title="%s">&#9680;</button>'
              '<h1>%s</h1><div class="sub">%s &middot; %.1f s &middot; %d %s &middot; %s</div>'
-             '<div class="verdict %s"><i></i>%s</div></header><!--NAV-->'
+             '<div class="verdict %s"><i></i>%s</div>%s</header><!--NAV-->'
              % (_esc(_('Light / dark theme')), _esc(_('Performance Report')), _esc(os.path.basename(game)), a['duration'],
                 len(a['play']), _esc(_('frames')), _esc(_('start-up (not counted): %.1f s') % a['startup_s']),
-                worst_level, _esc(verdict)))
+                worst_level, _esc(verdict),
+                ('<div class="sub">%s</div>' % _esc(_('Weak PC simulator: GPU about %dx slower') % weak)) if weak > 1 else ''))
 
     kpis = [
         (_('Typical FPS'), '%.0f' % fps, _level(a['median'], 1000 / 55, 1000 / 30)),
@@ -674,6 +754,10 @@ def write_html(folder, title=None):
                  _colored('%.2f' % v, _level(v, 2.0, 5.0))) for k, v in a['categories'][:15]]
         w.append('<h2>%s</h2><div class="card">%s</div>' % (_esc(_('Where the frame time goes (average)')),
                                                             _table((_('Part'), '', 'ms'), rows, numeric=(2,))))
+
+    gpu_steps = read_gpu_profile(folder)
+    if gpu_steps:
+        w.append(_gpu_section(gpu_steps, int(settings.get('weak_gpu', 1))))
 
     if a['has_scripts']:
         w.append('<h2>%s</h2><div class="card">' % _esc(_('Scripts')))

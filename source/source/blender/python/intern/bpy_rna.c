@@ -1212,7 +1212,10 @@ static bool pyrna_icon_fallback(PointerRNA *ptr, PropertyRNA *prop, const char *
 	int i;
 
 	RNA_property_enum_items(BPy_GetContext(), ptr, prop, &item, NULL, &free);
-	is_icon = (item == rna_enum_icon_items);
+	/* makesrna gives function parameters (layout.menu(icon=...)) their own copy of the icon
+	 * items, so the pointer only matches for properties: check the name and a known icon too. */
+	is_icon = (item == rna_enum_icon_items) ||
+	          (item && STREQ(RNA_property_identifier(prop), "icon") && RNA_enum_value_from_id(item, "BLENDER", &i));
 	if (free) {
 		MEM_freeN((void *)item);
 	}
@@ -1234,6 +1237,46 @@ static bool pyrna_icon_fallback(PointerRNA *ptr, PropertyRNA *prop, const char *
 	return true;
 }
 
+/* Error text for an unknown enum name: the whole list while it is short, otherwise the count and
+ * the names that look like the given one (shared prefix or one contained in the other). */
+static void pyrna_enum_not_found_error(PointerRNA *ptr, PropertyRNA *prop, const char *param, const char *error_prefix)
+{
+	const EnumPropertyItem *item = NULL;
+	bool free = false;
+	int totitem = 0;
+
+	RNA_property_enum_items(BPy_GetContext(), ptr, prop, &item, &totitem, &free);
+	if (item == NULL || totitem <= 30) {
+		const char *enum_str = pyrna_enum_as_string(ptr, prop);
+		PyErr_Format(PyExc_TypeError, "%.200s enum \"%.200s\" not found in (%s)", error_prefix, param, enum_str);
+		MEM_freeN((void *)enum_str);
+	}
+	else {
+		char similar[512] = "";
+		size_t len = 0;
+		int found = 0;
+		const size_t param_len = strlen(param);
+		for (int i = 0; item[i].identifier && found < 8; i++) {
+			const char *id = item[i].identifier;
+			if (id[0] == '\0') {
+				continue;
+			}
+			const bool alike = (param_len >= 3 && BLI_strncasecmp(id, param, 3) == 0) ||
+			                   (param_len >= 3 && BLI_strcasestr(id, param)) ||
+			                   (strlen(id) >= 3 && BLI_strcasestr(param, id));
+			if (alike) {
+				len += BLI_snprintf_rlen(similar + len, sizeof(similar) - len, "%s'%s'", found ? ", " : "", id);
+				found++;
+			}
+		}
+		PyErr_Format(PyExc_TypeError, "%.200s enum \"%.200s\" not found (%d options)%s%s",
+		             error_prefix, param, totitem, found ? "; similar: " : "", similar);
+	}
+	if (free) {
+		MEM_freeN((void *)item);
+	}
+}
+
 static int pyrna_string_to_enum(
         PyObject *item, PointerRNA *ptr, PropertyRNA *prop, int *r_value,
         const char *error_prefix)
@@ -1252,11 +1295,7 @@ static int pyrna_string_to_enum(
 		if (!RNA_property_enum_value(BPy_GetContext(), ptr, prop, param, r_value) &&
 		    !pyrna_icon_fallback(ptr, prop, param, r_value))
 		{
-			const char *enum_str = pyrna_enum_as_string(ptr, prop);
-			PyErr_Format(PyExc_TypeError,
-			             "%.200s enum \"%.200s\" not found in (%s)",
-			             error_prefix, param, enum_str);
-			MEM_freeN((void *)enum_str);
+			pyrna_enum_not_found_error(ptr, prop, param, error_prefix);
 			return -1;
 		}
 	}

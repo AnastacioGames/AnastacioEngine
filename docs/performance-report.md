@@ -9,7 +9,10 @@ usando o mesmo motor de gravação (`CM_Trace`).
   `source/release/scripts/modules/anastacio_perf_report.py` (análise + HTML; roda também fora do editor:
   `python anastacio_perf_report.py <pasta>`), menu em `bl_ui/space_info.py` (`INFO_MT_game_performance`).
 - Relatórios em `<config do usuário>/datafiles/performance_reports/<jogo>-<data>-<hora>/`
-  (`trace.jsonl`, `shaders.txt`, `summary.json`, `report.html`). **Open Last Report** e **Open Reports Folder**.
+  (`trace.jsonl`, `shaders.txt`, `profile.txt`, `settings.json`, `summary.json`, `report.html`). **Open Last Report** e
+  **Open Reports Folder** ficam no submenu **Reports**.
+- **Simulate Weak PC** (submenu): roda o Measure com a GPU N vezes mais lenta; ver `weak-pc-simulator.md`.
+  O relatório traz **GPU time by step** (tempo de GPU por etapa + estimativa numa GPU fraca).
 - Cena salva roda do próprio arquivo (caminhos relativos do jogo funcionam); com mudanças não salvas, uma cópia
   `_performance_report_<pid>.range` na mesma pasta, apagada no fim.
 - Módulos ligados: `load,usage,frames,work,scripts,runtime` + `RANGE_SHADER_LOG`.

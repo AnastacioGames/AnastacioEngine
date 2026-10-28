@@ -68,6 +68,7 @@ class RAS_ICanvas;
 class RAS_OffScreen;
 class SCA_IInputDevice;
 class KX_ShadowRenderer;
+class KX_WeakGpu;
 template <class T>
 class EXP_ListValue;
 
@@ -221,6 +222,9 @@ private:
 	/// Owns the native debug-draw overlays (camera frustum, vehicle debug). See KX_DebugRenderer
 	/// and Plano 7 in docs/ketsji-engine-modernization-plan.md.
 	std::unique_ptr<KX_DebugRenderer> m_debugRenderer;
+
+	/// RANGE_WEAK_GPU: makes the GPU about N times slower (KX_WeakGpu); null when off.
+	std::unique_ptr<KX_WeakGpu> m_weakGpu;
 
 	FlagType m_flags;
 

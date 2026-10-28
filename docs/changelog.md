@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-28 - Simulador de PC fraco, GPU por etapa no relatório e menu Performance em submenus
+
+- Simulador (`KX_WeakGpu`, `RANGE_WEAK_GPU=N`): mede o tempo de GPU do frame com timestamps e gasta (N - 1) vezes isso numa passada de tela cheia que não muda a imagem; FPS, GPU Latency e resolução dinâmica reagem como numa placa N vezes mais lenta. Também força a GPU a ser tratada como integrada (Auto = Low). Detalhes e limites em [weak-pc-simulator.md](weak-pc-simulator.md).
+- Performance Report: o Measure grava `profile.txt` (`RANGE_PROFILE`) e o relatório ganhou **GPU time by step**, com coluna estimada para GPU 8x mais lenta (ou o fator do simulador); `settings.json` guarda o fator e o topo do relatório avisa quando estava ligado.
+- Menu Performance: no topo ficam Scene Doctor e Measure; Simulate Weak PC, Reports, Optimize Scene, Prepare for Export e Web / Android viraram submenus com seta. Traduções pt_BR/es/ru.
+- Validado: build do editor e runtime; registro do menu e da opção em `-b`; relatório gerado com `profile.txt` de teste. Runtime em `teste_efeitos.range` (10 s cada): Off 17,4 ms (vsync, GPU em clock baixo); 8x 22,6 ms, GPU Latency 21,6 ms, com as etapas a ~2,8 ms em clock alto (8 × 2,8 ≈ 22,6, fator certo).
+- Ícone inválido em parâmetro de função (`layout.menu(icon='MEMORY')`) quebrava o menu: o makesrna dá aos parâmetros uma cópia da lista de ícones, e `pyrna_icon_fallback` só comparava o ponteiro. Agora reconhece também pelo nome `icon` e cai no ícone ERROR com aviso de uma linha.
+- Erro de enum desconhecido com mais de 30 opções não despeja mais a lista inteira: mostra a quantidade e os nomes parecidos (`enum "DECIMAT" not found (56 options); similar: 'DECIMATE'`). Listas curtas seguem completas.
+
 ## 2026-10-28 - Céu e lens flare mais leves em GPU integrada
 
 - Motivo: no Intel HD 4400 (notebook sem placa de vídeo) a cena inicial vazia rodava a ~10 fps, com GPU Latency de ~100 ms; o usuário isolou lens flare e estrelas/lua.
