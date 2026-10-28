@@ -1,0 +1,23 @@
+== qua 28 out 2026 13:01:50 -03 | Linux 7.0.0-38-generic
+== GPU: OpenGL renderer string: Mesa Intel(R) Graphics (RPL-P)
+== Wine skipped: no up-to-date Windows build (D: only has old RangeRuntime.exe)
+== Linux native, 60 fps
+AL lib: (EE) alc_cleanup: 1 device not closed
+fixed  sleep 1ms   | game=10.017 real=10.008 dist=79.66 expected=80.13 radius=5.27 step_cv=0.1 step_max=1.01 z_dev=0.0004 drift=0.518
+fixed  mix   1ms   | game=10.017 real=10.001 dist=79.66 expected=80.13 radius=5.27 step_cv=0.1 step_max=1.01 z_dev=0.0004 drift=0.475
+fixed  sleep 15ms  | game=10.033 real=10.015 dist=79.80 expected=80.27 radius=5.27 step_cv=0.1 step_max=1.01 z_dev=0.0004 drift=0.478
+fixed  mix   15ms  | game=10.017 real=10.000 dist=79.66 expected=80.13 radius=5.27 step_cv=0.1 step_max=1.01 z_dev=0.0004 drift=0.475
+legacy sleep 1ms   | game=10.017 real=10.001 dist=79.66 expected=80.13 radius=5.27 step_cv=4.2 step_max=2.00 z_dev=0.0004 drift=0.519
+legacy mix   1ms   | game=10.017 real=10.001 dist=79.66 expected=80.13 radius=5.27 step_cv=4.2 step_max=2.00 z_dev=0.0004 drift=0.520
+legacy sleep 15ms  | game=10.017 real=10.001 dist=79.66 expected=80.13 radius=5.27 step_cv=4.2 step_max=2.00 z_dev=0.0004 drift=0.519
+legacy mix   15ms  | game=10.017 real=10.001 dist=79.66 expected=80.13 radius=5.27 step_cv=4.2 step_max=2.00 z_dev=0.0004 drift=0.518
+== Linux native, 120 fps
+AL lib: (EE) alc_cleanup: 1 device not closed
+fixed  sleep 1ms   | game=10.008 real=10.005 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.254
+fixed  mix   1ms   | game=10.008 real=10.002 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.274
+fixed  sleep 15ms  | game=10.008 real=10.002 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.274
+fixed  mix   15ms  | game=10.008 real=10.003 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.274
+legacy sleep 1ms   | game=10.008 real=10.005 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.254
+legacy mix   1ms   | game=10.008 real=10.007 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.254
+legacy sleep 15ms  | game=10.008 real=10.006 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.254
+legacy mix   15ms  | game=10.008 real=10.006 dist=79.83 expected=80.07 radius=5.27 step_cv=0.0 step_max=1.00 z_dev=0.0001 drift=0.254
