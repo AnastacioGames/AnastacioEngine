@@ -44,6 +44,7 @@
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <cstdio>
 #include <cstdlib>
 
@@ -939,6 +940,20 @@ void KX_KetsjiEngine::WaitUntil(double deadline)
 	 * sleeping keeps it from overheating. Under the minimum sleep (Windows timer is ~1 ms even
 	 * with timeBeginPeriod(1)) a sleep could overshoot the frame, so the end is pure spin. */
 	const double minSleep = 0.0015;
+	// RANGE_PACING=sleep: previous method (shrinking sleeps, spin only the last 0.5 ms), for A/B tests.
+	static const bool sleepOnly = getenv("RANGE_PACING") && strcmp(getenv("RANGE_PACING"), "sleep") == 0;
+	if (sleepOnly) {
+		for (;;) {
+			const double remaining = deadline - m_clock.GetTimeSecond();
+			if (remaining <= 0.0) {
+				return;
+			}
+			if (remaining > 0.0005) {
+				const double wait = std::min(remaining * 0.5, remaining - 0.0005);
+				std::this_thread::sleep_for(std::chrono::microseconds((long long)(wait * 1e6)));
+			}
+		}
+	}
 	for (;;) {
 		double remaining = deadline - m_clock.GetTimeSecond();
 		if (remaining <= 0.0) {

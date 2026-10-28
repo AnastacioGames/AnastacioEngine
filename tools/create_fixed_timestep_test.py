@@ -59,7 +59,7 @@ def main(cont):
         state["msgs"] += 1
 
     real = time.perf_counter() - state["t0"]
-    if real >= 3.0 and not state["done"]:
+    if real >= float(os.environ.get("FT_SECONDS", "3.0")) and not state["done"]:
         state["done"] = True
         game = bge.logic.getFrameTime() - state["g0"]
         fall = state["z0"] - scene.objects["FallCube"].worldPosition.z

@@ -209,7 +209,10 @@ GHOST_SystemWin32::GHOST_SystemWin32(bool hiddenWindows)
 	// Default Windows timer resolution is ~15.6 ms, so Sleep(1) and std::this_thread::sleep_for
 	// in the editor loop and the game frame pacing overshoot by up to a whole frame (uneven
 	// physics steps). Ask for 1 ms for the lifetime of the process.
-	::timeBeginPeriod(1);
+	// RANGE_NO_TIMER_RES=1 keeps the default ~15.6 ms timer, to reproduce old Windows / Wine frame drops.
+	if (!getenv("RANGE_NO_TIMER_RES")) {
+		::timeBeginPeriod(1);
+	}
 
 #ifdef WITH_INPUT_NDOF
 	m_ndofManager = new GHOST_NDOFManagerWin32(*this);
@@ -218,7 +221,9 @@ GHOST_SystemWin32::GHOST_SystemWin32(bool hiddenWindows)
 
 GHOST_SystemWin32::~GHOST_SystemWin32()
 {
-	::timeEndPeriod(1);
+	if (!getenv("RANGE_NO_TIMER_RES")) {
+		::timeEndPeriod(1);
+	}
 
 	// Shutdown COM
 	OleUninitialize();
