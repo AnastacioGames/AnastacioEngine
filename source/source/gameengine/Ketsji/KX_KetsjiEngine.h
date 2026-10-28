@@ -368,8 +368,8 @@ private:
 	 * total pause duration not set.
 	 */
 	void UpdateSleepTime();
-	/// One catch-up sleep of UpdateSleepTime(), capped at the time still owed for the frame.
-	void SleepUnderRate();
+	/// Waits until deadline (m_clock seconds) mixing spin and sleep; ends in pure spin.
+	void WaitUntil(double deadline);
 	/// Headless server: sleeps until the next logic frame is due (the catch-up loop alone would spin).
 	void ServerSleep();
 
