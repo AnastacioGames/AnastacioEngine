@@ -11,7 +11,7 @@ uniform sampler2D bgl_DepthTexture;
 uniform float bgl_RenderedTextureWidth;
 uniform float bgl_RenderedTextureHeight;
 
-uniform vec4 ge_LensFlareParams; // scale, intensity, time, unused
+uniform vec4 ge_LensFlareParams; // scale, intensity, time, quality (0 High, 1 Medium, 2 Low)
 uniform vec2 ge_LensFlareSunPos; // sun position in screen space, [0,1]
 
 vec2 texcoord;
@@ -26,10 +26,19 @@ float lensNoise(vec2 co)
 	return fract(sin(dot(co.xy, vec2(12.9898, 78.233))) * 43758.5453);
 }
 
-vec3 lensflare(vec2 uv, vec2 pos, float sunscale, float timer)
+/* quality: 0 High, 1 Medium (no small ghosts), 2 Low (glow and the big ghosts only, no noise). */
+vec3 lensflare(vec2 uv, vec2 pos, float sunscale, float timer, float quality)
 {
 	vec2 main = uv - pos;
 	vec2 uvd = uv * length(uv);
+
+	if (quality > 1.5) {
+		float g0 = 1.8 / (length(main) / sunscale + 1.0);
+		vec2 d2 = uvd + 0.8 * pos, d22 = uvd + 0.85 * pos, d23 = uvd + 0.9 * pos;
+		vec3 ghost = vec3(0.25 / (1.0 + 32.0 * dot(d2, d2)), 0.23 / (1.0 + 32.0 * dot(d22, d22)),
+		                  0.21 / (1.0 + 32.0 * dot(d23, d23)));
+		return ghost + vec3(g0);
+	}
 
 	float ang = atan(main.y, main.x);
 	float dist = length(main);
@@ -49,6 +58,14 @@ vec3 lensflare(vec2 uv, vec2 pos, float sunscale, float timer)
 	float f42 = max(0.01 - pow(length(uvx + 0.45 * pos), 2.4), 0.0) * 5.0;
 	float f43 = max(0.01 - pow(length(uvx + 0.5 * pos), 2.4), 0.0) * 3.0;
 
+	vec3 c = vec3(f0);
+	c.r += f2 + f4;
+	c.g += f22 + f42;
+	c.b += f23 + f43;
+	if (quality > 0.5) {
+		return c;
+	}
+
 	uvx = mix(uv, uvd, -0.4);
 
 	float f5 = max(0.01 - pow(length(uvx + 0.2 * pos), 5.5), 0.0) * 2.0;
@@ -61,12 +78,9 @@ vec3 lensflare(vec2 uv, vec2 pos, float sunscale, float timer)
 	float f62 = max(0.01 - pow(length(uvx - 0.325 * pos), 1.6), 0.0) * 3.0;
 	float f63 = max(0.01 - pow(length(uvx - 0.35 * pos), 1.6), 0.0) * 5.0;
 
-	vec3 c = vec3(0.0);
-
-	c.r += f2 + f4 + f5 + f6;
-	c.g += f22 + f42 + f52 + f62;
-	c.b += f23 + f43 + f53 + f63;
-	c += vec3(f0);
+	c.r += f5 + f6;
+	c.g += f52 + f62;
+	c.b += f53 + f63;
 
 	return c;
 }
@@ -107,7 +121,7 @@ void main()
 	vec2 sunPos = vec2((ge_LensFlareSunPos.x - 0.5) * xconv, ge_LensFlareSunPos.y - 0.5);
 	vec2 uv = vec2((texcoord.x - 0.5) * xconv, texcoord.y - 0.5);
 
-	vec3 lens = lensflare(uv, sunPos, sunScale, timer);
+	vec3 lens = lensflare(uv, sunPos, sunScale, timer, ge_LensFlareParams.w);
 	renderedTex.rgb += lens * intensity * visibility;
 
 	gl_FragColor = renderedTex;

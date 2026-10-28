@@ -1657,7 +1657,8 @@ bool GPU_fx_do_composite_pass(
 			/* Not animated (timer = 0): the 3D View isn't redrawn every frame outside
 			 * Play/animation playback, so a moving flicker would just look stuck between
 			 * redraws. Position, scale and sun occlusion still update live. */
-			float flare_params[4] = {scene->world->flare_scale, scene->world->flare_intensity, 0.0f, 0.0f};
+			float flare_params[4] = {scene->world->flare_scale, scene->world->flare_intensity, 0.0f,
+			                          (float)scene->world->flare_quality};
 			float viewport_size[2] = {fx->viewsize_w, fx->viewsize_h};
 
 			GPULENSFLAREShaderInterface *interface = GPU_shader_get_interface(lensflare_shader);

@@ -55,6 +55,9 @@ enum {
 	GPU_SHADER_FLAGS_SHADOW_PCSS		= (1 << 10),
 	/* Some sun uses cascades: the light loop of node_bsdf_principled() samples them (#define SHADOW_CSM). */
 	GPU_SHADER_FLAGS_SHADOW_CSM			= (1 << 11),
+	/* World Star Quality Medium / Low: lighter Realistic stars (#define STARS_MEDIUM / STARS_LOW). */
+	GPU_SHADER_FLAGS_STARS_MEDIUM		= (1 << 12),
+	GPU_SHADER_FLAGS_STARS_LOW			= (1 << 13),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.

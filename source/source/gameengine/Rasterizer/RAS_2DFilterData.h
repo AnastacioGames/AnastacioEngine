@@ -190,6 +190,7 @@ typedef struct BuildInFilters {
 	float flare_time;
 	float flare_scale;
 	float flare_intensity;
+	float flare_quality; /* World flare_quality: 0 High, 1 Medium, 2 Low */
 	float flare_sun_x;
 	float flare_sun_y;
 

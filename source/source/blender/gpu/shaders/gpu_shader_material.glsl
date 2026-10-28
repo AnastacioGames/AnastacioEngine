@@ -2429,15 +2429,25 @@ vec3 world_stars_real(vec3 view, vec3 sundir, float factor, bool vivid)
 	float g = dot(c, gnp);
 	float band = exp(-g * g * 45.0);
 	vec3 col = vec3(0.0);
+	/* World Star Quality: Medium drops the dark dust lanes, Low keeps a smooth band without noise
+	 * and only the brighter star layer. */
 	if (band > 0.002) {
 		float bulge = pow(max(dot(c, gcen), 0.0), 6.0);
+#ifdef STARS_LOW
+		float n = 0.5, dust = 0.0;
+#elif defined(STARS_MEDIUM)
+		float n = stars_fbm(c * 6.0), dust = 0.0;
+#else
 		float n = stars_fbm(c * 6.0);
 		float dust = smoothstep(0.45, 0.7, stars_fbm(c * 11.0 + 3.0)) * exp(-g * g * 260.0);
+#endif
 		col = vec3(0.5, 0.55, 0.72) * (vivid ? 2.2 : 1.0) * band * (0.05 + 0.25 * bulge) * (0.4 + 1.2 * n) * (1.0 - 0.8 * dust);
 	}
 
 	/* background stars, denser along the galactic band */
+#ifndef STARS_LOW
 	col += stars_field(c, 1400.0, 0.20 + 0.35 * band, 0.08, 0.4, 0.0);
+#endif
 	col += stars_field(c, 600.0, 0.18, 0.25, 1.1, 91.0);
 
 	/* Named stars: direction on the celestial sphere (xyz, from stars_radec of ra in hours and dec in

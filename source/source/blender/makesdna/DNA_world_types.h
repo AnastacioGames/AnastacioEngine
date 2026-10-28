@@ -197,7 +197,9 @@ typedef struct World {
 	short vcloud_quality;      /* 0=Low,1=Medium,2=High */
 	short vcloud_flag;         /* WO_VCLOUDS_* bits */
 	float vcloud_shadow_strength;
-	int   vcloud_pad;          /* keeps the World struct 8-byte aligned for makesdna (see align errors on gpumaterial/prop otherwise) */
+	/* Qualidade do Lens Flare e das estrelas Realistic/Constellations: WO_FX_QUALITY_* (era vcloud_pad;
+	 * 0 = High, entao arquivos antigos ficam iguais). Mantem o World alinhado em 8 bytes. */
+	short flare_quality, star_quality;
 	/* Qualidade de Clouds e Sky Layers; os botoes Low/Medium/High do painel so preenchem estes valores */
 	short cloud_detail;        /* oitavas do ruido das Clouds, 1-8 (0 = arquivo antigo -> 5) */
 	short sky_layer_detail;    /* oitavas do ruido das Sky Layers, 1-8 (0 = arquivo antigo -> 5) */
@@ -295,6 +297,11 @@ typedef struct World {
 #define WO_STARS_SIMPLE         0
 #define WO_STARS_REALISTIC      1
 #define WO_STARS_CONSTELLATIONS 2
+
+/* flare_quality / star_quality */
+#define WO_FX_QUALITY_HIGH   0
+#define WO_FX_QUALITY_MEDIUM 1
+#define WO_FX_QUALITY_LOW    2
 
 /* sky_quality: passos do raymarch do ceu Atmospheric (Auto = Low na Web/Android) */
 #define WO_SKY_QUALITY_AUTO     0

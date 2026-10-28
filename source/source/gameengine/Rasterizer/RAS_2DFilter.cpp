@@ -979,7 +979,7 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 
 	if (m_predefinedUniforms[GE_LENSFLARE_PARAMS_UNIFORM] != -1) {
-		float params[4] = {m_buildInFilters.flare_scale, m_buildInFilters.flare_intensity, m_buildInFilters.flare_time, 0.0f};
+		float params[4] = {m_buildInFilters.flare_scale, m_buildInFilters.flare_intensity, m_buildInFilters.flare_time, m_buildInFilters.flare_quality};
 		SetUniformfv(m_predefinedUniforms[GE_LENSFLARE_PARAMS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
 	}
 	if (m_predefinedUniforms[GE_LENSFLARE_SUNPOS_UNIFORM] != -1) {

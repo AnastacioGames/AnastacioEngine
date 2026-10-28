@@ -204,6 +204,7 @@ typedef struct GPUPassStages {
 	float explode_factor;              /* Explode: triangles pushed apart along their normal, 0 disables */
 	ListBase *scripts;                 /* GPUScriptCode */
 	int sky_low;                       /* World Sky Quality: 1 = Low (SKY_LOW), 2 = Very Low (+ SKY_VERY_LOW) */
+	int star_quality;                  /* World Star Quality: 1 = Medium (STARS_MEDIUM), 2 = Low (STARS_LOW) */
 	bool shadow_pcss;                  /* Some lamp uses PCSS (SHADOW_PCSS) */
 	bool shadow_csm;                   /* Some sun uses cascades (SHADOW_CSM) */
 } GPUPassStages;

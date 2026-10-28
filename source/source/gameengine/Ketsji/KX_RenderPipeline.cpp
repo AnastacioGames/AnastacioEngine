@@ -1196,6 +1196,7 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 			if (const World *world = scene->GetBlenderScene()->world) {
 				flareParams->flare_scale = world->flare_scale;
 				flareParams->flare_intensity = world->flare_intensity;
+				flareParams->flare_quality = (float)world->flare_quality;
 			}
 			flareParams->flare_sun_x = sunPos[0];
 			flareParams->flare_sun_y = sunPos[1];

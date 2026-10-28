@@ -1495,6 +1495,18 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 0.0, 2.0, 1, 2);
 	RNA_def_property_ui_text(prop, "Intensity", "Intensity of the lens flare");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	static EnumPropertyItem flare_quality_items[] = {
+		{WO_FX_QUALITY_LOW, "LOW", 0, "Low", "Glow and the big ghosts only, no noise (phones, integrated GPUs)"},
+		{WO_FX_QUALITY_MEDIUM, "MEDIUM", 0, "Medium", "Glow with rays and the main ghosts"},
+		{WO_FX_QUALITY_HIGH, "HIGH", 0, "High", "Every ghost and the noisy rays"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "flare_quality", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "flare_quality");
+	RNA_def_property_enum_items(prop, flare_quality_items);
+	RNA_def_property_ui_text(prop, "Flare Quality", "Cost of the lens flare on the GPU");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 }
 
 static void rna_def_world_sound_entries(BlenderRNA *brna, PropertyRNA *cprop)
@@ -1832,6 +1844,18 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "sky_quality");
 	RNA_def_property_enum_items(prop, sky_quality_items);
 	RNA_def_property_ui_text(prop, "Sky Quality", "Cost of the Atmospheric sky on the GPU");
+	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
+
+	static EnumPropertyItem star_quality_items[] = {
+		{WO_FX_QUALITY_LOW, "LOW", 0, "Low", "Smooth Milky Way and only the brighter stars (phones, integrated GPUs)"},
+		{WO_FX_QUALITY_MEDIUM, "MEDIUM", 0, "Medium", "Milky Way without the dark dust lanes"},
+		{WO_FX_QUALITY_HIGH, "HIGH", 0, "High", "Full Milky Way with dust lanes and every star layer"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "star_quality", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "star_quality");
+	RNA_def_property_enum_items(prop, star_quality_items);
+	RNA_def_property_ui_text(prop, "Star Quality", "Cost of the Realistic and Constellations stars on the GPU");
 	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_update");
 
 	prop = RNA_def_property(srna, "use_sky_aurora", PROP_BOOLEAN, PROP_NONE);

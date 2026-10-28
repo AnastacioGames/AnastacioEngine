@@ -3617,6 +3617,12 @@ GPUPass *GPU_generate_pass(
 			flags |= GPU_SHADER_FLAGS_SKY_VERY_LOW;
 		}
 	}
+	if (stages && stages->star_quality == 1) {
+		flags |= GPU_SHADER_FLAGS_STARS_MEDIUM;
+	}
+	else if (stages && stages->star_quality == 2) {
+		flags |= GPU_SHADER_FLAGS_STARS_LOW;
+	}
 	if (stages && stages->shadow_pcss) {
 		flags |= GPU_SHADER_FLAGS_SHADOW_PCSS;
 	}

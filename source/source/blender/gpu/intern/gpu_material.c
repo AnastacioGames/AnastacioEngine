@@ -339,6 +339,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	{
 		const World *wo = material->scene ? material->scene->world : NULL;
 		const short q = wo ? wo->sky_quality : WO_SKY_QUALITY_AUTO;
+		stages.star_quality = wo ? wo->star_quality : WO_FX_QUALITY_HIGH;
 		if (q == WO_SKY_QUALITY_VERY_LOW) {
 			stages.sky_low = 2;
 		}

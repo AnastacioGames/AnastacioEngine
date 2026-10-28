@@ -267,6 +267,45 @@ class WORLD_OT_cloud_quality_preset(Operator):
         return {'FINISHED'}
 
 
+class WORLD_OT_flare_sun_set(Operator):
+    """Use this Lamp as the lens flare's sun"""
+    bl_idname = "world.flare_sun_set"
+    bl_label = "Set Flare Sun"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    name: StringProperty()
+
+    def execute(self, context):
+        context.world.weather_settings.sun_object_name = self.name
+        return {'FINISHED'}
+
+
+class WORLD_MT_flare_sun(Menu):
+    """Only the scene's Lamps can be the lens flare's sun"""
+    bl_label = "Sun Object"
+
+    def draw(self, context):
+        layout = self.layout
+        lamps = sorted(ob.name for ob in context.scene.objects if ob.type == 'LAMP')
+        if not lamps:
+            layout.label(text="No Lamp in the scene", icon='INFO')
+        for name in lamps:
+            layout.operator("world.flare_sun_set", text=name, icon='LAMP_SUN').name = name
+        layout.separator()
+        layout.operator("world.flare_sun_set", text="None", icon='X').name = ""
+
+
+def draw_preset_quality(row, layout, context, data, prop):
+    """Low/Medium/High; the Quality Preset (Post Processing) writes it on change and on Play,
+    so it is only editable with the preset in Custom (same as Sky Quality)."""
+    custom = context.scene.scenefx_settings.quality_preset == 'CUSTOM'
+    row.enabled = custom
+    row.label(text="Quality:")
+    row.prop(data, prop, expand=True)
+    if not custom:
+        layout.label(text="Set by Quality Preset (Post Processing)", icon='INFO')
+
+
 def draw_cloud_quality(layout, weather, effect):
     """Botões Low/Medium/High (o que bate com os valores atuais fica pressionado) e os valores."""
     presets = CLOUD_QUALITY_PRESETS[effect]
@@ -415,6 +454,9 @@ class CUSTOM_PT_game_world_night(CustomWorldButtonsPanel, Panel):
         row = box.row()
         row.active = world.use_sky_stars
         row.prop(world, "star_style", text="Style")
+        row = box.row()
+        row.active = world.use_sky_stars and world.star_style != 'SIMPLE'
+        draw_preset_quality(row, box, context, world, "star_quality")
         row = box.row(align=True)
         row.prop(world, "use_sky_aurora", text="Aurora")
         sub = row.row()
@@ -763,10 +805,17 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
         if weather.show_expanded_lensflare:
             col = main_box.column()
             col.active = weather.use_lens_flare
-            not_live_layout(col).prop_search(weather, "sun_object_name", scene, "objects",
-                                            text=iface_("Sun Object") + " *")
+            name = weather.sun_object_name
+            sun = scene.objects.get(name) if name else None
+            row = not_live_layout(col).row()
+            row.label(text=iface_("Sun Object") + " *:")
+            row.menu("WORLD_MT_flare_sun", text=name or iface_("None"),
+                     icon='LAMP_SUN' if sun is not None and sun.type == 'LAMP' else 'NONE')
+            if name and (sun is None or sun.type != 'LAMP'):
+                col.label(text="Sun Object must be a Lamp", icon='ERROR')
             col.prop(weather, "flare_scale")
             col.prop(weather, "flare_intensity")
+            draw_preset_quality(col.row(), col, context, weather, "flare_quality")
 
         row = main_box.row(align=True)
         row.prop(weather, "show_expanded_earthquake", text="Earthquake", emboss=True)

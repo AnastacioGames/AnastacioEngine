@@ -728,6 +728,12 @@ static GPUShader *gpu_shader_create_ex_impl_raw(const char *vertexcode,
 	if (flags & GPU_SHADER_FLAGS_SKY_VERY_LOW) {
 		strcat(standard_defines, "#define SKY_VERY_LOW\n");
 	}
+	if (flags & GPU_SHADER_FLAGS_STARS_MEDIUM) {
+		strcat(standard_defines, "#define STARS_MEDIUM\n");
+	}
+	if (flags & GPU_SHADER_FLAGS_STARS_LOW) {
+		strcat(standard_defines, "#define STARS_LOW\n");
+	}
 	if (flags & GPU_SHADER_FLAGS_SHADOW_PCSS) {
 		strcat(standard_defines, "#define SHADOW_PCSS\n");
 	}

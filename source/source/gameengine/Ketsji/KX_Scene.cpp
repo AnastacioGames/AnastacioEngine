@@ -622,6 +622,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.useLensFlare = true;
 			filters.flare_scale = world->flare_scale;
 			filters.flare_intensity = world->flare_intensity;
+			filters.flare_quality = (float)world->flare_quality;
 		}
 
 		/* World Bloom/SSR nodes (Shader Editor, World mode) override the Scene FX settings

@@ -311,6 +311,11 @@ bool BKE_scene_quality_preset_apply(Scene *scene, int preset)
 		wo->sky_layer_detail = q->cloud_detail;
 		wo->vcloud_quality = q->vcloud_quality;
 		wo->sky_quality = q->sky_quality;
+		/* Very Low/Low -> Low, Medium -> Medium, High/Ultra -> High */
+		const short fx_quality = (level <= SCENE_FX_QUALITY_LOW) ? WO_FX_QUALITY_LOW :
+		                         (level == SCENE_FX_QUALITY_MEDIUM) ? WO_FX_QUALITY_MEDIUM : WO_FX_QUALITY_HIGH;
+		wo->flare_quality = fx_quality;
+		wo->star_quality = fx_quality;
 	}
 
 	for (Base *base = scene->base.first; base; base = base->next) {
