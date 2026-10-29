@@ -1133,6 +1133,17 @@ static void armature_deform_vert_cb(void *__restrict userdata, const int i,
 	}
 }
 
+#ifdef _MSC_VER
+static __declspec(thread) bool armature_deform_no_threading = false;
+#else
+static __thread bool armature_deform_no_threading = false;
+#endif
+
+void armature_deform_verts_set_threading(bool use_threading)
+{
+	armature_deform_no_threading = !use_threading;
+}
+
 void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm, float (*vertexCos)[3],
                            float (*defMats)[3][3], int numVerts, int deformflag,
                            float (*prevCos)[3], const char *defgrp_name)
@@ -1263,7 +1274,7 @@ void armature_deform_verts(Object *armOb, Object *target, DerivedMesh *dm, float
 
 	ParallelRangeSettings settings;
 	BLI_parallel_range_settings_defaults(&settings);
-	settings.use_threading = (numVerts > 1024);
+	settings.use_threading = (numVerts > 1024) && !armature_deform_no_threading;
 	settings.min_iter_per_thread = 256;
 	BLI_task_parallel_range(0, numVerts, &vdata, armature_deform_vert_cb, &settings);
 

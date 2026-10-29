@@ -50,6 +50,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - RolimaRacer, Pista_1 com 20 IA, 2 rodadas alternadas: física 2,96/5,66 → 2,18/4,75 ms (-16 a -26%), +4 a +6 fps.
 - Determinismo: cena `tools/debug/cenas/criar_cena_determinismo_fisica.py` (64 corpos convexos e compound sobre
   trimesh, `-g fixed_timestep 1`, posições no quadro 400) deu arquivo idêntico em 2 rodadas serial e 3 paralelas.
+## 2026-10-29 - Revisao da Lua e tamanho ampliado
+
+- Corrigidos espelhamento abaixo do horizonte no Procedural e ajuste de direcao no Atmospheric. O caminho de textura agora independe da visibilidade inicial da Lua.
+- A pedido do usuario, Moon Size aceita ate 1.0 (antes 0.1), sem mudar valores salvos ou padrao. A cena de comparacao usa 0.1; ambos os modos aceitam a faixa ampliada.
+- Revisao anterior ao aumento: editor/player recompilados e oito execucoes com saida 0, sem erros nos logs. O bloqueio de arquivo pelo teste de fisica foi removido pelo encerramento desse teste. Build final de RangeEngine e RangeRuntime passou (artifacts/moon-size-final-build.log); quatro cenas no tamanho 1.0 foram salvas, reabertas para confirmar persistencia e executadas com saida 0, sem erros de shader nos logs (giant-results.json). Evidencias em artifacts/moon-precomputed/ e artifacts/moon-size-*-build.log. Ticks de logica nao medem ganho de render; aparencia e iGPU pendentes.
+
+## 2026-10-29 - Lua com superfície pré-calculada: primeira etapa experimental
+
+- Checkbox Precomputed Surface em World > Sky > Night, desligado por padrão. Textura RGBA8 512²
+  compartilhada e gerada uma vez na primeira utilização; não grava textura no `.cooked` nesta etapa.
+  Geometria do disco, halo, posição, tamanho e brilho continuam dinâmicos. O modo procedural permanece.
+- Build RangeEngine/RangeRuntime passou com vcvars64 e VSLANG=1033. Quatro cenas reabertas para conferir
+  persistência do checkbox e executadas com saída 0: Procedural/Atmospheric × procedural/pré-calculada,
+  sem erros de shader nos logs. Primeira tentativa de runtime descartada: arquivo de inspeção chamado
+  inspect.py sombreava a biblioteca padrão; renomeado antes das quatro execuções válidas.
+- O probe registrou intervalos de ticks de lógica (~16,67 ms), não tempos exclusivos de render; não
+  sustenta ganho de FPS. Aparência e desempenho em iGPU continuam pendentes. CPU/GPU podem produzir
+  ruído diferente e a textura limita detalhes. Gerador em tools/debug/cenas/criar_cena_lua_precalculada.py;
+  evidências em artifacts/moon-precomputed/. [Plano e limites](efeitos-precalculados.md).
+
+## 2026-10-29 - Animação: tarefas em blocos e skinning sem paralelismo aninhado
+
+- `KX_Scene`: pose e skinning vão ao pool em blocos (~4 por thread) em vez de uma tarefa por objeto; com 400 armatures o envio uma a uma gastava ~21% da thread principal travando o agendador.
+- `armature_deform_verts_set_threading()` (`BKE_lattice.h`, flag por thread): dentro da tarefa de skinning da engine o `armature_deform_verts` não abre outro `BLI_task_parallel_range` (criava e liberava um pool por malha). Restaurado ao fim da tarefa; editor sem mudança.
+- Cenas novas `tools/create_perf_physics_anim_test.py` (física e animação). RX 6800M, 3 rodadas alternadas: 400 personagens 19,8 → 28,8 fps (quadro −31%; Animations 16,6 → 8,6 ms, Skinning 19,0 → 11,5 ms); 100 personagens 64,2 → 74,7 fps. Pose fixa no quadro 21 capturada antes/depois: 0 pixels diferentes.
 
 ## 2026-10-29 - Envio de luz por objeto sem repetição (`abc20326`)
 

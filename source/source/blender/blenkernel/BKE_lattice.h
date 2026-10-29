@@ -66,6 +66,9 @@ void armature_deform_verts(struct Object *armOb, struct Object *target,
                            struct DerivedMesh *dm, float (*vertexCos)[3],
                            float (*defMats)[3][3], int numVerts, int deformflag,
                            float (*prevCos)[3], const char *defgrp_name);
+/* Per calling thread: false makes armature_deform_verts() run serially. The game engine turns it
+ * off inside its own per-object skinning tasks, which are already parallel. */
+void armature_deform_verts_set_threading(bool use_threading);
 
 float (*BKE_lattice_vertexcos_get(struct Object *ob, int *r_numVerts))[3];
 void    BKE_lattice_vertexcos_apply(struct Object *ob, float (*vertexCos)[3]);

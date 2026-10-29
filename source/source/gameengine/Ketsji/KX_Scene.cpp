@@ -108,6 +108,7 @@
 #include "BKE_node.h" // SH_NODE_WORLD_BLOOM_FX, SH_NODE_WORLD_SSR_FX
 extern "C" {
 #include "BKE_idprop.h"
+#include "BKE_lattice.h" // armature_deform_verts_set_threading
 }
 #include "GPU_material.h"
 #include "GPU_extensions.h"
@@ -2673,6 +2674,10 @@ void KX_Scene::UpdateAnimDeformTask(TaskPool *UNUSED(pool), void *taskdata, int 
 
 	KX_GameObject *parent = gameobj->GetParent();
 
+	// Objects are already skinned in parallel: a nested parallel range per mesh only created and
+	// freed a task pool each time. Restored below, these threads may be shared with Blender.
+	armature_deform_verts_set_threading(false);
+
 	// Only do deformers here if they are not parented to an armature, otherwise the armature will
 	// handle updating its children
 	if (gameobj->GetDeformer() && (!parent || parent->GetGameObjectType() != SCA_IObject::OBJ_ARMATURE)) {
@@ -2686,10 +2691,47 @@ void KX_Scene::UpdateAnimDeformTask(TaskPool *UNUSED(pool), void *taskdata, int 
 		return true;
 	});
 
+	armature_deform_verts_set_threading(true);
+
 	if (doProfiling) {
 		// set time elapsed.
 		gameobj->SetDebugTimeProfiling(KX_GameObject::DebugProfilingType::TIME_ANIMATION, timeProfiling);
 	}
+}
+
+/* One pool task per object locked the scheduler and woke a thread per push: with 400 armatures that
+ * was ~21% of the main thread (mostly pthread_mutex_lock). Objects go in blocks instead, a few per
+ * thread so uneven objects still balance. Runs `func` for every object, then waits. */
+struct AnimTaskChunk {
+	KX_GameObject *const *objects;
+	size_t count;
+	TaskRunFunction func;
+};
+
+static void anim_chunk_task(TaskPool *pool, void *taskdata, int threadid)
+{
+	const AnimTaskChunk *chunk = (const AnimTaskChunk *)taskdata;
+	for (size_t i = 0; i < chunk->count; i++) {
+		chunk->func(pool, chunk->objects[i], threadid);
+	}
+}
+
+static void anim_run_in_chunks(TaskPool *pool, TaskRunFunction func, const std::vector<KX_GameObject *>& objects)
+{
+	if (objects.empty()) {
+		return;
+	}
+	const size_t threads = (size_t)std::max(1, BLI_task_scheduler_num_threads(KX_GetActiveEngine()->GetTaskScheduler()));
+	const size_t per_chunk = std::max<size_t>(1, objects.size() / (threads * 4));
+	std::vector<AnimTaskChunk> chunks;
+	chunks.reserve(objects.size() / per_chunk + 1);
+	for (size_t start = 0; start < objects.size(); start += per_chunk) {
+		chunks.push_back({objects.data() + start, std::min(per_chunk, objects.size() - start), func});
+	}
+	for (AnimTaskChunk& chunk : chunks) {
+		BLI_task_pool_push(pool, anim_chunk_task, &chunk, false, TASK_PRIORITY_LOW);
+	}
+	BLI_task_pool_work_and_wait(pool);
 }
 
 bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
@@ -2730,11 +2772,7 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 		}
 	}
 
-	for (KX_GameObject *gameobj : poseTasks) {
-		BLI_task_pool_push(m_animationPool, UpdateAnimPoseTask, gameobj, false, TASK_PRIORITY_LOW);
-	}
-
-	BLI_task_pool_work_and_wait(m_animationPool);
+	anim_run_in_chunks(m_animationPool, UpdateAnimPoseTask, poseTasks);
 
 	// Keep work from earlier catch-up steps even if the next pose pass skips this object.
 	// Workers have finished; insertions and removal callbacks stay on the main thread.
@@ -2810,10 +2848,8 @@ bool KX_Scene::UpdateAnimations(double curtime, bool restrict)
 void KX_Scene::UpdateAnimationDeformers(bool applyToMesh)
 {
 	if (applyToMesh) {
-		for (KX_GameObject *gameobj : m_pendingAnimationDeformers) {
-			BLI_task_pool_push(m_animationPool, UpdateAnimDeformTask, gameobj, false, TASK_PRIORITY_LOW);
-		}
-		BLI_task_pool_work_and_wait(m_animationPool);
+		const std::vector<KX_GameObject *> deformTasks(m_pendingAnimationDeformers.begin(), m_pendingAnimationDeformers.end());
+		anim_run_in_chunks(m_animationPool, UpdateAnimDeformTask, deformTasks);
 	}
 	m_pendingAnimationDeformers.clear();
 }
