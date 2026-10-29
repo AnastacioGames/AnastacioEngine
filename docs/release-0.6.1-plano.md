@@ -22,6 +22,9 @@ Procedimento geral: [distribution-0.1.md](distribution-0.1.md) e as dicas em [re
 
 ## Linux (Claude no PC Linux)
 
+**Passos 1-5 já feitos** (`daf2dc74`, pacotes em `~/AnastacioEngine-build050/build-linux/dist/`). Falta só
+o 6 (opcional) e o 7: subir os dois arquivos e o `SHA256SUMS-linux.txt` no draft.
+
 Num clone separado com o `main` atualizado (`git pull`), conferir antes que o draft `v0.6.1` existe
 (`gh release view v0.6.1`).
 
