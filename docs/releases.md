@@ -45,7 +45,7 @@ Notas para o usuário:
 - **Correções:** troca de cena online desenha o World da cena nova; recarga de shaders após o clarão de explosão;
   UI Tree mantém o layout ao organizar; botões de toque e tela de carregamento na Web; gravação de tela mais rápida.
 
-Texto da página do GitHub: [release-notes-0.6.1.md](release-notes-0.6.1.md).
+Texto da página do GitHub: [release-notes-0.6.1.md](release-notes-0.6.1.md). Divisão Windows/Linux: [release-0.6.1-plano.md](release-0.6.1-plano.md).
 
 ### Linux (2026-10-28, notebook Linux, clone `~/AnastacioEngine-build050` em `034f480a`)
 
