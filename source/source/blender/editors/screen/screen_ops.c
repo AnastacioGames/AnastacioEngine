@@ -3670,8 +3670,11 @@ void ED_screens_header_tools_menu_create(bContext *C, uiLayout *layout, void *UN
 
 		RNA_pointer_create(&CTX_wm_screen(C)->id, &RNA_SpaceView3D, sa->spacedata.first, &space_ptr);
 		uiItemR(layout, &space_ptr, "show_floating_controls_in_header", 0, IFACE_("Floating Controls in Header"), ICON_NONE);
-		if (((View3D *)sa->spacedata.first)->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) {
+		if (((View3D *)sa->spacedata.first)->flag2 & (V3D_FLOATING_CONTROLS_IN_HEADER | V3D_GAME_CONTROLS_IN_HEADER)) {
 			uiItemR(layout, &space_ptr, "use_header_controls_center", 0, IFACE_("Center Controls in Header"), ICON_NONE);
+		}
+		if ((((View3D *)sa->spacedata.first)->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) == 0) {
+			uiItemR(layout, &space_ptr, "show_game_controls_in_header", 0, IFACE_("Game Controls in Header"), ICON_NONE);
 		}
 		uiItemR(layout, &space_ptr, "show_floating_debug_controls", 0, IFACE_("Floating Debug Controls"), ICON_NONE);
 

@@ -2717,6 +2717,15 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	                         "Show the 3D View floating controls in the header instead of inside the viewport");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
+	prop = RNA_def_property(srna, "show_game_controls_in_header", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_GAME_CONTROLS_IN_HEADER);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop,
+	                         "Game Controls in Header",
+	                         "Show only the game buttons (Cook, Play, Standalone, lock, console) in the header; "
+	                         "the other floating controls stay inside the viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
 	prop = RNA_def_property(srna, "show_floating_debug_controls", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag2", V3D_HIDE_FLOATING_DEBUG_CONTROLS);
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);

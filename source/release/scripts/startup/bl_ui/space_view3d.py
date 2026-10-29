@@ -101,6 +101,13 @@ class VIEW3D_HT_header(Header):
             layout.template_header_3D_controls()
             if view.use_header_controls_center:
                 layout.separator_spacer()
+        elif view.show_game_controls_in_header:
+            # Só Cook/Play/Standalone/cadeado/console; o resto continua flutuando na viewport.
+            if view.use_header_controls_center:
+                layout.separator_spacer()
+            layout.template_header_3D_game_controls()
+            if view.use_header_controls_center:
+                layout.separator_spacer()
 
         if obj:
             # Particle edit
@@ -4006,6 +4013,9 @@ class VIEW3D_PT_gizmo(Panel):
         sub.active = prefs.show_mini_axis
         sub.prop(prefs, "mini_axis_size", text="Size")
         layout.prop(view, "show_floating_controls_in_header", text="Controls in Header")
+        sub = layout.row()
+        sub.active = not view.show_floating_controls_in_header
+        sub.prop(view, "show_game_controls_in_header", text="Game Buttons in Header")
 
         layout.separator()
         layout.label(text="Object Gizmos")

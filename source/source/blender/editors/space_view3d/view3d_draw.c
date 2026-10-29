@@ -4570,8 +4570,9 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	 * Object Mode todos ficam desabilitados juntos, como o Play (game_engine_poll).
 	 * Botão desabilitado (o grupo fora do Object Mode, ou o Cook sem .blend salvo) é desenhado
 	 * com alpha 0.5, então sempre pinta um fundo opaco antes
-	 * para o texto da viewport (ex.: "(1) Armature") não vazar por trás. */
-	{
+	 * para o texto da viewport (ex.: "(1) Armature") não vazar por trás.
+	 * Com "Game Controls in Header" o grupo vai para o cabeçalho e aqui fica só o resto. */
+	if ((v3d->flag2 & V3D_GAME_CONTROLS_IN_HEADER) == 0) {
 		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
 		int end_x = x, end_y = y;
 

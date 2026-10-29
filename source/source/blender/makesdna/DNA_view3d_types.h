@@ -318,6 +318,7 @@ typedef struct View3D {
 #define V3D_HIDE_FLOATING_DEBUG_CONTROLS	(1 << 24)
 #define V3D_HEADER_CONTROLS_CENTER	(1 << 26) /* centraliza os controles quando estão no cabeçalho */
 #define V3D_SHOW_STATS				(1 << 25) /* overlay: vértices/faces/objetos no canto da viewport */
+#define V3D_GAME_CONTROLS_IN_HEADER	(1 << 27) /* só o grupo do jogo (Cook/Play/Standalone...) vai para o cabeçalho */
 
 
 /* View3D->around */

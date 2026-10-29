@@ -527,30 +527,34 @@ void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C)
 	View3D *v3d = sa->spacedata.first;
 	Scene *scene = CTX_data_scene(C);
 	PointerRNA v3dptr;
-	PointerRNA gameptr;
 	PointerRNA toolptr;
 	uiLayout *row;
 
 	RNA_pointer_create(&screen->id, &RNA_SpaceView3D, v3d, &v3dptr);
-	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);
 	RNA_pointer_create(&scene->id, &RNA_ToolSettings, scene->toolsettings, &toolptr);
 
 	row = uiLayoutRow(layout, true);
 
-	{
-		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
-		uiLayout *game_row = uiLayoutRow(row, true);
-
-		uiLayoutSetEnabled(game_row, game_ok);
-		/* Cook (convert everything once into the .cooked file) right before Play; Clear Cooked lives in the Cook panel. */
-		uiItemO(game_row, "Cook", ICON_COOK, "GAME_OT_cook");
-		uiItemO(game_row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
-		uiItemO(game_row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
-		uiItemR(game_row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
-		        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);
-		uiItemR(game_row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
-	}
+	uiTemplateHeader3D_game_controls(row, C);
 
 	uiItemS(row);
 	view3d_header_tool_controls(row, C);
+}
+
+void uiTemplateHeader3D_game_controls(uiLayout *layout, struct bContext *C)
+{
+	Scene *scene = CTX_data_scene(C);
+	const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
+	uiLayout *game_row = uiLayoutRow(layout, true);
+	PointerRNA gameptr;
+
+	RNA_pointer_create(&scene->id, &RNA_SceneGameData, &scene->gm, &gameptr);
+	uiLayoutSetEnabled(game_row, game_ok);
+	/* Cook (convert everything once into the .cooked file) right before Play; Clear Cooked lives in the Cook panel. */
+	uiItemO(game_row, "Cook", ICON_COOK, "GAME_OT_cook");
+	uiItemO(game_row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
+	uiItemO(game_row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
+	uiItemR(game_row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
+	        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);
+	uiItemR(game_row, &gameptr, "show_console", UI_ITEM_R_TOGGLE, "", ICON_CONSOLE);
 }
