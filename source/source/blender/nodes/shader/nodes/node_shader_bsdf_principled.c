@@ -58,7 +58,7 @@ static void node_shader_init_principled(bNodeTree *UNUSED(ntree), bNode *node)
 	node->custom2 = SHD_SUBSURFACE_BURLEY;
 }
 
-static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
+static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *node, bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
 	// normal; a builtin link is freed by the node that takes it, so the lightmap/volume gets its own
 	bool own_normal = !in[17].link;
@@ -92,9 +92,19 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *UNUSED(node)
 
 	GPUNodeLink *lightmap = node_shader_gpu_lightmap(
 	        mat, own_normal ? GPU_material_builtin(mat, GPU_VIEW_NORMAL) : in[17].link);
+
+	/* Multiscatter GGX: energy compensation from the environment BRDF table (docs/bsdf-energia.md).
+	 * GGX keeps the analytic path; its sampler reuses the screen copy pointer, so the code
+	 * generator gives it the same texture unit and GGX materials take no extra one. */
+	GPUTexture *brdf_lut_tex = GPU_texture_global_brdf_lut();
+	float ms_on = (node->custom1 == SHD_GLOSSY_MULTI_GGX && brdf_lut_tex) ? 1.0f : 0.0f;
+	GPUNodeLink *brdf_lut = (ms_on > 0.0f) ?
+	        GPU_dynamic_texture(brdf_lut_tex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL) :
+	        GPU_dynamic_texture_ptr(GPU_texture_global_scene_color_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
+
 	GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
 	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag, scol,
-	                      lightmap,
+	                      lightmap, brdf_lut, GPU_uniform(&ms_on),
 	                      &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
 }
 
