@@ -410,6 +410,9 @@ void KX_RenderPipeline::Render()
 		RANGE_PROFILE_MARK_GPU(prof, "render.begin");
 
 		for (KX_Scene *scene : scenes) {
+			if (!scene->IsVisible()) {
+				continue;
+			}
 			// shadow buffers
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_shadows);
 			m_engine->GetShadowRenderer()->Render(scene);
@@ -713,6 +716,10 @@ KX_RenderData KX_RenderPipeline::GetRenderData()
 		}
 
 		for (KX_Scene *scene : scenes) {
+			// The first scene left in the list draws the sky, so a hidden background scene gives it away.
+			if (!scene->IsVisible()) {
+				continue;
+			}
 			frameData.m_sceneDataList.emplace_back(scene);
 			KX_SceneRenderData& sceneFrameData = frameData.m_sceneDataList.back();
 

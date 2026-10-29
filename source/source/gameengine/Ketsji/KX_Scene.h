@@ -378,6 +378,8 @@ private:
 	 * Suspend (freeze) the entire scene.
 	 */
 	bool m_suspend;
+	/// scene.visible = False: the scene keeps running but is left out of the render (no sky, shadows or cameras).
+	bool m_visible;
 	double m_suspendedDelta;
 
 	/// Toggle to enable or disable object activity culling.
@@ -706,6 +708,10 @@ public:
 	void SetActivityCulling(bool b);
 
 	bool IsSuspended() const;
+	bool IsVisible() const
+	{
+		return m_visible;
+	}
 
 	/// Use of DBVT tree for camera culling
 	void SetDbvtCulling(bool b);
