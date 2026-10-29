@@ -49,7 +49,7 @@ Texto da página do GitHub: [release-notes-0.6.1.md](release-notes-0.6.1.md). Di
 
 ### Linux (2026-10-28, notebook Linux, clone `~/AnastacioEngine-build050` em `034f480a`)
 
-Pacotes em `~/AnastacioEngine-build050/build-linux/dist/` (não publicados):
+Pacotes em `~/AnastacioEngine-build050/build-linux/dist/` (enviados em 2026-10-28 ao rascunho `v0.6.1` junto com `SHA256SUMS-linux.txt`; o Windows publica):
 
 - `AnastacioEngine-0.6.1-linux-x86_64.tar.xz` (264 MB) sha256 `71494a7f5179d2f6eb8d41d29e00f827d8dcd1db08810b939d3b71fd00f0264b`
 - `RangeArmor-0.6.1-linux-x86_64.tar.xz` (7,1 MB) sha256 `bfa3cf146bd72801fb842c258cefca19d12e1ff4e177fdfdefbc1836cf23eefc`
