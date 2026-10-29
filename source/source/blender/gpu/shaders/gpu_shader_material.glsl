@@ -5413,7 +5413,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
 	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
 	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap,
-	sampler2D brdf_lut, float ms_on,
+	sampler2D brdf_lut, float lut_on, float ms_on, vec4 env_cc_mirror,
 	out vec4 result,
     out vec4 ssgi_normal, out vec4 ssgi_albedo, out vec4 ssgi_direct, out vec4 ssgi_linear)
 {
@@ -5593,6 +5593,21 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		float NdotV_e = clamp(dot(N, V), 0.0, 1.0);
 		vec2 AB_e = (ms_on > 0.5) ? brdf.rg : env_brdf_approx(NdotV_e, roughness);
 		L += env_mirror.rgb * (Cspec0 * AB_e.x + AB_e.y) * ms;
+
+		/* clearcoat environment: added on top like the lights' coat lobe (weight 0.25, IOR 1.5),
+		 * with its own albedo (GTR1) from the table; analytic F0 0.04 fit without the table */
+		if (clearcoat > 0.0) {
+			float CNdotV_e = clamp(dot(CN, V), 0.0, 1.0);
+			float Ecc;
+			if (lut_on > 0.5) {
+				Ecc = env_cc_lut(brdf_lut, CNdotV_e, clearcoat_roughness);
+			}
+			else {
+				vec2 ABc = env_brdf_approx(CNdotV_e, clearcoat_roughness);
+				Ecc = 0.04 * ABc.x + ABc.y;
+			}
+			L += env_cc_mirror.rgb * Ecc * 0.25 * clearcoat;
+		}
 	}
 
 	/* transmission: the scene behind through the screen copy (Alpha Blend only, see

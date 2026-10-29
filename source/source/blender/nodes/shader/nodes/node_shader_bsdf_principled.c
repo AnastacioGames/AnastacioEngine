@@ -68,6 +68,7 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *node, bNodeE
 		GPU_link(mat, "direction_transform_m4v3", in[17].link, GPU_material_builtin(mat, GPU_VIEW_MATRIX), &in[17].link);
 
 	// clearcoat normal
+	bool own_cc_normal = !in[18].link;
 	if (!in[18].link)
 		in[18].link = GPU_material_builtin(mat, GPU_VIEW_NORMAL);
 	else
@@ -93,18 +94,32 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *node, bNodeE
 	GPUNodeLink *lightmap = node_shader_gpu_lightmap(
 	        mat, own_normal ? GPU_material_builtin(mat, GPU_VIEW_NORMAL) : in[17].link);
 
-	/* Multiscatter GGX: energy compensation from the environment BRDF table (docs/bsdf-energia.md).
-	 * GGX keeps the analytic path; its sampler reuses the screen copy pointer, so the code
-	 * generator gives it the same texture unit and GGX materials take no extra one. */
+	/* Clearcoat reflects the environment too, with its own roughness and normal (only when the
+	 * coat is used: a second environment lookup per pixel). */
+	bool coat_on = in[12].link || in[12].vec[0] > 0.0f;
+	GPUNodeLink *env_cc_mirror;
+	if (coat_on) {
+		GPUNodeLink *cc_rough = in[13].link ? in[13].link : GPU_uniform(in[13].vec);
+		GPUNodeLink *cc_diffuse, *cc_flag;
+		node_shader_gpu_world_env(mat, cc_rough, own_cc_normal ? NULL : in[18].link, &env_cc_mirror, &cc_diffuse, &cc_flag);
+	}
+	else {
+		GPU_link(mat, "set_rgba_zero", &env_cc_mirror);
+	}
+
+	/* Environment BRDF table (docs/bsdf-energia.md): Multiscatter GGX energy compensation and the
+	 * clearcoat environment albedo. GGX without coat keeps the analytic path; its sampler reuses
+	 * the screen copy pointer, so the code generator gives it the same texture unit. */
 	GPUTexture *brdf_lut_tex = GPU_texture_global_brdf_lut();
 	float ms_on = (node->custom1 == SHD_GLOSSY_MULTI_GGX && brdf_lut_tex) ? 1.0f : 0.0f;
-	GPUNodeLink *brdf_lut = (ms_on > 0.0f) ?
+	float lut_on = (brdf_lut_tex && (ms_on > 0.0f || coat_on)) ? 1.0f : 0.0f;
+	GPUNodeLink *brdf_lut = (lut_on > 0.0f) ?
 	        GPU_dynamic_texture(brdf_lut_tex, GPU_DYNAMIC_SAMPLER_2DIMAGE, NULL) :
 	        GPU_dynamic_texture_ptr(GPU_texture_global_scene_color_ptr(), GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL);
 
 	GPUNodeLink *ssgi_normal, *ssgi_albedo, *ssgi_direct, *ssgi_linear;
 	return GPU_stack_link(mat, "node_bsdf_principled", in, out, view, env_mirror, env_diffuse, env_flag, scol,
-	                      lightmap, brdf_lut, GPU_uniform(&ms_on),
+	                      lightmap, brdf_lut, GPU_uniform(&lut_on), GPU_uniform(&ms_on), env_cc_mirror,
 	                      &ssgi_normal, &ssgi_albedo, &ssgi_direct, &ssgi_linear);
 }
 
