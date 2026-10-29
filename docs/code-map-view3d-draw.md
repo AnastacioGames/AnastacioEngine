@@ -3,12 +3,12 @@
 Índice de `view3d_draw.c` e dos arquivos separados dele (`view3d_draw_shadows.c`, `view3d_draw_warmup.c`): grade, cursor, bordas de câmera, profundidade e seleção, sombras na viewport,
 offscreen, overlays e o aquecimento de shaders. Não descreve arquitetura.
 
-**Linhas conferidas em 2026-10-26 (`HEAD` `1a63417a`).** Os números envelhecem a cada edição: confirme com
+**Linhas conferidas em 2026-10-29 (`HEAD` `2976bd78`).** Os números envelhecem a cada edição: confirme com
 `grep -n "nome" arquivo`. `python tools/check_docs.py --fix` corrige os números deste mapa.
 
 Regra da casa: não mudar o shading dos meshes na viewport; ajustes visuais vão nos overlays.
 
-## `source/source/blender/editors/space_view3d/view3d_draw.c` (4.830 linhas)
+## `source/source/blender/editors/space_view3d/view3d_draw.c` (4.843 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
@@ -25,8 +25,8 @@ Regra da casa: não mudar o shading dos meshes na viewport; ajustes visuais vão
 | Offscreen (render OpenGL, thumbnails) | `ED_view3d_draw_offscreen` 3411, `ED_view3d_draw_offscreen_imbuf` 3563 |
 | FPS e engine de render | `ED_scene_draw_fps` 3806, `view3d_main_region_draw_engine` 3908 |
 | Estéreo e LOD | `view3d_stereo3d_setup` 4045, `update_lods` 4113 |
-| Região principal | `view3d_main_region_draw_objects` 4139, `draw_paint_hints` 4385 (dicas de pintura), `view3d_main_region_draw_info` 4452, `view3d_draw_floating_controls` 4543, **`view3d_main_region_draw`** 4687 (entrada) |
-| Debug draw | `bl_debug_draw_quad_add` 4753, `bl_debug_draw` 4781 |
+| Região principal | `view3d_main_region_draw_objects` 4139, `draw_paint_hints` 4385 (dicas de pintura), `view3d_main_region_draw_info` 4452, `view3d_draw_floating_controls` 4543, **`view3d_main_region_draw`** 4700 (entrada) |
+| Debug draw | `bl_debug_draw_quad_add` 4766, `bl_debug_draw` 4794 |
 
 ## `source/source/blender/editors/space_view3d/view3d_draw_shadows.c` (438 linhas)
 

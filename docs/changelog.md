@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-29 - Principled BSDF: Multiscatter GGX e verniz refletindo o ambiente (branch `bsdf-energia`)
+
+- Tabela de BRDF do ambiente 64×64 RGBA16F (`gpu_brdf_lut.h`, gerada por `tools/debug/bsdf/integrar_brdf.py`), textura global criada em `GPU_invalid_tex_init` (`6d40afa9`). Canais `(A, B, Ecc, 0)`; detalhes e erros em [bsdf-energia.md](bsdf-energia.md).
+- Distribution **Multiscatter GGX** passa a valer no jogo (`125b8b1c`): `ms = 1 + Cspec0·(1−Ess)/Ess` com `Ess = A+B`, um só fator para luzes e ambiente (forma do Filament, aproximação, não o random walk do Cycles). No furnace o metal rugoso deixa de escurecer. GGX (padrão) não muda.
+- Clearcoat reflete World, sondas e SH9 com a própria roughness e normal (`9204bd2a`): `env_cc_mirror·Ecc·0,25·clearcoat`, somado. Segunda leitura de ambiente só quando Clearcoat > 0 ou ligado.
+- `gpu_codegen.c`: limite de parâmetros por função GLSL 32 → 48 e o parser para com aviso em vez de escrever fora do vetor; função acima do limite é descartada (`fde36177`, `0cc30d8f`). O Principled passou de 32 e derrubava a cena HDRI+SSGI.
+
 ## 2026-10-29 - Animações podem ignorar o time scale
 
 - `Range.logic.setAnimationsUseTimeScale(False)` / `getAnimationsUseTimeScale()`: o relógio de animação avança pelo passo sem escala (`m_timestep`) em vez de `m_framestep`. Padrão `True` mantém o CLK-02. Pedido do Kitsuy: jogo em escala reduzida com animações em velocidade cheia, sem compensar cada ação.
