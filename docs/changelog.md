@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-29 - Animações podem ignorar o time scale
+
+- `Range.logic.setAnimationsUseTimeScale(False)` / `getAnimationsUseTimeScale()`: o relógio de animação avança pelo passo sem escala (`m_timestep`) em vez de `m_framestep`. Padrão `True` mantém o CLK-02. Pedido do Kitsuy: jogo em escala reduzida com animações em velocidade cheia, sem compensar cada ação.
+- Para não abrir divergência: `BL_Action` passa a iniciar no relógio de animação (`GetAnimationsTime`) e a suspensão de cena desconta `GetAnimationStep()`.
 ## 2026-10-28 - Versão 0.6.1 em preparo: tempo de jogo no Wine e Fixed Timestep suave
 
 - Versão `0.6.1` em `ANASTACIO_VERSION_STRING`, About e scripts de release; seção em `docs/releases.md`. O pacote espera o retorno do Linux/Wine.
