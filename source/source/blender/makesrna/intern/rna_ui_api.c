@@ -1078,6 +1078,10 @@ void RNA_api_ui_layout(StructRNA *srna)
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	RNA_def_function_ui_description(func, "Inserts only the 3D View game buttons (Cook, Play, Standalone, lock, console)");
 
+	func = RNA_def_function(srna, "template_header_3D_tool_controls", "uiTemplateHeader3D_tool_controls");
+	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
+	RNA_def_function_ui_description(func, "Inserts only the 3D View tool buttons (mode, pivot, gizmos, shading)");
+
 	func = RNA_def_function(srna, "template_edit_mode_selection", "uiTemplateEditModeSelection");
 	RNA_def_function_flag(func, FUNC_USE_CONTEXT);
 	RNA_def_function_ui_description(func, "Inserts common 3DView Edit modes header UI (selector for selection mode)");

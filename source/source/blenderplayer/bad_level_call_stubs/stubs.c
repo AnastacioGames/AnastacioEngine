@@ -1532,6 +1532,7 @@ void uiTemplateHeader3D(struct uiLayout *layout, struct bContext *C) RET_NONE
 #ifndef WITH_BLENDER
 void uiTemplateHeader3D_controls(struct uiLayout *layout, struct bContext *C) RET_NONE
 void uiTemplateHeader3D_game_controls(struct uiLayout *layout, struct bContext *C) RET_NONE
+void uiTemplateHeader3D_tool_controls(struct uiLayout *layout, struct bContext *C) RET_NONE
 void uiItemS_type(struct uiLayout *layout, float factor, bool line) RET_NONE
 void ED_view3d_layers_shown(struct Main *bmain, struct Scene *scene, struct View3D *v3d, unsigned int lay_old,
                             double t_begin, double dag_seconds) RET_NONE

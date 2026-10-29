@@ -314,11 +314,15 @@ typedef struct View3D {
 #define V3D_LOD_INVISIBLE_SHOW		(1 << 20)
 #define V3D_ALWAYS_RENDER	        (1 << 21)
 #define V3D_SHOW_TRANSFORM_VALUES	(1 << 22) /* show rotate/scale value next to the pivot while transforming */
-#define V3D_FLOATING_CONTROLS_IN_HEADER	(1 << 23)
+#define V3D_FLOATING_CONTROLS_IN_HEADER	(1 << 23) /* antigo: os dois grupos no cabeçalho (vale como GAME + TOOL) */
 #define V3D_HIDE_FLOATING_DEBUG_CONTROLS	(1 << 24)
 #define V3D_HEADER_CONTROLS_CENTER	(1 << 26) /* centraliza os controles quando estão no cabeçalho */
 #define V3D_SHOW_STATS				(1 << 25) /* overlay: vértices/faces/objetos no canto da viewport */
-#define V3D_GAME_CONTROLS_IN_HEADER	(1 << 27) /* só o grupo do jogo (Cook/Play/Standalone...) vai para o cabeçalho */
+#define V3D_GAME_CONTROLS_IN_HEADER	(1 << 27) /* grupo do jogo (Cook/Play/Standalone...) no cabeçalho */
+#define V3D_TOOL_CONTROLS_IN_HEADER	(1 << 28) /* resto da barra flutuante (modo, pivô, gizmo, shading) no cabeçalho */
+
+#define V3D_GAME_IN_HEADER(v3d) (((v3d)->flag2 & (V3D_FLOATING_CONTROLS_IN_HEADER | V3D_GAME_CONTROLS_IN_HEADER)) != 0)
+#define V3D_TOOL_IN_HEADER(v3d) (((v3d)->flag2 & (V3D_FLOATING_CONTROLS_IN_HEADER | V3D_TOOL_CONTROLS_IN_HEADER)) != 0)
 
 
 /* View3D->around */

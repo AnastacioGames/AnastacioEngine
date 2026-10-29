@@ -94,18 +94,20 @@ class VIEW3D_HT_header(Header):
         # manipulator toggle it used to sit beside. template_header_3D() also
         # draws the layers grid and the lock-camera-and-layers icon last.
         layout.template_header_3D()
-        if view.show_floating_controls_in_header:
+        # Cada grupo da barra flutuante vai para o cabeçalho sozinho: jogo (Cook/Play/...) e ferramentas.
+        game_in_header = view.show_game_controls_in_header
+        tool_in_header = view.show_tool_controls_in_header
+        if game_in_header or tool_in_header:
             # Espaços elásticos dos dois lados centralizam os controles (Blender 5).
             if view.use_header_controls_center:
                 layout.separator_spacer()
-            layout.template_header_3D_controls()
-            if view.use_header_controls_center:
-                layout.separator_spacer()
-        elif view.show_game_controls_in_header:
-            # Só Cook/Play/Standalone/cadeado/console; o resto continua flutuando na viewport.
-            if view.use_header_controls_center:
-                layout.separator_spacer()
-            layout.template_header_3D_game_controls()
+            row = layout.row(align=True)
+            if game_in_header:
+                row.template_header_3D_game_controls()
+            if game_in_header and tool_in_header:
+                row.separator()
+            if tool_in_header:
+                row.template_header_3D_tool_controls()
             if view.use_header_controls_center:
                 layout.separator_spacer()
 
@@ -4012,10 +4014,8 @@ class VIEW3D_PT_gizmo(Panel):
         sub = row.row(align=True)
         sub.active = prefs.show_mini_axis
         sub.prop(prefs, "mini_axis_size", text="Size")
-        layout.prop(view, "show_floating_controls_in_header", text="Controls in Header")
-        sub = layout.row()
-        sub.active = not view.show_floating_controls_in_header
-        sub.prop(view, "show_game_controls_in_header", text="Game Buttons in Header")
+        layout.prop(view, "show_game_controls_in_header", text="Game Buttons in Header")
+        layout.prop(view, "show_tool_controls_in_header", text="Tool Buttons in Header")
 
         layout.separator()
         layout.label(text="Object Gizmos")

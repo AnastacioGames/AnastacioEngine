@@ -4398,7 +4398,7 @@ static void draw_paint_hints(Scene *scene, int mode, ARegion *ar, View3D *v3d, c
 	/* Rodapé, alinhado à esquerda, acima da barra flutuante (Play/Standalone). */
 	const int x0 = rect->xmin + U.widget_unit;
 	const int base_y = rect->ymin + pad +
-	        ((v3d->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) ? 0 : (UI_UNIT_Y / 2) + 20 + pad);
+	        ((V3D_GAME_IN_HEADER(v3d) && V3D_TOOL_IN_HEADER(v3d)) ? 0 : (UI_UNIT_Y / 2) + 20 + pad);
 	const int max_w = rect->xmax - U.widget_unit - x0;
 
 	(void)ar;
@@ -4542,7 +4542,7 @@ static void view3d_main_region_draw_info(const bContext *C, Scene *scene,
 
 static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D *v3d, Scene *scene)
 {
-	if (v3d->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) {
+	if (V3D_GAME_IN_HEADER(v3d) && V3D_TOOL_IN_HEADER(v3d)) {
 		return;
 	}
 
@@ -4574,7 +4574,7 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	 * Com "Game Controls in Header" o grupo vai para o cabeçalho: o bloco só é medido e
 	 * descartado, para o resto da barra continuar no mesmo lugar. */
 	{
-		const bool game_in_header = (v3d->flag2 & V3D_GAME_CONTROLS_IN_HEADER) != 0;
+		const bool game_in_header = V3D_GAME_IN_HEADER(v3d);
 		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
 		int end_x = x, end_y = y;
 
@@ -4617,6 +4617,10 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		}
 
 		x = end_x + UI_UNIT_X / 3;
+	}
+
+	if (V3D_TOOL_IN_HEADER(v3d)) {
+		return;
 	}
 
 	block = UI_block_begin(C, ar, "view3d_floating_controls", UI_EMBOSS);

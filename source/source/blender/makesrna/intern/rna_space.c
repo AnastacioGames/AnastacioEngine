@@ -425,6 +425,52 @@ static void rna_SpaceView3D_realtime_viewport_update(Main *bmain,
 	}
 }
 
+/* A opção antiga (os dois grupos juntos) vira as duas novas na primeira mudança. */
+static void rna_SpaceView3D_split_legacy_header_controls(View3D *v3d)
+{
+	if (v3d->flag2 & V3D_FLOATING_CONTROLS_IN_HEADER) {
+		v3d->flag2 &= ~V3D_FLOATING_CONTROLS_IN_HEADER;
+		v3d->flag2 |= V3D_GAME_CONTROLS_IN_HEADER | V3D_TOOL_CONTROLS_IN_HEADER;
+	}
+}
+
+static bool rna_SpaceView3D_game_controls_in_header_get(PointerRNA *ptr)
+{
+	return V3D_GAME_IN_HEADER((View3D *)ptr->data);
+}
+
+static void rna_SpaceView3D_game_controls_in_header_set(PointerRNA *ptr, bool value)
+{
+	View3D *v3d = ptr->data;
+	rna_SpaceView3D_split_legacy_header_controls(v3d);
+	SET_FLAG_FROM_TEST(v3d->flag2, value, V3D_GAME_CONTROLS_IN_HEADER);
+}
+
+static bool rna_SpaceView3D_tool_controls_in_header_get(PointerRNA *ptr)
+{
+	return V3D_TOOL_IN_HEADER((View3D *)ptr->data);
+}
+
+static void rna_SpaceView3D_tool_controls_in_header_set(PointerRNA *ptr, bool value)
+{
+	View3D *v3d = ptr->data;
+	rna_SpaceView3D_split_legacy_header_controls(v3d);
+	SET_FLAG_FROM_TEST(v3d->flag2, value, V3D_TOOL_CONTROLS_IN_HEADER);
+}
+
+static bool rna_SpaceView3D_floating_controls_in_header_get(PointerRNA *ptr)
+{
+	View3D *v3d = ptr->data;
+	return V3D_GAME_IN_HEADER(v3d) && V3D_TOOL_IN_HEADER(v3d);
+}
+
+static void rna_SpaceView3D_floating_controls_in_header_set(PointerRNA *ptr, bool value)
+{
+	View3D *v3d = ptr->data;
+	v3d->flag2 &= ~V3D_FLOATING_CONTROLS_IN_HEADER;
+	SET_FLAG_FROM_TEST(v3d->flag2, value, V3D_GAME_CONTROLS_IN_HEADER | V3D_TOOL_CONTROLS_IN_HEADER);
+}
+
 static void rna_SpaceView3D_lock_camera_and_layers_set(PointerRNA *ptr, bool value)
 {
 	View3D *v3d = (View3D *)(ptr->data);
@@ -2710,20 +2756,32 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "show_floating_controls_in_header", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_FLOATING_CONTROLS_IN_HEADER);
+	RNA_def_property_boolean_funcs(prop, "rna_SpaceView3D_floating_controls_in_header_get",
+	                               "rna_SpaceView3D_floating_controls_in_header_set");
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop,
 	                         "Floating Controls in Header",
-	                         "Show the 3D View floating controls in the header instead of inside the viewport");
+	                         "Show both groups of 3D View floating controls in the header (game and tool controls)");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "show_game_controls_in_header", PROP_BOOLEAN, PROP_NONE);
-	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_GAME_CONTROLS_IN_HEADER);
+	RNA_def_property_boolean_funcs(prop, "rna_SpaceView3D_game_controls_in_header_get",
+	                               "rna_SpaceView3D_game_controls_in_header_set");
 	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 	RNA_def_property_ui_text(prop,
 	                         "Game Controls in Header",
-	                         "Show only the game buttons (Cook, Play, Standalone, lock, console) in the header; "
-	                         "the other floating controls stay inside the viewport");
+	                         "Show the game buttons (Cook, Play, Standalone, lock, console) in the header "
+	                         "instead of inside the viewport");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "show_tool_controls_in_header", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_funcs(prop, "rna_SpaceView3D_tool_controls_in_header_get",
+	                               "rna_SpaceView3D_tool_controls_in_header_set");
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop,
+	                         "Tool Controls in Header",
+	                         "Show the tool buttons (mode, pivot, snapping, gizmos, shading) in the header "
+	                         "instead of inside the viewport");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "show_floating_debug_controls", PROP_BOOLEAN, PROP_NONE);

@@ -541,6 +541,11 @@ void uiTemplateHeader3D_controls(uiLayout *layout, struct bContext *C)
 	view3d_header_tool_controls(row, C);
 }
 
+void uiTemplateHeader3D_tool_controls(uiLayout *layout, struct bContext *C)
+{
+	view3d_header_tool_controls(uiLayoutRow(layout, true), C);
+}
+
 void uiTemplateHeader3D_game_controls(uiLayout *layout, struct bContext *C)
 {
 	Scene *scene = CTX_data_scene(C);
