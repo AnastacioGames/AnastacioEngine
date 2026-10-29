@@ -100,8 +100,8 @@ static int node_shader_gpu_bsdf_principled(GPUMaterial *mat, bNode *node, bNodeE
 	GPUNodeLink *env_cc_mirror;
 	if (coat_on) {
 		GPUNodeLink *cc_rough = in[13].link ? in[13].link : GPU_uniform(in[13].vec);
-		GPUNodeLink *cc_diffuse, *cc_flag;
-		node_shader_gpu_world_env(mat, cc_rough, own_cc_normal ? NULL : in[18].link, &env_cc_mirror, &cc_diffuse, &cc_flag);
+		GPUNodeLink *cc_diffuse;
+		node_shader_gpu_world_env(mat, cc_rough, own_cc_normal ? NULL : in[18].link, &env_cc_mirror, &cc_diffuse, NULL);
 	}
 	else {
 		GPU_link(mat, "set_rgba_zero", &env_cc_mirror);
