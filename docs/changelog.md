@@ -51,6 +51,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Determinismo: cena `tools/debug/cenas/criar_cena_determinismo_fisica.py` (64 corpos convexos e compound sobre
   trimesh, `-g fixed_timestep 1`, posições no quadro 400) deu arquivo idêntico em 2 rodadas serial e 3 paralelas.
 
+## 2026-10-29 - Envio de luz por objeto sem repetição (`abc20326`)
+
+- IES: sem lâmpada IES nos slots, `unfiesinfo` recebe zeros uma vez por programa (`GPU_shader_uniform_cache_tag`) em vez de dois vetores sem cache em todo desenho. Com IES, igual a antes.
+- Texturas de sombra: registro do que cada unidade tem durante a passada (`GPU_texture_bind_cached`/`GPU_texture_unit_clear_cached`), zerado em `KX_Scene::RenderBuckets` e antes de cada chamada do viewport do editor (que fica no comportamento antigo).
+- RX 6800M, 900 objetos/8 luzes: `lightUniforms` 5400 → 4 por quadro; quadro −5,3% (1 material) e −4,1% (N materiais), melhor em 7 de 8 pares; p95 sem efeito. Capturas antes/depois idênticas pixel a pixel nas cenas pbr, de sombra (`tools/debug/cenas/criar_cena_sombras_ab.py`: CSM, spot, point, colorida, materiais clássicos) e IES (`tools/create_ies_test.py`, point e spot). Aceito com janela. Não testado: VSM, overlay, outras GPUs.
+
 ## 2026-10-29 - Telas internas do jogo criadas sob demanda (VRAM)
 
 - `RAS_ICanvas` criava as 9 telas internas no tamanho da janela de uma vez (filtros, olhos esquerdo/direito, profundidade,

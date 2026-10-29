@@ -94,6 +94,9 @@ def lamp(name, kind, loc, target, energy, **kw):
     la.energy = energy
     la.use_shadow = True
     la.shadow_buffer_size = 1024
+    # Bias padrao deixa listras (acne) no chao de 32 m com mapa de 1024.
+    la.shadow_buffer_bias = 2.0
+    la.shadow_buffer_slope_bias = 0.5
     for k, v in kw.items():
         setattr(la, k, v)
     ob = bpy.data.objects.new(name, la)
