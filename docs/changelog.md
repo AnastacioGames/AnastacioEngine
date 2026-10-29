@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-29 - Cache de shaders do usuário descarta binários sem uso
+
+- O cache do usuário (`%LOCALAPPDATA%\AnastacioEngine\ShaderCache\<jogo>-<hash>.shaders`) só crescia: era lido
+  inteiro, ficava todo na RAM durante o jogo e era regravado com tudo, inclusive binários de versões antigas dos
+  shaders. Nesta máquina a pasta tinha 5 GB; o do RolimaRacer, 778 MB com 2583 binários.
+- Formato `ANASHAD2`: contador de aberturas no cabeçalho e, por binário, a abertura em que foi usado. Binário sem
+  uso por 8 aberturas sai; se voltar a ser preciso, compila no primeiro desenho e retorna. Fora isso, só o
+  contador do cabeçalho é atualizado no lugar (regravação inteira só quando algo sai ou um carimbo envelhece).
+  Arquivos `ANASHAD1` são lidos e regravados no formato novo uma vez.
+- Teste: 1 abertura com salt A + 11 com salt B: os 7 binários de A saem na 9ª (1,3 → 0,7 MB); migração do formato
+  antigo conferida. A/B, cena de 900 materiais, mesmo exe e salt, 4 rodadas alternadas: cache inchado (263 MB) x
+  enxuto (24 MB): pronto **5,87 → 4,22 s**, RAM privada **1214 → 1013 MB**.
+
 ## 2026-10-29 - Principled BSDF: Multiscatter GGX e verniz refletindo o ambiente (branch `bsdf-energia`)
 
 - Tabela de BRDF do ambiente 64×64 RGBA16F (`gpu_brdf_lut.h`, gerada por `tools/debug/bsdf/integrar_brdf.py`), textura global criada em `GPU_invalid_tex_init` (`6d40afa9`). Canais `(A, B, Ecc, 0)`; detalhes e erros em [bsdf-energia.md](bsdf-energia.md).

@@ -58,7 +58,13 @@ static const uint32_t kindHull = 1;
 static const uint32_t kindShader = 2;
 static const uint32_t kindMesh = 3;
 static const uint32_t kindBvh = 4;
-static const char userMagic[8] = {'A', 'N', 'A', 'S', 'H', 'A', 'D', '1'};
+// User cache shader record that also keeps the open (see userOpens) it was last used in.
+static const uint32_t kindShaderIdle = 5;
+static const char userMagic[8] = {'A', 'N', 'A', 'S', 'H', 'A', 'D', '2'};
+static const char userMagicOld[8] = {'A', 'N', 'A', 'S', 'H', 'A', 'D', '1'};
+/* A shader left unused for this many opens leaves the user cache (it grew forever: binaries of old shader
+ * versions stayed). One that is needed again compiles when first drawn and comes back. */
+static const uint32_t maxIdleOpens = 8;
 
 // Key: hash of the vertex bytes and the vertex count.
 typedef std::pair<uint64_t, uint32_t> Key;
@@ -71,6 +77,9 @@ struct Shader
 	std::vector<char> data;
 	// From or for the user shader cache.
 	bool user;
+	// User cache: open it was last used in; used: found or added in this open.
+	uint32_t lastOpen;
+	bool used;
 };
 static std::map<uint64_t, Shader> shaders;
 static std::map<uint64_t, std::vector<char> > meshes;
@@ -82,6 +91,10 @@ static bool cooking = false;
 // Exported game: its own shaders go to this file (empty otherwise).
 static std::string userPath;
 static uint64_t device = 0;
+// User cache: opens counted in its header (this one included).
+static uint32_t userOpens = 0;
+// Read from the old format (no open count): rewritten whole once.
+static bool userOldFormat = false;
 static bool warmUp = false;
 static unsigned int numLoaded = 0, numHits = 0, numAdded = 0;
 static unsigned int numShadersLoaded = 0, numShaderHits = 0, numShadersAdded = 0;
@@ -133,10 +146,16 @@ static void ReadRecords(FILE *file, bool user)
 			hulls[Key(hash, count1)] = std::move(points);
 			++numLoaded;
 		}
-		else if (kind == kindShader) {
+		else if (kind == kindShader || (kind == kindShaderIdle && user)) {
+			uint32_t lastOpen = userOpens;
+			if (kind == kindShaderIdle && fread(&lastOpen, 4, 1, file) != 1) {
+				break;
+			}
 			Shader& shader = shaders[hash];
 			shader.format = count1;
 			shader.user = user;
+			shader.lastOpen = lastOpen;
+			shader.used = false;
 			shader.data.resize(count2);
 			if (fread(shader.data.data(), 1, count2, file) != count2) {
 				shaders.erase(hash);
@@ -207,9 +226,17 @@ static void OpenUserCache(const char *gamePath)
 	}
 	char head[8];
 	uint64_t fileDevice;
-	if (fread(head, 1, 8, file) == 8 && memcmp(head, userMagic, 8) == 0 && fread(&fileDevice, 8, 1, file) == 1 &&
+	if (fread(head, 1, 8, file) == 8 && (memcmp(head, userMagic, 8) == 0 || memcmp(head, userMagicOld, 8) == 0) &&
+	    fread(&fileDevice, 8, 1, file) == 1 &&
 	    fileDevice == device)
 	{
+		uint32_t opens = 0;
+		if (memcmp(head, userMagic, 8) == 0 && fread(&opens, 4, 1, file) != 1) {
+			fclose(file);
+			return;
+		}
+		userOpens = opens + 1;
+		userOldFormat = memcmp(head, userMagicOld, 8) == 0;
 		ReadRecords(file, true);
 		warmUp = false;
 	}
@@ -260,6 +287,8 @@ void Open(const std::string& mainFile, unsigned long long deviceKey)
 	filePath.clear();
 	userPath.clear();
 	record = cooking = warmUp = false;
+	userOpens = 0;
+	userOldFormat = false;
 	device = deviceKey;
 	if (mainFile.empty()) {
 		return;
@@ -309,7 +338,8 @@ static bool WriteFile(const std::string& path, bool user)
 	bool ok = file != nullptr;
 	if (ok) {
 		if (user) {
-			ok = fwrite(userMagic, 1, 8, file) == 8 && fwrite(&device, 8, 1, file) == 1;
+			ok = fwrite(userMagic, 1, 8, file) == 8 && fwrite(&device, 8, 1, file) == 1 &&
+			     fwrite(&userOpens, 4, 1, file) == 1;
 		}
 		else {
 			const uint32_t version = sizeof(btScalar);
@@ -338,9 +368,14 @@ static bool WriteFile(const std::string& path, bool user)
 			if (user && !item.second.user) {
 				continue;
 			}
+			const uint32_t lastOpen = item.second.used ? userOpens : item.second.lastOpen;
+			if (user && userOpens - lastOpen > maxIdleOpens) {
+				continue;
+			}
 			const uint32_t size = (uint32_t)item.second.data.size();
-			ok = ok && fwrite(&kindShader, 4, 1, file) == 1 && fwrite(&item.first, 8, 1, file) == 1 &&
-			     fwrite(&item.second.format, 4, 1, file) == 1 && fwrite(&size, 4, 1, file) == 1 &&
+			ok = ok && fwrite(user ? &kindShaderIdle : &kindShader, 4, 1, file) == 1 &&
+			     fwrite(&item.first, 8, 1, file) == 1 && fwrite(&item.second.format, 4, 1, file) == 1 &&
+			     fwrite(&size, 4, 1, file) == 1 && (!user || fwrite(&lastOpen, 4, 1, file) == 1) &&
 			     fwrite(item.second.data.data(), 1, size, file) == size;
 		}
 		ok = (fclose(file) == 0) && ok;
@@ -356,6 +391,34 @@ static bool WriteFile(const std::string& path, bool user)
 		CM_Warning("[Cooked] could not write " << path);
 	}
 	return ok;
+}
+
+/** The whole user cache is rewritten only when a shader leaves it or a used one has an old stamp (refreshed
+ *  halfway, so a game played often doesn't rewrite it on every close). */
+static bool UserCacheStale()
+{
+	if (userOldFormat) {
+		return true;
+	}
+	for (const auto& item : shaders) {
+		const Shader& shader = item.second;
+		if (shader.user && userOpens - shader.lastOpen > (shader.used ? maxIdleOpens / 2 : maxIdleOpens)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/// Otherwise only the open count in the header changes, written in place.
+static void WriteUserOpens()
+{
+	FILE *file = BLI_fopen(userPath.c_str(), "r+b");
+	if (file) {
+		if (fseek(file, 16, SEEK_SET) != 0 || fwrite(&userOpens, 4, 1, file) != 1) {
+			CM_Warning("[Cooked] could not update " << userPath);
+		}
+		fclose(file);
+	}
 }
 
 void Close()
@@ -378,7 +441,7 @@ void Close()
 		WriteFile(filePath, false);
 	}
 	// Written after a warm-up even when empty, so it isn't done again on every start.
-	if (!userPath.empty() && (numShadersAdded || warmUp)) {
+	if (!userPath.empty() && (numShadersAdded || warmUp || UserCacheStale())) {
 		char dir[FILE_MAX];
 		BLI_split_dir_part(userPath.c_str(), dir, sizeof(dir));
 		BLI_dir_create_recursive(dir);
@@ -387,6 +450,9 @@ void Close()
 		if (BLI_exists(marker.c_str())) {
 			BLI_delete(marker.c_str(), false, false);
 		}
+	}
+	else if (!userPath.empty() && userOpens) {
+		WriteUserOpens();
 	}
 	hulls.clear();
 	shaders.clear();
@@ -436,6 +502,7 @@ const void *FindShader(unsigned long long key, unsigned int *format, int *size)
 		return nullptr;
 	}
 	++numShaderHits;
+	it->second.used = true;
 	*format = it->second.format;
 	*size = (int)it->second.data.size();
 	return it->second.data.data();
@@ -449,6 +516,8 @@ void AddShader(unsigned long long key, unsigned int format, const void *data, in
 	}
 	Shader& shader = shaders[key];
 	shader.user = !userPath.empty();
+	shader.lastOpen = userOpens;
+	shader.used = true;
 	// A binary the driver rejected is replaced by the new one.
 	shader.format = format;
 	shader.data.assign((const char *)data, (const char *)data + size);
