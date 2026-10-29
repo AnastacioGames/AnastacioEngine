@@ -4571,8 +4571,10 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	 * Botão desabilitado (o grupo fora do Object Mode, ou o Cook sem .blend salvo) é desenhado
 	 * com alpha 0.5, então sempre pinta um fundo opaco antes
 	 * para o texto da viewport (ex.: "(1) Armature") não vazar por trás.
-	 * Com "Game Controls in Header" o grupo vai para o cabeçalho e aqui fica só o resto. */
-	if ((v3d->flag2 & V3D_GAME_CONTROLS_IN_HEADER) == 0) {
+	 * Com "Game Controls in Header" o grupo vai para o cabeçalho: o bloco só é medido e
+	 * descartado, para o resto da barra continuar no mesmo lugar. */
+	{
+		const bool game_in_header = (v3d->flag2 & V3D_GAME_CONTROLS_IN_HEADER) != 0;
 		const bool game_ok = (CTX_data_mode_enum(C) == CTX_MODE_OBJECT);
 		int end_x = x, end_y = y;
 
@@ -4593,7 +4595,11 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		UI_block_layout_resolve(block, &end_x, &end_y);
 		UI_block_end(C, block);
 
-		if (end_x > x) {
+		if (game_in_header) {
+			BLI_remlink(&ar->uiblocks, block);
+			UI_block_free(C, block);
+		}
+		else if (end_x > x) {
 			bTheme *btheme = UI_GetTheme();
 			unsigned char col[4];
 
@@ -4606,7 +4612,9 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 			                         0.2f * U.widget_unit);
 			glDisable(GL_BLEND);
 		}
-		UI_block_draw(C, block);
+		if (!game_in_header) {
+			UI_block_draw(C, block);
+		}
 
 		x = end_x + UI_UNIT_X / 3;
 	}
