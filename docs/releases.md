@@ -82,7 +82,11 @@ Resultados:
 - Zip extraído em pasta limpa: `blender.crt/` com manifesto, `web/runtime`, `0.6.1` no executável, editor `-b` criou a cena de teste e o runtime rodou no modo Fixed. `check_docs.py --fix`: 0 erros.
 - Hashes juntados em `SHA256SUMS.txt`; README com os links 0.6.1.
 
-Aberto: Wine não testado com o build final (pacote `D:\wine_timing`).
+Wine (2026-10-28, notebook Linux, wine 9.0, zip Windows publicado, [timing_linux_result.txt](../timing_linux_result.txt)):
+modo Fixed sem câmera lenta a 60 e 120 fps. O sleep simples treme a 120 fps (`step_cv` 5,4 com timer de 1 ms e
+11,1 com 15 ms, passo de até 4×); o spin/sleep (`mix`, padrão) fica em 0,8 e 1,9. No modo legado o sleep simples
+deixa o jogo 1% (60 fps) a 3% (120 fps) mais lento; o `mix` não. O editor do pacote estava aberto durante o
+teste, o que pode explicar o `step_cv` 1,3–2,6 do Linux nativo a 120 fps (antes 0,3).
 
 Antes pendente: Wine, pacotes Windows (o runtime Web pode ser copiado de `build-web-release/bin` do Linux),
 `SHA256SUMS.txt` com os quatro arquivos, README/site e publicação.
