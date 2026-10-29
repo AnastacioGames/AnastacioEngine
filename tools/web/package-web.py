@@ -1055,7 +1055,7 @@ __PERF_SCRIPT__
 """
 
 
-SERVE_PY = '''#!/usr/bin/env python3
+SERVE_PY = r'''#!/usr/bin/env python3
 """Servidor local para testar o pacote Web: python serve.py [porta] (0 = porta livre)"""
 import functools
 import http.server
@@ -1094,9 +1094,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
                     with open(os.path.join(folder, name), "w", encoding="utf-8", newline="") as f:
                         f.write(text)
             with open(os.path.join(folder, "device.txt"), "w", encoding="utf-8") as f:
-                f.write(data.get("ua", "") + "
-" + "GPU: " + data.get("gpu", "") + "
-")
+                f.write(data.get("ua", "") + "\n" + "GPU: " + data.get("gpu", "") + "\n")
             if REPORT_TOOL:
                 subprocess.run([sys.executable, REPORT_TOOL, folder], capture_output=True)
             print("[report] " + folder, flush=True)
