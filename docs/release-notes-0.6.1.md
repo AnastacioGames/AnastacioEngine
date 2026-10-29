@@ -31,7 +31,9 @@ Fixed Timestep e menos custo de GPU em placas integradas.
 - UI Tree: Auto Arrange mantém o layout da tela e só organiza os nós de ação.
 - Web: botões de toque do topo abaixo do botão Controls e do notch; botão de tela cheia respeita o notch;
   tela de carregamento e relatório mostram a GPU do WebGL.
-- Gravação de tela: o x264 usa vários núcleos e um preset rápido de verdade.
+- **Gravação de tela (Rec):** o codificador de vídeo usava só um núcleo, e o vídeo gravado saía com ~7 fps.
+  Agora usa vários núcleos e o preset rápido de verdade: no RolimaRacer (1280x720) o vídeo foi de ~7 para
+  ~48 fps (136 ms → ~20 ms por quadro). Vale também para o render de vídeo do editor.
 - Interface traduzida (pt_BR, es, ru) para as opções novas de lens flare e estrelas.
 
 ## Downloads
