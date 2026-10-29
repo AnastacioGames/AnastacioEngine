@@ -478,6 +478,10 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 - **Sombra de CSM no Principled:** feita em 2026-10-26 (primeiro sol com cascata por draw, sem VSM nem sombra
   colorida no slot CSM); falta aceite visual com janela. PCSS já funciona nos dois caminhos (2026-10-25). Menu Hard/Soft/Realistic e PCSS
   virando sombra dura em Low/Very Low feitos em 2026-10-26.
+- **Principled BSDF: energia e verniz** (branch `bsdf-energia`, [doc](bsdf-energia.md)): Multiscatter GGX e
+  clearcoat refletindo o ambiente feitos e medidos em 2026-10-29. Falta: aceite visual com janela (verniz dos carros
+  do RolimaRacer), header 64×64 e doc do Codex, merge no main. Opcional: leitura só de reflexo para o verniz
+  (−0,15 ms em 1080p) se pesar na iGPU.
 - **Nós de material Game × Cycles × BI** ([matriz](node-material-support.md)): fases 1–6 feitas e validadas.
   Sem suporte: Point Density e Script.
 - **Material rápido (receitas de nós):** falta o usuário conferir no editor e no jogo

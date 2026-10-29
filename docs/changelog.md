@@ -14,6 +14,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Distribution **Multiscatter GGX** passa a valer no jogo (`125b8b1c`): `ms = 1 + Cspec0·(1−Ess)/Ess` com `Ess = A+B`, um só fator para luzes e ambiente (forma do Filament, aproximação, não o random walk do Cycles). No furnace o metal rugoso deixa de escurecer. GGX (padrão) não muda.
 - Clearcoat reflete World, sondas e SH9 com a própria roughness e normal (`9204bd2a`): `env_cc_mirror·Ecc·0,25·clearcoat`, somado. Segunda leitura de ambiente só quando Clearcoat > 0 ou ligado.
 - `gpu_codegen.c`: limite de parâmetros por função GLSL 32 → 48 e o parser para com aviso em vez de escrever fora do vetor; função acima do limite é descartada (`fde36177`, `0cc30d8f`). O Principled passou de 32 e derrubava a cena HDRI+SSGI.
+- Custo medido em A/B no mesmo binário (RX 6800M, 1080p, 24 esferas cobrindo a tela, GPU do passe de malhas): GGX 1,34 ms; Multiscatter 1,37 ms (+0,03); Clearcoat 1 em todas 1,60 ms (+0,26, dos quais 0,15 é a segunda leitura de ambiente). Escala ~16x num HD 4400: ~+0,5 ms Multiscatter e ~+4 ms com verniz em tela cheia. RolimaRacer e YoFrankie abrem sem falha de shader. Falta aceite visual com janela.
 
 ## 2026-10-29 - Animações podem ignorar o time scale
 
