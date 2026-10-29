@@ -71,6 +71,8 @@ Resultados:
    `3cb1ade9…`). Export **Universal com Compile Scripts** de um projeto de teste: `data/` só com `.rasec`,
    `.cooked` e `.pyc`; `test_universal_linux.py --run` OK e o jogo rodou o módulo a partir do `.pyc`
    (`MARKER_PYC frames=60`). Lado Windows do Universal foi um `.exe` falso.
+7. Com janela (Wayland): editor do pacote abre (binário `AnastacioEngine 0.6.1`); jogo de teste no modo Fixed
+   rodou 8 s sem câmera lenta (`real=8.004`, `step_cv=0.3`).
 
 Pendente: Wine, pacotes Windows (o runtime Web pode ser copiado de `build-web-release/bin` do Linux),
 `SHA256SUMS.txt` com os quatro arquivos, README/site e publicação.
