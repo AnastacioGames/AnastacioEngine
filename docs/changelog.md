@@ -58,6 +58,37 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Estrelas realistas (`world_stars_real`): retorna antes de tudo de dia (`night <= 0`); as 58 estrelas nomeadas viram direções pré-calculadas (o laço por pixel ficou sem trigonometria); o ruído da Via Láctea só roda perto da faixa. `do_sky_simple`/`do_sky_atmospheric` pulam as estrelas quando `env_sky > 0.001` em vez de multiplicar por zero.
 - Validado: `glslangValidator` sem erro nos três shaders (biblioteca de material com `SKY_LOW`/`SKY_VERY_LOW`). Falta: build no CI e o usuário medir FPS e conferir o céu noturno no jogo real.
 
+## 2026-10-27 - Composicao inicial do splash 0.6.0 no Rolima Racer
+
+- Nova proposta independente `criar_splash_rolima_surpresa.py`: camera rente ao
+  chao baseada no enquadramento Claude B escolhido pelo usuario, horizonte
+  inclinado, spray de agua, nevoa/Sky Layers e impacto eletrico. Cena anterior arquivada com scripts/captura em
+  `artifacts/splash-0.6.0-aprovada/`, hash do `.range` identico ao original.
+- Segunda proposta de camera: angulo traseiro pelo lado esquerdo, mais baixo e
+  proximo, lente de 30 mm e piloto deslocado para a direita da composicao.
+- Particulas das quatro rodas na copia: velocidade Z de 1,5 para 0,1 e rastro
+  dirigido para tras (Y=-1,2), com cone levemente descendente.
+- Fragmentos suspensos removidos da composicao apos retorno visual do usuario;
+  asset de madeira quebrada ainda nao havia sido testado no jogo.
+- Filtro 2D custom de velocidade: desfoque radial discreto nas bordas, mascara
+  do piloto para o enquadramento atual e tecla B para comparar ligado/desligado.
+- Raio localizado a frente do piloto e pequena explosao nativa com clarao:
+  primeiro evento em 2 s, ciclo ajustado para 10 s e cinco pulsos do raio por evento.
+  R dispara manualmente. Impulso zero; copia original do jogo preservada.
+- Direcao de arte Codex: ceu diurno atmosferico herdado desligado, ceu/nuvens
+  de tempestade e iluminacao azul/ambar. Desfoque radial aumentado para 0,10
+  com 16 amostras e riscos animados que independem de movimento real. DOF e
+  circulos de chuva reduzidos. Copia anterior preservada nos artefatos.
+  Filtro compilado no player com log vazio; captura nativa `captura-arte.png`
+  conferida, com rastros visiveis no cenario e piloto preservado pela mascara.
+- Gerador `tools/debug/cenas/criar_splash_rolima_060.py`: cena separada com Pista 1,
+  carrinho, Fabio em pose de pilotagem e fragmentos da cerca do jogo. Sem salvar
+  sobre o projeto original; texturas locais encontradas. Recursos nativos de chuva,
+  pocas/SSR, relampagos e pos-processamento. [Uso e limites](splash-0.6.0.md).
+- Copia reaberta e controlador executado por 120 quadros no player `--server`;
+  marcador de conclusao registrado. Carregamento inicial demorado. Validacao visual,
+  ajuste de composicao e captura final pendentes; splash instalado preservado.
+
 ## 2026-10-27 - Preparação da 0.6.0 e teste do pacote Linux
 
 - Versão 0.6.0 em `ANASTACIO_VERSION_STRING`, About e scripts de release. A 0.5.4 Linux não sai; a 0.6.0 a substitui.
