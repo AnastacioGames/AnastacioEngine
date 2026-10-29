@@ -1322,6 +1322,20 @@ bool GPU_shader_uniform_int_cached(GPUShader *shader, int location, int value)
 	return true;
 }
 
+/* For values the cache can't hold (arrays): the caller names what it sent with a tag of its own
+ * (not 1..16 nor -1, those are the cached setters' lengths). Returns true when the location doesn't
+ * hold that tag yet, so the caller must send it. Tag 0 forgets the value. */
+bool GPU_shader_uniform_cache_tag(GPUShader *shader, int location, float tag)
+{
+	float *entry = shader_uniform_cache_entry(shader, location);
+	if (!entry)
+		return true;
+	if (tag != 0.0f && entry[0] == tag)
+		return false;
+	entry[0] = tag;
+	return true;
+}
+
 void GPU_shader_uniform_vector_int(GPUShader *UNUSED(shader), int location, int length, int arraysize, const int *value)
 {
 	if (location == -1)
@@ -1394,6 +1408,7 @@ void GPU_shader_uniform_texture(GPUShader *UNUSED(shader), int location, GPUText
 		glBindTexture(target, bindcode);
 	else
 		GPU_invalid_tex_bind(target);
+	GPU_texture_unit_cache_note(number, bindcode != 0 ? bindcode : (unsigned int)-1);
 	GPU_render_profile_count(GPU_RENDER_SAMPLER);
 	glUniform1i(location, number);
 	if (GPU_texture_unit_fixed_function(number)) glEnable(target);

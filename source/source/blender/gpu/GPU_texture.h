@@ -114,6 +114,10 @@ int GPU_texture_ref_count(GPUTexture *tex);
 
 void GPU_texture_bind(GPUTexture *tex, int number);
 void GPU_texture_unbind(GPUTexture *tex);
+bool GPU_texture_bind_cached(GPUTexture *tex, int number);
+bool GPU_texture_unit_clear_cached(int number);
+void GPU_texture_unit_cache_note(int number, unsigned int bindcode);
+void GPU_texture_unit_cache_reset(void);
 int GPU_texture_bound_number(GPUTexture *tex);
 bool GPU_texture_unit_fixed_function(int number);
 

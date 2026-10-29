@@ -142,6 +142,7 @@ void GPU_shader_uniform_int(GPUShader *shader, int location, int value);
 void GPU_shader_uniform_float(GPUShader *shader, int location, float value);
 bool GPU_shader_uniform_vector_cached(GPUShader *shader, int location, int length, const float *value);
 bool GPU_shader_uniform_int_cached(GPUShader *shader, int location, int value);
+bool GPU_shader_uniform_cache_tag(GPUShader *shader, int location, float tag);
 void GPU_shader_geometry_stage_primitive_io(GPUShader *shader, int input, int output, int number);
 
 int GPU_shader_get_attribute(GPUShader *shader, const char *name);

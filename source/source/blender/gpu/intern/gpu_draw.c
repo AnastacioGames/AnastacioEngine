@@ -2128,6 +2128,8 @@ static int gpu_object_material_bind_impl(int nr, void *attribs)
 			auto_bump_scale = GMS.gob->derivedFinal != NULL ? GMS.gob->derivedFinal->auto_bump_scale : 1.0f;
 			GPU_material_bind_uniforms(gpumat, GMS.gob->obmat, GMS.gviewmat, GMS.gob->col, GMS.gob->lay, auto_bump_scale, &partile_info, object_info);
 			if (GMS.scene_lights) {
+				/* The viewport binds textures raw between materials: bind the lamps every time. */
+				GPU_texture_unit_cache_reset();
 				GPU_material_bind_shadow_lamps(gpumat, GMS.shadowlamps);
 				GPU_material_bind_scene_lights(gpumat, GMS.lights);
 			}

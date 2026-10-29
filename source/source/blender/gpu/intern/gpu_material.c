@@ -6062,8 +6062,8 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 				if (!BLI_findptr(&material->lamps, cascade[c], offsetof(LinkData, data))) {
 					add_user_list(&material->lamps, cascade[c]);
 				}
-				GPU_texture_bind(cascade[c]->depthtex, csmunit[c]);
-				LIGHT_GL_CALLS += 1 + GPU_shader_uniform_int_cached(shader, material->csmmaploc[c], csmunit[c]);
+				LIGHT_GL_CALLS += GPU_texture_bind_cached(cascade[c]->depthtex, csmunit[c]) +
+				                  GPU_shader_uniform_int_cached(shader, material->csmmaploc[c], csmunit[c]);
 			}
 			if (material->csmpersmatloc != -1) {
 				float persmat[2][16];
@@ -6113,10 +6113,10 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			}
 
 			if (material->shadowmaploc[i] != -1) {
-				/* The bind stays every draw (other draws reuse the unit); the sampler uniform only
-				 * when it changes. */
-				GPU_texture_bind(lamp->depthtex, texunit + i);
-				LIGHT_GL_CALLS += 1 + GPU_shader_uniform_int_cached(shader, material->shadowmaploc[i], texunit + i);
+				/* Bind and sampler uniform only when they change: the unit is shared by every draw,
+				 * so consecutive objects lit by the same lamp skip both. */
+				LIGHT_GL_CALLS += GPU_texture_bind_cached(lamp->depthtex, texunit + i) +
+				                  GPU_shader_uniform_int_cached(shader, material->shadowmaploc[i], texunit + i);
 			}
 			if (material->shadowpersmatloc[i] != -1) {
 				LIGHT_GL_CALLS += GPU_shader_uniform_vector_cached(shader, material->shadowpersmatloc[i], 16, (float *)lamp->dynpersmat);
@@ -6130,8 +6130,8 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			const bool colored = lamp->colortex && !GPU_lamp_has_point_shadow(lamp) && !csm;
 			if (colored && material->shadowcolorloc[i] != -1) {
 				const int colorunit = GPU_max_textures() - 2 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1 - i;
-				GPU_texture_bind(lamp->colortex, colorunit);
-				LIGHT_GL_CALLS += 1 + GPU_shader_uniform_int_cached(shader, material->shadowcolorloc[i], colorunit);
+				LIGHT_GL_CALLS += GPU_texture_bind_cached(lamp->colortex, colorunit) +
+				                  GPU_shader_uniform_int_cached(shader, material->shadowcolorloc[i], colorunit);
 			}
 			if (material->shadowcoloredloc[i] != -1) {
 				const float colored_f = colored ? 1.0f : 0.0f;
@@ -6162,10 +6162,7 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 			LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->shadowmaploc[i], texunit + i);
 			/* The unit may still hold a lamp depth texture from an earlier bind: in the shadow
 			 * pass that texture is the render target, so leave nothing bound there. */
-			glActiveTexture(GL_TEXTURE0 + texunit + i);
-			glBindTexture(GL_TEXTURE_2D, 0);
-			glActiveTexture(GL_TEXTURE0);
-			LIGHT_GL_CALLS += 3;
+			LIGHT_GL_CALLS += 3 * GPU_texture_unit_clear_cached(texunit + i);
 		}
 		if (!has_shadow && material->shadowcoloredloc[i] != -1) {
 			const float zero = 0.0f;
@@ -6188,12 +6185,9 @@ void GPU_material_bind_shadow_lamps(GPUMaterial *material, GPULamp * const lamps
 	if (!csm_bound && material->csmmaploc[0] != -1) {
 		/* No cascaded sun in this draw: keep the shadow samplers off unit 0 (see the unused slots above). */
 		for (int c = 0; c < 2; c++) {
-			LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->csmmaploc[c], csmunit[c]);
-			glActiveTexture(GL_TEXTURE0 + csmunit[c]);
-			glBindTexture(GL_TEXTURE_2D, 0);
+			LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->csmmaploc[c], csmunit[c]) +
+			                  3 * GPU_texture_unit_clear_cached(csmunit[c]);
 		}
-		glActiveTexture(GL_TEXTURE0);
-		LIGHT_GL_CALLS += 5;
 	}
 }
 
@@ -6383,6 +6377,9 @@ void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], con
  * skips recomputing when the light layer didn't change between objects. No-op under COMPAT,
  * where the shader doesn't declare unflightsource and every location is -1. */
 
+/* GPU_shader_uniform_cache_tag() of unfiesinfo when the program holds zeros (no IES lamp). */
+#define GPU_IES_NONE_TAG -2.0f
+
 void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight lights[GPU_MATERIAL_NUM_SCENE_LIGHTS])
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
@@ -6402,18 +6399,29 @@ void GPU_material_bind_scene_lights(GPUMaterial *material, const GPUSceneLight l
 			}
 			any |= (info[i][0] > 0.0f);
 		}
-		GPU_shader_uniform_vector(shader, material->iesinfoloc, 4, GPU_MATERIAL_NUM_SCENE_LIGHTS, &info[0][0]);
-		GPU_shader_uniform_vector(shader, material->iesaxesloc, 3, GPU_MATERIAL_NUM_SCENE_LIGHTS * 3, &axes[0][0]);
-		LIGHT_GL_CALLS += 2;
+		int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 3;
+		GPUTexture *atlas = any ? gpu_ies_atlas() : NULL;
+		if (any) {
+			GPU_shader_uniform_cache_tag(shader, material->iesinfoloc, 0.0f);
+			GPU_shader_uniform_vector(shader, material->iesinfoloc, 4, GPU_MATERIAL_NUM_SCENE_LIGHTS, &info[0][0]);
+			GPU_shader_uniform_vector(shader, material->iesaxesloc, 3, GPU_MATERIAL_NUM_SCENE_LIGHTS * 3, &axes[0][0]);
+			LIGHT_GL_CALLS += 2;
+		}
+		else if (GPU_shader_uniform_cache_tag(shader, material->iesinfoloc, GPU_IES_NONE_TAG)) {
+			/* No IES lamp in any slot: the shader reads only unfiesinfo[i].x (axes and atlas sit
+			 * behind it), so zeros go once per program instead of both arrays every draw. */
+			const float zeros[GPU_MATERIAL_NUM_SCENE_LIGHTS][4] = {{0.0f}};
+			GPU_shader_uniform_vector(shader, material->iesinfoloc, 4, GPU_MATERIAL_NUM_SCENE_LIGHTS, &zeros[0][0]);
+			LIGHT_GL_CALLS++;
+		}
 		if (material->iesatlasloc != -1) {
-			int texunit = GPU_max_textures() - GPU_MATERIAL_NUM_SHADOW_LAMPS - 3;
-			GPUTexture *atlas = any ? gpu_ies_atlas() : NULL;
+			/* Both branches point the sampler at texunit, so the cached int stays true. */
 			if (atlas) {
 				GPU_texture_bind(atlas, texunit);
 				GPU_shader_uniform_texture(shader, material->iesatlasloc, atlas);
 			}
 			else {
-				GPU_shader_uniform_int(shader, material->iesatlasloc, texunit);
+				LIGHT_GL_CALLS += GPU_shader_uniform_int_cached(shader, material->iesatlasloc, texunit);
 			}
 		}
 	}

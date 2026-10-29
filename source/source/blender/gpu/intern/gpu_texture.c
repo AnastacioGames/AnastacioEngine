@@ -1164,6 +1164,62 @@ bool GPU_texture_unit_fixed_function(int number)
 #endif
 }
 
+/* What GPU_texture_bind()/unbind()/free() and GPU_shader_uniform_texture() last left on each unit,
+ * for GPU_texture_bind_cached(). Raw glBindTexture calls elsewhere (2D filters, particles, text)
+ * don't report here, so every unit starts unknown at GPU_texture_unit_cache_reset(), which the game
+ * engine calls at the start of each bucket pass: inside a pass only these functions bind. A wrong
+ * entry can only cause a bind too many, never one missing, as long as that holds. */
+#define UNIT_CACHE_LEN 256
+static GLuint UNIT_BOUND[UNIT_CACHE_LEN];
+static bool UNIT_KNOWN[UNIT_CACHE_LEN];
+
+void GPU_texture_unit_cache_note(int number, unsigned int bindcode)
+{
+	if (number >= 0 && number < UNIT_CACHE_LEN) {
+		UNIT_BOUND[number] = bindcode;
+		UNIT_KNOWN[number] = true;
+	}
+}
+
+static void gpu_texture_unit_cache_forget(int number)
+{
+	if (number >= 0 && number < UNIT_CACHE_LEN) {
+		UNIT_KNOWN[number] = false;
+	}
+}
+
+void GPU_texture_unit_cache_reset(void)
+{
+	memset(UNIT_KNOWN, 0, sizeof(UNIT_KNOWN));
+}
+
+/* GPU_texture_bind() that skips the GL calls when the unit already holds this texture. Returns true
+ * when it bound. tex->number is set either way, GPU_texture_unbind() reads it. */
+bool GPU_texture_bind_cached(GPUTexture *tex, int number)
+{
+	if (number >= 0 && number < UNIT_CACHE_LEN && UNIT_KNOWN[number] && tex->bindcode != 0 &&
+	    UNIT_BOUND[number] == tex->bindcode && !GPU_texture_unit_fixed_function(number))
+	{
+		tex->number = number;
+		return false;
+	}
+	GPU_texture_bind(tex, number);
+	return true;
+}
+
+/* Leaves no 2D texture on the unit (the active unit goes back to 0). Returns true when it bound. */
+bool GPU_texture_unit_clear_cached(int number)
+{
+	if (number >= 0 && number < UNIT_CACHE_LEN && UNIT_KNOWN[number] && UNIT_BOUND[number] == 0) {
+		return false;
+	}
+	glActiveTexture(GL_TEXTURE0 + number);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	GPU_texture_unit_cache_note(number, 0);
+	return true;
+}
+
 void GPU_texture_bind(GPUTexture *tex, int number)
 {
 	if (number >= GPU_max_textures()) {
@@ -1186,9 +1242,12 @@ void GPU_texture_bind(GPUTexture *tex, int number)
 	if (number != 0) glActiveTexture(arbnumber);
 	if (tex->bindcode != 0) {
 		glBindTexture(tex->target_base, tex->bindcode);
+		GPU_texture_unit_cache_note(number, tex->bindcode);
 	}
-	else
+	else {
 		GPU_invalid_tex_bind(tex->target_base);
+		gpu_texture_unit_cache_forget(number);
+	}
 	if (GPU_texture_unit_fixed_function(number)) glEnable(tex->target_base);
 	if (number != 0) glActiveTexture(GL_TEXTURE0);
 
@@ -1214,6 +1273,7 @@ void GPU_texture_unbind(GPUTexture *tex)
 	glBindTexture(tex->target_base, 0);
 	if (GPU_texture_unit_fixed_function(tex->number)) glDisable(tex->target_base);
 	if (tex->number != 0) glActiveTexture(GL_TEXTURE0);
+	GPU_texture_unit_cache_note(tex->number, 0);
 
 	tex->number = -1;
 
@@ -1303,8 +1363,15 @@ void GPU_texture_free(GPUTexture *tex)
 	if (tex->refcount == 0) {
 		if (tex->fb)
 			GPU_framebuffer_texture_detach(tex);
-		if (tex->bindcode && !tex->fromblender)
+		if (tex->bindcode && !tex->fromblender) {
+			/* Deleting unbinds it, and the name can come back for another texture. */
+			for (int i = 0; i < UNIT_CACHE_LEN; i++) {
+				if (UNIT_KNOWN[i] && UNIT_BOUND[i] == tex->bindcode) {
+					UNIT_KNOWN[i] = false;
+				}
+			}
 			glDeleteTextures(1, &tex->bindcode);
+		}
 
 		MEM_freeN(tex);
 	}

@@ -111,6 +111,7 @@ extern "C" {
 }
 #include "GPU_material.h"
 #include "GPU_extensions.h"
+#include "GPU_texture.h"
 
 #include "KX_NodeRelationships.h"
 
@@ -2869,6 +2870,8 @@ void KX_Scene::RenderBuckets(const std::vector<KX_GameObject *>& objects, RAS_Ra
 		gameobj->UpdateBuckets();
 	}
 
+	/* Between passes 2D filters and others bind textures without telling GPU_texture_bind_cached(). */
+	GPU_texture_unit_cache_reset();
 	m_bucketmanager->Renderbuckets(drawingMode, cameratransform, rasty, offScreen);
 	KX_BlenderMaterial::EndFrame(rasty);
 }
