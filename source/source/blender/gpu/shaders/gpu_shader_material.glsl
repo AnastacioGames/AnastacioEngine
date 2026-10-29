@@ -3436,6 +3436,19 @@ vec2 env_brdf_approx(float NdotV, float rough)
 	return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
+/* Tabulated environment BRDF (gpu_brdf_lut.h, GPU_texture_global_brdf_lut): row = roughness,
+ * column = NdotV. .rg = split-sum (A, B) of the base lobe, .a = the lights' lobe energy. */
+vec4 env_brdf_lut(sampler2D lut, float NdotV, float rough)
+{
+	return texture2D(lut, vec2(clamp(NdotV, 0.0, 1.0), clamp(rough, 0.0, 1.0)));
+}
+
+/* Clearcoat directional albedo (GTR1, Fresnel IOR 1.5), same table, .b channel. */
+float env_cc_lut(sampler2D lut, float CNdotV, float cc_rough)
+{
+	return env_brdf_lut(lut, CNdotV, cc_rough).b;
+}
+
 void env_cube_tex(float rough, float turbid, samplerCube wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
 #if __VERSION__ >= 130

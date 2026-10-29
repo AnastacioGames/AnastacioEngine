@@ -76,6 +76,10 @@ GPUTexture *GPU_texture_from_blender(
 GPUTexture *GPU_texture_from_preview(struct PreviewImage *prv, int mipmap);
 GPUTexture *GPU_texture_create_jitter(int w);
 GPUTexture *GPU_texture_global_jitter_64(void);
+/* Principled BSDF environment table (gpu_brdf_lut.h): split-sum (A, B), clearcoat albedo and
+ * the lights' lobe energy for the Multiscatter GGX compensation. NULL when it could not be
+ * created; the node then keeps the analytic env_brdf_approx path. */
+GPUTexture *GPU_texture_global_brdf_lut(void);
 GPUTexture **GPU_texture_global_depth_ptr(void);
 void GPU_texture_set_global_depth(GPUTexture *depthtex);
 /* Game PBR screen-space refraction: copy of the scene color after the solid pass (mipmapped),
