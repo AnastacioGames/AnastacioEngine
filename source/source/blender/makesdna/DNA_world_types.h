@@ -292,6 +292,7 @@ typedef struct World {
 #define WO_SKYPAPER             (1 << 2)
 #define WO_SKYATMOSPHERIC       (1 << 3)
 #define WO_SKYATMOSPHERIC_STARS (1 << 4) // Draw stars
+#define WO_SKY_MOON_PRECOMPUTED (1 << 7) /* Reuse the visual moon's surface texture. */
 
 /* star_style */
 #define WO_STARS_SIMPLE         0

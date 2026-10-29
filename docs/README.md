@@ -85,6 +85,7 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
   entregue pela engine, salas, convites e transporte Steam opcional; primeira validação no RolimaRacer.
   [Desenvolvimento do complemento](steam-complement-development.md): build local e API de inicialização.
 - [Efeitos de câmera](camera-fx.md): efeitos e integração
+- [Efeitos pré-calculados](efeitos-precalculados.md): primeira etapa da Lua e limites de cooking.
 - [Filtros 2D custom](2d-filters.md): entradas `bgl_*`, uniforms `u_*`, erros, recompilação e modelos
   com o pipeline de renderização.
 - [Materiais de nós](node-material-support.md): estado da compatibilidade e limitações do suporte a node materials.

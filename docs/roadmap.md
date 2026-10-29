@@ -5,6 +5,12 @@ concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](..
 e detalhados no [`changelog.md`](changelog.md) (histórico antigo em [`changelog-arquivo.md`](changelog-arquivo.md)).
 Ao concluir um item, apague-o daqui e registre no changelog.
 
+## Efeitos pré-calculados
+
+- Lua: superfície opcional implementada; pendentes avaliação visual, A/B em iGPU e persistência dos
+  recursos no cooking. Estrelas/constelações e lens flare são as próximas etapas, ainda não implementadas.
+  Escopo e limites em [efeitos-precalculados.md](efeitos-precalculados.md).
+
 ## Scene Doctor: colisao simplificada (fase 1)
 
 - Regra Python implementada e validada em background: formas primitivas com encaixe >=85%, fix/revert

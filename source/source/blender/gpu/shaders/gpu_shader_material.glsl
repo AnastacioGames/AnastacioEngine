@@ -2748,6 +2748,40 @@ void sky_moon(vec3 view, vec3 sundir, float enabled, float size, float brightnes
 	moon = (col + vec3(0.6, 0.68, 0.85) * glow) * brightness * enabled * aboveHorizon;
 }
 
+/* Optional surface cache. Geometry, edge anti-aliasing, halo and World controls remain live. */
+void sky_moon_precomputed(vec4 sky, vec3 view, vec3 sundir, float enabled, float size,
+                          float brightness, float rough, float ground, sampler2D surface, out vec4 outcol)
+{
+	outcol = sky;
+	/* Match the view transform of the selected procedural sky.
+	 * Negative ground marks the atmospheric path. */
+	if (ground < 0.0) view.z /= pow(rough + 1.0, 3.0);
+	else if (view.z < 0.0 && ground == 0.0) view.z *= -1.0;
+	vec3 moonDir = normalize(-sundir);
+	float aboveHorizon = smoothstep(-0.02, 0.02, moonDir.z);
+	if (enabled * aboveHorizon <= 0.0) return;
+	vec3 v = normalize(view);
+	float ang = sqrt(2.0 * max(size * 0.05, 0.00005));
+	float align = dot(v, moonDir);
+	if (align < cos(ang * 6.0)) return;
+	vec3 t = normalize(cross(moonDir, abs(moonDir.z) < 0.99 ? vec3(0, 0, 1) : vec3(1, 0, 0)));
+	vec3 bt = cross(t, moonDir);
+	vec2 uv = vec2(dot(v, t), dot(v, bt)) / sin(ang);
+	float r2 = dot(uv, uv);
+	float edge = fwidth(length(uv)) + 0.002;
+	float disk = smoothstep(1.0 + edge, 1.0 - edge, sqrt(r2));
+	vec3 col = vec3(0.0);
+	if (r2 < 1.1) {
+		float nz = sqrt(max(1.0 - r2, 0.0));
+		float albedo = texture2D(surface, clamp(uv * 0.5 + 0.5, 0.0, 1.0)).r;
+		float limb = 0.55 + 0.45 * pow(nz, 0.35);
+		col = vec3(0.96, 0.94, 0.89) * albedo * limb * disk;
+	}
+	float d = acos(clamp(align, -1.0, 1.0)) / ang;
+	float glow = exp(-max(d - 1.0, 0.0) * 2.5) * (1.0 - disk) * 0.06;
+	outcol.rgb += (col + vec3(0.6, 0.68, 0.85) * glow) * brightness * enabled * aboveHorizon;
+}
+
 void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float sunsize,
 				  float turbid, float ground, float moonEnabled, float moonSize, float moonBrightness, float rough,
 				  vec4 hor, vec4 zen, vec4 nad, float env_sky, out vec4 outcol)

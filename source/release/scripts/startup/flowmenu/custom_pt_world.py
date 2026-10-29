@@ -466,6 +466,9 @@ class CUSTOM_PT_game_world_night(CustomWorldButtonsPanel, Panel):
         row.active = world.use_sky_moon
         row.prop(world, "moon_size", text="Size")
         row.prop(world, "moon_brightness", text="Brightness")
+        row = box.row()
+        row.active = world.use_sky_moon
+        row.prop(world, "use_moon_precomputed", text="Precomputed Surface")
 
 
 # ==============================================================================

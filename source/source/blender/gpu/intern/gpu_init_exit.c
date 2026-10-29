@@ -62,6 +62,7 @@ void GPU_exit(void)
 		gpu_debug_exit();
 	gpu_codegen_exit();
 	gpu_world_sh_exit();
+	gpu_moon_surface_exit();
 	GPU_lamp_ies_exit();
 
 	gpu_extensions_exit(); /* must come last */

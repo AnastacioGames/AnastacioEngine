@@ -84,6 +84,11 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 
 ### Render e materiais
 
+- **Lua visual pré-calculada (experimental):** opção individual no World substitui manchas/crateras
+  procedurais por textura compartilhada gerada na primeira utilização. Editor/player compilados e
+  execução conferida nos céus Procedural e Atmospheric. Sem persistência no `.cooked`, avaliação visual
+  ou ganho em iGPU validados; [escopo](docs/efeitos-precalculados.md).
+
 - O player usa OpenGL core profile; o editor fica em compatibility. No core, motion blur legado e texto de debug
   por `BLF_draw` são no-ops. Core profile é decisão de arquitetura, não ganho automático de performance.
 - Filtros 2D do jogo e efeitos multipass nativos são pipelines diferentes e se validam separadamente.

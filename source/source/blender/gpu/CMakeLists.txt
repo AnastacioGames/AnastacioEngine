@@ -58,6 +58,7 @@ set(SRC
 	intern/gpu_material.c
 	intern/gpu_material_export.c
 	intern/gpu_material_ies.c
+	intern/gpu_moon_surface.c
 	intern/gpu_select.c
 	intern/gpu_select_pick.c
 	intern/gpu_select_sample_query.c

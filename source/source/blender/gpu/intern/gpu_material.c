@@ -4492,6 +4492,15 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 				static float env_sky_values[4] = { 1.0f, 0.0f, -1.0f, -2.0f };
 				int env_sky_index = (wo->skytype & WO_SKYATMOSPHERIC_STARS) ? 1 + CLAMPIS(wo->star_style, 0, 2) : 0;
 				float *env_sky = &env_sky_values[env_sky_index];
+				GPUTexture *moonSurface = NULL;
+				GPUNodeLink *surfaceMoonEnabled = moonEnabled;
+				if ((wo->skytype & WO_SKY_MOON_PRECOMPUTED) && scene->world_sun) {
+					moonSurface = gpu_moon_surface_texture();
+					if (moonSurface) {
+						/* Keep the original path if texture allocation fails. */
+						GPU_link(mat, "set_value_zero", &moonEnabled);
+					}
+				}
 				if (wo->skytype & WO_SKYATMOSPHERIC) {
 					GPUNodeLink *rlh, *atmo;
 					gpu_world_atmosphere_links(mat, wo, &rlh, &atmo);
@@ -4500,6 +4509,14 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 				} else {
 					GPU_link(mat, "do_sky_simple", shi.view, sunDir, sunCol, sunEnergy, sunSize,
 						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(env_sky), &shi.rgb);
+				}
+
+				if (moonSurface) {
+					static float atmosphericGround = -1.0f;
+					float *moonGround = (wo->skytype & WO_SKYATMOSPHERIC) ? &atmosphericGround : &wo->ground;
+					GPU_link(mat, "sky_moon_precomputed", shi.rgb, shi.view, sunDir,
+					         surfaceMoonEnabled, moonSize, moonBrightness, blend, GPU_uniform(moonGround),
+					         GPU_dynamic_texture(moonSurface, GPU_DYNAMIC_SAMPLER_2DBUFFER, NULL), &shi.rgb);
 				}
 
 				if (GPUWorld.mistype == 3) { // use Height Fog

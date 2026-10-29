@@ -32,4 +32,8 @@ void gpu_debug_exit(void);
 /* gpu_material.c */
 void gpu_world_sh_exit(void);
 
+/* gpu_moon_surface.c: owned by the GPU lifetime, shared by all worlds. */
+struct GPUTexture *gpu_moon_surface_texture(void);
+void gpu_moon_surface_exit(void);
+
 #endif  /* __GPU_PRIVATE_H__ */

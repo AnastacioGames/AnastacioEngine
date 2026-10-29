@@ -1772,10 +1772,16 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Moon", "Render a visual moon opposite the World Sun without lighting the scene");
 	RNA_def_property_update(prop, 0, "rna_World_update");
 
+	prop = RNA_def_property(srna, "use_moon_precomputed", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "skytype", WO_SKY_MOON_PRECOMPUTED);
+	RNA_def_property_ui_text(prop, "Precomputed Surface",
+	                         "Reuse a 512 pixel moon surface generated at startup; finite resolution and CPU noise can change details. Not stored in .cooked yet");
+	RNA_def_property_update(prop, 0, "rna_World_update");
+
 	prop = RNA_def_property(srna, "moon_size", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "moon_size");
-	RNA_def_property_range(prop, 0.001f, 0.1f);
-	RNA_def_property_ui_text(prop, "Moon Size", "Angular size of the visual moon");
+	RNA_def_property_range(prop, 0.001f, 1.0f);
+	RNA_def_property_ui_text(prop, "Moon Size", "Angular size of the visual moon; 0.1 matches the large comparison moon, 1.0 allows a giant moon");
 	RNA_def_property_update(prop, 0, "rna_World_update");
 
 	prop = RNA_def_property(srna, "moon_brightness", PROP_FLOAT, PROP_FACTOR);
