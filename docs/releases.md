@@ -29,7 +29,7 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.6.1
 
-Estado: **em preparo** (versão `0.6.1` no executável, About e scripts de release). Pacotes Linux montados e
+Estado: **publicada completa em 2026-10-28** (tag `v0.6.1`). Pacotes Linux montados e
 testados em 2026-10-28 (seção "Linux" abaixo); Windows e Wine pendentes.
 
 Notas para o usuário:
@@ -74,7 +74,17 @@ Resultados:
 7. Com janela (Wayland): editor do pacote abre (binário `AnastacioEngine 0.6.1`); jogo de teste no modo Fixed
    rodou 8 s sem câmera lenta (`real=8.004`, `step_cv=0.3`).
 
-Pendente: Wine, pacotes Windows (o runtime Web pode ser copiado de `build-web-release/bin` do Linux),
+### Windows (2026-10-28)
+
+- `ninja` + `ninja install`; runtime Web recompilado em `build-web-release` (emsdk) e posto no pacote com `stage_release_web.py`.
+- `AnastacioEngine-0.6.1-windows-x64.zip` (203,1 MiB) sha256 `f7219d59087e997a902212d85f537e55850e9adaf99a2e7de32bca8c0bf948e1`
+- `RangeArmor-0.6.1-windows-x64.zip` sha256 `238387aed75873445636cf39dfb0c9aad212842f72bea4375a23744f1e865699` (base: zip 0.6.0)
+- Zip extraído em pasta limpa: `blender.crt/` com manifesto, `web/runtime`, `0.6.1` no executável, editor `-b` criou a cena de teste e o runtime rodou no modo Fixed. `check_docs.py --fix`: 0 erros.
+- Hashes juntados em `SHA256SUMS.txt`; README com os links 0.6.1.
+
+Aberto: Wine não testado com o build final (pacote `D:\wine_timing`).
+
+Antes pendente: Wine, pacotes Windows (o runtime Web pode ser copiado de `build-web-release/bin` do Linux),
 `SHA256SUMS.txt` com os quatro arquivos, README/site e publicação.
 
 ## 0.6.0

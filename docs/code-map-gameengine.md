@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-10-26 (`HEAD` `f4e37e60`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-10-28 (`HEAD` `ec38b049`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -13,7 +13,7 @@ Caminhos abaixo relativos a `source/source/gameengine/`.
 
 ---
 
-## `Ketsji/KX_Scene.cpp` (4.709 linhas)
+## `Ketsji/KX_Scene.cpp` (4.710 linhas)
 
 Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings Python. Cutscene e Trace Rail ficam em
 `Ketsji/KX_SceneCutscene.cpp` (mesma classe `KX_Scene`). O header é
@@ -22,27 +22,27 @@ Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings
 | Domínio | Métodos (linha inicial) |
 |---|---|
 | Ciclo de vida da cena | funções `static` de réplica/destruição/atualização do SceneGraph 127–150, construtor 162, destrutor 334 |
-| Acessores e listas | `GetName`/`SetName` 792–797, managers e listas (`GetObjectList`, `GetLightList`, `GetCameraList`, `GetRenderList`, `GetLogicManager`…) 852–917, framing 515–520 |
-| Mundo, sol e terremoto | `Set/GetWorldInfo` 525–530, `SetWorldSun`/`GetWorldSun`/`SetAutoWorldSun`/`UpdateAutoWorldSun` 913–934, `UpdateEarthquake` 983 |
-| Suspensão e culling (config) | `Suspend`/`Resume`/`IsSuspended` 1092–1107, `SetActivityCulling` 1087, `Set/GetDbvtCulling` e oclusão 719–734 |
-| Objetos: criação/réplica/grupos | `AddNodeReplicaObject` 1145, `ReplicateLogic` 1347, `DupliGroupRecurse` 1433, `IsObjectInGroup` 1575, `FindInactiveObjectAcrossScenes` 1580, `AddReplicaObject` 1627 |
-| Objetos: remoção | `RemoveNodeDestructObject` 1135, `RemoveObject` 1725, `RemoveDupliGroup` 1738, `DelayedRemoveObject` 1747, `RemoveEuthanasyObjects` 1754, `NewRemoveObject` 1774 |
-| Câmera e estatísticas de culling | `Get/SetActiveCamera` 1450–1468, contadores `GetLast*` 1474–1504, `Get/SetOverrideCullingCamera` 1511–1516, `SetCameraOnTop` 2014 |
-| Culling e listas visíveis | `PhysicsCullingCallback` 2035, `CalculateVisibleMeshes` 2054–2077, `UpdateObjectActivity` 3313 |
-| Debug (desenho e ImGui) | `GetDebugDraw` 2256, `DrawDebug` 2261, `RenderDebugProperties` 2298, `RenderDebugPropertiesImGui` 2351, `FlushDebugDraw` 2497, `AddObjectDebugProperties` 1117 |
-| Frame lógico | `LogicBeginFrame` 2502, `LogicUpdateFrame` 2789, `LogicEndFrame` 2815, `UpdateParents` 2838 |
-| Animação | `AddAnimatedObject` 2519, `UpdateAnimPoseTask` 2607, `UpdateAnimDeformTask` 2634, `UpdateAnimations` 2663, `UpdateAnimationDeformers` 2778 |
-| Render | `RenderBuckets` 2861, `RenderTextureRenderers` 2874, `Get2DFilterManager` 3624, `Render2DFilters` 3629 |
-| LOD | `UpdateObjectLods` 2880, hysteresis 2185–2200 |
-| Partículas GPU | `UpdateGpuParticleEmitters` 3001, listas de emissores/colisores 2219–2250 |
+| Acessores e listas | `GetName`/`SetName` 793–798, managers e listas (`GetObjectList`, `GetLightList`, `GetCameraList`, `GetRenderList`, `GetLogicManager`…) 853–918, framing 515–520 |
+| Mundo, sol e terremoto | `Set/GetWorldInfo` 525–530, `SetWorldSun`/`GetWorldSun`/`SetAutoWorldSun`/`UpdateAutoWorldSun` 914–935, `UpdateEarthquake` 984 |
+| Suspensão e culling (config) | `Suspend`/`Resume`/`IsSuspended` 1093–1108, `SetActivityCulling` 1088, `Set/GetDbvtCulling` e oclusão 719–734 |
+| Objetos: criação/réplica/grupos | `AddNodeReplicaObject` 1146, `ReplicateLogic` 1348, `DupliGroupRecurse` 1434, `IsObjectInGroup` 1576, `FindInactiveObjectAcrossScenes` 1581, `AddReplicaObject` 1628 |
+| Objetos: remoção | `RemoveNodeDestructObject` 1136, `RemoveObject` 1726, `RemoveDupliGroup` 1739, `DelayedRemoveObject` 1748, `RemoveEuthanasyObjects` 1755, `NewRemoveObject` 1775 |
+| Câmera e estatísticas de culling | `Get/SetActiveCamera` 1450–1468, contadores `GetLast*` 1474–1504, `Get/SetOverrideCullingCamera` 1511–1516, `SetCameraOnTop` 2015 |
+| Culling e listas visíveis | `PhysicsCullingCallback` 2036, `CalculateVisibleMeshes` 2055–2078, `UpdateObjectActivity` 3314 |
+| Debug (desenho e ImGui) | `GetDebugDraw` 2257, `DrawDebug` 2262, `RenderDebugProperties` 2299, `RenderDebugPropertiesImGui` 2352, `FlushDebugDraw` 2498, `AddObjectDebugProperties` 1118 |
+| Frame lógico | `LogicBeginFrame` 2503, `LogicUpdateFrame` 2790, `LogicEndFrame` 2816, `UpdateParents` 2839 |
+| Animação | `AddAnimatedObject` 2520, `UpdateAnimPoseTask` 2608, `UpdateAnimDeformTask` 2635, `UpdateAnimations` 2664, `UpdateAnimationDeformers` 2779 |
+| Render | `RenderBuckets` 2862, `RenderTextureRenderers` 2875, `Get2DFilterManager` 3625, `Render2DFilters` 3630 |
+| LOD | `UpdateObjectLods` 2881, hysteresis 2185–2200 |
+| Partículas GPU | `UpdateGpuParticleEmitters` 3002, listas de emissores/colisores 2219–2250 |
 | Sombras (listas) | casters estáticos/dinâmicos e flag "dirty" 2255–2298 |
 | Física e rede | `Get/SetPhysicsEnvironment` 2339–2344, gravidade 2353–2358, `Get/SetNetworkMessageScene` 2329–2334, `Get/SetSuspendedDelta` 2363–2368 |
-| Merge de cenas | `MergeScene_LogicBrick` 3388, `MergeScene_GameObject` 3411, `MergeScene` 3486 |
+| Merge de cenas | `MergeScene_LogicBrick` 3389, `MergeScene_GameObject` 3412, `MergeScene` 3487 |
 | Iluminação (flag) | `Get/SetUseLightScatter` 2582–2587 |
 | Cutscene e Trace Rail (em `Ketsji/KX_SceneCutscene.cpp`, 901 linhas) | `SetCutsceneManager` 153, `StopCutscene` 164, `RestartCutscene` 174, `UpdateCutscene` 185, `StartTraceRail` 241, `StartTraceRailOrigin` 295, `UpdateTraceRail` 361, `UpdateCutscenePaths` 467, `TakePendingCutsceneEvents` 518, `DispatchCutsceneEvents` 574 (~300 linhas), `ClearCutsceneSpawnedObjects` 877, `GetCutsceneManager` 893 |
 | Busca e texto (`static`, em `KX_SceneCutscene.cpp`) | `FindObjectWithComponent` 526, `FindGameObject` 548, `GetLocalizedText` 566 |
-| Callbacks de Python | `RunDrawingCallbacks` 3700, `RunOnRemoveCallbacks` 3716 |
-| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 4653 |
+| Callbacks de Python | `RunDrawingCallbacks` 3701, `RunOnRemoveCallbacks` 3717 |
+| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 4654 |
 
 Observações: `DispatchCutsceneEvents` e `AddReplicaObject` são as funções mais longas; a remoção de objetos tem
 cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`, `NewRemoveObject`,
@@ -50,7 +50,7 @@ cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`,
 
 ---
 
-## `Ketsji/KX_PythonInit.cpp` (3.862 linhas)
+## `Ketsji/KX_PythonInit.cpp` (3.872 linhas)
 
 Bootstrap do Python embutido e módulos `Range`/`bge`. O registro dos **tipos** (`KX_GameObject`, `KX_Scene`…)
 não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específico de Web (`__EMSCRIPTEN__`) em 69,
@@ -61,22 +61,22 @@ não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específic
 | Utilitários do módulo `Range` (funções globais `gPy*`) | aleatório/gravidade/caminho 214–243, `gPyStartGame`/`EndGame`/`RestartGame` 261–289, `SaveGlobalDict`/`LoadGlobalDict` 300–318, `GetProfileInfo` 336, `SendMessage` 349, `GetSpectrum` 372 |
 | Taxas e relógio | tic rate, render rate, animation rate, exit key, max frames, clock/time scale 384–602 |
 | Lista de arquivos e cenas | `.blend`/`.range`/`.rasec` 607–660, `AddScene`/`GetCurrentScene`/`GetSceneList` 671–707 |
-| Informação de sistema | `pyPrintStats` 837, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 919 |
-| Bibliotecas externas | `gLibLoad` 938, `gLibNew` 1157, `gLibFree` 1211, `gLibList` 1227, `gPyNextFrame` 1253 |
+| Informação de sistema | `pyPrintStats` 847, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 929 |
+| Bibliotecas externas | `gLibLoad` 948, `gLibNew` 1167, `gLibFree` 1221, `gLibList` 1237, `gPyNextFrame` 1263 |
 | Tabela `game_methods[]` | 997 |
-| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1388–1582 |
-| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1893, janela/fullscreen 1507–1524 |
+| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1398–1592 |
+| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1903, janela/fullscreen 1507–1524 |
 | Áudio e debug na tela | `MasterVolume` 1585–1597, `ShowFramerate`/`ShowProfile`/`ShowProperties`/`AutoDebugList` 1606–1650, `GetDisplayDimensions` 1660 |
 | Tabela `rasterizer_methods[]` | 1679 |
-| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2262 (~430 linhas, constantes de tipos/estados) |
-| Ambiente `sys` e caminhos | `backupPySysObjects` 2692 … `restorePySysObjects` 2767, `appendPythonPath` 2795, `addImportMain`/`removeImportMain` 2806–2811 |
-| Módulo `Range` e compatibilidade | `addSubModule` 2828, `initRANGE` 2836, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2874, `installLegacyAudFactoryAlias` 2928 (alias `bge`/`aud`) |
-| Init/saída do Python | `initPlayerPython` 2976, `exitPlayerPython` 3016, console 2528–2595, `initGamePython` 3107, `exitGamePython` 3201 |
-| Console e joystick | `createPythonConsole` 3223, `getPythonJoystick` 3235, `updatePythonJoysticks` 3240 |
-| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3281 |
-| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3415 (~190 linhas de constantes) |
-| Módulo `Application` | `initApplicationPythonBinding` 3610 |
-| Config persistente do jogo | `saveGamePythonConfig` 3672, `loadGamePythonConfig` 3751, `pathGamePythonConfig` 3828 (contém código Web/IDBFS) |
+| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2272 (~430 linhas, constantes de tipos/estados) |
+| Ambiente `sys` e caminhos | `backupPySysObjects` 2702 … `restorePySysObjects` 2777, `appendPythonPath` 2805, `addImportMain`/`removeImportMain` 2816–2821 |
+| Módulo `Range` e compatibilidade | `addSubModule` 2838, `initRANGE` 2846, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2884, `installLegacyAudFactoryAlias` 2938 (alias `bge`/`aud`) |
+| Init/saída do Python | `initPlayerPython` 2986, `exitPlayerPython` 3026, console 2528–2595, `initGamePython` 3117, `exitGamePython` 3211 |
+| Console e joystick | `createPythonConsole` 3233, `getPythonJoystick` 3245, `updatePythonJoysticks` 3250 |
+| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3291 |
+| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3425 (~190 linhas de constantes) |
+| Módulo `Application` | `initApplicationPythonBinding` 3620 |
+| Config persistente do jogo | `saveGamePythonConfig` 3682, `loadGamePythonConfig` 3761, `pathGamePythonConfig` 3838 (contém código Web/IDBFS) |
 
 Observação: `initPlayerPython` (editor não usa) é o caminho do standalone; o editor entra por `BPY_python_start`.
 
@@ -158,37 +158,37 @@ trecho inteiro, não só um método.
 
 ---
 
-## `Ketsji/KX_KetsjiEngine.cpp` (1.632 linhas)
+## `Ketsji/KX_KetsjiEngine.cpp` (1.743 linhas)
 
 Laço do jogo: tempo, frames lógicos/físicos, cenas. O desenho em si fica em `KX_RenderPipeline.cpp` (abaixo).
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
-| Construção e serviços | `KX_KetsjiEngine` 189, `SetCanvas` 327, `SetRasterizer` 333, `SetConverter` 421, `StartEngine` 453, `StopEngine` 1128 |
-| Frame | `BeginFrame` 494, `EndFrame` 518, `UpdateDynamicResolution` 599, **`NextFrame`** 689 (lógica, física, animação), `Render` 1056 |
-| Tempo e espera | `ServerSleep` 908, `SleepUnderRate` 921, `UpdateSleepTime` 934, `ClockTiming` 1174, `FrameTiming` 1210, `AdvanceStepTime` 1223 |
-| Animação e sombra | `UpdateAnimations` 1114, `IsStaticShadowSettled` 1123 |
-| Cenas | `AddScene` 1168, `ConvertAndAddScene` 1267, `PreloadScene` 1272, `RemoveScene` 1277, `ReplaceScene` 1292, `SuspendScene` 1297, `ResumeScene` 1302 |
-| Taxas e flags | `SetTicRate` 1328, `SetUseFixedTimestep` 1400, `SetShadowCulling` 1427, `SetDynamicResolution` 1432 |
+| Construção e serviços | `KX_KetsjiEngine` 191, `SetCanvas` 330, `SetRasterizer` 336, `SetConverter` 424, `StartEngine` 456, `StopEngine` 1236 |
+| Frame | `BeginFrame` 497, `EndFrame` 524, `UpdateDynamicResolution` 609, **`NextFrame`** 699 (lógica, física, animação), `Render` 1086 |
+| Tempo e espera | `ServerSleep` 926, `SleepUnderRate` 921, `UpdateSleepTime` 991, `ClockTiming` 1282, `FrameTiming` 1318, `AdvanceStepTime` 1331 |
+| Animação e sombra | `UpdateAnimations` 1222, `IsStaticShadowSettled` 1231 |
+| Cenas | `AddScene` 1276, `ConvertAndAddScene` 1377, `PreloadScene` 1382, `RemoveScene` 1387, `ReplaceScene` 1402, `SuspendScene` 1407, `ResumeScene` 1412 |
+| Taxas e flags | `SetTicRate` 1438, `SetUseFixedTimestep` 1511, `SetShadowCulling` 1538, `SetDynamicResolution` 1543 |
 
-## `Ketsji/KX_RenderPipeline.cpp` (1.224 linhas)
+## `Ketsji/KX_RenderPipeline.cpp` (1.235 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
 | Névoa volumétrica | `KX_FillVolumetricFog` 125 |
 | Frame | **`Render`** 375 (sombras, câmeras, filtros), `RenderCollisionDepthBuffer` 555 |
 | Câmeras e visibilidade | `GetCameraRenderData` 598, `GetRenderData` 644, `GetVisibleMeshes` 738, `RenderCamera` 783 |
-| Pós-render | `PostRenderScene` 929 (2D filters, offscreen final) |
+| Pós-render | `PostRenderScene` 939 (2D filters, offscreen final) |
 
-## `Converter/BL_Converter.cpp` (1.973 linhas)
+## `Converter/BL_Converter.cpp` (1.979 linhas)
 
 Conversão de cenas e LibLoad (síncrono e assíncrono). A conversão objeto a objeto fica em
 `BL_BlenderDataConversion.cpp` (acima).
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
-| Cena | `ConvertScene` 682, `CompileSceneShaders` 721, `ConvertScene` 911, `PostConvertScene` 1018, `RemoveScene` 1023 |
+| Cena | `ConvertScene` 688, `CompileSceneShaders` 727, `ConvertScene` 917, `PostConvertScene` 1024, `RemoveScene` 1029 |
 | Objetos sob demanda | `FindOrConvertMainObject` 253, `FindSceneObject` 298, `ConvertSceneObject` 310, `FreeUnconvertedData` 470 |
-| LibLoad | `LinkBlendFileMemory` 1421, `LinkBlendFilePath` 1429, **`LinkBlendFile`** 1458, `FreeBlendFileData` 1625, `FreeBlendFile` 1748 |
-| Merge e assíncrono | `StepMerge` 1141, `StepReloads` 1268, `ProcessScheduledLibraries` 1309, `FinalizeAsyncLoads` 1350, `AsyncConvertTask` 1381, `MergeSceneData` 1779, `MergeScene` 1793 |
-| Shaders e malhas | `ReloadShaders` 1827, `ConvertMeshSpecial` 1865 |
+| LibLoad | `LinkBlendFileMemory` 1427, `LinkBlendFilePath` 1435, **`LinkBlendFile`** 1464, `FreeBlendFileData` 1631, `FreeBlendFile` 1754 |
+| Merge e assíncrono | `StepMerge` 1147, `StepReloads` 1274, `ProcessScheduledLibraries` 1315, `FinalizeAsyncLoads` 1356, `AsyncConvertTask` 1387, `MergeSceneData` 1785, `MergeScene` 1799 |
+| Shaders e malhas | `ReloadShaders` 1833, `ConvertMeshSpecial` 1871 |
