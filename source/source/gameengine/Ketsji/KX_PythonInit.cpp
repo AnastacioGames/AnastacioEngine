@@ -708,6 +708,21 @@ static PyObject *gPySetTimeScale(PyObject *, PyObject *args)
 	Py_RETURN_NONE;
 }
 
+static PyObject *gPyGetAnimationsUseTimeScale(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	return PyBool_FromLong(KX_GetActiveEngine()->GetAnimationsUseTimeScale());
+}
+
+static PyObject *gPySetAnimationsUseTimeScale(PyObject *, PyObject *args)
+{
+	int use;
+	if (!PyArg_ParseTuple(args, "p:setAnimationsUseTimeScale", &use)) {
+		return nullptr;
+	}
+	KX_GetActiveEngine()->SetAnimationsUseTimeScale(use != 0);
+	Py_RETURN_NONE;
+}
+
 static PyObject *gPyGetDeltaTime(PyObject*, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetActiveEngine()->GetEngineDeltaTime());
@@ -1367,6 +1382,8 @@ static struct PyMethodDef game_methods[] = {
 	{"getAverageFrameRate", (PyCFunction)gPyGetAverageFrameRate, METH_NOARGS, (const char *)"Gets the estimated average frame rate"},
 	{"getTimeScale", (PyCFunction)gPyGetTimeScale, METH_NOARGS, (const char *)"Get the time multiplier"},
 	{"setTimeScale", (PyCFunction)gPySetTimeScale, METH_VARARGS, (const char *)"Set the time multiplier"},
+	{"getAnimationsUseTimeScale", (PyCFunction)gPyGetAnimationsUseTimeScale, METH_NOARGS, (const char *)"True if animations follow the time scale"},
+	{"setAnimationsUseTimeScale", (PyCFunction)gPySetAnimationsUseTimeScale, METH_VARARGS, (const char *)"Set whether animations follow the time scale (False = always full speed)"},
 	{"deltaTime", (PyCFunction)gPyGetDeltaTime, METH_NOARGS, (const char*)"Get deltaTime"},
 	{"getBlendFileList", (PyCFunction)gPyGetBlendFileList, METH_VARARGS, (const char *)"Gets a list of blend files in the same directory as the current blend file"},
 	{"getRangeFileList", (PyCFunction)gPyGetRangeFileList, METH_VARARGS, (const char *)"Gets a list of range files in the same directory as the current range file"},

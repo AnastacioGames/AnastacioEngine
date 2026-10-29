@@ -462,6 +462,20 @@ Time related functions
 
     :arg time_scale: The new time multiplier.
 
+.. function:: setAnimationsUseTimeScale(use)
+
+   Choose whether actions follow :func:`setTimeScale`. With ``False`` the
+   animation clock advances by the unscaled logic step, so actions play at
+   full speed while physics, timers and logic stay scaled. Default ``True``.
+
+   :arg use: ``True`` to scale animations, ``False`` to keep them at full speed.
+   :type use: bool
+
+.. function:: getAnimationsUseTimeScale()
+
+   :return: ``True`` if actions follow the time scale.
+   :rtype: bool
+
 .. function:: getUseExternalClock()
 
     .. deprecated:: 0.5.5

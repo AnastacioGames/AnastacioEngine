@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-29 - Principled BSDF: Multiscatter GGX e verniz refletindo o ambiente (branch `bsdf-energia`)
+
+- Tabela de BRDF do ambiente 64×64 RGBA16F (`gpu_brdf_lut.h`, gerada por `tools/debug/bsdf/integrar_brdf.py`), textura global criada em `GPU_invalid_tex_init` (`6d40afa9`). Canais `(A, B, Ecc, 0)`; detalhes e erros em [bsdf-energia.md](bsdf-energia.md).
+- Distribution **Multiscatter GGX** passa a valer no jogo (`125b8b1c`): `ms = 1 + Cspec0·(1−Ess)/Ess` com `Ess = A+B`, um só fator para luzes e ambiente (forma do Filament, aproximação, não o random walk do Cycles). No furnace o metal rugoso deixa de escurecer. GGX (padrão) não muda.
+- Clearcoat reflete World, sondas e SH9 com a própria roughness e normal (`9204bd2a`): `env_cc_mirror·Ecc·0,25·clearcoat`, somado. Segunda leitura de ambiente só quando Clearcoat > 0 ou ligado.
+- `gpu_codegen.c`: limite de parâmetros por função GLSL 32 → 48 e o parser para com aviso em vez de escrever fora do vetor; função acima do limite é descartada (`fde36177`, `0cc30d8f`). O Principled passou de 32 e derrubava a cena HDRI+SSGI.
+- Custo medido em A/B no mesmo binário (RX 6800M, 1080p, 24 esferas cobrindo a tela, GPU do passe de malhas): GGX 1,34 ms; Multiscatter 1,37 ms (+0,03); Clearcoat 1 em todas 1,60 ms (+0,26, dos quais 0,15 é a segunda leitura de ambiente). Escala ~16x num HD 4400: ~+0,5 ms Multiscatter e ~+4 ms com verniz em tela cheia. RolimaRacer e YoFrankie abrem sem falha de shader. Falta aceite visual com janela.
+
+## 2026-10-29 - Animações podem ignorar o time scale
+
+- `Range.logic.setAnimationsUseTimeScale(False)` / `getAnimationsUseTimeScale()`: o relógio de animação avança pelo passo sem escala (`m_timestep`) em vez de `m_framestep`. Padrão `True` mantém o CLK-02. Pedido do Kitsuy: jogo em escala reduzida com animações em velocidade cheia, sem compensar cada ação.
+- Para não abrir divergência: `BL_Action` passa a iniciar no relógio de animação (`GetAnimationsTime`) e a suspensão de cena desconta `GetAnimationStep()`.
 ## 2026-10-28 - Versão 0.6.1 em preparo: tempo de jogo no Wine e Fixed Timestep suave
 
 - Versão `0.6.1` em `ANASTACIO_VERSION_STRING`, About e scripts de release; seção em `docs/releases.md`. O pacote espera o retorno do Linux/Wine.
@@ -53,6 +65,37 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Lens flare (`RAS_LensFlare2DFilter.glsl` e `gpu_shader_fx_lensflare_frag.glsl`): sai cedo quando o sol está escondido ou fora da tela; o ramo é igual em todos os pixels.
 - Estrelas realistas (`world_stars_real`): retorna antes de tudo de dia (`night <= 0`); as 58 estrelas nomeadas viram direções pré-calculadas (o laço por pixel ficou sem trigonometria); o ruído da Via Láctea só roda perto da faixa. `do_sky_simple`/`do_sky_atmospheric` pulam as estrelas quando `env_sky > 0.001` em vez de multiplicar por zero.
 - Validado: `glslangValidator` sem erro nos três shaders (biblioteca de material com `SKY_LOW`/`SKY_VERY_LOW`). Falta: build no CI e o usuário medir FPS e conferir o céu noturno no jogo real.
+
+## 2026-10-27 - Composicao inicial do splash 0.6.0 no Rolima Racer
+
+- Nova proposta independente `criar_splash_rolima_surpresa.py`: camera rente ao
+  chao baseada no enquadramento Claude B escolhido pelo usuario, horizonte
+  inclinado, spray de agua, nevoa/Sky Layers e impacto eletrico. Cena anterior arquivada com scripts/captura em
+  `artifacts/splash-0.6.0-aprovada/`, hash do `.range` identico ao original.
+- Segunda proposta de camera: angulo traseiro pelo lado esquerdo, mais baixo e
+  proximo, lente de 30 mm e piloto deslocado para a direita da composicao.
+- Particulas das quatro rodas na copia: velocidade Z de 1,5 para 0,1 e rastro
+  dirigido para tras (Y=-1,2), com cone levemente descendente.
+- Fragmentos suspensos removidos da composicao apos retorno visual do usuario;
+  asset de madeira quebrada ainda nao havia sido testado no jogo.
+- Filtro 2D custom de velocidade: desfoque radial discreto nas bordas, mascara
+  do piloto para o enquadramento atual e tecla B para comparar ligado/desligado.
+- Raio localizado a frente do piloto e pequena explosao nativa com clarao:
+  primeiro evento em 2 s, ciclo ajustado para 10 s e cinco pulsos do raio por evento.
+  R dispara manualmente. Impulso zero; copia original do jogo preservada.
+- Direcao de arte Codex: ceu diurno atmosferico herdado desligado, ceu/nuvens
+  de tempestade e iluminacao azul/ambar. Desfoque radial aumentado para 0,10
+  com 16 amostras e riscos animados que independem de movimento real. DOF e
+  circulos de chuva reduzidos. Copia anterior preservada nos artefatos.
+  Filtro compilado no player com log vazio; captura nativa `captura-arte.png`
+  conferida, com rastros visiveis no cenario e piloto preservado pela mascara.
+- Gerador `tools/debug/cenas/criar_splash_rolima_060.py`: cena separada com Pista 1,
+  carrinho, Fabio em pose de pilotagem e fragmentos da cerca do jogo. Sem salvar
+  sobre o projeto original; texturas locais encontradas. Recursos nativos de chuva,
+  pocas/SSR, relampagos e pos-processamento. [Uso e limites](splash-0.6.0.md).
+- Copia reaberta e controlador executado por 120 quadros no player `--server`;
+  marcador de conclusao registrado. Carregamento inicial demorado. Validacao visual,
+  ajuste de composicao e captura final pendentes; splash instalado preservado.
 
 ## 2026-10-27 - Preparação da 0.6.0 e teste do pacote Linux
 

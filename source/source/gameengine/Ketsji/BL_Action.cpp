@@ -227,7 +227,7 @@ bool BL_Action::Play(const std::string& name,
 	}
 
 	// Now that we have an action, we have something we can play
-	m_starttime = KX_GetActiveEngine()->GetFrameTime() - kxscene->GetSuspendedDelta();
+	m_starttime = KX_GetActiveEngine()->GetAnimationsTime() - kxscene->GetSuspendedDelta();
 	m_startframe = m_localframe = start;
 	KX_AnimLog("PLAY obj=%s action=%s frames=%.1f-%.1f speed=%.3f mode=%d frameT=%.3f susp=%.3f anim_fps=%.1f",
 	           m_obj->GetName().c_str(), name.c_str(), start, end, playback_speed, play_mode,

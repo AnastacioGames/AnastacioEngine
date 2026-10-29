@@ -242,6 +242,8 @@ private:
 	double m_clockTime;
 	/// time scaling parameter. if > 1.0, time goes faster than real-time. If < 1.0, times goes slower than real-time.
 	double m_timescale;
+	/// When true, animation time advances by the unscaled step (time scale does not slow animations).
+	bool m_animationsIgnoreTimeScale;
 	double m_previousRealTime;
 
 	double m_logictimestart;
@@ -789,6 +791,14 @@ public:
 	 * Sets the time scale multiplier
 	 */
 	void SetTimeScale(double timeScale);
+
+	/// Whether animations follow the time scale (default true) or always run at full speed.
+	bool GetAnimationsUseTimeScale() const;
+	void SetAnimationsUseTimeScale(bool use);
+	/// Step added to the animation clock per simulation step (scaled or not, see above).
+	double GetAnimationStep() const;
+	/// Animation clock: actions start and run on it.
+	double GetAnimationsTime() const;
 
 	void SetExitKey(SCA_IInputDevice::SCA_EnumInputs key);
 	SCA_IInputDevice::SCA_EnumInputs GetExitKey() const;

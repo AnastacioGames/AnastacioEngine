@@ -226,6 +226,7 @@ KX_KetsjiEngine::KX_KetsjiEngine()
 	m_animationsTime(0.0f),
 	m_clockTime(0.0f),
 	m_timescale(1.0f),
+	m_animationsIgnoreTimeScale(false),
 	m_previousRealTime(0.0f),
 	m_logictimestart(0.0f),
 	m_logicframetime(0.0f),
@@ -1334,7 +1335,8 @@ void KX_KetsjiEngine::AdvanceStepTime()
 	// suspended delta use, so time scale slows animations and cutscenes too (CLK-02).
 	m_frameTime += m_framestep;
 	m_logicTime += m_framestep;
-	m_animationsTime += m_framestep;
+	// Optional: animations ignore the time scale (Range.logic.setAnimationsUseTimeScale(False)).
+	m_animationsTime += GetAnimationStep();
 }
 
 
@@ -1490,6 +1492,26 @@ void KX_KetsjiEngine::SetTimeScale(double timeScale)
 		KX_AnimLog("TIMESCALE %.3f -> %.3f", m_timescale, timeScale);
 	}
 	m_timescale = timeScale;
+}
+
+bool KX_KetsjiEngine::GetAnimationsUseTimeScale() const
+{
+	return !m_animationsIgnoreTimeScale;
+}
+
+void KX_KetsjiEngine::SetAnimationsUseTimeScale(bool use)
+{
+	m_animationsIgnoreTimeScale = !use;
+}
+
+double KX_KetsjiEngine::GetAnimationStep() const
+{
+	return m_animationsIgnoreTimeScale ? m_timestep : m_framestep;
+}
+
+double KX_KetsjiEngine::GetAnimationsTime() const
+{
+	return m_animationsTime;
 }
 
 int KX_KetsjiEngine::GetMaxLogicFrame()

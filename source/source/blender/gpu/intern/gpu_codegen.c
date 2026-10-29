@@ -77,7 +77,8 @@ enum {
 	MAX_FUNCTION_NAME = 64,
 };
 enum {
-	MAX_PARAMETER = 32,
+	/* node_bsdf_principled has 35 */
+	MAX_PARAMETER = 48,
 };
 
 typedef enum {
@@ -411,6 +412,12 @@ static void gpu_parse_functions_string(GHash *hash, char *code)
 				/* add parameter */
 				code = gpu_str_skip_token(code, NULL, 0);
 				code = gpu_str_skip_token(code, NULL, 0);
+				if (function->totparam == MAX_PARAMETER) {
+					fprintf(stderr, "GPU: %s has more than %d parameters, raise MAX_PARAMETER\n",
+					        function->name, MAX_PARAMETER);
+					function->totparam = -1;
+					break;
+				}
 				function->paramqual[function->totparam] = qual;
 				function->paramtype[function->totparam] = type;
 				function->totparam++;
@@ -419,6 +426,13 @@ static void gpu_parse_functions_string(GHash *hash, char *code)
 				fprintf(stderr, "GPU invalid function parameter in %s.\n", function->name);
 				break;
 			}
+		}
+
+		/* Too many parameters: drop this function only (a partial signature would link the wrong
+		 * arguments); strstr resumes at the next one. */
+		if (function->totparam == -1) {
+			MEM_freeN(function);
+			continue;
 		}
 
 		if (function->name[0] == '\0' || function->totparam == 0) {

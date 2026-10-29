@@ -90,7 +90,7 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 		}
 		else {
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_overhead);
-			scene->SetSuspendedDelta(scene->GetSuspendedDelta() + m_engine->GetFrameStep());
+			scene->SetSuspendedDelta(scene->GetSuspendedDelta() + m_engine->GetAnimationStep());
 		}
 
 		if (!scene->IsSuspended()) {

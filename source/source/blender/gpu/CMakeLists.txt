@@ -80,6 +80,7 @@ set(SRC
 	GPU_shader.h
 	GPU_texture.h
 	GPU_vertex_array.h
+	intern/gpu_brdf_lut.h
 	intern/gpu_codegen.h
 	intern/gpu_material_intern.h
 	intern/gpu_private.h

@@ -3436,6 +3436,19 @@ vec2 env_brdf_approx(float NdotV, float rough)
 	return vec2(-1.04, 1.04) * a004 + r.zw;
 }
 
+/* Tabulated environment BRDF (gpu_brdf_lut.h, GPU_texture_global_brdf_lut): row = roughness,
+ * column = NdotV. .rg = split-sum (A, B) of the base lobe, .a = the lights' lobe energy. */
+vec4 env_brdf_lut(sampler2D lut, float NdotV, float rough)
+{
+	return texture2D(lut, vec2(clamp(NdotV, 0.0, 1.0), clamp(rough, 0.0, 1.0)));
+}
+
+/* Clearcoat directional albedo (GTR1, Fresnel IOR 1.5), same table, .b channel. */
+float env_cc_lut(sampler2D lut, float CNdotV, float cc_rough)
+{
+	return env_brdf_lut(lut, CNdotV, cc_rough).b;
+}
+
 void env_cube_tex(float rough, float turbid, samplerCube wtex, vec3 wv, vec3 wn, vec3 wr, out vec4 mirror, out vec4 diffibl, out vec4 transmit)
 {
 #if __VERSION__ >= 130
@@ -5400,6 +5413,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	float specular_tint, float roughness, float anisotropic, float anisotropic_rotation, float sheen, float sheen_tint, float clearcoat,
 	float clearcoat_roughness, float ior, float transmission, float transmission_roughness, vec3 N, vec3 CN, vec3 T, vec3 I,
 	vec4 env_mirror, vec4 env_diffuse, float env_on, sampler2D scol, vec4 lightmap,
+	sampler2D brdf_lut, float lut_on, float ms_on, vec4 env_cc_mirror,
 	out vec4 result,
     out vec4 ssgi_normal, out vec4 ssgi_albedo, out vec4 ssgi_direct, out vec4 ssgi_linear)
 {
@@ -5464,6 +5478,22 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	float F0 = fresnel_dielectric_0(eta);
 	float F0_norm = 1.0 / (1.0 - F0);
 
+	float Cdlum = 0.3 * base_color.r + 0.6 * base_color.g + 0.1 * base_color.b; // luminance approx.
+	vec3 Ctint = Cdlum > 0.0 ? base_color.rgb / Cdlum : vec3(1.0); // normalize lum. to isolate hue+sat
+	vec3 Cspec0 = mix(specular * 0.08 * mix(vec3(1.0), Ctint, specular_tint), base_color.rgb, metallic);
+	vec3 Csheen = mix(vec3(1.0), Ctint, sheen_tint);
+
+	/* Multiscatter GGX: real-time energy compensation (Kulla-Conty / Filament form, not Cycles'
+	 * random walk). The single-scatter energy Ess comes from the environment table (standard
+	 * Smith G); the same factor scales the lights' specular and the environment specular. */
+	vec4 brdf = vec4(0.0);
+	vec3 ms = vec3(1.0);
+	if (ms_on > 0.5) {
+		brdf = env_brdf_lut(brdf_lut, dot(N, V), roughness);
+		float Ess = brdf.r + brdf.g;
+		ms = 1.0 + Cspec0 * (1.0 - Ess) / max(Ess, 1e-4);
+	}
+
 	/* directional lights */
 	for (int i = 0; i < NUM_LIGHTS; i++) {
 		vec3 light_position;
@@ -5485,12 +5515,6 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 		vec3 ssgi_light = vec3(0.0);
 		if (NdotL >= 0.0 && NdotV >= 0.0) {
 			float NdotH = dot(N, H);
-
-			float Cdlum = 0.3 * base_color.r + 0.6 * base_color.g + 0.1 * base_color.b; // luminance approx.
-
-			vec3 Ctint = Cdlum > 0.0 ? base_color.rgb / Cdlum : vec3(1.0); // normalize lum. to isolate hue+sat
-			vec3 Cspec0 = mix(specular * 0.08 * mix(vec3(1.0), Ctint, specular_tint), base_color.rgb, metallic);
-			vec3 Csheen = mix(vec3(1.0), Ctint, sheen_tint);
 
 			// Diffuse fresnel - go from 1 at normal incidence to .5 at grazing
 			// and mix in diffuse retro-reflection based on roughness
@@ -5522,7 +5546,7 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 
 			vec3 diffuse_bsdf = (mix(Fd * base_color.rgb, ss * subsurface_color.rgb, subsurface) + Fsheen) * light_diffuse;
             ssgi_light = diffuse_bsdf * (1.0 - metallic) * (1.0 - transmission);
-			vec3 specular_bsdf = Gs * Fs * Ds * light_specular;
+			vec3 specular_bsdf = Gs * Fs * Ds * light_specular * ms;
 			diffuse_and_specular_bsdf = diffuse_bsdf * (1.0 - metallic) *
 			                            (1.0 - baked_static_diffuse) + specular_bsdf;
 		}
@@ -5564,13 +5588,26 @@ void node_bsdf_principled(vec4 base_color, float subsurface, vec3 subsurface_rad
 	}
 
 	if (env_on > 0.5) {
-		/* environment specular: reflected sky/HDRI times the split-sum environment BRDF */
-		float Cdlum_e = 0.3 * base_color.r + 0.6 * base_color.g + 0.1 * base_color.b;
-		vec3 Ctint_e = Cdlum_e > 0.0 ? base_color.rgb / Cdlum_e : vec3(1.0);
-		vec3 Cspec0_e = mix(specular * 0.08 * mix(vec3(1.0), Ctint_e, specular_tint), base_color.rgb, metallic);
+		/* environment specular: reflected sky/HDRI times the split-sum environment BRDF
+		 * (analytic fit for GGX, the table plus compensation for Multiscatter GGX) */
 		float NdotV_e = clamp(dot(N, V), 0.0, 1.0);
-		vec2 AB_e = env_brdf_approx(NdotV_e, roughness);
-		L += env_mirror.rgb * (Cspec0_e * AB_e.x + AB_e.y);
+		vec2 AB_e = (ms_on > 0.5) ? brdf.rg : env_brdf_approx(NdotV_e, roughness);
+		L += env_mirror.rgb * (Cspec0 * AB_e.x + AB_e.y) * ms;
+
+		/* clearcoat environment: added on top like the lights' coat lobe (weight 0.25, IOR 1.5),
+		 * with its own albedo (GTR1) from the table; analytic F0 0.04 fit without the table */
+		if (clearcoat > 0.0) {
+			float CNdotV_e = clamp(dot(CN, V), 0.0, 1.0);
+			float Ecc;
+			if (lut_on > 0.5) {
+				Ecc = env_cc_lut(brdf_lut, CNdotV_e, clearcoat_roughness);
+			}
+			else {
+				vec2 ABc = env_brdf_approx(CNdotV_e, clearcoat_roughness);
+				Ecc = 0.04 * ABc.x + ABc.y;
+			}
+			L += env_cc_mirror.rgb * Ecc * 0.25 * clearcoat;
+		}
 	}
 
 	/* transmission: the scene behind through the screen copy (Alpha Blend only, see

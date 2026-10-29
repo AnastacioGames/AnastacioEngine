@@ -43,6 +43,8 @@
 #include "GPU_shader.h"
 #include "GPU_texture.h"
 
+#include "gpu_brdf_lut.h"
+
 #ifdef __EMSCRIPTEN__
 /* The SH9 readback calls: GLEW keeps these in function pointers that stay null on the web, route
  * them to the WebGL2 entry points (see gpu_framebuffer.c). */
@@ -78,6 +80,7 @@ static struct GPUTextureGlobal {
 	GPUTexture *invalid_tex_2D;
 	GPUTexture *invalid_tex_3D;
 	GPUTexture *jitter_64_tex;
+	GPUTexture *brdf_lut_tex; /* see GPU_texture_global_brdf_lut */
 	GPUTexture *depth_tex;
 	GPUTexture *scene_color_tex; /* see GPU_texture_global_scene_color_ptr */
 	int scene_color_requested;
@@ -975,6 +978,28 @@ GPUTexture *GPU_texture_global_jitter_64(void)
 	return GG.jitter_64_tex;
 }
 
+static GPUTexture *gpu_texture_create_brdf_lut(void)
+{
+	/* RGBA16F is filterable in core GL 3.0 and WebGL2, no extension needed. Without float
+	 * textures stay NULL: an incomplete texture would read as black specular. */
+#ifndef __EMSCRIPTEN__
+	if (!(GLEW_VERSION_3_0 || GLEW_ARB_texture_float)) {
+		return NULL;
+	}
+#endif
+	GPUTexture *tex = GPU_texture_create_nD(GPU_BRDF_LUT_SIZE, GPU_BRDF_LUT_SIZE, 2, gpu_brdf_lut,
+	                                        GPU_TEXTURE_MODE_NONE, GPU_HDR_HALF_FLOAT, 4, 0, NULL);
+	if (tex) {
+		GPU_texture_unbind(tex);
+	}
+	return tex;
+}
+
+GPUTexture *GPU_texture_global_brdf_lut(void)
+{
+	return GG.brdf_lut_tex;
+}
+
 GPUTexture **GPU_texture_global_depth_ptr(void)
 {
 	return &GG.depth_tex;
@@ -1073,6 +1098,7 @@ void GPU_invalid_tex_init(void)
 #endif
 	GG.invalid_tex_2D = GPU_texture_create_2D(1, 1, color, GPU_HDR_NONE, NULL);
 	GG.jitter_64_tex = GPU_texture_create_jitter(64);
+	GG.brdf_lut_tex = gpu_texture_create_brdf_lut();
 	GG.depth_tex = GG.invalid_tex_2D;
 	GG.scene_color_tex = GG.invalid_tex_2D;
 	GG.collider_depth_tex = GG.invalid_tex_2D;
@@ -1111,6 +1137,10 @@ void GPU_invalid_tex_free(void)
 		GPU_texture_free(GG.invalid_tex_3D);
 	if (GG.jitter_64_tex) {
 		GPU_texture_free(GG.jitter_64_tex);
+	}
+	if (GG.brdf_lut_tex) {
+		GPU_texture_free(GG.brdf_lut_tex);
+		GG.brdf_lut_tex = NULL;
 	}
 }
 
