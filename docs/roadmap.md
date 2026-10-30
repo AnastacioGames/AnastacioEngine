@@ -431,10 +431,9 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 
 - **Range Trace ([range-trace.md](range-trace.md))** — fases 1 a 4 feitas (scripts/runtime no relatório e no
   launcher em 2026-10-24). Falta usar num jogo real com som (o `--server` não toca).
-- **Static Batch:** com ele ligado empatamos com a ThunderPlayer no benchmark de 2026-10-09
-  ([batching estático e culling](batching-estatico-e-culling.md)). Grupos dupli entram desde 2026-10-21; grupo só
-  RAS ficou impossível (construtor protegido). Opção Auto Static Batch na cena feita em 2026-10-26; falta medir
-  no benchmark da Thunder com ela ligada e decidir se vira padrão em arquivo novo.
+- **Static Batch:** Auto Static Batch medido em 2026-10-30 no benchmark da Thunder: igual ao manual e empatado
+  com a Thunder ([batching estático e culling](batching-estatico-e-culling.md)). Falta decidir se vira padrão em
+  arquivo novo.
 - **Travadas do RolimaRacer (2026-10-10):** `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo. Abertos:
   picos longos no swap sem causa identificada; conferir de novo com 10 pilotos pelo menu (Range Trace, módulos
   `frames`, `shaders` e `profile`).
@@ -484,10 +483,8 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 - **Sombra de CSM no Principled:** feita em 2026-10-26 (primeiro sol com cascata por draw, sem VSM nem sombra
   colorida no slot CSM); falta aceite visual com janela. PCSS já funciona nos dois caminhos (2026-10-25). Menu Hard/Soft/Realistic e PCSS
   virando sombra dura em Low/Very Low feitos em 2026-10-26.
-- **Principled BSDF: energia e verniz** (branch `bsdf-energia`, [doc](bsdf-energia.md)): Multiscatter GGX e
-  clearcoat refletindo o ambiente feitos e medidos em 2026-10-29. Falta: aceite visual com janela (verniz dos carros
-  do RolimaRacer), header 64×64 e doc do Codex, merge no main. Opcional: leitura só de reflexo para o verniz
-  (−0,15 ms em 1080p) se pesar na iGPU.
+- **Principled BSDF: energia e verniz** ([doc](bsdf-energia.md)): no main (4dd6d10b). Falta aceite visual com
+  janela (verniz dos carros do RolimaRacer). Opcional: leitura só de reflexo para o verniz (−0,15 ms em 1080p).
 - **Nós de material Game × Cycles × BI** ([matriz](node-material-support.md)): fases 1–6 feitas e validadas.
   Sem suporte: Point Density e Script.
 - **Material rápido (receitas de nós):** falta o usuário conferir no editor e no jogo

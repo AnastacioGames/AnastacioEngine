@@ -84,6 +84,7 @@ void DrawRasterizerLine(const float *from, const float *to, int color);
 
 #include "CM_Message.h"
 #include "CM_List.h"
+#include "CM_WorkCounters.h"
 
 // This was copied from the old KX_ConvertPhysicsObjects
 #ifdef WIN32
@@ -1113,6 +1114,7 @@ void CcdPhysicsEnvironment::ProceedDeltaTime(double timeStep, double interval)
 	}
 	//float subStep = timeStep / float(m_numTimeSubSteps);
 	i = m_dynamicsWorld->stepSimulation(interval, 25, subStep);//perform always a full simulation step
+	CM_WorkCount(CM_WORK_PHYSICS_SUBSTEPS, i);
 	if (i < 1) {
 		//CM_Warning("subStep " << i << " times");
 		return;
@@ -1189,6 +1191,7 @@ void CcdPhysicsEnvironment::ProceedDeltaTimeCar(double timeStep, double interval
 
 	double subStep = timeStep / double(m_numTimeSubSteps);
 	i = m_dynamicsWorld->stepSimulation(interval, 25, subStep);//perform always a full simulation step
+	CM_WorkCount(CM_WORK_PHYSICS_SUBSTEPS, i);
 
 	if (i < 1) {
 		return;

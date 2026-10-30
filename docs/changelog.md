@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - Contador de substeps da física; Auto Static Batch medido
+
+- Novo contador `physicsSubsteps` em `Range.logic.getRenderStats()` e `substeps` no módulo `work` do Range Trace
+  (`CM_WORK_PHYSICS_SUBSTEPS`, retorno de `stepSimulation`, somado entre as cenas com física).
+- RolimaRacer, Pista_1 com 20 IA: 11 substeps em todos os quadros (Pista_1 5 + 0_SCN_System 4 + demais). A física
+  que varia entre 2,7 e 5 ms não vem de substeps extras, e sim do número de contatos.
+- Auto Static Batch no benchmark da Thunder (1.600 objetos, plano Silent): desligado 590-720 fps, Auto 1.265-1.280,
+  igual ao Static Batch manual (1.268-1.279). Thunder na mesma hora: 1.309 (em 2026-10-09, em outro plano de energia,
+  as duas faziam ~2.330). Pasta `D:\ThunderPlayer-investigacaoenchmark\diagnosticoutosb_1030`.
+- Corrida com 20 IA, build de 28/10 x atual: diferença menor que a variação entre rodadas; os scripts Python
+  (~7 ms) dominam o quadro e os ganhos do plano 29/10 (sombras, materiais, propriedades) quase não aparecem ali.
+
+
 ## 2026-10-30 - Character: capsula na malha e postura (abaixar, rastejar, pulo)
 
 - Capsula do Character agora fica no centro da malha quando a origem nao esta no centro (antes ficava presa na origem e o boneco afundava/flutuava). Forma convexa de duas esferas (btMultiSphereShape), sem compound.

@@ -49,6 +49,8 @@ enum CM_WorkCounter {
 	CM_WORK_PASS_UNIFORMS,
 	/// Instance VBO streams submitted after their cached contents changed.
 	CM_WORK_INSTANCING_UPLOADS,
+	/// Bullet substeps run this frame (stepSimulation return), to explain physics time spikes.
+	CM_WORK_PHYSICS_SUBSTEPS,
 	CM_WORK_COUNTER_MAX
 };
 

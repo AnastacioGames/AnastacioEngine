@@ -166,7 +166,7 @@ const std::string KX_KetsjiEngine::m_renderQueriesLabels[QUERY_MAX] = {
 static void trace_work()
 {
 	static const char *names[CM_WORK_COUNTER_MAX] = {"nodes", "syncs", "bounds", "matrices", "notifies", "lightUniforms",
-	                                                  "passUniforms", "instancing"};
+	                                                  "passUniforms", "instancing", "substeps"};
 	char buf[64];
 	std::string parts;
 	snprintf(buf, sizeof(buf), "\"draws\":%d,\"matBinds\":%d,\"lightBinds\":%d", RAS_Rasterizer::GetLastDrawCalls(),
