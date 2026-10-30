@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - Colisão (narrowphase) em paralelo no Bullet
+
+- `CcdCollisionDispatcher` substitui o dispatcher do Bullet: os pares do broadphase são testados em threads. Pools de
+  algoritmo/manifold ficam sob mutex, cada algoritmo convexo tem seu simplex solver, e criações/liberações são
+  reaplicadas na ordem dos pares (mesma ordem de manifolds do serial). Liga por padrão; `RANGE_PHYSICS_MT=0` desliga.
+- RolimaRacer, Pista_1 com 20 IA, 2 rodadas alternadas: física 2,96/5,66 → 2,18/4,75 ms (-16 a -26%), +4 a +6 fps.
+- Determinismo: cena `tools/debug/cenas/criar_cena_determinismo_fisica.py` (64 corpos convexos e compound sobre
+  trimesh, `-g fixed_timestep 1`, posições no quadro 400) deu arquivo idêntico em 2 rodadas serial e 3 paralelas.
+
 ## 2026-10-29 - Telas internas do jogo criadas sob demanda (VRAM)
 
 - `RAS_ICanvas` criava as 9 telas internas no tamanho da janela de uma vez (filtros, olhos esquerdo/direito, profundidade,
