@@ -17,6 +17,7 @@
  * purpose.  It is provided "as is" without express or implied warranty.
  *
  */
+#include <algorithm>
 #include "EXP_Value.h"
 #include "EXP_BoolValue.h"
 #include "EXP_FloatValue.h"
@@ -153,25 +154,30 @@ void EXP_Value::SetProperty(const std::string & name, EXP_Value *ioProperty)
 		return;
 	}
 
-	// Try to replace property (if so -> exit as soon as we replaced it).
-	EXP_Value *oldval = m_properties[name];
-
-	// AddRef the new value before releasing the old one, in case they're the same object.
-	m_properties[name] = ioProperty->AddRef();
-
-	if (oldval) {
+	// Keep the list sorted by name: iteration order (GetPropertyNames, Python keys) stays alphabetical.
+	const auto it = LowerBound(name);
+	if (it != m_properties.end() && it->first == name) {
+		// AddRef the new value before releasing the old one, in case they're the same object.
+		PropertyEntry& entry = m_properties[it - m_properties.begin()];
+		EXP_Value *oldval = entry.second;
+		entry.second = ioProperty->AddRef();
 		oldval->Release();
+		return;
 	}
+
+	m_properties.insert(it, PropertyEntry{name, ioProperty->AddRef(), HashName(name)});
+}
+
+EXP_Value::PropertyList::const_iterator EXP_Value::LowerBound(std::string_view name) const
+{
+	return std::lower_bound(m_properties.begin(), m_properties.end(), name,
+	                        [](const PropertyEntry& entry, std::string_view key) { return entry.first < key; });
 }
 
 /// Get pointer to a property with name <inName>, returns nullptr if there is no property named <inName>.
 EXP_Value *EXP_Value::GetProperty(const std::string & inName)
 {
-	auto it = m_properties.find(inName);
-	if (it != m_properties.end()) {
-		return it->second;
-	}
-	return nullptr;
+	return FindProperty(inName);
 }
 
 /// Get text description of property with name <inName>, returns an empty string if there is no property named <inName>.
@@ -200,10 +206,12 @@ float EXP_Value::GetPropertyNumber(const std::string& inName, float defnumber)
 /// Remove the property named <inName>, returns true if the property was succesfully removed, false if property was not found or could not be removed.
 bool EXP_Value::RemoveProperty(const std::string& inName)
 {
-	auto it = m_properties.find(inName);
-	if (it != m_properties.end()) {
-		(*it).second->Release();
-		m_properties.erase(it);
+	const PropertyEntry *entry = FindEntry(inName);
+	if (entry) {
+		// Erase before Release: the value's destructor must not see (or invalidate) its own entry.
+		EXP_Value *value = entry->second;
+		m_properties.erase(m_properties.begin() + (entry - m_properties.data()));
+		value->Release();
 		return true;
 	}
 
@@ -236,13 +244,10 @@ void EXP_Value::ClearProperties()
 /// Get property number <inIndex>.
 EXP_Value *EXP_Value::GetProperty(int inIndex)
 {
-	int count = 0;
-	for (const auto& pair : m_properties) {
-		if (count++ == inIndex) {
-			return pair.second;
-		}
+	if (inIndex < 0 || (size_t)inIndex >= m_properties.size()) {
+		return nullptr;
 	}
-	return nullptr;
+	return m_properties[inIndex].second;
 }
 
 /// Get the amount of properties assiocated with this value.

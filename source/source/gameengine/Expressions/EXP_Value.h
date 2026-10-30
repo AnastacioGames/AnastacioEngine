@@ -25,7 +25,8 @@
 
 #include "CM_RefCount.h"
 
-#include <map> // Array functionality for the property list.
+#include <map> // Kept: many headers rely on it arriving through here.
+#include <functional> // std::hash<std::string_view>.
 #include <vector>
 #include <string> // std::string class.
 #include <string_view>
@@ -124,14 +125,24 @@ public:
 	virtual EXP_Value *CalcFinal(VALUE_DATA_TYPE dtype, VALUE_OPERATOR op, EXP_Value *val);
 
 	/// Property Management
+	/** One property, kept in a contiguous list sorted by name (same order the old std::map gave).
+	 * first/second keep the std::pair spelling used by callers that iterate GetProperties(). */
+	struct PropertyEntry
+	{
+		std::string first;
+		EXP_Value *second;
+		size_t hash;
+	};
+	using PropertyList = std::vector<PropertyEntry>;
+
 	/// Set property <ioProperty>, overwrites and releases a previous property with the same name if needed.
 	virtual void SetProperty(const std::string& name, EXP_Value *ioProperty);
 	virtual EXP_Value *GetProperty(const std::string & inName);
 	/// Same lookup without building a std::string (Python obj.get / obj[name] / "name" in obj).
 	EXP_Value *FindProperty(std::string_view inName) const
 	{
-		const auto it = m_properties.find(inName);
-		return (it != m_properties.end()) ? it->second : nullptr;
+		const PropertyEntry *entry = FindEntry(inName);
+		return entry ? entry->second : nullptr;
 	}
 	/// Get text description of property with name <inName>, returns an empty string if there is no property named <inName>.
 	const std::string GetPropertyText(const std::string & inName);
@@ -142,10 +153,10 @@ public:
 	/// Clear all properties.
 	virtual void ClearProperties();
 
-	/// Get property number <inIndex>. O(n) per call: walks the map from the start, prefer GetProperties() in loops.
+	/// Get property number <inIndex> (alphabetical order), nullptr when out of range.
 	virtual EXP_Value *GetProperty(int inIndex);
-	/// Direct read-only access to the property map, for O(n) iteration.
-	const std::map<std::string, EXP_Value *, std::less<>>& GetProperties() const
+	/// Direct read-only access to the property list, sorted by name.
+	const PropertyList& GetProperties() const
 	{
 		return m_properties;
 	}
@@ -178,9 +189,32 @@ protected:
 	virtual void DestructFromPython();
 
 private:
+	/** Lookup by name: compares hashes over the contiguous list (objects rarely have more than a
+	 * few dozen properties), binary search by name past LINEAR_LOOKUP_MAX. A std::map walk here
+	 * cost one cache miss per tree node plus one per long (heap) name. */
+	static constexpr size_t LINEAR_LOOKUP_MAX = 32;
+	static size_t HashName(std::string_view name)
+	{
+		return std::hash<std::string_view>()(name);
+	}
+	const PropertyEntry *FindEntry(std::string_view name) const
+	{
+		if (m_properties.size() <= LINEAR_LOOKUP_MAX) {
+			const size_t hash = HashName(name);
+			for (const PropertyEntry& entry : m_properties) {
+				if (entry.hash == hash && entry.first == name) {
+					return &entry;
+				}
+			}
+			return nullptr;
+		}
+		const auto it = LowerBound(name);
+		return (it != m_properties.end() && it->first == name) ? &*it : nullptr;
+	}
+	PropertyList::const_iterator LowerBound(std::string_view name) const;
+
 	/// Properties for user/game etc.
-	/// std::less<> lets FindProperty look up by string_view without allocating.
-	std::map<std::string, EXP_Value *, std::less<>> m_properties;
+	PropertyList m_properties;
 };
 
 /** EXP_PropValue is a EXP_Value derived class, that implements the identification (String name)
