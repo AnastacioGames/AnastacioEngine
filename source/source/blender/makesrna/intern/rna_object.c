@@ -2430,6 +2430,13 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_float_default(prop, 0.3f);
 	RNA_def_property_ui_text(prop, "Crawl Speed", "Walk speed while crawling (1 = same as standing)");
 
+	prop = RNA_def_property(srna, "run_speed", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "run_speed");
+	RNA_def_property_range(prop, 1.0f, 10.0f);
+	RNA_def_property_ui_range(prop, 1.0f, 4.0f, 1, 2);
+	RNA_def_property_float_default(prop, 1.8f);
+	RNA_def_property_ui_text(prop, "Run Speed", "Walk speed while running, standing only (1 = same as walking)");
+
 	prop = RNA_def_property(srna, "use_auto_crouch", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "posture_flag", OB_POSTURE_AUTO_CROUCH);
 	RNA_def_property_ui_text(prop, "Auto Crouch",

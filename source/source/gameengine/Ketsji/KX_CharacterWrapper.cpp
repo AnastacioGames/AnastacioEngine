@@ -104,6 +104,7 @@ PyAttributeDef KX_CharacterWrapper::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("smoothMovement", KX_CharacterWrapper, pyattr_get_smoothMovement, pyattr_set_smoothMovement),
 	EXP_PYATTRIBUTE_RW_FUNCTION("posture", KX_CharacterWrapper, pyattr_get_posture, pyattr_set_posture),
 	EXP_PYATTRIBUTE_RO_FUNCTION("canStand", KX_CharacterWrapper, pyattr_get_canStand),
+	EXP_PYATTRIBUTE_RW_FUNCTION("running", KX_CharacterWrapper, pyattr_get_running, pyattr_set_running),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
 
@@ -132,6 +133,28 @@ int KX_CharacterWrapper::pyattr_set_posture(EXP_PyObjectPlus *self_v, const EXP_
 	}
 	PyErr_SetString(PyExc_ValueError, "KX_CharacterWrapper.posture: expected 'STAND', 'CROUCH' or 'CRAWL'");
 	return PY_SET_ATTR_FAIL;
+}
+
+PyObject *KX_CharacterWrapper::pyattr_get_running(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_CharacterWrapper *self = static_cast<KX_CharacterWrapper *>(self_v);
+	CHARACTER_VALID_CHECK_OR_RETURN(self->m_character, attrdef->m_name.c_str(), nullptr);
+
+	return PyBool_FromLong(self->m_character->IsRunning());
+}
+
+int KX_CharacterWrapper::pyattr_set_running(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_CharacterWrapper *self = static_cast<KX_CharacterWrapper *>(self_v);
+	CHARACTER_VALID_CHECK_OR_RETURN(self->m_character, attrdef->m_name.c_str(), PY_SET_ATTR_FAIL);
+
+	const int param = PyObject_IsTrue(value);
+	if (param == -1) {
+		PyErr_SetString(PyExc_TypeError, "KX_CharacterWrapper.running: expected True or False");
+		return PY_SET_ATTR_FAIL;
+	}
+	self->m_character->SetRunning(param != 0);
+	return PY_SET_ATTR_SUCCESS;
 }
 
 PyObject *KX_CharacterWrapper::pyattr_get_canStand(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)

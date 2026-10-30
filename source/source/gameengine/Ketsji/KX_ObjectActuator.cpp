@@ -222,11 +222,14 @@ bool KX_ObjectActuator::Update()
 		// Explicitly stop the movement if we're using character motion
 		if (m_bitLocalFlag.CharacterMotion) {
 			// A posture-only brick (Loc zero) must not stop another brick's walking.
-			if (m_posture == 0 || !m_bitLocalFlag.ZeroDLoc) {
+			if ((m_posture == 0 && !m_bitLocalFlag.CharacterRun) || !m_bitLocalFlag.ZeroDLoc) {
 				character->SetWalkDirection(mt::zero3);
 			}
 			if (m_posture != 0) {
 				character->SetPosture(POSTURE_STAND); // stands when there is room
+			}
+			if (m_bitLocalFlag.CharacterRun) {
+				character->SetRunning(false);
 			}
 		}
 
@@ -356,7 +359,7 @@ bool KX_ObjectActuator::Update()
 			}
 
 			// We always want to set the walk direction since a walk direction of (0, 0, 0) should stop the character
-			if (m_posture == 0 || !m_bitLocalFlag.ZeroDLoc) {
+			if ((m_posture == 0 && !m_bitLocalFlag.CharacterRun) || !m_bitLocalFlag.ZeroDLoc) {
 				character->SetWalkDirection(dir / parent->GetScene()->GetPhysicsEnvironment()->GetNumTimeSubSteps());
 			}
 
@@ -366,6 +369,9 @@ bool KX_ObjectActuator::Update()
 
 			if (m_posture != 0) {
 				character->SetPosture((m_posture == 2) ? POSTURE_CRAWL : POSTURE_CROUCH);
+			}
+			if (m_bitLocalFlag.CharacterRun) {
+				character->SetRunning(true);
 			}
 
 			if (m_bitLocalFlag.CharacterJump) {

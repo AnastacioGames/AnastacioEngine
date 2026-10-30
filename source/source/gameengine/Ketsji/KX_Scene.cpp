@@ -1968,6 +1968,11 @@ void KX_Scene::UpdateCharacterPostureProperties()
 		}
 		const std::string& prop = character->GetPostureProperty();
 		const char *name = names[character->GetPosture()];
+		if (character->GetPosture() == POSTURE_STAND && character->IsRunning() &&
+		    !mt::FuzzyZero(character->GetWalkDirection()))
+		{
+			name = "RUN";
+		}
 		EXP_Value *old = gameobj->GetProperty(prop);
 		if (old && old->GetText() == name) {
 			continue; // unchanged: keep Property sensors from seeing a new value

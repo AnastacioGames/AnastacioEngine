@@ -2330,8 +2330,10 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 
 			split = uiLayoutSplit(layout, 0.9, false);
 			row = uiLayoutRow(split, false);
-			split = uiLayoutSplit(row, 0.7, false);
+			split = uiLayoutSplit(row, 0.4, false);
 			uiItemL(split, "", ICON_NONE); /*Just use this for some spacing */
+			split = uiLayoutRow(split, true);
+			uiItemR(split, ptr, "use_character_run", UI_ITEM_R_TOGGLE, NULL, ICON_FF);
 			uiItemR(split, ptr, "use_character_jump", UI_ITEM_R_TOGGLE, NULL, ICON_POSE_DATA);
 			uiItemR(layout, ptr, "character_posture", 0, NULL, ICON_NONE);
 			break;

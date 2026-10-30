@@ -377,6 +377,8 @@ CcdCharacter::CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionStat
 	m_standRadius(0.0f),
 	m_crouchSpeed(1.0f),
 	m_crawlSpeed(1.0f),
+	m_runSpeed(1.0f),
+	m_running(false),
 	m_autoCrouch(false),
 	m_autoCrouched(false),
 	m_lastBasis(btMatrix3x3::getIdentity()),
@@ -661,7 +663,8 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 
 	// Slower while crouched / crawling: scale the walk step for this update only.
 	const btScalar speed = (m_posture == POSTURE_CROUCH) ? m_crouchSpeed :
-	                       (m_posture == POSTURE_CRAWL) ? m_crawlSpeed : btScalar(1.0f);
+	                       (m_posture == POSTURE_CRAWL) ? m_crawlSpeed :
+	                       (m_running && m_posture == POSTURE_STAND) ? m_runSpeed : btScalar(1.0f);
 	if (speed != 1.0f) {
 		const btVector3 walk = m_walkDirection;
 		m_walkDirection *= speed;
@@ -1276,6 +1279,7 @@ bool CcdPhysicsController::CreateCharacterController()
 	m_characterController->setJumpDirection(m_cci.m_jumpAxis);
 	m_characterController->SetPostureSettings(m_cci.m_crouchHeight, m_cci.m_crawlHeight, m_cci.m_jumpTuck, m_cci.m_crawlAxis);
 	m_characterController->SetPostureMotion(m_cci.m_crouchSpeed, m_cci.m_crawlSpeed, m_cci.m_autoCrouch, m_cci.m_postureProperty);
+	m_characterController->SetRunSpeed(m_cci.m_runSpeed);
 
 	return true;
 }

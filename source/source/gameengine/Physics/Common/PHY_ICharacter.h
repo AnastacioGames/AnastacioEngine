@@ -91,6 +91,9 @@ public:
 	virtual int GetPosture() const = 0;
 	virtual int GetRequestedPosture() const = 0;
 	virtual bool CanStand() const = 0;
+	/// Run: walk faster (Run Speed) while standing.
+	virtual void SetRunning(bool running) = 0;
+	virtual bool IsRunning() const = 0;
 	/// Game property to keep updated with the posture name (empty = none).
 	virtual const std::string& GetPostureProperty() const = 0;
 

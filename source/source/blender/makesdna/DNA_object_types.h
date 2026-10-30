@@ -697,6 +697,8 @@ typedef struct Object {
 	float jump_tuck;
 	/* Walk speed factor while crouched / crawling */
 	float crouch_speed, crawl_speed;
+	/* Walk speed factor while running (standing only) */
+	float run_speed, pad_run;
 	/* Game property kept up to date with the posture name ("STAND", "CROUCH", ...) */
 	char posture_prop[64]; /* MAX_NAME */
 

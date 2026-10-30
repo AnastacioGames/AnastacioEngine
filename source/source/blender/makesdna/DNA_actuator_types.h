@@ -328,6 +328,7 @@ typedef struct bActuator {
 #define ACT_CHAR_POSTURE_CROUCH	1
 #define ACT_CHAR_POSTURE_CRAWL	2
 #define ACT_DLOC_VR_GAZE		512 /* Loc follows the head gaze (y = forward), horizontal only */
+#define ACT_CHAR_RUN			2048 /* character motion: run (Run Speed of the physics settings) */
 #define ACT_DLOC_VR_TELEPORT	1024 /* with VR Gaze: jump once to the looked-at ground point (Loc Y = max distance) instead of walking */
 
 /* objectactuator->type */

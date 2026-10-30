@@ -3403,6 +3403,7 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		ci.m_crawlAxis = blenderobject->crawl_axis;
 		ci.m_crouchSpeed = blenderobject->crouch_speed;
 		ci.m_crawlSpeed = blenderobject->crawl_speed;
+		ci.m_runSpeed = blenderobject->run_speed;
 		ci.m_autoCrouch = (blenderobject->posture_flag & OB_POSTURE_AUTO_CROUCH) != 0;
 		ci.m_postureProperty = blenderobject->posture_prop;
 		if (blenderobject->posture_prop[0]) {

@@ -195,6 +195,7 @@ void BL_ConvertActuators(const char *maggiename,
 				bitLocalFlag.SetPositionMode = bool(obact->type == ACT_OBJECT_NORMAL_SET);
 				bitLocalFlag.CharacterMotion = bool(obact->type == ACT_OBJECT_CHARACTER);
 				bitLocalFlag.CharacterJump = bool((obact->flag & ACT_CHAR_JUMP) != 0);
+				bitLocalFlag.CharacterRun = bool((obact->flag & ACT_CHAR_RUN) != 0);
 				bitLocalFlag.AddOrSetLinV = bool((obact->flag & ACT_ADD_LIN_VEL) != 0);
 				bitLocalFlag.AddOrSetCharLoc = bool((obact->flag & ACT_ADD_CHAR_LOC) != 0);
 				bitLocalFlag.ServoControlAngular = (obact->servotype == ACT_SERVO_ANGULAR);

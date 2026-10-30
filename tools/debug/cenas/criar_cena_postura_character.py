@@ -68,6 +68,9 @@ lento.game.crawl_speed = 0.3
 auto = boneco('Auto', 0, -8, (0.3, 0.9, 0.9))
 auto.game.use_auto_crouch = True
 boneco('Gira', 0, 8, (0.9, 0.5, 0.2))
+corre = boneco('Corre', 0, 16, (0.4, 0.9, 0.4))
+corre.game.run_speed = 1.8
+corre.game.posture_property = 'pose'
 
 t = bpy.data.texts.new('postura.py')
 t.write('''import bge
@@ -146,6 +149,22 @@ def tick(cont):
         cr.walkDirection = (0.02, 0, 0)
     if f == 140:
         cl.walkDirection = (0, 0, 0); cr.walkDirection = (0, 0, 0)
+    # --- Corrida: Corre (Run Speed 1.8) x Rasteja andando, mesma caminhada
+    co = sc.objects['Corre']; cc = C.getCharacter(co)
+    if f == 100:
+        estado['xc'] = co.worldPosition.x
+        cc.running = True
+    if 110 <= f < 140:
+        cc.walkDirection = (0.02, 0, 0)
+    if f == 125:
+        linhas.append('corrida: pose=%%r (esperado RUN)' %% co.get('pose'))
+    if f == 140:
+        cc.walkDirection = (0, 0, 0)
+        cc.running = False
+    if f == 150:
+        dc = co.worldPosition.x - estado['xc']; dr2 = r.worldPosition.x - estado['x0'][1]
+        linhas.append('corrida: %%.2f de %%.2f = %%.2f (esperado ~1.80); pose=%%r (esperado STAND)' %% (
+            dc, dr2, dc / dr2 if dr2 else 0, co.get('pose')))
     if f == 150:
         dl = lo.worldPosition.x - estado['x0'][0]; dr = r.worldPosition.x - estado['x0'][1]
         linhas.append('velocidade deitado: %%.2f de %%.2f = %%.2f (esperado ~0.30)' %% (dl, dr, dl / dr if dr else 0))

@@ -127,6 +127,9 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             row.prop(game, "crouch_speed", slider=True)
             row.prop(game, "crawl_speed", slider=True)
             row = box.row()
+            row.prop(game, "run_speed", slider=True)
+            row.label(text="")
+            row = box.row()
             row.prop(game, "use_jump_tuck")
             sub = row.row()
             sub.active = game.use_jump_tuck

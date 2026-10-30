@@ -365,6 +365,12 @@ void blo_do_versions_upbge(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "Object", "float", "run_speed")) {
+    for (Object *ob = main->object.first; ob; ob = ob->id.next) {
+      ob->run_speed = 1.8f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "Material", "float", "roughness_bsdf")) {
     for (Material *mat = main->mat.first; mat; mat = mat->id.next) {
       mat->roughness_bsdf = 0.5f;

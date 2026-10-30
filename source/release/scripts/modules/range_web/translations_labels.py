@@ -1105,6 +1105,9 @@ TABLE = (
 EXTRA = (
     # Postura do Character (abaixar / rastejar / pulo)
     ("Posture (Crouch / Crawl / Jump):", "Postura (abaixar / rastejar / pulo):", "Postura (agacharse / arrastrarse / salto):", "Поза (присесть / ползти / прыжок):"),
+    ("Run Speed", "Velocidade correndo", "Velocidad corriendo", "Скорость бега"),
+    ("Walk speed while running, standing only (1 = same as walking)", "Velocidade correndo, só em pé (1 = igual andando)", "Velocidad corriendo, solo de pie (1 = igual que caminando)", "Скорость бега, только стоя (1 = как при ходьбе)"),
+    ("Run while active, using the Run Speed of the physics properties", "Corre enquanto ativo, com a Velocidade correndo da física", "Corre mientras está activo, con la Velocidad corriendo de la física", "Бежать, пока активно, со скоростью бега из физики"),
     ("Crouch Speed", "Velocidade abaixado", "Velocidad agachado", "Скорость в приседе"),
     ("Crawl Speed", "Velocidade deitado", "Velocidad arrastrándose", "Скорость ползком"),
     ("Auto Crouch", "Abaixar sozinho", "Agacharse solo", "Автоприсед"),

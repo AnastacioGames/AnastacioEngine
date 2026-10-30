@@ -885,7 +885,8 @@ def _character_code(act):
         act.use_add_character_location, A("Rot", act.offset_rotation), act.use_local_rotation,
         A("Jump", act.use_character_jump), substeps,
         (", gaze=True" if act.use_vr_gaze else "") +
-        (", posture=%r" % act.character_posture if act.character_posture != 'NONE' else ""))], True
+        (", posture=%r" % act.character_posture if act.character_posture != 'NONE' else "") +
+        (", run=True" if act.use_character_run else ""))], True
 
 
 _ACTION_MODES = {'PLAY': 0, 'PINGPONG': 1, 'FLIPPER': 2, 'LOOPSTOP': 3, 'LOOPEND': 4, 'PROPERTY': 6}
@@ -2419,7 +2420,7 @@ _EXTRA["_servo"] = '''
 '''
 _EXTRA["_char_move"] = '''
     def _char_move(self, key, on, loc, local, add, rot, rot_local, jump, substeps, gaze=False, own=None,
-                   posture=None):
+                   posture=None, run=False):
         """Motion Character (KX_ObjectActuator): anda com o personagem; ao soltar, para.
         posture ('CROUCH'/'CRAWL'): abaixa/deita enquanto ativo e levanta ao soltar (se couber)."""
         from Range import constraints
@@ -2427,16 +2428,20 @@ _EXTRA["_char_move"] = '''
         ch = constraints.getCharacter(ob)
         if ch is None:
             return
-        walks = not posture or any(loc)  # brick so de postura nao mexe na caminhada
+        walks = not (posture or run) or any(loc)  # brick so de postura/corrida nao mexe na caminhada
         if not on:
             if self._ticks.pop(key, None) is not None:
                 if walks:
                     ch.walkDirection = (0.0, 0.0, 0.0)
                 if posture:
                     ch.posture = 'STAND'
+                if run:
+                    ch.running = False
             return
         if posture:
             ch.posture = posture
+        if run:
+            ch.running = True
         step = 60.0 * logic.deltaTime()
         d = Vector(loc) * step
         if gaze:

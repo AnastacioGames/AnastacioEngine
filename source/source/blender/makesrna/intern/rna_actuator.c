@@ -1014,6 +1014,11 @@ static void rna_def_object_actuator(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Z", "Set limit to force/torque along the Z axis");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
+	prop = RNA_def_property(srna, "use_character_run", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_CHAR_RUN);
+	RNA_def_property_ui_text(prop, "Run", "Run while active, using the Run Speed of the physics properties");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
 	prop = RNA_def_property(srna, "use_character_jump", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_CHAR_JUMP);
 	RNA_def_property_ui_text(prop, "Jump", "Make the character jump using the settings in the physics properties");

@@ -56,6 +56,7 @@ struct KX_LocalFlags {
 		SetPositionMode(false),
 		CharacterMotion(false),
 		CharacterJump(false),
+		CharacterRun(false),
 		ZeroForce(false),
 		ZeroTorque(false),
 		ZeroDRot(false),
@@ -80,6 +81,7 @@ struct KX_LocalFlags {
 	bool SetPositionMode;
 	bool CharacterMotion;
 	bool CharacterJump;
+	bool CharacterRun;
 	bool ZeroForce;
 	bool ZeroTorque;
 	bool ZeroDRot;
