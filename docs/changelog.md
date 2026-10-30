@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - Character: capsula na malha e postura (abaixar, rastejar, pulo)
+
+- Capsula do Character agora fica no centro da malha quando a origem nao esta no centro (antes ficava presa na origem e o boneco afundava/flutuava). Forma convexa de duas esferas (btMultiSphereShape), sem compound.
+- Postura: Crouch Height, Crawl Height e Jump Tuck no painel de fisica; campo Posture no actuator Motion (Character); Python `character.posture` ('STAND'/'CROUCH'/'CRAWL'/'JUMP_TUCK') e `character.canStand`. So a forma de colisao muda.
+- Levantar/esticar as pernas so acontece se a forma em pe couber (contactTest com tolerancia da margem do outro objeto); sob teto o boneco fica abaixado e levanta sozinho ao sair. Pulo bloqueado ao rastejar.
+- DNA: Object.crouch_height/crawl_height/jump_tuck/posture_flag (versioning por campo), bObjectActuator.posture no pad.
+- Crawl Front (+Y/-Y/+X/-X, Object.crawl_axis no pad): deitado o corpo sai de tras dos pes para a frente escolhida. Actuator so de postura (Loc zero) nao zera mais a caminhada de outro brick. Textos traduzidos (pt/es/ru) em translations_labels.py; quadro tambem no painel do FlowMenu.
+- Sugestoes da revisao: Crouch/Crawl Speed (passo de caminhada escalado so no update), Auto Crouch (sonda a frente: em pe nao cabe e abaixado cabe), Posture Property (KX_Scene::UpdateCharacterPostureProperties apos a fisica grava STAND/CROUCH/CRAWL/JUMP_TUCK, so quando muda), giro deitado desfeito se jogar o corpo na parede, no "Character Motion" no Logic Tree e posture no conversor Logic->Python. DNA: crouch_speed, crawl_speed, posture_prop[64].
+- Corrida: Run Speed (padrao 1.8, so em pe), opcao Run no actuator Motion (Character) e no no Character Motion, Python `character.running`; Posture Property mostra RUN correndo. DNA: run_speed (+pad), ACT_CHAR_RUN 2048.
+- Revisao: btMultiSphereShape escala so os raios (nao as posicoes) -> CcdMultiSphereShape escala ambos (personagem com escala != 1 e origem fora do centro flutuava 0.4 m); SetScaling do personagem escala a forma em pe e refaz as de postura; troca de forma limpa os pares em cache (cleanProxyFromPairs); dica da Posture Property cita RUN.
+- Teste: tools/debug/cenas/criar_cena_postura_character.py (todos os casos OK); falta aceite com janela e postura nos bricks do Logic Tree/Bricks 2.0.
+
+
 ## 2026-10-30 - Propriedades de jogo em lista contínua com hash
 
 - `EXP_Value` guardava as propriedades num `std::map`; agora é um vetor ordenado por nome com o hash do nome em
