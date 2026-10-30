@@ -8,6 +8,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - Propriedades de jogo em lista contínua com hash
+
+- `EXP_Value` guardava as propriedades num `std::map`; agora é um vetor ordenado por nome com o hash do nome em
+  cache (busca linear por hash até 32 entradas, binária acima). A ordem continua alfabética (`getPropertyNames`,
+  chaves no Python, `GetProperty(int)`, que ficou O(1)). `RemoveProperty` tira da lista antes de liberar o valor.
+- Micro A/B (2.000 objetos, `obj[chave]` no Python, mediana por acesso): 1 propriedade 315 → 123 ns, 20 curtas
+  686 → 123 ns, 20 longas 1.479 → 255 ns, chave ausente 658 → 176 ns. Cenas de lógica com 1 propriedade por objeto:
+  Actuators ~−5%, frame dentro do ruído. Teste de comportamento idêntico ao build anterior.
+- Investigação da submissão mais barata com GPU ocupada (plano 29/10, item 3) refeita com Silent e Turbo: não se
+  reproduz no build atual e o plano de energia não muda a CPU de render. Encerrada sem código.
+
 ## 2026-10-30 - Passadas de sombra percorrem só os materiais visíveis
 
 - `RAS_BucketManager` guarda a lista dos materiais com algo visível na passada (`RAS_MaterialBucket::MarkActive`

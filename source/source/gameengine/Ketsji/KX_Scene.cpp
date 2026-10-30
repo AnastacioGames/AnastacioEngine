@@ -1157,7 +1157,7 @@ KX_GameObject *KX_Scene::AddNodeReplicaObject(SG_Node *node, KX_GameObject *game
 	m_map_gameobject_to_replica[gameobj] = newobj;
 
 	// Also register 'timers' (time properties) of the replica.
-	// Iterate the map directly: GetProperty(i) restarts the walk on every call (O(n^2)).
+	// Iterate the property list directly.
 	for (const auto& pair : newobj->GetProperties()) {
 		EXP_Value *prop = pair.second;
 
