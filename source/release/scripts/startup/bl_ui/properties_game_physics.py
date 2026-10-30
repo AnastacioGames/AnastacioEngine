@@ -121,6 +121,9 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             row.prop(game, "crouch_height", slider=True)
             row.prop(game, "crawl_height", slider=True)
             row = box.row()
+            row.label(text="Crawl Front:")
+            row.prop(game, "crawl_axis", expand=True)
+            row = box.row()
             row.prop(game, "use_jump_tuck")
             sub = row.row()
             sub.active = game.use_jump_tuck

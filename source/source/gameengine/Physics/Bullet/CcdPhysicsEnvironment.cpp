@@ -3399,6 +3399,7 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 	if (isbulletchar) {
 		ci.m_crouchHeight = blenderobject->crouch_height;
 		ci.m_crawlHeight = blenderobject->crawl_height;
+		ci.m_crawlAxis = blenderobject->crawl_axis;
 		ci.m_jumpTuck = (blenderobject->posture_flag & OB_POSTURE_JUMP_TUCK) ? blenderobject->jump_tuck : 0.0f;
 	}
 	ci.m_jumpAxis = btVector3(

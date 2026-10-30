@@ -221,7 +221,10 @@ bool KX_ObjectActuator::Update()
 		m_vr_teleport_done = false;
 		// Explicitly stop the movement if we're using character motion
 		if (m_bitLocalFlag.CharacterMotion) {
-			character->SetWalkDirection(mt::zero3);
+			// A posture-only brick (Loc zero) must not stop another brick's walking.
+			if (m_posture == 0 || !m_bitLocalFlag.ZeroDLoc) {
+				character->SetWalkDirection(mt::zero3);
+			}
 			if (m_posture != 0) {
 				character->SetPosture(POSTURE_STAND); // stands when there is room
 			}
@@ -353,7 +356,9 @@ bool KX_ObjectActuator::Update()
 			}
 
 			// We always want to set the walk direction since a walk direction of (0, 0, 0) should stop the character
-			character->SetWalkDirection(dir / parent->GetScene()->GetPhysicsEnvironment()->GetNumTimeSubSteps());
+			if (m_posture == 0 || !m_bitLocalFlag.ZeroDLoc) {
+				character->SetWalkDirection(dir / parent->GetScene()->GetPhysicsEnvironment()->GetNumTimeSubSteps());
+			}
 
 			if (!m_bitLocalFlag.ZeroDRot) {
 				parent->ApplyRotation((m_drot * 60.f) * KX_GetActiveEngine()->GetEngineDeltaTime(), (m_bitLocalFlag.DRot) != 0);

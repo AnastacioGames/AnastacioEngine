@@ -2393,6 +2393,22 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	                         "Collision height when crawling (shape lies down along the object's Y axis), "
 	                         "as a fraction of the standing height");
 
+	{
+		static EnumPropertyItem crawl_axis_items[] = {
+			{OB_CRAWL_AXIS_POS_Y, "POS_Y", 0, "+Y", ""},
+			{OB_CRAWL_AXIS_NEG_Y, "NEG_Y", 0, "-Y", ""},
+			{OB_CRAWL_AXIS_POS_X, "POS_X", 0, "+X", ""},
+			{OB_CRAWL_AXIS_NEG_X, "NEG_X", 0, "-X", ""},
+			{0, NULL, 0, NULL, NULL}
+		};
+		prop = RNA_def_property(srna, "crawl_axis", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "crawl_axis");
+		RNA_def_property_enum_items(prop, crawl_axis_items);
+		RNA_def_property_ui_text(prop, "Crawl Front",
+		                         "Front of the character (local axis): when crawling the body lies down "
+		                         "from the feet towards this side");
+	}
+
 	prop = RNA_def_property(srna, "jump_tuck", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "jump_tuck");
 	RNA_def_property_range(prop, 0.0f, 0.9f);

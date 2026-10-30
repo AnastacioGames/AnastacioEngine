@@ -337,6 +337,7 @@ struct CcdConstructionInfo {
 	float m_crouchHeight = 0.5f;
 	float m_crawlHeight = 0.3f;
 	float m_jumpTuck = 0.0f; ///< 0 = jump tuck off.
+	int m_crawlAxis = 0; ///< Front when crawling: 0 +Y, 1 -Y, 2 +X, 3 -X.
 
 	int m_gamesoftFlag;
 	unsigned short m_softBendingDistance;
@@ -488,6 +489,7 @@ private:
 	float m_crawlHeight;
 	float m_jumpTuck;
 	float m_tuckLift; ///< Height removed from the bottom by the tuck shape.
+	int m_crawlAxis;
 	int m_posture;
 	int m_requestedPosture;
 	bool m_canStand;
@@ -504,7 +506,7 @@ public:
 	CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionState, btPairCachingGhostObject *ghost, btConvexShape *shape, float stepHeight);
 	virtual ~CcdCharacter();
 
-	void SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck);
+	void SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck, int crawlAxis);
 
 	virtual void updateAction(btCollisionWorld *collisionWorld, btScalar dt);
 

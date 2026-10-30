@@ -1103,6 +1103,27 @@ TABLE = (
 # Textos que o catalogo do Blender traduz em alguns idiomas e nao em outros (es ou ru). Ficam nas tres linguas para
 # as tabelas terem as mesmas chaves (engine_i18n.py); onde o catalogo traduz, o dele vence.
 EXTRA = (
+    # Postura do Character (abaixar / rastejar / pulo)
+    ("Posture (Crouch / Crawl / Jump):", "Postura (abaixar / rastejar / pulo):", "Postura (agacharse / arrastrarse / salto):", "Поза (присесть / ползти / прыжок):"),
+    ("Crouch Height", "Altura abaixado", "Altura agachado", "Высота приседа"),
+    ("Crawl Height", "Altura deitado", "Altura arrastrándose", "Высота ползком"),
+    ("Jump Tuck", "Recolher no pulo", "Recoger en el salto", "Поджать в прыжке"),
+    ("Crawl Front:", "Frente ao rastejar:", "Frente al arrastrarse:", "Перед при ползании:"),
+    ("Crawl Front", "Frente ao rastejar", "Frente al arrastrarse", "Перед при ползании"),
+    ("Posture", "Postura", "Postura", "Поза"),
+    ("Stand", "Em pé", "De pie", "Стоя"),
+    ("Crouch", "Abaixar", "Agacharse", "Присесть"),
+    ("Crawl", "Rastejar", "Arrastrarse", "Ползти"),
+    ("Motion actuator > Posture, or Python: character.posture", "Actuator Motion > Postura, ou Python: character.posture", "Actuador Motion > Postura, o Python: character.posture", "Актуатор Motion > Поза или Python: character.posture"),
+    ("Collision height when crouching, as a fraction of the standing height (the top of the shape shrinks, the feet stay on the ground)", "Altura da colisão abaixado, em fração da altura em pé (o topo desce, os pés ficam no chão)", "Altura de colisión agachado, como fracción de la altura de pie (la parte superior baja, los pies quedan en el suelo)", "Высота коллизии в приседе, доля от роста стоя (верх опускается, ноги на земле)"),
+    ("Collision height when crawling (shape lies down along the object's Y axis), as a fraction of the standing height", "Altura da colisão deitado, em fração da altura em pé", "Altura de colisión arrastrándose, como fracción de la altura de pie", "Высота коллизии ползком, доля от роста стоя"),
+    ("Part of the height removed from the bottom while rising in a jump (legs pulled up)", "Parte da altura tirada de baixo enquanto sobe no pulo (pernas recolhidas)", "Parte de la altura quitada desde abajo al subir en el salto (piernas recogidas)", "Часть высоты, убираемая снизу при подъёме в прыжке (ноги поджаты)"),
+    ("Pull the bottom of the collision shape up while rising in a jump", "Recolhe a parte de baixo da colisão enquanto sobe no pulo", "Recoge la parte inferior de la colisión al subir en el salto", "Поднимать низ коллизии при подъёме в прыжке"),
+    ("Front of the character (local axis): when crawling the body lies down from the feet towards this side", "Frente do personagem (eixo local): ao rastejar o corpo deita dos pés para este lado", "Frente del personaje (eje local): al arrastrarse el cuerpo se tiende desde los pies hacia este lado", "Перед персонажа (локальная ось): при ползании тело ложится от ног в эту сторону"),
+    ("Character posture while the actuator is active", "Postura do personagem enquanto o actuator está ativo", "Postura del personaje mientras el actuador está activo", "Поза персонажа, пока актуатор активен"),
+    ("Keep the standing collision shape", "Mantém a colisão em pé", "Mantiene la colisión de pie", "Оставить коллизию стоя"),
+    ("Crouch while active, stand up when released (if there is room)", "Abaixa enquanto ativo, levanta ao soltar (se houver espaço)", "Se agacha mientras está activo, se levanta al soltar (si hay espacio)", "Присесть, пока активно; встать при отпускании (если есть место)"),
+    ("Lie down while active, stand up when released (if there is room)", "Deita enquanto ativo, levanta ao soltar (se houver espaço)", "Se tiende mientras está activo, se levanta al soltar (si hay espacio)", "Лечь, пока активно; встать при отпускании (если есть место)"),
     ("Audio", "Áudio", "Audio", "Звук"),
     ("Buffer", "Buffer", "Búfer", "Буфер"),
     ("Color", "Cor", "Color", "Цвет"),

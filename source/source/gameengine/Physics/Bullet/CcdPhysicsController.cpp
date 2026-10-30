@@ -373,6 +373,7 @@ CcdCharacter::CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionStat
 	m_crawlHeight(0.3f),
 	m_jumpTuck(0.0f),
 	m_tuckLift(0.0f),
+	m_crawlAxis(0),
 	m_posture(POSTURE_STAND),
 	m_requestedPosture(POSTURE_STAND),
 	m_canStand(true)
@@ -397,8 +398,9 @@ void CcdCharacter::FreePostureShapes()
 	}
 }
 
-void CcdCharacter::SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck)
+void CcdCharacter::SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck, int crawlAxis)
 {
+	m_crawlAxis = btClamped(crawlAxis, 0, 3);
 	m_crouchHeight = btClamped(crouchHeight, 0.05f, 1.0f);
 	m_crawlHeight = btClamped(crawlHeight, 0.05f, 1.0f);
 	m_jumpTuck = btClamped(jumpTuck, 0.0f, 0.9f);
@@ -413,7 +415,7 @@ static btConvexShape *posture_capsule(const btVector3& center, const btVector3& 
 	const btVector3 centers[2] = {center + half, center - half};
 	const btScalar radii[2] = {radius, radius};
 	btMultiSphereShape *shape = new btMultiSphereShape(centers, radii, 2);
-	shape->setMargin(margin);
+	shape->setMargin(btMin(margin, btScalar(0.5f) * radius)); // margin is inside the spheres
 	return shape;
 }
 
@@ -444,10 +446,13 @@ void CcdCharacter::BuildPostureShapes()
 	const btScalar crouch = height * m_crouchHeight;
 	m_postureShapes[POSTURE_CROUCH] = posture_capsule(btVector3(cx, cy, bottom + 0.5f * crouch), axisZ, crouch, radius, margin);
 
-	// Crawl: lying down along the object's Y axis, on the ground.
+	// Crawl: lying on the ground, from the back of the feet towards the front axis.
 	const btScalar crawl = height * m_crawlHeight;
-	m_postureShapes[POSTURE_CRAWL] = posture_capsule(btVector3(cx, cy, bottom + 0.5f * crawl), btVector3(0.0f, 1.0f, 0.0f),
-	                                                 btMax(height, crawl), 0.5f * crawl, margin);
+	const btScalar length = btMax(height, crawl);
+	static const btVector3 fronts[4] = {btVector3(0, 1, 0), btVector3(0, -1, 0), btVector3(1, 0, 0), btVector3(-1, 0, 0)};
+	const btVector3& front = fronts[m_crawlAxis];
+	const btVector3 rear = btVector3(cx, cy, bottom + 0.5f * crawl) - front * radius;
+	m_postureShapes[POSTURE_CRAWL] = posture_capsule(rear + front * (0.5f * length), front, length, 0.5f * crawl, margin);
 
 	// Jump tuck: the legs come up, the head stays.
 	m_tuckLift = height * m_jumpTuck;
@@ -1201,7 +1206,7 @@ bool CcdPhysicsController::CreateCharacterController()
 	m_characterController->setMaxSlope(m_cci.m_maxSlope);
 	m_characterController->setSmoothMovement(m_cci.m_smoothMovement);
 	m_characterController->setJumpDirection(m_cci.m_jumpAxis);
-	m_characterController->SetPostureSettings(m_cci.m_crouchHeight, m_cci.m_crawlHeight, m_cci.m_jumpTuck);
+	m_characterController->SetPostureSettings(m_cci.m_crouchHeight, m_cci.m_crawlHeight, m_cci.m_jumpTuck, m_cci.m_crawlAxis);
 
 	return true;
 }

@@ -691,7 +691,8 @@ typedef struct Object {
 	float crouch_height;
 	unsigned char max_jumps;
 	char posture_flag; /* OB_POSTURE_* */
-	char pad2[2];
+	char crawl_axis; /* OB_CRAWL_AXIS_*: character front when lying down */
+	char pad2[1];
 	float crawl_height;
 	float jump_tuck;
 
@@ -1284,6 +1285,12 @@ enum {
 
 /* Object.posture_flag */
 #define OB_POSTURE_JUMP_TUCK	(1 << 0)
+
+/* Object.crawl_axis */
+#define OB_CRAWL_AXIS_POS_Y	0
+#define OB_CRAWL_AXIS_NEG_Y	1
+#define OB_CRAWL_AXIS_POS_X	2
+#define OB_CRAWL_AXIS_NEG_X	3
 
 #ifdef __cplusplus
 }
