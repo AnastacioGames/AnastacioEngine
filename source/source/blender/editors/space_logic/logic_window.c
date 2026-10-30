@@ -2321,21 +2321,21 @@ static void draw_actuator_motion(uiLayout *layout, PointerRNA *ptr)
 			uiLayoutSetActive(sub, RNA_boolean_get(ptr, "use_vr_gaze") == false);
 			uiItemR(sub, ptr, "use_local_location", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 			uiItemR(row, ptr, "use_add_character_location", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
-			uiItemR(layout, ptr, "use_vr_gaze", 0, NULL, ICON_NONE);
 
 			split = uiLayoutSplit(layout, 0.9, false);
 			row = uiLayoutRow(split, false);
 			uiItemR(row, ptr, "offset_rotation", 0, NULL, ICON_NONE);
 			uiItemR(split, ptr, "use_local_rotation", UI_ITEM_R_TOGGLE, NULL, ICON_NONE);
 
-			split = uiLayoutSplit(layout, 0.9, false);
-			row = uiLayoutRow(split, false);
-			split = uiLayoutSplit(row, 0.4, false);
-			uiItemL(split, "", ICON_NONE); /*Just use this for some spacing */
-			split = uiLayoutRow(split, true);
-			uiItemR(split, ptr, "use_character_run", UI_ITEM_R_TOGGLE, NULL, ICON_FF);
-			uiItemR(split, ptr, "use_character_jump", UI_ITEM_R_TOGGLE, NULL, ICON_POSE_DATA);
-			uiItemR(layout, ptr, "character_posture", 0, NULL, ICON_NONE);
+			/* Run, Jump and the posture side by side on one line. */
+			row = uiLayoutRow(layout, false);
+			sub = uiLayoutRow(row, true);
+			uiItemR(sub, ptr, "use_character_run", UI_ITEM_R_TOGGLE, NULL, ICON_FF);
+			uiItemR(sub, ptr, "use_character_jump", UI_ITEM_R_TOGGLE, NULL, ICON_POSE_DATA);
+			sub = uiLayoutRow(row, true);
+			uiItemR(sub, ptr, "character_posture", UI_ITEM_R_EXPAND, NULL, ICON_NONE);
+
+			uiItemR(layout, ptr, "use_vr_gaze", 0, NULL, ICON_NONE);
 			break;
 		case ACT_OBJECT_NORMAL_SET:
 			split = uiLayoutSplit(layout, 0.9, false);

@@ -63,6 +63,10 @@ public:
 
 	virtual unsigned char GetJumpCount() = 0;
 
+	/// Motion actuators in Add mode sum their walk this logic frame (W + D = diagonal).
+	double m_addWalkStamp = -1.0;
+	float m_addWalkLength = 0.0f;
+
 	virtual void SetWalkDirection(const mt::vec3& dir) = 0;
 	virtual mt::vec3 GetWalkDirection() = 0;
 

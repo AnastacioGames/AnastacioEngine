@@ -126,7 +126,11 @@ void	btGhostObject::convexSweepTest(const btConvexShape* castShape, const btTran
 			//RigidcollisionObject* collisionObject = ctrl->GetRigidcollisionObject();
 			btVector3 collisionObjectAabbMin,collisionObjectAabbMax;
 			collisionObject->getCollisionShape()->getAabb(collisionObject->getWorldTransform(),collisionObjectAabbMin,collisionObjectAabbMax);
-			AabbExpand (collisionObjectAabbMin, collisionObjectAabbMax, castShapeAabbMin, castShapeAabbMax);
+			// Minkowski difference: the cast shape's local AABB is around its origin, which is
+			// what the ray below follows. Bullet added min to min / max to max, correct only for
+			// shapes centered on the origin; shapes below the origin (character crouching/crawling
+			// with the origin in the middle) missed the floor and sank. (Range fix)
+			AabbExpand (collisionObjectAabbMin, collisionObjectAabbMax, -castShapeAabbMax, -castShapeAabbMin);
 			btScalar hitLambda = btScalar(1.); //could use resultCallback.m_closestHitFraction, but needs testing
 			btVector3 hitNormal;
 			if (btRayAabb(convexFromWorld.getOrigin(),convexToWorld.getOrigin(),collisionObjectAabbMin,collisionObjectAabbMax,hitLambda,hitNormal))

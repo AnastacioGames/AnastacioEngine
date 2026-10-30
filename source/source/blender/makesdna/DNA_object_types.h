@@ -1292,6 +1292,7 @@ enum {
 /* Object.posture_flag */
 #define OB_POSTURE_JUMP_TUCK	(1 << 0)
 #define OB_POSTURE_AUTO_CROUCH	(1 << 1) /* crouch by itself under a low ceiling */
+#define OB_POSTURE_FACE_MOVE	(1 << 2) /* turn towards the walk direction */
 
 /* Object.crawl_axis */
 #define OB_CRAWL_AXIS_POS_Y	0

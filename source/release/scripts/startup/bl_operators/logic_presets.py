@@ -21,6 +21,7 @@
 # Logic brick presets: each one adds a group of bricks already linked.
 
 import bpy
+import math
 from bpy.types import Operator
 from bpy.props import BoolProperty, EnumProperty, StringProperty
 from bpy.app.translations import pgettext_iface
@@ -239,6 +240,69 @@ def _pause(b, scene):
     b.link([key], [pause], "Pause")
 
 
+def _character(b, context):
+    """Third person Character: WASD relative to the camera (turns towards the walk),
+    Shift runs, C crouches, Z crawls, Space jumps; the mouse turns the camera."""
+    from mathutils import Vector
+    ob = b.ob
+    g = ob.game
+    if g.physics_type != 'CHARACTER':
+        g.physics_type = 'CHARACTER'
+        g.use_collision_bounds = True
+        g.collision_bounds_type = 'CAPSULE'
+    g.use_face_movement = True
+    # VR Gaze walks where the camera looks; Add sums the keys (W + D = diagonal).
+    for key, name, loc in (('W', "Forward", (0.0, 0.08, 0.0)), ('S', "Back", (0.0, -0.06, 0.0)),
+                           ('A', "Left", (-0.07, 0.0, 0.0)), ('D', "Right", (0.07, 0.0, 0.0))):
+        a = b.actuator('MOTION', name, mode='OBJECT_CHARACTER', offset_location=loc,
+                       use_vr_gaze=True, use_add_character_location=True)
+        b.link([b.key(key, "Key " + key)], [a], name)
+    for key, name, props in (('LEFT_SHIFT', "Run", {'use_character_run': True}),
+                             ('C', "Crouch", {'character_posture': 'CROUCH'}),
+                             ('Z', "Crawl", {'character_posture': 'CRAWL'}),
+                             ('SPACE', "Jump", {'use_character_jump': True})):
+        a = b.actuator('MOTION', name, mode='OBJECT_CHARACTER', **props)
+        b.link([b.key(key, "Key " + key)], [a], name)
+    for s in g.sensors:
+        if s.group == b.group:
+            s.use_pulse_true_level = True
+
+    # Camera pivot following only the position (vertex parent): the character turns alone.
+    if ob.type != 'MESH' or not ob.data.vertices:
+        return
+    scene = context.scene
+    top = max(v.co.z for v in ob.data.vertices) * ob.scale.z
+    piv = bpy.data.objects.new(ob.name + "_CamPivot", None)
+    scene.objects.link(piv)
+    piv.location = ob.matrix_world.translation + Vector((0.0, 0.0, top * 0.75))
+    piv.parent = ob
+    piv.parent_type = 'VERTEX'
+    piv.parent_vertices = (0, 0, 0)
+    cam = scene.camera
+    if cam is None or cam == ob:
+        cam = bpy.data.objects.new(ob.name + "_Camera", bpy.data.cameras.new(ob.name + "_Camera"))
+        scene.objects.link(cam)
+        scene.camera = cam
+    cam.parent = None
+    cam.location = piv.location + Vector((0.0, -7.0, 2.5))
+    cam.rotation_euler = (piv.location - cam.location).to_track_quat('-Z', 'Y').to_euler()
+    scene.update()
+    cam.parent = piv
+    cam.matrix_parent_inverse = piv.matrix_world.inverted()
+    for obj, x, y in ((piv, True, False), (cam, False, True)):
+        mb = _Bricks(obj, b.group)
+        s = mb.sensor('ALWAYS', "Always", use_pulse_true_level=True)
+        a = mb.actuator('MOUSE', "Mouse Look", mode='LOOK', use_axis_x=x, use_axis_y=y)
+        if y:
+            # tested by the user: gentle vertical look, +-15 degrees
+            a.local_y = True
+            a.reset_y = True
+            a.sensitivity_y = 0.3
+            a.min_y = math.radians(-15.0)
+            a.max_y = math.radians(15.0)
+        mb.link([s], [a], "Mouse Look")
+
+
 class LOGIC_OT_preset_add(Operator):
     """Add a group of logic bricks already linked"""
     bl_idname = "logic.preset_add"
@@ -275,6 +339,9 @@ class LOGIC_OT_preset_add(Operator):
             ('TURRET', "Turret", "Turns to the object with the property \"player\" when it enters a "
                                  "60 degree radar of 15 units", 'LAMP_SPOT', 13),
             ('PAUSE', "Pause Key", "P suspends the scene (an overlay scene can resume it)", 'PAUSE', 14),
+            ('CHARACTER', "Character (Posture)", "Third person Character: WASD walks where the camera "
+                                                 "looks and turns the character, Shift runs, C crouches, "
+                                                 "Z crawls, Space jumps, the mouse turns the camera", 'ARMATURE_DATA', 15),
         ),
     )
 
@@ -312,6 +379,9 @@ class LOGIC_OT_preset_add(Operator):
             # the other selected mesh becomes the object to add
             other = next((o for o in context.selected_objects if o != ob and o.type == 'MESH'), None)
             (_shoot if self.type == 'SHOOT' else _spawn_timer)(b, other)
+            return {'FINISHED'}
+        if self.type == 'CHARACTER':
+            _character(b, context)
             return {'FINISHED'}
         if self.type == 'PAUSE':
             _pause(b, context.scene)

@@ -2442,6 +2442,12 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Auto Crouch",
 	                         "Crouch by itself when walking under something too low to pass standing");
 
+	prop = RNA_def_property(srna, "use_face_movement", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "posture_flag", OB_POSTURE_FACE_MOVE);
+	RNA_def_property_ui_text(prop, "Face Movement",
+	                         "Turn the character smoothly towards where it walks (front = Crawl Front axis); "
+	                         "use world/camera directions in the Motion actuator, not Local");
+
 	prop = RNA_def_property(srna, "posture_property", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "posture_prop");
 	RNA_def_property_ui_text(prop, "Posture Property",

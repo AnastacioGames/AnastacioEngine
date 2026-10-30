@@ -1111,6 +1111,8 @@ EXTRA = (
     ("Crouch Speed", "Velocidade abaixado", "Velocidad agachado", "Скорость в приседе"),
     ("Crawl Speed", "Velocidade deitado", "Velocidad arrastrándose", "Скорость ползком"),
     ("Auto Crouch", "Abaixar sozinho", "Agacharse solo", "Автоприсед"),
+    ("Face Movement", "Virar para onde anda", "Girar hacia donde camina", "Поворот по движению"),
+    ("Turn the character smoothly towards where it walks (front = Crawl Front axis); use world/camera directions in the Motion actuator, not Local", "Gira o personagem suavemente para onde ele anda (frente = eixo Crawl Front); no Motion actuator use direções do mundo, sem o L", "Gira el personaje suavemente hacia donde camina (frente = eje Crawl Front); en el Motion actuator use direcciones del mundo, sin L", "Плавно поворачивает персонажа по направлению движения (перед = ось Crawl Front); в Motion actuator используйте мировые направления, без L"),
     ("Posture Property", "Propriedade da postura", "Propiedad de postura", "Свойство позы"),
     ("Character Motion", "Movimento do personagem", "Movimiento del personaje", "Движение персонажа"),
     ("Walk speed while crouched (1 = same as standing)", "Velocidade andando abaixado (1 = igual em pé)", "Velocidad al caminar agachado (1 = igual que de pie)", "Скорость ходьбы в приседе (1 = как стоя)"),

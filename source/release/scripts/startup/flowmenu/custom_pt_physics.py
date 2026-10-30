@@ -1055,6 +1055,7 @@ class CUSTOM_PT_game_physics(CustomPhysicsButtonsPanel, Panel):
             sub.active = game.use_jump_tuck
             sub.prop(game, "jump_tuck", slider=True)
             post_box.prop(game, "use_auto_crouch")
+            post_box.prop(game, "use_face_movement")
             post_box.prop(game, "posture_property", icon="TEXT")
             post_box.label(text="Motion actuator > Posture, or Python: character.posture", icon="INFO")
 

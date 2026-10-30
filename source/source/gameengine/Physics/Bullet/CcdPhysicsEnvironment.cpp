@@ -3408,6 +3408,7 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		ci.m_crawlSpeed = blenderobject->crawl_speed;
 		ci.m_runSpeed = blenderobject->run_speed;
 		ci.m_autoCrouch = (blenderobject->posture_flag & OB_POSTURE_AUTO_CROUCH) != 0;
+		ci.m_faceMovement = (blenderobject->posture_flag & OB_POSTURE_FACE_MOVE) != 0;
 		ci.m_postureProperty = blenderobject->posture_prop;
 		if (blenderobject->posture_prop[0]) {
 			gameobj->GetScene()->SetHasCharacterPostureProperties();
@@ -3657,6 +3658,7 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 			// placed on the mesh center here (origin at the feet = half buried).
 			if (isbulletchar) {
 				shapeInfo->m_capsuleOffset = boundsTrans.getOrigin();
+				shapeInfo->m_characterCapsule = true;
 			}
 			bm = shapeInfo->CreateBulletShape(ci.m_margin);
 			break;

@@ -717,6 +717,9 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 		m_jumps = 0;
 	}
 
+	if (m_faceMovement) {
+		FaceWalkDirection(dt); // before UpdatePosture: its crawl guard undoes a turn into a wall
+	}
 	UpdatePosture(collisionWorld);
 
 	// Slower while crouched / crawling: scale the walk step for this update only.
@@ -742,6 +745,31 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 	if (!(nodeTrans == ghostTrans)) {
 		m_motionState->setWorldTransform(ghostTrans);
 	}
+}
+
+void CcdCharacter::FaceWalkDirection(btScalar dt)
+{
+	const btVector3 up = getUp();
+	btVector3 want = m_walkDirection - up * m_walkDirection.dot(up);
+	if (want.length2() < SIMD_EPSILON) {
+		return;
+	}
+	static const btVector3 fronts[4] = {btVector3(0, 1, 0), btVector3(0, -1, 0), btVector3(1, 0, 0), btVector3(-1, 0, 0)};
+	btTransform &trans = m_ghostObject->getWorldTransform();
+	btVector3 front = trans.getBasis() * fronts[m_crawlAxis];
+	front -= up * front.dot(up);
+	if (front.length2() < SIMD_EPSILON) {
+		return;
+	}
+	front.normalize();
+	want.normalize();
+	const btScalar angle = btAtan2(front.cross(want).dot(up), front.dot(want));
+	const btScalar maxStep = btScalar(12.0f) * dt; // ~0.25 s for a half turn
+	const btScalar step = btClamped(angle, -maxStep, maxStep);
+	if (btFabs(step) < btScalar(1e-4f)) {
+		return;
+	}
+	trans.setBasis(btMatrix3x3(btQuaternion(up, step)) * trans.getBasis());
 }
 
 void CcdCharacter::FollowPlatform(btCollisionWorld *collisionWorld)
@@ -1338,6 +1366,7 @@ bool CcdPhysicsController::CreateCharacterController()
 	m_characterController->SetPostureSettings(m_cci.m_crouchHeight, m_cci.m_crawlHeight, m_cci.m_jumpTuck, m_cci.m_crawlAxis);
 	m_characterController->SetPostureMotion(m_cci.m_crouchSpeed, m_cci.m_crawlSpeed, m_cci.m_autoCrouch, m_cci.m_postureProperty);
 	m_characterController->SetRunSpeed(m_cci.m_runSpeed);
+	m_characterController->SetFaceMovement(m_cci.m_faceMovement);
 
 	return true;
 }
@@ -3418,7 +3447,7 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 		}
 		case PHY_SHAPE_CAPSULE:
 		{
-			if (m_capsuleOffset.length2() > 1.0e-10f) {
+			if (m_characterCapsule || m_capsuleOffset.length2() > 1.0e-10f) {
 				const btVector3 halfAxis(0.0f, 0.0f, 0.5f * m_height);
 				const btVector3 centers[2] = {m_capsuleOffset + halfAxis, m_capsuleOffset - halfAxis};
 				const btScalar radii[2] = {m_radius, m_radius};

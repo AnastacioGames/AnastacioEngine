@@ -8,6 +8,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - Character: Face Movement, diagonal com Ad, preset de bricks e cápsula fora da origem
+
+- **Face Movement** (`use_face_movement`, `OB_POSTURE_FACE_MOVE` em `posture_flag`, sem campo DNA novo): o Character
+  gira suave (~0,25 s meia-volta) para a direção em que anda; a frente é o eixo do Crawl Front. Usar com direções do
+  mundo ou da câmera (VR Gaze), não Local.
+- **Motion actuator, Character:** com **Ad**, os bricks somam a direção no mesmo frame (W + D = diagonal, velocidade do
+  mais rápido); antes misturavam com o frame anterior e travavam. Brick só de pulo (Loc zero) não zera mais a
+  caminhada dos outros (o pulo andando quase parava no ar).
+- Painel: Run, Jump e Stand | Crouch | Crawl numa linha; VR Gaze no fim.
+- Preset de logic bricks **Character (Posture)** em `logic_presets.py`: WASD relativo à câmera, Shift, C, Z, Espaço,
+  pivô da câmera por vertex parent e Mouse Look (Y: 0,3, ±15°, Local, Reset).
+- **Cápsula com a origem fora dos pés:** o Character usa sempre a multisphere (a cápsula comum afundava o raio com a
+  origem no meio) e foi corrigido `btGhostObject::convexSweepTest` no Bullet: a soma de Minkowski usava min+min /
+  max+max, certa só para formas centradas; formas abaixo da origem (abaixar/rastejar com origem no meio) não viam o
+  chão e afundavam.
+- Testes: `tools/debug/cenas/criar_cena_capsula_origem.py` (origem no meio x pés, em pé e rastejando),
+  `criar_cena_postura_bricks.py` (só bricks); `criar_cena_postura_character.py` segue 19/19.
+
+
 ## 2026-10-30 - Contador de substeps da física; Auto Static Batch medido
 
 - Novo contador `physicsSubsteps` em `Range.logic.getRenderStats()` e `substeps` no módulo `work` do Range Trace

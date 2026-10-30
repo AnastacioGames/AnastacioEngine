@@ -221,8 +221,10 @@ bool KX_ObjectActuator::Update()
 		m_vr_teleport_done = false;
 		// Explicitly stop the movement if we're using character motion
 		if (m_bitLocalFlag.CharacterMotion) {
-			// A posture-only brick (Loc zero) must not stop another brick's walking.
-			if ((m_posture == 0 && !m_bitLocalFlag.CharacterRun) || !m_bitLocalFlag.ZeroDLoc) {
+			// A posture/run/jump-only brick (Loc zero) must not stop another brick's walking.
+			const bool otherWalked = m_bitLocalFlag.AddOrSetCharLoc &&
+			                         character->m_addWalkStamp == KX_GetActiveEngine()->GetFrameTime();
+			if (((m_posture == 0 && !m_bitLocalFlag.CharacterRun && !m_bitLocalFlag.CharacterJump) || !m_bitLocalFlag.ZeroDLoc) && !otherWalked) {
 				character->SetWalkDirection(mt::zero3);
 			}
 			if (m_posture != 0) {
@@ -345,21 +347,27 @@ bool KX_ObjectActuator::Update()
 				dir = basis * dir;
 			}
 
-			if (m_bitLocalFlag.AddOrSetCharLoc) {
-				mt::vec3 old_dir = character->GetWalkDirection();
-
-				if (!mt::FuzzyZero(old_dir)) {
-					float mag = old_dir.Length();
-
-					dir = dir + ((old_dir * 60.f) * KX_GetActiveEngine()->GetEngineDeltaTime());
+			if (m_bitLocalFlag.AddOrSetCharLoc && !m_bitLocalFlag.ZeroDLoc) {
+				// Sum with the other Add bricks of this frame (W + D walks diagonally), keeping
+				// the speed of the fastest one instead of walking faster on diagonals.
+				const double now = KX_GetActiveEngine()->GetFrameTime();
+				const float len = dir.Length();
+				if (character->m_addWalkStamp == now) {
+					const float substeps = parent->GetScene()->GetPhysicsEnvironment()->GetNumTimeSubSteps();
+					character->m_addWalkLength = std::max(character->m_addWalkLength, len);
+					dir += character->GetWalkDirection() * substeps;
 					if (!mt::FuzzyZero(dir)) {
-						dir = dir.Normalized() * mag;
+						dir = dir.Normalized() * character->m_addWalkLength;
 					}
+				}
+				else {
+					character->m_addWalkStamp = now;
+					character->m_addWalkLength = len;
 				}
 			}
 
 			// We always want to set the walk direction since a walk direction of (0, 0, 0) should stop the character
-			if ((m_posture == 0 && !m_bitLocalFlag.CharacterRun) || !m_bitLocalFlag.ZeroDLoc) {
+			if ((m_posture == 0 && !m_bitLocalFlag.CharacterRun && !m_bitLocalFlag.CharacterJump) || !m_bitLocalFlag.ZeroDLoc) {
 				character->SetWalkDirection(dir / parent->GetScene()->GetPhysicsEnvironment()->GetNumTimeSubSteps());
 			}
 

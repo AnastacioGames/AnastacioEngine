@@ -2580,6 +2580,8 @@ TABLE = (
     ('Smart Component Wizard', 'Assistente de Smart Component', 'Asistente de Smart Component', 'Мастер умных компонентов'),
     ('Sobe quando o jogador chega perto e desce quando ele sai', '', 'Sube cuando el jugador se acerca y baja cuando se va', 'Поднимается, когда игрок подходит, и опускается, когда уходит'),
     ('Spawn Every 2 Seconds', 'Criar a cada 2 segundos', 'Generar cada 2 segundos', 'Создавать каждые 2 секунды'),
+    ('Character (Posture)', 'Personagem (postura)', 'Personaje (postura)', 'Персонаж (поза)'),
+    ('Third person Character: WASD walks where the camera looks and turns the character, Shift runs, C crouches, Z crawls, Space jumps, the mouse turns the camera', 'Personagem em terceira pessoa: WASD anda para onde a câmera olha e vira o personagem, Shift corre, C abaixa, Z rasteja, Espaço pula, o mouse gira a câmera', 'Personaje en tercera persona: WASD camina hacia donde mira la cámara y gira el personaje, Shift corre, C se agacha, Z se arrastra, Espacio salta, el ratón gira la cámara', 'Персонаж от третьего лица: WASD идёт туда, куда смотрит камера, и поворачивает персонажа, Shift — бег, C — присесть, Z — ползти, Пробел — прыжок, мышь вращает камеру'),
     ('Spawner', 'Gerador', 'Generador', 'Генератор'),
     ('Standalone player recording saved: %s', 'Gravação do player Standalone salva: %s', 'Grabación del reproductor independiente guardada: %s', 'Запись Standalone Player сохранена: %s'),
     ('Start Recording', 'Iniciar gravação', 'Iniciar grabación', 'Начать запись'),

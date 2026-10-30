@@ -81,6 +81,7 @@ public:
 		m_height(1.0f),
 		m_halfExtend(0.0f, 0.0f, 0.0f),
 		m_capsuleOffset(0.0f, 0.0f, 0.0f),
+		m_characterCapsule(false),
 		m_childScale(1.0f, 1.0f, 1.0f),
 		m_userData(nullptr),
 		m_mesh(nullptr),
@@ -162,6 +163,8 @@ public:
 	// Capsule center inside the object (characters only: they cannot use a
 	// compound, so the offset is built into a convex two-sphere shape).
 	btVector3 m_capsuleOffset;
+	/// Character capsule: always built as a multisphere (the plain capsule sank by its radius).
+	bool m_characterCapsule;
 	btTransform m_childTrans;
 	btVector3 m_childScale;
 	void *m_userData;
@@ -343,6 +346,7 @@ struct CcdConstructionInfo {
 	float m_crawlSpeed = 1.0f;
 	float m_runSpeed = 1.0f;
 	bool m_autoCrouch = false;
+	bool m_faceMovement = false; ///< Turn towards the walk direction.
 	std::string m_postureProperty; ///< Game property updated with the posture name.
 
 	int m_gamesoftFlag;
@@ -503,6 +507,8 @@ private:
 	bool m_running;
 	bool m_autoCrouch;
 	bool m_autoCrouched; ///< Crouched by Auto Crouch, not by request.
+	bool m_faceMovement = false;
+	void FaceWalkDirection(btScalar dt);
 	btMatrix3x3 m_lastBasis; ///< To undo turning while crawling into a wall.
 	std::string m_postureProperty;
 	int m_posture;
@@ -523,6 +529,10 @@ public:
 
 	void SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck, int crawlAxis);
 	void SetPostureMotion(float crouchSpeed, float crawlSpeed, bool autoCrouch, const std::string& property);
+	void SetFaceMovement(bool face)
+	{
+		m_faceMovement = face;
+	}
 	void SetRunSpeed(float runSpeed)
 	{
 		m_runSpeed = btMax(runSpeed, 0.0f);
