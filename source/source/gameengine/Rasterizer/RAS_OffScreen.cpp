@@ -102,6 +102,11 @@ RAS_OffScreen::RAS_OffScreen(unsigned int width, unsigned int height, unsigned s
 
 RAS_OffScreen::~RAS_OffScreen()
 {
+	// Canvas off screens are recreated on resize: don't leave a dangling "last bound" one.
+	if (lastOffScreen == this) {
+		lastOffScreen = nullptr;
+	}
+
 	// Free every attachment that was actually allocated, even if creation failed partway
 	// through (m_frameBuffer nullptr) and left earlier slots holding live GPU resources.
 	if (m_frameBuffer) {

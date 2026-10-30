@@ -187,6 +187,7 @@ public:
 
 	/// Update dimensions of all off screens.
 	void UpdateOffScreens();
+	void CreateOffScreen(RAS_OffScreen::Type type);
 	/// Change only the internal render-target scale; presentation, input and UI retain native canvas size.
 	void SetRenderScale(float scale);
 	float GetRenderScale() const;

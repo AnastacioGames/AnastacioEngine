@@ -194,6 +194,10 @@ void RAS_ICanvas::FlushScreenshots(RAS_Rasterizer *rasty)
 
 RAS_OffScreen *RAS_ICanvas::GetOffScreen(RAS_OffScreen::Type type)
 {
+	// Created on first use: most games never use the right eye, depth blit, collision depth or custom ones (~10 MB each at 720p).
+	if (!m_offScreens[type]) {
+		CreateOffScreen(type);
+	}
 	return m_offScreens[type].get();
 }
 
@@ -262,37 +266,46 @@ void RAS_ICanvas::SaveScreeshot(const Screenshot& screenshot, RAS_Rasterizer *ra
 	                   TASK_PRIORITY_LOW);
 }
 
-void RAS_ICanvas::UpdateOffScreens()
+void RAS_ICanvas::CreateOffScreen(RAS_OffScreen::Type type)
 {
 	const unsigned int width = GetRenderWidth();
 	const unsigned int height = GetRenderHeight();
-	for (unsigned short i = 0; i < RAS_OffScreen::RAS_OFFSCREEN_MAX; ++i) {
-		RAS_OffScreen::Type type = (RAS_OffScreen::Type)i;
-		// Check if the off screen type can support samples.
-		const bool sampleofs = ELEM(type, RAS_OffScreen::RAS_OFFSCREEN_EYE_LEFT0, RAS_OffScreen::RAS_OFFSCREEN_EYE_RIGHT0);
+	// Check if the off screen type can support samples.
+	const bool sampleofs = ELEM(type, RAS_OffScreen::RAS_OFFSCREEN_EYE_LEFT0, RAS_OffScreen::RAS_OFFSCREEN_EYE_RIGHT0);
 
-		/* Some GPUs doesn't support high multisample value with GL_RGBA16F or GL_RGBA32F.
-		 * To avoid crashing we check if the off screen was created and if not decremente
-		 * the multisample value and try to create the off screen to find a supported value.
-		 */
-		for (int samples = m_samples; samples >= 0; --samples) {
-			RAS_OffScreen *ofs = new RAS_OffScreen(width, height, sampleofs ? samples : 0, m_attachments, type);
-			if (!ofs->GetValid()) {
-				delete ofs;
-				continue;
-			}
-
-			m_offScreens[type].reset(ofs);
-			m_samples = samples;
-			break;
+	/* Some GPUs doesn't support high multisample value with GL_RGBA16F or GL_RGBA32F.
+	 * To avoid crashing we check if the off screen was created and if not decremente
+	 * the multisample value and try to create the off screen to find a supported value.
+	 */
+	for (int samples = m_samples; samples >= 0; --samples) {
+		RAS_OffScreen *ofs = new RAS_OffScreen(width, height, sampleofs ? samples : 0, m_attachments, type);
+		if (!ofs->GetValid()) {
+			delete ofs;
+			continue;
 		}
 
-		/* Creating an off screen restore the default frame buffer object.
-		 * We have to rebind the last off screen. */
-		RAS_OffScreen *lastOffScreen = RAS_OffScreen::GetLastOffScreen();
-		if (lastOffScreen) {
-			lastOffScreen->Bind();
-		}
+		m_offScreens[type].reset(ofs);
+		m_samples = samples;
+		break;
+	}
+
+	/* Creating an off screen restore the default frame buffer object.
+	 * We have to rebind the last off screen. */
+	RAS_OffScreen *lastOffScreen = RAS_OffScreen::GetLastOffScreen();
+	if (lastOffScreen) {
+		lastOffScreen->Bind();
+	}
+}
+
+void RAS_ICanvas::UpdateOffScreens()
+{
+	for (std::unique_ptr<RAS_OffScreen>& ofs : m_offScreens) {
+		ofs.reset();
+	}
+	// Used every frame (the main one first: it settles the sample count the GPU supports).
+	for (RAS_OffScreen::Type type : {RAS_OffScreen::RAS_OFFSCREEN_EYE_LEFT0, RAS_OffScreen::RAS_OFFSCREEN_EYE_LEFT1,
+	                                RAS_OffScreen::RAS_OFFSCREEN_FILTER0, RAS_OffScreen::RAS_OFFSCREEN_FILTER1}) {
+		CreateOffScreen(type);
 	}
 }
 

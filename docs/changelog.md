@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-29 - Telas internas do jogo criadas sob demanda (VRAM)
+
+- `RAS_ICanvas` criava as 9 telas internas no tamanho da janela de uma vez (filtros, olhos esquerdo/direito, profundidade,
+  colisão e `CUSTOM`, que nunca é usada pelo canvas). Agora cria só as 4 usadas em todo quadro; olho direito, cópia de
+  profundidade e colisão nascem no primeiro `GetOffScreen`. `~RAS_OffScreen` zera o ponteiro da última tela ligada.
+- 1280x720, quente, 4 rodadas alternadas: física 2000 226 → 162 MB; 900 materiais 392 → 356 MB; animação 400
+  524 → 488 MB. Tempo até pronto igual ao exe recompilado sem a mudança (3,26 x 3,26 s).
+- Capturas idênticas ao exe sem a mudança: RenderEffects, ParticleFlipbook (profundidade suave), colisão de partículas
+  por profundidade e estéreo anáglifo (olho direito sob demanda).
+
 ## 2026-10-29 - Cache de shaders do usuário descarta binários sem uso
 
 - O cache do usuário (`%LOCALAPPDATA%\AnastacioEngine\ShaderCache\<jogo>-<hash>.shaders`) só crescia: era lido
