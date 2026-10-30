@@ -90,6 +90,25 @@ base class --- :class:`EXP_PyObjectPlus`
 
       :type: float (0.0 to 1.0)
 
+   .. attribute:: posture
+
+      Current posture (the collision shape in use). Setting it asks for a new posture;
+      standing up waits until there is room above the character (see :data:`canStand`).
+
+      :type: string, one of ``'STAND'``, ``'CROUCH'``, ``'CRAWL'``, ``'JUMP_TUCK'``
+
+   .. attribute:: canStand
+
+      True when there is room to stand up from the current posture.
+
+      :type: boolean (read-only)
+
+   .. attribute:: running
+
+      Run mode: while True the character walks with the object's Run Speed factor.
+
+      :type: boolean
+
    .. method:: reset()
 
       Resets the character velocity and walk direction.

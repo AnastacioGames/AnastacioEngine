@@ -130,6 +130,10 @@ Antes deles, use `docs/local-knowledge/index-<área>.md`: índice mecânico (arq
   mudam ou de uma checagem barata antes. Depois de mexer em atualização/culling/transform, rodar
   `python tools/check_trabalho_repetido.py` (e `--selftest`) e o detector numa cena parada
   ([docs/auditoria-trabalho-repetido.md](docs/auditoria-trabalho-repetido.md)): parado, os contadores devem ficar ~0.
+- **Cascata de propriedade nova**: campo novo de física, logic brick ou atributo Python do jogo precisa
+  aparecer em DNA, versioning, painel/FlowMenu, conversor, `logic_to_python.py`, `range_logic_tree.py`,
+  traduções, changelog e inventário da API. Antes do commit, rodar `python tools/check_cascata.py`
+  (diff desde `HEAD~1` + local; `HEAD~N` para mais; `--prop id` para um só; `--selftest`). FALTA é obrigatório.
 - **Teste visual no jogo real, não em screenshot automatizado**: para bugs de renderização/visuais, captura
   automatizada de tela via câmera scriptada (`RangeRuntime.exe` headless + `--background` + `PrintWindow`) é
   pouco confiável aqui e já produziu resultados enganosos. Prefira pedir para o usuário testar no jogo real
