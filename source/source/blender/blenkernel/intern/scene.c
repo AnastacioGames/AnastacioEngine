@@ -1085,7 +1085,8 @@ void BKE_scene_init(Scene *sce)
 	sce->gm.recastData.detailsampledist = 6.0f;
 	sce->gm.recastData.detailsamplemaxerror = 1.0f;
 
-	sce->gm.lodflag = SCE_LOD_USE_HYST;
+	/* New scenes batch eligible static objects (A/B 2026-10-30: same as manual Static Batch). */
+	sce->gm.lodflag = SCE_LOD_USE_HYST | SCE_AUTO_STATIC_BATCH;
 	sce->gm.scehysteresis = 10;
 	sce->gm.max_debris = 150;
 

@@ -316,7 +316,7 @@ void BLO_update_defaults_startup_blend(Main *bmain)
       pset->brush[PE_BRUSH_CUT].strength = 1.0f;
     }
 
-    scene->gm.lodflag |= SCE_LOD_USE_HYST;
+    scene->gm.lodflag |= SCE_LOD_USE_HYST | SCE_AUTO_STATIC_BATCH;
     scene->gm.scehysteresis = 10;
     /* MSAA minimo que o jogo aceita (alpha-to-coverage da folhagem Hashed); ver LA_Launcher.cpp. */
     scene->gm.aasamples = 2;

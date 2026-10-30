@@ -27,6 +27,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   `criar_cena_postura_bricks.py` (só bricks); `criar_cena_postura_character.py` segue 19/19.
 
 
+## 2026-10-30 - Auto Static Batch ligado em cena nova
+
+- Cena nova e arquivo de fábrica vêm com Auto Static Batch ligado (`BKE_scene_init` e `versioning_defaults.c`).
+  Arquivos salvos mantêm o que tinham (RolimaRacer continua desligado).
+- Conferido em background: fábrica `True`, `scenes.new` `True`, RolimaRacer `False`. Cena de 400 cubos/4 materiais +
+  um cubo movido por script de outro objeto: 6 draws (chão, 4 lotes, cubo móvel), sem erro. Falta aceite com janela.
+
+
 ## 2026-10-30 - Contador de substeps da física; Auto Static Batch medido
 
 - Novo contador `physicsSubsteps` em `Range.logic.getRenderStats()` e `substeps` no módulo `work` do Range Trace
