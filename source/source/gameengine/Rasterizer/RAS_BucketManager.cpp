@@ -167,8 +167,21 @@ void RAS_BucketManager::RenderBasicBuckets(RAS_Rasterizer *rasty, RAS_BucketMana
 	PrepareBuckets(rasty, bucketType);
 
 	RAS_UpwardTreeLeafs leafs;
-	for (RAS_MaterialBucket *bucket : m_buckets[bucketType]) {
-		bucket->GenerateTree(m_downwardNode, m_upwardNode, leafs, m_nodeData.m_drawingMode, false);
+	if (m_nodeData.m_shaderOverride) {
+		/* Override passes (shadow depth, collision depth, wireframe) draw every material with
+		 * one shader, so material order doesn't matter: walk only the materials visible in this
+		 * pass instead of the whole list (43 shadow passes x 900 materials in the test scene). */
+		const unsigned int bit = 1u << bucketType;
+		for (RAS_MaterialBucket *bucket : m_activeBuckets) {
+			if (bucket->HasTypeBit(bit)) {
+				bucket->GenerateTree(m_downwardNode, m_upwardNode, leafs, m_nodeData.m_drawingMode, false);
+			}
+		}
+	}
+	else {
+		for (RAS_MaterialBucket *bucket : m_buckets[bucketType]) {
+			bucket->GenerateTree(m_downwardNode, m_upwardNode, leafs, m_nodeData.m_drawingMode, false);
+		}
 	}
 
 	if (m_downwardNode.GetValid()) {
@@ -393,9 +406,10 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 		}
 	}
 
-	for (RAS_MaterialBucket *bucket : m_buckets[ALL_BUCKET]) {
+	for (RAS_MaterialBucket *bucket : m_activeBuckets) {
 		bucket->RemoveActiveMeshSlots();
 	}
+	m_activeBuckets.clear();
 
 	rasty->SetClientObject(nullptr);
 }
@@ -413,32 +427,38 @@ RAS_MaterialBucket *RAS_BucketManager::FindBucket(RAS_IMaterial *material, bool 
 	RAS_MaterialBucket *bucket = new RAS_MaterialBucket(material);
 	bucketCreated = true;
 
+	bucket->SetActiveList(&m_activeBuckets);
+	const auto add = [this, bucket](BucketType type) {
+		m_buckets[type].push_back(bucket);
+		bucket->AddTypeBit(1u << type);
+	};
+
 	const bool useinstancing = material->UseInstancing();
 	if (!material->OnlyShadow()) {
 		if (material->IsAlpha()) {
-			m_buckets[useinstancing ? ALPHA_INSTANCING_BUCKET : ALPHA_BUCKET].push_back(bucket);
+			add(useinstancing ? ALPHA_INSTANCING_BUCKET : ALPHA_BUCKET);
 			if (material->IsAlphaDepth()) {
-				m_buckets[useinstancing ? ALPHA_DEPTH_INSTANCING_BUCKET : ALPHA_DEPTH_BUCKET].push_back(bucket);
+				add(useinstancing ? ALPHA_DEPTH_INSTANCING_BUCKET : ALPHA_DEPTH_BUCKET);
 			}
 		}
 		else {
-			m_buckets[useinstancing ? SOLID_INSTANCING_BUCKET : SOLID_BUCKET].push_back(bucket);
+			add(useinstancing ? SOLID_INSTANCING_BUCKET : SOLID_BUCKET);
 		}
 	}
 	if (material->CastsShadows()) {
 		if (material->IsColorShadow()) {
-			m_buckets[useinstancing ? COLOR_SHADOW_INSTANCING_BUCKET : COLOR_SHADOW_BUCKET].push_back(bucket);
+			add(useinstancing ? COLOR_SHADOW_INSTANCING_BUCKET : COLOR_SHADOW_BUCKET);
 		}
 		else if (material->IsAlphaShadow()) {
-			m_buckets[useinstancing ? ALPHA_SHADOW_INSTANCING_BUCKET : ALPHA_SHADOW_BUCKET].push_back(bucket);
+			add(useinstancing ? ALPHA_SHADOW_INSTANCING_BUCKET : ALPHA_SHADOW_BUCKET);
 		}
 		else {
-			m_buckets[useinstancing ? SOLID_SHADOW_INSTANCING_BUCKET : SOLID_SHADOW_BUCKET].push_back(bucket);
+			add(useinstancing ? SOLID_SHADOW_INSTANCING_BUCKET : SOLID_SHADOW_BUCKET);
 		}
 	}
 
 	// Used to free the bucket.
-	m_buckets[ALL_BUCKET].push_back(bucket);
+	add(ALL_BUCKET);
 	return bucket;
 }
 
@@ -472,6 +492,7 @@ void RAS_BucketManager::RemoveMaterial(RAS_IMaterial *mat)
 			for (unsigned short i = 0; i < ALL_BUCKET; ++i) {
 				CM_ListRemoveIfFound(m_buckets[i], bucket);
 			}
+			CM_ListRemoveIfFound(m_activeBuckets, bucket);
 			// Remove the bucket from ALL_BUCKET and destruct it.
 			it = allBuckets.erase(it);
 			delete bucket;
@@ -491,5 +512,9 @@ void RAS_BucketManager::Merge(RAS_BucketManager *other, SCA_IScene *scene)
 		// Skip the text bucket.
 		std::remove_copy(otherbuckets.begin(), otherbuckets.end(), std::back_inserter(buckets), other->m_text.m_bucket);
 		otherbuckets.clear();
+	}
+	// The moved buckets now report their visibility to this manager.
+	for (RAS_MaterialBucket *bucket : m_buckets[ALL_BUCKET]) {
+		bucket->SetActiveList(&m_activeBuckets);
 	}
 }

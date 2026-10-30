@@ -96,6 +96,8 @@ protected:
 	};
 
 	BucketList m_buckets[NUM_BUCKET_TYPE];
+	/// Buckets with a visible mesh slot in the current pass (see RAS_MaterialBucket::MarkActive).
+	BucketList m_activeBuckets;
 
 	RAS_ManagerNodeData m_nodeData;
 	RAS_ManagerDownwardNode m_downwardNode;

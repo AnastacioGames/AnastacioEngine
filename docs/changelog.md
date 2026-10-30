@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - Passadas de sombra percorrem só os materiais visíveis
+
+- `RAS_BucketManager` guarda a lista dos materiais com algo visível na passada (`RAS_MaterialBucket::MarkActive`
+  registra na 1ª ativação). As passadas com shader de override (sombra, profundidade de colisão, wireframe) montam
+  a árvore só com eles, e a limpeza do fim da passada também; a câmera mantém a ordem original dos materiais.
+  `RemoveMaterial` tira o material da lista e `Merge` (LibLoad) aponta os materiais movidos para o novo gerenciador.
+- Cena 900 objetos / 8 luzes / 900 materiais (43 passadas de sombra), 9 rodadas alternadas: `Shadows` 4,99 → 4,70 ms
+  (−6%); frame igual (15,2 ms). Capturas da cena e das cenas de sombra CSM e colorida idênticas pixel a pixel;
+  RolimaRacer (LibLoad) correu 60 s sem erro.
+
 ## 2026-10-30 - Colisão (narrowphase) em paralelo no Bullet
 
 - `CcdCollisionDispatcher` substitui o dispatcher do Bullet: os pares do broadphase são testados em threads. Pools de
