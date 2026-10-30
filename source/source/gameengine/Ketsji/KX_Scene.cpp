@@ -119,6 +119,7 @@ extern "C" {
 #include "PHY_IPhysicsEnvironment.h"
 #include "PHY_IGraphicController.h"
 #include "PHY_IPhysicsController.h"
+#include "PHY_ICharacter.h"
 #include "BL_Converter.h"
 #include "KX_LibLoadStatus.h"
 #include "BL_ArmatureObject.h"
@@ -1952,6 +1953,29 @@ KX_Camera *KX_Scene::GetActiveCamera()
 const mt::vec3& KX_Scene::GetOptimizationReferencePosition() const
 {
 	return m_optimizationReferencePosition;
+}
+
+void KX_Scene::UpdateCharacterPostureProperties()
+{
+	if (!m_hasCharacterPostureProperties) {
+		return;
+	}
+	static const char *names[POSTURE_COUNT] = {"STAND", "CROUCH", "CRAWL", "JUMP_TUCK"};
+	for (KX_GameObject *gameobj : *m_objectlist) {
+		PHY_ICharacter *character = m_physicsEnvironment->GetCharacterController(gameobj);
+		if (!character || character->GetPostureProperty().empty()) {
+			continue;
+		}
+		const std::string& prop = character->GetPostureProperty();
+		const char *name = names[character->GetPosture()];
+		EXP_Value *old = gameobj->GetProperty(prop);
+		if (old && old->GetText() == name) {
+			continue; // unchanged: keep Property sensors from seeing a new value
+		}
+		EXP_Value *value = new EXP_StringValue(name, prop);
+		gameobj->SetProperty(prop, value);
+		value->Release();
+	}
 }
 
 void KX_Scene::UpdateOptimizationReference()

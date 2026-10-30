@@ -24,6 +24,7 @@
 #include "CM_RefCount.h"
 
 #include <vector>
+#include <string>
 #include <map>
 
 #include "PHY_IPhysicsController.h"
@@ -338,6 +339,10 @@ struct CcdConstructionInfo {
 	float m_crawlHeight = 0.3f;
 	float m_jumpTuck = 0.0f; ///< 0 = jump tuck off.
 	int m_crawlAxis = 0; ///< Front when crawling: 0 +Y, 1 -Y, 2 +X, 3 -X.
+	float m_crouchSpeed = 1.0f;
+	float m_crawlSpeed = 1.0f;
+	bool m_autoCrouch = false;
+	std::string m_postureProperty; ///< Game property updated with the posture name.
 
 	int m_gamesoftFlag;
 	unsigned short m_softBendingDistance;
@@ -490,6 +495,13 @@ private:
 	float m_jumpTuck;
 	float m_tuckLift; ///< Height removed from the bottom by the tuck shape.
 	int m_crawlAxis;
+	float m_standRadius;
+	float m_crouchSpeed;
+	float m_crawlSpeed;
+	bool m_autoCrouch;
+	bool m_autoCrouched; ///< Crouched by Auto Crouch, not by request.
+	btMatrix3x3 m_lastBasis; ///< To undo turning while crawling into a wall.
+	std::string m_postureProperty;
 	int m_posture;
 	int m_requestedPosture;
 	bool m_canStand;
@@ -507,6 +519,7 @@ public:
 	virtual ~CcdCharacter();
 
 	void SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck, int crawlAxis);
+	void SetPostureMotion(float crouchSpeed, float crawlSpeed, bool autoCrouch, const std::string& property);
 
 	virtual void updateAction(btCollisionWorld *collisionWorld, btScalar dt);
 
@@ -610,6 +623,10 @@ public:
 	virtual int GetPosture() const;
 	virtual int GetRequestedPosture() const;
 	virtual bool CanStand() const;
+	virtual const std::string& GetPostureProperty() const
+	{
+		return m_postureProperty;
+	}
 };
 
 class CleanPairCallback : public btOverlapCallback

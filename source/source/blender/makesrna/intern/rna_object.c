@@ -2416,6 +2416,31 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Jump Tuck",
 	                         "Part of the height removed from the bottom while rising in a jump (legs pulled up)");
 
+	prop = RNA_def_property(srna, "crouch_speed", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "crouch_speed");
+	RNA_def_property_range(prop, 0.0f, 2.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 1.0f, 1, 2);
+	RNA_def_property_float_default(prop, 0.5f);
+	RNA_def_property_ui_text(prop, "Crouch Speed", "Walk speed while crouched (1 = same as standing)");
+
+	prop = RNA_def_property(srna, "crawl_speed", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "crawl_speed");
+	RNA_def_property_range(prop, 0.0f, 2.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 1.0f, 1, 2);
+	RNA_def_property_float_default(prop, 0.3f);
+	RNA_def_property_ui_text(prop, "Crawl Speed", "Walk speed while crawling (1 = same as standing)");
+
+	prop = RNA_def_property(srna, "use_auto_crouch", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "posture_flag", OB_POSTURE_AUTO_CROUCH);
+	RNA_def_property_ui_text(prop, "Auto Crouch",
+	                         "Crouch by itself when walking under something too low to pass standing");
+
+	prop = RNA_def_property(srna, "posture_property", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "posture_prop");
+	RNA_def_property_ui_text(prop, "Posture Property",
+	                         "Game property kept up to date with the posture: STAND, CROUCH, CRAWL or JUMP_TUCK "
+	                         "(created if missing; use a Property sensor to switch animations)");
+
 	prop = RNA_def_property(srna, "use_jump_tuck", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "posture_flag", OB_POSTURE_JUMP_TUCK);
 	RNA_def_property_ui_text(prop, "Jump Tuck", "Pull the bottom of the collision shape up while rising in a jump");

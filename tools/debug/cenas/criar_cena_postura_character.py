@@ -30,6 +30,10 @@ def caixa(nome, loc, escala, cor):
 caixa('Chao', (0, 0, -0.5), (20, 20, 0.5), (0.3, 0.6, 0.3))
 # Teto baixo (base em z=1.4) de x=2 a x=6, só na faixa do boneco "Abaixa" (y=0).
 caixa('Teto', (4, 0, 1.9), (2, 1, 0.5), (0.6, 0.6, 0.6))
+# Teto baixo para o "Auto" (abaixar sozinho), y=-8.
+caixa('Teto2', (4, -8, 1.9), (2, 1, 0.5), (0.6, 0.6, 0.6))
+# Parede para o "Gira" (girar deitado): ao lado direito (x=+1.2), ao longo de Y.
+caixa('Parede', (1.6, 8, 1), (0.3, 3, 1), (0.6, 0.4, 0.3))
 
 
 def boneco(nome, x, y, cor):
@@ -50,12 +54,20 @@ def boneco(nome, x, y, cor):
     g.use_jump_tuck = True
     g.jump_tuck = 0.3
     g.jump_speed = 8.0
+    g.crouch_speed = 1.0   # casos antigos medem distância sem redução
+    g.crawl_speed = 1.0
     return o
 
 
 boneco('Abaixa', 0, 0, (0.9, 0.2, 0.2))
 boneco('Rasteja', 0, 4, (0.9, 0.8, 0.2))
 boneco('Pula', 0, -4, (0.2, 0.3, 0.9))
+sc.objects['Abaixa'].game.posture_property = 'pose'
+lento = boneco('Lento', 0, 12, (0.8, 0.5, 0.9))
+lento.game.crawl_speed = 0.3
+auto = boneco('Auto', 0, -8, (0.3, 0.9, 0.9))
+auto.game.use_auto_crouch = True
+boneco('Gira', 0, 8, (0.9, 0.5, 0.2))
 
 t = bpy.data.texts.new('postura.py')
 t.write('''import bge
@@ -117,6 +129,52 @@ def tick(cont):
     if f == 140:
         linhas.append('pulo: posturas vistas=%%s (esperado JUMP_TUCK e STAND)' %% sorted(estado['posturas']))
         linhas.append('pouso: posture=%%s base=%%.3f onGround=%%s (esperado STAND, ~0, True)' %% (cp.posture, base(p), cp.onGround))
+
+    # --- Propriedade da postura (Abaixa tem posture_property='pose')
+    if f == 75:
+        linhas.append('propriedade: pose=%%r (esperado CROUCH)' %% a.get('pose'))
+    if f == 280:
+        linhas.append('propriedade: pose=%%r (esperado STAND)' %% a.get('pose'))
+
+    # --- Velocidade: Lento deitado (30%%) x Rasteja em pé, mesma caminhada
+    lo = sc.objects['Lento']; cl = C.getCharacter(lo)
+    if f == 100:
+        cl.posture = 'CRAWL'
+        estado['x0'] = (lo.worldPosition.x, r.worldPosition.x)
+    if 110 <= f < 140:
+        cl.walkDirection = (0.02, 0, 0)
+        cr.walkDirection = (0.02, 0, 0)
+    if f == 140:
+        cl.walkDirection = (0, 0, 0); cr.walkDirection = (0, 0, 0)
+    if f == 150:
+        dl = lo.worldPosition.x - estado['x0'][0]; dr = r.worldPosition.x - estado['x0'][1]
+        linhas.append('velocidade deitado: %%.2f de %%.2f = %%.2f (esperado ~0.30)' %% (dl, dr, dl / dr if dr else 0))
+
+    # --- Abaixar sozinho: Auto anda para baixo do Teto2 sem pedir postura
+    au = sc.objects['Auto']; cau = C.getCharacter(au)
+    if 60 <= f < 220:
+        cau.walkDirection = (0.03, 0, 0)
+        if 2.5 < au.worldPosition.x < 5.5:
+            estado.setdefault('auto', set()).add(cau.posture)
+    if f == 220:
+        cau.walkDirection = (0, 0, 0)
+    if f == 240:
+        linhas.append('abaixar sozinho: sob o teto=%%s, depois x=%%.2f posture=%%s (esperado CROUCH, >6, STAND)' %% (
+            sorted(estado.get('auto', [])), au.worldPosition.x, cau.posture))
+
+    # --- Girar deitado perto da parede: virar para +X jogaria o corpo dentro dela
+    gi = sc.objects['Gira']; cg = C.getCharacter(gi)
+    if f == 60:
+        cg.posture = 'CRAWL'
+    if f == 80:
+        estado['yaw0'] = gi.worldOrientation.to_euler().z
+        gi.applyRotation((0, 0, -1.5708), False)
+    if f == 90:
+        linhas.append('girar deitado contra a parede: yaw %%.2f -> %%.2f (esperado igual, giro desfeito)' %% (
+            estado['yaw0'], gi.worldOrientation.to_euler().z))
+        gi.applyRotation((0, 0, 1.5708), False)   # para o outro lado: livre
+    if f == 100:
+        linhas.append('girar deitado para o lado livre: yaw=%%.2f (esperado ~1.57)' %% gi.worldOrientation.to_euler().z)
 
     if f == 300:
         with open(LOG, 'w') as fh:

@@ -543,6 +543,13 @@ public:
 	const mt::vec3& GetOptimizationReferencePosition() const;
 	/// Refresh the reference after physics/camera movement. Uses the active camera for now.
 	void UpdateOptimizationReference();
+	/// A character writes its posture to a game property (set at conversion).
+	void SetHasCharacterPostureProperties()
+	{
+		m_hasCharacterPostureProperties = true;
+	}
+	/// Copy each character posture to its Posture Property, after physics.
+	void UpdateCharacterPostureProperties();
 
 	/// Object counters from the last main-camera (non-shadow) culling pass. See m_lastCullingTotalObjects.
 	int GetLastCullingTotalObjects() const;
@@ -861,6 +868,8 @@ public:
 	// Run the registered python callbacks when the scene is removed.
 	void RunOnRemoveCallbacks();
 #endif
+
+	bool m_hasCharacterPostureProperties = false;
 };
 
 #ifdef WITH_PYTHON

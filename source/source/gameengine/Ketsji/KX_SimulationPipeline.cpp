@@ -149,6 +149,9 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 			// systems (currently foliage wind) all consume this same frame position.
 			scene->UpdateOptimizationReference();
 
+			// Posture Property of characters (STAND, CROUCH, ...), for Property sensors.
+			scene->UpdateCharacterPostureProperties();
+
 			// Run after physics so the active camera has its final frame position;
 			// the scenegraph pass below publishes the light transform for rendering.
 			scene->UpdateAutoWorldSun();

@@ -695,6 +695,10 @@ typedef struct Object {
 	char pad2[1];
 	float crawl_height;
 	float jump_tuck;
+	/* Walk speed factor while crouched / crawling */
+	float crouch_speed, crawl_speed;
+	/* Game property kept up to date with the posture name ("STAND", "CROUCH", ...) */
+	char posture_prop[64]; /* MAX_NAME */
 
 	/** Collision mask settings */
 	unsigned short col_group, col_mask;
@@ -1285,6 +1289,7 @@ enum {
 
 /* Object.posture_flag */
 #define OB_POSTURE_JUMP_TUCK	(1 << 0)
+#define OB_POSTURE_AUTO_CROUCH	(1 << 1) /* crouch by itself under a low ceiling */
 
 /* Object.crawl_axis */
 #define OB_CRAWL_AXIS_POS_Y	0

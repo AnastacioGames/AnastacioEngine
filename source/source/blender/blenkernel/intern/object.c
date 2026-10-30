@@ -712,6 +712,8 @@ void BKE_object_init(Object *ob)
 	ob->crouch_height = 0.5f;
 	ob->crawl_height = 0.3f;
 	ob->jump_tuck = 0.3f;
+	ob->crouch_speed = 0.5f;
+	ob->crawl_speed = 0.3f;
 	ob->smooth_movement = 0;
 	ob->jump_direction[0] = 0.0f;
 	ob->jump_direction[1] = 0.0f;

@@ -374,6 +374,12 @@ CcdCharacter::CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionStat
 	m_jumpTuck(0.0f),
 	m_tuckLift(0.0f),
 	m_crawlAxis(0),
+	m_standRadius(0.0f),
+	m_crouchSpeed(1.0f),
+	m_crawlSpeed(1.0f),
+	m_autoCrouch(false),
+	m_autoCrouched(false),
+	m_lastBasis(btMatrix3x3::getIdentity()),
 	m_posture(POSTURE_STAND),
 	m_requestedPosture(POSTURE_STAND),
 	m_canStand(true)
@@ -396,6 +402,14 @@ void CcdCharacter::FreePostureShapes()
 		delete s;
 		s = nullptr;
 	}
+}
+
+void CcdCharacter::SetPostureMotion(float crouchSpeed, float crawlSpeed, bool autoCrouch, const std::string& property)
+{
+	m_crouchSpeed = btMax(crouchSpeed, 0.0f);
+	m_crawlSpeed = btMax(crawlSpeed, 0.0f);
+	m_autoCrouch = autoCrouch;
+	m_postureProperty = property;
 }
 
 void CcdCharacter::SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck, int crawlAxis)
@@ -435,6 +449,7 @@ void CcdCharacter::BuildPostureShapes()
 	}
 	const btScalar margin = m_standShape->getMargin();
 	const btScalar radius = 0.5f * btMax(bmax.x() - bmin.x(), bmax.y() - bmin.y());
+	m_standRadius = radius;
 	const btScalar cx = 0.5f * (bmin.x() + bmax.x());
 	const btScalar cy = 0.5f * (bmin.y() + bmax.y());
 	const btScalar bottom = bmin.z();
@@ -531,13 +546,28 @@ bool CcdCharacter::ShapeFits(btCollisionWorld *world, btConvexShape *shape, cons
 void CcdCharacter::UpdatePosture(btCollisionWorld *world)
 {
 	const bool useTuck = m_jumpTuck > 0.0f;
-	if (m_requestedPosture == POSTURE_STAND && m_posture == POSTURE_STAND && !useTuck) {
+	if (m_requestedPosture == POSTURE_STAND && m_posture == POSTURE_STAND && !useTuck && !m_autoCrouch) {
 		m_canStand = true;
 		return; // Common case: nothing to do.
 	}
 
 	if (!m_postureShapes[POSTURE_CROUCH]) {
 		BuildPostureShapes();
+	}
+
+	btTransform trans = m_ghostObject->getWorldTransform();
+
+	// Crawling: the body sticks out in front, so turning can swing it into a wall.
+	// Undo the turn when the new facing does not fit but the old one does.
+	if (m_posture == POSTURE_CRAWL && !(trans.getBasis() == m_lastBasis) &&
+	    !ShapeFits(world, m_convexShape, trans))
+	{
+		btTransform previous = trans;
+		previous.setBasis(m_lastBasis);
+		if (ShapeFits(world, m_convexShape, previous)) {
+			trans = previous;
+			m_ghostObject->setWorldTransform(trans);
+		}
 	}
 
 	int target = m_requestedPosture;
@@ -548,7 +578,33 @@ void CcdCharacter::UpdatePosture(btCollisionWorld *world)
 		target = POSTURE_JUMP_TUCK;
 	}
 
-	const btTransform trans = m_ghostObject->getWorldTransform();
+	// Auto Crouch: walking towards a gap too low to pass standing.
+	if (m_autoCrouch && target == POSTURE_STAND && (m_posture == POSTURE_STAND || m_posture == POSTURE_CROUCH) &&
+	    onGround())
+	{
+		bool lowAhead = false;
+		const btScalar walk = m_walkDirection.length();
+		if (walk > SIMD_EPSILON) {
+			btTransform ahead = trans;
+			ahead.setOrigin(trans.getOrigin() + m_walkDirection * ((0.5f * m_standRadius + walk) / walk));
+			lowAhead = !ShapeFits(world, m_standShape, ahead) &&
+			           ShapeFits(world, m_postureShapes[POSTURE_CROUCH], ahead);
+		}
+		if (lowAhead) {
+			m_autoCrouched = true;
+		}
+		if (m_autoCrouched) {
+			if (lowAhead || !ShapeFits(world, m_standShape, trans)) {
+				target = POSTURE_CROUCH;
+			}
+			else {
+				m_autoCrouched = false;
+			}
+		}
+	}
+	else if (target != POSTURE_STAND) {
+		m_autoCrouched = false;
+	}
 
 	if (target != m_posture) {
 		btConvexShape *shape = ShapeForPosture(target);
@@ -569,6 +625,7 @@ void CcdCharacter::UpdatePosture(btCollisionWorld *world)
 		// Otherwise keep the current shape and retry next step (e.g. ceiling above).
 	}
 
+	m_lastBasis = m_ghostObject->getWorldTransform().getBasis();
 	m_canStand = (m_posture == POSTURE_STAND) || ShapeFits(world, m_standShape, m_ghostObject->getWorldTransform());
 }
 
@@ -602,7 +659,18 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 
 	UpdatePosture(collisionWorld);
 
-	btKinematicCharacterController::updateAction(collisionWorld, dt);
+	// Slower while crouched / crawling: scale the walk step for this update only.
+	const btScalar speed = (m_posture == POSTURE_CROUCH) ? m_crouchSpeed :
+	                       (m_posture == POSTURE_CRAWL) ? m_crawlSpeed : btScalar(1.0f);
+	if (speed != 1.0f) {
+		const btVector3 walk = m_walkDirection;
+		m_walkDirection *= speed;
+		btKinematicCharacterController::updateAction(collisionWorld, dt);
+		m_walkDirection = walk;
+	}
+	else {
+		btKinematicCharacterController::updateAction(collisionWorld, dt);
+	}
 	FollowPlatform(collisionWorld);
 
 	/* Publish to the scene node only when the ghost actually moved (idle characters
@@ -1207,6 +1275,7 @@ bool CcdPhysicsController::CreateCharacterController()
 	m_characterController->setSmoothMovement(m_cci.m_smoothMovement);
 	m_characterController->setJumpDirection(m_cci.m_jumpAxis);
 	m_characterController->SetPostureSettings(m_cci.m_crouchHeight, m_cci.m_crawlHeight, m_cci.m_jumpTuck, m_cci.m_crawlAxis);
+	m_characterController->SetPostureMotion(m_cci.m_crouchSpeed, m_cci.m_crawlSpeed, m_cci.m_autoCrouch, m_cci.m_postureProperty);
 
 	return true;
 }

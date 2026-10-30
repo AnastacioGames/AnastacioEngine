@@ -46,6 +46,7 @@
 #include "PHY_IMotionState.h"
 #include "PHY_ICharacter.h"
 #include "KX_GameObject.h"
+#include "KX_Scene.h"
 #include "KX_Globals.h" // for KX_RasterizerDrawDebugLine
 #include "KX_Mesh.h"
 #include "BL_SceneConverter.h"
@@ -3400,6 +3401,13 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		ci.m_crouchHeight = blenderobject->crouch_height;
 		ci.m_crawlHeight = blenderobject->crawl_height;
 		ci.m_crawlAxis = blenderobject->crawl_axis;
+		ci.m_crouchSpeed = blenderobject->crouch_speed;
+		ci.m_crawlSpeed = blenderobject->crawl_speed;
+		ci.m_autoCrouch = (blenderobject->posture_flag & OB_POSTURE_AUTO_CROUCH) != 0;
+		ci.m_postureProperty = blenderobject->posture_prop;
+		if (blenderobject->posture_prop[0]) {
+			gameobj->GetScene()->SetHasCharacterPostureProperties();
+		}
 		ci.m_jumpTuck = (blenderobject->posture_flag & OB_POSTURE_JUMP_TUCK) ? blenderobject->jump_tuck : 0.0f;
 	}
 	ci.m_jumpAxis = btVector3(

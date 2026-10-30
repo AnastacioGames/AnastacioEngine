@@ -10,6 +10,7 @@
 
 #include <utility>
 #include <vector>
+#include <string>
 
 enum PHY_CharacterPosture {
 	POSTURE_STAND = 0,
@@ -90,6 +91,8 @@ public:
 	virtual int GetPosture() const = 0;
 	virtual int GetRequestedPosture() const = 0;
 	virtual bool CanStand() const = 0;
+	/// Game property to keep updated with the posture name (empty = none).
+	virtual const std::string& GetPostureProperty() const = 0;
 
 private:
 	std::vector<std::pair<void (*)(void *), void *> > m_invalidationCallbacks;

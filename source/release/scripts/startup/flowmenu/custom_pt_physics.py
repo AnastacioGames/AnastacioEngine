@@ -1044,10 +1044,15 @@ class CUSTOM_PT_game_physics(CustomPhysicsButtonsPanel, Panel):
             row.label(text="Crawl Front:")
             row.prop(game, "crawl_axis", expand=True)
             row = post_box.row()
+            row.prop(game, "crouch_speed", slider=True)
+            row.prop(game, "crawl_speed", slider=True)
+            row = post_box.row()
             row.prop(game, "use_jump_tuck")
             sub = row.row()
             sub.active = game.use_jump_tuck
             sub.prop(game, "jump_tuck", slider=True)
+            post_box.prop(game, "use_auto_crouch")
+            post_box.prop(game, "posture_property", icon="PROPERTIES")
             post_box.label(text="Motion actuator > Posture, or Python: character.posture", icon="INFO")
 
         elif physics_type in {'DYNAMIC', 'RIGID_BODY'}:

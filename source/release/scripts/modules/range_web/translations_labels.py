@@ -1105,6 +1105,15 @@ TABLE = (
 EXTRA = (
     # Postura do Character (abaixar / rastejar / pulo)
     ("Posture (Crouch / Crawl / Jump):", "Postura (abaixar / rastejar / pulo):", "Postura (agacharse / arrastrarse / salto):", "Поза (присесть / ползти / прыжок):"),
+    ("Crouch Speed", "Velocidade abaixado", "Velocidad agachado", "Скорость в приседе"),
+    ("Crawl Speed", "Velocidade deitado", "Velocidad arrastrándose", "Скорость ползком"),
+    ("Auto Crouch", "Abaixar sozinho", "Agacharse solo", "Автоприсед"),
+    ("Posture Property", "Propriedade da postura", "Propiedad de postura", "Свойство позы"),
+    ("Character Motion", "Movimento do personagem", "Movimiento del personaje", "Движение персонажа"),
+    ("Walk speed while crouched (1 = same as standing)", "Velocidade andando abaixado (1 = igual em pé)", "Velocidad al caminar agachado (1 = igual que de pie)", "Скорость ходьбы в приседе (1 = как стоя)"),
+    ("Walk speed while crawling (1 = same as standing)", "Velocidade rastejando (1 = igual em pé)", "Velocidad arrastrándose (1 = igual que de pie)", "Скорость ползком (1 = как стоя)"),
+    ("Crouch by itself when walking under something too low to pass standing", "Abaixa sozinho ao andar para baixo de algo baixo demais para passar em pé", "Se agacha solo al caminar bajo algo demasiado bajo para pasar de pie", "Само приседает, проходя под слишком низким препятствием"),
+    ("Game property kept up to date with the posture: STAND, CROUCH, CRAWL or JUMP_TUCK (created if missing; use a Property sensor to switch animations)", "Propriedade do jogo atualizada com a postura: STAND, CROUCH, CRAWL ou JUMP_TUCK (criada se não existir; use um sensor Property para trocar a animação)", "Propiedad del juego actualizada con la postura: STAND, CROUCH, CRAWL o JUMP_TUCK (se crea si no existe; usa un sensor Property para cambiar la animación)", "Игровое свойство с текущей позой: STAND, CROUCH, CRAWL или JUMP_TUCK (создаётся при отсутствии; сенсор Property для смены анимации)"),
     ("Crouch Height", "Altura abaixado", "Altura agachado", "Высота приседа"),
     ("Crawl Height", "Altura deitado", "Altura arrastrándose", "Высота ползком"),
     ("Jump Tuck", "Recolher no pulo", "Recoger en el salto", "Поджать в прыжке"),

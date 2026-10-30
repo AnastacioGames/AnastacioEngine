@@ -883,7 +883,9 @@ def _character_code(act):
     return ["self._char_move(%r, %s, %s, %s, %s, %s, %s, %s, %d%s, own=ob)" % (
         "chr:" + _ACT_LABEL[0], _ON, A("Loc", act.offset_location), act.use_local_location,
         act.use_add_character_location, A("Rot", act.offset_rotation), act.use_local_rotation,
-        A("Jump", act.use_character_jump), substeps, ", gaze=True" if act.use_vr_gaze else "")], True
+        A("Jump", act.use_character_jump), substeps,
+        (", gaze=True" if act.use_vr_gaze else "") +
+        (", posture=%r" % act.character_posture if act.character_posture != 'NONE' else ""))], True
 
 
 _ACTION_MODES = {'PLAY': 0, 'PINGPONG': 1, 'FLIPPER': 2, 'LOOPSTOP': 3, 'LOOPEND': 4, 'PROPERTY': 6}
@@ -2416,17 +2418,25 @@ _EXTRA["_servo"] = '''
             ob.applyForce(f, local)
 '''
 _EXTRA["_char_move"] = '''
-    def _char_move(self, key, on, loc, local, add, rot, rot_local, jump, substeps, gaze=False, own=None):
-        """Motion Character (KX_ObjectActuator): anda com o personagem; ao soltar, para."""
+    def _char_move(self, key, on, loc, local, add, rot, rot_local, jump, substeps, gaze=False, own=None,
+                   posture=None):
+        """Motion Character (KX_ObjectActuator): anda com o personagem; ao soltar, para.
+        posture ('CROUCH'/'CRAWL'): abaixa/deita enquanto ativo e levanta ao soltar (se couber)."""
         from Range import constraints
         ob = own or self.object
         ch = constraints.getCharacter(ob)
         if ch is None:
             return
+        walks = not posture or any(loc)  # brick so de postura nao mexe na caminhada
         if not on:
             if self._ticks.pop(key, None) is not None:
-                ch.walkDirection = (0.0, 0.0, 0.0)
+                if walks:
+                    ch.walkDirection = (0.0, 0.0, 0.0)
+                if posture:
+                    ch.posture = 'STAND'
             return
+        if posture:
+            ch.posture = posture
         step = 60.0 * logic.deltaTime()
         d = Vector(loc) * step
         if gaze:
@@ -2439,7 +2449,8 @@ _EXTRA["_char_move"] = '''
                 d = d + old * step
                 if d.length > 1e-6:
                     d = d.normalized() * old.length
-        ch.walkDirection = d / substeps
+        if walks:
+            ch.walkDirection = d / substeps
         if any(rot):
             ob.applyRotation(Vector(rot) * step, rot_local)
         jumping = self._ticks.get(key, False)

@@ -241,6 +241,11 @@ ACTION_NODES = (
                 ("linear_velocity", "use_local_linear_velocity", "use_add_linear_velocity",
                  "angular_velocity", "use_local_angular_velocity", "force", "use_local_force",
                  "torque", "use_local_torque")),
+    # Personagem (Physics Type Character): anda, pula e abaixa/rasteja enquanto ativo.
+    _brick_node(ActionNode, "RangeLogicCharacter", "Character Motion", T.ObjectActuator, 'MOTION',
+                ("offset_location", "use_local_location", "use_character_jump", "character_posture"),
+                ("offset_rotation", "use_local_rotation", "use_add_character_location"),
+                fixed={"mode": 'OBJECT_CHARACTER'}),
     _brick_node(ActionNode, "RangeLogicSetProperty", "Set Property", T.PropertyActuator, 'PROPERTY',
                 ("property", "value"), fixed={"mode": 'ASSIGN'}, required=("property",)),
     _brick_node(ActionNode, "RangeLogicAddProperty", "Add to Property", T.PropertyActuator,
