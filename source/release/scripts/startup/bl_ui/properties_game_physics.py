@@ -132,7 +132,7 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             sub.active = game.use_jump_tuck
             sub.prop(game, "jump_tuck", slider=True)
             box.prop(game, "use_auto_crouch")
-            box.prop(game, "posture_property", icon="PROPERTIES")
+            box.prop(game, "posture_property", icon="TEXT")
             box.label(text="Motion actuator > Posture, or Python: character.posture", icon="INFO")
 
         elif physics_type in {'DYNAMIC', 'RIGID_BODY'}:
