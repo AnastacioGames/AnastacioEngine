@@ -59,12 +59,14 @@ set(INC_SYS
 )
 
 set(SRC
+	CcdCollisionDispatcher.cpp
 	CcdConstraint.cpp
 	CcdCookedData.cpp
 	CcdPhysicsEnvironment.cpp
 	CcdPhysicsController.cpp
 	CcdGraphicController.cpp
 
+	CcdCollisionDispatcher.h
 	CcdConstraint.h
 	CcdCookedData.h
 	CcdMathUtils.h

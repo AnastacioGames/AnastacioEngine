@@ -20,6 +20,7 @@
 #include "CcdPhysicsController.h"
 #include "CcdGraphicController.h"
 #include "CcdConstraint.h"
+#include "CcdCollisionDispatcher.h"
 #include "CcdMathUtils.h"
 
 #include <algorithm>
@@ -725,7 +726,7 @@ CcdPhysicsEnvironment::CcdPhysicsEnvironment(PHY_SolverType solverType, bool use
 
 	m_collisionConfiguration = new btSoftBodyRigidBodyCollisionConfiguration();
 
-	btCollisionDispatcher *dispatcher = new btCollisionDispatcher(m_collisionConfiguration);
+	btCollisionDispatcher *dispatcher = new CcdCollisionDispatcher(m_collisionConfiguration);
 	btGImpactCollisionAlgorithm::registerAlgorithm(dispatcher);
 	m_ownDispatcher = dispatcher;
 
