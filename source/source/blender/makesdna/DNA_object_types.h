@@ -687,9 +687,13 @@ typedef struct Object {
 	float max_slope;
 	float smooth_movement;
 	float jump_direction[3];
-	int pad5;
+	/* Character posture: crouch/crawl height and jump tuck, fractions of the standing height */
+	float crouch_height;
 	unsigned char max_jumps;
-	char pad2[3];
+	char posture_flag; /* OB_POSTURE_* */
+	char pad2[2];
+	float crawl_height;
+	float jump_tuck;
 
 	/** Collision mask settings */
 	unsigned short col_group, col_mask;
@@ -1277,6 +1281,9 @@ enum {
 };
 
 #define MAX_DUPLI_RECUR 8
+
+/* Object.posture_flag */
+#define OB_POSTURE_JUMP_TUCK	(1 << 0)
 
 #ifdef __cplusplus
 }

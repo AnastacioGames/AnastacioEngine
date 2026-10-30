@@ -115,6 +115,18 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             col.prop(game, "radius")
             col.prop(game, "jump_direction")
 
+            box = layout.box()
+            box.label(text="Posture (Crouch / Crawl / Jump):", icon="MOD_ARMATURE")
+            row = box.row()
+            row.prop(game, "crouch_height", slider=True)
+            row.prop(game, "crawl_height", slider=True)
+            row = box.row()
+            row.prop(game, "use_jump_tuck")
+            sub = row.row()
+            sub.active = game.use_jump_tuck
+            sub.prop(game, "jump_tuck", slider=True)
+            box.label(text="Motion actuator > Posture, or Python: character.posture", icon="INFO")
+
         elif physics_type in {'DYNAMIC', 'RIGID_BODY'}:
             split = layout.split()
 

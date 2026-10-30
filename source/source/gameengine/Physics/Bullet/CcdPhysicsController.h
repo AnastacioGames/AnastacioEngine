@@ -79,6 +79,7 @@ public:
 		m_radius(1.0f),
 		m_height(1.0f),
 		m_halfExtend(0.0f, 0.0f, 0.0f),
+		m_capsuleOffset(0.0f, 0.0f, 0.0f),
 		m_childScale(1.0f, 1.0f, 1.0f),
 		m_userData(nullptr),
 		m_mesh(nullptr),
@@ -157,6 +158,9 @@ public:
 	btScalar m_radius;
 	btScalar m_height;
 	btVector3 m_halfExtend;
+	// Capsule center inside the object (characters only: they cannot use a
+	// compound, so the offset is built into a convex two-sphere shape).
+	btVector3 m_capsuleOffset;
 	btTransform m_childTrans;
 	btVector3 m_childScale;
 	void *m_userData;
@@ -329,6 +333,10 @@ struct CcdConstructionInfo {
 	unsigned char m_maxJumps;
 	float m_smoothMovement;
 	btVector3 m_jumpAxis;
+	/// Character posture: fractions of the standing height.
+	float m_crouchHeight = 0.5f;
+	float m_crawlHeight = 0.3f;
+	float m_jumpTuck = 0.0f; ///< 0 = jump tuck off.
 
 	int m_gamesoftFlag;
 	unsigned short m_softBendingDistance;
@@ -472,8 +480,31 @@ private:
 	const btCollisionObject *m_platform;
 	btTransform m_platformPrevTrans;
 
+	/// Posture (crouch / crawl / jump tuck). The standing shape belongs to the
+	/// controller; the posture shapes are built from its bounds and owned here.
+	btConvexShape *m_standShape;
+	btConvexShape *m_postureShapes[POSTURE_COUNT];
+	float m_crouchHeight;
+	float m_crawlHeight;
+	float m_jumpTuck;
+	float m_tuckLift; ///< Height removed from the bottom by the tuck shape.
+	int m_posture;
+	int m_requestedPosture;
+	bool m_canStand;
+
+	void BuildPostureShapes();
+	void FreePostureShapes();
+	btConvexShape *ShapeForPosture(int posture) const;
+	void ApplyShape(btCollisionWorld *world, btConvexShape *shape);
+	/// True when the shape at this transform does not overlap solid geometry.
+	bool ShapeFits(btCollisionWorld *world, btConvexShape *shape, const btTransform& trans) const;
+	void UpdatePosture(btCollisionWorld *world);
+
 public:
 	CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionState, btPairCachingGhostObject *ghost, btConvexShape *shape, float stepHeight);
+	virtual ~CcdCharacter();
+
+	void SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck);
 
 	virtual void updateAction(btCollisionWorld *collisionWorld, btScalar dt);
 
@@ -572,6 +603,11 @@ public:
 	virtual void SetVelocity(const mt::vec3& vel, float time, bool local);
 
 	virtual void Reset();
+
+	virtual void SetPosture(int posture);
+	virtual int GetPosture() const;
+	virtual int GetRequestedPosture() const;
+	virtual bool CanStand() const;
 };
 
 class CleanPairCallback : public btOverlapCallback

@@ -215,6 +215,7 @@ void BL_ConvertActuators(const char *maggiename,
 					angvelvec,
 					damping,
 					bitLocalFlag);
+				tmpbaseact->SetCharacterPosture(obact->posture);
 				baseact = tmpbaseact;
 				break;
 			}

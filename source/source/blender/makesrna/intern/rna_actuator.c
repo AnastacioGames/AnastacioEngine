@@ -1018,6 +1018,20 @@ static void rna_def_object_actuator(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_CHAR_JUMP);
 	RNA_def_property_ui_text(prop, "Jump", "Make the character jump using the settings in the physics properties");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	{
+		static EnumPropertyItem posture_items[] = {
+			{ACT_CHAR_POSTURE_NONE, "NONE", 0, "Stand", "Keep the standing collision shape"},
+			{ACT_CHAR_POSTURE_CROUCH, "CROUCH", 0, "Crouch", "Crouch while active, stand up when released (if there is room)"},
+			{ACT_CHAR_POSTURE_CRAWL, "CRAWL", 0, "Crawl", "Lie down while active, stand up when released (if there is room)"},
+			{0, NULL, 0, NULL, NULL}
+		};
+		prop = RNA_def_property(srna, "character_posture", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "posture");
+		RNA_def_property_enum_items(prop, posture_items);
+		RNA_def_property_ui_text(prop, "Posture", "Character posture while the actuator is active");
+		RNA_def_property_update(prop, NC_LOGIC, NULL);
+	}
 }
 
 static void rna_def_camera_actuator(BlenderRNA *brna)

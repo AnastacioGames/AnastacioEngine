@@ -2377,6 +2377,33 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	RNA_def_property_float_default(prop, 0);
 	RNA_def_property_ui_text(prop, "Jump Direction", "Character jump direction");
 
+	prop = RNA_def_property(srna, "crouch_height", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "crouch_height");
+	RNA_def_property_range(prop, 0.1f, 1.0f);
+	RNA_def_property_float_default(prop, 0.5f);
+	RNA_def_property_ui_text(prop, "Crouch Height",
+	                         "Collision height when crouching, as a fraction of the standing height "
+	                         "(the top of the shape shrinks, the feet stay on the ground)");
+
+	prop = RNA_def_property(srna, "crawl_height", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "crawl_height");
+	RNA_def_property_range(prop, 0.05f, 1.0f);
+	RNA_def_property_float_default(prop, 0.3f);
+	RNA_def_property_ui_text(prop, "Crawl Height",
+	                         "Collision height when crawling (shape lies down along the object's Y axis), "
+	                         "as a fraction of the standing height");
+
+	prop = RNA_def_property(srna, "jump_tuck", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "jump_tuck");
+	RNA_def_property_range(prop, 0.0f, 0.9f);
+	RNA_def_property_float_default(prop, 0.3f);
+	RNA_def_property_ui_text(prop, "Jump Tuck",
+	                         "Part of the height removed from the bottom while rising in a jump (legs pulled up)");
+
+	prop = RNA_def_property(srna, "use_jump_tuck", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "posture_flag", OB_POSTURE_JUMP_TUCK);
+	RNA_def_property_ui_text(prop, "Jump Tuck", "Pull the bottom of the collision shape up while rising in a jump");
+
 	/* Collision Masks */
 	prop = RNA_def_property(srna, "collision_group", PROP_BOOLEAN, PROP_LAYER_MEMBER);
 	RNA_def_property_boolean_sdna(prop, NULL, "col_group", 1);

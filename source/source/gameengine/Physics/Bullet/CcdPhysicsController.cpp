@@ -367,8 +367,226 @@ CcdCharacter::CcdCharacter(CcdPhysicsController *ctrl, btMotionState *motionStat
 	m_jumps(0),
 	m_maxJumps(1),
 	m_platform(nullptr),
-	m_platformPrevTrans(btTransform::getIdentity())
+	m_platformPrevTrans(btTransform::getIdentity()),
+	m_standShape(shape),
+	m_crouchHeight(0.5f),
+	m_crawlHeight(0.3f),
+	m_jumpTuck(0.0f),
+	m_tuckLift(0.0f),
+	m_posture(POSTURE_STAND),
+	m_requestedPosture(POSTURE_STAND),
+	m_canStand(true)
 {
+	for (btConvexShape *&s : m_postureShapes) {
+		s = nullptr;
+	}
+}
+
+CcdCharacter::~CcdCharacter()
+{
+	// The controller deletes the standing shape; give it back to the ghost first.
+	m_ghostObject->setCollisionShape(m_standShape);
+	FreePostureShapes();
+}
+
+void CcdCharacter::FreePostureShapes()
+{
+	for (btConvexShape *&s : m_postureShapes) {
+		delete s;
+		s = nullptr;
+	}
+}
+
+void CcdCharacter::SetPostureSettings(float crouchHeight, float crawlHeight, float jumpTuck)
+{
+	m_crouchHeight = btClamped(crouchHeight, 0.05f, 1.0f);
+	m_crawlHeight = btClamped(crawlHeight, 0.05f, 1.0f);
+	m_jumpTuck = btClamped(jumpTuck, 0.0f, 0.9f);
+	FreePostureShapes();
+}
+
+static btConvexShape *posture_capsule(const btVector3& center, const btVector3& axis, btScalar length,
+                                      btScalar radius, btScalar margin)
+{
+	radius = btMin(radius, btScalar(0.5f) * length);
+	const btVector3 half = axis * (btScalar(0.5f) * length - radius);
+	const btVector3 centers[2] = {center + half, center - half};
+	const btScalar radii[2] = {radius, radius};
+	btMultiSphereShape *shape = new btMultiSphereShape(centers, radii, 2);
+	shape->setMargin(margin);
+	return shape;
+}
+
+void CcdCharacter::BuildPostureShapes()
+{
+	FreePostureShapes();
+
+	// Standing bounds in object space (any convex shape works, not only capsules).
+	// Use the real surface (supporting points): a capsule's AABB adds its margin,
+	// which is its whole radius, and would make every posture shape too big.
+	btVector3 bmin, bmax;
+	for (int i = 0; i < 3; ++i) {
+		btVector3 dir(0.0f, 0.0f, 0.0f);
+		dir[i] = 1.0f;
+		bmax[i] = m_standShape->localGetSupportingVertex(dir)[i];
+		bmin[i] = m_standShape->localGetSupportingVertex(-dir)[i];
+	}
+	const btScalar margin = m_standShape->getMargin();
+	const btScalar radius = 0.5f * btMax(bmax.x() - bmin.x(), bmax.y() - bmin.y());
+	const btScalar cx = 0.5f * (bmin.x() + bmax.x());
+	const btScalar cy = 0.5f * (bmin.y() + bmax.y());
+	const btScalar bottom = bmin.z();
+	const btScalar top = bmax.z();
+	const btScalar height = top - bottom;
+	const btVector3 axisZ(0.0f, 0.0f, 1.0f);
+
+	// Crouch: the top comes down, the feet stay.
+	const btScalar crouch = height * m_crouchHeight;
+	m_postureShapes[POSTURE_CROUCH] = posture_capsule(btVector3(cx, cy, bottom + 0.5f * crouch), axisZ, crouch, radius, margin);
+
+	// Crawl: lying down along the object's Y axis, on the ground.
+	const btScalar crawl = height * m_crawlHeight;
+	m_postureShapes[POSTURE_CRAWL] = posture_capsule(btVector3(cx, cy, bottom + 0.5f * crawl), btVector3(0.0f, 1.0f, 0.0f),
+	                                                 btMax(height, crawl), 0.5f * crawl, margin);
+
+	// Jump tuck: the legs come up, the head stays.
+	m_tuckLift = height * m_jumpTuck;
+	const btScalar tuck = height - m_tuckLift;
+	m_postureShapes[POSTURE_JUMP_TUCK] = posture_capsule(btVector3(cx, cy, top - 0.5f * tuck), axisZ, tuck, radius, margin);
+}
+
+btConvexShape *CcdCharacter::ShapeForPosture(int posture) const
+{
+	return (posture == POSTURE_STAND) ? m_standShape : m_postureShapes[posture];
+}
+
+void CcdCharacter::ApplyShape(btCollisionWorld *world, btConvexShape *shape)
+{
+	m_convexShape = shape;
+	m_ghostObject->setCollisionShape(shape);
+	if (world && m_ghostObject->getBroadphaseHandle()) {
+		world->updateSingleAabb(m_ghostObject);
+	}
+}
+
+namespace {
+struct PostureContactCallback : public btCollisionWorld::ContactResultCallback
+{
+	const btCollisionObject *m_self;
+	const btCollisionObject *m_probe;
+	bool m_blocked;
+
+	PostureContactCallback(const btCollisionObject *self, const btCollisionObject *probe)
+		:m_self(self),
+		m_probe(probe),
+		m_blocked(false)
+	{
+	}
+
+	virtual bool needsCollision(btBroadphaseProxy *proxy) const
+	{
+		const btCollisionObject *ob = static_cast<const btCollisionObject *>(proxy->m_clientObject);
+		if (m_blocked || ob == m_self || !ob->hasContactResponse()) {
+			return false;
+		}
+		return ContactResultCallback::needsCollision(proxy);
+	}
+
+	virtual btScalar addSingleResult(btManifoldPoint& cp, const btCollisionObjectWrapper *wrap0, int, int,
+	                                 const btCollisionObjectWrapper *wrap1, int, int)
+	{
+		// Touching is fine (standing on the floor). Resting contacts overlap by
+		// the other object's collision margin, so only deeper overlap blocks.
+		const btCollisionObjectWrapper *other = (wrap0->getCollisionObject() == m_probe) ? wrap1 : wrap0;
+		const btScalar tolerance = 0.02f + other->getCollisionShape()->getMargin();
+		if (cp.getDistance() < -tolerance) {
+			m_blocked = true;
+		}
+		return 0.0f;
+	}
+};
+}
+
+bool CcdCharacter::ShapeFits(btCollisionWorld *world, btConvexShape *shape, const btTransform& trans) const
+{
+	btCollisionObject probe;
+	probe.setCollisionShape(shape);
+	probe.setWorldTransform(trans);
+
+	PostureContactCallback callback(m_ghostObject, &probe);
+	const btBroadphaseProxy *handle = m_ghostObject->getBroadphaseHandle();
+	if (handle) {
+		callback.m_collisionFilterGroup = handle->m_collisionFilterGroup;
+		callback.m_collisionFilterMask = handle->m_collisionFilterMask;
+	}
+	world->contactTest(&probe, callback);
+	return !callback.m_blocked;
+}
+
+void CcdCharacter::UpdatePosture(btCollisionWorld *world)
+{
+	const bool useTuck = m_jumpTuck > 0.0f;
+	if (m_requestedPosture == POSTURE_STAND && m_posture == POSTURE_STAND && !useTuck) {
+		m_canStand = true;
+		return; // Common case: nothing to do.
+	}
+
+	if (!m_postureShapes[POSTURE_CROUCH]) {
+		BuildPostureShapes();
+	}
+
+	int target = m_requestedPosture;
+	// Tuck only while rising from a standing jump.
+	if (useTuck && target == POSTURE_STAND && (m_posture == POSTURE_STAND || m_posture == POSTURE_JUMP_TUCK) &&
+	    !onGround() && m_verticalVelocity > 0.0f)
+	{
+		target = POSTURE_JUMP_TUCK;
+	}
+
+	const btTransform trans = m_ghostObject->getWorldTransform();
+
+	if (target != m_posture) {
+		btConvexShape *shape = ShapeForPosture(target);
+		if (ShapeFits(world, shape, trans)) {
+			ApplyShape(world, shape);
+			m_posture = target;
+		}
+		else if (m_posture == POSTURE_JUMP_TUCK && target == POSTURE_STAND) {
+			// Legs would go into the floor: stretch them out by lifting the body instead.
+			btTransform lifted = trans;
+			lifted.setOrigin(trans.getOrigin() + getUp() * m_tuckLift);
+			if (ShapeFits(world, shape, lifted)) {
+				m_ghostObject->setWorldTransform(lifted);
+				ApplyShape(world, shape);
+				m_posture = target;
+			}
+		}
+		// Otherwise keep the current shape and retry next step (e.g. ceiling above).
+	}
+
+	m_canStand = (m_posture == POSTURE_STAND) || ShapeFits(world, m_standShape, m_ghostObject->getWorldTransform());
+}
+
+void CcdCharacter::SetPosture(int posture)
+{
+	if (posture == POSTURE_STAND || posture == POSTURE_CROUCH || posture == POSTURE_CRAWL) {
+		m_requestedPosture = posture;
+	}
+}
+
+int CcdCharacter::GetPosture() const
+{
+	return m_posture;
+}
+
+int CcdCharacter::GetRequestedPosture() const
+{
+	return m_requestedPosture;
+}
+
+bool CcdCharacter::CanStand() const
+{
+	return m_canStand;
 }
 
 void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
@@ -376,6 +594,8 @@ void CcdCharacter::updateAction(btCollisionWorld *collisionWorld, btScalar dt)
 	if (onGround()) {
 		m_jumps = 0;
 	}
+
+	UpdatePosture(collisionWorld);
 
 	btKinematicCharacterController::updateAction(collisionWorld, dt);
 	FollowPlatform(collisionWorld);
@@ -454,7 +674,8 @@ bool CcdCharacter::canJump() const
 
 void CcdCharacter::jump()
 {
-	if (!canJump()) {
+	// No jumping while lying down.
+	if (!canJump() || m_posture == POSTURE_CRAWL) {
 		return;
 	}
 
@@ -524,6 +745,10 @@ void CcdCharacter::SetVelocity(const btVector3& vel, float time, bool local)
 
 void CcdCharacter::ReplaceShape(btConvexShape* shape)
 {
+	// New standing shape (e.g. replaced mesh): rebuild the postures from it.
+	m_standShape = shape;
+	FreePostureShapes();
+	m_posture = POSTURE_STAND;
 	m_convexShape = shape;
 	m_ghostObject->setCollisionShape(m_convexShape);
 }
@@ -976,6 +1201,7 @@ bool CcdPhysicsController::CreateCharacterController()
 	m_characterController->setMaxSlope(m_cci.m_maxSlope);
 	m_characterController->setSmoothMovement(m_cci.m_smoothMovement);
 	m_characterController->setJumpDirection(m_cci.m_jumpAxis);
+	m_characterController->SetPostureSettings(m_cci.m_crouchHeight, m_cci.m_crawlHeight, m_cci.m_jumpTuck);
 
 	return true;
 }
@@ -3052,7 +3278,15 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 		}
 		case PHY_SHAPE_CAPSULE:
 		{
-			collisionShape = new btCapsuleShapeZ(m_radius, m_height);
+			if (m_capsuleOffset.length2() > 1.0e-10f) {
+				const btVector3 halfAxis(0.0f, 0.0f, 0.5f * m_height);
+				const btVector3 centers[2] = {m_capsuleOffset + halfAxis, m_capsuleOffset - halfAxis};
+				const btScalar radii[2] = {m_radius, m_radius};
+				collisionShape = new btMultiSphereShape(centers, radii, 2);
+			}
+			else {
+				collisionShape = new btCapsuleShapeZ(m_radius, m_height);
+			}
 			collisionShape->setMargin(margin);
 			break;
 		}

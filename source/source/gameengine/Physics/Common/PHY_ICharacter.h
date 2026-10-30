@@ -11,6 +11,14 @@
 #include <utility>
 #include <vector>
 
+enum PHY_CharacterPosture {
+	POSTURE_STAND = 0,
+	POSTURE_CROUCH,
+	POSTURE_CRAWL,
+	POSTURE_JUMP_TUCK, ///< Automatic while rising in a jump.
+	POSTURE_COUNT
+};
+
 class PHY_ICharacter
 {
 public:
@@ -75,6 +83,13 @@ public:
 	virtual void SetVelocity(const mt::vec3& vel, float time, bool local) = 0;
 
 	virtual void Reset() = 0;
+
+	/// Posture: the collision shape changes, the mesh does not.
+	/// Growing back (stand up, untuck) waits until there is room.
+	virtual void SetPosture(int posture) = 0;
+	virtual int GetPosture() const = 0;
+	virtual int GetRequestedPosture() const = 0;
+	virtual bool CanStand() const = 0;
 
 private:
 	std::vector<std::pair<void (*)(void *), void *> > m_invalidationCallbacks;

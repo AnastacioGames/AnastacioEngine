@@ -120,7 +120,8 @@ typedef struct bObjectActuator {
 	short flag, type, otype;
 	short damping;
 	short servotype;
-	short pad2[3];
+	short posture; /* ACT_CHAR_POSTURE_* (character motion) */
+	short pad2[2];
 	float forceloc[3], forcerot[3];
 	float pad[3], pad1[3];
 	float dloc[3], drot[3]; /* angle in radians */
@@ -321,6 +322,11 @@ typedef struct bActuator {
 #define ACT_ADD_LIN_VEL			64
 #define ACT_ADD_CHAR_LOC		128
 #define ACT_CHAR_JUMP			256
+
+/* objectactuator->posture */
+#define ACT_CHAR_POSTURE_NONE	0
+#define ACT_CHAR_POSTURE_CROUCH	1
+#define ACT_CHAR_POSTURE_CRAWL	2
 #define ACT_DLOC_VR_GAZE		512 /* Loc follows the head gaze (y = forward), horizontal only */
 #define ACT_DLOC_VR_TELEPORT	1024 /* with VR Gaze: jump once to the looked-at ground point (Loc Y = max distance) instead of walking */
 

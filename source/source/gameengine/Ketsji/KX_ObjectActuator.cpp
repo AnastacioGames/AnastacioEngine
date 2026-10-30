@@ -149,6 +149,7 @@ KX_ObjectActuator::KX_ObjectActuator(SCA_IObject *gameobj,
 	m_linear_damping_active(false),
 	m_angular_damping_active(false),
 	m_jumping(false),
+	m_posture(0),
 	m_vr_gaze_factor(0.0f),
 	m_vr_gaze_braking(false),
 	m_vr_teleport_done(false)
@@ -221,6 +222,9 @@ bool KX_ObjectActuator::Update()
 		// Explicitly stop the movement if we're using character motion
 		if (m_bitLocalFlag.CharacterMotion) {
 			character->SetWalkDirection(mt::zero3);
+			if (m_posture != 0) {
+				character->SetPosture(POSTURE_STAND); // stands when there is room
+			}
 		}
 
 		m_linear_damping_active = false;
@@ -353,6 +357,10 @@ bool KX_ObjectActuator::Update()
 
 			if (!m_bitLocalFlag.ZeroDRot) {
 				parent->ApplyRotation((m_drot * 60.f) * KX_GetActiveEngine()->GetEngineDeltaTime(), (m_bitLocalFlag.DRot) != 0);
+			}
+
+			if (m_posture != 0) {
+				character->SetPosture((m_posture == 2) ? POSTURE_CRAWL : POSTURE_CROUCH);
 			}
 
 			if (m_bitLocalFlag.CharacterJump) {

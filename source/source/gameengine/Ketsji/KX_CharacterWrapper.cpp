@@ -23,6 +23,8 @@
  */
 
 #include "KX_CharacterWrapper.h"
+
+#include <cstring>
 #include "KX_PyMath.h"
 
 #include "PHY_ICharacter.h"
@@ -100,8 +102,45 @@ PyAttributeDef KX_CharacterWrapper::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("walkDirection", KX_CharacterWrapper, pyattr_get_walk_dir, pyattr_set_walk_dir),
 	EXP_PYATTRIBUTE_RW_FUNCTION("jumpDirection", KX_CharacterWrapper, pyattr_get_jump_dir, pyattr_set_jump_dir),
 	EXP_PYATTRIBUTE_RW_FUNCTION("smoothMovement", KX_CharacterWrapper, pyattr_get_smoothMovement, pyattr_set_smoothMovement),
+	EXP_PYATTRIBUTE_RW_FUNCTION("posture", KX_CharacterWrapper, pyattr_get_posture, pyattr_set_posture),
+	EXP_PYATTRIBUTE_RO_FUNCTION("canStand", KX_CharacterWrapper, pyattr_get_canStand),
 	EXP_PYATTRIBUTE_NULL    //Sentinel
 };
+
+static const char *posture_names[POSTURE_COUNT] = {"STAND", "CROUCH", "CRAWL", "JUMP_TUCK"};
+
+// Current posture (the shape in use). Setting asks for one; standing up waits for room.
+PyObject *KX_CharacterWrapper::pyattr_get_posture(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_CharacterWrapper *self = static_cast<KX_CharacterWrapper *>(self_v);
+	CHARACTER_VALID_CHECK_OR_RETURN(self->m_character, attrdef->m_name.c_str(), nullptr);
+
+	return PyUnicode_FromString(posture_names[self->m_character->GetPosture()]);
+}
+
+int KX_CharacterWrapper::pyattr_set_posture(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value)
+{
+	KX_CharacterWrapper *self = static_cast<KX_CharacterWrapper *>(self_v);
+	CHARACTER_VALID_CHECK_OR_RETURN(self->m_character, attrdef->m_name.c_str(), PY_SET_ATTR_FAIL);
+
+	const char *name = PyUnicode_Check(value) ? PyUnicode_AsUTF8(value) : nullptr;
+	for (int i = POSTURE_STAND; name && i <= POSTURE_CRAWL; ++i) {
+		if (strcmp(name, posture_names[i]) == 0) {
+			self->m_character->SetPosture(i);
+			return PY_SET_ATTR_SUCCESS;
+		}
+	}
+	PyErr_SetString(PyExc_ValueError, "KX_CharacterWrapper.posture: expected 'STAND', 'CROUCH' or 'CRAWL'");
+	return PY_SET_ATTR_FAIL;
+}
+
+PyObject *KX_CharacterWrapper::pyattr_get_canStand(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_CharacterWrapper *self = static_cast<KX_CharacterWrapper *>(self_v);
+	CHARACTER_VALID_CHECK_OR_RETURN(self->m_character, attrdef->m_name.c_str(), nullptr);
+
+	return PyBool_FromLong(self->m_character->CanStand());
+}
 
 PyObject *KX_CharacterWrapper::pyattr_get_onground(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {

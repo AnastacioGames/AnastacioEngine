@@ -119,6 +119,11 @@ class KX_ObjectActuator : public SCA_IActuator, public mt::SimdClassAllocator
 	bool m_linear_damping_active;
 	bool m_angular_damping_active;
 	bool m_jumping;
+	short m_posture; ///< ACT_CHAR_POSTURE_* (0 = none)
+
+public:
+	void SetCharacterPosture(short posture) { m_posture = posture; }
+private:
 	/// VR Gaze walking: 0..1 ramp toward the Loc speed over the damping frames.
 	float m_vr_gaze_factor;
 	/// VR Gaze walking: slowing down after the trigger was released.

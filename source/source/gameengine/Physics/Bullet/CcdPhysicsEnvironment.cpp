@@ -3396,6 +3396,11 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 	ci.m_maxSlope = isbulletchar ? blenderobject->max_slope : 0.0f;
 	ci.m_maxJumps = isbulletchar ? blenderobject->max_jumps : 0;
 	ci.m_smoothMovement = isbulletchar ? blenderobject->smooth_movement : 0;
+	if (isbulletchar) {
+		ci.m_crouchHeight = blenderobject->crouch_height;
+		ci.m_crawlHeight = blenderobject->crawl_height;
+		ci.m_jumpTuck = (blenderobject->posture_flag & OB_POSTURE_JUMP_TUCK) ? blenderobject->jump_tuck : 0.0f;
+	}
 	ci.m_jumpAxis = btVector3(
 							blenderobject->jump_direction[0],
 							blenderobject->jump_direction[1],
@@ -3635,6 +3640,11 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 				shapeInfo->m_height = 0.0f;
 			}
 			shapeInfo->m_shapeType = PHY_SHAPE_CAPSULE;
+			// Characters skip the compound offset below, so the capsule must be
+			// placed on the mesh center here (origin at the feet = half buried).
+			if (isbulletchar) {
+				shapeInfo->m_capsuleOffset = boundsTrans.getOrigin();
+			}
 			bm = shapeInfo->CreateBulletShape(ci.m_margin);
 			break;
 		}
