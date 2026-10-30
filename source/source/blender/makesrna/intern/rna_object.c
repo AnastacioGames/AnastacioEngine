@@ -2445,7 +2445,7 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "posture_property", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "posture_prop");
 	RNA_def_property_ui_text(prop, "Posture Property",
-	                         "Game property kept up to date with the posture: STAND, CROUCH, CRAWL or JUMP_TUCK "
+	                         "Game property kept up to date with the posture: STAND, CROUCH, CRAWL, JUMP_TUCK or RUN "
 	                         "(created if missing; use a Property sensor to switch animations)");
 
 	prop = RNA_def_property(srna, "use_jump_tuck", PROP_BOOLEAN, PROP_NONE);

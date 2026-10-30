@@ -195,6 +195,22 @@ def tick(cont):
     if f == 100:
         linhas.append('girar deitado para o lado livre: yaw=%%.2f (esperado ~1.57)' %% gi.worldOrientation.to_euler().z)
 
+    # --- Escala mudando abaixado: Lento abaixa, dobra de tamanho, levanta
+    if f == 200:
+        cl.posture = 'CROUCH'
+    if f == 210:
+        lo.worldScale = (2, 2, 2)
+    if f == 220:
+        cl.posture = 'STAND'
+    if f == 210:
+        p.worldScale = (2, 2, 2)   # em pé, sem postura: referência
+    if f == 270:
+        linhas.append('escala em pe (referencia): base=%%.3f' %% base(p))
+    if f == 270:
+        m = lo.meshes[0]
+        alt = 2 * max(m.getVertex(0, i).XYZ.z for i in range(m.getVertexArrayLength(0)))
+        linhas.append('escala abaixado: posture=%%s base=%%.3f altura_malha=%%.1f (esperado STAND, ~0, 4.0)' %% (cl.posture, base(lo), alt))
+
     if f == 300:
         with open(LOG, 'w') as fh:
             fh.write('\\n'.join(linhas) + '\\n# fim\\n')

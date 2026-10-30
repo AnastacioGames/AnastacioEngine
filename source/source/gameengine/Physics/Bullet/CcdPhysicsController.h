@@ -549,6 +549,10 @@ public:
 	/// Replace current convex shape.
 	void ReplaceShape(btConvexShape *shape);
 
+	/// Object scale changed: scale the standing shape and rebuild the posture shapes
+	/// (the one in use is a posture shape when crouched/crawling).
+	void SetStandScaling(const btVector3& scaling);
+
 	/// Carries the character along whatever rigid body it stands on (moving platform),
 	/// since btKinematicCharacterController on its own only cancels penetration and
 	/// doesn't track the ground's own motion. Translation only, no rotation.

@@ -423,6 +423,50 @@ void CcdCharacter::SetPostureSettings(float crouchHeight, float crawlHeight, flo
 	FreePostureShapes();
 }
 
+/// Two-sphere capsule that can sit off the object origin. Bullet's btMultiSphereShape
+/// scales the sphere radii but not their positions, so a scaled object would get its
+/// capsule in the wrong place (character floating or sinking); this one scales both.
+class CcdMultiSphereShape : public btMultiSphereShape
+{
+public:
+	CcdMultiSphereShape(const btVector3 *positions, const btScalar *radi, int numSpheres)
+		:btMultiSphereShape(positions, radi, numSpheres)
+	{
+		recalcLocalAabb();
+	}
+
+	virtual btVector3 localGetSupportingVertexWithoutMargin(const btVector3& vec0) const
+	{
+		btVector3 supVec;
+		batchedUnitVectorGetSupportingVertexWithoutMargin(&vec0, &supVec, 1);
+		return supVec;
+	}
+
+	virtual void batchedUnitVectorGetSupportingVertexWithoutMargin(const btVector3 *vectors, btVector3 *supportVerticesOut,
+	                                                               int numVectors) const
+	{
+		for (int j = 0; j < numVectors; ++j) {
+			btVector3 vec = vectors[j];
+			if (vec.length2() < SIMD_EPSILON * SIMD_EPSILON) {
+				vec.setValue(1.0f, 0.0f, 0.0f);
+			}
+			else {
+				vec.normalize();
+			}
+			btScalar maxDot = -BT_LARGE_FLOAT;
+			for (int i = 0; i < getSphereCount(); ++i) {
+				const btVector3 vtx = getSpherePosition(i) * m_localScaling +
+				                      vec * m_localScaling * getSphereRadius(i) - vec * getMargin();
+				const btScalar dot = vec.dot(vtx);
+				if (dot > maxDot) {
+					maxDot = dot;
+					supportVerticesOut[j] = vtx;
+				}
+			}
+		}
+	}
+};
+
 static btConvexShape *posture_capsule(const btVector3& center, const btVector3& axis, btScalar length,
                                       btScalar radius, btScalar margin)
 {
@@ -430,7 +474,7 @@ static btConvexShape *posture_capsule(const btVector3& center, const btVector3& 
 	const btVector3 half = axis * (btScalar(0.5f) * length - radius);
 	const btVector3 centers[2] = {center + half, center - half};
 	const btScalar radii[2] = {radius, radius};
-	btMultiSphereShape *shape = new btMultiSphereShape(centers, radii, 2);
+	btMultiSphereShape *shape = new CcdMultiSphereShape(centers, radii, 2);
 	shape->setMargin(btMin(margin, btScalar(0.5f) * radius)); // margin is inside the spheres
 	return shape;
 }
@@ -486,9 +530,23 @@ void CcdCharacter::ApplyShape(btCollisionWorld *world, btConvexShape *shape)
 {
 	m_convexShape = shape;
 	m_ghostObject->setCollisionShape(shape);
-	if (world && m_ghostObject->getBroadphaseHandle()) {
+	btBroadphaseProxy *handle = m_ghostObject->getBroadphaseHandle();
+	if (world && handle) {
+		// Cached contact pairs belong to the old shape: drop them (Bullet's advice on shape swaps).
+		world->getBroadphase()->getOverlappingPairCache()->cleanProxyFromPairs(handle, world->getDispatcher());
 		world->updateSingleAabb(m_ghostObject);
 	}
+}
+
+void CcdCharacter::SetStandScaling(const btVector3& scaling)
+{
+	m_standShape->setLocalScaling(scaling);
+	if (m_posture == POSTURE_STAND) {
+		FreePostureShapes(); // rebuilt on demand from the scaled standing shape
+		return;
+	}
+	BuildPostureShapes();
+	ApplyShape(m_ctrl->GetPhysicsEnvironment()->GetDynamicsWorld(), ShapeForPosture(m_posture));
 }
 
 namespace {
@@ -1993,7 +2051,11 @@ void CcdPhysicsController::SetScaling(const mt::vec3& scale)
 	    !btFuzzyZero(m_cci.m_scaling.z() - scale.z)) {
 		m_cci.m_scaling = ToBullet(scale);
 
-		if (m_object && m_object->getCollisionShape()) {
+		if (m_characterController) {
+			// The ghost may hold a crouch/crawl shape: scale the standing one instead.
+			m_characterController->SetStandScaling(m_cci.m_scaling);
+		}
+		else if (m_object && m_object->getCollisionShape()) {
 			m_object->activate(true); // without this, sleeping objects scale wont be applied in bullet if python changes the scale - Campbell.
 			m_object->getCollisionShape()->setLocalScaling(m_cci.m_scaling);
 
@@ -3360,7 +3422,7 @@ btCollisionShape *CcdShapeConstructionInfo::CreateBulletShape(btScalar margin, b
 				const btVector3 halfAxis(0.0f, 0.0f, 0.5f * m_height);
 				const btVector3 centers[2] = {m_capsuleOffset + halfAxis, m_capsuleOffset - halfAxis};
 				const btScalar radii[2] = {m_radius, m_radius};
-				collisionShape = new btMultiSphereShape(centers, radii, 2);
+				collisionShape = new CcdMultiSphereShape(centers, radii, 2);
 			}
 			else {
 				collisionShape = new btCapsuleShapeZ(m_radius, m_height);
