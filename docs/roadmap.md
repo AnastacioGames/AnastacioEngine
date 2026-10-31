@@ -5,6 +5,12 @@ concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](..
 e detalhados no [`changelog.md`](changelog.md) (histórico antigo em [`changelog-arquivo.md`](changelog-arquivo.md)).
 Ao concluir um item, apague-o daqui e registre no changelog.
 
+## Água realista (estudo do water 0.99)
+
+- Fases 1-5 em [plano-agua-realista.md](plano-agua-realista.md): gotas na lente (fase 1 no Rolimã),
+  filtro de lente na engine, material Water Surface nativo, modo debaixo d'água + cáusticas, demo.
+  O arquivo de referência não tem licença: reimplementar as técnicas, sem copiar código ou texturas.
+
 ## Efeitos pré-calculados
 
 - Lua: superfície opcional implementada; pendentes avaliação visual, A/B em iGPU e persistência dos
