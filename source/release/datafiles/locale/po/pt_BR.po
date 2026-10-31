@@ -98039,3 +98039,12 @@ msgstr "Duplo clique renomeia também o grupo dos bricks"
 
 msgid "Groups offered by the group field of the logic bricks"
 msgstr "Grupos oferecidos pelo campo de grupo dos logic bricks"
+
+msgid "Select an object to assign the action"
+msgstr "Selecione um objeto para receber a animação"
+
+msgid "Show only the actions whose name contains this text (e.g. CARRO_)"
+msgstr "Mostra só as animações cujo nome contém este texto (ex.: CARRO_)"
+
+msgid "Click an action to assign it to the active object"
+msgstr "Clique numa animação para colocá-la no objeto ativo"
