@@ -968,7 +968,31 @@ static void v3d_transform_butsR(uiLayout *layout, PointerRNA *ptr)
 
 	split = uiLayoutSplit(layout, 0.8f, false);
 	colsub = uiLayoutColumn(split, true);
-	uiItemR(colsub, ptr, "scale", 0, NULL, ICON_NONE);
+	{
+		/* Escala diferente de 1 fica em vermelho e avisa no rótulo. */
+		PropertyRNA *scale_prop = RNA_struct_find_property(ptr, "scale");
+		float scale[3];
+		bool scale_off = false;
+		int i;
+		static const char *axis_names[3] = {"X", "Y", "Z"};
+		RNA_property_float_get_array(ptr, scale_prop, scale);
+		for (i = 0; i < 3; i++) {
+			if (scale[i] != 1.0f) scale_off = true;
+		}
+		if (scale_off) {
+			uiLayout *row = uiLayoutRow(colsub, false);
+			uiLayoutSetRedAlert(row, true);
+			uiItemL(row, IFACE_("Scale: (not 1, apply with Ctrl+A)"), ICON_ERROR);
+		}
+		else {
+			uiItemL(colsub, IFACE_("Scale:"), ICON_NONE);
+		}
+		for (i = 0; i < 3; i++) {
+			uiLayoutSetRedAlert(colsub, scale[i] != 1.0f);
+			uiItemFullR(colsub, ptr, scale_prop, i, 0, 0, axis_names[i], ICON_NONE);
+		}
+		uiLayoutSetRedAlert(colsub, false);
+	}
 	colsub = uiLayoutColumn(split, true);
 	uiItemL(colsub, "", ICON_NONE);
 	uiItemR(colsub, ptr, "lock_scale", UI_ITEM_R_TOGGLE | UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
