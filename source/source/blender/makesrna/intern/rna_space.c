@@ -1188,12 +1188,13 @@ static const EnumPropertyItem *rna_SpaceProperties_context_itemf(bContext *UNUSE
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_PARTICLE);
 	}
 
-	if (sbuts->pathflag & (1 << BCONTEXT_PHYSICS)) {
-		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_PHYSICS);
-	}
-
 	if (sbuts->pathflag & (1 << BCONTEXT_VEHICLE)) {
 		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_VEHICLE);
+	}
+
+	/* Physics stays last, where users expect it */
+	if (sbuts->pathflag & (1 << BCONTEXT_PHYSICS)) {
+		RNA_enum_items_add_value(&item, &totitem, buttons_context_items, BCONTEXT_PHYSICS);
 	}
 
 	RNA_enum_item_end(&item, &totitem);
