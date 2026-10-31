@@ -116,6 +116,8 @@ PyAttributeDef KX_ParticleSystem::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("useDebugUi", KX_ParticleSystem, pyattr_get_panel, pyattr_set_panel),
 	/* useVortex: bool, spin the particles around the emitter's Z axis. */
 	EXP_PYATTRIBUTE_RW_FUNCTION("useVortex", KX_ParticleSystem, pyattr_get_panel, pyattr_set_panel),
+	/* useObjectRotation: bool, gravity/velocity/direction/offset/vortex axis follow the owner rotation. */
+	EXP_PYATTRIBUTE_RW_FUNCTION("useObjectRotation", KX_ParticleSystem, pyattr_get_panel, pyattr_set_panel),
 	/* vortexHeight: float, height of the vortex funnel. */
 	EXP_PYATTRIBUTE_RW_FUNCTION("vortexHeight", KX_ParticleSystem, pyattr_get_panel, pyattr_set_panel),
 	/* vortexRadiusTop: float, radius of the funnel at vortexHeight. */
@@ -172,6 +174,9 @@ PyObject *KX_ParticleSystem::pyattr_get_panel(EXP_PyObjectPlus *self_v, const EX
 	if (name == "useVortex") {
 		return PyBool_FromLong(buffer->GetUseVortex());
 	}
+	if (name == "useObjectRotation") {
+		return PyBool_FromLong(buffer->GetUseObjectRotation());
+	}
 	if (name == "vortexHeight") {
 		return PyFloat_FromDouble(buffer->GetVortexHeight());
 	}
@@ -203,7 +208,7 @@ int KX_ParticleSystem::pyattr_set_panel(EXP_PyObjectPlus *self_v, const EXP_PYAT
 		}
 		return PY_SET_ATTR_SUCCESS;
 	}
-	if (name == "useBackfaceCulling" || name == "useDebugUi" || name == "useVortex") {
+	if (name == "useBackfaceCulling" || name == "useDebugUi" || name == "useVortex" || name == "useObjectRotation") {
 		const int v = PyObject_IsTrue(value);
 		if (v == -1) {
 			return PY_SET_ATTR_FAIL;
@@ -213,6 +218,9 @@ int KX_ParticleSystem::pyattr_set_panel(EXP_PyObjectPlus *self_v, const EXP_PYAT
 		}
 		else if (name == "useDebugUi") {
 			buffer->SetDebugUI(v != 0);
+		}
+		else if (name == "useObjectRotation") {
+			buffer->SetUseObjectRotation(v != 0);
 		}
 		else {
 			buffer->SetUseVortex(v != 0);

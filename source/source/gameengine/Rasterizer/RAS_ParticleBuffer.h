@@ -187,7 +187,8 @@ public:
 
 	/// Runs one transform feedback pass (gravity integration + age/respawn) and swaps the read buffer.
 	/// worldOrigin is the owning object's world position (or (0,0,0) for a scene-fixed emitter);
-	/// the actual emission point uploaded to the shader is worldOrigin + m_emitterPos, so
+	/// the actual emission point uploaded to the shader is worldOrigin + m_emitterPos (rotated by
+	/// worldRot with Use Object Rotation), so
 	/// m_emitterPos itself stays a local-space offset editable via Get/SetEmitterPos without
 	/// drifting as the owner moves.
 	/// worldRot is the owner's world orientation, only used when m_useObjectRotation is on.

@@ -114,6 +114,10 @@ bool Draw(KX_GameObject *gameobj, RAS_ParticleBuffer *buffer)
 	}
 
 	ImGui::Separator();
+	bool useObjectRotation = buffer->GetUseObjectRotation();
+	if (ImGui::Checkbox("Use Object Rotation", &useObjectRotation)) {
+		buffer->SetUseObjectRotation(useObjectRotation);
+	}
 	ImGui::Text("Vortex / Cone (Tornado)");
 	bool useVortex = buffer->GetUseVortex();
 	if (ImGui::Checkbox("Use Vortex", &useVortex)) {
@@ -269,6 +273,7 @@ static bool ApplyToBpy(const std::string &objectName, RAS_ParticleBuffer *buffer
 					TrySetAttr(gp, "collision_bounce", PyFloat_FromDouble(buffer->GetCollisionBounce()));
 					TrySetAttr(gp, "collision_friction", PyFloat_FromDouble(buffer->GetCollisionFriction()));
 					TrySetAttr(gp, "use_vortex", PyBool_FromLong(buffer->GetUseVortex() ? 1 : 0));
+					TrySetAttr(gp, "use_object_rotation", PyBool_FromLong(buffer->GetUseObjectRotation() ? 1 : 0));
 					TrySetAttr(gp, "vortex_rotation_speed", PyFloat_FromDouble(buffer->GetVortexRotationSpeed()));
 					TrySetAttr(gp, "vortex_radius_top", PyFloat_FromDouble(buffer->GetVortexRadiusTop()));
 					TrySetAttr(gp, "vortex_height", PyFloat_FromDouble(buffer->GetVortexHeight()));
@@ -350,6 +355,7 @@ static void WriteJsonSidecar(const std::string &objectName, RAS_ParticleBuffer *
 	cJSON_AddNumberToObject(entry, "collision_bounce", buffer->GetCollisionBounce());
 	cJSON_AddNumberToObject(entry, "collision_friction", buffer->GetCollisionFriction());
 	cJSON_AddBoolToObject(entry, "use_vortex", buffer->GetUseVortex());
+	cJSON_AddBoolToObject(entry, "use_object_rotation", buffer->GetUseObjectRotation());
 	cJSON_AddNumberToObject(entry, "vortex_rotation_speed", buffer->GetVortexRotationSpeed());
 	cJSON_AddNumberToObject(entry, "vortex_radius_top", buffer->GetVortexRadiusTop());
 	cJSON_AddNumberToObject(entry, "vortex_height", buffer->GetVortexHeight());

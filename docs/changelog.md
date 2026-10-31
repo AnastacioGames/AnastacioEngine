@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - GPU Particles: Use Object Rotation
+
+- Opção nova `use_object_rotation` (DNA: `RangeGPUParticleSettings`, antigo `pad5[0]`; desligada = como antes):
+  gravidade, velocidade, direção de emissão, posição do emissor e eixo do vórtice seguem a rotação do objeto.
+  O vórtice agora gira em volta de qualquer eixo (tornado de lado). Painéis normal e Mix, debug UI (com
+  "Apply to .blend") e Python `KX_ParticleSystem.useObjectRotation`.
+- Comportamento: a gravidade também gira; girar o objeto move o funil inteiro (partículas já no ar inclusive).
+  Escala do objeto não é aplicada ao offset.
+
 ## 2026-10-30 - Verificador de cascata e traduções para a próxima versão
 
 - `tools/check_cascata.py`: lê o diff e diz em qual camada falta cada propriedade RNA nova ou atributo
