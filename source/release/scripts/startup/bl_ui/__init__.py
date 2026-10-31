@@ -137,6 +137,19 @@ def register():
         items.extend([(cat, cat, "") for cat in sorted(items_unique)])
         return items
 
+    from .space_dopesheet import action_list_index_update
+    WindowManager.action_list_search = StringProperty(
+        name="Search",
+        description="Show only the actions whose name contains this text (e.g. CARRO_)",
+        options={'TEXTEDIT_UPDATE'},
+    )
+    WindowManager.action_list_index = IntProperty(
+        name="Action",
+        description="Click an action to assign it to the active object",
+        default=-1,
+        update=action_list_index_update,
+    )
+
     WindowManager.addon_search = StringProperty(
         name="Search",
         description="Search within the selected filter",

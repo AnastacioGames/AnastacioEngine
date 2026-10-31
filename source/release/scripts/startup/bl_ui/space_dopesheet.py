@@ -19,7 +19,7 @@
 # <pep8 compliant>
 
 import bpy
-from bpy.types import Header, Menu
+from bpy.types import Header, Menu, Panel, UIList
 
 
 #######################################
@@ -477,6 +477,55 @@ class DOPESHEET_MT_delete(Menu):
         layout.operator("action.clean", text="Clean Channels").channels = True
 
 
+
+def action_list_index_update(self, context):
+    """Clicking an action in the sidebar list makes it the active object's action."""
+    idx = context.window_manager.action_list_index
+    if not (0 <= idx < len(bpy.data.actions)):
+        return
+    obj = context.object
+    if obj is None:
+        return
+    if obj.animation_data is None:
+        obj.animation_data_create()
+    obj.animation_data.action = bpy.data.actions[idx]
+
+
+class DOPESHEET_UL_actions(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        obj = context.object
+        current = obj is not None and obj.animation_data is not None and obj.animation_data.action == item
+        row = layout.row(align=True)
+        row.label(text=item.name, icon='FILE_TICK' if current else 'ACTION')
+        if item.use_fake_user:
+            row.label(text="F")
+
+    def filter_items(self, context, data, propname):
+        actions = getattr(data, propname)
+        search = context.window_manager.action_list_search.lower()
+        flags = [self.bitflag_filter_item if search in a.name.lower() else 0 for a in actions]
+        order = bpy.types.UI_UL_list.sort_items_by_name(actions, "name")
+        return flags, order
+
+
+class DOPESHEET_PT_action_list(Panel):
+    bl_space_type = 'DOPESHEET_EDITOR'
+    bl_region_type = 'UI'
+    bl_label = "Actions"
+
+    @classmethod
+    def poll(cls, context):
+        return context.space_data.mode == 'ACTION'
+
+    def draw(self, context):
+        layout = self.layout
+        wm = context.window_manager
+        layout.prop(wm, "action_list_search", text="", icon='VIEWZOOM')
+        layout.template_list("DOPESHEET_UL_actions", "", bpy.data, "actions", wm, "action_list_index", rows=12)
+        if context.object is None:
+            layout.label(text="Select an object to assign the action", icon='INFO')
+
+
 classes = (
     DOPESHEET_HT_header,
     DOPESHEET_MT_editor_menus,
@@ -489,6 +538,8 @@ classes = (
     DOPESHEET_MT_gpencil_channel,
     DOPESHEET_MT_gpencil_frame,
     DOPESHEET_MT_delete,
+    DOPESHEET_UL_actions,
+    DOPESHEET_PT_action_list,
 )
 
 if __name__ == "__main__":  # only for live edit.
