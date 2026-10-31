@@ -165,28 +165,42 @@ static void VIEW3D_OT_pastebuffer(wmOperatorType *ot)
 static int view3d_import_obj_drop_exec(bContext *C, wmOperator *op)
 {
 	char filepath[FILE_MAX];
-	wmOperatorType *import_ot = WM_operatortype_find("IMPORT_SCENE_OT_obj", false);
+	const char *op_name, *addon;
+	wmOperatorType *import_ot;
 	PointerRNA props;
 	int result;
 
 	RNA_string_get(op->ptr, "filepath", filepath);
-	if (!BLI_path_extension_check(filepath, ".obj") || !BLI_is_file(filepath)) {
-		BKE_report(op->reports, RPT_ERROR, "Dropped OBJ file does not exist");
+	if (BLI_path_extension_check(filepath, ".obj")) {
+		op_name = "IMPORT_SCENE_OT_obj";
+		addon = "io_scene_obj";
+	}
+	else if (BLI_path_extension_check(filepath, ".fbx")) {
+		op_name = "IMPORT_SCENE_OT_fbx";
+		addon = "io_scene_fbx";
+	}
+	else {
+		BKE_report(op->reports, RPT_ERROR, "Dropped file is not OBJ or FBX");
+		return OPERATOR_CANCELLED;
+	}
+	if (!BLI_is_file(filepath)) {
+		BKE_report(op->reports, RPT_ERROR, "Dropped file does not exist");
 		return OPERATOR_CANCELLED;
 	}
 
+	import_ot = WM_operatortype_find(op_name, false);
 	if (import_ot == NULL) {
 		wmOperatorType *enable_ot = WM_operatortype_find("WM_OT_addon_enable", false);
 		if (enable_ot != NULL) {
 			WM_operator_properties_create_ptr(&props, enable_ot);
-			RNA_string_set(&props, "module", "io_scene_obj");
+			RNA_string_set(&props, "module", addon);
 			WM_operator_name_call_ptr(C, enable_ot, WM_OP_EXEC_DEFAULT, &props);
 			WM_operator_properties_free(&props);
-			import_ot = WM_operatortype_find("IMPORT_SCENE_OT_obj", false);
+			import_ot = WM_operatortype_find(op_name, false);
 		}
 	}
 	if (import_ot == NULL) {
-		BKE_report(op->reports, RPT_ERROR, "OBJ importer is unavailable");
+		BKE_reportf(op->reports, RPT_ERROR, "Importer %s is unavailable", addon);
 		return OPERATOR_CANCELLED;
 	}
 
@@ -199,13 +213,13 @@ static int view3d_import_obj_drop_exec(bContext *C, wmOperator *op)
 
 static void VIEW3D_OT_import_obj_drop(wmOperatorType *ot)
 {
-	ot->name = "Import Dropped OBJ";
+	ot->name = "Import Dropped File";
 	ot->idname = "VIEW3D_OT_import_obj_drop";
-	ot->description = "Import a dropped Wavefront OBJ file directly into the scene";
+	ot->description = "Import a dropped OBJ or FBX file directly into the scene";
 	ot->exec = view3d_import_obj_drop_exec;
 	ot->poll = ED_operator_scene_editable;
 
-	RNA_def_string_file_path(ot->srna, "filepath", NULL, FILE_MAX, "File Path", "OBJ file to import");
+	RNA_def_string_file_path(ot->srna, "filepath", NULL, FILE_MAX, "File Path", "OBJ or FBX file to import");
 }
 
 /* ************************** asset drop ***************************** */

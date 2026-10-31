@@ -685,7 +685,7 @@ static bool view3d_ob_drop_poll(bContext *UNUSED(C), wmDrag *drag, const wmEvent
 static bool view3d_obj_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(event))
 {
 	return ED_operator_scene_editable(C) && drag->type == WM_DRAG_PATH &&
-	       BLI_path_extension_check(drag->path, ".obj") && BLI_is_file(drag->path);
+	       BLI_path_extension_check_n(drag->path, ".obj", ".fbx", NULL) && BLI_is_file(drag->path);
 }
 
 static void view3d_obj_drop_copy(wmDrag *drag, wmDropBox *drop)
