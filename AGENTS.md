@@ -134,6 +134,7 @@ Antes deles, use `docs/local-knowledge/index-<área>.md`: índice mecânico (arq
   aparecer em DNA, versioning, painel/FlowMenu, conversor, `logic_to_python.py`, `range_logic_tree.py`,
   traduções, changelog e inventário da API. Antes do commit, rodar `python tools/check_cascata.py`
   (diff desde `HEAD~1` + local; `HEAD~N` para mais; `--prop id` para um só; `--selftest`). FALTA é obrigatório.
+  Ele também roda o `check_docs` no final (`--no-docs` pula).
 - **Teste visual no jogo real, não em screenshot automatizado**: para bugs de renderização/visuais, captura
   automatizada de tela via câmera scriptada (`RangeRuntime.exe` headless + `--background` + `PrintWindow`) é
   pouco confiável aqui e já produziu resultados enganosos. Prefira pedir para o usuário testar no jogo real

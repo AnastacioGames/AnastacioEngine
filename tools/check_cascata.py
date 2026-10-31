@@ -28,7 +28,8 @@ Uso:
     python tools/check_cascata.py HEAD~5          # tudo desde HEAD~5
     python tools/check_cascata.py --prop crouch_speed --prop character_posture
     python tools/check_cascata.py --selftest
-Saída: 0 = tudo coberto; 1 = falta camada obrigatória.
+No final roda tools/check_docs.py (mapas com linha velha); --no-docs pula.
+Saída: 0 = tudo coberto; 1 = falta camada obrigatória ou erro no check_docs.
 """
 import argparse
 import glob
@@ -290,6 +291,7 @@ def main():
     ap.add_argument("base", nargs="?", default="HEAD~1", help="commit base (padrão HEAD~1)")
     ap.add_argument("--prop", action="append", default=[], help="conferir um id RNA específico")
     ap.add_argument("--no-worktree", action="store_true", help="ignorar mudanças não commitadas")
+    ap.add_argument("--no-docs", action="store_true", help="não rodar tools/check_docs.py no final")
     ap.add_argument("--selftest", action="store_true")
     a = ap.parse_args()
     if hasattr(sys.stdout, "reconfigure"):
@@ -300,7 +302,24 @@ def main():
     if a.prop:
         return report([find_prop_in_rna(n) for n in a.prop], [], c)
     props, pyattrs = parse_diff(diff_text(a.base, not a.no_worktree))
-    return report(props, pyattrs, c)
+    rc = report(props, pyattrs, c)
+    if not a.no_docs:
+        rc |= check_docs()
+    return rc
+
+
+def check_docs():
+    """Roda tools/check_docs.py: mapas de código com linha velha, links quebrados."""
+    r = subprocess.run([sys.executable, os.path.join(ROOT, "tools", "check_docs.py")],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    lines = [l for l in r.stdout.splitlines() if l.strip()]
+    errs = [l for l in lines if l.startswith("ERRO")]
+    print("\ncheck_docs: " + (lines[-1] if lines else "sem saída"))
+    for l in errs[:10]:
+        print("  " + l)
+    if errs:
+        print("  -> mapas: python tools/check_docs.py --fix")
+    return 1 if errs or r.returncode else 0
 
 
 if __name__ == "__main__":
