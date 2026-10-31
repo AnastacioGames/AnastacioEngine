@@ -312,7 +312,7 @@ PT_BR = {
 'Parent Node Tree': 'Árvore de nós parente',
 'Pen': 'Caneta',
 'Pentagonal': 'Pentagonal',
-'Performance': 'Performance',
+'Performance': 'Desempenho',
 'Phong': 'Phong',
 'Play Rendered Animation': 'Reproduzir animação renderizada',
 'Pose': 'Pose',

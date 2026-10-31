@@ -737,6 +737,13 @@ static void rna_def_object_gpu_particles(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Random Start", "Flipbook: each particle starts on a random frame");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	prop = RNA_def_property(srna, "use_object_rotation", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "use_object_rotation", 1);
+	RNA_def_property_ui_text(prop, "Use Object Rotation",
+	                         "Gravity, velocity, emission direction, emitter position and the vortex axis "
+	                         "follow the object's rotation (local space) instead of the world axes");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "use_vortex", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "use_vortex", 1);
 	RNA_def_property_ui_text(prop, "Vortex / Cone",

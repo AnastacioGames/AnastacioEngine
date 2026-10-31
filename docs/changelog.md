@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-30 - Verificador de cascata e traduções para a próxima versão
+
+- `tools/check_cascata.py`: lê o diff e diz em qual camada falta cada propriedade RNA nova ou atributo
+  Python do jogo (DNA, versioning, painel/FlowMenu, conversor, `logic_to_python`, Logic Tree, traduções,
+  changelog, inventário da API); no final roda `check_docs`. Regra no AGENTS.md.
+- API Python: `KX_CharacterWrapper.posture`, `canStand` e `running` documentados.
+- Auditoria de tradução (`tools/tests/web_profile/i18n_*.py`, pt_BR/es/ru): traduzidos os textos novos dos
+  controles no cabeçalho, Glare estilo Blender 5, preset de qualidade, contador de FPS, Auto Static Batch,
+  flipbook, tamanho e superfície pré-calculada da lua; "Performance" vira "Desempenho" e "Bias:" vira
+  "Viés:"/"Sesgo:". O que sobra nas listas é nome próprio, sigla ou palavra igual no idioma.
+- Mapas de código com números de linha atualizados (`check_docs --fix`).
+
 ## 2026-10-30 - Character: Face Movement, diagonal com Ad, preset de bricks e cápsula fora da origem
 
 - **Face Movement** (`use_face_movement`, `OB_POSTURE_FACE_MOVE` em `posture_flag`, sem campo DNA novo): o Character
