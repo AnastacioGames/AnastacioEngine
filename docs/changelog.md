@@ -8,6 +8,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-31 - NLA: correções no editor e no `playNLA()`; aba Car antes da Física
+
+- `playNLA()` (33f08f26): chamar de novo com os mesmos argumentos não reinicia (pode ir no Always com pulso);
+  a primeira strip entra com valor cheio, como no Blender (regra por objeto, não por osso); velocidade
+  negativa começa do fim; NLA sem loop que termina com a armature fora da tela aplica a última pose quando
+  ela volta; ossos procurados uma vez só; curva de influência avaliada numa cópia (evaluate_fcurve escreve
+  na curva). Teste: `playNLA(speed=-1)` todo frame desce 51, 50, 49… sem reiniciar.
+- NLA Editor (bugs herdados do 2.79): Apply Scale não copia action só por causa do Fake User; Move Up/Down
+  respeita track travada; nome da strip não passa da borda; Mute/Reverse não ficam apagados com influência
+  animada; dica do Duplicate > Linked corrigida; clique no vazio não escreve "Error" no console.
+- Tweak Mode conferido: o jogo ignora `NLATRACK_DISABLED` e toca todas as tracks, então salvar em Tweak Mode
+  não muda o resultado.
+- Properties (49669bd6): aba Car antes da Física; Física volta a ser a última, como no Blender.
+
 ## 2026-10-31 - NLA no jogo: `playNLA()` (branch feat/nla-game)
 
 - Antes a engine ignorava o NLA Editor. Novo `BL_NlaPlayer` (Ketsji), dono opcional do `BL_ActionManager`:

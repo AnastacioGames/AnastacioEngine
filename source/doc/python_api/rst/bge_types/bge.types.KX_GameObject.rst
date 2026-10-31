@@ -1415,10 +1415,13 @@ base class --- :class:`SCA_IObject`
       in/out, repeat, scale, reverse and extrapolation). Actions played with :meth:`playAction` are
       blended on top of the NLA result.
 
+      Calling it again while the NLA is playing with the same arguments keeps it going, so it can be
+      called every frame.
+
       Not supported yet: transition and meta strips, Subtract/Multiply modes (played as Replace),
       strip time curves and NLA on objects that are not armatures.
 
-      :arg speed: Playback speed (1.0 = scene animation frame rate, 0.0 = stopped, use :meth:`setNLAFrame`).
+      :arg speed: Playback speed (1.0 = scene animation frame rate, 0.0 = stopped, use :meth:`setNLAFrame`; negative plays backwards from the last frame).
       :type speed: float
       :arg loop: Restart from the first strip after the last one ends, else hold the last frame.
       :type loop: boolean

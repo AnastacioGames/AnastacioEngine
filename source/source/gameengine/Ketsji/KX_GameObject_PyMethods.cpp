@@ -1725,7 +1725,8 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, isPlayingAction,
 
 EXP_PYMETHODDEF_DOC(KX_GameObject, playNLA,
                     "playNLA(speed=1.0, loop=True)\n"
-                    "Plays the NLA tracks of the armature under its action layers. Returns True when it started.\n")
+                    "Plays the NLA tracks of the armature under its action layers. Returns True when it started.\n"
+                    "Calling it again while playing keeps it going; a negative speed plays backwards from the end.\n")
 {
 	float speed = 1.0f;
 	int loop = 1;

@@ -7,7 +7,7 @@ Python em [`KX_GameObject_Python.cpp`](../source/source/gameengine/Ketsji/KX_Gam
 (tabelas, tipo e atributos) e
 [`KX_GameObject_PyMethods.cpp`](../source/source/gameengine/Ketsji/KX_GameObject_PyMethods.cpp) (métodos).
 
-**Linhas conferidas em 2026-10-31 (`HEAD` `d1f0db34`).** Números de linha são aproximados e envelhecem a cada
+**Linhas conferidas em 2026-10-31 (`HEAD` `49669bd6`).** Números de linha são aproximados e envelhecem a cada
 edição: use-os como ponto de partida e confirme com `grep -n "KX_GameObject::NomeDoMetodo"`.
 
 Para a declaração das classes e membros, o header é
@@ -51,7 +51,7 @@ Bindings Python, parte 1. Tudo dentro de `#ifdef WITH_PYTHON`. Ordem do arquivo:
 | 419–1386 | `Methods[]`, helpers de destruição (`static`), `Attributes[]`, `Map_GetItem` 1187, `Map_SetItem`, `Seq_Contains` (`static`), `Mapping`, `Sequence`, `KX_GameObject::Type` |
 | 1387–fim | getters/setters de atributos Python (`pyattr_get_*`, `pyattr_set_*`, a partir de `pyattr_get_name` 1452) e `py_get_*_item` |
 
-## `Ketsji/KX_GameObject_PyMethods.cpp` (1.916 linhas)
+## `Ketsji/KX_GameObject_PyMethods.cpp` (1.917 linhas)
 
 Bindings Python, parte 2: métodos (`PyApply*` a partir de `PyApplyForce` 136, `EXP_PYMETHODDEF_DOC*`: rayCast,
 getVectTo, playAction, addDebugProperty, …). Repete a macro `PYTHON_CHECK_PHYSICS_CONTROLLER` (usada nos dois
