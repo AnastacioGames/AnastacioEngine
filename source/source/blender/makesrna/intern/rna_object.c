@@ -2137,17 +2137,17 @@ static void rna_def_object_game_settings(BlenderRNA *brna)
 	PropertyRNA *prop;
 
 	static const EnumPropertyItem body_type_items[] = {
-		{OB_BODY_TYPE_NO_COLLISION, "NO_COLLISION", 0, "No Collision", "Disable collision for this object"},
-		{OB_BODY_TYPE_STATIC, "STATIC", 0, "Static", "Stationary object"},
-		{OB_BODY_TYPE_DYNAMIC, "DYNAMIC", 0, "Dynamic", "Linear physics"},
-		{OB_BODY_TYPE_RIGID, "RIGID_BODY", 0, "Rigid Body", "Linear and angular physics"},
-		{OB_BODY_TYPE_SOFT, "SOFT_BODY", 0, "Soft Body", "Soft body"},
-		{OB_BODY_TYPE_OCCLUDER, "OCCLUDER", 0, "Occluder", "Occluder for optimizing scene rendering"},
-		{OB_BODY_TYPE_SENSOR, "SENSOR", 0, "Sensor",
+		{OB_BODY_TYPE_NO_COLLISION, "NO_COLLISION", ICON_X, "No Collision", "Disable collision for this object"},
+		{OB_BODY_TYPE_STATIC, "STATIC", ICON_VIEW3D, "Static", "Stationary object"},
+		{OB_BODY_TYPE_DYNAMIC, "DYNAMIC", ICON_VIEW3D, "Dynamic", "Linear physics"},
+		{OB_BODY_TYPE_RIGID, "RIGID_BODY", ICON_VIEW3D, "Rigid Body", "Linear and angular physics"},
+		{OB_BODY_TYPE_SOFT, "SOFT_BODY", ICON_SNAP_VOLUME, "Soft Body", "Soft body"},
+		{OB_BODY_TYPE_OCCLUDER, "OCCLUDER", ICON_RESTRICT_RENDER_ON, "Occluder", "Occluder for optimizing scene rendering"},
+		{OB_BODY_TYPE_SENSOR, "SENSOR", ICON_RESTRICT_VIEW_OFF, "Sensor",
 		                      "Collision Sensor, detects static and dynamic objects but not the other "
 		                      "collision sensor objects"},
-		{OB_BODY_TYPE_NAVMESH, "NAVMESH", 0, "Navigation Mesh", "Navigation mesh"},
-		{OB_BODY_TYPE_CHARACTER, "CHARACTER", 0, "Character",
+		{OB_BODY_TYPE_NAVMESH, "NAVMESH", ICON_GHOST_ENABLED, "Navigation Mesh", "Navigation mesh"},
+		{OB_BODY_TYPE_CHARACTER, "CHARACTER", ICON_POSE_HLT, "Character",
 		                         "Simple kinematic physics appropriate for game characters"},
 		{0, NULL, 0, NULL, NULL}
 	};
