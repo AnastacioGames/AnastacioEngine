@@ -27,6 +27,7 @@
 #include "BL_Action.h"
 #include "BL_ActionData.h"
 #include "BL_ActionManager.h"
+#include "BL_NlaPlayer.h"
 
 BL_ActionManager::BL_ActionManager(class KX_GameObject *obj) :
 	m_obj(obj),
@@ -171,8 +172,41 @@ bool BL_ActionManager::IsActionDone(short layer)
 	return action ? action->IsDone() : true;
 }
 
+bool BL_ActionManager::PlayNla(float speed, bool loop)
+{
+	if (!m_nla) {
+		m_nla.reset(new BL_NlaPlayer(m_obj));
+	}
+	return m_nla->Play(speed, loop);
+}
+
+void BL_ActionManager::StopNla()
+{
+	m_nla.reset();
+}
+
+bool BL_ActionManager::IsNlaPlaying() const
+{
+	return m_nla && m_nla->IsPlaying();
+}
+
+float BL_ActionManager::GetNlaFrame() const
+{
+	return m_nla ? m_nla->GetFrame() : 0.0f;
+}
+
+void BL_ActionManager::SetNlaFrame(float frame)
+{
+	if (m_nla) {
+		m_nla->SetFrame(frame);
+	}
+}
+
 bool BL_ActionManager::HasActiveActions()
 {
+	if (IsNlaPlaying()) {
+		return true;
+	}
 	for (const auto& pair : m_layers) {
 		if (!pair.second->IsDone()) {
 			return true;
@@ -199,6 +233,9 @@ bool BL_ActionManager::IsSuspended() const
 
 void BL_ActionManager::Update(float curtime, bool applyToObject)
 {
+	if (m_nla) {
+		m_nla->Update(curtime, applyToObject);
+	}
 	for (const auto& pair : m_layers) {
 		pair.second->Update(curtime, applyToObject);
 	}

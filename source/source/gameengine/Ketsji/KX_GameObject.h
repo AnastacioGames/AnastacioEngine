@@ -411,6 +411,13 @@ public:
 	/// True when an action layer still requires an animation update.
 	bool HasActiveActions();
 
+	/// Play the NLA tracks of an armature under its action layers.
+	bool PlayNla(float speed, bool loop);
+	void StopNla();
+	bool IsNlaPlaying();
+	float GetNlaFrame();
+	void SetNlaFrame(float frame);
+
 	bool IsActionsSuspended();
 
 	/**
@@ -1259,6 +1266,11 @@ public:
 	EXP_PYMETHOD_DOC(KX_GameObject, setActionLayerSpeed);
 	EXP_PYMETHOD_DOC(KX_GameObject, setActionFrame);
 	EXP_PYMETHOD_DOC(KX_GameObject, isPlayingAction);
+	EXP_PYMETHOD_DOC(KX_GameObject, playNLA);
+	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, stopNLA);
+	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, isPlayingNLA);
+	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, getNLAFrame);
+	EXP_PYMETHOD_DOC_O(KX_GameObject, setNLAFrame);
 	
 	/* Dict access */
 	/* obj.get(name[, default]) is called hundreds of times per frame by game scripts: METH_FASTCALL

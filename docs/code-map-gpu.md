@@ -4,13 +4,13 @@ Guia de navegação para os arquivos de material e shader da GPU, que mais mudam
 engine (sombra, céu, Filmic, SSGI, nós de shader, sondas, lightmap). Não descreve arquitetura; é só um
 índice para achar a função certa sem ler 7 mil linhas.
 
-**Linhas conferidas em 2026-10-29 (`HEAD` `fb2e4645`).** Os números envelhecem a cada edição: use-os como
+**Linhas conferidas em 2026-10-31 (`HEAD` `d1f0db34`).** Os números envelhecem a cada edição: use-os como
 ponto de partida e confirme com `grep -n "nome_da_funcao" arquivo`. `python tools/check_docs.py --fix`
 corrige os números deste mapa.
 
 Arquivos vizinhos:
 
-- [`GPU_material.h`](../source/source/blender/gpu/GPU_material.h) (631 linhas): API pública. Enums
+- [`GPU_material.h`](../source/source/blender/gpu/GPU_material.h) (632 linhas): API pública. Enums
   `GPUBuiltin` e `GPUDynamicType` (uniforms dinâmicos), `GPUShadeInput`/`GPUShadeResult`.
 - [`gpu_codegen.c`](../source/source/blender/gpu/intern/gpu_codegen.c) (3.740 linhas): monta o GLSL final
   a partir do grafo de nós; cola `gpu_shader_material.glsl` inteiro como biblioteca de funções.
@@ -30,26 +30,26 @@ névoa"), `GPUDynamicType` novo em `GPU_material.h`, ligação em `GPU_material_
 **Sombra.** Buffers e cascatas em `gpu_material.c` ("Lâmpadas e sombras"); amostragem no GLSL ("Sombras").
 Sombra colorida = `GPU_lamp_shadow_color_*` + `shadow_color_*`/`csm_shadow_color_tint`.
 
-## `source/source/blender/gpu/intern/gpu_material.c` (6.646 linhas)
+## `source/source/blender/gpu/intern/gpu_material.c` (6.667 linhas)
 
 Structs `GPUMaterial`/`GPULamp` ficam em `gpu_material_intern.h`, compartilhado com os arquivos abaixo.
 
 | Domínio | Funções (linha inicial) |
 |---|---|
-| Construção do material | `GPU_material_builtin` 146, `GPU_material_construct_begin` 191, `gpu_material_construct_end` 295 (compila e cria o pass), `GPU_material_free` 586, `gpu_material_add_node` 1319 |
-| Instancing e skinning | `GPU_material_use_instancing` 631, `GPU_material_bind_instancing_attrib` 636, `GPU_material_use_skinning` 683, `GPU_material_bind_bone_matrices` 694 |
-| Bind por desenho | `GPU_material_update_lamps` 703, `GPU_material_bind` 792, `GPU_material_bind_uniforms` 937 (uniforms por objeto), `GPU_material_unbind` 1070, `GPU_material_load_images` 1097, `GPU_material_set_foliage_reference_position` 1104 |
-| SSGI | `GPU_material_ssgi_slot` 1137, `GPU_material_ssgi_disabled_reason` 1153, `GPU_material_ssgi_approximate` 1166, `gpu_ssgi_closure` 1236, `GPU_material_ssgi_outputs` 1293 |
-| Passe de sombra (lado material) | `GPU_shadow_depth_pass_set` 1177, `GPU_material_shadow_color_link` 1187, `gpu_material_link_shadow_color` 1200 |
-| Alpha e efeitos de geometria | `GPU_material_alpha_blend` 1311, `GPU_material_vertex_offset` 1325, `GPU_material_shells` 1335, `GPU_material_outline` 1356, `GPU_material_strands` 1364, `GPU_material_explode` 1375, `GPU_material_planar_reflection` 1391 |
-| GLSL Script e erros de nó | `gpu_material_add_script` 1403, `GPU_material_has_error` 1470, `gpu_material_add_script_uniform` 1494, `GPU_material_script_uniform_set` 1507, `GPU_material_node_error` 1563 |
-| Color management (Filmic) | `gpu_view_transform_contrast` 1806, `gpu_material_link_display_transform` 1824, `GPU_material_do_color_management` 1838 |
-| Shading legado (Blender Internal) | `lamp_get_visibility` 1856, `ramp_diffuse_result` 2008, `shade_light_textures` 2155, `shade_one_light` 2274 (≈460 linhas), `material_lights` 2742, `do_material_tex` 2881 (≈790 linhas, texturas mtex), `GPU_shadeinput_set` 3673, `GPU_shaderesult_set` 3781 |
-| Mundo, céu e névoa | `GPU_mist_update_values` 3708, `GPU_horizon_update_color` 3720, `GPU_update_exposure_range` 3742, `GPU_sky_texture_slot` 3751, `GPU_sky_texture_follow_sun` 3765, `do_world_tex` 4269, `gpu_material_old_world` 4415, `GPU_material_world` 4563, `GPU_material_world_prefetch` 4605, `GPU_material_world_env` 4630 |
-| Entrada principal e cache | `GPU_blender_material` 4189, `GPU_material_matcap` 4226, **`GPU_material_from_blender`** 4736, `GPU_material_prefetch` 4842, `GPU_material_moves_vertices` 4915, `GPU_materials_free_text` 4939, `GPU_materials_free` 4955 |
-| Lâmpadas | `GPU_lamp_update` 5004, `GPU_lamp_update_colors` 5057, `gpu_lamp_from_blender` 5088, `GPU_lamp_from_blender` 5436, `GPU_lamp_free` 5585, `GPU_lamp_get_data` 6466 |
-| Lâmpadas e sombras | `gpu_lamp_shadow_color_create` 5234, `gpu_lamp_create_shadow_buffer` 5259, `gpu_lamp_create_cascade` 5341 (CSM), `gpu_lamp_create_point_shadow_buffer` 5389, `GPU_lamp_shadow_set_size` 5642, `gpu_lamp_csm_auto_bias` 5721, `GPU_lamp_shadow_buffer_bind` 5749, `GPU_lamp_shadow_buffer_unbind` 5528, `GPU_lamp_shadow_color_begin` 5840, `GPU_lamp_shadow_static_ensure` 5900 (sombra estática), `GPU_lamp_shadow_static_matches` 5950 |
-| Bind de lâmpadas, sondas e dano | `GPU_material_bind_shadow_lamps` 6041, `GPU_material_bind_probe` 6214, `GPU_material_bind_probe2` 6265, `GPU_material_bind_planar` 6318, `GPU_material_bind_damage` 6372, `GPU_material_bind_scene_lights` 6041 |
+| Construção do material | `GPU_material_builtin` 146, `GPU_material_construct_begin` 191, `gpu_material_construct_end` 295 (compila e cria o pass), `GPU_material_free` 615, `gpu_material_add_node` 1340 |
+| Instancing e skinning | `GPU_material_use_instancing` 652, `GPU_material_bind_instancing_attrib` 657, `GPU_material_use_skinning` 704, `GPU_material_bind_bone_matrices` 715 |
+| Bind por desenho | `GPU_material_update_lamps` 724, `GPU_material_bind` 813, `GPU_material_bind_uniforms` 958 (uniforms por objeto), `GPU_material_unbind` 1091, `GPU_material_load_images` 1118, `GPU_material_set_foliage_reference_position` 1125 |
+| SSGI | `GPU_material_ssgi_slot` 1158, `GPU_material_ssgi_disabled_reason` 1174, `GPU_material_ssgi_approximate` 1187, `gpu_ssgi_closure` 1257, `GPU_material_ssgi_outputs` 1314 |
+| Passe de sombra (lado material) | `GPU_shadow_depth_pass_set` 1198, `GPU_material_shadow_color_link` 1208, `gpu_material_link_shadow_color` 1221 |
+| Alpha e efeitos de geometria | `GPU_material_alpha_blend` 1332, `GPU_material_vertex_offset` 1346, `GPU_material_shells` 1356, `GPU_material_outline` 1377, `GPU_material_strands` 1385, `GPU_material_explode` 1396, `GPU_material_planar_reflection` 1412 |
+| GLSL Script e erros de nó | `gpu_material_add_script` 1424, `GPU_material_has_error` 1491, `gpu_material_add_script_uniform` 1515, `GPU_material_script_uniform_set` 1528, `GPU_material_node_error` 1584 |
+| Color management (Filmic) | `gpu_view_transform_contrast` 1827, `gpu_material_link_display_transform` 1845, `GPU_material_do_color_management` 1859 |
+| Shading legado (Blender Internal) | `lamp_get_visibility` 1877, `ramp_diffuse_result` 2029, `shade_light_textures` 2176, `shade_one_light` 2295 (≈460 linhas), `material_lights` 2763, `do_material_tex` 2902 (≈790 linhas, texturas mtex), `GPU_shadeinput_set` 3694, `GPU_shaderesult_set` 3802 |
+| Mundo, céu e névoa | `GPU_mist_update_values` 3729, `GPU_horizon_update_color` 3741, `GPU_update_exposure_range` 3763, `GPU_sky_texture_slot` 3772, `GPU_sky_texture_follow_sun` 3786, `do_world_tex` 4290, `gpu_material_old_world` 4436, `GPU_material_world` 4584, `GPU_material_world_prefetch` 4626, `GPU_material_world_env` 4651 |
+| Entrada principal e cache | `GPU_blender_material` 4210, `GPU_material_matcap` 4247, **`GPU_material_from_blender`** 4757, `GPU_material_prefetch` 4863, `GPU_material_moves_vertices` 4936, `GPU_materials_free_text` 4960, `GPU_materials_free` 4976 |
+| Lâmpadas | `GPU_lamp_update` 5025, `GPU_lamp_update_colors` 5078, `gpu_lamp_from_blender` 5109, `GPU_lamp_from_blender` 5457, `GPU_lamp_free` 5606, `GPU_lamp_get_data` 6487 |
+| Lâmpadas e sombras | `gpu_lamp_shadow_color_create` 5255, `gpu_lamp_create_shadow_buffer` 5280, `gpu_lamp_create_cascade` 5362 (CSM), `gpu_lamp_create_point_shadow_buffer` 5410, `GPU_lamp_shadow_set_size` 5663, `gpu_lamp_csm_auto_bias` 5742, `GPU_lamp_shadow_buffer_bind` 5770, `GPU_lamp_shadow_buffer_unbind` 5549, `GPU_lamp_shadow_color_begin` 5861, `GPU_lamp_shadow_static_ensure` 5921 (sombra estática), `GPU_lamp_shadow_static_matches` 5971 |
+| Bind de lâmpadas, sondas e dano | `GPU_material_bind_shadow_lamps` 6062, `GPU_material_bind_probe` 6235, `GPU_material_bind_probe2` 6286, `GPU_material_bind_planar` 6339, `GPU_material_bind_damage` 6393, `GPU_material_bind_scene_lights` 6062 |
 
 ## `source/source/blender/gpu/intern/gpu_material_export.c` (330 linhas)
 

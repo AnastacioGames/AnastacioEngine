@@ -28,6 +28,7 @@
 #define __BL_ACTIONMANAGER_H__
 
 #include <map>
+#include <memory>
 
 // Currently, we use the max value of a short.
 // We should switch to unsigned short; doesn't make sense to support negative layers.
@@ -36,6 +37,7 @@
 
 class BL_Action;
 class BL_ActionData;
+class BL_NlaPlayer;
 
 /**
  * BL_ActionManager is responsible for handling a KX_GameObject's actions.
@@ -47,6 +49,9 @@ private:
 
 	class KX_GameObject* m_obj;
 	BL_ActionMap 		 m_layers;
+
+	/// NLA tracks played under the action layers (created on demand).
+	std::unique_ptr<BL_NlaPlayer> m_nla;
 
 	/// Suspend action update?
 	bool m_suspended;
@@ -124,6 +129,13 @@ public:
 	 * Check whether any layer still needs per-frame animation updates.
 	 */
 	bool HasActiveActions();
+
+	/// NLA playback: the tracks are evaluated before the action layers, which blend on top.
+	bool PlayNla(float speed, bool loop);
+	void StopNla();
+	bool IsNlaPlaying() const;
+	float GetNlaFrame() const;
+	void SetNlaFrame(float frame);
 
 	void Suspend();
 	void Resume();

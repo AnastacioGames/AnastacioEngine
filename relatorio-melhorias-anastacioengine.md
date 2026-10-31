@@ -42,7 +42,7 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 - **Navmesh:** API moderna do Detour e navmesh dinâmica com obstáculos em runtime.
 - **Editor:** barra flutuante na 3D View, Outliner com coleções, Asset Browser, abas Camera/Input/Export Game,
   painéis de material do modo jogo, idiomas (English, Português, Español, Русский), associação de `.blend`/`.range`.
-- **Jogo:** Reverb Area, Animation Events, World Status, destruição e explosões, câmera com foco/rastreio/Camera FX,
+- **Jogo:** Reverb Area, Animation Events, NLA no jogo (`playNLA`, só armatures), World Status, destruição e explosões, câmera com foco/rastreio/Camera FX,
   chuva/nuvens/lens flare no World, soft body, compatibilidade com scripts BGE/UPBGE, Logic Bricks → Python (fase 1).
 - **Releases** 0.3.0 a 0.4.6 (Windows e Linux).
 

@@ -79,6 +79,7 @@ set(INC_SYS
 set(SRC
 	BL_Action.cpp
 	BL_ActionManager.cpp
+	BL_NlaPlayer.cpp
 	BL_BlenderShader.cpp
 	BL_Shader.cpp
 	BL_Texture.cpp
@@ -209,6 +210,7 @@ set(SRC
 
 	BL_Action.h
 	BL_ActionManager.h
+	BL_NlaPlayer.h
 	BL_BlenderShader.h
 	BL_Shader.h
 	BL_Texture.h

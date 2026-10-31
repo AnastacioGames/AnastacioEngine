@@ -523,6 +523,11 @@ PyMethodDef KX_GameObject::Methods[] = {
 	EXP_PYMETHODTABLE_KEYWORDS(KX_GameObject, setActionLayerSpeed),
 	EXP_PYMETHODTABLE(KX_GameObject, setActionFrame),
 	EXP_PYMETHODTABLE(KX_GameObject, isPlayingAction),
+	EXP_PYMETHODTABLE_KEYWORDS(KX_GameObject, playNLA),
+	EXP_PYMETHODTABLE_NOARGS(KX_GameObject, stopNLA),
+	EXP_PYMETHODTABLE_NOARGS(KX_GameObject, isPlayingNLA),
+	EXP_PYMETHODTABLE_NOARGS(KX_GameObject, getNLAFrame),
+	EXP_PYMETHODTABLE_O(KX_GameObject, setNLAFrame),
 
 	// dict style access for props
 	{"get", (PyCFunction)(void (*)(void))KX_GameObject::sPyget, METH_FASTCALL},

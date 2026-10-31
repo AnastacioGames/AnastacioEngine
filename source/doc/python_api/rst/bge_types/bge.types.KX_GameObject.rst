@@ -1408,6 +1408,44 @@ base class --- :class:`SCA_IObject`
       :return: Whether or not the action is playing
       :rtype: boolean
 
+   .. method:: playNLA(speed=1.0, loop=True)
+
+      Plays the NLA tracks of an armature, like the NLA Editor does. Muted tracks and strips are skipped,
+      Solo is respected and the tracks are blended from the bottom up (Replace and Add, influence, blend
+      in/out, repeat, scale, reverse and extrapolation). Actions played with :meth:`playAction` are
+      blended on top of the NLA result.
+
+      Not supported yet: transition and meta strips, Subtract/Multiply modes (played as Replace),
+      strip time curves and NLA on objects that are not armatures.
+
+      :arg speed: Playback speed (1.0 = scene animation frame rate, 0.0 = stopped, use :meth:`setNLAFrame`).
+      :type speed: float
+      :arg loop: Restart from the first strip after the last one ends, else hold the last frame.
+      :type loop: boolean
+      :return: True when the NLA started (the object is an armature with at least one strip).
+      :rtype: boolean
+
+   .. method:: stopNLA()
+
+      Stops the NLA playback. The armature keeps its current pose.
+
+   .. method:: isPlayingNLA()
+
+      :return: True while the NLA is playing (False after a non-looping NLA reached its end).
+      :rtype: boolean
+
+   .. method:: getNLAFrame()
+
+      :return: The current NLA frame.
+      :rtype: float
+
+   .. method:: setNLAFrame(frame)
+
+      Jumps the NLA to the given frame, clamped to the range of the strips.
+
+      :arg frame: The NLA frame.
+      :type frame: float
+
    .. method:: addDebugProperty (name[, debug])
 
       Adds a single debug property to the debug list.

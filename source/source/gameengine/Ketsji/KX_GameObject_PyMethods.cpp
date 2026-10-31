@@ -1723,6 +1723,54 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, isPlayingAction,
 	return PyBool_FromLong(!IsActionDone(layer));
 }
 
+EXP_PYMETHODDEF_DOC(KX_GameObject, playNLA,
+                    "playNLA(speed=1.0, loop=True)\n"
+                    "Plays the NLA tracks of the armature under its action layers. Returns True when it started.\n")
+{
+	float speed = 1.0f;
+	int loop = 1;
+
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "|fp:playNLA", {"speed", "loop", 0}, &speed, &loop)) {
+		return nullptr;
+	}
+
+	return PyBool_FromLong(PlayNla(speed, loop != 0));
+}
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, stopNLA,
+                           "stopNLA()\n"
+                           "Stops the NLA playback; the armature keeps its current pose.\n")
+{
+	StopNla();
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, isPlayingNLA,
+                           "isPlayingNLA()\n"
+                           "True while the NLA is playing (False after a non-looping NLA reached its end).\n")
+{
+	return PyBool_FromLong(IsNlaPlaying());
+}
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, getNLAFrame,
+                           "getNLAFrame()\n"
+                           "Gets the current NLA frame.\n")
+{
+	return PyFloat_FromDouble(GetNlaFrame());
+}
+
+EXP_PYMETHODDEF_DOC_O(KX_GameObject, setNLAFrame,
+                      "setNLAFrame(frame)\n"
+                      "Jumps the NLA to the given frame (clamped to the strips range).\n")
+{
+	const float frame = (float)PyFloat_AsDouble(value);
+	if (frame == -1.0f && PyErr_Occurred()) {
+		return nullptr;
+	}
+	SetNlaFrame(frame);
+	Py_RETURN_NONE;
+}
+
 
 EXP_PYMETHODDEF_DOC(KX_GameObject, addDebugProperty,
                     "addDebugProperty(name, visible=1)\n"

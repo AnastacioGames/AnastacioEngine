@@ -8,6 +8,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-31 - NLA no jogo: `playNLA()` (branch feat/nla-game)
+
+- Antes a engine ignorava o NLA Editor. Novo `BL_NlaPlayer` (Ketsji), dono opcional do `BL_ActionManager`:
+  avalia as faixas de baixo para cima com as mesmas funções de mistura de pose dos Action Actuators
+  (`SetPoseByAction` + `BlendInPose`). Roda antes das layers de ação, que misturam por cima.
+- Suporta: faixas mutadas/Solo, strips mutadas, Replace e Add, influência (fixa, blend in/out e curva de
+  influência animada), repeat, scale, reverse e extrapolação (Hold / Hold Forward / Nothing). Ossos chaveados
+  pelas strips voltam ao repouso a cada frame; strip Add parte do repouso, então só soma o que ela chaveia.
+- Fora por enquanto: strips Transition/Meta, Subtract/Multiply (viram Replace), curva de tempo da strip e
+  objetos que não são armature.
+- Python: `playNLA(speed=1.0, loop=True)`, `stopNLA()`, `isPlayingNLA()`, `getNLAFrame()`, `setNLAFrame(f)`.
+  Ações copiadas por objeto (como o `BL_Action`) para as threads de animação.
+- Teste: `tools/debug/cenas/criar_cena_nla.py` (player `--server`): rotação 45/90/180/0/90 e soma Add 0,5
+  nos frames 11/25/40/1/21, como esperado. Armature sem malha filha precisa de Culling None para atualizar.
+
 ## 2026-10-31 - Correção: material compartilhado entre cenas desenhava branco ou crashava
 
 - `BL_BlenderShader::ReloadMaterial` liberava as GPU materials do `Material` em todas as cenas; outra cena

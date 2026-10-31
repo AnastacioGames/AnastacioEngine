@@ -757,6 +757,41 @@ bool KX_GameObject::HasActiveActions()
 	return m_actionManager && m_actionManager->HasActiveActions();
 }
 
+bool KX_GameObject::PlayNla(float speed, bool loop)
+{
+	if (!GetActionManager()->PlayNla(speed, loop)) {
+		return false;
+	}
+	GetScene()->AddAnimatedObject(this);
+	return true;
+}
+
+void KX_GameObject::StopNla()
+{
+	if (m_actionManager) {
+		m_actionManager->StopNla();
+	}
+}
+
+bool KX_GameObject::IsNlaPlaying()
+{
+	return m_actionManager && m_actionManager->IsNlaPlaying();
+}
+
+float KX_GameObject::GetNlaFrame()
+{
+	return m_actionManager ? m_actionManager->GetNlaFrame() : 0.0f;
+}
+
+void KX_GameObject::SetNlaFrame(float frame)
+{
+	if (m_actionManager) {
+		m_actionManager->SetNlaFrame(frame);
+		// A finished NLA left the update list: a new frame must be applied.
+		GetScene()->AddAnimatedObject(this);
+	}
+}
+
 bool KX_GameObject::IsActionsSuspended()
 {
 	return GetActionManager()->IsSuspended();
