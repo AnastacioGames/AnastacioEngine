@@ -118,16 +118,23 @@ float strip_action_frame(const NlaStrip *strip, float time)
 	return atEnd ? strip->actend : strip->actstart + std::fmod(time - strip->start, actlength * scale) / scale;
 }
 
+/// Influence curve of a strip (animated influence), or null.
+const FCurve *strip_influence_curve(const NlaStrip *strip)
+{
+	for (const FCurve *fcu = (const FCurve *)strip->fcurves.first; fcu; fcu = fcu->next) {
+		if (fcu->rna_path && STREQ(fcu->rna_path, "influence") && !fcu->driver) {
+			return fcu;
+		}
+	}
+	return nullptr;
+}
+
 /// Influence of a strip: its influence curve when animated, else the automatic blend in/out.
-float strip_influence(const NlaStrip *strip, float time)
+/// curve is the player's own copy, because evaluate_fcurve writes into the curve.
+float strip_influence(const NlaStrip *strip, FCurve *curve, float time)
 {
 	if (strip->flag & NLASTRIP_FLAG_USR_INFLUENCE) {
-		for (FCurve *fcu = (FCurve *)strip->fcurves.first; fcu; fcu = fcu->next) {
-			if (fcu->rna_path && STREQ(fcu->rna_path, "influence") && !fcu->driver) {
-				return evaluate_fcurve(fcu, time);
-			}
-		}
-		return strip->influence;
+		return curve ? evaluate_fcurve(curve, time) : strip->influence;
 	}
 	const float blendin = std::fabs(strip->blendin);
 	const float blendout = std::fabs(strip->blendout);
@@ -165,7 +172,9 @@ BL_NlaPlayer::BL_NlaPlayer(KX_GameObject *obj)
 	m_playing(false),
 	m_done(true),
 	m_frameSet(false),
-	m_prevUpdate(-1.0f)
+	m_needApply(false),
+	m_prevUpdate(-1.0f),
+	m_chanPose(nullptr)
 {
 }
 
@@ -186,6 +195,12 @@ void BL_NlaPlayer::FreeActions()
 		BKE_libblock_free(G.main, pair.second);
 	}
 	m_actions.clear();
+	for (const auto &pair : m_influence) {
+		free_fcurve(pair.second);
+	}
+	m_influence.clear();
+	m_chans.clear();
+	m_chanPose = nullptr;
 }
 
 bool BL_NlaPlayer::Play(float speed, bool loop)
@@ -199,6 +214,11 @@ bool BL_NlaPlayer::Play(float speed, bool loop)
 	if (!adt || (adt->flag & ADT_NLA_EVAL_OFF)) {
 		CM_Warning("playNLA: object " << m_obj->GetName() << " has no NLA tracks to play");
 		return false;
+	}
+
+	// Called again while already playing (e.g. every frame from an Always sensor): keep going.
+	if (m_playing && !m_done && speed == m_speed && loop == m_loop) {
+		return true;
 	}
 
 	FreeActions();
@@ -219,6 +239,12 @@ bool BL_NlaPlayer::Play(float speed, bool loop)
 			}
 			m_startFrame = std::min(m_startFrame, strip->start);
 			m_endFrame = std::max(m_endFrame, strip->end);
+			if (strip->flag & NLASTRIP_FLAG_USR_INFLUENCE) {
+				const FCurve *curve = strip_influence_curve(strip);
+				if (curve) {
+					m_influence[strip] = copy_fcurve(curve);
+				}
+			}
 			if (m_actions.find(strip->act) == m_actions.end()) {
 				m_actions[strip->act] = BKE_action_copy(G.main, strip->act);
 				for (const FCurve *fcu = (const FCurve *)strip->act->curves.first; fcu; fcu = fcu->next) {
@@ -243,11 +269,13 @@ bool BL_NlaPlayer::Play(float speed, bool loop)
 
 	m_speed = speed;
 	m_loop = loop;
-	m_frame = m_startFrame;
+	// Playing backwards starts at the end.
+	m_frame = (speed < 0.0f) ? m_endFrame : m_startFrame;
 	m_startTime = KX_GetActiveEngine()->GetAnimationsTime() - m_obj->GetScene()->GetSuspendedDelta();
 	m_playing = true;
 	m_done = false;
-	m_frameSet = false;
+	m_frameSet = (speed < 0.0f);  // sync the clock with m_frame on the first update
+	m_needApply = false;
 	m_prevUpdate = -1.0f;
 	return true;
 }
@@ -262,6 +290,11 @@ void BL_NlaPlayer::Stop()
 bool BL_NlaPlayer::IsPlaying() const
 {
 	return m_playing && !m_done;
+}
+
+bool BL_NlaPlayer::NeedsUpdate() const
+{
+	return IsPlaying() || (m_playing && m_needApply);
 }
 
 float BL_NlaPlayer::GetFrame() const
@@ -291,7 +324,16 @@ void BL_NlaPlayer::SetFrame(float frame)
 
 void BL_NlaPlayer::Update(float curtime, bool applyToObject)
 {
-	if (!m_playing || ((m_done || m_prevUpdate == curtime) && !m_frameSet)) {
+	if (!m_playing) {
+		return;
+	}
+	if ((m_done || m_prevUpdate == curtime) && !m_frameSet) {
+		// Finished while culled: apply the last pose once the armature is visible again.
+		if (m_needApply && applyToObject) {
+			ApplyPose();
+			static_cast<BL_ArmatureObject *>(m_obj)->UpdateTimestep(curtime - (float)m_obj->GetScene()->GetSuspendedDelta());
+			m_needApply = false;
+		}
 		return;
 	}
 	m_prevUpdate = curtime;
@@ -323,6 +365,10 @@ void BL_NlaPlayer::Update(float curtime, bool applyToObject)
 	if (applyToObject) {
 		ApplyPose();
 		static_cast<BL_ArmatureObject *>(m_obj)->UpdateTimestep(curtime);
+		m_needApply = false;
+	}
+	else {
+		m_needApply = true;
 	}
 }
 
@@ -336,12 +382,23 @@ void BL_NlaPlayer::ApplyPose()
 	}
 
 	bPose *pose = arm->GetArmatureObject()->pose;
-	for (const std::string &name : m_bones) {
-		bPoseChannel *chan = BKE_pose_channel_find_name(pose, name.c_str());
-		if (chan) {
-			channel_rest(chan);
+	if (pose != m_chanPose) {
+		// Look the keyed bones up once (again only if the pose was rebuilt).
+		m_chans.clear();
+		for (const std::string &name : m_bones) {
+			bPoseChannel *chan = BKE_pose_channel_find_name(pose, name.c_str());
+			if (chan) {
+				m_chans.push_back(chan);
+			}
 		}
+		m_chanPose = pose;
 	}
+	for (bPoseChannel *chan : m_chans) {
+		channel_rest(chan);
+	}
+
+	// Like Blender, the first strip writes its full value: influence only blends over strips below.
+	bool first = true;
 
 	// Tracks go from the bottom up: each strip blends over the result of the tracks below it.
 	for (const NlaTrack *track = (const NlaTrack *)adt->nla_tracks.first; track; track = track->next) {
@@ -357,8 +414,16 @@ void BL_NlaPlayer::ApplyPose()
 		if (it == m_actions.end()) {
 			continue;
 		}
-		const float influence = std::max(0.0f, std::min(strip_influence(strip, time), 1.0f));
+		const auto curve = m_influence.find(strip);
+		const float influence = std::max(0.0f, std::min(strip_influence(
+		        strip, (curve != m_influence.end()) ? curve->second : nullptr, time), 1.0f));
 		if (influence <= 0.0f) {
+			continue;
+		}
+
+		if (first) {
+			arm->SetPoseByAction(it->second, strip_action_frame(strip, time));
+			first = false;
 			continue;
 		}
 

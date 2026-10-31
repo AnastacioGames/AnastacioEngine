@@ -204,7 +204,7 @@ void BL_ActionManager::SetNlaFrame(float frame)
 
 bool BL_ActionManager::HasActiveActions()
 {
-	if (IsNlaPlaying()) {
+	if (m_nla && m_nla->NeedsUpdate()) {
 		return true;
 	}
 	for (const auto& pair : m_layers) {

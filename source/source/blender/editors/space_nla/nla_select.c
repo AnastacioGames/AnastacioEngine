@@ -34,6 +34,7 @@
 
 #include "BKE_nla.h"
 #include "BKE_context.h"
+#include "BKE_global.h"
 #include "BKE_screen.h"
 
 #include "ED_anim_api.h"
@@ -533,8 +534,9 @@ static void mouse_nla_strips(bContext *C, bAnimContext *ac, const int mval[2], s
 	/* try to get channel */
 	ale = BLI_findlink(&anim_data, channel_index);
 	if (ale == NULL) {
-		/* channel not found */
-		printf("Error: animation channel (index = %d) not found in mouse_nla_strips()\n", channel_index);
+		/* channel not found (clicked on empty space) */
+		if (G.debug & G_DEBUG)
+			printf("Error: animation channel (index = %d) not found in mouse_nla_strips()\n", channel_index);
 		ANIM_animdata_freelist(&anim_data);
 		return;
 	}

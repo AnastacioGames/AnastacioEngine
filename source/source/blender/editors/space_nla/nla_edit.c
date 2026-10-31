@@ -1122,7 +1122,7 @@ void NLA_OT_duplicate(wmOperatorType *ot)
 	ot->flag = OPTYPE_REGISTER | OPTYPE_UNDO;
 
 	/* own properties */
-	ot->prop = RNA_def_boolean(ot->srna, "linked", false, "Linked", "When duplicating strips, assign new copies of the actions they use");
+	ot->prop = RNA_def_boolean(ot->srna, "linked", false, "Linked", "When duplicating strips, keep using the same actions instead of making copies of them");
 
 	/* to give to transform */
 	RNA_def_enum(ot->srna, "mode", rna_enum_transform_mode_types, TFM_TRANSLATION, "Mode", "");
@@ -1661,8 +1661,8 @@ static int nlaedit_move_up_exec(bContext *C, wmOperator *UNUSED(op))
 			stripn = strip->next;
 
 			if (strip->flag & NLASTRIP_FLAG_SELECT) {
-				/* check if the track above has room for this strip */
-				if (BKE_nlatrack_has_space(nltn, strip->start, strip->end)) {
+				/* check if the track above has room for this strip (and isn't locked) */
+				if (!(nltn->flag & NLATRACK_PROTECTED) && BKE_nlatrack_has_space(nltn, strip->start, strip->end)) {
 					/* remove from its current track, and add to the one above
 					 * (it 'should' work, so no need to worry) */
 					BLI_remlink(&nlt->strips, strip);
@@ -1736,8 +1736,8 @@ static int nlaedit_move_down_exec(bContext *C, wmOperator *UNUSED(op))
 			stripn = strip->next;
 
 			if (strip->flag & NLASTRIP_FLAG_SELECT) {
-				/* check if the track below has room for this strip */
-				if (BKE_nlatrack_has_space(nltp, strip->start, strip->end)) {
+				/* check if the track below has room for this strip (and isn't locked) */
+				if (!(nltp->flag & NLATRACK_PROTECTED) && BKE_nlatrack_has_space(nltp, strip->start, strip->end)) {
 					/* remove from its current track, and add to the one above
 					 * (it 'should' work, so no need to worry) */
 					BLI_remlink(&nlt->strips, strip);
@@ -1979,7 +1979,8 @@ static int nlaedit_apply_scale_exec(bContext *C, wmOperator *UNUSED(op))
 				 * make this strip use its own copy */
 				if (strip->act == NULL)
 					continue;
-				if (strip->act->id.us > 1) {
+				/* real users only: a Fake User doesn't need its own copy */
+				if (ID_REAL_USERS(strip->act) > 1) {
 					/* make a copy of the Action to work on */
 					bAction *act = BKE_action_copy(bmain, strip->act);
 

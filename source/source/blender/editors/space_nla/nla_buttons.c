@@ -371,9 +371,8 @@ static void nla_panel_properties(const bContext *C, Panel *pa)
 		uiItemR(sub, &strip_ptr, "blend_in", 0, NULL, ICON_NONE);
 		uiItemR(sub, &strip_ptr, "blend_out", 0, NULL, ICON_NONE);
 
-		/* settings */
+		/* settings (mute and reverse still work with animated influence/time) */
 		column = uiLayoutColumn(layout, true);
-		uiLayoutSetActive(column, !(RNA_boolean_get(&strip_ptr, "use_animated_influence") || RNA_boolean_get(&strip_ptr, "use_animated_time")));
 		uiItemL(column, IFACE_("Playback Settings:"), ICON_NONE);
 		uiItemR(column, &strip_ptr, "mute", 0, NULL, ICON_NONE);
 		uiItemR(column, &strip_ptr, "use_reverse", 0, NULL, ICON_NONE);

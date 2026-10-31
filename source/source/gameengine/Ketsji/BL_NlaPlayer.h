@@ -31,10 +31,14 @@
 #include <map>
 #include <set>
 #include <string>
+#include <vector>
 
 class KX_GameObject;
 struct bAction;
 struct bPose;
+struct bPoseChannel;
+struct FCurve;
+struct NlaStrip;
 
 class BL_NlaPlayer
 {
@@ -44,6 +48,10 @@ private:
 	std::map<bAction *, bAction *> m_actions;
 	/// Bones keyed by the strips: reset to rest before each evaluation so Add strips don't accumulate.
 	std::set<std::string> m_bones;
+	/// Pose channels of m_bones, cached for the pose m_chanPose.
+	std::vector<bPoseChannel *> m_chans;
+	/// Private copies of the animated influence curves (evaluate_fcurve writes into the curve).
+	std::map<const NlaStrip *, FCurve *> m_influence;
 	bPose *m_prevPose;
 	bPose *m_stripPose;
 
@@ -56,7 +64,10 @@ private:
 	bool m_playing;
 	bool m_done;
 	bool m_frameSet;
+	/// The frame changed while culled: the pose still has to be applied.
+	bool m_needApply;
 	float m_prevUpdate;
+	bPose *m_chanPose;
 
 	void FreeActions();
 	void ApplyPose();
@@ -69,6 +80,8 @@ public:
 	bool Play(float speed, bool loop);
 	void Stop();
 	bool IsPlaying() const;
+	/// Playing, or finished while culled with the last pose not applied yet.
+	bool NeedsUpdate() const;
 
 	float GetFrame() const;
 	void SetFrame(float frame);

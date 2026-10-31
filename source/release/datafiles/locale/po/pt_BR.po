@@ -49651,8 +49651,8 @@ msgid "Duplicate selected NLA-Strips, adding the new strips in new tracks above 
 msgstr "Duplica as faixas de animação não linear selecionadas, adicionando as novas faixas dentro de novas trilhas sobre as originais."
 
 
-msgid "When duplicating strips, assign new copies of the actions they use"
-msgstr "Durante a duplicação de faixas, atribui novas cópias das ações que elas usam."
+msgid "When duplicating strips, keep using the same actions instead of making copies of them"
+msgstr "Ao duplicar faixas, continua usando as mesmas ações em vez de criar cópias delas"
 
 
 msgctxt "Operator"
