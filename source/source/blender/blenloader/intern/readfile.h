@@ -169,5 +169,6 @@ void blo_do_versions_upbge(struct FileData *fd, struct Library *lib, struct Main
 void blo_do_versions_range(struct FileData *fd, struct Library *lib, struct Main *main);
 
 void do_versions_after_linking_270(struct Main *bmain);
+void do_versions_after_linking_range(struct Main *main);
 
 #endif

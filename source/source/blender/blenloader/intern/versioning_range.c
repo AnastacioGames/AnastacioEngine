@@ -562,44 +562,6 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
-  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 118)) {
-    /* The game lamp panel now has one "Use Shadow" checkbox for both the traditional and the
-     * PBR (Shading Nodes) path. PBR used to ignore that flag and cast shadows unconditionally,
-     * so lamps in PBR scenes would lose their shadow on load -- flag them as shadow casters,
-     * unless they were authored in Cycles with "Cast Shadow" explicitly off. */
-    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
-      if (!(scene->gm.flag & GAME_USE_SHADING_NODES)) {
-        continue;
-      }
-      LISTBASE_FOREACH (Base *, base, &scene->base) {
-        Object *ob = base->object;
-        if (!ob || ob->type != OB_LAMP || !ob->data) {
-          continue;
-        }
-        Lamp *la = ob->data;
-        if (!ELEM(la->type, LA_SUN, LA_SPOT, LA_LOCAL)) {
-          continue;
-        }
-        IDProperty *cycles = la->id.properties ?
-                                 IDP_GetPropertyFromGroup(la->id.properties, "cycles") :
-                                 NULL;
-        IDProperty *cast = (cycles && cycles->type == IDP_GROUP) ?
-                               IDP_GetPropertyFromGroup(cycles, "cast_shadow") :
-                               NULL;
-        if (cast && IDP_Int(cast) == 0) {
-          continue;
-        }
-        /* Same test as lamp.use_shadow: only a Spot counts the legacy buffer bit. */
-        const bool use_shadow = (la->type == LA_SPOT) ?
-                                    ((la->mode & (LA_SHAD_BUF | LA_SHAD_RAY)) != 0) :
-                                    ((la->mode & LA_SHAD_RAY) != 0);
-        if (!use_shadow) {
-          la->mode |= LA_SHAD_RAY;
-        }
-      }
-    }
-  }
-
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 119)) {
     /* Keep the new Rain sub-panels open for existing files, preserving the previous
      * fully expanded presentation on their first load in this version. */
@@ -758,6 +720,48 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
      * settings (files from the original Range skip this function, but read 0 = Custom too). */
     LISTBASE_FOREACH (Scene *, scene, &main->scene) {
       scene->scenefx_settings.quality_preset = SCENE_FX_QUALITY_CUSTOM;
+    }
+  }
+}
+
+void do_versions_after_linking_range(Main *main)
+{
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 118)) {
+    /* The game lamp panel now has one "Use Shadow" checkbox for both the traditional and the
+     * PBR (Shading Nodes) path. PBR used to ignore that flag and cast shadows unconditionally,
+     * so lamps in PBR scenes would lose their shadow on load -- flag them as shadow casters,
+     * unless they were authored in Cycles with "Cast Shadow" explicitly off.
+     * Runs after linking: base->object and ob->data are file pointers before that. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      if (!(scene->gm.flag & GAME_USE_SHADING_NODES)) {
+        continue;
+      }
+      LISTBASE_FOREACH (Base *, base, &scene->base) {
+        Object *ob = base->object;
+        if (!ob || ob->type != OB_LAMP || !ob->data) {
+          continue;
+        }
+        Lamp *la = ob->data;
+        if (!ELEM(la->type, LA_SUN, LA_SPOT, LA_LOCAL)) {
+          continue;
+        }
+        IDProperty *cycles = la->id.properties ?
+                                 IDP_GetPropertyFromGroup(la->id.properties, "cycles") :
+                                 NULL;
+        IDProperty *cast = (cycles && cycles->type == IDP_GROUP) ?
+                               IDP_GetPropertyFromGroup(cycles, "cast_shadow") :
+                               NULL;
+        if (cast && IDP_Int(cast) == 0) {
+          continue;
+        }
+        /* Same test as lamp.use_shadow: only a Spot counts the legacy buffer bit. */
+        const bool use_shadow = (la->type == LA_SPOT) ?
+                                    ((la->mode & (LA_SHAD_BUF | LA_SHAD_RAY)) != 0) :
+                                    ((la->mode & LA_SHAD_RAY) != 0);
+        if (!use_shadow) {
+          la->mode |= LA_SHAD_RAY;
+        }
+      }
     }
   }
 }

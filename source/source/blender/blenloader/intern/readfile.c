@@ -8895,6 +8895,7 @@ static void do_versions_after_linking(Main *main)
 //	       main->curlib ? "LIB" : "MAIN", main->versionfile, main->subversionfile);
 
 	do_versions_after_linking_270(main);
+	do_versions_after_linking_range(main);
 
 	/* Range: split 2.49 materials shared by faces with different TexFace flags */
 	if (main->versionfile < 259 || (main->versionfile == 259 && main->subversionfile < 3)) {
