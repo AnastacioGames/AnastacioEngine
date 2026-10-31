@@ -204,8 +204,9 @@ static const EnumPropertyItem buttons_context_items[] = {
 	{BCONTEXT_GAME, "GAME", ICON_FILE_SCRIPT, "Game", "Game Object Properties"},
 	{BCONTEXT_TEXTURE, "TEXTURE", ICON_TEXTURE, "Texture", "Texture"},
 	{BCONTEXT_PARTICLE, "PARTICLES", ICON_PARTICLES, "Particles", "Particle"},
-	{BCONTEXT_PHYSICS, "PHYSICS", ICON_PHYSICS, "Physics", "Physics"},
 	{BCONTEXT_VEHICLE, "VEHICLE", ICON_AUTO, "Vehicle", "Vehicle"},
+	/* Physics last, where users expect it (the tab bar draws in this order) */
+	{BCONTEXT_PHYSICS, "PHYSICS", ICON_PHYSICS, "Physics", "Physics"},
 	{0, NULL, 0, NULL, NULL}
 };
 
