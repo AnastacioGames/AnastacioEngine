@@ -78,7 +78,7 @@ private:
 	int m_collisionViewProjLoc, m_collisionDepthTexLoc, m_collisionDepthTexValidLoc;
 
 	/// Fase R: vortex/cone motion (tornado funnel).
-	int m_useVortexLoc, m_vortexRotationSpeedLoc, m_vortexRadiusTopLoc, m_vortexHeightLoc, m_vortexAxisLoc;
+	int m_useVortexLoc, m_vortexRotationSpeedLoc, m_vortexRadiusTopLoc, m_vortexHeightLoc;
 
 	bool m_valid;
 
@@ -146,7 +146,6 @@ public:
 	int GetVortexRotationSpeedLoc() const { return m_vortexRotationSpeedLoc; }
 	int GetVortexRadiusTopLoc() const { return m_vortexRadiusTopLoc; }
 	int GetVortexHeightLoc() const { return m_vortexHeightLoc; }
-	int GetVortexAxisLoc() const { return m_vortexAxisLoc; }
 
 	/// Returns a shared cache for the given custom fragment script text (empty = the default
 	/// built-in look). Compiles on first call for that exact script text (or the first call

@@ -134,10 +134,6 @@ private:
 	float m_vortexRadiusTop = 0.0f;
 	float m_vortexHeight = 1.0f;
 
-	/// Follow the owner's rotation: gravity, velocity, emission direction, emitter offset and the
-	/// vortex axis are taken in the object's local space (see RangeGPUParticleSettings).
-	bool m_useObjectRotation = false;
-
 	/// Fase E: optional sprite texture, GL bindcode of a GPUTexture owned by the loaded Image
 	/// datablock (0 = untextured, falls back to the procedural round mask). Path kept only so
 	/// the Python getter can round-trip what was set.
@@ -190,8 +186,7 @@ public:
 	/// the actual emission point uploaded to the shader is worldOrigin + m_emitterPos, so
 	/// m_emitterPos itself stays a local-space offset editable via Get/SetEmitterPos without
 	/// drifting as the owner moves.
-	/// worldRot is the owner's world orientation, only used when m_useObjectRotation is on.
-	void Update(float deltaTime, const mt::vec3 &worldOrigin, const mt::mat3 &worldRot = mt::mat3::Identity());
+	void Update(float deltaTime, const mt::vec3 &worldOrigin);
 
 	/// Draws the current particle set as camera-facing billboards (instanced quads, view-space
 	/// offset so the quad always faces the camera without needing separate right/up uniforms).
@@ -307,8 +302,6 @@ public:
 
 	float GetVortexHeight() const { return m_vortexHeight; }
 	void SetVortexHeight(float v) { m_vortexHeight = v; }
-	bool GetUseObjectRotation() const { return m_useObjectRotation; }
-	void SetUseObjectRotation(bool v) { m_useObjectRotation = v; }
 
 	/// Fase F: pool size, resizable at runtime via Resize() (respecifies m_vbo[2] in place,
 	/// VAOs/programs untouched -- see Resize()).

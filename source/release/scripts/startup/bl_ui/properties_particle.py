@@ -388,7 +388,6 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             row.prop(gp, "velocity", text="")
             box.prop(gp, "velocity_randomness")
             box.prop(gp, "drag")
-            box.prop(gp, "use_object_rotation", icon="MANIPUL")
 
             box = main_box.box()
             box.prop(gp, "use_vortex", text="Vortex / Cone (Tornado)", icon="MESH_CONE")
@@ -495,7 +494,6 @@ class PARTICLE_PT_gpu_emitter(GPUParticleButtonsPanel, Panel):
             sub.prop(gpm, "velocity")
             sub.prop(gpm, "velocity_randomness")
             sub.prop(gpm, "drag")
-            sub.prop(gpm, "use_object_rotation")
             sub.prop(gpm, "use_vortex", text="Vortex / Cone (Tornado)", icon="MESH_CONE")
             if gpm.use_vortex:
                 sub.prop(gpm, "vortex_rotation_speed")
@@ -1738,7 +1736,7 @@ def _apply_gpu_debug_values(filepath):
                     "emission_angle", "billboard_mode", "use_backface_culling",
                     "collision_mode", "collision_height", "collision_bounce", "collision_friction",
                     "use_vortex", "vortex_rotation_speed", "vortex_radius_top", "vortex_height",
-                    "drag", "burst_interval", "use_object_rotation"):
+                    "drag", "burst_interval"):
             if key in values:
                 setattr(gp, key, values[key])
         applied.append(object_name)

@@ -314,7 +314,7 @@ bool RAS_ParticleBuffer::Create()
 	return true;
 }
 
-void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin, const mt::mat3 &worldRot)
+void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin)
 {
 	if (!m_valid || !m_enabled) {
 		return;
@@ -363,18 +363,10 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin, co
 		m_burstPending = false;
 	}
 
-	// Use Object Rotation: the local-space vectors follow the owner's orientation.
-	const mt::mat3 rot = m_useObjectRotation ? worldRot : mt::mat3::Identity();
-	const mt::vec3 offset = rot * mt::vec3(m_emitterPos[0], m_emitterPos[1], m_emitterPos[2]);
-	const mt::vec3 gravity = rot * mt::vec3(m_gravity[0], m_gravity[1], m_gravity[2]);
-	const mt::vec3 velocityBase = rot * mt::vec3(m_velocityBase[0], m_velocityBase[1], m_velocityBase[2]);
-	const mt::vec3 emissionDir = rot * mt::vec3(m_emissionDir[0], m_emissionDir[1], m_emissionDir[2]);
-	mt::vec3 vortexAxis = rot * mt::vec3(0.0f, 0.0f, 1.0f);
-	vortexAxis.Normalize();
 	const float emitterPos[3] = {
-		worldOrigin[0] + offset[0],
-		worldOrigin[1] + offset[1],
-		worldOrigin[2] + offset[2]
+		worldOrigin[0] + m_emitterPos[0],
+		worldOrigin[1] + m_emitterPos[1],
+		worldOrigin[2] + m_emitterPos[2]
 	};
 
 	glEnable(GL_RASTERIZER_DISCARD);
@@ -385,10 +377,10 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin, co
 	glUniform1f(m_shaderCache->GetEmitterRadiusLoc(), m_emitterRadius);
 	glUniform1f(m_shaderCache->GetVelocityRandomnessLoc(), m_velocityRandomness);
 	glUniform1f(m_shaderCache->GetTimeLoc(), m_simTime);
-	glUniform3fv(m_shaderCache->GetGravityLoc(), 1, gravity.Data());
+	glUniform3fv(m_shaderCache->GetGravityLoc(), 1, m_gravity);
 	glUniform3fv(m_shaderCache->GetEmitterPosLoc(), 1, emitterPos);
-	glUniform3fv(m_shaderCache->GetVelocityBaseLoc(), 1, velocityBase.Data());
-	glUniform3fv(m_shaderCache->GetEmissionDirLoc(), 1, emissionDir.Data());
+	glUniform3fv(m_shaderCache->GetVelocityBaseLoc(), 1, m_velocityBase);
+	glUniform3fv(m_shaderCache->GetEmissionDirLoc(), 1, m_emissionDir);
 	glUniform1f(m_shaderCache->GetEmissionAngleLoc(), m_emissionAngle);
 	glUniform1i(m_shaderCache->GetBurstModeLoc(), m_burstMode ? 1 : 0);
 	glUniform1i(m_shaderCache->GetBurstNowLoc(), burstNow ? 1 : 0);
@@ -403,7 +395,6 @@ void RAS_ParticleBuffer::Update(float deltaTime, const mt::vec3 &worldOrigin, co
 	glUniform1f(m_shaderCache->GetVortexRotationSpeedLoc(), m_vortexRotationSpeed);
 	glUniform1f(m_shaderCache->GetVortexRadiusTopLoc(), m_vortexRadiusTop);
 	glUniform1f(m_shaderCache->GetVortexHeightLoc(), m_vortexHeight);
-	glUniform3fv(m_shaderCache->GetVortexAxisLoc(), 1, vortexAxis.Data());
 
 	if (m_collisionMode == 2 /* GPU_PARTICLE_COLLISION_DEPTH */) {
 		// Reuses the dedicated collider depth texture populated by objects flagged

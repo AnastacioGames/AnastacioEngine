@@ -809,7 +809,6 @@ void KX_GameObject::ApplyGPUParticleParams(RAS_ParticleBuffer *buffer, const Ran
 	buffer->SetVortexRotationSpeed(settings.vortex_rotation_speed);
 	buffer->SetVortexRadiusTop(settings.vortex_radius_top);
 	buffer->SetVortexHeight(settings.vortex_height);
-	buffer->SetUseObjectRotation(settings.use_object_rotation != 0);
 	buffer->SetBurstMode(settings.emission_mode == GPU_PARTICLE_EMISSION_BURST);
 	buffer->SetBurstInterval(settings.burst_interval);
 	buffer->SetDrag(settings.drag);
@@ -934,12 +933,12 @@ void KX_GameObject::UpdateParticles(float deltaTime)
 		if (m_collisionGroundObject) {
 			m_particleBuffer->SetCollisionHeight(m_collisionGroundObject->NodeGetWorldPosition().z);
 		}
-		m_particleBuffer->Update(deltaTime, NodeGetWorldPosition(), NodeGetWorldOrientation());
+		m_particleBuffer->Update(deltaTime, NodeGetWorldPosition());
 	}
 	if (m_particleBufferMix) {
 		const bool enabled = (GetPropertyNumber("GPU_Particles_Enabled", 1.0f) != 0.0f);
 		m_particleBufferMix->SetEnabled(enabled);
-		m_particleBufferMix->Update(deltaTime, NodeGetWorldPosition(), NodeGetWorldOrientation());
+		m_particleBufferMix->Update(deltaTime, NodeGetWorldPosition());
 	}
 }
 

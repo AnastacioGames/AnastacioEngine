@@ -89,7 +89,6 @@ const char *updateVertexSource =
 	"uniform float u_vortexRotationSpeed;\n"
 	"uniform float u_vortexRadiusTop;\n"
 	"uniform float u_vortexHeight;\n"
-	"uniform vec3 u_vortexAxis;\n"
 	// Burst emission: dead particles stay dead (parked far below, age held at the lifetime)
 	// until u_burstNow respawns the whole pool in the same frame.
 	"uniform bool u_burstMode;\n"
@@ -145,23 +144,17 @@ const char *updateVertexSource =
 	"		vel *= exp(-u_drag * u_deltaTime);\n"
 	"		pos += vel * u_deltaTime;\n"
 	"		if (u_useVortex) {\n"
-	// Snap onto a cone around u_vortexAxis (world Z, or the object's Z with Use Object
-	// Rotation): radius grows from u_emitterRadius at the base to u_vortexRadiusTop after
-	// u_vortexHeight along the axis, and the angle keeps advancing every frame -- the distance
-	// along the axis still comes from the normal gravity/velocity integration above.
-	"			vec3 ax = u_vortexAxis;\n"
-	"			vec3 ref = (abs(ax.z) < 0.999) ? vec3(0.0, 0.0, 1.0) : vec3(1.0, 0.0, 0.0);\n"
-	"			vec3 bx = normalize(cross(ref, ax));\n"
-	"			vec3 by = cross(ax, bx);\n"
-	"			vec3 rel = pos - u_emitterPos;\n"
-	"			float h = dot(rel, ax);\n"
-	"			vec2 rel2 = vec2(dot(rel, bx), dot(rel, by));\n"
-	"			float curRadius = length(rel2);\n"
-	"			vec2 dir = (curRadius > 0.0001) ? rel2 / curRadius : vec2(1.0, 0.0);\n"
-	"			float heightFrac = clamp(h / max(u_vortexHeight, 0.0001), 0.0, 1.0);\n"
+	// Snap XY onto a cone around the emitter's vertical axis: radius grows from
+	// u_emitterRadius at the base to u_vortexRadiusTop after u_vortexHeight of rise, and the
+	// angle keeps advancing every frame -- Z (and thus the height fraction) still comes from
+	// the normal gravity/velocity integration above.
+	"			vec2 rel = pos.xy - u_emitterPos.xy;\n"
+	"			float curRadius = length(rel);\n"
+	"			vec2 dir = (curRadius > 0.0001) ? rel / curRadius : vec2(1.0, 0.0);\n"
+	"			float heightFrac = clamp((pos.z - u_emitterPos.z) / max(u_vortexHeight, 0.0001), 0.0, 1.0);\n"
 	"			float targetRadius = mix(u_emitterRadius, u_vortexRadiusTop, heightFrac);\n"
 	"			float ang = atan(dir.y, dir.x) + radians(u_vortexRotationSpeed) * u_deltaTime;\n"
-	"			pos = u_emitterPos + ax * h + (bx * cos(ang) + by * sin(ang)) * targetRadius;\n"
+	"			pos.xy = u_emitterPos.xy + vec2(cos(ang), sin(ang)) * targetRadius;\n"
 	"		}\n"
 	// Fase O: collision response. Purely kinematic (no Bullet, no particle-particle) --
 	// see RAS_ParticleShaderCache.h and the collision plan doc for the accepted limitations.
@@ -911,7 +904,6 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragSh
 	m_vortexRotationSpeedLoc = glGetUniformLocation(updateProgram, "u_vortexRotationSpeed");
 	m_vortexRadiusTopLoc = glGetUniformLocation(updateProgram, "u_vortexRadiusTop");
 	m_vortexHeightLoc = glGetUniformLocation(updateProgram, "u_vortexHeight");
-	m_vortexAxisLoc = glGetUniformLocation(updateProgram, "u_vortexAxis");
 
 	m_valid = true;
 }
