@@ -265,7 +265,10 @@ typedef struct RangeGPUParticleSettings {
 	short flipbook_cols, flipbook_rows;
 	float flipbook_cycles;
 	short flipbook_random;
-	short pad5[3];
+	/* Gravity, velocity, emission direction, emitter offset and the vortex axis follow the
+	 * owner's rotation (object space). 0 (old files) = world space, as before. */
+	short use_object_rotation;
+	short pad5[2];
 } RangeGPUParticleSettings;
 
 /* Native reverb area (opt-in on an Empty via gameflag2 & OB_REVERB_AREA). While the active camera
