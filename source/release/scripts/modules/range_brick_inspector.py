@@ -105,7 +105,8 @@ class _Ctx:
         for o in self.objects:
             for c in o.game.controllers:
                 for a in c.actuators:
-                    names.add(a.as_pointer())
+                    if a is not None:  # old files may keep a dead link
+                        names.add(a.as_pointer())
         return names
 
     def linked_controllers(self):
@@ -113,7 +114,8 @@ class _Ctx:
         for o in self.objects:
             for s in o.game.sensors:
                 for c in s.controllers:
-                    ptrs.add(c.as_pointer())
+                    if c is not None:
+                        ptrs.add(c.as_pointer())
         return ptrs
 
 
