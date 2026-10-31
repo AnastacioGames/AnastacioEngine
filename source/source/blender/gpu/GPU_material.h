@@ -337,6 +337,7 @@ bool GPU_material_prefetch_viewport(struct Scene *scene, struct Material *ma);
 GPUMaterial *GPU_material_from_blender(struct Scene *scene, struct Material *ma, bool use_opensubdiv, bool is_instancing, bool is_skinning);
 GPUMaterial *GPU_material_matcap(struct Scene *scene, struct Material *ma, bool use_opensubdiv);
 void GPU_material_free(struct ListBase *gpumaterial);
+void GPU_material_free_scene(struct ListBase *gpumaterial, struct Scene *scene);
 
 void GPU_materials_free(struct Main *bmain);
 bool GPU_materials_free_text(struct Main *bmain, struct Text *text);

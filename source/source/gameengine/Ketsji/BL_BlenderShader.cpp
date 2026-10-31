@@ -222,9 +222,10 @@ void BL_BlenderShader::ReloadMaterial()
 {
 	// Force regenerating shader by deleting it.
 	if (m_gpuMat) {
-		GPU_material_free(&m_mat->gpumaterial);
-		GPU_material_free(&m_mat->gpumaterialinstancing);
-		GPU_material_free(&m_mat->gpumaterialskinning);
+		// Only this scene's: other running scenes may use the same Material.
+		GPU_material_free_scene(&m_mat->gpumaterial, m_blenderScene);
+		GPU_material_free_scene(&m_mat->gpumaterialinstancing, m_blenderScene);
+		GPU_material_free_scene(&m_mat->gpumaterialskinning, m_blenderScene);
 	}
 
 	m_gpuMat = (m_mat) ? GPU_material_from_blender(m_blenderScene, m_mat, false, UseInstancing(), UseSkinning()) : nullptr;

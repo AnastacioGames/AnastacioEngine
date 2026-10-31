@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-10-31 - Correção: material compartilhado entre cenas desenhava branco ou crashava
+
+- `BL_BlenderShader::ReloadMaterial` liberava as GPU materials do `Material` em todas as cenas; outra cena
+  rodando com o mesmo material (ex.: ícone `icone_menu` do popup de música em instância de grupo) ficava
+  com ponteiro solto: ícone branco de vez em quando ou crash em `GPU_pass_bind`.
+- Novo `GPU_material_free_scene()`: o reload libera só as da própria cena. Testado várias vezes no
+  RolimaRacer sem repetir o bug.
+
 ## 2026-10-30 - GPU Particles: Use Object Rotation
 
 - Opção nova `use_object_rotation` (DNA: `RangeGPUParticleSettings`, antigo `pad5[0]`; desligada = como antes):

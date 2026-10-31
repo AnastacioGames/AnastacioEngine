@@ -583,11 +583,9 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	return 0;
 }
 
-void GPU_material_free(ListBase *gpumaterial)
+static void gpu_material_free_one(GPUMaterial *material)
 {
-	for (LinkData *link = gpumaterial->first; link; link = link->next) {
-		GPUMaterial *material = link->data;
-
+	{
 		if (material->pass)
 			GPU_pass_free(material->pass);
 
@@ -612,8 +610,31 @@ void GPU_material_free(ListBase *gpumaterial)
 		MEM_SAFE_FREE(material->error_log);
 		MEM_freeN(material);
 	}
+}
+
+void GPU_material_free(ListBase *gpumaterial)
+{
+	for (LinkData *link = gpumaterial->first; link; link = link->next) {
+		gpu_material_free_one(link->data);
+	}
 
 	BLI_freelistN(gpumaterial);
+}
+
+/* Frees only the GPU materials built for this scene. The game reloads a material per scene: freeing the
+ * whole list left the other running scenes using the same Material with freed GPU materials (menu icon
+ * drawing white now and then, crash in GPU_pass_bind). */
+void GPU_material_free_scene(ListBase *gpumaterial, Scene *scene)
+{
+	LinkData *next;
+	for (LinkData *link = gpumaterial->first; link; link = next) {
+		next = link->next;
+		GPUMaterial *material = link->data;
+		if (material->scene == scene) {
+			gpu_material_free_one(material);
+			BLI_freelinkN(gpumaterial, link);
+		}
+	}
 }
 
 bool GPU_lamp_visible(GPULamp *lamp, SceneRenderLayer *srl, Material *ma)
