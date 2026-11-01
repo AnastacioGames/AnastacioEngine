@@ -77,6 +77,25 @@ personagem que já passou pelo Mixamo (deformação nas animações Idle, Runnin
 - As outras duas ficam na pasta como opções futuras da biblioteca; o Enzo rigado pelo Mixamo também é o gabarito
   para comparar com o resultado da ferramenta.
 
+## Esqueleto e pesos (feito, 2026-11-01, falta aceite visual)
+
+`range_character_autorig`: `load_base(fbx)` (aplica transformações, tira pontas, junta as peças, guarda a altura
+do corpo em `arm["autorig_height"]`), `align_to_base` (agora na altura da base), `fit_skeleton` (copia a
+armature e estica os braços pela envergadura) e `transfer_weights` (BVH: face mais próxima da malha base,
+pesos dos cantos pelo inverso da distância, 4 ossos por vértice, normalizado). O modificador Data Transfer foi
+descartado: em `-b` deixou o corpo com um osso só e sapato/cabelo sem peso.
+
+Medidas:
+- Juntas do Enzo no corpo do Fabio (rig do Mixamo como gabarito): média 2,3 cm, máx. 4,2 cm (quadril);
+  braços caem de 8 cm para 3 cm com o ajuste pela envergadura.
+- Nos 9 personagens: todos os vértices com peso; osso dominante entre os 3 mais próximos em 98,1-99,5 %.
+- Enzo da ferramenta x Enzo do Mixamo correndo: esqueleto idêntico; malha a 0,64 cm em média (igual parado,
+  é a diferença OBJ x FBX), máx. 2,3 cm.
+- Animações do Mixamo no rig com transformações aplicadas: localização das f-curves × 0,01 (cm → m).
+- Cena para conferir com janela: `tools/debug/autorig_demo_correndo.py`.
+
+Falta: aceite visual (Patty correndo), materiais, atlas, LOD, ragdoll, grupo, painel.
+
 ## Decisões
 
 - Feitas (2026-11-01): base Enzo dois dedos (34 ossos), no lugar do Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo

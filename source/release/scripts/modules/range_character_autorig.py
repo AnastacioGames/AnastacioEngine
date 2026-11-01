@@ -90,7 +90,7 @@ def is_upright(objects):
     return s.z >= max(s.x, s.y) * 0.6 or s.z >= min(s.x, s.y) * 3.0
 
 
-def align_to_base(objects, base_arm, match_height=True, report=print):
+def align_to_base(objects, base_arm, match_height=True, base_height=None, report=print):
     """Põe as peças de pé, em metros, com o pé no chão, centradas, de frente para o lado da base e,
     com match_height, na mesma altura da base.
 
@@ -130,7 +130,7 @@ def align_to_base(objects, base_arm, match_height=True, report=print):
     mn, mx = bounds(world_verts(objects))
     _transform(objects, Matrix.Translation(Vector(((-(mn.x + mx.x) / 2), -(mn.y + mx.y) / 2, -mn.z))))
     mn, mx = bounds(world_verts(objects))
-    base_h = armature_height(base_arm)
+    base_h = base_height or base_arm.get("autorig_height") or armature_height(base_arm)
     # A altura é a do corpo: cabelo, chapéu, óculos e máscara ficam de fora (um penteado alto não encolhe ninguém).
     core = [o for o in objects if o.name.split(".")[0].lower() not in ACCESSORIES] or objects
     cmn, cmx = bounds(world_verts(core))
@@ -166,3 +166,134 @@ def _transform(objects, matrix):
         o.matrix_world = Matrix.Identity(4)
         o.data.update()
 
+
+
+# -- Base (rig do Mixamo) ---------------------------------------------------------------------------------
+
+END_BONES = ("HeadTop_End", "Toe_End", "Thumb4", "Index4", "Middle4", "Ring4", "Pinky4")
+
+
+def load_base(fbx_path):
+    """Importa o FBX do Mixamo (T-pose, With Skin) e devolve (armature, malhas) com transformações aplicadas.
+
+    Tira os ossos de ponta (sem pesos) e junta as peças numa malha só, usada como fonte dos pesos."""
+    import bpy
+    scene = bpy.context.scene
+    before = set(scene.objects)
+    bpy.ops.import_scene.fbx(filepath=fbx_path)
+    new = [o for o in scene.objects if o not in before]
+    arm = next(o for o in new if o.type == 'ARMATURE')
+    meshes = [o for o in new if o.type == 'MESH']
+    for o in scene.objects:
+        o.select = o in new
+    scene.objects.active = arm
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    # Ossos de ponta: não deformam nada.
+    bpy.ops.object.mode_set(mode='EDIT')
+    for b in list(arm.data.edit_bones):
+        if b.name.endswith(END_BONES):
+            arm.data.edit_bones.remove(b)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    # Altura do corpo sem acessórios, medida antes de juntar (depois as peças perdem o nome).
+    scene.update()
+    core = [o for o in meshes if o.name.split(".")[0].lower() not in ACCESSORIES] or meshes
+    cmn, cmx = bounds(world_verts(core))
+    arm["autorig_height"] = cmx.z - cmn.z
+    for o in scene.objects:
+        o.select = o in meshes
+    scene.objects.active = meshes[0]
+    if len(meshes) > 1:
+        bpy.ops.object.join()
+    source = scene.objects.active
+    source.name = "AutoRigSource"
+    scene.update()
+    return arm, source
+
+
+# -- Encaixe do esqueleto ---------------------------------------------------------------------------------
+
+def _half_span(objects):
+    core = [o for o in objects if o.name.split(".")[0].lower() not in ACCESSORIES] or objects
+    return max(abs(v.x) for v in world_verts(core))
+
+
+def fit_skeleton(arm, base_source, objects):
+    """Copia a armature base e estica os braços para a envergadura da malha nova (pose T, braços em X).
+
+    Altura já igualada em align_to_base. Erro medido contra o rig do Mixamo do Fabio: 2,3 cm em média."""
+    import bpy
+    scene = bpy.context.scene
+    new_arm = arm.copy()
+    new_arm.data = arm.data.copy()
+    scene.objects.link(new_arm)
+    base_span = _half_span([base_source])
+    new_span = _half_span(objects)
+    for o in scene.objects:
+        o.select = o is new_arm
+    scene.objects.active = new_arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    eb = new_arm.data.edit_bones
+    for side in ("Left", "Right"):
+        upper = eb.get("mixamorig:%sArm" % side)
+        if upper is None:
+            continue
+        sh = abs(upper.head.x)
+        k = (new_span - sh) / max(base_span - sh, 1e-6)
+        for b in eb:
+            n = b.name
+            if side not in n or not any(t in n for t in ("Arm", "Hand")):
+                continue
+            for p in (b.head, b.tail):
+                s = 1.0 if p.x > 0 else -1.0
+                if abs(p.x) > sh:
+                    p.x = s * (sh + (abs(p.x) - sh) * k)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    return new_arm
+
+
+# -- Pesos ------------------------------------------------------------------------------------------------
+
+def transfer_weights(base_source, objects, arm, max_bones=4):
+    """Pesos da malha base para cada peça e liga na armature nova.
+
+    Para cada vértice: ponto mais próximo na malha base (BVH), pesos dos cantos da face misturados pelo
+    inverso da distância a cada canto. Fica com os max_bones ossos mais fortes, normalizados."""
+    from mathutils.bvhtree import BVHTree
+    src = base_source.data
+    names = {g.index: g.name for g in base_source.vertex_groups}
+    bones = set(b.name for b in arm.data.bones)
+    src_w = [{names[g.group]: g.weight for g in v.groups if g.weight > 0.0 and names[g.group] in bones}
+             for v in src.vertices]
+    mw = base_source.matrix_world
+    verts = [mw * v.co for v in src.vertices]
+    polys = [tuple(p.vertices) for p in src.polygons]
+    tree = BVHTree.FromPolygons(verts, polys)
+    for o in objects:
+        for g in list(o.vertex_groups):
+            o.vertex_groups.remove(g)
+        groups = {}
+        for v in o.data.vertices:
+            co = o.matrix_world * v.co
+            hit, _normal, index, _dist = tree.find_nearest(co)
+            if hit is None:
+                continue
+            acc = {}
+            total = 0.0
+            for vi in polys[index]:
+                k = 1.0 / max((verts[vi] - hit).length, 1e-5)
+                total += k
+                for name, w in src_w[vi].items():
+                    acc[name] = acc.get(name, 0.0) + w * k
+            best = sorted(acc.items(), key=lambda x: -x[1])[:max_bones]
+            norm = sum(w for _n, w in best)
+            if norm <= 0.0:
+                continue
+            for name, w in best:
+                g = groups.get(name)
+                if g is None:
+                    g = groups[name] = o.vertex_groups.new(name)
+                g.add([v.index], w / norm, 'REPLACE')
+        o.parent = arm
+        m = o.modifiers.new("Armature", 'ARMATURE')
+        m.object = arm
+    return objects
