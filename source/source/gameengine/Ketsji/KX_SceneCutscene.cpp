@@ -259,7 +259,20 @@ void KX_Scene::UpdateCutscene(double deltaTime)
 		}
 	}
 
-	/* Screen effects animate and the skip key is read while a cutscene runs or an overlay is visible. */
+	KX_CutsceneManager::DispatchedEvents dispatchedEvents = m_cutsceneManager->Advance(deltaTime);
+	m_pendingCutsceneEvents.insert(
+		m_pendingCutsceneEvents.end(), dispatchedEvents.begin(), dispatchedEvents.end());
+
+	if (!m_cutscenePaths.empty()) {
+		UpdateCutscenePaths(m_cutsceneManager->GetPlayTime());
+		if (m_cutscenePaths.empty() &&
+		    m_cutsceneManager->GetWaitType() == KX_CutsceneManager::WAIT_CAMERA_END) {
+			m_cutsceneManager->ClearWait();
+		}
+	}
+
+	/* After the paths moved the camera: screen and camera effects animate and the skip key is
+	 * read while a cutscene runs or an overlay is visible. */
 	const bool inProgress = m_cutsceneManager->IsInProgress();
 	if (inProgress || m_cutsceneOverlayActive) {
 #ifdef WITH_PYTHON
@@ -280,21 +293,8 @@ void KX_Scene::UpdateCutscene(double deltaTime)
 		m_cutsceneOverlayActive = (flags & 1) != 0;
 		if ((flags & 2) && inProgress) {
 			SkipCutscene();
-			return;
 		}
 #endif
-	}
-
-	KX_CutsceneManager::DispatchedEvents dispatchedEvents = m_cutsceneManager->Advance(deltaTime);
-	m_pendingCutsceneEvents.insert(
-		m_pendingCutsceneEvents.end(), dispatchedEvents.begin(), dispatchedEvents.end());
-
-	if (!m_cutscenePaths.empty()) {
-		UpdateCutscenePaths(m_cutsceneManager->GetPlayTime());
-		if (m_cutscenePaths.empty() &&
-		    m_cutsceneManager->GetWaitType() == KX_CutsceneManager::WAIT_CAMERA_END) {
-			m_cutsceneManager->ClearWait();
-		}
 	}
 }
 
@@ -563,20 +563,34 @@ void KX_Scene::UpdateCutscenePaths(double time)
 			continue;
 		}
 
-		const float duration = event->m_paramFloat;
-		const float fraction = (duration > 0.0f) ?
-			std::min(float((time - it->m_startTime) / duration), 1.0f) : 1.0f;
+		const float elapsed = float(time - it->m_startTime);
+		const float duration = it->m_duration;
+		float fraction = (duration > 0.0f) ? std::min(elapsed / duration, 1.0f) : 1.0f;
+		switch (it->m_ease) {
+			case 1: fraction = fraction * fraction; break;
+			case 2: fraction = 1.0f - (1.0f - fraction) * (1.0f - fraction); break;
+			case 3: fraction = fraction * fraction * (3.0f - 2.0f * fraction); break;
+			default: break;
+		}
+		const float rawFraction = (duration > 0.0f) ? std::min(elapsed / duration, 1.0f) : 1.0f;
+		/* transition SMOOTH: blend from where the object was into the path (smoothstep). */
+		float blend = 1.0f;
+		if (it->m_blendTime > 0.0f && elapsed < it->m_blendTime) {
+			blend = elapsed / it->m_blendTime;
+			blend = blend * blend * (3.0f - 2.0f * blend);
+		}
 
 		mt::vec3 localPosition, localDirection;
 		EvaluateCutscenePath(event->m_pathPoints, fraction, localPosition, localDirection);
 
 		const mt::mat3x4 curveTransform = curve->NodeGetWorldTransform();
-		const mt::vec3 position = curveTransform * localPosition;
+		const mt::vec3 pathPosition = curveTransform * localPosition;
+		const mt::vec3 position = it->m_startPosition + (pathPosition - it->m_startPosition) * blend;
 		object->NodeSetWorldPosition(position);
 
 		/* Cameras look down -Z; keep the horizon level with world +Z as up. */
 		mt::vec3 forward = mt::zero3;
-		KX_GameObject *target = event->m_dependentObject;
+		KX_GameObject *target = it->m_target;
 		if (target && m_objectlist->SearchValue(target)) {
 			forward = target->NodeGetWorldPosition() - position;
 		}
@@ -589,12 +603,20 @@ void KX_Scene::UpdateCutscenePaths(double time)
 			if (xAxis.LengthSquared() > 1e-6f) {
 				xAxis.Normalize();
 				const mt::vec3 yAxis = mt::cross(zAxis, xAxis);
-				object->NodeSetGlobalOrientation(mt::mat3(xAxis, yAxis, zAxis));
+				const mt::mat3 pathOrientation(xAxis, yAxis, zAxis);
+				if (blend < 1.0f) {
+					const mt::quat from = mt::quat::FromMatrix(it->m_startOrientation).Normalized();
+					const mt::quat to = mt::quat::FromMatrix(pathOrientation).Normalized();
+					object->NodeSetGlobalOrientation(mt::quat::Slerp(from, to, blend).ToMatrix());
+				}
+				else {
+					object->NodeSetGlobalOrientation(pathOrientation);
+				}
 			}
 		}
 		object->NodeUpdate();
 
-		if (fraction >= 1.0f) {
+		if (rawFraction >= 1.0f && blend >= 1.0f) {
 			it = m_cutscenePaths.erase(it);
 		}
 		else {
@@ -1024,7 +1046,39 @@ void KX_Scene::DispatchCutsceneEvents()
 						break;
 					}
 				}
-				m_cutscenePaths.push_back({event, m_cutsceneManager->GetPlayTime()});
+				CutscenePathPlayback playback;
+				playback.m_event = event;
+				playback.m_startTime = m_cutsceneManager->GetPlayTime();
+				playback.m_duration = event->m_paramFloat;
+				playback.m_target = event->m_dependentObject;
+				playback.m_startPosition = event->m_templateObject->NodeGetWorldPosition();
+				playback.m_startOrientation = event->m_templateObject->NodeGetWorldOrientation();
+				KX_GameObject *curve = event->m_spawnPoint;
+				if (EXP_Value *value = curve->GetProperty("duration")) {
+					if (playback.m_duration <= 0.0f) {
+						playback.m_duration = (float)value->GetNumber();
+					}
+				}
+				EXP_Value *transition = curve->GetProperty("transition");
+				if (transition && transition->GetText() == "SMOOTH") {
+					EXP_Value *speed = curve->GetProperty("transition_speed");
+					playback.m_blendTime = speed ? std::max(0.0f, (float)speed->GetNumber()) : 1.0f;
+				}
+				if (EXP_Value *ease = curve->GetProperty("ease")) {
+					const std::string text = ease->GetText();
+					playback.m_ease = (text == "IN") ? 1 : (text == "OUT") ? 2 : (text == "IN_OUT") ? 3 : 0;
+				}
+				if (!playback.m_target) {
+					if (EXP_Value *target = curve->GetProperty("target")) {
+						const std::string name = target->GetText();
+						playback.m_target = name.empty() ? nullptr : m_objectlist->FindValue(name);
+					}
+				}
+				m_cutscenePaths.push_back(playback);
+				/* FOV, shake, noise, slow motion and filter messages of the curve (Python side). */
+				CallCutsceneRuntime("path_start", Py_BuildValue("(NN)", event->m_templateObject->GetProxy(),
+				                                                curve->GetProxy()));
+				m_cutsceneOverlayActive = true;
 
 				if (event->m_paramInt && event->m_templateObject->GetGameObjectType() == SCA_IObject::OBJ_CAMERA) {
 					SetActiveCamera(static_cast<KX_Camera *>(event->m_templateObject));

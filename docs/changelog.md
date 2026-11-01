@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Cutscene: Camera Path com informações de corte da curva
+
+- A curva do **Camera Path** lê propriedades de tomada (game properties, mesmas do Shot Tool): `transition`
+  (CUT = entra direto; SMOOTH = desliza de onde a câmera está até a curva em `transition_speed` segundos, posição
+  e rotação), `ease` (LINEAR, IN, OUT, IN_OUT), `duration` (se o evento tiver 0), `target` (se o evento não tiver
+  Look At), e no Python `fov`, `shake`, `noise`, `slowmo_scale`, `filter_on`/`filter_off`. Sem essas propriedades
+  o caminho funciona como antes (velocidade constante, corte seco).
+- Efeitos da curva duram até a próxima tomada ou a volta da câmera (Restore, Camera Stop, pular, parar), que
+  devolve FOV e escala de tempo. O tremor não acumula com a câmera parada.
+- `range_cutscene_runtime.update()` passou para depois do `UpdateCutscenePaths` (o tremor vai por cima da curva).
+- Addon Shot Tool: curvas ganham "Make Curve Shot" (propriedades sem `order` e com `ease`), e o painel do evento
+  avisa quando a curva tem ou não as propriedades.
+
 ## 2026-11-01 - Cutscene: tomadas por Empty (Cutscene Shot Tool) nativas
 
 - **Camera Shot** aceita um Empty de tomada em *Camera*: a câmera ativa sai do pai e vai até ele seguindo as

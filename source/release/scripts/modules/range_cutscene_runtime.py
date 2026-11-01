@@ -34,6 +34,11 @@ shot_to(empty) / start_shots() / restore_shot_camera()
     duration). start_shots() passa por todos os Empties com "order", em ordem,
     cada um pelo seu duration. restore_shot_camera() devolve a câmera ao lugar.
 
+path_start(obj, curve)
+    Camera Path: a engine move `obj` pela curva (com transition/ease/target/
+    duration da curva); aqui entram fov, shake, noise, slowmo_scale e
+    filter_on/off da curva, até a próxima tomada ou a volta da câmera.
+
 Sem objeto Text, a fala fica em logic.globalDict["cutscene_dialog"]
 ({"text", "speaker", "audio"}) para uma interface própria do jogo.
 """
@@ -418,6 +423,7 @@ def shot_to(empty):
     """Camera Shot com um Empty: vai para essa tomada (para a fila do start_shots)."""
     _shot["queue"] = []
     _shot["seed"] = random.uniform(0.0, 100.0)
+    _end_path_fx(restore=True)
     _begin_shot(empty)
 
 
@@ -436,8 +442,68 @@ def shots_active():
     return _shot["empty"] is not None
 
 
+_path = {"obj": None, "curve": None, "saved": None, "time": 0.0, "seed": 0.0, "filter_off": ""}
+
+
+def _end_path_fx(restore):
+    obj, saved = _path["obj"], _path["saved"]
+    last, last_pos = _path.get("last"), _path.get("last_pos")
+    if obj is not None and not obj.invalid and last is not None and last_pos is not None:
+        if (obj.worldPosition - last_pos).length < 1e-6:
+            obj.worldPosition = obj.worldPosition - last  # sem o último tremor
+    if _path["filter_off"]:
+        logic.sendMessage(_path["filter_off"])
+    _path.update(obj=None, curve=None, saved=None, filter_off="", last=None, last_pos=None)
+    if restore and saved is not None:
+        fov, timescale = saved
+        logic.setTimeScale(timescale)
+        if obj is not None and not obj.invalid and fov is not None:
+            obj.fov = fov
+
+
+def path_start(obj, curve):
+    """Efeitos da curva no objeto que a percorre (normalmente a câmera)."""
+    saved = _path["saved"] if _path["obj"] is obj else None
+    _end_path_fx(restore=_path["obj"] is not obj)
+    if saved is None:
+        saved = (getattr(obj, "fov", None), logic.getTimeScale())
+    _path.update(obj=obj, curve=curve, saved=saved, time=0.0, seed=random.uniform(0.0, 100.0),
+                 filter_off=str(curve.get("filter_off", "")))
+    if "fov" in curve and hasattr(obj, "fov"):
+        obj.fov = float(curve["fov"])
+    if "slowmo_scale" in curve:
+        logic.setTimeScale(float(curve["slowmo_scale"]) or 1.0)
+    if curve.get("filter_on", ""):
+        logic.sendMessage(str(curve["filter_on"]))
+
+
+def _update_path_fx(dt):
+    from mathutils import Vector
+    obj, curve = _path["obj"], _path["curve"]
+    if obj is None or obj.invalid or curve is None or curve.invalid:
+        return
+    _path["time"] += dt
+    t = _path["time"] + _path["seed"]
+    offset = Vector((0.0, 0.0, 0.0))
+    if curve.get("noise", False):
+        offset += Vector((math.sin(t * 0.9), math.sin(t * 1.3 + 1.0), math.sin(t * 0.7 + 2.0))) * NOISE_AMPLITUDE
+    shake = float(curve.get("shake", 0.0))
+    if shake > 0.0:
+        offset += Vector((random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1))) * shake * 0.05
+    # Tira o tremor do quadro anterior antes de pôr o novo: com a curva já
+    # terminada (câmera parada) ele também não acumula.
+    last = _path.get("last")
+    base = obj.worldPosition.copy()
+    if last is not None and _path.get("last_pos") is not None and (base - _path["last_pos"]).length < 1e-6:
+        base -= last
+    obj.worldPosition = base + offset
+    _path["last"] = offset
+    _path["last_pos"] = obj.worldPosition.copy()
+
+
 def restore_shot_camera():
     """Devolve a câmera ao pai, à posição e ao FOV de antes das tomadas."""
+    _end_path_fx(restore=True)
     cam, saved = _shot["cam"], _shot["saved"]
     if _shot["filter_off"]:
         logic.sendMessage(_shot["filter_off"])
@@ -458,6 +524,9 @@ def update(dt, in_progress):
     flags = 0
     if _shot["empty"] is not None:
         _update_shot(dt)
+        flags |= 1
+    if _path["obj"] is not None:
+        _update_path_fx(dt)
         flags |= 1
     if _current["box_wait"] and _box_finished():
         _current["box_wait"] = False

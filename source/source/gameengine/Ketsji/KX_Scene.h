@@ -426,6 +426,13 @@ private:
 	{
 		const KX_CutsceneManager::Event *m_event;
 		double m_startTime;
+		/* Shot properties read from the curve's game properties (Cutscene Shot Tool). */
+		float m_duration = 0.0f;   // event Duration, or the curve's "duration"
+		float m_blendTime = 0.0f;  // transition SMOOTH: seconds to blend from the start pose into the path
+		int m_ease = 0;            // 0 linear, 1 in, 2 out, 3 in-out
+		KX_GameObject *m_target = nullptr;  // event Look At, or the curve's "target"
+		mt::vec3 m_startPosition = mt::zero3;
+		mt::mat3 m_startOrientation = mt::mat3::Identity();
 	};
 	std::vector<CutscenePathPlayback> m_cutscenePaths;
 	/** Active camera before the first native Camera Shot cut; restored by Restore Gameplay Camera/Stop. */

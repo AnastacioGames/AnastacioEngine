@@ -299,6 +299,11 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             follow.active = event.path_look_at is None
             follow.prop(event, "path_follow")
             box.prop(event, "path_set_camera")
+            if event.path_curve is not None:
+                if "transition" in event.path_curve.game.properties:
+                    box.label("Uses the shot properties of the curve (Shot Tool).", icon='INFO')
+                else:
+                    box.label("Shot Tool > Make Curve Shot adds cuts, ease and effects.", icon='INFO')
 
             if event.path_object is None or event.path_curve is None:
                 box.label("Object and Curve are required.", icon='ERROR')
