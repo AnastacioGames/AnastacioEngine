@@ -5990,7 +5990,7 @@ static void rna_def_scene_shaders_fx(BlenderRNA *brna)
 	RNA_def_property_boolean_sdna(prop, NULL, "use_taa", 1);
 	RNA_def_property_ui_text(prop, "TAA",
 	                         "Temporal anti-aliasing in the game: blends sub-pixel shifted frames for smooth, "
-	                         "stable edges. Objects moving with the camera may blur (game only, not on the Web)");
+	                         "stable edges. Objects moving with the camera may blur (game only)");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
 	prop = RNA_def_property(srna, "show_expanded_taa", PROP_BOOLEAN, PROP_NONE);

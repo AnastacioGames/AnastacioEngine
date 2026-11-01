@@ -1352,6 +1352,16 @@ EXTRA = (
 
 # Paineis de Render do Range Engine (System, Display, Attachments, Animations, FXAA) e dicas do Bake.
 RENDER_PANELS = (
+    # TAA
+    ("TAA (Temporal Anti-Aliasing)", "TAA (anti-aliasing temporal)", "TAA (anti-aliasing temporal)", "TAA (временное сглаживание)"),
+    ("Game only. Objects moving with the camera may blur",
+     "Só no jogo. Objetos que andam com a câmera podem borrar",
+     "Solo en el juego. Los objetos que se mueven con la cámara pueden verse borrosos",
+     "Только в игре. Объекты, движущиеся с камерой, могут размываться"),
+    ("FXAA on top of TAA softens the image more",
+     "FXAA junto com o TAA suaviza ainda mais a imagem",
+     "FXAA junto con TAA suaviza aún más la imagen",
+     "FXAA поверх TAA ещё сильнее смягчает изображение"),
     # Bake
     ("Needs a UV map and an image set in the UV/Image Editor",
      "Precisa de um mapa UV e de uma imagem definida no Editor UV/Imagem",

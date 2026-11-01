@@ -1819,6 +1819,9 @@ PT_BR = {
     "Who speaks: the name of the Dialogue Box, or shown before the line in a Text object (optional)": "Quem fala: o nome no Dialogue Box, ou antes da fala num objeto de texto (opcional)",
     "Object read by a UI Tree Dialogue Box (Source Property or Text Object), or a Text object with Setup Dialogue; empty uses the _dialogue overlay scene": "Objeto lido por um Dialogue Box da UI Tree (Source Property ou Text Object), ou um objeto de texto com Setup Dialogue; vazio usa a cena sobreposta _dialogue",
     "Pause the cutscene until the player advances past the last page of the line": "Pausa a cutscene até o jogador passar da última página da fala",
+    "Show the TAA settings": "Mostra os ajustes do TAA",
+    "Sharpens the image to make up for the softness of TAA": "Deixa a imagem mais nítida para compensar a suavidade do TAA",
+    "Temporal anti-aliasing in the game: blends sub-pixel shifted frames for smooth, stable edges. Objects moving with the camera may blur (game only)": "Anti-aliasing temporal no jogo: mistura quadros deslocados em subpixel para bordas suaves e estáveis. Objetos que andam junto com a câmera podem borrar (só no jogo)",
 }
 
 ES = {
@@ -3639,6 +3642,9 @@ ES = {
     "Who speaks: the name of the Dialogue Box, or shown before the line in a Text object (optional)": "Quién habla: el nombre del Dialogue Box, o antes de la frase en un objeto de texto (opcional)",
     "Object read by a UI Tree Dialogue Box (Source Property or Text Object), or a Text object with Setup Dialogue; empty uses the _dialogue overlay scene": "Objeto leído por un Dialogue Box de la UI Tree (Source Property o Text Object), o un objeto de texto con Setup Dialogue; vacío usa la escena superpuesta _dialogue",
     "Pause the cutscene until the player advances past the last page of the line": "Pausa la cutscene hasta que el jugador pase la última página de la frase",
+    "Show the TAA settings": "Muestra los ajustes del TAA",
+    "Sharpens the image to make up for the softness of TAA": "Aumenta la nitidez de la imagen para compensar la suavidad del TAA",
+    "Temporal anti-aliasing in the game: blends sub-pixel shifted frames for smooth, stable edges. Objects moving with the camera may blur (game only)": "Anti-aliasing temporal en el juego: mezcla cuadros desplazados a nivel de subpíxel para bordes suaves y estables. Los objetos que se mueven con la cámara pueden verse borrosos (solo en el juego)",
 }
 
 RU = {
@@ -5459,4 +5465,7 @@ RU = {
     "Who speaks: the name of the Dialogue Box, or shown before the line in a Text object (optional)": "Кто говорит: имя в Dialogue Box или перед репликой в текстовом объекте (необязательно)",
     "Object read by a UI Tree Dialogue Box (Source Property or Text Object), or a Text object with Setup Dialogue; empty uses the _dialogue overlay scene": "Объект, который читает Dialogue Box из UI Tree (Source Property или Text Object), или текстовый объект с Setup Dialogue; пусто — оверлей-сцена _dialogue",
     "Pause the cutscene until the player advances past the last page of the line": "Пауза катсцены, пока игрок не пролистает последнюю страницу реплики",
+    "Show the TAA settings": "Показать настройки TAA",
+    "Sharpens the image to make up for the softness of TAA": "Повышает резкость изображения, компенсируя мягкость TAA",
+    "Temporal anti-aliasing in the game: blends sub-pixel shifted frames for smooth, stable edges. Objects moving with the camera may blur (game only)": "Временное сглаживание в игре: смешивает кадры со сдвигом на долю пикселя для гладких и стабильных краёв. Объекты, движущиеся вместе с камерой, могут размываться (только в игре)",
 }

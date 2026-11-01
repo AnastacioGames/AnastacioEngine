@@ -20,7 +20,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   peso do quadro atual 0,08 parado e 0,25 em movimento; mistura com peso por luma; sharpen opcional.
 - Histórico próprio (RGBA16F, unidade 22) em `RAS_2DFilterManager`: invalidado em resize, troca de viewport,
   corte de câmera (`ViewProjectionJumped`) e se o TAA ficou parado mais de 2 quadros. Saída nunca vai para um
-  eye off screen multisample (não dá para copiar). Web: sem histórico nem jitter. `RANGE_TAA_OFF=1` desliga o
+  eye off screen multisample (não dá para copiar). Histórico desenhado num off screen (não é cópia de textura), então também roda no WebGL 2 (ainda sem teste no navegador). `RANGE_TAA_OFF=1` desliga o
   histórico para comparação A/B.
 - Cena: `scenefx_settings.use_taa` e `taa_sharpen` (ocupam `pad[0]` e `pad_grain`; arquivos antigos abrem
   com TAA desligado e sharpen 0,25 via versioning). Painel Render > TAA. Python:
@@ -32,7 +32,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Revisão: tela dividida (câmera com viewport), estéreo e modo não texturizado desligam jitter e histórico
   (`SetTaaAllowed`): o passe reprojetaria tudo com a matriz da última câmera. Painel TAA no padrão de box
   (box próprio, ajustes num sub-box, aviso de FXAA junto num box separado).
-- Pendente: build Windows, teste em GPU real e num jogo (RolimaRacer: carro visto de trás vai borrar até a
+- Windows (2026-11-01): build OK e `teste_taa.py` PASS em GPU real; dica do botão não diz mais "not on the Web".
+- Pendente: teste no navegador e num jogo (RolimaRacer: carro visto de trás vai borrar até a
   etapa 2), custo em ms, painel no editor (não houve build do editor nesta sessão).
 
 ## 2026-11-01 - Cutscene: revisão e traduções
