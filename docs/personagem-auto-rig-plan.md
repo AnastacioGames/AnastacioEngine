@@ -164,7 +164,14 @@ aqui), atlas em `textures/`. Os 9 personagens de `_novos` passam, 5,6-6,7 MB cad
 No editor: **File > Import > Fuse Character (.obj)** (`bl_operators/anastacio_fuse_character.py`): escolhe
 esqueleto, nome, ragdoll, pasta de saída e pasta do jogo; roda `cli_main` num Blender em segundo plano (não mexe no
 arquivo aberto) e liga o grupo pronto na cena, no cursor 3D. Textos em pt/es/ru.
-Falta: aceite com janela, teste de queda na corrida, pôr no `GroupAll_Pilotos` do jogo, DDS.
+Peso (2026-11-01): o corpo do Fuse (20-26 mil triângulos) não entra no jogo. O nível 0 já sai reduzido para
+`BODY_TRIS` = 6000 (Collapse High Quality) e os LOD têm metas fixas, 2500 a 10 m e 900 a 25 m (`LOD_LEVELS`),
+perto do Mestre Deen (3450/1268/427). Objetos salvos na camada 2 com a cena mostrando só a 1
+(`hide_for_libload`): no LibLoad do jogo entram inativos, prontos para o `addObject`.
+No RolimaRacer os pilotos passam a ser carregados por LibLoad (`scripts/pilotos.py`): arquivos em
+`5 - Personagem Link/_antigos` e `_novos`; a corrida carrega só os do grid.
+Falta: aceite com janela, teste de queda na corrida, botões dos novos no menu, tirar os pilotos de dentro do
+RolimaRacer.range, DDS.
 
 ## Decisões
 

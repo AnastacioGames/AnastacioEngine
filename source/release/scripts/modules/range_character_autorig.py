@@ -651,7 +651,9 @@ def join_pieces(objects, name="Body"):
 
 FP_BONES = ("Head", "Neck")      # sempre na parte escondida em 1a pessoa
 FP_HEIGHT = 0.62                 # e o resto acima desta fracao da altura (Fabio: 1,10 m de 1,77 m)
-LOD_LEVELS = ((0.45, 10.0), (0.21, 25.0))   # (decimate, distancia) como os pilotos prontos
+BODY_TRIS = 6000                 # o corpo do Fuse (20-26 mil) nao entra no jogo: o nivel 0 ja e reduzido
+LOD_LEVELS = ((2500, 10.0), (900, 25.0))   # (triangulos, distancia); Mestre Deen: 3450/1268/427
+HIDDEN_LAYER = 1                 # camada 2: a cena mostra so a 1, como no RolimaRacer
 GAME_COMPONENT = "scripts.VehicleSystem.ragdoll_system.ragdoll.Ragdoll"
 
 
@@ -663,20 +665,32 @@ def _select_only(obj):
     scene.objects.active = obj
 
 
-def _decimated_copy(scene, src, ratio, name):
+def _tris(ob):
+    return sum(len(p.vertices) - 2 for p in ob.data.polygons)
+
+
+def decimate_to(ob, tris):
+    """Collapse (High Quality) ate ~tris triangulos; pesos e UV seguem. Nao faz nada se ja for menor."""
     import bpy
+    ratio = tris / max(_tris(ob), 1)
+    if ratio >= 1.0:
+        return
+    mod = ob.modifiers.new("Decimate", 'DECIMATE')
+    mod.ratio = ratio
+    if hasattr(mod, "use_collapse_quality"):
+        mod.use_collapse_quality = True
+    _select_only(ob)
+    while ob.modifiers[0] != mod:
+        bpy.ops.object.modifier_move_up(modifier=mod.name)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+
+
+def _decimated_copy(scene, src, tris, name):
     ob = src.copy()
     ob.data = src.data.copy()
     ob.name = ob.data.name = name
     scene.objects.link(ob)
-    for m in [m for m in ob.modifiers if m.type == 'ARMATURE']:
-        ob.modifiers.remove(m)
-    mod = ob.modifiers.new("Decimate", 'DECIMATE')
-    mod.ratio = ratio
-    _select_only(ob)
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    arm_mod = ob.modifiers.new("Armature", 'ARMATURE')
-    arm_mod.object = src.parent
+    decimate_to(ob, tris)
     return ob
 
 
@@ -727,6 +741,7 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     mat.name = group_name + "Material"
     mat.use_transparency = False
     mat.game_settings.alpha_blend = 'OPAQUE'
+    decimate_to(body, BODY_TRIS)
     lods = [_decimated_copy(scene, body, r, "Bodylod%d%s" % (i, group_name))
             for i, (r, _d) in enumerate(LOD_LEVELS, 1)]
     rest, fp = split_fp_part(body, height)
@@ -802,10 +817,18 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
     for im in bpy.data.images:
         if im.packed_file:
             im.unpack(method='REMOVE')
+    hide_for_libload(scene)
     path = os.path.join(out_dir, group_name + ".range")
     bpy.ops.wm.save_as_mainfile(filepath=path, relative_remap=True)
     info["arquivo"] = path
     return info
+
+
+def hide_for_libload(scene, layer=HIDDEN_LAYER):
+    """Objetos so na camada escondida: no LibLoad do jogo entram inativos (prontos p/ addObject)."""
+    for o in scene.objects:
+        o.layers = [i == layer for i in range(20)]
+    scene.layers = [i == 0 for i in range(20)]
 
 
 def cli_main(args):
