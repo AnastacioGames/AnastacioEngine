@@ -11,6 +11,11 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   filtro de lente na engine, material Water Surface nativo, modo debaixo d'água + cáusticas, demo.
   O arquivo de referência não tem licença: reimplementar as técnicas, sem copiar código ou texturas.
 
+## TAA e upscaling
+
+- [Plano](plano-taa.md): etapa 1 TAA com jitter e reprojeção da câmera; etapa 2 velocity buffer
+  (objetos, GPU skinning, partículas); etapa 3 upscaling. Nada implementado ainda.
+
 ## Efeitos pré-calculados
 
 - Lua: superfície opcional implementada; pendentes avaliação visual, A/B em iGPU e persistência dos
