@@ -436,7 +436,7 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 ## Performance
 
 - **Range Trace ([range-trace.md](range-trace.md))** — fases 1 a 4 feitas (scripts/runtime no relatório e no
-  launcher em 2026-10-24). Falta usar num jogo real com som (o `--server` não toca).
+  launcher em 2026-10-24); culpado provável por frame lento no relatório (2026-11-01, falta conferir num trace real). Falta usar num jogo real com som (o `--server` não toca).
 - **Static Batch:** Auto Static Batch medido em 2026-10-30 no benchmark da Thunder: igual ao manual e empatado
   com a Thunder ([batching estático e culling](batching-estatico-e-culling.md)). Ligado por padrão em cena nova desde 2026-10-30; aceito com janela em 2026-10-30.
 - **Travadas do RolimaRacer (2026-10-10):** `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo. Abertos:

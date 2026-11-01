@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Range Trace: culpado provável de cada frame lento
+
+- `relatorio_trace.py` cruza frames, `scripts`, `work` e cargas e escreve uma coluna "culpado provável" na tabela
+  de frames lentos (HTML e `resumo.md`). Ordem: script que tomou ≥ 1 ms e ≥ 20% do frame; carga no frame ou no
+  anterior; contador do `work` ≥ 3× a mediana (mín. 50); senão a categoria do profiler que mais pesou.
+- Novo bloco "Quem mais pesa" (categorias e scripts mais caros em média por frame de jogo) e a lista dos culpados
+  que mais se repetem. Só o relatório mudou; formato do trace e C++ intactos.
+- Testado com traces sintéticos (com e sem `scripts`/`work`). Falta usar num trace real.
+
 ## 2026-10-31 - NLA: correções no editor e no `playNLA()`; aba Car antes da Física
 
 - `playNLA()` (33f08f26): chamar de novo com os mesmos argumentos não reinicia (pode ir no Always com pulso);
