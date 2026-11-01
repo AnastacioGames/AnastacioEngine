@@ -423,7 +423,23 @@ RAGDOLL_BONES = tuple("mixamorig:" + n for n in (
 
 # Formato dos pilotos do RolimaRacer (scripts/fix_ragdoll_collisions.py, camera_change.py).
 GAME_RAGDOLL = {"collision_group": 3, "collision_mask": (1,), "part_mass": 2.0,
-                "focus_bone": "mixamorig:Spine1", "focus_prop": "foco_camera_ragdoll", "names": "RagdollPart"}
+                "focus_bone": "mixamorig:Spine1", "focus_prop": "foco_camera_ragdoll", "names": "RagdollPart",
+                # juntas e amortecimento iguais aos pilotos prontos (Fabio): o preset do addon (+-45/25) deixa mole
+                "joint_limit": (0.0, 15.0), "damping": (0.04, 0.1)}
+
+
+def stiffen_ragdoll(bodies, game=GAME_RAGDOLL):
+    """Juntas Cone Twist de 0 a 15 graus em X/Y/Z e o amortecimento dos pilotos do jogo."""
+    lo, hi = (math.radians(a) for a in game["joint_limit"])
+    for body in bodies:
+        body.game.damping, body.game.rotation_damping = game["damping"]
+        for c in body.constraints:
+            if c.type != 'RIGID_BODY_JOINT':
+                continue
+            for a in "xyz":
+                setattr(c, "use_angular_limit_" + a, True)
+                setattr(c, "limit_angle_min_" + a, lo)
+                setattr(c, "limit_angle_max_" + a, hi)
 
 
 def _ragdoll_addon():
@@ -495,6 +511,8 @@ def add_ragdoll(arm, game=GAME_RAGDOLL):
             pivot = next(c for c in body.children if c.anastacio_ragdoll_link.role == 'PIVOT')
             body.name = "%s-%s-%s-Dynamic" % (game["names"], arm.name, bone)
             pivot.name = "%s-%s-%s-Empty" % (game["names"], arm.name, bone)
+    if game.get("joint_limit"):
+        stiffen_ragdoll(bodies, game)
     return bodies
 
 
@@ -653,7 +671,9 @@ FP_BONES = ("Head", "Neck")      # sempre na parte escondida em 1a pessoa
 FP_HEIGHT = 0.62                 # e o resto acima desta fracao da altura (Fabio: 1,10 m de 1,77 m)
 BODY_TRIS = 9000                 # o corpo do Fuse (20-26 mil) nao entra no jogo: o nivel 0 ja e reduzido
 FP_TRIS = 6000                   # dos 9000, a parte de cima (cabeca e peito): rosto amassava com a reducao por igual
-LOD_LEVELS = ((2500, 10.0), (900, 25.0))   # (triangulos, distancia); Mestre Deen: 3450/1268/427
+# (triangulos, distancia); Mestre Deen: 3450/1268/427. DESLIGADO: LOD de malha com armature em arquivo
+# carregado por LibLoad aparece em pose T no jogo (sem deformacao); volta quando o motor for corrigido.
+LOD_LEVELS = ()   # era ((2500, 10.0), (900, 25.0))
 HIDDEN_LAYER = 1                 # camada 2: a cena mostra so a 1, como no RolimaRacer
 GAME_COMPONENT = "scripts.VehicleSystem.ragdoll_system.ragdoll.Ragdoll"
 
@@ -758,7 +778,8 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
             part.lod_levels[i].distance = dist
         _prop(part, "aura_rain_effect", False)
     _prop(fp, "camera_hide_fp", True)
-    _prop(lods[0], "aura_rain_effect", False)
+    if lods:
+        _prop(lods[0], "aura_rain_effect", False)
     arm.name = "Armature" + group_name
     arm.game.physics_type = 'NO_COLLISION'
     _prop(arm, "pilot.armature", False)
