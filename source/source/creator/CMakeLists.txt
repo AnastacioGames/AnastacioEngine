@@ -532,6 +532,12 @@ install(
 	DESTINATION ${TARGETDIR_VER}/datafiles
 )
 
+# Skeleton library for the character auto-rig (armature + simplified weight mesh per base)
+install(
+	DIRECTORY ${CMAKE_SOURCE_DIR}/release/datafiles/characters
+	DESTINATION ${TARGETDIR_VER}/datafiles
+)
+
 # game controller data base
 if(WITH_GAMEENGINE AND WITH_SDL)
 	install(

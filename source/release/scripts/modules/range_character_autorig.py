@@ -173,7 +173,7 @@ def _transform(objects, matrix):
 END_BONES = ("HeadTop_End", "Toe_End", "Thumb4", "Index4", "Middle4", "Ring4", "Pinky4")
 
 
-def load_base(fbx_path):
+def load_base(fbx_path, drop=()):
     """Importa o FBX do Mixamo (T-pose, With Skin) e devolve (armature, malhas) com transformações aplicadas.
 
     Tira os ossos de ponta (sem pesos) e junta as peças numa malha só, usada como fonte dos pesos."""
@@ -199,6 +199,10 @@ def load_base(fbx_path):
     core = [o for o in meshes if o.name.split(".")[0].lower() not in ACCESSORIES] or meshes
     cmn, cmx = bounds(world_verts(core))
     arm["autorig_height"] = cmx.z - cmn.z
+    # Peças que não entram na fonte dos pesos (ex.: olhos e cílios na biblioteca).
+    for o in [o for o in meshes if o.name.split(".")[0].lower() in drop]:
+        meshes.remove(o)
+        bpy.data.objects.remove(o, do_unlink=True)
     for o in scene.objects:
         o.select = o in meshes
     scene.objects.active = meshes[0]
@@ -297,3 +301,101 @@ def transfer_weights(base_source, objects, arm, max_bones=4):
         m = o.modifiers.new("Armature", 'ARMATURE')
         m.object = arm
     return objects
+
+
+# -- Biblioteca de esqueletos -----------------------------------------------------------------------------
+#
+# datafiles/characters/<id>/base.range: só a armature e "WeightProxy" (malha simplificada, sem textura, que
+# serve apenas de fonte dos pesos). base.json: {"name", "bones", "order"}. Pastas extras do usuário entram
+# por extra_dirs.
+
+LIBRARY_DIR = "characters"
+
+
+def library_dirs(extra_dirs=()):
+    """Pastas da biblioteca: a do usuário, a local (ao lado do exe) e a do sistema, mais extra_dirs."""
+    import os
+    import bpy
+    dirs = []
+    for kind in ('USER', 'LOCAL', 'SYSTEM'):
+        root = bpy.utils.resource_path(kind)
+        if root:
+            path = os.path.join(root, "datafiles", LIBRARY_DIR)
+            if path not in dirs:
+                dirs.append(path)
+    dirs.extend(extra_dirs)
+    return dirs
+
+
+def list_skeletons(extra_dirs=()):
+    """[(id, nome, pasta)] em ordem: primeiro "order" do base.json, depois o nome."""
+    import json
+    import os
+    found = {}
+    for root in library_dirs(extra_dirs):
+        if not root or not os.path.isdir(root):
+            continue
+        for sid in sorted(os.listdir(root)):
+            folder = os.path.join(root, sid)
+            info = os.path.join(folder, "base.json")
+            if os.path.isfile(info) and os.path.isfile(os.path.join(folder, "base.range")):
+                with open(info, encoding="utf-8") as f:
+                    data = json.load(f)
+                found[sid] = (data.get("order", 99), data.get("name", sid), folder)
+    return [(sid, name, folder) for sid, (_o, name, folder) in sorted(found.items(), key=lambda x: (x[1][0], x[1][1]))]
+
+
+def load_library_base(folder):
+    """Traz a armature e a WeightProxy de uma base da biblioteca para a cena. Retorna (armature, proxy)."""
+    import os
+    import bpy
+    path = os.path.join(folder, "base.range")
+    with bpy.data.libraries.load(path, link=False) as (src, dst):
+        dst.objects = list(src.objects)
+    scene = bpy.context.scene
+    arm = proxy = None
+    for o in dst.objects:
+        if o is None:
+            continue
+        scene.objects.link(o)
+        if o.type == 'ARMATURE':
+            arm = o
+        elif o.type == 'MESH':
+            proxy = o
+    scene.update()
+    return arm, proxy
+
+
+def make_library_base(fbx_path, folder, name, order=99, target_faces=6000):
+    """Gera datafiles/characters/<id>/ a partir do FBX do Mixamo (T-pose, With Skin)."""
+    import json
+    import os
+    import bpy
+    arm, src = load_base(fbx_path, drop=("eyes", "eyelashes"))
+    scene = bpy.context.scene
+    for o in scene.objects:
+        o.select = o is src
+    scene.objects.active = src
+    faces = len(src.data.polygons)
+    if faces > target_faces:
+        dec = src.modifiers.new("Decimate", 'DECIMATE')
+        dec.ratio = target_faces / float(faces)
+        bpy.ops.object.modifier_apply(modifier=dec.name)
+    for m in list(src.modifiers):
+        src.modifiers.remove(m)
+    src.data.materials.clear()
+    while src.data.uv_textures:
+        src.data.uv_textures.remove(src.data.uv_textures[0])
+    src.name = src.data.name = "WeightProxy"
+    src.parent = arm
+    src.matrix_parent_inverse.identity()
+    arm.name = "Armature"
+    arm.data.name = "Armature"
+    os.makedirs(folder, exist_ok=True)
+    path = os.path.join(folder, "base.range")
+    bpy.data.libraries.write(path, {arm, src}, fake_user=False)
+    info = {"name": name, "order": order, "bones": len(arm.data.bones),
+            "height": round(arm["autorig_height"], 4), "faces": len(src.data.polygons)}
+    with open(os.path.join(folder, "base.json"), "w", encoding="utf-8") as f:
+        json.dump(info, f, ensure_ascii=False, indent=1)
+    return info

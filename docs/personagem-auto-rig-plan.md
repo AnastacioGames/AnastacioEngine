@@ -96,6 +96,25 @@ Medidas:
 
 Falta: aceite visual (Patty correndo), materiais, atlas, LOD, ragdoll, grupo, painel.
 
+## Biblioteca de esqueletos (feita, 2026-11-01)
+
+`source/release/datafiles/characters/<id>/` (instalada em `2.79/datafiles/characters`), gerada por
+`tools/build_skeleton_library.py` a partir dos FBX do Mixamo do Enzo:
+
+| id | Nome | Ossos |
+|---|---|---|
+| mixamo_two_fingers (padrão) | Two Fingers (thumb + index) | 34 |
+| mixamo_no_fingers | No Fingers | 22 |
+| mixamo_three_fingers | Three Fingers | 40 |
+| mixamo_full_fingers | Full Fingers | 52 |
+
+Cada `base.range` (~1,3 MB) tem só a armature e `WeightProxy` (malha decimada ~8 mil faces, sem material, UV,
+textura, olhos nem cílios), para não redistribuir o personagem do Fuse/Mixamo. `base.json`: nome, ordem,
+ossos, altura do corpo. API: `list_skeletons()`, `load_library_base(pasta)`; pastas: USER, LOCAL e SYSTEM
+(`datafiles/characters`) + extras.
+Proxy x malha completa nos 9 personagens: mesmo osso dominante em 97,5-99,4 % dos vértices, diferença média
+de peso 0,008-0,023.
+
 ## Decisões
 
 - Feitas (2026-11-01): base Enzo dois dedos (34 ossos), no lugar do Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo
