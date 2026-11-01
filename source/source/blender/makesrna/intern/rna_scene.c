@@ -8020,8 +8020,8 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "Object");
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
 	RNA_def_property_ui_text(prop, "Text Object",
-	                         "Text object that shows the line (use Setup Dialogue on it for typewriter and advance); "
-	                         "empty uses the _dialogue overlay scene");
+	                         "Object read by a UI Tree Dialogue Box (Source Property or Text Object), or a Text "
+	                         "object with Setup Dialogue; empty uses the _dialogue overlay scene");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	prop = RNA_def_property(srna, "dialog_speaker", PROP_STRING, PROP_NONE);

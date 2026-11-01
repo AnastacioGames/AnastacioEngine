@@ -22,6 +22,17 @@ import bpy
 from bpy.types import Panel, UIList
 
 
+def _ui_reads_object(scene, obj):
+    """True if a UI Tree Dialogue Box reads this object (Source Property or Text Object)."""
+    for tree in bpy.data.node_groups:
+        for node in getattr(tree, "nodes", ()):
+            if node.bl_idname != "RangeUIDialogue" or node.source == 'TEXT':
+                continue
+            if node.object_name == obj.name or (not node.object_name and node.source == 'PROPERTY'):
+                return True
+    return False
+
+
 class CUTSCENE_UL_sequences(UIList):
 	def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
 		split = layout.split(factor=0.15, align=True)
@@ -187,7 +198,9 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             box.prop(event, "dialog_wait")
             if event.dialog_text_object is None:
                 box.prop(event, "dialog_live")
-            elif event.dialog_wait and "td_end" not in event.dialog_text_object.game.properties:
+            elif (event.dialog_wait and event.dialog_text_object.type == 'FONT' and
+                  "td_end" not in event.dialog_text_object.game.properties and
+                  not _ui_reads_object(context.scene, event.dialog_text_object)):
                 box.label("Use Setup Dialogue on the Text object to wait for advance.", icon='ERROR')
 
         elif event.type == 'FADE':

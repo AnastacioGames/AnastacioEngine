@@ -1,7 +1,10 @@
 """Diálogo e voz dos eventos de Cutscene (chamado pela engine, KX_SceneCutscene.cpp).
 
 show_dialog(obj, text, speaker, audio, wait) -> bool
-    Escreve a fala no objeto Text `obj` e toca a voz `audio`.
+    Mostra a fala e toca a voz `audio`. Se um Dialogue Box da UI Tree lê `obj`
+    (Source = Property ou Text Object), a fala vai para a caixa na tela, com o
+    nome em Speaker; a espera acaba quando o jogador fecha a última página.
+    Senão escreve no objeto Text `obj`.
     Com `obj` preparado pelo "Setup Dialogue" (range_text_dialogue), a máquina
     de escrever e o avanço (Enter/clique/botão A) já funcionam. Se `wait` for
     verdadeiro, o objeto passa a mandar a mensagem WAIT_SUBJECT quando o jogador
@@ -32,7 +35,8 @@ from Range import logic
 
 WAIT_SUBJECT = "cutscene_dialog"
 
-_current = {"obj": None, "message": None, "handle": None, "shown": None}
+_current = {"obj": None, "message": None, "handle": None, "shown": None,
+            "box": None, "box_speaker": None, "box_wait": False}
 
 # Passo do filtro de fade/faixas: depois dos filtros do jogo e do vídeo (120).
 OVERLAY_PASS = 121
@@ -137,8 +141,55 @@ def camera_cut():
     _follow_active_camera(_current["shown"])
 
 
+def _find_dialogue_box(obj):
+    """(ui, Dialogue) de um Dialogue Box da UI Tree que lê `obj`, ou None."""
+    try:
+        import range_ui_runtime
+    except ImportError:
+        return None
+    if range_ui_runtime.get() is None:
+        return None
+    for ui in range_ui_runtime._instances:
+        for screen in ui.screens.values():
+            for box in screen.dialogues:
+                data = box.data
+                if data.get("source") in ("PROPERTY", "TEXT_OBJECT") and ui.obj_for(data) is obj:
+                    return ui, box
+    return None
+
+
+def _box_write(box, obj, text):
+    if box.data.get("source") == "PROPERTY":
+        obj[box.data["property"]] = text
+    else:
+        obj.text = text
+
+
+def _release_box(clear):
+    found = _current["box"]
+    _current["box"] = None
+    _current["box_wait"] = False
+    if found is None:
+        return
+    box, obj, speaker = found
+    box.data["speaker"] = speaker
+    if clear and obj is not None and not getattr(obj, "invalid", True):
+        _box_write(box, obj, "")
+
+
+def _box_finished():
+    box, obj, _speaker = _current["box"]
+    if obj is None or getattr(obj, "invalid", True):
+        return True
+    if box.data.get("source") == "PROPERTY":
+        # A caixa esvazia a propriedade no fim da última página.
+        return obj.get(box.data["property"], "") == ""
+    return box.done
+
+
 def show_dialog(obj, text, speaker="", audio="", wait=False):
     _restore_message()
+    _release_box(clear=False)
     old = _current["shown"]
     if old is not None and old is not obj and not getattr(old, "invalid", True):
         old.visible = False
@@ -146,6 +197,17 @@ def show_dialog(obj, text, speaker="", audio="", wait=False):
     _play_voice(audio)
     if obj is None:
         return False
+
+    found = _find_dialogue_box(obj)
+    if found is not None:
+        _ui, box = found
+        _current["box"] = (box, obj, box.data.get("speaker", ""))
+        if speaker:
+            box.data["speaker"] = speaker
+        box.reset()  # a mesma frase duas vezes também recomeça
+        _box_write(box, obj, text)
+        _current["box_wait"] = bool(wait)
+        return bool(wait)
 
     line = "%s: %s" % (speaker, text) if speaker else text
     try:
@@ -169,6 +231,7 @@ def show_dialog(obj, text, speaker="", audio="", wait=False):
 
 
 def hide_dialog():
+    _release_box(clear=True)
     obj = _current["shown"]
     _current["shown"] = None
     _restore_message()
@@ -240,6 +303,9 @@ def _skip_pressed():
 
 def update(dt, in_progress):
     flags = 0
+    if _current["box_wait"] and _box_finished():
+        _current["box_wait"] = False
+        logic.sendMessage(WAIT_SUBJECT)
     if _fade.moving or _bars.moving:
         _fade.step(dt)
         _bars.step(dt)

@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Cutscene: fala no Dialogue Box da UI Tree
+
+- O evento Dialog usa o **Dialogue Box** da UI Tree quando uma caixa lê o objeto escolhido em *Text Object*
+  (Source Property ou Text Object): a fala vai para a caixa na tela e *Speaker* substitui o nome da caixa só
+  durante a fala. Com *Wait for Advance*, a espera acaba quando a caixa fecha a última página
+  (`range_cutscene_runtime.update()` manda `cutscene_dialog`). O objeto Text com Setup Dialogue continua valendo.
+- O aviso do painel não aparece mais para objetos lidos por um Dialogue Box.
+- Exemplo `create_cutscene_story_example.py` agora usa o template HUD (só a caixa), ligado na câmera do jogo.
+
 ## 2026-11-01 - Cutscene: pular, Fade e Letterbox
 
 - **Pular:** Tab ou Start do controle (botão 6 SDL) pulam a cutscene em andamento; `scene.skip_cutscene()` faz o

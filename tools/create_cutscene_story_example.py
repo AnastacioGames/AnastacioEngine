@@ -7,12 +7,11 @@ Roteiro (sequência "Chegada"):
   corte para CamAna  -> Ana fala (espera Enter/clique/botão A)
   corte para CamBeto -> Beto responde (espera)
   corte para CamGeral -> Ana fecha a conversa (espera)
-  some a legenda, tiram-se as faixas, volta para CamJogo e libera o jogador.
+  some a fala, tiram-se as faixas, volta para CamJogo e libera o jogador.
 Começa com faixas de cinema e abrindo do preto. Tab (ou Start no controle) pula.
 
-A legenda é um objeto Text filho da câmera do jogo; a cada corte ela passa
-para a câmera ativa (range_cutscene_runtime.camera_cut). "Setup Dialogue"
-já está aplicado nela (máquina de escrever + avanço).
+A fala aparece no Dialogue Box da UI Tree (template HUD), desenhado na tela,
+com o nome de quem fala; Enter/Espaço/clique ou botão A avançam.
 Para voz, preencha "Audio" de cada evento Dialog com um .ogg/.wav (caminho //relativo).
 """
 import bpy
@@ -82,25 +81,24 @@ cam_beto = camera("CamBeto", (0.4, -2.6, 1.7), (1.2, 0, 1.5))
 cam_geral = camera("CamGeral", (4.5, -4.5, 2.5), (0, 0, 1))
 scene.camera = cam_jogo
 
-# Legenda: Text filho da câmera, na parte de baixo da tela.
-curve = bpy.data.curves.new("Legenda", 'FONT')
-curve.body = ""
-curve.size = 0.045
-curve.align_x = 'CENTER'
-curve.text_boxes[0].width = 0.9
-curve.text_boxes[0].x = -0.45
-curve.text_boxes[0].height = 3 * curve.size * curve.space_line
-legenda = bpy.data.objects.new("Legenda", curve)
-scene.objects.link(legenda)
-legenda.data.materials.append(material("LegendaMat", (1, 1, 1)))
-legenda.parent = cam_jogo
-legenda.location = (0.0, -0.1, -1.0)
-scene.objects.active = legenda
-legenda.select = True
-add_logic(legenda, "range_text_dialogue.main")
-for name, kind, value in (("td_speed", 'FLOAT', 40.0), ("td_end", 'STRING', "KEEP"), ("td_message", 'STRING', "")):
-    bpy.ops.object.game_property_new(type=kind, name=name)
-    legenda.game.properties[name].value = value
+# Caixa de diálogo: o Dialogue Box do template HUD da UI Tree, que lê a
+# propriedade "dialogo" do dono da UI (a câmera do jogo). Só a caixa fica.
+import range_ui_tree
+
+tree = bpy.data.node_groups.new("UI", range_ui_tree.UITree.bl_idname)
+range_ui_tree.add_template(tree, "HUD")
+for node in list(tree.nodes):
+    if node.bl_idname not in ("NodeFrame", "RangeUIDialogue"):
+        tree.nodes.remove(node)
+caixa = next(n for n in tree.nodes if n.bl_idname == "RangeUIDialogue")
+caixa.speaker = ""  # o nome vem do campo Speaker de cada fala
+caixa.width = 420
+caixa.location.x = 110
+range_ui_tree.setup_game_logic(cam_jogo)
+cam_jogo.game.properties["ui_screen"].value = ""   # sem menu
+cam_jogo.game.properties["ui_hud"].value = True    # HUD (a caixa) ligado
+range_ui_tree.write_bake(tree, scene)
+dono_dialogo = cam_jogo
 
 # Começa a cutscene 0 no 2º quadro.
 starter = bpy.data.objects.new("CutsceneStart", None)
@@ -145,7 +143,7 @@ for index, (name, kind, props) in enumerate(STEPS):
     event.type = kind
     event.time = 0.5 + 0.4 * index
     if kind == "DIALOG":
-        event.dialog_text_object = legenda
+        event.dialog_text_object = dono_dialogo
         event.dialog_wait = True
     for key, value in props.items():
         setattr(event, key, value)
