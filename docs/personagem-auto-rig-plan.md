@@ -170,6 +170,9 @@ perto do Mestre Deen (3450/1268/427). Objetos salvos na camada 2 com a cena most
 (`hide_for_libload`): no LibLoad do jogo entram inativos, prontos para o `addObject`.
 No RolimaRacer os pilotos passam a ser carregados por LibLoad (`scripts/pilotos.py`): arquivos em
 `5 - Personagem Link/_antigos` e `_novos`; a corrida carrega só os do grid.
+Cartão do menu (2026-11-01): `render_card` fotografa a malha cheia (antes da redução) numa pose da animação do jogo
+(`CARD_POSE`, ginga da PLAYER_IDLE_CAPOEIRA, quadro 50), luz Sun, fundo transparente, 512x1024 em
+`textures/<Nome>_card.png`; sem jogo, pose manual com os braços abaixados.
 Falta: aceite com janela, teste de queda na corrida, botões dos novos no menu, tirar os pilotos de dentro do
 RolimaRacer.range, DDS.
 

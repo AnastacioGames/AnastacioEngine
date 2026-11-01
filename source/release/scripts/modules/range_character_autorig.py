@@ -782,6 +782,124 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     return grp
 
 
+
+# -- Cartao do menu (foto do piloto) ---------------------------------------------------------------------
+
+CARD_SIZE = (512, 1024)          # os cartoes do RolimaRacer sao 256x512 (corpo inteiro, fundo transparente)
+CARD_POSE = ("RolimaRacer.range", "PLAYER_IDLE_CAPOEIRA 1_104", 50)   # ginga, como o cartao do Fabio   # (arquivo do jogo, acao, quadro)
+
+
+def _pose_from_game(arm, game_root, pose=CARD_POSE):
+    """Aplica um quadro de uma animacao do jogo (mesmos nomes mixamorig:). False se nao achar."""
+    import os
+    import bpy
+    if not game_root:
+        return False
+    path = os.path.join(game_root, pose[0])
+    if not os.path.isfile(path):
+        return False
+    with bpy.data.libraries.load(path) as (src, dst):
+        if pose[1] not in src.actions:
+            return False
+        dst.actions = [pose[1]]
+    act = dst.actions[0]
+    names = {pb.name for pb in arm.pose.bones}
+    for fc in act.fcurves:
+        if not fc.data_path.startswith("pose.bones"):
+            continue
+        bone = fc.data_path.split('"')[1]
+        prop = fc.data_path.rsplit(".", 1)[1]
+        if bone not in names or prop == "location":   # posicao fica da armature do personagem
+            continue
+        pb = arm.pose.bones[bone]
+        if prop == "rotation_quaternion":
+            pb.rotation_mode = 'QUATERNION'
+        elif prop == "rotation_euler":
+            if pb.rotation_mode == 'QUATERNION':
+                pb.rotation_mode = 'XYZ'
+        if hasattr(pb, prop):
+            getattr(pb, prop)[fc.array_index] = fc.evaluate(pose[2])
+    bpy.data.actions.remove(act)
+    return True
+
+
+def _pose_arms_down(arm):
+    """Sem jogo: abaixa os bracos da pose T."""
+    for side in ("Left", "Right"):
+        pb = arm.pose.bones.get("mixamorig:%sArm" % side)
+        if not pb:
+            continue
+        d = (pb.tail - pb.head).normalized()
+        target = Vector((d.x * 0.3, 0.05, -0.95)).normalized()
+        q = d.rotation_difference(target)
+        m = pb.matrix.copy()
+        pb.matrix = Matrix.Translation(m.to_translation()) * q.to_matrix().to_4x4() *             Matrix.Translation(-m.to_translation()) * m
+
+
+def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, report=print):
+    """Foto do corpo inteiro em pose, luz Sun, fundo transparente (cartao do menu de escolha)."""
+    import bpy
+    scene = bpy.context.scene
+    if not _pose_from_game(arm, game_root):
+        report("cartao: animacao do jogo nao encontrada, pose manual")
+        _pose_arms_down(arm)
+    scene.update()
+    pts = [o.matrix_world * v.co for o in meshes for v in o.to_mesh(scene, True, 'RENDER').vertices]
+    zmin = min(p.z for p in pts)
+    zmax = max(p.z for p in pts)
+    h = zmax - zmin
+    ang = math.radians(25)             # 3/4, o personagem olha para +Y
+    right = Vector((-math.cos(ang), math.sin(ang), 0.0))   # eixo X da camera
+    xs = [p.dot(right) for p in pts]
+    w = max(xs) - min(xs)
+    mid = (max(xs) + min(xs)) / 2
+    cam_data = bpy.data.cameras.new("CardCam")
+    cam_data.type = 'ORTHO'
+    cam_data.ortho_scale = max(h, w * size[1] / size[0]) * 1.08   # cabe em pe e com os bracos abertos
+    cam = bpy.data.objects.new("CardCam", cam_data)
+    scene.objects.link(cam)
+    dist = 10.0
+    c = right * mid
+    cam.location = (c.x + dist * math.sin(ang), c.y + dist * math.cos(ang), zmin + h / 2)
+    cam.rotation_euler = (math.radians(90), 0, math.radians(180) - ang)
+    sun_data = bpy.data.lamps.new("CardSun", 'SUN')
+    sun_data.energy = 1.1
+    sun = bpy.data.objects.new("CardSun", sun_data)
+    scene.objects.link(sun)
+    sun.rotation_euler = (math.radians(-55), math.radians(-25), math.radians(20))
+    world = scene.world or bpy.data.worlds.new("CardWorld")
+    scene.world = world
+    world.ambient_color = (0.12, 0.12, 0.13)
+    for o in meshes:
+        for m in o.data.materials:
+            if m:
+                m.ambient = 1.0
+                m.specular_intensity = 0.1
+    r = scene.render
+    r.engine = 'BLENDER_RENDER'
+    r.resolution_x, r.resolution_y = size
+    r.resolution_percentage = 100
+    r.alpha_mode = 'TRANSPARENT'
+    r.image_settings.file_format = 'PNG'
+    r.image_settings.color_mode = 'RGBA'
+    r.use_antialiasing = True
+    scene.view_settings.view_transform = 'Default'   # cor como no jogo (2.79 abre em Filmic)
+    scene.camera = cam
+    for ob in (cam, sun):
+        ob.layers = meshes[0].layers
+    r.filepath = path
+    bpy.ops.render.render(write_still=True)
+    for ob in (cam, sun):
+        bpy.data.objects.remove(ob, do_unlink=True)
+    for pb in arm.pose.bones:          # volta para a pose de descanso
+        pb.location = (0, 0, 0)
+        pb.rotation_quaternion = (1, 0, 0, 0)
+        pb.rotation_euler = (0, 0, 0)
+        pb.scale = (1, 1, 1)
+    scene.update()
+    return path
+
+
 def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, game=GAME_RAGDOLL,
                      component=GAME_COMPONENT, game_root=None, report=print):
     """Do OBJ do Fuse ao Group<Nome>.range pronto. Retorna um resumo com o caminho salvo."""
@@ -810,6 +928,11 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
     arm.name = "Armature" + group_name
     if ragdoll:
         add_ragdoll(arm, game)
+    card = os.path.join(tex_dir, name + "_card.png")
+    try:
+        info["cartao"] = render_card(arm, [body], card, game_root, report=report)
+    except Exception as exc:
+        report("aviso: cartao nao renderizado (%s)" % exc)
     finish_pilot(arm, body, group_name, component, report)
     # Materiais, texturas e imagens das peças do Fuse ficaram sem uso depois do atlas.
     for coll in (bpy.data.materials, bpy.data.textures, bpy.data.images, bpy.data.meshes):
