@@ -409,6 +409,12 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 - **Alternância manual de controles para menus (2026-10-14):** implementada no template Web/APK; falta validar em
   celular real (menu, retorno à partida, rotação), incluindo iframe do itch.io.
 
+### Personagem automático (Fuse → armature base)
+
+Plano em [personagem-auto-rig-plan.md](personagem-auto-rig-plan.md) (2026-11-01): ligar malhas do Fuse numa armature
+base do Mixamo sem passar pelo site, com materiais, LOD, ragdoll e grupo num botão. Aguardando os arquivos de
+exemplo do usuário em `tests/assets/personagem/`.
+
 ### Outros
 
 - **Associação de arquivos**: abrir `.blend` e `.range` direto com os executáveis adequados (instalação/registro
