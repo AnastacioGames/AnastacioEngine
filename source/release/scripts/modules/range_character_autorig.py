@@ -651,7 +651,8 @@ def join_pieces(objects, name="Body"):
 
 FP_BONES = ("Head", "Neck")      # sempre na parte escondida em 1a pessoa
 FP_HEIGHT = 0.62                 # e o resto acima desta fracao da altura (Fabio: 1,10 m de 1,77 m)
-BODY_TRIS = 6000                 # o corpo do Fuse (20-26 mil) nao entra no jogo: o nivel 0 ja e reduzido
+BODY_TRIS = 9000                 # o corpo do Fuse (20-26 mil) nao entra no jogo: o nivel 0 ja e reduzido
+FP_TRIS = 6000                   # dos 9000, a parte de cima (cabeca e peito): rosto amassava com a reducao por igual
 LOD_LEVELS = ((2500, 10.0), (900, 25.0))   # (triangulos, distancia); Mestre Deen: 3450/1268/427
 HIDDEN_LAYER = 1                 # camada 2: a cena mostra so a 1, como no RolimaRacer
 GAME_COMPONENT = "scripts.VehicleSystem.ragdoll_system.ragdoll.Ragdoll"
@@ -741,10 +742,11 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     mat.name = group_name + "Material"
     mat.use_transparency = False
     mat.game_settings.alpha_blend = 'OPAQUE'
-    decimate_to(body, BODY_TRIS)
     lods = [_decimated_copy(scene, body, r, "Bodylod%d%s" % (i, group_name))
             for i, (r, _d) in enumerate(LOD_LEVELS, 1)]
     rest, fp = split_fp_part(body, height)
+    decimate_to(fp, FP_TRIS)
+    decimate_to(rest, BODY_TRIS - FP_TRIS)
     rest.name = rest.data.name = "Body" + group_name
     fp.name = fp.data.name = "Body%s.001" % group_name
     for part in (rest, fp):

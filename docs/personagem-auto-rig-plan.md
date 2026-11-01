@@ -165,7 +165,7 @@ No editor: **File > Import > Fuse Character (.obj)** (`bl_operators/anastacio_fu
 esqueleto, nome, ragdoll, pasta de saída e pasta do jogo; roda `cli_main` num Blender em segundo plano (não mexe no
 arquivo aberto) e liga o grupo pronto na cena, no cursor 3D. Textos em pt/es/ru.
 Peso (2026-11-01): o corpo do Fuse (20-26 mil triângulos) não entra no jogo. O nível 0 já sai reduzido para
-`BODY_TRIS` = 6000 (Collapse High Quality) e os LOD têm metas fixas, 2500 a 10 m e 900 a 25 m (`LOD_LEVELS`),
+`BODY_TRIS` = 9000, 6000 deles na parte de cima (`FP_TRIS`, cabeça e peito reduzidos à parte; com 6000 por igual o rosto amassava; Collapse High Quality) e os LOD têm metas fixas, 2500 a 10 m e 900 a 25 m (`LOD_LEVELS`),
 perto do Mestre Deen (3450/1268/427). Objetos salvos na camada 2 com a cena mostrando só a 1
 (`hide_for_libload`): no LibLoad do jogo entram inativos, prontos para o `addObject`.
 No RolimaRacer os pilotos passam a ser carregados por LibLoad (`scripts/pilotos.py`): arquivos em
