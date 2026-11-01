@@ -196,6 +196,9 @@ Convenção: um nome só, `<Nome>` (ex.: `Patty`, `Quarta_Feira`, sem espaço). 
    O `--projeto` é obrigatório: dá o componente do ragdoll e a pose do cartão (animação do jogo).
 3. **Lista do jogo:** pôr `"Group<Nome>"` em `PILOTOS_NOVOS` de `D:\ProjetoRolimaRacer\scripts\pilotos.py`.
    Só isso já põe o piloto no sorteio das CPUs e no LibLoad da corrida.
+   **Não** precisa mais pôr o grupo dentro do `GroupAll_Pilotos`: esse contêiner (instância escondida na camada 11
+   de `Personagens_Carro` e `Pista_1`) só traz os pilotos antigos que ainda estão dentro do RolimaRacer.range.
+   Corrida (`add_all_players`), sorteio (`_prepareData`) e cutscene (`add_player_cutscene`) fazem LibLoad pela lista.
 4. **Menu de escolha:** backup dos dois `.range` e:
    ```
    buildin\AnastacioEngine.exe -b --factory-startup D:\ProjetoRolimaRacer\RolimaRacer.range ^
