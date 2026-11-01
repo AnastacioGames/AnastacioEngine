@@ -645,3 +645,164 @@ def join_pieces(objects, name="Body"):
     for uv in [u for u in body.data.uv_textures if u.name != "UV_Atlas"]:
         body.data.uv_textures.remove(uv)
     return body
+
+
+# -- Personagem pronto (formato dos pilotos do RolimaRacer) -----------------------------------------------
+
+FP_BONES = ("Head", "Neck")      # sempre na parte escondida em 1a pessoa
+FP_HEIGHT = 0.62                 # e o resto acima desta fracao da altura (Fabio: 1,10 m de 1,77 m)
+LOD_LEVELS = ((0.45, 10.0), (0.21, 25.0))   # (decimate, distancia) como os pilotos prontos
+GAME_COMPONENT = "scripts.VehicleSystem.ragdoll_system.ragdoll.Ragdoll"
+
+
+def _select_only(obj):
+    import bpy
+    scene = bpy.context.scene
+    for o in scene.objects:
+        o.select = o is obj
+    scene.objects.active = obj
+
+
+def _decimated_copy(scene, src, ratio, name):
+    import bpy
+    ob = src.copy()
+    ob.data = src.data.copy()
+    ob.name = ob.data.name = name
+    scene.objects.link(ob)
+    for m in [m for m in ob.modifiers if m.type == 'ARMATURE']:
+        ob.modifiers.remove(m)
+    mod = ob.modifiers.new("Decimate", 'DECIMATE')
+    mod.ratio = ratio
+    _select_only(ob)
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    arm_mod = ob.modifiers.new("Armature", 'ARMATURE')
+    arm_mod.object = src.parent
+    return ob
+
+
+def split_fp_part(body, height):
+    """Separa a cabeca e o alto do tronco (camera_hide_fp). Retorna (resto, parte_escondida)."""
+    import bmesh
+    import bpy
+    names = {g.index: g.name.replace("mixamorig:", "") for g in body.vertex_groups}
+    mw = body.matrix_world
+    zmin = min((mw * v.co).z for v in body.data.vertices)
+    limit = zmin + FP_HEIGHT * height
+    hide = set()
+    for v in body.data.vertices:
+        if not v.groups:
+            continue
+        dom = names[max(v.groups, key=lambda g: g.weight).group]
+        arm_side = any(k in dom for k in ("Arm", "Hand", "Thumb", "Index", "Middle", "Ring", "Pinky"))
+        if dom in FP_BONES or ((mw * v.co).z > limit and not arm_side):
+            hide.add(v.index)
+    scene = bpy.context.scene
+    _select_only(body)
+    bpy.ops.object.mode_set(mode='EDIT')
+    bm = bmesh.from_edit_mesh(body.data)
+    for f in bm.faces:
+        f.select = sum(1 for v in f.verts if v.index in hide) * 2 > len(f.verts)
+    bmesh.update_edit_mesh(body.data)
+    bpy.ops.mesh.separate(type='SELECTED')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    part = next(o for o in scene.objects if o.select and o is not body)
+    return body, part
+
+
+def _prop(obj, name, value):
+    import bpy
+    _select_only(obj)
+    if name not in obj.game.properties:
+        kind = 'BOOL' if isinstance(value, bool) else ('FLOAT' if isinstance(value, float) else 'INT')
+        bpy.ops.object.game_property_new(type=kind, name=name)
+    obj.game.properties[name].value = value
+
+
+def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
+    """Malha em 2 partes + LOD + propriedades + componente + grupo, como GroupFabio."""
+    import bpy
+    scene = bpy.context.scene
+    height = arm.get("autorig_height") or 1.7
+    mat = body.data.materials[0]
+    mat.name = group_name + "Material"
+    mat.use_transparency = False
+    mat.game_settings.alpha_blend = 'OPAQUE'
+    lods = [_decimated_copy(scene, body, r, "Bodylod%d%s" % (i, group_name))
+            for i, (r, _d) in enumerate(LOD_LEVELS, 1)]
+    rest, fp = split_fp_part(body, height)
+    rest.name = rest.data.name = "Body" + group_name
+    fp.name = fp.data.name = "Body%s.001" % group_name
+    for part in (rest, fp):
+        _select_only(part)
+        for _lod in lods:
+            bpy.ops.object.lod_add()   # o primeiro também cria o nível 0 (a própria malha)
+        for i, ((_ratio, dist), lod) in enumerate(zip(LOD_LEVELS, lods), 1):
+            part.lod_levels[i].object = lod
+            part.lod_levels[i].distance = dist
+        _prop(part, "aura_rain_effect", False)
+    _prop(fp, "camera_hide_fp", True)
+    _prop(lods[0], "aura_rain_effect", False)
+    arm.name = "Armature" + group_name
+    arm.game.physics_type = 'NO_COLLISION'
+    _prop(arm, "pilot.armature", False)
+    _prop(arm, "active_ragdoll", False)
+    if component:
+        _select_only(arm)
+        try:
+            bpy.ops.logic.python_component_register(component_name=component)
+        except Exception as exc:
+            report("aviso: componente %s nao registrado (%s); anexe pelo painel Logic" % (component, exc))
+    root = bpy.data.objects.new(group_name, None)
+    scene.objects.link(root)
+    root.empty_draw_size = 0.3
+    _prop(root, "is_pilot", False)
+    grp = bpy.data.groups.new(group_name)
+    members = [root, arm, rest, fp] + lods + [o for o in scene.objects if o.name.startswith("RagdollPart-")]
+    for o in members:
+        grp.objects.link(o)
+    return grp
+
+
+def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, game=GAME_RAGDOLL,
+                     component=GAME_COMPONENT, game_root=None, report=print):
+    """Do OBJ do Fuse ao Group<Nome>.range pronto. Retorna um resumo com o caminho salvo."""
+    import os
+    import sys
+    import bpy
+    if game_root and game_root not in sys.path:
+        sys.path.insert(0, game_root)
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    _ragdoll_addon()
+    arm0, proxy = load_library_base(skeleton_folder)
+    before = set(scene.objects)
+    bpy.ops.import_scene.obj(filepath=obj_path)
+    pieces = [o for o in scene.objects if o not in before and o.type == 'MESH']
+    scene.update()
+    info = align_to_base(pieces, arm0, report=report)
+    arm = fit_skeleton(arm0, proxy, pieces)
+    transfer_weights(proxy, pieces, arm)
+    group_name = "Group" + name
+    tex_dir = os.path.join(out_dir, "textures")
+    build_atlas(pieces, tex_dir, group_name)
+    body = join_pieces(pieces)
+    bpy.data.objects.remove(proxy, do_unlink=True)
+    bpy.data.objects.remove(arm0, do_unlink=True)
+    arm.name = "Armature" + group_name
+    if ragdoll:
+        add_ragdoll(arm, game)
+    finish_pilot(arm, body, group_name, component, report)
+    # Materiais, texturas e imagens das peças do Fuse ficaram sem uso depois do atlas.
+    for coll in (bpy.data.materials, bpy.data.textures, bpy.data.images, bpy.data.meshes):
+        for block in [b for b in coll if b.users == 0]:
+            coll.remove(block)
+    # O atlas fica em textures/ ao lado do .range, não empacotado (como os pilotos prontos).
+    # (este editor liga o empacotamento automático em arquivos novos)
+    bpy.data.use_autopack = False
+    for im in bpy.data.images:
+        if im.packed_file:
+            im.unpack(method='REMOVE')
+    path = os.path.join(out_dir, group_name + ".range")
+    bpy.ops.wm.save_as_mainfile(filepath=path, relative_remap=True)
+    info["arquivo"] = path
+    return info

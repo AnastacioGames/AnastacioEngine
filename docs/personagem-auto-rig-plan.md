@@ -151,6 +151,18 @@ de peso 0,008-0,023.
   propriedades e componente, grupo, salvar `5 - Personagem Link/Group<Nome>/Group<Nome>.range` + textures/
   (DDS); depois painel e aceite com janela. Os OBJ/FBX ficam em D:\ProjetoRolimaRacer (só na máquina local).
 
+## Personagem pronto (feito, 2026-11-01, falta aceite com janela e teste na corrida)
+
+`create_character(obj, pasta_do_esqueleto, Nome, saída)` faz tudo; linha de comando em
+`tools/create_fuse_character.py` (`-- <obj> <Nome> <saída> [esqueleto] [--sem-ragdoll] [--projeto <jogo>]`).
+`finish_pilot`: material opaco `Group<Nome>Material`; LOD por decimate 0,45/0,21 a 10/25 m
+(`Bodylod1/2<Group>`); `split_fp_part` separa `Body<Group>.001` com `camera_hide_fp` (Head/Neck dominantes +
+o que está acima de 62 % da altura, menos braços); `aura_rain_effect` no corpo e LOD1; armature com
+`pilot.armature`, `active_ragdoll` e o componente do jogo; Empty `Group<Nome>` com `is_pilot`; grupo com 34
+objetos (com ragdoll). Arquivo sem texturas empacotadas (o editor liga autopack em arquivos novos: desligado
+aqui), atlas em `textures/`. Os 9 personagens de `_novos` passam, 5,6-6,7 MB cada (GroupFabio: 7,6 MB).
+Falta: pôr no `GroupAll_Pilotos` do jogo, DDS, painel no editor.
+
 ## Decisões
 
 - Feitas (2026-11-01): base Enzo dois dedos (34 ossos), no lugar do Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo
