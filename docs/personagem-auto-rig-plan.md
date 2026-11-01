@@ -118,6 +118,21 @@ ossos, altura do corpo. API: `list_skeletons()`, `load_library_base(pasta)`; pas
 Proxy x malha completa nos 9 personagens: mesmo osso dominante em 97,5-99,4 % dos vértices, diferença média
 de peso 0,008-0,023.
 
+## Ragdoll (feito, 2026-11-01, falta teste no jogo)
+
+- 14 caixas, só ossos grandes (pedido do usuário): Hips, Spine1, Spine2, Head, Arm, ForeArm, UpLeg, Leg, Foot
+  (L/R). Mão, dedos, ombro, pescoço e Spine ficam de fora (seguem o pai). Spine1 é obrigatório: a câmera do
+  ragdoll do RolimaRacer mira a peça com `foco_camera_ragdoll`, que fica nele.
+- Tamanhos medidos na WeightProxy ao gerar a biblioteca (`ragdoll_sizes_from_mesh`, vértices com o osso
+  dominante, no espaço do osso, ×0,85) e guardados nos ajustes do addon Anastacio Ragdoll do esqueleto. Ao criar
+  o personagem não usa malha: `add_ragdoll(arm)` = addon `generate` + `prepare_physics`.
+- Formato do jogo (`GAME_RAGDOLL`, conferido no RolimaRacer.range): nomes `RagdollPart-<armature>-<osso>-Dynamic`
+  e pivô `-Empty` (o componente `scripts.VehicleSystem.ragdoll_system.ragdoll.Ragdoll` exige esse prefixo),
+  Copy Transforms nos ossos, juntas cone twist, grupo de colisão 3 / máscara 1 (`fix_ragdoll_collisions.py`),
+  2 kg por peça. Outras propriedades do jogo: `Group<Nome>` com `is_pilot` no grupo `GroupAll_Pilotos`;
+  armature `Armature<Group>` com `pilot.armature` e `active_ragdoll`; cabeça achada pelo nome do osso (Head).
+  `body_ragdoll` não é mais usada pelos pilotos atuais.
+
 ## Decisões
 
 - Feitas (2026-11-01): base Enzo dois dedos (34 ossos), no lugar do Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo

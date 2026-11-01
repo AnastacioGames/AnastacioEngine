@@ -395,6 +395,7 @@ def make_library_base(fbx_path, folder, name, order=99, target_faces=6000):
     src.data.materials.clear()
     while src.data.uv_textures:
         src.data.uv_textures.remove(src.data.uv_textures[0])
+    ragdoll_sizes_from_mesh(arm, src)
     src.name = src.data.name = "WeightProxy"
     src.parent = arm
     src.matrix_parent_inverse.identity()
@@ -408,3 +409,90 @@ def make_library_base(fbx_path, folder, name, order=99, target_faces=6000):
     with open(os.path.join(folder, "base.json"), "w", encoding="utf-8") as f:
         json.dump(info, f, ensure_ascii=False, indent=1)
     return info
+
+
+# -- Ragdoll ----------------------------------------------------------------------------------------------
+#
+# Usa o addon Anastacio Ragdoll (caixas pelos ossos). Os tamanhos saem da WeightProxy uma vez só, ao gerar a
+# biblioteca, e ficam guardados no esqueleto: na hora de criar o personagem a malha não é usada.
+
+RAGDOLL_BONES = tuple("mixamorig:" + n for n in (
+    "Hips", "Spine1", "Spine2", "Head",
+    "LeftArm", "LeftForeArm", "RightArm", "RightForeArm",
+    "LeftUpLeg", "LeftLeg", "LeftFoot", "RightUpLeg", "RightLeg", "RightFoot"))
+
+# Formato dos pilotos do RolimaRacer (scripts/fix_ragdoll_collisions.py, camera_change.py).
+GAME_RAGDOLL = {"collision_group": 3, "collision_mask": (1,), "part_mass": 2.0,
+                "focus_bone": "mixamorig:Spine1", "focus_prop": "foco_camera_ragdoll", "names": "RagdollPart"}
+
+
+def _ragdoll_addon():
+    import addon_utils
+    addon_utils.enable("anastacio_ragdoll", default_set=True)
+    import anastacio_ragdoll
+    return anastacio_ragdoll
+
+
+def ragdoll_sizes_from_mesh(arm, mesh, bones=RAGDOLL_BONES, shrink=0.85):
+    """Guarda no esqueleto (addon) o tamanho de cada caixa: vértices com esse osso como dominante, no espaço
+    do osso (X largura, Z profundidade, Y comprimento)."""
+    rd = _ragdoll_addon()
+    rd.sync_bones(arm)
+    names = {g.index: g.name for g in mesh.vertex_groups}
+    inv_arm = arm.matrix_world.inverted()
+    pts = {b: [] for b in bones}
+    for v in mesh.data.vertices:
+        if not v.groups:
+            continue
+        g = max(v.groups, key=lambda x: x.weight)
+        name = names.get(g.group)
+        if name in pts and g.weight > 0.5:
+            pts[name].append(inv_arm * (mesh.matrix_world * v.co))
+    for item in arm.anastacio_ragdoll.bones:
+        item.enabled = item.name in bones
+        if not item.enabled:
+            continue
+        bone = arm.data.bones[item.name]
+        local = [bone.matrix_local.inverted() * p for p in pts[item.name]]
+        if len(local) < 8:
+            continue
+        xs = [p.x for p in local]
+        ys = [p.y for p in local]
+        zs = [p.z for p in local]
+        item.width = max(0.02, (max(xs) - min(xs)) * shrink)
+        item.depth = max(0.02, (max(zs) - min(zs)) * shrink)
+        cy = (max(ys) + min(ys)) / 2.0
+        length = max(0.02, (max(ys) - min(ys)) * shrink)
+        item.length_ratio = min(3.0, max(0.05, length / bone.length))
+        item.offset = ((max(xs) + min(xs)) / 2.0, cy - bone.length * 0.5, (max(zs) + min(zs)) / 2.0)
+    rd.apply_preset(arm)
+
+
+def add_ragdoll(arm, game=GAME_RAGDOLL):
+    """Gera as caixas, pivôs, constraints e juntas (addon) e aplica o formato do jogo, se houver."""
+    import bpy
+    rd = _ragdoll_addon()
+    context = bpy.context
+    for o in context.scene.objects:
+        o.select = o is arm
+    context.scene.objects.active = arm
+    rd.generate(context, arm, runtime=False)
+    created = rd.owned(arm)
+    parts = rd.descriptors(arm)
+    rd.prepare_physics(context, arm, created, parts)
+    bodies = [o for o in created if o.anastacio_ragdoll_link.role == 'BODY']
+    if not game:
+        return bodies
+    by_key = {p['key']: p['bone'] for p in parts}
+    for body in bodies:
+        bone = by_key[body.anastacio_ragdoll_link.key]
+        body.game.collision_group = tuple(i == game["collision_group"] - 1 for i in range(16))
+        body.game.collision_mask = tuple((i + 1) in game["collision_mask"] for i in range(16))
+        body.game.mass = game["part_mass"]
+        if bone == game["focus_bone"]:
+            rd.game_property(context, body, game["focus_prop"], 0)
+        if game.get("names"):
+            pivot = next(c for c in body.children if c.anastacio_ragdoll_link.role == 'PIVOT')
+            body.name = "%s-%s-%s-Dynamic" % (game["names"], arm.name, bone)
+            pivot.name = "%s-%s-%s-Empty" % (game["names"], arm.name, bone)
+    return bodies
