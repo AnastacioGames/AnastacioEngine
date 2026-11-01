@@ -771,10 +771,14 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     scene.objects.link(root)
     root.empty_draw_size = 0.3
     _prop(root, "is_pilot", False)
+    # Como no RolimaRacer.range: o grupo tem armature, corpo e ragdoll; os LOD ficam fora (o corpo os chama
+    # pelo lod_levels; dentro do grupo o addObject criaria todos na tela) e o Empty instancia o grupo.
     grp = bpy.data.groups.new(group_name)
-    members = [root, arm, rest, fp] + lods + [o for o in scene.objects if o.name.startswith("RagdollPart-")]
+    members = [arm, rest, fp] + [o for o in scene.objects if o.name.startswith("RagdollPart-")]
     for o in members:
         grp.objects.link(o)
+    root.dupli_type = 'GROUP'
+    root.dupli_group = grp
     return grp
 
 

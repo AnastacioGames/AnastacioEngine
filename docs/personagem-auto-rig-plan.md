@@ -159,7 +159,7 @@ de peso 0,008-0,023.
 (`Bodylod1/2<Group>`); `split_fp_part` separa `Body<Group>.001` com `camera_hide_fp` (Head/Neck dominantes +
 o que está acima de 62 % da altura, menos braços); `aura_rain_effect` no corpo e LOD1; armature com
 `pilot.armature`, `active_ragdoll` e o componente do jogo; Empty `Group<Nome>` com `is_pilot`; grupo com 34
-objetos (com ragdoll). Arquivo sem texturas empacotadas (o editor liga autopack em arquivos novos: desligado
+objetos (com ragdoll; corrigido 2026-11-01: grupo = armature + 2 partes + ragdoll, LOD fora, Empty instancia o grupo). Arquivo sem texturas empacotadas (o editor liga autopack em arquivos novos: desligado
 aqui), atlas em `textures/`. Os 9 personagens de `_novos` passam, 5,6-6,7 MB cada (GroupFabio: 7,6 MB).
 No editor: **File > Import > Fuse Character (.obj)** (`bl_operators/anastacio_fuse_character.py`): escolhe
 esqueleto, nome, ragdoll, pasta de saída e pasta do jogo; roda `cli_main` num Blender em segundo plano (não mexe no
