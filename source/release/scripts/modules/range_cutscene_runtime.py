@@ -27,9 +27,19 @@ update(dt, in_progress) -> int
     tela. Bit 1: ainda há efeito na tela. Bit 2: o jogador pediu para pular
     (Tab ou Start do controle; desligue com globalDict["cutscene_skip"] = False).
 
+shot_to(empty) / start_shots() / restore_shot_camera()
+    Tomadas por Empty (as do addon Cutscene Shot Tool): a câmera ativa vai até
+    o Empty e segue as propriedades dele (transition, transition_speed, fov,
+    target, pan_target, follow, shake, noise, slowmo_scale, filter_on/off,
+    duration). start_shots() passa por todos os Empties com "order", em ordem,
+    cada um pelo seu duration. restore_shot_camera() devolve a câmera ao lugar.
+
 Sem objeto Text, a fala fica em logic.globalDict["cutscene_dialog"]
 ({"text", "speaker", "audio"}) para uma interface própria do jogo.
 """
+
+import math
+import random
 
 from Range import logic
 
@@ -301,8 +311,154 @@ def _skip_pressed():
     return pressed
 
 
+# -- tomadas por Empty (Cutscene Shot Tool) ----------------------------------
+
+ORDER_PROP_ALIASES = ("index", "order", "step", "ordem", "shot_index")
+# transition_speed 1.0 = a câmera cobre ~63% da distância em 1/4 de segundo.
+SMOOTH_RATE = 4.0
+NOISE_AMPLITUDE = 0.015
+
+_shot = {"cam": None, "saved": None, "empty": None, "time": 0.0, "queue": [],
+         "offset": None, "seed": 0.0, "filter_off": ""}
+
+
+def _shot_order(obj):
+    for key in obj.getPropertyNames():
+        if key.strip().lower() in ORDER_PROP_ALIASES:
+            try:
+                return float(obj[key])
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _scene_object(name):
+    return logic.getCurrentScene().objects.get(name) if name else None
+
+
+def _begin_shot(empty):
+    scene = logic.getCurrentScene()
+    cam = _shot["cam"] if _shot["cam"] is not None and not _shot["cam"].invalid else scene.active_camera
+    if cam is None:
+        return
+    if _shot["saved"] is None:
+        _shot["saved"] = (cam.parent, cam.localTransform.copy(), cam.fov, logic.getTimeScale())
+        cam.removeParent()
+    if _shot["filter_off"]:
+        logic.sendMessage(_shot["filter_off"])
+    _shot["cam"] = cam
+    _shot["empty"] = empty
+    _shot["time"] = 0.0
+    _shot["filter_off"] = str(empty.get("filter_off", ""))
+    follow = _scene_object(empty.get("follow", ""))
+    _shot["offset"] = (empty.worldPosition - follow.worldPosition) if follow is not None else None
+    if "fov" in empty:
+        cam.fov = float(empty["fov"])
+    logic.setTimeScale(float(empty.get("slowmo_scale", 1.0)) or 1.0)
+    if empty.get("filter_on", ""):
+        logic.sendMessage(str(empty["filter_on"]))
+    if str(empty.get("transition", "SMOOTH")).upper() == "CUT":
+        _place_camera(1.0)
+
+
+def _shot_pose():
+    from mathutils import Vector
+    empty = _shot["empty"]
+    duration = max(0.001, float(empty.get("duration", 3.5)))
+    pos = empty.worldPosition.copy()
+    pan = _scene_object(empty.get("pan_target", ""))
+    if pan is not None:
+        pos = pos.lerp(pan.worldPosition, min(1.0, _shot["time"] / duration))
+    follow = _scene_object(empty.get("follow", ""))
+    if follow is not None and _shot["offset"] is not None:
+        pos = follow.worldPosition + _shot["offset"]
+    target = _scene_object(empty.get("target", ""))
+    if target is not None and (target.worldPosition - pos).length > 1e-4:
+        rot = (target.worldPosition - pos).to_track_quat('-Z', 'Y')
+    else:
+        rot = empty.worldOrientation.to_quaternion()
+    t = _shot["time"] + _shot["seed"]
+    if empty.get("noise", True):
+        pos += Vector((math.sin(t * 0.9), math.sin(t * 1.3 + 1.0), math.sin(t * 0.7 + 2.0))) * NOISE_AMPLITUDE
+    shake = float(empty.get("shake", 0.0))
+    if shake > 0.0:
+        pos += Vector((random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-1, 1))) * shake * 0.05
+    return pos, rot
+
+
+def _place_camera(factor):
+    cam = _shot["cam"]
+    pos, rot = _shot_pose()
+    if factor >= 1.0:
+        cam.worldPosition = pos
+        cam.worldOrientation = rot.to_matrix()
+        return
+    cam.worldPosition = cam.worldPosition.lerp(pos, factor)
+    current = cam.worldOrientation.to_quaternion()
+    cam.worldOrientation = current.slerp(rot, factor).to_matrix()
+
+
+def _update_shot(dt):
+    empty = _shot["empty"]
+    cam = _shot["cam"]
+    if empty is None or empty.invalid or cam is None or cam.invalid:
+        return
+    _shot["time"] += dt
+    if _shot["queue"] and _shot["time"] >= float(empty.get("duration", 3.5)):
+        _begin_shot(_shot["queue"].pop(0))
+        empty = _shot["empty"]
+    if str(empty.get("transition", "SMOOTH")).upper() == "CUT":
+        _place_camera(1.0)
+    else:
+        rate = SMOOTH_RATE * max(0.05, float(empty.get("transition_speed", 0.7)))
+        _place_camera(1.0 - math.exp(-rate * dt))
+
+
+def shot_to(empty):
+    """Camera Shot com um Empty: vai para essa tomada (para a fila do start_shots)."""
+    _shot["queue"] = []
+    _shot["seed"] = random.uniform(0.0, 100.0)
+    _begin_shot(empty)
+
+
+def start_shots():
+    """Camera Start sem componente: todas as tomadas com "order", em ordem. Retorna False se não houver."""
+    shots = [o for o in logic.getCurrentScene().objects if _shot_order(o) is not None]
+    shots.sort(key=_shot_order)
+    if not shots:
+        return False
+    shot_to(shots[0])
+    _shot["queue"] = shots[1:]
+    return True
+
+
+def shots_active():
+    return _shot["empty"] is not None
+
+
+def restore_shot_camera():
+    """Devolve a câmera ao pai, à posição e ao FOV de antes das tomadas."""
+    cam, saved = _shot["cam"], _shot["saved"]
+    if _shot["filter_off"]:
+        logic.sendMessage(_shot["filter_off"])
+    _shot.update(cam=None, saved=None, empty=None, queue=[], offset=None, filter_off="")
+    if saved is None:
+        return
+    parent, local, fov, timescale = saved
+    logic.setTimeScale(timescale)
+    if cam is None or cam.invalid:
+        return
+    if parent is not None and not parent.invalid:
+        cam.setParent(parent, False, False)
+    cam.localTransform = local
+    cam.fov = fov
+
+
 def update(dt, in_progress):
     flags = 0
+    if _shot["empty"] is not None:
+        _update_shot(dt)
+        flags |= 1
     if _current["box_wait"] and _box_finished():
         _current["box_wait"] = False
         logic.sendMessage(WAIT_SUBJECT)
@@ -326,10 +482,12 @@ def _clear_overlay():
 def skip_cleanup():
     """Pulou a cutscene: sem fala, sem voz, sem fade nem faixas."""
     hide_dialog()
+    restore_shot_camera()
     _clear_overlay()
 
 
 def stop():
     """Fim/parada da cutscene: some com a fala, a voz e os efeitos de tela."""
     hide_dialog()
+    restore_shot_camera()
     _clear_overlay()

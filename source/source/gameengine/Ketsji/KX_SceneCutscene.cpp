@@ -770,7 +770,10 @@ void KX_Scene::DispatchCutsceneEvents()
 			if (event->m_templateObject && m_objectlist->SearchValue(event->m_templateObject)) {
 				/* Native cut: switch to the chosen camera, remembering the gameplay camera once. */
 				if (event->m_templateObject->GetGameObjectType() != SCA_IObject::OBJ_CAMERA) {
-					CM_Error("Cutscene Camera Shot event '" << event->m_name << "': the object is not a camera");
+					/* Shot Empty (Cutscene Shot Tool): the active camera travels to it, following its properties. */
+					PyObject *args = Py_BuildValue("(N)", event->m_templateObject->GetProxy());
+					CallCutsceneRuntime("shot_to", args);
+					m_cutsceneOverlayActive = true;
 					continue;
 				}
 				KX_Camera *shotCamera = static_cast<KX_Camera *>(event->m_templateObject);
@@ -817,6 +820,7 @@ void KX_Scene::DispatchCutsceneEvents()
 			break;
 
 		case CUTSCENE_EVENT_RESTORE_GAMEPLAY_CAMERA:
+			CallCutsceneRuntime("restore_shot_camera", PyTuple_New(0));
 			RestoreCutsceneGameplayCamera();
 			CallCutsceneRuntime("camera_cut", PyTuple_New(0));
 			{
@@ -840,7 +844,12 @@ void KX_Scene::DispatchCutsceneEvents()
 		case CUTSCENE_EVENT_CAMERA_START:
 			{
 				KX_GameObject *cameraMgr = FindGameObject(m_objectlist, "CutsceneCameraManager");
-				if (cameraMgr) {
+				if (!cameraMgr) {
+					/* No game component: the engine plays the Shot Empties itself. */
+					CallCutsceneRuntime("start_shots", PyTuple_New(0));
+					m_cutsceneOverlayActive = true;
+				}
+				else {
 					EXP_ListValue<KX_PythonComponent> *components = cameraMgr->GetComponents();
 					if (components && components->GetCount() > 0) {
 						KX_PythonComponent *cameraComp = components->GetValue(0);
@@ -859,7 +868,12 @@ void KX_Scene::DispatchCutsceneEvents()
 		case CUTSCENE_EVENT_CAMERA_STOP:
 			{
 				KX_GameObject *cameraMgr = FindGameObject(m_objectlist, "CutsceneCameraManager");
-				if (cameraMgr) {
+				if (!cameraMgr) {
+					/* No game component: the engine plays the Shot Empties itself. */
+					CallCutsceneRuntime("restore_shot_camera", PyTuple_New(0));
+					m_cutsceneOverlayActive = true;
+				}
+				else {
 					EXP_ListValue<KX_PythonComponent> *components = cameraMgr->GetComponents();
 					if (components && components->GetCount() > 0) {
 						KX_PythonComponent *cameraComp = components->GetValue(0);

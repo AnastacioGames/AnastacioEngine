@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Cutscene: tomadas por Empty (Cutscene Shot Tool) nativas
+
+- **Camera Shot** aceita um Empty de tomada em *Camera*: a câmera ativa sai do pai e vai até ele seguindo as
+  propriedades do addon Shot Tool: `transition` (CUT/SMOOTH), `transition_speed`, `fov`, `target` (olha para),
+  `pan_target` (desliza até ele durante `duration`), `follow` (acompanha mantendo a distância), `shake`, `noise`,
+  `slowmo_scale` (`setTimeScale`), `filter_on`/`filter_off` (mandados como mensagem no início/fim da tomada).
+- **Camera Start** sem `CutsceneCameraManager` na cena toca todos os Empties com `order` (ou alias), cada um pelo
+  seu `duration`; **Camera Stop**, Restore Gameplay Camera, pular e parar devolvem pai, posição, FOV e escala de
+  tempo. Com o componente do jogo na cena, o comportamento antigo continua.
+- Lógica em `range_cutscene_runtime.py` (`shot_to`, `start_shots`, `restore_shot_camera`), testada com objetos
+  falsos e `mathutils`; falta testar no jogo.
+
 ## 2026-11-01 - Cutscene: fala no Dialogue Box da UI Tree
 
 - O evento Dialog usa o **Dialogue Box** da UI Tree quando uma caixa lê o objeto escolhido em *Text Object*

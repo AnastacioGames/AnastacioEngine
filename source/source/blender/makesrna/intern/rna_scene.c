@@ -8041,8 +8041,8 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "Object");
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
 	RNA_def_property_ui_text(prop, "Camera",
-	                         "Camera to cut to; Restore Gameplay Camera goes back. Empty uses the CutsceneCameraManager "
-	                         "component with Shot Order");
+	                         "Camera to cut to, or a Shot Empty (Cutscene Shot Tool) the active camera travels to; "
+	                         "Restore Gameplay Camera goes back. Unset uses the CutsceneCameraManager with Shot Order");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	prop = RNA_def_property(srna, "camera_order", PROP_INT, PROP_NONE);

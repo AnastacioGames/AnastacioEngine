@@ -224,8 +224,10 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             box.prop(event, "shot_camera")
             if event.shot_camera is None:
                 box.prop(event, "camera_order")
+            elif event.shot_camera.type == 'EMPTY':
+                box.label("Shot Empty: the camera follows its shot properties.", icon='INFO')
             elif event.shot_camera.type != 'CAMERA':
-                box.label("The object must be a camera.", icon='ERROR')
+                box.label("Use a camera or a Shot Empty.", icon='ERROR')
 
         elif event.type == 'LOOK_AT':
             box = layout.box()
@@ -238,10 +240,10 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             layout.box().label("Restores the gameplay camera. No parameters.")
 
         elif event.type == 'CAMERA_START':
-            layout.box().label("Starts the cutscene camera manager. No parameters.")
+            layout.box().label("Plays every Shot Empty in order (or starts the CutsceneCameraManager).")
 
         elif event.type == 'CAMERA_STOP':
-            layout.box().label("Stops the cutscene camera manager. No parameters.")
+            layout.box().label("Stops the shots and puts the camera back.")
 
         elif event.type == 'LOCK_PLAYER':
             layout.box().label("Locks player input. No parameters.")
