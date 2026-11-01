@@ -764,7 +764,7 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     mat.game_settings.alpha_blend = 'OPAQUE'
     # alpha 0 + alpha da textura deixava o corpo meio transparente no jogo; o cartao baixa o brilho so p/ a foto
     mat.alpha = 1.0
-    mat.specular_intensity = 0.5
+    mat.specular_intensity = 0.2       # brilho branco alto deixava o piloto esbranquicado (pista molhada)
     # metal 0,5 (padrao novo) refletia o ambiente no lugar da cor: piloto cinza-azulado e lavado no jogo
     mat.diffuse_metallic_bsdf = mat.specular_metallic_bsdf = 0.0
     mat.use_object_color = True        # como os pilotos prontos (o jogo pode tingir/esmaecer pelo obj.color)
@@ -793,6 +793,7 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     _prop(fp, "camera_hide_fp", True)
     arm.name = "Armature" + group_name
     arm.game.physics_type = 'NO_COLLISION'
+    arm.data.deform_method = 'BGE_GPU'   # skinning na GPU (cai para CPU sozinho se o material nao suportar)
     _prop(arm, "pilot.armature", False)
     _prop(arm, "active_ragdoll", False)
     if component:
