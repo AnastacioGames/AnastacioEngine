@@ -762,6 +762,12 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     mat.name = group_name + "Material"
     mat.use_transparency = False
     mat.game_settings.alpha_blend = 'OPAQUE'
+    # alpha 0 + alpha da textura deixava o corpo meio transparente no jogo; o cartao baixa o brilho so p/ a foto
+    mat.alpha = 1.0
+    mat.specular_intensity = 0.5
+    for ts in mat.texture_slots:
+        if ts and ts.texture:
+            ts.use_map_alpha = False
     lods = [_decimated_copy(scene, body, r, "Bodylod%d%s" % (i, group_name))
             for i, (r, _d) in enumerate(LOD_LEVELS, 1)]
     rest, fp = split_fp_part(body, height)
