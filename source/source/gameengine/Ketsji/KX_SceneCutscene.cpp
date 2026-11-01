@@ -150,6 +150,46 @@ extern "C" {
 #include "RAS_ParticleBuffer.h"
 
 
+/* Call range_cutscene_runtime.<func>(args). Returns the result truthiness. Steals `args`. */
+static bool CallCutsceneRuntime(const char *func, PyObject *args)
+{
+#ifdef WITH_PYTHON
+	bool result = false;
+	PyObject *module = PyImport_ImportModule("range_cutscene_runtime");
+	if (module && args) {
+		PyObject *callable = PyObject_GetAttrString(module, func);
+		if (callable) {
+			PyObject *ret = PyObject_CallObject(callable, args);
+			if (ret) {
+				result = PyObject_IsTrue(ret) == 1;
+				Py_DECREF(ret);
+			}
+			Py_DECREF(callable);
+		}
+	}
+	if (PyErr_Occurred()) {
+		CM_Error("cutscene: range_cutscene_runtime." << func << "() failed");
+		PyErr_Print();
+	}
+	Py_XDECREF(args);
+	Py_XDECREF(module);
+	return result;
+#else
+	(void)func;
+	(void)args;
+	return false;
+#endif
+}
+
+void KX_Scene::RestoreCutsceneGameplayCamera()
+{
+	KX_Camera *camera = m_cutsceneGameplayCamera;
+	m_cutsceneGameplayCamera = nullptr;
+	if (camera && GetCameraList()->SearchValue(camera)) {
+		SetActiveCamera(camera);
+	}
+}
+
 void KX_Scene::SetCutsceneManager(std::unique_ptr<KX_CutsceneManager> cutsceneManager)
 {
 	ClearCutsceneSpawnedObjects();
@@ -169,6 +209,26 @@ void KX_Scene::StopCutscene()
 	}
 	m_pendingCutsceneEvents.clear();
 	m_cutscenePaths.clear();
+	CallCutsceneRuntime("stop", PyTuple_New(0));
+	RestoreCutsceneGameplayCamera();
+	m_cutsceneOverlayActive = false;
+}
+
+bool KX_Scene::SkipCutscene()
+{
+	if (!m_cutsceneManager || !m_cutsceneManager->IsInProgress()) {
+		return false;
+	}
+	const KX_CutsceneManager::DispatchedEvents remaining = m_cutsceneManager->Skip();
+	m_pendingCutsceneEvents.insert(m_pendingCutsceneEvents.end(), remaining.begin(), remaining.end());
+	m_cutsceneSkipping = true;
+	DispatchCutsceneEvents();
+	m_cutsceneSkipping = false;
+	m_cutscenePaths.clear();
+	/* Drop the dialog and any fade/bars: the game continues in its normal view. */
+	CallCutsceneRuntime("skip_cleanup", PyTuple_New(0));
+	m_cutsceneOverlayActive = false;
+	return true;
 }
 
 bool KX_Scene::RestartCutscene()
@@ -179,6 +239,8 @@ bool KX_Scene::RestartCutscene()
 	ClearCutsceneSpawnedObjects();
 	m_pendingCutsceneEvents.clear();
 	m_cutscenePaths.clear();
+	CallCutsceneRuntime("stop", PyTuple_New(0));
+	RestoreCutsceneGameplayCamera();
 	return m_cutsceneManager->Restart();
 }
 
@@ -207,6 +269,32 @@ void KX_Scene::UpdateCutscene(double deltaTime)
 		    m_cutsceneManager->GetWaitType() == KX_CutsceneManager::WAIT_CAMERA_END) {
 			m_cutsceneManager->ClearWait();
 		}
+	}
+
+	/* After the paths moved the camera: screen and camera effects animate and the skip key is
+	 * read while a cutscene runs or an overlay is visible. */
+	const bool inProgress = m_cutsceneManager->IsInProgress();
+	if (inProgress || m_cutsceneOverlayActive) {
+#ifdef WITH_PYTHON
+		int flags = 0;
+		PyObject *module = PyImport_ImportModule("range_cutscene_runtime");
+		if (module) {
+			PyObject *ret = PyObject_CallMethod(module, "update", "di", deltaTime, inProgress ? 1 : 0);
+			if (ret) {
+				flags = PyLong_Check(ret) ? (int)PyLong_AsLong(ret) : 0;
+				Py_DECREF(ret);
+			}
+			Py_DECREF(module);
+		}
+		if (PyErr_Occurred()) {
+			CM_Error("cutscene: range_cutscene_runtime.update() failed");
+			PyErr_Print();
+		}
+		m_cutsceneOverlayActive = (flags & 1) != 0;
+		if ((flags & 2) && inProgress) {
+			SkipCutscene();
+		}
+#endif
 	}
 }
 
@@ -475,20 +563,34 @@ void KX_Scene::UpdateCutscenePaths(double time)
 			continue;
 		}
 
-		const float duration = event->m_paramFloat;
-		const float fraction = (duration > 0.0f) ?
-			std::min(float((time - it->m_startTime) / duration), 1.0f) : 1.0f;
+		const float elapsed = float(time - it->m_startTime);
+		const float duration = it->m_duration;
+		float fraction = (duration > 0.0f) ? std::min(elapsed / duration, 1.0f) : 1.0f;
+		switch (it->m_ease) {
+			case 1: fraction = fraction * fraction; break;
+			case 2: fraction = 1.0f - (1.0f - fraction) * (1.0f - fraction); break;
+			case 3: fraction = fraction * fraction * (3.0f - 2.0f * fraction); break;
+			default: break;
+		}
+		const float rawFraction = (duration > 0.0f) ? std::min(elapsed / duration, 1.0f) : 1.0f;
+		/* transition SMOOTH: blend from where the object was into the path (smoothstep). */
+		float blend = 1.0f;
+		if (it->m_blendTime > 0.0f && elapsed < it->m_blendTime) {
+			blend = elapsed / it->m_blendTime;
+			blend = blend * blend * (3.0f - 2.0f * blend);
+		}
 
 		mt::vec3 localPosition, localDirection;
 		EvaluateCutscenePath(event->m_pathPoints, fraction, localPosition, localDirection);
 
 		const mt::mat3x4 curveTransform = curve->NodeGetWorldTransform();
-		const mt::vec3 position = curveTransform * localPosition;
+		const mt::vec3 pathPosition = curveTransform * localPosition;
+		const mt::vec3 position = it->m_startPosition + (pathPosition - it->m_startPosition) * blend;
 		object->NodeSetWorldPosition(position);
 
 		/* Cameras look down -Z; keep the horizon level with world +Z as up. */
 		mt::vec3 forward = mt::zero3;
-		KX_GameObject *target = event->m_dependentObject;
+		KX_GameObject *target = it->m_target;
 		if (target && m_objectlist->SearchValue(target)) {
 			forward = target->NodeGetWorldPosition() - position;
 		}
@@ -501,12 +603,20 @@ void KX_Scene::UpdateCutscenePaths(double time)
 			if (xAxis.LengthSquared() > 1e-6f) {
 				xAxis.Normalize();
 				const mt::vec3 yAxis = mt::cross(zAxis, xAxis);
-				object->NodeSetGlobalOrientation(mt::mat3(xAxis, yAxis, zAxis));
+				const mt::mat3 pathOrientation(xAxis, yAxis, zAxis);
+				if (blend < 1.0f) {
+					const mt::quat from = mt::quat::FromMatrix(it->m_startOrientation).Normalized();
+					const mt::quat to = mt::quat::FromMatrix(pathOrientation).Normalized();
+					object->NodeSetGlobalOrientation(mt::quat::Slerp(from, to, blend).ToMatrix());
+				}
+				else {
+					object->NodeSetGlobalOrientation(pathOrientation);
+				}
 			}
 		}
 		object->NodeUpdate();
 
-		if (fraction >= 1.0f) {
+		if (rawFraction >= 1.0f && blend >= 1.0f) {
 			it = m_cutscenePaths.erase(it);
 		}
 		else {
@@ -575,6 +685,22 @@ void KX_Scene::DispatchCutsceneEvents()
 {
 	const KX_CutsceneManager::DispatchedEvents dispatchedEvents = TakePendingCutsceneEvents();
 	for (const KX_CutsceneManager::Event *event : dispatchedEvents) {
+		if (m_cutsceneSkipping) {
+			switch (event->m_type) {
+				case CUTSCENE_EVENT_DIALOG:
+				case CUTSCENE_EVENT_HIDE_DIALOG:
+				case CUTSCENE_EVENT_WAIT_TIME:
+				case CUTSCENE_EVENT_WAIT_TRIGGER:
+				case CUTSCENE_EVENT_WAIT_CAMERA_END:
+				case CUTSCENE_EVENT_CAMERA_PATH:
+				case CUTSCENE_EVENT_FADE:
+				case CUTSCENE_EVENT_LETTERBOX:
+				case CUTSCENE_EVENT_PLAYER_ANIM:
+					continue;
+				default:
+					break;
+			}
+		}
 		switch (event->m_type) {
 		case CUTSCENE_EVENT_SPAWN_OBJECT:
 			if (!event->m_templateObject || !event->m_spawnPoint) {
@@ -623,22 +749,63 @@ void KX_Scene::DispatchCutsceneEvents()
 				PyErr_Clear();
 
 				const std::string &text = GetLocalizedText(event, lang);
-				const std::string &overlayScene = event->m_paramBool ? "_dialogue_live" : "_dialogue";
-				KX_GetActiveEngine()->ConvertAndAddScene(overlayScene, true);
-
-				if (!event->m_audioPath.empty()) {
-					/* TODO: integrate audio playback */
+				KX_GameObject *textObject = event->m_templateObject;
+				if (textObject && !m_objectlist->SearchValue(textObject)) {
+					textObject = nullptr;
 				}
+				if (!textObject) {
+					/* Legacy: the game provides an overlay scene that reads globalDict["cutscene_dialog"]. */
+					const std::string &overlayScene = event->m_paramBool ? "_dialogue_live" : "_dialogue";
+					KX_GetActiveEngine()->ConvertAndAddScene(overlayScene, true);
+				}
+#ifdef WITH_PYTHON
+				PyObject *objArg = Py_None;
+				if (textObject) {
+					objArg = textObject->GetProxy();
+				}
+				else {
+					Py_INCREF(Py_None);
+				}
+				PyObject *args = Py_BuildValue("(NsssO)", objArg, text.c_str(), event->m_paramStrA.c_str(),
+				                               event->m_audioPath.c_str(), event->m_paramInt ? Py_True : Py_False);
+				const bool canWait = CallCutsceneRuntime("show_dialog", args);
+				if (event->m_paramInt && m_cutsceneManager) {
+					if (canWait) {
+						m_cutsceneManager->StartWaitTrigger("cutscene_dialog");
+					}
+					else {
+						CM_Warning("cutscene Dialog '" << event->m_name << "': Wait for Advance needs a Text object "
+						           "prepared with Setup Dialogue; not waiting");
+					}
+				}
+#endif
 			}
 			break;
 
 		case CUTSCENE_EVENT_HIDE_DIALOG:
 			KX_GetActiveEngine()->RemoveScene("_dialogue_live");
 			KX_GetActiveEngine()->RemoveScene("_dialogue");
+			CallCutsceneRuntime("hide_dialog", PyTuple_New(0));
 			break;
 
 		case CUTSCENE_EVENT_CAMERA_SHOT:
-			{
+			if (event->m_templateObject && m_objectlist->SearchValue(event->m_templateObject)) {
+				/* Native cut: switch to the chosen camera, remembering the gameplay camera once. */
+				if (event->m_templateObject->GetGameObjectType() != SCA_IObject::OBJ_CAMERA) {
+					/* Shot Empty (Cutscene Shot Tool): the active camera travels to it, following its properties. */
+					PyObject *args = Py_BuildValue("(N)", event->m_templateObject->GetProxy());
+					CallCutsceneRuntime("shot_to", args);
+					m_cutsceneOverlayActive = true;
+					continue;
+				}
+				KX_Camera *shotCamera = static_cast<KX_Camera *>(event->m_templateObject);
+				if (!m_cutsceneGameplayCamera && GetActiveCamera() != shotCamera) {
+					m_cutsceneGameplayCamera = GetActiveCamera();
+				}
+				SetActiveCamera(shotCamera);
+				CallCutsceneRuntime("camera_cut", PyTuple_New(0));
+			}
+			else {
 				KX_GameObject *cameraMgr = FindGameObject(m_objectlist, "CutsceneCameraManager");
 				if (cameraMgr) {
 					EXP_ListValue<KX_PythonComponent> *components = cameraMgr->GetComponents();
@@ -675,6 +842,9 @@ void KX_Scene::DispatchCutsceneEvents()
 			break;
 
 		case CUTSCENE_EVENT_RESTORE_GAMEPLAY_CAMERA:
+			CallCutsceneRuntime("restore_shot_camera", PyTuple_New(0));
+			RestoreCutsceneGameplayCamera();
+			CallCutsceneRuntime("camera_cut", PyTuple_New(0));
 			{
 				KX_GameObject *cameraMgr = FindGameObject(m_objectlist, "CutsceneCameraManager");
 				if (cameraMgr) {
@@ -696,7 +866,12 @@ void KX_Scene::DispatchCutsceneEvents()
 		case CUTSCENE_EVENT_CAMERA_START:
 			{
 				KX_GameObject *cameraMgr = FindGameObject(m_objectlist, "CutsceneCameraManager");
-				if (cameraMgr) {
+				if (!cameraMgr) {
+					/* No game component: the engine plays the Shot Empties itself. */
+					CallCutsceneRuntime("start_shots", PyTuple_New(0));
+					m_cutsceneOverlayActive = true;
+				}
+				else {
 					EXP_ListValue<KX_PythonComponent> *components = cameraMgr->GetComponents();
 					if (components && components->GetCount() > 0) {
 						KX_PythonComponent *cameraComp = components->GetValue(0);
@@ -715,7 +890,12 @@ void KX_Scene::DispatchCutsceneEvents()
 		case CUTSCENE_EVENT_CAMERA_STOP:
 			{
 				KX_GameObject *cameraMgr = FindGameObject(m_objectlist, "CutsceneCameraManager");
-				if (cameraMgr) {
+				if (!cameraMgr) {
+					/* No game component: the engine plays the Shot Empties itself. */
+					CallCutsceneRuntime("restore_shot_camera", PyTuple_New(0));
+					m_cutsceneOverlayActive = true;
+				}
+				else {
 					EXP_ListValue<KX_PythonComponent> *components = cameraMgr->GetComponents();
 					if (components && components->GetCount() > 0) {
 						KX_PythonComponent *cameraComp = components->GetValue(0);
@@ -866,12 +1046,60 @@ void KX_Scene::DispatchCutsceneEvents()
 						break;
 					}
 				}
-				m_cutscenePaths.push_back({event, m_cutsceneManager->GetPlayTime()});
+				CutscenePathPlayback playback;
+				playback.m_event = event;
+				playback.m_startTime = m_cutsceneManager->GetPlayTime();
+				playback.m_duration = event->m_paramFloat;
+				playback.m_target = event->m_dependentObject;
+				playback.m_startPosition = event->m_templateObject->NodeGetWorldPosition();
+				playback.m_startOrientation = event->m_templateObject->NodeGetWorldOrientation();
+				KX_GameObject *curve = event->m_spawnPoint;
+				if (EXP_Value *value = curve->GetProperty("duration")) {
+					if (playback.m_duration <= 0.0f) {
+						playback.m_duration = (float)value->GetNumber();
+					}
+				}
+				EXP_Value *transition = curve->GetProperty("transition");
+				if (transition && transition->GetText() == "SMOOTH") {
+					EXP_Value *speed = curve->GetProperty("transition_speed");
+					playback.m_blendTime = speed ? std::max(0.0f, (float)speed->GetNumber()) : 1.0f;
+				}
+				if (EXP_Value *ease = curve->GetProperty("ease")) {
+					const std::string text = ease->GetText();
+					playback.m_ease = (text == "IN") ? 1 : (text == "OUT") ? 2 : (text == "IN_OUT") ? 3 : 0;
+				}
+				if (!playback.m_target) {
+					if (EXP_Value *target = curve->GetProperty("target")) {
+						const std::string name = target->GetText();
+						playback.m_target = name.empty() ? nullptr : m_objectlist->FindValue(name);
+					}
+				}
+				m_cutscenePaths.push_back(playback);
+				/* FOV, shake, noise, slow motion and filter messages of the curve (Python side). */
+				CallCutsceneRuntime("path_start", Py_BuildValue("(NN)", event->m_templateObject->GetProxy(),
+				                                                curve->GetProxy()));
+				m_cutsceneOverlayActive = true;
 
 				if (event->m_paramInt && event->m_templateObject->GetGameObjectType() == SCA_IObject::OBJ_CAMERA) {
 					SetActiveCamera(static_cast<KX_Camera *>(event->m_templateObject));
 				}
 				UpdateCutscenePaths(m_cutsceneManager->GetPlayTime());
+			}
+			break;
+
+		case CUTSCENE_EVENT_FADE:
+			{
+				PyObject *args = Py_BuildValue("(if)", event->m_paramInt, event->m_paramFloat);
+				CallCutsceneRuntime("fade", args);
+				m_cutsceneOverlayActive = true;
+			}
+			break;
+
+		case CUTSCENE_EVENT_LETTERBOX:
+			{
+				PyObject *args = Py_BuildValue("(if)", event->m_paramBool ? 1 : 0, event->m_paramFloat);
+				CallCutsceneRuntime("letterbox", args);
+				m_cutsceneOverlayActive = true;
 			}
 			break;
 

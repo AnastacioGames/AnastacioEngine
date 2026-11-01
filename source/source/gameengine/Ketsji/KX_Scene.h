@@ -426,8 +426,22 @@ private:
 	{
 		const KX_CutsceneManager::Event *m_event;
 		double m_startTime;
+		/* Shot properties read from the curve's game properties (Cutscene Shot Tool). */
+		float m_duration = 0.0f;   // event Duration, or the curve's "duration"
+		float m_blendTime = 0.0f;  // transition SMOOTH: seconds to blend from the start pose into the path
+		int m_ease = 0;            // 0 linear, 1 in, 2 out, 3 in-out
+		KX_GameObject *m_target = nullptr;  // event Look At, or the curve's "target"
+		mt::vec3 m_startPosition = mt::zero3;
+		mt::mat3 m_startOrientation = mt::mat3::Identity();
 	};
 	std::vector<CutscenePathPlayback> m_cutscenePaths;
+	/** Active camera before the first native Camera Shot cut; restored by Restore Gameplay Camera/Stop. */
+	KX_Camera *m_cutsceneGameplayCamera = nullptr;
+	void RestoreCutsceneGameplayCamera();
+	/** True while SkipCutscene() runs the remaining events (dialog, waits, paths and screen effects are dropped). */
+	bool m_cutsceneSkipping = false;
+	/** A Fade/Letterbox overlay is on screen; range_cutscene_runtime.update() runs every frame while set. */
+	bool m_cutsceneOverlayActive = false;
 	/** Place Camera Path objects for the current cutscene time and drop the finished ones. */
 	void UpdateCutscenePaths(double time);
 
@@ -765,6 +779,8 @@ public:
 
 	void SetCutsceneManager(std::unique_ptr<KX_CutsceneManager> cutsceneManager);
 	void StopCutscene();
+	/** Jump to the end of the playing Cutscene, keeping its end state (camera, player, scene change). */
+	bool SkipCutscene();
 	bool RestartCutscene();
 	/** Advance the scene-owned Cutscene clock and retain crossed events. */
 	void UpdateCutscene(double deltaTime);
@@ -828,6 +844,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_Scene, play_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, release_cutscene_trigger);
 	EXP_PYMETHOD_DOC(KX_Scene, stop_cutscene);
+	EXP_PYMETHOD_DOC(KX_Scene, skip_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, restart_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, explode);
 	EXP_PYMETHOD_DOC(KX_Scene, get);

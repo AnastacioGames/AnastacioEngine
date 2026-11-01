@@ -333,6 +333,65 @@ def analisar_extras(pasta, eventos):
     return x
 
 
+# Culpado de um frame lento: script acima disto (ms e fracao do frame) ou contador acima de N x a mediana.
+CULPADO_SCRIPT_MS = 1.0
+CULPADO_SCRIPT_FRACAO = 0.2
+CULPADO_WORK_FATOR = 3.0
+CULPADO_WORK_MIN = 50
+
+
+def apontar_culpados(a, eventos):
+    """Junta frames, scripts, work e cargas para dizer o provavel culpado de cada frame lento e da sessao."""
+    scripts = {e['f']: e.get('c', {}) for e in eventos if e['ev'] == 'scripts'}
+    work = {e['f']: e for e in eventos if e['ev'] == 'work'}
+    med_work = {}
+    jogo_work = [e for f, e in work.items() if f > FRAMES_DE_LOAD]
+    for k in {k for e in jogo_work for k in e if k not in ('t', 'f', 'ev')}:
+        med_work[k] = mediana([e.get(k, 0) for e in jogo_work])
+    for pk in a['picos']:
+        motivos = []
+        sc = scripts.get(pk['f'], {})
+        if sc:
+            nome, (ms, _n) = max(sc.items(), key=lambda kv: kv[1][0])
+            if ms >= CULPADO_SCRIPT_MS and ms >= CULPADO_SCRIPT_FRACAO * pk['ms']:
+                motivos.append('script %s (%.1f ms)' % (nome, ms))
+        if pk['cargas']:
+            motivos.append('carga: ' + pk['cargas'][0])
+        wk = work.get(pk['f'])
+        if wk:
+            picos_w = []
+            for k, med in med_work.items():
+                v = wk.get(k, 0)
+                if v >= CULPADO_WORK_MIN and v >= CULPADO_WORK_FATOR * max(med, 1):
+                    picos_w.append((v / max(med, 1), k, v, med))
+            for _r, k, v, med in sorted(picos_w, reverse=True)[:2]:
+                motivos.append('%s %d (normal %.0f)' % (k, v, med))
+        if not motivos and pk['cats']:
+            motivos.append('categoria %s (%.1f ms)' % pk['cats'][0])
+        pk['culpado'] = motivos[0] if motivos else '-'
+        pk['motivos'] = motivos
+
+    # Sessao: o que mais pesa em media nos frames de jogo.
+    jogo = [fr for f, fr in a['frames'].items() if f > FRAMES_DE_LOAD]
+    sessao = []
+    if jogo:
+        soma = defaultdict(float)
+        for fr in jogo:
+            for k, v in fr['c'].items():
+                if k not in OCIOSO:
+                    soma[k] += v
+        for k, v in sorted(soma.items(), key=lambda kv: kv[1], reverse=True)[:3]:
+            sessao.append(('categoria', k, v / len(jogo)))
+    x = a.get('extras', {})
+    for nome, _ms, _n, _nf, _pior, media in x.get('scripts', {}).get('linhas', [])[:3]:
+        sessao.append(('script', nome, media))
+    contagem = defaultdict(int)
+    for pk in a['picos']:
+        if pk['culpado'] != '-':
+            contagem[pk['culpado'].split(' (')[0]] += 1
+    a['culpados'] = dict(sessao=sessao, repetidos=sorted(contagem.items(), key=lambda kv: kv[1], reverse=True)[:5])
+
+
 def obs_objeto(o):
     """Camada e marcas que mudam a leitura de "nunca desenhado"."""
     partes = ['ativa' if o['active_layer'] else 'inativa']
@@ -437,11 +496,22 @@ def resumo_md(a):
         w('Mediana %.1f ms; lento = acima de %.1f ms (sem contar a espera ociosa).' % (a['frame_mediana'], a['pico_limite']))
         if a['picos']:
             w('')
-            w('| frame | segundo | ms | categorias | carregou junto |')
-            w('|---|---|---|---|---|')
+            c = a.get('culpados', {})
+            if c.get('repetidos'):
+                w('Culpados que mais se repetem: ' + '; '.join('%s (%dx)' % kv for kv in c['repetidos']) + '.')
+                w('')
+            w('| frame | segundo | ms | culpado provavel | categorias | carregou junto |')
+            w('|---|---|---|---|---|---|')
             for pk in a['picos'][:TOP_RESUMO]:
-                w('| %d | %.1f | %.1f | %s | %s |' % (pk['f'], pk['t'], pk['ms'], texto_cats(pk['cats']),
-                                                     '; '.join(pk['cargas']) or '-'))
+                w('| %d | %.1f | %.1f | %s | %s | %s |' % (pk['f'], pk['t'], pk['ms'], pk.get('culpado', '-'),
+                                                          texto_cats(pk['cats']), '; '.join(pk['cargas']) or '-'))
+    c = a.get('culpados', {})
+    if c.get('sessao'):
+        w('')
+        w('## Quem mais pesa (media por frame de jogo)')
+        w('')
+        for tipo, nome, ms in c['sessao']:
+            w('- %s %s: %.2f ms' % (tipo, nome, ms))
     resumo_trilho(a, w)
     x = a.get('extras', {})
     if 'work' in x:
@@ -920,9 +990,17 @@ def html_picos(a, w):
     w(secao('lentos', 'Frames lentos', len(a['picos']),
             'Mediana %.1f ms; lento = acima de %.1f ms, sem a espera ociosa. "Carregou junto" = cargas registradas no '
             'mesmo frame ou no anterior: a causa mais provavel da travada.' % (a['frame_mediana'], a['pico_limite'])))
-    linhas = [(pk['f'], '%.1f' % pk['t'], '%.1f' % pk['ms'], chips_cats(pk['cats']), '; '.join(pk['cargas']) or '-')
-              for pk in a['picos']]
-    w(tabela(('frame', 'segundo', 'ms', 'categorias (ms)', 'carregou junto'), linhas, (0, 1, 2),
+    c = a.get('culpados', {})
+    if c.get('sessao'):
+        w('<h3>Quem mais pesa</h3>')
+        w('<p class="nota">Media por frame de jogo: as categorias do profiler e os scripts mais caros.</p>')
+        w(tabela(('tipo', 'nome', 'ms/frame'), [(t, n, '%.2f' % v) for t, n, v in c['sessao']], (2,), calor=(2,)))
+    if c.get('repetidos'):
+        w('<p class="nota">Culpados que mais se repetem nos frames lentos: %s.</p>'
+          % esc('; '.join('%s (%dx)' % kv for kv in c['repetidos'])))
+    linhas = [(pk['f'], '%.1f' % pk['t'], '%.1f' % pk['ms'], pk.get('culpado', '-'), chips_cats(pk['cats']),
+               '; '.join(pk['cargas']) or '-') for pk in a['picos']]
+    w(tabela(('frame', 'segundo', 'ms', 'culpado provavel', 'categorias (ms)', 'carregou junto'), linhas, (0, 1, 2),
              calor=(2,), piso={2: a['pico_limite']}))
     w('</section>')
 
@@ -1262,6 +1340,7 @@ def main():
     eventos = ler_eventos(caminho)
     a = analisar(eventos)
     a['extras'] = analisar_extras(pasta, eventos)
+    apontar_culpados(a, eventos)
     md = resumo_md(a)
     with open(os.path.join(pasta, 'resumo.md'), 'w', encoding='utf-8') as f:
         f.write(md)

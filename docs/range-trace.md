@@ -98,7 +98,10 @@ o nome do original (os On Demand aparecem primeiro na cena temporária `..Conver
 - **Só em sombra:** fora da câmera o tempo todo, mas projetando sombra.
 - **Malhas, materiais e imagens à toa:** usados só pelos objetos nunca desenhados.
 - **Frames lentos:** acima de 2x a mediana e de 33 ms, sem a espera ociosa (Sleeping), com as três
-  categorias que mais pesaram e o que carregou no mesmo frame ou no anterior.
+  categorias que mais pesaram e o que carregou no mesmo frame ou no anterior. A coluna "culpado provável"
+  escolhe, nesta ordem: script que tomou ≥ 1 ms e ≥ 20% do frame (módulo `scripts`), carga no frame,
+  contador do `work` ≥ 3× a mediana, ou a categoria que mais pesou. Acima da tabela, "Quem mais pesa" lista
+  as categorias e scripts mais caros em média e os culpados que mais se repetem.
 - **Trilho de câmera:** a curva dividida em 40 trechos; faixa e mapa visto de cima coloridos de verde a
   vermelho pelo custo médio. Trecho quente = acima de 125% da mediana dos trechos e 1 ms a mais. Os primeiros
   10 frames do trilho ficam de fora (fim do load). A coluna de categorias diz o que pesa: MainRender e

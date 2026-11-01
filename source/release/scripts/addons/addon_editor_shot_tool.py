@@ -55,6 +55,24 @@ SHOT_PROPERTY_SCHEMA = [
     ("filter_off", 'STRING', ""),
 ]
 
+# Curva (Camera Path): a engine move a câmera pela curva e lê estas propriedades.
+# Sem "order" (a curva é escolhida no evento) e sem pan_target/follow (a curva
+# já é o caminho). transition SMOOTH: transition_speed = segundos para entrar na
+# curva; ease: LINEAR, IN, OUT ou IN_OUT; duration vale se o evento tiver 0.
+CURVE_PROPERTY_SCHEMA = [
+    ("target", 'STRING', ""),
+    ("duration", 'FLOAT', 0.0),
+    ("transition", 'STRING', "CUT"),
+    ("transition_speed", 'FLOAT', 1.0),
+    ("ease", 'STRING', "IN_OUT"),
+    ("fov", 'FLOAT', 45.0),
+    ("shake", 'FLOAT', 0.0),
+    ("noise", 'BOOL', False),
+    ("slowmo_scale", 'FLOAT', 1.0),
+    ("filter_on", 'STRING', ""),
+    ("filter_off", 'STRING', ""),
+]
+
 ORDER_PROP_ALIASES = ("index", "order", "step", "ordem", "shot_index")
 
 
@@ -73,6 +91,11 @@ def get_shot_order(obj):
 
 
 SHOT_OBJECT_TYPES = ('EMPTY', 'CAMERA')
+PANEL_OBJECT_TYPES = SHOT_OBJECT_TYPES + ('CURVE',)
+
+
+def is_curve_shot(obj):
+    return obj.type == 'CURVE' and "transition" in obj.game.properties
 
 
 def is_shot_empty(obj):
@@ -136,13 +159,17 @@ class CUTSCENE_OT_sync_shot_properties(bpy.types.Operator):
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
-        targets = [o for o in context.selected_objects if o.type in SHOT_OBJECT_TYPES]
+        targets = [o for o in context.selected_objects if o.type in PANEL_OBJECT_TYPES]
         if not targets:
             self.report({'WARNING'}, tip_("Select at least one Empty or Camera."))
             return {'CANCELLED'}
 
         touched = 0
         for obj in targets:
+            if obj.type == 'CURVE':
+                if apply_schema(obj, CURVE_PROPERTY_SCHEMA, overwrite=False):
+                    touched += 1
+                continue
             if get_shot_order(obj) is None:
                 add_or_get_prop(obj, "order", 'INT').value = next_free_order(context.scene)
             added = apply_schema(obj, SHOT_PROPERTY_SCHEMA, overwrite=False)
@@ -188,7 +215,8 @@ class CUTSCENE_OT_strip_shot_properties(bpy.types.Operator):
         if not obj:
             return {'CANCELLED'}
 
-        names_to_remove = set(ORDER_PROP_ALIASES) | {n for n, _, _ in SHOT_PROPERTY_SCHEMA}
+        names_to_remove = (set(ORDER_PROP_ALIASES) | {n for n, _, _ in SHOT_PROPERTY_SCHEMA} |
+                           {n for n, _, _ in CURVE_PROPERTY_SCHEMA})
         for p in list(obj.game.properties):
             if p.name.strip().lower() in names_to_remove or p.name in names_to_remove:
                 bpy.context.scene.objects.active = obj
@@ -257,10 +285,11 @@ FIELD_LABELS = {
     "slowmo_scale": "Slow Motion Scale",
     "filter_on": "Filter On",
     "filter_off": "Filter Off",
+    "ease": "Ease",
 }
 
 FIELD_GROUPS = (
-    ("Framing", ("duration", "transition", "fov", "transition_speed")),
+    ("Framing", ("duration", "transition", "fov", "transition_speed", "ease")),
     ("Camera Focus", ("target", "pan_target", "follow")),
     ("Effects", ("shake", "noise", "slowmo_scale")),
     ("Post-Processing Filters", ("filter_on", "filter_off")),
@@ -285,13 +314,17 @@ class CUTSCENE_PT_empty_shot_data(bpy.types.Panel):
 
     @classmethod
     def poll(cls, context):
-        return context.object and context.object.type in SHOT_OBJECT_TYPES
+        return context.object and context.object.type in PANEL_OBJECT_TYPES
 
     def draw(self, context):
         ob = context.object
         layout = self.layout
 
-        order = get_shot_order(ob)
+        if ob.type == 'CURVE' and not is_curve_shot(ob):
+            layout.label(text="Curve without shot properties (Camera Path).", icon='INFO')
+            layout.operator("cutscene.sync_shot_properties", text="Make Curve Shot", icon='CURVE_BEZCURVE')
+            return
+        order = get_shot_order(ob) if ob.type != 'CURVE' else 0
         if order is None:
             layout.label(text="This object is not a cutscene shot yet.", icon='INFO')
             layout.operator("cutscene.sync_shot_properties", text="Make Camera Shot", icon='CAMERA_DATA')
@@ -300,7 +333,10 @@ class CUTSCENE_PT_empty_shot_data(bpy.types.Panel):
         props_by_name = {p.name: p for p in ob.game.properties}
 
         row = layout.row()
-        row.label(text="Shot Order", icon='CAMERA_DATA')
+        if ob.type == 'CURVE':
+            row.label(text="Curve shot: pick this curve in a Camera Path event.", icon='CURVE_BEZCURVE')
+        else:
+            row.label(text="Shot Order", icon='CAMERA_DATA')
         for alias in ORDER_PROP_ALIASES:
             if alias in props_by_name:
                 row.prop(props_by_name[alias], "value", text="")

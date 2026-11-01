@@ -22,6 +22,17 @@ import bpy
 from bpy.types import Panel, UIList
 
 
+def _ui_reads_object(scene, obj):
+    """True if a UI Tree Dialogue Box reads this object (Source Property or Text Object)."""
+    for tree in bpy.data.node_groups:
+        for node in getattr(tree, "nodes", ()):
+            if node.bl_idname != "RangeUIDialogue" or node.source == 'TEXT':
+                continue
+            if node.object_name == obj.name or (not node.object_name and node.source == 'PROPERTY'):
+                return True
+    return False
+
+
 class CUTSCENE_UL_sequences(UIList):
 	def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
 		split = layout.split(factor=0.15, align=True)
@@ -177,12 +188,32 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
         elif event.type == 'DIALOG':
             box = layout.box()
             box.label("Dialog")
+            box.prop(event, "dialog_text_object")
+            box.prop(event, "dialog_speaker")
             box.prop(event, "dialog_text_en")
             box.prop(event, "dialog_text_pt")
             box.prop(event, "dialog_text_es")
             box.prop(event, "dialog_text_ru")
             box.prop(event, "dialog_audio_path")
-            box.prop(event, "dialog_live")
+            box.prop(event, "dialog_wait")
+            if event.dialog_text_object is None:
+                box.prop(event, "dialog_live")
+            elif (event.dialog_wait and event.dialog_text_object.type == 'FONT' and
+                  "td_end" not in event.dialog_text_object.game.properties and
+                  not _ui_reads_object(context.scene, event.dialog_text_object)):
+                box.label("Use Setup Dialogue on the Text object to wait for advance.", icon='ERROR')
+
+        elif event.type == 'FADE':
+            box = layout.box()
+            box.label("Fade")
+            box.prop(event, "fade_mode", expand=True)
+            box.prop(event, "fade_duration")
+
+        elif event.type == 'LETTERBOX':
+            box = layout.box()
+            box.label("Letterbox")
+            box.prop(event, "letterbox_show")
+            box.prop(event, "fade_duration")
 
         elif event.type == 'HIDE_DIALOG':
             layout.box().label("Hides the current dialog. No parameters.")
@@ -190,7 +221,13 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
         elif event.type == 'CAMERA_SHOT':
             box = layout.box()
             box.label("Camera Shot")
-            box.prop(event, "camera_order")
+            box.prop(event, "shot_camera")
+            if event.shot_camera is None:
+                box.prop(event, "camera_order")
+            elif event.shot_camera.type == 'EMPTY':
+                box.label("Shot Empty: the camera follows its shot properties.", icon='INFO')
+            elif event.shot_camera.type != 'CAMERA':
+                box.label("Use a camera or a Shot Empty.", icon='ERROR')
 
         elif event.type == 'LOOK_AT':
             box = layout.box()
@@ -203,10 +240,10 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             layout.box().label("Restores the gameplay camera. No parameters.")
 
         elif event.type == 'CAMERA_START':
-            layout.box().label("Starts the cutscene camera manager. No parameters.")
+            layout.box().label("Plays every Shot Empty in order (or starts the CutsceneCameraManager).")
 
         elif event.type == 'CAMERA_STOP':
-            layout.box().label("Stops the cutscene camera manager. No parameters.")
+            layout.box().label("Stops the shots and puts the camera back.")
 
         elif event.type == 'LOCK_PLAYER':
             layout.box().label("Locks player input. No parameters.")
@@ -262,6 +299,11 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             follow.active = event.path_look_at is None
             follow.prop(event, "path_follow")
             box.prop(event, "path_set_camera")
+            if event.path_curve is not None:
+                if "transition" in event.path_curve.game.properties:
+                    box.label("Uses the shot properties of the curve (Shot Tool).", icon='INFO')
+                else:
+                    box.label("Shot Tool > Make Curve Shot adds cuts, ease and effects.", icon='INFO')
 
             if event.path_object is None or event.path_curve is None:
                 box.label("Object and Curve are required.", icon='ERROR')

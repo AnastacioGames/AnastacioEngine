@@ -7955,6 +7955,8 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 		{CUTSCENE_EVENT_WAIT_TRIGGER, "WAIT_TRIGGER", ICON_TIME, "Wait Trigger", "Pause the timeline until a named trigger fires"},
 		{CUTSCENE_EVENT_WAIT_CAMERA_END, "WAIT_CAMERA_END", ICON_TIME, "Wait Camera End", "Pause the timeline until the current camera shot finishes"},
 		{CUTSCENE_EVENT_CAMERA_PATH, "CAMERA_PATH", ICON_CURVE_PATH, "Camera Path", "Move an object (usually a camera) along a curve"},
+		{CUTSCENE_EVENT_FADE, "FADE", ICON_IMAGE_ALPHA, "Fade", "Fade the screen to or from black"},
+		{CUTSCENE_EVENT_LETTERBOX, "LETTERBOX", ICON_FULLSCREEN_EXIT, "Letterbox", "Show or hide black cinema bars at the top and bottom"},
 		{0, NULL, 0, NULL, NULL}
 	};
 
@@ -8032,7 +8034,38 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Live", "Use the live dialogue overlay instead of the standard one");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "dialog_text_object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "template_object");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
+	RNA_def_property_ui_text(prop, "Text Object",
+	                         "Object read by a UI Tree Dialogue Box (Source Property or Text Object), or a Text "
+	                         "object with Setup Dialogue; empty uses the _dialogue overlay scene");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "dialog_speaker", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "param_str_a");
+	RNA_def_property_ui_text(prop, "Speaker",
+	                         "Who speaks: the name of the Dialogue Box, or shown before the line in a Text object "
+	                         "(optional)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "dialog_wait", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "param_int", 1);
+	RNA_def_property_ui_text(prop, "Wait for Advance",
+	                         "Pause the cutscene until the player advances past the last page of the line");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	/* Camera */
+	prop = RNA_def_property(srna, "shot_camera", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "template_object");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
+	RNA_def_property_ui_text(prop, "Camera",
+	                         "Camera to cut to, or a Shot Empty (Cutscene Shot Tool) the active camera travels to; "
+	                         "Restore Gameplay Camera goes back. Unset uses the CutsceneCameraManager with Shot Order");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "camera_order", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "param_int");
 	RNA_def_property_ui_text(prop, "Shot Order", "Index of the camera shot to jump to");
@@ -8043,6 +8076,31 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "Object");
 	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
 	RNA_def_property_ui_text(prop, "Target", "Object the player camera should look at");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	/* Fade / Letterbox */
+	{
+		static EnumPropertyItem fade_mode_items[] = {
+			{0, "OUT", 0, "To Black", "Darken the screen until it is black"},
+			{1, "IN", 0, "From Black", "Start black and reveal the scene"},
+			{0, NULL, 0, NULL, NULL}
+		};
+		prop = RNA_def_property(srna, "fade_mode", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "param_int");
+		RNA_def_property_enum_items(prop, fade_mode_items);
+		RNA_def_property_ui_text(prop, "Fade", "Direction of the fade");
+		RNA_def_property_update(prop, NC_SCENE, NULL);
+	}
+
+	prop = RNA_def_property(srna, "fade_duration", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_float_sdna(prop, NULL, "param_float");
+	RNA_def_property_range(prop, 0.0f, 60.0f);
+	RNA_def_property_ui_text(prop, "Duration", "Seconds the fade or the bars take (0 = instant)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "letterbox_show", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "param_bool", 1);
+	RNA_def_property_ui_text(prop, "Show Bars", "Show the bars (off hides them)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	/* Camera Path */

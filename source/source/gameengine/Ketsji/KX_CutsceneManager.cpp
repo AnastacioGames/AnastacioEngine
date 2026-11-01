@@ -100,7 +100,9 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Update(double time)
 		++m_nextEventIndex;
 
 		/* Pause after WAIT_* events; will be resumed by scene check */
-		if (event->m_type == 14 || event->m_type == 15 || event->m_type == 16) { // WAIT_TIME, WAIT_TRIGGER, WAIT_CAMERA_END
+		/* A Dialog with "Wait for Advance" (m_paramInt) also stops here; the scene starts its trigger wait. */
+		const bool dialogWait = (event->m_type == 1 && event->m_paramInt); // DIALOG
+		if (event->m_type == 14 || event->m_type == 15 || event->m_type == 16 || dialogWait) { // WAIT_TIME, WAIT_TRIGGER, WAIT_CAMERA_END
 			/* The timeline stops at the wait, so the rest of the step is not credited to the
 			 * events after it; the wait itself began that much earlier in played time. */
 			m_waitStartPlayTime = m_playTime - (time - event->m_time);
@@ -151,6 +153,28 @@ double KX_CutsceneManager::GetTime() const
 bool KX_CutsceneManager::IsPlaying() const
 {
 	return m_isPlaying;
+}
+
+bool KX_CutsceneManager::IsInProgress() const
+{
+	return m_isPlaying && (m_waitType != WAIT_NONE || m_nextEventIndex < m_eventOrder.size());
+}
+
+KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Skip()
+{
+	DispatchedEvents skipped;
+	if (!m_isPlaying) {
+		return skipped;
+	}
+	const std::vector<Event>& events = m_sequences[m_activeSequenceIndex].m_events;
+	for (; m_nextEventIndex < m_eventOrder.size(); ++m_nextEventIndex) {
+		const Event *event = &events[m_eventOrder[m_nextEventIndex]];
+		skipped.push_back(event);
+		m_time = std::max(m_time, static_cast<double>(event->m_time));
+	}
+	ClearWait();
+	m_latchedTriggers.clear();
+	return skipped;
 }
 
 int KX_CutsceneManager::GetActiveSequenceIndex() const

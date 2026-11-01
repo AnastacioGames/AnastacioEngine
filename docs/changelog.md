@@ -35,6 +35,84 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Pendente: build Windows, teste em GPU real e num jogo (RolimaRacer: carro visto de trás vai borrar até a
   etapa 2), custo em ms, painel no editor (não houve build do editor nesta sessão).
 
+## 2026-11-01 - Cutscene: revisão e traduções
+
+- Câmera lenta (`slowmo_scale`) de tomada ou curva volta ao normal quando a cutscene acaba, mesmo sem Restore
+  (antes o jogo continuava em câmera lenta).
+- Traduções pt/es/ru dos textos RNA da cutscene que faltavam (eventos Fade/Letterbox, campos novos e textos
+  antigos como "Camera Path", "Timed cutscene event"); descrição do Speaker fala do Dialogue Box.
+
+## 2026-11-01 - Cutscene: Camera Path com informações de corte da curva
+
+- A curva do **Camera Path** lê propriedades de tomada (game properties, mesmas do Shot Tool): `transition`
+  (CUT = entra direto; SMOOTH = desliza de onde a câmera está até a curva em `transition_speed` segundos, posição
+  e rotação), `ease` (LINEAR, IN, OUT, IN_OUT), `duration` (se o evento tiver 0), `target` (se o evento não tiver
+  Look At), e no Python `fov`, `shake`, `noise`, `slowmo_scale`, `filter_on`/`filter_off`. Sem essas propriedades
+  o caminho funciona como antes (velocidade constante, corte seco).
+- Efeitos da curva duram até a próxima tomada ou a volta da câmera (Restore, Camera Stop, pular, parar), que
+  devolve FOV e escala de tempo. O tremor não acumula com a câmera parada.
+- `range_cutscene_runtime.update()` passou para depois do `UpdateCutscenePaths` (o tremor vai por cima da curva).
+- Addon Shot Tool: curvas ganham "Make Curve Shot" (propriedades sem `order` e com `ease`), e o painel do evento
+  avisa quando a curva tem ou não as propriedades.
+
+## 2026-11-01 - Cutscene: tomadas por Empty (Cutscene Shot Tool) nativas
+
+- **Camera Shot** aceita um Empty de tomada em *Camera*: a câmera ativa sai do pai e vai até ele seguindo as
+  propriedades do addon Shot Tool: `transition` (CUT/SMOOTH), `transition_speed`, `fov`, `target` (olha para),
+  `pan_target` (desliza até ele durante `duration`), `follow` (acompanha mantendo a distância), `shake`, `noise`,
+  `slowmo_scale` (`setTimeScale`), `filter_on`/`filter_off` (mandados como mensagem no início/fim da tomada).
+- **Camera Start** sem `CutsceneCameraManager` na cena toca todos os Empties com `order` (ou alias), cada um pelo
+  seu `duration`; **Camera Stop**, Restore Gameplay Camera, pular e parar devolvem pai, posição, FOV e escala de
+  tempo. Com o componente do jogo na cena, o comportamento antigo continua.
+- Lógica em `range_cutscene_runtime.py` (`shot_to`, `start_shots`, `restore_shot_camera`), testada com objetos
+  falsos e `mathutils`; falta testar no jogo.
+
+## 2026-11-01 - Cutscene: fala no Dialogue Box da UI Tree
+
+- O evento Dialog usa o **Dialogue Box** da UI Tree quando uma caixa lê o objeto escolhido em *Text Object*
+  (Source Property ou Text Object): a fala vai para a caixa na tela e *Speaker* substitui o nome da caixa só
+  durante a fala. Com *Wait for Advance*, a espera acaba quando a caixa fecha a última página
+  (`range_cutscene_runtime.update()` manda `cutscene_dialog`). O objeto Text com Setup Dialogue continua valendo.
+- O aviso do painel não aparece mais para objetos lidos por um Dialogue Box.
+- Exemplo `create_cutscene_story_example.py` agora usa o template HUD (só a caixa), ligado na câmera do jogo.
+
+## 2026-11-01 - Cutscene: pular, Fade e Letterbox
+
+- **Pular:** Tab ou Start do controle (botão 6 SDL) pulam a cutscene em andamento; `scene.skip_cutscene()` faz o
+  mesmo e `globalDict["cutscene_skip"] = False` desliga a tecla. `KX_CutsceneManager::Skip()` devolve os eventos
+  restantes; a cena roda só os que deixam o estado final certo (câmera, Lock/Unlock, Spawn, Change Scene, mouse) e
+  descarta fala, esperas, Camera Path, Player Anim, Fade e Letterbox; depois some com fala, voz e efeitos.
+- **Novos eventos** `FADE` (18: To Black/From Black, Duration) e `LETTERBOX` (19: Show Bars, Duration), sem campos
+  novos no DNA (`param_int`, `param_bool`, `param_float`). Desenhados num filtro 2D no passo 121
+  (`range_cutscene_runtime.py`); o fade continua depois do fim da sequência (fade-out antes de Change Scene).
+- `range_cutscene_runtime.update()` roda a cada quadro só com cutscene em andamento ou efeito na tela.
+- JSON: ações `fade`/`letterbox` e tipo `enum` na tabela. Exemplo `create_cutscene_story_example.py` abre do preto
+  com faixas. Checado com compilação de sintaxe (C++ e RNA) e teste do runtime com `Range` falso; falta Windows.
+
+## 2026-11-01 - Cutscene: diálogo na tela, voz e corte de câmera nativos
+
+- **Dialog** ganhou *Text Object*, *Speaker* e *Wait for Advance* (slots `template_object`, `param_str_a`,
+  `param_int`; sem mudar DNA). A fala vai para o objeto Text (com Setup Dialogue: máquina de escrever e avanço);
+  com espera, o relógio para no evento (`KX_CutsceneManager::Update`) e um Wait Trigger `cutscene_dialog` é
+  liberado quando o jogador passa da última página (`td_message` trocado só durante a fala). Antes o texto era
+  escolhido e descartado. Sem Text Object segue o overlay `_dialogue`, agora com `globalDict["cutscene_dialog"]`.
+- **Voz:** `dialog_audio_path` toca via `aud` (antes era TODO); Hide Dialog e Stop param a voz.
+- **Camera Shot** ganhou *Camera*: corte direto para a câmera, guardando a câmera de jogo uma vez; Restore
+  Gameplay Camera e `stop/restart_cutscene` voltam para ela. Vazio mantém o `CutsceneCameraManager` (Shot Order).
+  Uma legenda filha de câmera passa para a câmera ativa a cada corte.
+- Lógica Python em `range_cutscene_runtime.py`; C++ em `KX_SceneCutscene.cpp`. Export/import JSON com os campos
+  novos. Exemplo: `tools/create_cutscene_story_example.py` (duas personagens, três planos, três falas).
+- Checado só com compilação de sintaxe no Linux; falta build Windows e testar o exemplo no jogo.
+
+## 2026-11-01 - Range Trace: culpado provável de cada frame lento
+
+- `relatorio_trace.py` cruza frames, `scripts`, `work` e cargas e escreve uma coluna "culpado provável" na tabela
+  de frames lentos (HTML e `resumo.md`). Ordem: script que tomou ≥ 1 ms e ≥ 20% do frame; carga no frame ou no
+  anterior; contador do `work` ≥ 3× a mediana (mín. 50); senão a categoria do profiler que mais pesou.
+- Novo bloco "Quem mais pesa" (categorias e scripts mais caros em média por frame de jogo) e a lista dos culpados
+  que mais se repetem. Só o relatório mudou; formato do trace e C++ intactos.
+- Testado com traces sintéticos (com e sem `scripts`/`work`). Falta usar num trace real.
+
 ## 2026-10-31 - NLA: correções no editor e no `playNLA()`; aba Car antes da Física
 
 - `playNLA()` (33f08f26): chamar de novo com os mesmos argumentos não reinicia (pode ir no Always com pulso);

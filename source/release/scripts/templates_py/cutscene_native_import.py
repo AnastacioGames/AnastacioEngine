@@ -74,7 +74,7 @@ def _param(params, key, action):
 
 def _coerce(value, kind, key):
     try:
-        if kind == ev.STR:
+        if kind in (ev.STR, ev.ENUM):
             return str(value)
         if kind == ev.FLOAT:
             return float(value)

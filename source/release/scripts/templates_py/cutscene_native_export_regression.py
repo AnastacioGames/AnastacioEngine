@@ -37,6 +37,8 @@ def sample_value(key, kind, objects):
         return objects[key]
     if kind == ev.STR:
         return "valor " + key + " ção"
+    if kind == ev.ENUM:
+        return "IN"
     if kind == ev.FLOAT:
         return 1.75
     if kind == ev.INT:

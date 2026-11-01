@@ -287,6 +287,10 @@ Evento Camera Path (2026-09-30): falta relinkar `RangeEngine` e o usuário testa
 os 18 tipos de evento (schema 2) e o Wait Trigger é liberado por mensagem ou `scene.release_cutscene_trigger()`
 (branch `cutscene/events`, 2026-10-04, testes headless no Linux passaram; falta o usuário testar no Windows/jogo
 real). Pendente: liberar por propriedade (decisão em aberto, ver [notas](notes-cutscene-events.md)).
+Diálogo na tela (Text Object, Speaker, Wait for Advance), voz e corte nativo de câmera feitos em 2026-11-01
+(ver changelog); falta compilar no Windows e testar `tools/create_cutscene_story_example.py`. Próximos:
+transição suave entre câmeras (hoje só corte seco) e animação de NPC por evento. Pular (Tab/Start), Fade e
+Letterbox também feitos em 2026-11-01, aguardando teste no Windows.
 
 ### World Status
 
@@ -415,6 +419,12 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 - **Alternância manual de controles para menus (2026-10-14):** implementada no template Web/APK; falta validar em
   celular real (menu, retorno à partida, rotação), incluindo iframe do itch.io.
 
+### Personagem automático (Fuse → armature base)
+
+Plano em [personagem-auto-rig-plan.md](personagem-auto-rig-plan.md) (2026-11-01): ligar malhas do Fuse numa armature
+base do Mixamo sem passar pelo site, com materiais, LOD, ragdoll e grupo num botão. Aguardando os arquivos de
+exemplo do usuário em `tests/assets/personagem/`.
+
 ### Outros
 
 - **Associação de arquivos**: abrir `.blend` e `.range` direto com os executáveis adequados (instalação/registro
@@ -442,7 +452,7 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 ## Performance
 
 - **Range Trace ([range-trace.md](range-trace.md))** — fases 1 a 4 feitas (scripts/runtime no relatório e no
-  launcher em 2026-10-24). Falta usar num jogo real com som (o `--server` não toca).
+  launcher em 2026-10-24); culpado provável por frame lento no relatório (2026-11-01, falta conferir num trace real). Falta usar num jogo real com som (o `--server` não toca).
 - **Static Batch:** Auto Static Batch medido em 2026-10-30 no benchmark da Thunder: igual ao manual e empatado
   com a Thunder ([batching estático e culling](batching-estatico-e-culling.md)). Ligado por padrão em cena nova desde 2026-10-30; aceito com janela em 2026-10-30.
 - **Travadas do RolimaRacer (2026-10-10):** `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo. Abertos:
