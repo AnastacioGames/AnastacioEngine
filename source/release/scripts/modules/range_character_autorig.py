@@ -8,6 +8,9 @@ import math
 
 from mathutils import Matrix, Vector
 
+# Peças do Fuse que não contam na altura do corpo.
+ACCESSORIES = {"hair", "hats", "hat", "eyewear", "masks", "mask"}
+
 # Direções de frente possíveis no chão (o personagem já está de pé em Z).
 _DIRS = {"+Y": Vector((0, 1, 0)), "-Y": Vector((0, -1, 0)), "+X": Vector((1, 0, 0)), "-X": Vector((-1, 0, 0))}
 
@@ -87,8 +90,9 @@ def is_upright(objects):
     return s.z >= max(s.x, s.y) * 0.6 or s.z >= min(s.x, s.y) * 3.0
 
 
-def align_to_base(objects, base_arm, report=print):
-    """Põe as peças de pé, em metros, com o pé no chão, centradas e de frente para o lado da base.
+def align_to_base(objects, base_arm, match_height=True, report=print):
+    """Põe as peças de pé, em metros, com o pé no chão, centradas, de frente para o lado da base e,
+    com match_height, na mesma altura da base.
 
     Aplica a transformação nas malhas (escala 1, rotação 0). Retorna um dicionário com o que mudou."""
     out = {}
@@ -126,10 +130,18 @@ def align_to_base(objects, base_arm, report=print):
     mn, mx = bounds(world_verts(objects))
     _transform(objects, Matrix.Translation(Vector(((-(mn.x + mx.x) / 2), -(mn.y + mx.y) / 2, -mn.z))))
     mn, mx = bounds(world_verts(objects))
-    out["altura"] = round(mx.z - mn.z, 3)
     base_h = armature_height(base_arm)
+    # A altura é a do corpo: cabelo, chapéu, óculos e máscara ficam de fora (um penteado alto não encolhe ninguém).
+    core = [o for o in objects if o.name.split(".")[0].lower() not in ACCESSORIES] or objects
+    cmn, cmx = bounds(world_verts(core))
     if base_h:
         out["altura_base"] = round(base_h, 3)
+        # Todos os personagens com a altura da base (pé no chão fica no lugar).
+        if match_height and abs((cmx.z - cmn.z) - base_h) > 0.001:
+            out["altura_original"] = round(cmx.z - cmn.z, 3)
+            _transform(objects, Matrix.Scale(base_h / (cmx.z - cmn.z), 4))
+            cmn, cmx = bounds(world_verts(core))
+    out["altura"] = round(cmx.z - cmn.z, 3)
     return out
 
 

@@ -21,7 +21,7 @@ for nome,m in casos.items():
     bpy.context.scene.update()
     r=ar.align_to_base(objs,arm)
     f,_=ar.mesh_front(objs)
-    passou = f==ar.armature_front(arm) and 1.5<r["altura"]<1.8 and ar._widest_slice(ar.world_verts(objs))>0.5
+    passou = f==ar.armature_front(arm) and abs(r["altura"]-r["altura_base"])<0.002 and ar._widest_slice(ar.world_verts(objs))>0.5
     ok&=passou
     print("ALINHAR",nome,"OK" if passou else "FALHOU",r)
     for o in objs: bpy.data.objects.remove(o,do_unlink=True)
