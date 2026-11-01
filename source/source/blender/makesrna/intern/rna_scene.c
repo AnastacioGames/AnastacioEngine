@@ -8026,7 +8026,9 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "dialog_speaker", PROP_STRING, PROP_NONE);
 	RNA_def_property_string_sdna(prop, NULL, "param_str_a");
-	RNA_def_property_ui_text(prop, "Speaker", "Name shown before the line, e.g. \"Ana: ...\" (optional)");
+	RNA_def_property_ui_text(prop, "Speaker",
+	                         "Who speaks: the name of the Dialogue Box, or shown before the line in a Text object "
+	                         "(optional)");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	prop = RNA_def_property(srna, "dialog_wait", PROP_BOOLEAN, PROP_NONE);

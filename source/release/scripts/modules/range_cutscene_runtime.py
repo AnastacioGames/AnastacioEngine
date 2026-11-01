@@ -347,7 +347,7 @@ def _begin_shot(empty):
     if cam is None:
         return
     if _shot["saved"] is None:
-        _shot["saved"] = (cam.parent, cam.localTransform.copy(), cam.fov, logic.getTimeScale())
+        _shot["saved"] = (cam.parent, cam.localTransform.copy(), cam.fov)
         cam.removeParent()
     if _shot["filter_off"]:
         logic.sendMessage(_shot["filter_off"])
@@ -359,7 +359,7 @@ def _begin_shot(empty):
     _shot["offset"] = (empty.worldPosition - follow.worldPosition) if follow is not None else None
     if "fov" in empty:
         cam.fov = float(empty["fov"])
-    logic.setTimeScale(float(empty.get("slowmo_scale", 1.0)) or 1.0)
+    _set_timescale(float(empty.get("slowmo_scale", 1.0)) or 1.0)
     if empty.get("filter_on", ""):
         logic.sendMessage(str(empty["filter_on"]))
     if str(empty.get("transition", "SMOOTH")).upper() == "CUT":
@@ -454,11 +454,8 @@ def _end_path_fx(restore):
     if _path["filter_off"]:
         logic.sendMessage(_path["filter_off"])
     _path.update(obj=None, curve=None, saved=None, filter_off="", last=None, last_pos=None)
-    if restore and saved is not None:
-        fov, timescale = saved
-        logic.setTimeScale(timescale)
-        if obj is not None and not obj.invalid and fov is not None:
-            obj.fov = fov
+    if restore and saved is not None and obj is not None and not obj.invalid:
+        obj.fov = saved
 
 
 def path_start(obj, curve):
@@ -466,13 +463,13 @@ def path_start(obj, curve):
     saved = _path["saved"] if _path["obj"] is obj else None
     _end_path_fx(restore=_path["obj"] is not obj)
     if saved is None:
-        saved = (getattr(obj, "fov", None), logic.getTimeScale())
+        saved = getattr(obj, "fov", None)
     _path.update(obj=obj, curve=curve, saved=saved, time=0.0, seed=random.uniform(0.0, 100.0),
                  filter_off=str(curve.get("filter_off", "")))
     if "fov" in curve and hasattr(obj, "fov"):
         obj.fov = float(curve["fov"])
     if "slowmo_scale" in curve:
-        logic.setTimeScale(float(curve["slowmo_scale"]) or 1.0)
+        _set_timescale(float(curve["slowmo_scale"]) or 1.0)
     if curve.get("filter_on", ""):
         logic.sendMessage(str(curve["filter_on"]))
 
@@ -504,14 +501,14 @@ def _update_path_fx(dt):
 def restore_shot_camera():
     """Devolve a câmera ao pai, à posição e ao FOV de antes das tomadas."""
     _end_path_fx(restore=True)
+    _restore_timescale()
     cam, saved = _shot["cam"], _shot["saved"]
     if _shot["filter_off"]:
         logic.sendMessage(_shot["filter_off"])
     _shot.update(cam=None, saved=None, empty=None, queue=[], offset=None, filter_off="")
     if saved is None:
         return
-    parent, local, fov, timescale = saved
-    logic.setTimeScale(timescale)
+    parent, local, fov = saved
     if cam is None or cam.invalid:
         return
     if parent is not None and not parent.invalid:
@@ -520,7 +517,26 @@ def restore_shot_camera():
     cam.fov = fov
 
 
+_timescale = {"saved": None}
+
+
+def _set_timescale(value):
+    """Câmera lenta de uma tomada; a escala original volta no fim da cutscene."""
+    if _timescale["saved"] is None:
+        _timescale["saved"] = logic.getTimeScale()
+    logic.setTimeScale(value)
+
+
+def _restore_timescale():
+    if _timescale["saved"] is not None:
+        logic.setTimeScale(_timescale["saved"])
+        _timescale["saved"] = None
+
+
 def update(dt, in_progress):
+    if not in_progress:
+        # A cutscene acabou sem Restore: a câmera pode ficar, a câmera lenta não.
+        _restore_timescale()
     flags = 0
     if _shot["empty"] is not None:
         _update_shot(dt)

@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Cutscene: revisão e traduções
+
+- Câmera lenta (`slowmo_scale`) de tomada ou curva volta ao normal quando a cutscene acaba, mesmo sem Restore
+  (antes o jogo continuava em câmera lenta).
+- Traduções pt/es/ru dos textos RNA da cutscene que faltavam (eventos Fade/Letterbox, campos novos e textos
+  antigos como "Camera Path", "Timed cutscene event"); descrição do Speaker fala do Dialogue Box.
+
 ## 2026-11-01 - Cutscene: Camera Path com informações de corte da curva
 
 - A curva do **Camera Path** lê propriedades de tomada (game properties, mesmas do Shot Tool): `transition`
