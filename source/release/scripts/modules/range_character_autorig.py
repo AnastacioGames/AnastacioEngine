@@ -782,10 +782,10 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
         for i, ((_ratio, dist), lod) in enumerate(zip(LOD_LEVELS, lods), 1):
             part.lod_levels[i].object = lod
             part.lod_levels[i].distance = dist
-        _prop(part, "aura_rain_effect", False)
+        # sem "aura_rain_effect": a aura da chuva cobre o corpo com agua e o deixa com cara de fantasma
+        # (os pilotos prontos nao tem a propriedade)
+        limit_head_weights(part, arm)
     _prop(fp, "camera_hide_fp", True)
-    if lods:
-        _prop(lods[0], "aura_rain_effect", False)
     arm.name = "Armature" + group_name
     arm.game.physics_type = 'NO_COLLISION'
     _prop(arm, "pilot.armature", False)
@@ -868,6 +868,29 @@ def _pose_arms_down(arm):
         q = d.rotation_difference(target)
         m = pb.matrix.copy()
         pb.matrix = Matrix.Translation(m.to_translation()) * q.to_matrix().to_4x4() *             Matrix.Translation(-m.to_translation()) * m
+
+
+def limit_head_weights(mesh, arm, margin=0.02,
+                       chain=(("mixamorig:Head", "mixamorig:Neck"), ("mixamorig:Neck", "mixamorig:Spine2"))):
+    """Peso da cabeca so acima da base dela, peso do pescoco so acima da base dele (o resto vai para o osso
+    de baixo). A transferencia de pesos espalhava a cabeca no pescoco e nos ombros: ao girar a cabeca
+    (head_look, camera de lado) eles torciam junto."""
+    to_arm = arm.matrix_world.inverted() * mesh.matrix_world
+    groups = {g.name: g for g in mesh.vertex_groups}
+    for bone_name, lower_name in chain:
+        bone = arm.data.bones.get(bone_name)
+        g, low = groups.get(bone_name), groups.get(lower_name)
+        if not bone or not g or not low:
+            continue
+        floor = bone.head_local.z - margin
+        for v in mesh.data.vertices:
+            if (to_arm * v.co).z >= floor:
+                continue
+            w = next((e.weight for e in v.groups if e.group == g.index), 0.0)
+            if w <= 0.0:
+                continue
+            g.remove([v.index])
+            low.add([v.index], w, 'ADD')
 
 
 SEAT_POSE = ("RolimaRacer.range", "CARRO_Main_drive_position", 1)
