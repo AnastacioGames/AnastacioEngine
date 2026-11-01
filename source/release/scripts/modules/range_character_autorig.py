@@ -496,3 +496,152 @@ def add_ragdoll(arm, game=GAME_RAGDOLL):
             body.name = "%s-%s-%s-Dynamic" % (game["names"], arm.name, bone)
             pivot.name = "%s-%s-%s-Empty" % (game["names"], arm.name, bone)
     return bodies
+
+
+# -- Atlas (sem bake) -------------------------------------------------------------------------------------
+#
+# As peças do Fuse já têm UV 0-1 e uma textura cada: copia cada textura para uma célula de um atlas 2048 e
+# reposiciona o UV. Olhos e cílios usam a textura do corpo e ficam na mesma célula.
+
+BIG_PIECES = ("body",)            # 1/4 do atlas
+LARGE_PIECES = ("tops", "bottoms")  # 1/4 se couber, senão 1/16
+
+
+def _piece(o):
+    return o.name.split(".")[0].lower()
+
+
+def _slot_image(obj, kind):
+    for mat in obj.data.materials:
+        if mat is None:
+            continue
+        for s in mat.texture_slots:
+            if s and s.texture and s.texture.type == 'IMAGE' and s.texture.image:
+                if kind == "diffuse" and s.use_map_color_diffuse:
+                    return s.texture.image
+                if kind == "normal" and s.use_map_normal:
+                    return s.texture.image
+    return None
+
+
+def _atlas_layout(keys, size):
+    """keys = [(image, peça)] na ordem de prioridade. Retorna {image: (x, y, lado)} em pixels."""
+    q = size // 2
+    cell = size // 4
+    big = [k for k in keys if k[1] in BIG_PIECES][:1]
+    rest = [k for k in keys if k not in big]
+    large = [k for k in rest if k[1] in LARGE_PIECES]
+    small = [k for k in rest if k not in large]
+    quads = [(0, 0), (q, 0), (0, q), (q, q)]
+    layout = {}
+    if big:
+        layout[big[0][0]] = quads.pop(0) + (q,)
+    # Peças grandes ganham um quadrante enquanto o resto ainda couber nas células de 1/16.
+    while large and len(quads) * 4 - 4 >= len(small) + len(large) - 1:
+        layout[large.pop(0)[0]] = quads.pop(0) + (q,)
+    cells = [(qx + cx, qy + cy) for qx, qy in quads for cy in (0, cell) for cx in (0, cell)]
+    for img, _p in large + small:
+        if not cells:
+            raise ValueError("peças demais para um atlas %d" % size)
+        layout[img] = cells.pop(0) + (cell,)
+    return layout
+
+
+def _paste(dst, size, src, x, y, side, default):
+    """Copia src redimensionada para (x, y, side) dentro de dst (lista RGBA de size*size)."""
+    import bpy
+    if src is None:
+        for row in range(side):
+            o = ((y + row) * size + x) * 4
+            dst[o:o + side * 4] = default * side
+        return
+    tmp = src.copy()
+    if tuple(tmp.size) != (side, side):
+        tmp.scale(side, side)
+    px = list(tmp.pixels)
+    bpy.data.images.remove(tmp)
+    for row in range(side):
+        o = ((y + row) * size + x) * 4
+        dst[o:o + side * 4] = px[row * side * 4:(row + 1) * side * 4]
+
+
+def build_atlas(objects, out_dir, name, size=2048, normal=True, uv_name="UV_Atlas"):
+    """Atlas de diffuse (com alfa) e normal, UV novo em cada peça, um material só. Salva PNGs em out_dir."""
+    import os
+    import bpy
+    order = sorted(objects, key=lambda o: (_piece(o) not in BIG_PIECES, _piece(o) not in LARGE_PIECES, o.name))
+    keys, img_of = [], {}
+    for o in order:
+        img = _slot_image(o, "diffuse")
+        img_of[o] = img
+        if img is not None and all(k[0] is not img for k in keys):
+            keys.append((img, _piece(o)))
+    layout = _atlas_layout(keys, size)
+    maps = {"diffuse": [0.0] * (size * size * 4)}
+    if normal:
+        maps["normal"] = [0.0] * (size * size * 4)
+    for img, _p in keys:
+        x, y, side = layout[img]
+        owner = next(o for o in order if img_of[o] is img)
+        _paste(maps["diffuse"], size, img, x, y, side, [1.0, 1.0, 1.0, 1.0])
+        if normal:
+            _paste(maps["normal"], size, _slot_image(owner, "normal"), x, y, side, [0.5, 0.5, 1.0, 1.0])
+    os.makedirs(out_dir, exist_ok=True)
+    images = {}
+    for kind, px in maps.items():
+        im = bpy.data.images.new("%s_%s" % (name, kind), size, size, alpha=(kind == "diffuse"))
+        im.pixels = px
+        im.filepath_raw = os.path.join(out_dir, "%s_%s.png" % (name, kind))
+        im.file_format = 'PNG'
+        im.save()
+        images[kind] = im
+    # Material único (Blender Internal, como os pilotos do jogo); alfa por recorte só onde a textura tem alfa.
+    mat = bpy.data.materials.new(name + "_mat")
+    mat.specular_intensity = 0.1
+    mat.use_transparency = True
+    mat.alpha = 0.0
+    mat.game_settings.alpha_blend = 'CLIP'
+    for kind, im in images.items():
+        tex = bpy.data.textures.new("%s_%s" % (name, kind), 'IMAGE')
+        tex.image = im
+        slot = mat.texture_slots.add()
+        slot.texture = tex
+        slot.texture_coords = 'UV'
+        slot.uv_layer = uv_name
+        if kind == "diffuse":
+            slot.use_map_alpha = True
+        else:
+            tex.use_normal_map = True
+            slot.use_map_color_diffuse = False
+            slot.use_map_normal = True
+            slot.normal_factor = 1.0
+    for o in order:
+        img = img_of[o]
+        x, y, side = layout[img] if img is not None else (0, 0, 0)
+        src_uv = o.data.uv_layers.active
+        new = o.data.uv_textures.new(uv_name)
+        dst_uv = o.data.uv_layers[uv_name]
+        for a, b in zip(src_uv.data, dst_uv.data):
+            b.uv = ((x + a.uv.x * side) / size, (y + a.uv.y * side) / size)
+        o.data.uv_textures.active = new
+        o.data.uv_textures[uv_name].active_render = True
+        o.data.materials.clear()
+        o.data.materials.append(mat)
+    return mat, layout
+
+
+def join_pieces(objects, name="Body"):
+    """Junta as peças numa malha só (pesos e UV do atlas juntos). Retorna o objeto."""
+    import bpy
+    scene = bpy.context.scene
+    for o in scene.objects:
+        o.select = o in objects
+    scene.objects.active = next(o for o in objects if _piece(o) == "body") if any(
+        _piece(o) == "body" for o in objects) else objects[0]
+    bpy.ops.object.join()
+    body = scene.objects.active
+    body.name = body.data.name = name
+    # Só o UV do atlas fica (o UV original de cada peça já foi convertido).
+    for uv in [u for u in body.data.uv_textures if u.name != "UV_Atlas"]:
+        body.data.uv_textures.remove(uv)
+    return body

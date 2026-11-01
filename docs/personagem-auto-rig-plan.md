@@ -133,6 +133,24 @@ de peso 0,008-0,023.
   armature `Armature<Group>` com `pilot.armature` e `active_ragdoll`; cabeça achada pelo nome do osso (Head).
   `body_ragdoll` não é mais usada pelos pilotos atuais.
 
+## Atlas (feito, 2026-11-01) e o que falta para o grupo
+
+- `build_atlas(peças, pasta, nome)`: sem bake. Cada textura do Fuse vai para uma célula de um atlas 2048
+  (corpo 1/4; Tops/Bottoms 1/4 se couber; resto 1/16), UV `UV_Atlas` reposicionado, diffuse (com alfa) e
+  normal em PNG, um material só. Olhos e cílios usam a textura do corpo. `join_pieces` junta tudo em `Body`.
+  Sara: 5,3 s, atlas conferido.
+- Pilotos prontos (RolimaRacer.range, conferido 2026-11-01): material **OPAQUE** `Group<Nome>Material`
+  (trocar o CLIP atual para opaco no formato do jogo); malha em duas partes filhas da armature:
+  `Body<Group>` e `Body<Group>.001` com `camera_hide_fp` (cabeça + alto do tronco, acima de ~62 % da altura;
+  `scripts/VehicleSystem/fp_body_visibility.py` esconde na câmera 1ª pessoa); `aura_rain_effect` no corpo e no
+  LOD1; LOD 3 níveis `Bodylod1<Group>`/`Bodylod2<Group>` a 10 m e 25 m; armature só com `pilot.armature`,
+  `active_ragdoll` e o componente `scripts.VehicleSystem.ragdoll_system.ragdoll.Ragdoll` (Active e Debug Lines
+  False), física No Collision, sem constraints além das do ragdoll; Empty `Group<Nome>` com `is_pilot` no
+  grupo `GroupAll_Pilotos`.
+- Próximos: separar a parte `camera_hide_fp`, LOD (`game.lod_generate_batch` ou distâncias fixas 10/25),
+  propriedades e componente, grupo, salvar `5 - Personagem Link/Group<Nome>/Group<Nome>.range` + textures/
+  (DDS); depois painel e aceite com janela. Os OBJ/FBX ficam em D:\ProjetoRolimaRacer (só na máquina local).
+
 ## Decisões
 
 - Feitas (2026-11-01): base Enzo dois dedos (34 ossos), no lugar do Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo
