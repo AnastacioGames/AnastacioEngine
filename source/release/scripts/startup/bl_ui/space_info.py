@@ -271,6 +271,7 @@ class INFO_MT_file_import(Menu):
     bl_label = "Import"
 
     def draw(self, context):
+        self.layout.operator("import_scene.fuse_character", text="Fuse Character (.obj)")
         if bpy.app.build_options.collada:
             self.layout.operator("wm.collada_import", text="Collada (Default) (.dae)")
         if bpy.app.build_options.alembic:

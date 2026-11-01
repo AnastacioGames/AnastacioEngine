@@ -1352,6 +1352,7 @@ EXTRA = (
 
 # Paineis de Render do Range Engine (System, Display, Attachments, Animations, FXAA) e dicas do Bake.
 RENDER_PANELS = (
+    ("Fuse Character (.obj)", "Personagem do Fuse (.obj)", "Personaje de Fuse (.obj)", "Персонаж Fuse (.obj)"),
     # TAA
     ("TAA (Temporal Anti-Aliasing)", "TAA (anti-aliasing temporal)", "TAA (anti-aliasing temporal)", "TAA (временное сглаживание)"),
     ("Game only. Objects moving with the camera may blur",

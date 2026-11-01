@@ -161,7 +161,10 @@ o que está acima de 62 % da altura, menos braços); `aura_rain_effect` no corpo
 `pilot.armature`, `active_ragdoll` e o componente do jogo; Empty `Group<Nome>` com `is_pilot`; grupo com 34
 objetos (com ragdoll). Arquivo sem texturas empacotadas (o editor liga autopack em arquivos novos: desligado
 aqui), atlas em `textures/`. Os 9 personagens de `_novos` passam, 5,6-6,7 MB cada (GroupFabio: 7,6 MB).
-Falta: pôr no `GroupAll_Pilotos` do jogo, DDS, painel no editor.
+No editor: **File > Import > Fuse Character (.obj)** (`bl_operators/anastacio_fuse_character.py`): escolhe
+esqueleto, nome, ragdoll, pasta de saída e pasta do jogo; roda `cli_main` num Blender em segundo plano (não mexe no
+arquivo aberto) e liga o grupo pronto na cena, no cursor 3D. Textos em pt/es/ru.
+Falta: aceite com janela, teste de queda na corrida, pôr no `GroupAll_Pilotos` do jogo, DDS.
 
 ## Decisões
 

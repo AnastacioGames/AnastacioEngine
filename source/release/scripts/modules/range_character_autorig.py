@@ -806,3 +806,24 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
     bpy.ops.wm.save_as_mainfile(filepath=path, relative_remap=True)
     info["arquivo"] = path
     return info
+
+
+def cli_main(args):
+    """Linha de comando (tools/create_fuse_character.py e o operador do editor, em segundo plano):
+    <obj> <Nome> <saida> [esqueleto] [--sem-ragdoll] [--projeto <raiz do jogo>]."""
+    root = None
+    if "--projeto" in args:
+        i = args.index("--projeto")
+        root = args[i + 1]
+        args = args[:i] + args[i + 2:]
+    flags = {a for a in args if a.startswith("--")}
+    pos = [a for a in args if not a.startswith("--")]
+    obj_path, name, out_dir = pos[0], pos[1], pos[2]
+    skeleton = pos[3] if len(pos) > 3 else "mixamo_two_fingers"
+    folders = {sid: folder for sid, _n, folder in list_skeletons()}
+    if skeleton not in folders:
+        raise SystemExit("skeleton %r not found; options: %s" % (skeleton, ", ".join(folders)))
+    info = create_character(obj_path, folders[skeleton], name, out_dir,
+                            ragdoll="--sem-ragdoll" not in flags, game_root=root)
+    print("PERSONAGEM", info)
+    return info
