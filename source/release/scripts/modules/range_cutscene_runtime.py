@@ -15,6 +15,15 @@ camera_cut()
 hide_dialog()
     Esconde o objeto da fala atual e para a voz.
 
+fade(mode, duration) / letterbox(show, duration)
+    Escurecer (mode 0 = para o preto, 1 = do preto) e faixas pretas de cinema,
+    num filtro 2D próprio (passo OVERLAY_PASS). update() anima a cada quadro.
+
+update(dt, in_progress) -> int
+    Chamado pela engine a cada quadro enquanto a cutscene roda ou há efeito na
+    tela. Bit 1: ainda há efeito na tela. Bit 2: o jogador pediu para pular
+    (Tab ou Start do controle; desligue com globalDict["cutscene_skip"] = False).
+
 Sem objeto Text, a fala fica em logic.globalDict["cutscene_dialog"]
 ({"text", "speaker", "audio"}) para uma interface própria do jogo.
 """
@@ -24,6 +33,60 @@ from Range import logic
 WAIT_SUBJECT = "cutscene_dialog"
 
 _current = {"obj": None, "message": None, "handle": None, "shown": None}
+
+# Passo do filtro de fade/faixas: depois dos filtros do jogo e do vídeo (120).
+OVERLAY_PASS = 121
+# Altura de cada faixa preta, em fração da tela.
+LETTERBOX_SIZE = 0.12
+SKIP_KEYS = ("TABKEY",)
+SKIP_JOY_BUTTON = 6  # Start no layout SDL GameController
+
+OVERLAY_SHADER = """
+uniform sampler2D bgl_RenderedTexture;
+uniform float fade_alpha;
+uniform float bar_size;
+
+void main()
+{
+	vec2 uv = gl_TexCoord[0].st;
+	vec4 color = texture2D(bgl_RenderedTexture, uv);
+	float bar = step(uv.y, bar_size) + step(1.0 - bar_size, uv.y);
+	color.rgb *= 1.0 - clamp(bar, 0.0, 1.0);
+	color.rgb *= 1.0 - fade_alpha;
+	gl_FragColor = color;
+}
+"""
+
+
+class _Ramp:
+    """Valor que vai de `value` até `target` em `duration` segundos."""
+
+    def __init__(self):
+        self.value = 0.0
+        self.target = 0.0
+        self.speed = 0.0
+
+    def start(self, start, target, duration):
+        self.value = start
+        self.target = target
+        self.speed = abs(target - start) / duration if duration > 0.0 else float("inf")
+        if duration <= 0.0:
+            self.value = target
+
+    def step(self, dt):
+        if self.value < self.target:
+            self.value = min(self.target, self.value + self.speed * dt)
+        elif self.value > self.target:
+            self.value = max(self.target, self.value - self.speed * dt)
+
+    @property
+    def moving(self):
+        return self.value != self.target
+
+
+_fade = _Ramp()
+_bars = _Ramp()
+_overlay = {"filter": None, "scene": None, "joy_down": False}
 
 
 def _stop_voice():
@@ -115,6 +178,92 @@ def hide_dialog():
         obj.visible = False
 
 
-def stop():
-    """Fim/parada da cutscene: some com a fala e a voz."""
+def _overlay_filter():
+    scene = logic.getCurrentScene()
+    filt = _overlay["filter"]
+    if filt is not None and _overlay["scene"] is scene and not getattr(filt, "invalid", False):
+        return filt
+    manager = scene.filterManager
+    filt = manager.getFilter(OVERLAY_PASS)
+    if filt is None:
+        filt = manager.addFilter(OVERLAY_PASS, logic.RAS_2DFILTER_CUSTOMFILTER, OVERLAY_SHADER)
+    _overlay["filter"] = filt
+    _overlay["scene"] = scene
+    return filt
+
+
+def _apply_overlay():
+    if _fade.value <= 0.0 and _bars.value <= 0.0:
+        _remove_overlay()
+        return
+    filt = _overlay_filter()
+    filt.setUniform("fade_alpha", _fade.value)
+    filt.setUniform("bar_size", _bars.value * LETTERBOX_SIZE)
+
+
+def _remove_overlay():
+    if _overlay["filter"] is None:
+        return
+    _overlay["filter"] = None
+    try:
+        _overlay["scene"].filterManager.removeFilter(OVERLAY_PASS)
+    except Exception:
+        pass
+    _overlay["scene"] = None
+
+
+def fade(mode, duration):
+    if mode == 1:  # do preto
+        _fade.start(1.0 if not _fade.moving and _fade.value <= 0.0 else _fade.value, 0.0, duration)
+    else:  # para o preto
+        _fade.start(_fade.value, 1.0, duration)
+    _apply_overlay()
+
+
+def letterbox(show, duration):
+    _bars.start(_bars.value, 1.0 if show else 0.0, duration)
+    _apply_overlay()
+
+
+def _skip_pressed():
+    if not logic.globalDict.get("cutscene_skip", True):
+        return False
+    from Range import events
+    keyboard = logic.keyboard.inputs
+    pressed = any(keyboard[getattr(events, name)].activated for name in SKIP_KEYS)
+    joy = next((j for j in logic.joysticks if j is not None), None)
+    down = joy is not None and SKIP_JOY_BUTTON in joy.activeButtons
+    pressed = pressed or (down and not _overlay["joy_down"])
+    _overlay["joy_down"] = down
+    return pressed
+
+
+def update(dt, in_progress):
+    flags = 0
+    if _fade.moving or _bars.moving:
+        _fade.step(dt)
+        _bars.step(dt)
+        _apply_overlay()
+    if _overlay["filter"] is not None:
+        flags |= 1
+    if in_progress and _skip_pressed():
+        flags |= 2
+    return flags
+
+
+def _clear_overlay():
+    _fade.start(0.0, 0.0, 0.0)
+    _bars.start(0.0, 0.0, 0.0)
+    _remove_overlay()
+
+
+def skip_cleanup():
+    """Pulou a cutscene: sem fala, sem voz, sem fade nem faixas."""
     hide_dialog()
+    _clear_overlay()
+
+
+def stop():
+    """Fim/parada da cutscene: some com a fala, a voz e os efeitos de tela."""
+    hide_dialog()
+    _clear_overlay()

@@ -283,7 +283,8 @@ os 18 tipos de evento (schema 2) e o Wait Trigger é liberado por mensagem ou `s
 real). Pendente: liberar por propriedade (decisão em aberto, ver [notas](notes-cutscene-events.md)).
 Diálogo na tela (Text Object, Speaker, Wait for Advance), voz e corte nativo de câmera feitos em 2026-11-01
 (ver changelog); falta compilar no Windows e testar `tools/create_cutscene_story_example.py`. Próximos:
-transição suave entre câmeras (hoje só corte seco) e animação de NPC por evento.
+transição suave entre câmeras (hoje só corte seco) e animação de NPC por evento. Pular (Tab/Start), Fade e
+Letterbox também feitos em 2026-11-01, aguardando teste no Windows.
 
 ### World Status
 

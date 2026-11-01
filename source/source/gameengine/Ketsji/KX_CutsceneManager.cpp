@@ -155,6 +155,28 @@ bool KX_CutsceneManager::IsPlaying() const
 	return m_isPlaying;
 }
 
+bool KX_CutsceneManager::IsInProgress() const
+{
+	return m_isPlaying && (m_waitType != WAIT_NONE || m_nextEventIndex < m_eventOrder.size());
+}
+
+KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Skip()
+{
+	DispatchedEvents skipped;
+	if (!m_isPlaying) {
+		return skipped;
+	}
+	const std::vector<Event>& events = m_sequences[m_activeSequenceIndex].m_events;
+	for (; m_nextEventIndex < m_eventOrder.size(); ++m_nextEventIndex) {
+		const Event *event = &events[m_eventOrder[m_nextEventIndex]];
+		skipped.push_back(event);
+		m_time = std::max(m_time, static_cast<double>(event->m_time));
+	}
+	ClearWait();
+	m_latchedTriggers.clear();
+	return skipped;
+}
+
 int KX_CutsceneManager::GetActiveSequenceIndex() const
 {
 	return m_activeSequenceIndex;

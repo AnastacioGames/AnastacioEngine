@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Cutscene: pular, Fade e Letterbox
+
+- **Pular:** Tab ou Start do controle (botão 6 SDL) pulam a cutscene em andamento; `scene.skip_cutscene()` faz o
+  mesmo e `globalDict["cutscene_skip"] = False` desliga a tecla. `KX_CutsceneManager::Skip()` devolve os eventos
+  restantes; a cena roda só os que deixam o estado final certo (câmera, Lock/Unlock, Spawn, Change Scene, mouse) e
+  descarta fala, esperas, Camera Path, Player Anim, Fade e Letterbox; depois some com fala, voz e efeitos.
+- **Novos eventos** `FADE` (18: To Black/From Black, Duration) e `LETTERBOX` (19: Show Bars, Duration), sem campos
+  novos no DNA (`param_int`, `param_bool`, `param_float`). Desenhados num filtro 2D no passo 121
+  (`range_cutscene_runtime.py`); o fade continua depois do fim da sequência (fade-out antes de Change Scene).
+- `range_cutscene_runtime.update()` roda a cada quadro só com cutscene em andamento ou efeito na tela.
+- JSON: ações `fade`/`letterbox` e tipo `enum` na tabela. Exemplo `create_cutscene_story_example.py` abre do preto
+  com faixas. Checado com compilação de sintaxe (C++ e RNA) e teste do runtime com `Range` falso; falta Windows.
+
 ## 2026-11-01 - Cutscene: diálogo na tela, voz e corte de câmera nativos
 
 - **Dialog** ganhou *Text Object*, *Speaker* e *Wait for Advance* (slots `template_object`, `param_str_a`,

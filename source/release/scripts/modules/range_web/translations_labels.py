@@ -1695,6 +1695,10 @@ MESSAGES = (
      "Use Setup Dialogue no objeto de texto para esperar o avanço.",
      "Usa Setup Dialogue en el objeto de texto para esperar el avance.",
      "Примените Setup Dialogue к текстовому объекту, чтобы ждать продолжения."),
+    ("To Black", "Para o preto", "A negro", "В чёрный"),
+    ("From Black", "Do preto", "Desde negro", "Из чёрного"),
+    ("Show Bars", "Mostrar faixas", "Mostrar franjas", "Показать полосы"),
+    ("Letterbox", "Faixas de cinema", "Franjas de cine", "Кинополосы"),
     ("The object must be a camera.", "O objeto precisa ser uma câmera.", "El objeto debe ser una cámara.",
      "Объект должен быть камерой."),
 )

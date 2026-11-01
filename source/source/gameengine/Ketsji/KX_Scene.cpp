@@ -3831,6 +3831,7 @@ PyMethodDef KX_Scene::Methods[] = {
 	EXP_PYMETHODTABLE(KX_Scene, resume),
 	EXP_PYMETHODTABLE(KX_Scene, play_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, stop_cutscene),
+	EXP_PYMETHODTABLE(KX_Scene, skip_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, restart_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, release_cutscene_trigger),
 	EXP_PYMETHODTABLE(KX_Scene, drawObstacleSimulation),
@@ -4590,6 +4591,20 @@ EXP_PYMETHODDEF_DOC(KX_Scene, stop_cutscene,
 
 	StopCutscene();
 	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_Scene, skip_cutscene,
+                    "skip_cutscene()\n"
+                    "Jumps to the end of the playing Cutscene: dialogs, waits, camera paths and fades are\n"
+                    "dropped, the other remaining events run (camera restore, unlock, scene change).\n"
+                    "Returns False when nothing was playing. Tab or the gamepad Start button do the same\n"
+                    "unless range.logic.globalDict['cutscene_skip'] is False.\n")
+{
+	if (!GetCutsceneManager()) {
+		PyErr_SetString(PyExc_RuntimeError, "scene.skip_cutscene(): this scene has no converted Cutscene");
+		return nullptr;
+	}
+	return PyBool_FromLong(SkipCutscene());
 }
 
 EXP_PYMETHODDEF_DOC(KX_Scene, restart_cutscene,

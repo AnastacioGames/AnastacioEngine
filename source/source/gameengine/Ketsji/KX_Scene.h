@@ -431,6 +431,10 @@ private:
 	/** Active camera before the first native Camera Shot cut; restored by Restore Gameplay Camera/Stop. */
 	KX_Camera *m_cutsceneGameplayCamera = nullptr;
 	void RestoreCutsceneGameplayCamera();
+	/** True while SkipCutscene() runs the remaining events (dialog, waits, paths and screen effects are dropped). */
+	bool m_cutsceneSkipping = false;
+	/** A Fade/Letterbox overlay is on screen; range_cutscene_runtime.update() runs every frame while set. */
+	bool m_cutsceneOverlayActive = false;
 	/** Place Camera Path objects for the current cutscene time and drop the finished ones. */
 	void UpdateCutscenePaths(double time);
 
@@ -768,6 +772,8 @@ public:
 
 	void SetCutsceneManager(std::unique_ptr<KX_CutsceneManager> cutsceneManager);
 	void StopCutscene();
+	/** Jump to the end of the playing Cutscene, keeping its end state (camera, player, scene change). */
+	bool SkipCutscene();
 	bool RestartCutscene();
 	/** Advance the scene-owned Cutscene clock and retain crossed events. */
 	void UpdateCutscene(double deltaTime);
@@ -831,6 +837,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_Scene, play_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, release_cutscene_trigger);
 	EXP_PYMETHOD_DOC(KX_Scene, stop_cutscene);
+	EXP_PYMETHOD_DOC(KX_Scene, skip_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, restart_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, explode);
 	EXP_PYMETHOD_DOC(KX_Scene, get);

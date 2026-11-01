@@ -190,6 +190,18 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             elif event.dialog_wait and "td_end" not in event.dialog_text_object.game.properties:
                 box.label("Use Setup Dialogue on the Text object to wait for advance.", icon='ERROR')
 
+        elif event.type == 'FADE':
+            box = layout.box()
+            box.label("Fade")
+            box.prop(event, "fade_mode", expand=True)
+            box.prop(event, "fade_duration")
+
+        elif event.type == 'LETTERBOX':
+            box = layout.box()
+            box.label("Letterbox")
+            box.prop(event, "letterbox_show")
+            box.prop(event, "fade_duration")
+
         elif event.type == 'HIDE_DIALOG':
             layout.box().label("Hides the current dialog. No parameters.")
 

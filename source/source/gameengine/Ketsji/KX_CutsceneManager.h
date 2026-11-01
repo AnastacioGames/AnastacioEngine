@@ -104,6 +104,13 @@ public:
 	double GetWaitStartPlayTime() const;
 
 	bool IsPlaying() const;
+	/** True while a sequence still has events to dispatch or a wait is active. */
+	bool IsInProgress() const;
+	/**
+	 * Jump to the end of the sequence: clear any wait and return every event not dispatched
+	 * yet, in timeline order. The caller decides which of them still run (Skip).
+	 */
+	DispatchedEvents Skip();
 	int GetActiveSequenceIndex() const;
 
 	/** Track runtime instances until their owning scene removes them. */

@@ -211,6 +211,24 @@ void KX_Scene::StopCutscene()
 	m_cutscenePaths.clear();
 	CallCutsceneRuntime("stop", PyTuple_New(0));
 	RestoreCutsceneGameplayCamera();
+	m_cutsceneOverlayActive = false;
+}
+
+bool KX_Scene::SkipCutscene()
+{
+	if (!m_cutsceneManager || !m_cutsceneManager->IsInProgress()) {
+		return false;
+	}
+	const KX_CutsceneManager::DispatchedEvents remaining = m_cutsceneManager->Skip();
+	m_pendingCutsceneEvents.insert(m_pendingCutsceneEvents.end(), remaining.begin(), remaining.end());
+	m_cutsceneSkipping = true;
+	DispatchCutsceneEvents();
+	m_cutsceneSkipping = false;
+	m_cutscenePaths.clear();
+	/* Drop the dialog and any fade/bars: the game continues in its normal view. */
+	CallCutsceneRuntime("skip_cleanup", PyTuple_New(0));
+	m_cutsceneOverlayActive = false;
+	return true;
 }
 
 bool KX_Scene::RestartCutscene()
@@ -239,6 +257,32 @@ void KX_Scene::UpdateCutscene(double deltaTime)
 		if (!m_networkScene->FindMessages("", triggerName).empty()) {
 			m_cutsceneManager->ReleaseTrigger(triggerName);
 		}
+	}
+
+	/* Screen effects animate and the skip key is read while a cutscene runs or an overlay is visible. */
+	const bool inProgress = m_cutsceneManager->IsInProgress();
+	if (inProgress || m_cutsceneOverlayActive) {
+#ifdef WITH_PYTHON
+		int flags = 0;
+		PyObject *module = PyImport_ImportModule("range_cutscene_runtime");
+		if (module) {
+			PyObject *ret = PyObject_CallMethod(module, "update", "di", deltaTime, inProgress ? 1 : 0);
+			if (ret) {
+				flags = PyLong_Check(ret) ? (int)PyLong_AsLong(ret) : 0;
+				Py_DECREF(ret);
+			}
+			Py_DECREF(module);
+		}
+		if (PyErr_Occurred()) {
+			CM_Error("cutscene: range_cutscene_runtime.update() failed");
+			PyErr_Print();
+		}
+		m_cutsceneOverlayActive = (flags & 1) != 0;
+		if ((flags & 2) && inProgress) {
+			SkipCutscene();
+			return;
+		}
+#endif
 	}
 
 	KX_CutsceneManager::DispatchedEvents dispatchedEvents = m_cutsceneManager->Advance(deltaTime);
@@ -619,6 +663,22 @@ void KX_Scene::DispatchCutsceneEvents()
 {
 	const KX_CutsceneManager::DispatchedEvents dispatchedEvents = TakePendingCutsceneEvents();
 	for (const KX_CutsceneManager::Event *event : dispatchedEvents) {
+		if (m_cutsceneSkipping) {
+			switch (event->m_type) {
+				case CUTSCENE_EVENT_DIALOG:
+				case CUTSCENE_EVENT_HIDE_DIALOG:
+				case CUTSCENE_EVENT_WAIT_TIME:
+				case CUTSCENE_EVENT_WAIT_TRIGGER:
+				case CUTSCENE_EVENT_WAIT_CAMERA_END:
+				case CUTSCENE_EVENT_CAMERA_PATH:
+				case CUTSCENE_EVENT_FADE:
+				case CUTSCENE_EVENT_LETTERBOX:
+				case CUTSCENE_EVENT_PLAYER_ANIM:
+					continue;
+				default:
+					break;
+			}
+		}
 		switch (event->m_type) {
 		case CUTSCENE_EVENT_SPAWN_OBJECT:
 			if (!event->m_templateObject || !event->m_spawnPoint) {
@@ -956,6 +1016,22 @@ void KX_Scene::DispatchCutsceneEvents()
 					SetActiveCamera(static_cast<KX_Camera *>(event->m_templateObject));
 				}
 				UpdateCutscenePaths(m_cutsceneManager->GetPlayTime());
+			}
+			break;
+
+		case CUTSCENE_EVENT_FADE:
+			{
+				PyObject *args = Py_BuildValue("(if)", event->m_paramInt, event->m_paramFloat);
+				CallCutsceneRuntime("fade", args);
+				m_cutsceneOverlayActive = true;
+			}
+			break;
+
+		case CUTSCENE_EVENT_LETTERBOX:
+			{
+				PyObject *args = Py_BuildValue("(if)", event->m_paramBool ? 1 : 0, event->m_paramFloat);
+				CallCutsceneRuntime("letterbox", args);
+				m_cutsceneOverlayActive = true;
 			}
 			break;
 

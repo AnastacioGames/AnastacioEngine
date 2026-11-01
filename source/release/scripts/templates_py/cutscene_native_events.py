@@ -11,6 +11,7 @@ STR = "string"
 FLOAT = "float"
 INT = "int"
 BOOL = "bool"
+ENUM = "enum"  # identificador RNA (ex.: "IN")
 
 # action -> (event type, [(chave JSON == nome RNA, tipo, obrigatório)])
 ACTIONS = {
@@ -24,6 +25,8 @@ ACTIONS = {
         ("dialog_text_object", OBJ, False), ("dialog_speaker", STR, False),
         ("dialog_wait", BOOL, False)]),
     "hide_dialog": ("HIDE_DIALOG", []),
+    "fade": ("FADE", [("fade_mode", ENUM, False), ("fade_duration", FLOAT, False)]),
+    "letterbox": ("LETTERBOX", [("letterbox_show", BOOL, False), ("fade_duration", FLOAT, False)]),
     "camera_shot": ("CAMERA_SHOT", [("camera_order", INT, False),
         ("shot_camera", OBJ, False)]),
     "look_at": ("LOOK_AT", [("look_at_target", OBJ, False)]),

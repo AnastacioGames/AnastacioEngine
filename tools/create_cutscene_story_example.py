@@ -7,7 +7,8 @@ Roteiro (sequência "Chegada"):
   corte para CamAna  -> Ana fala (espera Enter/clique/botão A)
   corte para CamBeto -> Beto responde (espera)
   corte para CamGeral -> Ana fecha a conversa (espera)
-  some a legenda, volta para CamJogo e libera o jogador.
+  some a legenda, tiram-se as faixas, volta para CamJogo e libera o jogador.
+Começa com faixas de cinema e abrindo do preto. Tab (ou Start no controle) pula.
 
 A legenda é um objeto Text filho da câmera do jogo; a cada corte ela passa
 para a câmera ativa (range_cutscene_runtime.camera_cut). "Setup Dialogue"
@@ -121,6 +122,8 @@ sequence.name = "Chegada"
 
 STEPS = (
     ("Lock Player", "LOCK_PLAYER", {}),
+    ("Faixas", "LETTERBOX", {"letterbox_show": True, "fade_duration": 0.6}),
+    ("Abre do preto", "FADE", {"fade_mode": "IN", "fade_duration": 1.0}),
     ("Plano Ana", "CAMERA_SHOT", {"shot_camera": cam_ana}),
     ("Fala Ana 1", "DIALOG", {"dialog_speaker": "Ana", "dialog_text_pt": "Beto! Finalmente você chegou.",
                              "dialog_text_en": "Beto! You finally made it."}),
@@ -131,6 +134,7 @@ STEPS = (
     ("Fala Ana 2", "DIALOG", {"dialog_speaker": "Ana", "dialog_text_pt": "Vamos, o barco já vai sair.",
                              "dialog_text_en": "Come on, the boat is about to leave."}),
     ("Esconde fala", "HIDE_DIALOG", {}),
+    ("Tira faixas", "LETTERBOX", {"letterbox_show": False, "fade_duration": 0.6}),
     ("Volta câmera", "RESTORE_GAMEPLAY_CAMERA", {}),
     ("Unlock Player", "UNLOCK_PLAYER", {}),
 )
