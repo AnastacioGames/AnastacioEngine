@@ -765,9 +765,14 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     # alpha 0 + alpha da textura deixava o corpo meio transparente no jogo; o cartao baixa o brilho so p/ a foto
     mat.alpha = 1.0
     mat.specular_intensity = 0.5
+    # metal 0,5 (padrao novo) refletia o ambiente no lugar da cor: piloto cinza-azulado e lavado no jogo
+    mat.diffuse_metallic_bsdf = mat.specular_metallic_bsdf = 0.0
+    mat.use_object_color = True        # como os pilotos prontos (o jogo pode tingir/esmaecer pelo obj.color)
     for ts in mat.texture_slots:
         if ts and ts.texture:
             ts.use_map_alpha = False
+            if ts.use_map_normal and ts.texture.image:
+                ts.texture.image.colorspace_settings.name = 'Non-Color'
     lods = [_decimated_copy(scene, body, r, "Bodylod%d%s" % (i, group_name))
             for i, (r, _d) in enumerate(LOD_LEVELS, 1)]
     rest, fp = split_fp_part(body, height)
