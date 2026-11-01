@@ -281,6 +281,9 @@ Evento Camera Path (2026-09-30): falta relinkar `RangeEngine` e o usuário testa
 os 18 tipos de evento (schema 2) e o Wait Trigger é liberado por mensagem ou `scene.release_cutscene_trigger()`
 (branch `cutscene/events`, 2026-10-04, testes headless no Linux passaram; falta o usuário testar no Windows/jogo
 real). Pendente: liberar por propriedade (decisão em aberto, ver [notas](notes-cutscene-events.md)).
+Diálogo na tela (Text Object, Speaker, Wait for Advance), voz e corte nativo de câmera feitos em 2026-11-01
+(ver changelog); falta compilar no Windows e testar `tools/create_cutscene_story_example.py`. Próximos:
+transição suave entre câmeras (hoje só corte seco) e animação de NPC por evento.
 
 ### World Status
 

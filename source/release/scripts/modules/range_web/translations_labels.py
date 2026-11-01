@@ -1688,6 +1688,15 @@ MESSAGES = (
     ("Shot Order", "Ordem da Tomada", "Orden de la toma", "Порядок плана"),
     ("Add Missing Properties", "Adicionar Propriedades Faltantes", "Añadir propiedades que faltan",
      "Добавить недостающие свойства"),
+    ("Text Object", "Objeto de Texto", "Objeto de texto", "Текстовый объект"),
+    ("Speaker", "Quem fala", "Quién habla", "Говорящий"),
+    ("Wait for Advance", "Esperar avançar", "Esperar a avanzar", "Ждать продолжения"),
+    ("Use Setup Dialogue on the Text object to wait for advance.",
+     "Use Setup Dialogue no objeto de texto para esperar o avanço.",
+     "Usa Setup Dialogue en el objeto de texto para esperar el avance.",
+     "Примените Setup Dialogue к текстовому объекту, чтобы ждать продолжения."),
+    ("The object must be a camera.", "O objeto precisa ser uma câmera.", "El objeto debe ser una cámara.",
+     "Объект должен быть камерой."),
 )
 
 # Caixas e dicas dos paineis da aba Export Game (RangeArmor, Web, Android).

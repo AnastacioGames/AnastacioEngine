@@ -100,7 +100,9 @@ KX_CutsceneManager::DispatchedEvents KX_CutsceneManager::Update(double time)
 		++m_nextEventIndex;
 
 		/* Pause after WAIT_* events; will be resumed by scene check */
-		if (event->m_type == 14 || event->m_type == 15 || event->m_type == 16) { // WAIT_TIME, WAIT_TRIGGER, WAIT_CAMERA_END
+		/* A Dialog with "Wait for Advance" (m_paramInt) also stops here; the scene starts its trigger wait. */
+		const bool dialogWait = (event->m_type == 1 && event->m_paramInt); // DIALOG
+		if (event->m_type == 14 || event->m_type == 15 || event->m_type == 16 || dialogWait) { // WAIT_TIME, WAIT_TRIGGER, WAIT_CAMERA_END
 			/* The timeline stops at the wait, so the rest of the step is not credited to the
 			 * events after it; the wait itself began that much earlier in played time. */
 			m_waitStartPlayTime = m_playTime - (time - event->m_time);

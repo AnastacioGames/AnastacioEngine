@@ -428,6 +428,9 @@ private:
 		double m_startTime;
 	};
 	std::vector<CutscenePathPlayback> m_cutscenePaths;
+	/** Active camera before the first native Camera Shot cut; restored by Restore Gameplay Camera/Stop. */
+	KX_Camera *m_cutsceneGameplayCamera = nullptr;
+	void RestoreCutsceneGameplayCamera();
 	/** Place Camera Path objects for the current cutscene time and drop the finished ones. */
 	void UpdateCutscenePaths(double time);
 

@@ -8,6 +8,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Cutscene: diálogo na tela, voz e corte de câmera nativos
+
+- **Dialog** ganhou *Text Object*, *Speaker* e *Wait for Advance* (slots `template_object`, `param_str_a`,
+  `param_int`; sem mudar DNA). A fala vai para o objeto Text (com Setup Dialogue: máquina de escrever e avanço);
+  com espera, o relógio para no evento (`KX_CutsceneManager::Update`) e um Wait Trigger `cutscene_dialog` é
+  liberado quando o jogador passa da última página (`td_message` trocado só durante a fala). Antes o texto era
+  escolhido e descartado. Sem Text Object segue o overlay `_dialogue`, agora com `globalDict["cutscene_dialog"]`.
+- **Voz:** `dialog_audio_path` toca via `aud` (antes era TODO); Hide Dialog e Stop param a voz.
+- **Camera Shot** ganhou *Camera*: corte direto para a câmera, guardando a câmera de jogo uma vez; Restore
+  Gameplay Camera e `stop/restart_cutscene` voltam para ela. Vazio mantém o `CutsceneCameraManager` (Shot Order).
+  Uma legenda filha de câmera passa para a câmera ativa a cada corte.
+- Lógica Python em `range_cutscene_runtime.py`; C++ em `KX_SceneCutscene.cpp`. Export/import JSON com os campos
+  novos. Exemplo: `tools/create_cutscene_story_example.py` (duas personagens, três planos, três falas).
+- Checado só com compilação de sintaxe no Linux; falta build Windows e testar o exemplo no jogo.
+
 ## 2026-11-01 - Range Trace: culpado provável de cada frame lento
 
 - `relatorio_trace.py` cruza frames, `scripts`, `work` e cargas e escreve uma coluna "culpado provável" na tabela

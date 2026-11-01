@@ -177,12 +177,18 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
         elif event.type == 'DIALOG':
             box = layout.box()
             box.label("Dialog")
+            box.prop(event, "dialog_text_object")
+            box.prop(event, "dialog_speaker")
             box.prop(event, "dialog_text_en")
             box.prop(event, "dialog_text_pt")
             box.prop(event, "dialog_text_es")
             box.prop(event, "dialog_text_ru")
             box.prop(event, "dialog_audio_path")
-            box.prop(event, "dialog_live")
+            box.prop(event, "dialog_wait")
+            if event.dialog_text_object is None:
+                box.prop(event, "dialog_live")
+            elif event.dialog_wait and "td_end" not in event.dialog_text_object.game.properties:
+                box.label("Use Setup Dialogue on the Text object to wait for advance.", icon='ERROR')
 
         elif event.type == 'HIDE_DIALOG':
             layout.box().label("Hides the current dialog. No parameters.")
@@ -190,7 +196,11 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
         elif event.type == 'CAMERA_SHOT':
             box = layout.box()
             box.label("Camera Shot")
-            box.prop(event, "camera_order")
+            box.prop(event, "shot_camera")
+            if event.shot_camera is None:
+                box.prop(event, "camera_order")
+            elif event.shot_camera.type != 'CAMERA':
+                box.label("The object must be a camera.", icon='ERROR')
 
         elif event.type == 'LOOK_AT':
             box = layout.box()

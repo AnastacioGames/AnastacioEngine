@@ -8013,7 +8013,36 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Live", "Use the live dialogue overlay instead of the standard one");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "dialog_text_object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "template_object");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
+	RNA_def_property_ui_text(prop, "Text Object",
+	                         "Text object that shows the line (use Setup Dialogue on it for typewriter and advance); "
+	                         "empty uses the _dialogue overlay scene");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "dialog_speaker", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "param_str_a");
+	RNA_def_property_ui_text(prop, "Speaker", "Name shown before the line, e.g. \"Ana: ...\" (optional)");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	prop = RNA_def_property(srna, "dialog_wait", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "param_int", 1);
+	RNA_def_property_ui_text(prop, "Wait for Advance",
+	                         "Pause the cutscene until the player advances past the last page of the line");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	/* Camera */
+	prop = RNA_def_property(srna, "shot_camera", PROP_POINTER, PROP_NONE);
+	RNA_def_property_pointer_sdna(prop, NULL, "template_object");
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_flag(prop, PROP_EDITABLE | PROP_ID_REFCOUNT);
+	RNA_def_property_ui_text(prop, "Camera",
+	                         "Camera to cut to; Restore Gameplay Camera goes back. Empty uses the CutsceneCameraManager "
+	                         "component with Shot Order");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "camera_order", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "param_int");
 	RNA_def_property_ui_text(prop, "Shot Order", "Index of the camera shot to jump to");
