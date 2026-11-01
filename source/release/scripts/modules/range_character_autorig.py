@@ -607,11 +607,13 @@ def build_atlas(objects, out_dir, name, size=2048, normal=True, uv_name="UV_Atla
     os.makedirs(out_dir, exist_ok=True)
     images = {}
     for kind, px in maps.items():
-        im = bpy.data.images.new("%s_%s" % (name, kind), size, size, alpha=(kind == "diffuse"))
+        # sem alpha: o atlas herda furos de alpha das texturas do Fuse e o jogo deixava o corpo transparente
+        im = bpy.data.images.new("%s_%s" % (name, kind), size, size, alpha=False)
         im.pixels = px
         im.filepath_raw = os.path.join(out_dir, "%s_%s.png" % (name, kind))
         im.file_format = 'PNG'
         im.save()
+        im.use_alpha = False
         images[kind] = im
     # Material único (Blender Internal, como os pilotos do jogo); alfa por recorte só onde a textura tem alfa.
     mat = bpy.data.materials.new(name + "_mat")
