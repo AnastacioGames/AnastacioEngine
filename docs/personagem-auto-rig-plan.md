@@ -108,6 +108,9 @@ Falta: aceite visual (Patty correndo), materiais, atlas, LOD, ragdoll, grupo, pa
 | mixamo_three_fingers | Three Fingers | 40 |
 | mixamo_full_fingers | Full Fingers | 52 |
 
+Formato igual ao dos pilotos do RolimaRacer: rotação 0, escala 1, frente **+Y** (o FBX do Mixamo vem com 90° em X,
+escala 0,01 e frente −Y; `load_base` aplica e gira 180° em Z). As ações `CARRO_*` do jogo estão em metros e
+servem; as `PLAYER_*` estão em cm (rig antigo com escala 0,01).
 Cada `base.range` (~1,3 MB) tem só a armature e `WeightProxy` (malha decimada ~8 mil faces, sem material, UV,
 textura, olhos nem cílios), para não redistribuir o personagem do Fuse/Mixamo. `base.json`: nome, ordem,
 ossos, altura do corpo. API: `list_skeletons()`, `load_library_base(pasta)`; pastas: USER, LOCAL e SYSTEM

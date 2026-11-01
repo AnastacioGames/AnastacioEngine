@@ -173,7 +173,7 @@ def _transform(objects, matrix):
 END_BONES = ("HeadTop_End", "Toe_End", "Thumb4", "Index4", "Middle4", "Ring4", "Pinky4")
 
 
-def load_base(fbx_path, drop=()):
+def load_base(fbx_path, drop=(), front="+Y"):
     """Importa o FBX do Mixamo (T-pose, With Skin) e devolve (armature, malhas) com transformações aplicadas.
 
     Tira os ossos de ponta (sem pesos) e junta as peças numa malha só, usada como fonte dos pesos."""
@@ -188,6 +188,15 @@ def load_base(fbx_path, drop=()):
         o.select = o in new
     scene.objects.active = arm
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    # Frente igual à dos personagens do jogo (+Y, como os pilotos do RolimaRacer): o Mixamo vem em -Y.
+    current = armature_front(arm)
+    if current != front:
+        a, b = _DIRS[current], _DIRS[front]
+        angle = math.atan2(a.x * b.y - a.y * b.x, a.dot(b))
+        rot = Matrix.Rotation(angle, 4, 'Z')
+        for o in new:
+            o.matrix_world = rot * o.matrix_world
+        bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     # Ossos de ponta: não deformam nada.
     bpy.ops.object.mode_set(mode='EDIT')
     for b in list(arm.data.edit_bones):
