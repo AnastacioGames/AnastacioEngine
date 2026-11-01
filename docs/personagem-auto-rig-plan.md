@@ -194,6 +194,10 @@ Convenção: um nome só, `<Nome>` (ex.: `Patty`, `Quarta_Feira`, sem espaço). 
    Sai `Group<Nome>.range` + `textures/` (atlas, `<Nome>_card.png`, `<Nome>_foto.png`). Conferir no log
    `PERSONAGEM {...}` (sem `aviso`) e os triângulos: 6000 na parte de cima + 3000, LOD 2500/900.
    O `--projeto` é obrigatório: dá o componente do ragdoll e a pose do cartão (animação do jogo).
+   DDS (2026-11-01): no fim o gerador roda o Prepare Textures (Game > Performance > Textures (DDS)) no próprio
+   arquivo: atlas de cor → `textures_dds/` (DXT5 2048 com mipmaps, por causa do alfa do cabelo), normal fica PNG.
+   O editor e o runtime em desenvolvimento usam o PNG; o export do jogo troca pelo DDS (e também prepara sozinho
+   qualquer `.range` da pasta que falte, com a opção de texturas ligada). Conferir: `prepared_path()` sem erro.
 3. **Lista do jogo:** pôr `"Group<Nome>"` em `PILOTOS_NOVOS` de `D:\ProjetoRolimaRacer\scripts\pilotos.py`.
    Só isso já põe o piloto no sorteio das CPUs e no LibLoad da corrida.
    **Não** precisa mais pôr o grupo dentro do `GroupAll_Pilotos`: esse contêiner (instância escondida na camada 11

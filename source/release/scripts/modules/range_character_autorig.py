@@ -959,7 +959,11 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
             im.unpack(method='REMOVE')
     hide_for_libload(scene)
     path = os.path.join(out_dir, group_name + ".range")
+    bpy.context.user_preferences.filepaths.save_version = 0   # sem .range1 ao salvar de novo
     bpy.ops.wm.save_as_mainfile(filepath=path, relative_remap=True)
+    info["dds"] = prepare_dds(report)
+    if info["dds"]:
+        bpy.ops.wm.save_mainfile()     # guarda o mapa PNG -> DDS usado pelo export do jogo
     info["arquivo"] = path
     return info
 
@@ -969,6 +973,29 @@ def hide_for_libload(scene, layer=HIDDEN_LAYER):
     for o in scene.objects:
         o.layers = [i == layer for i in range(20)]
     scene.layers = [i == 0 for i in range(20)]
+
+
+def prepare_dds(report=print):
+    """Game > Performance > Textures (DDS) no arquivo do personagem (o export do jogo nao prepara os
+    arquivos de LibLoad). So a cor vira DDS; o normal map fica PNG (regra do conversor)."""
+    import bpy
+    try:
+        from bl_operators import anastacio_prepare_textures as pt
+    except ImportError:
+        report("aviso: conversor DDS nao encontrado")
+        return []
+    colors = pt.color_usage()
+    feitos = []
+    for im in bpy.data.images:
+        reason = pt.skip_reason(im, colors)
+        if reason:
+            continue
+        try:
+            pt.prepare_image(im, 2048, 10)
+            feitos.append(im.name)
+        except Exception as exc:
+            report("aviso: DDS de %s falhou (%s)" % (im.name, exc))
+    return feitos
 
 
 def cli_main(args):
