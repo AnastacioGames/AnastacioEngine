@@ -870,6 +870,37 @@ def _pose_arms_down(arm):
         pb.matrix = Matrix.Translation(m.to_translation()) * q.to_matrix().to_4x4() *             Matrix.Translation(-m.to_translation()) * m
 
 
+SEAT_POSE = ("RolimaRacer.range", "CARRO_Main_drive_position", 1)
+
+
+def bake_seat_pose(arm, game_root, pose=SEAT_POSE):
+    """Grava nos ossos a pose sentada do jogo (rotacao e posicao, como os pilotos prontos foram salvos).
+    No jogo a action de base ja esteve mutada: sem isto o piloto ficava em pose T. Le as curvas mesmo mutadas."""
+    import os
+    import bpy
+    if not game_root or not os.path.isfile(os.path.join(game_root, pose[0])):
+        return False
+    with bpy.data.libraries.load(os.path.join(game_root, pose[0])) as (src, dst):
+        if pose[1] not in src.actions:
+            return False
+        dst.actions = [pose[1]]
+    act = dst.actions[0]
+    names = {pb.name for pb in arm.pose.bones}
+    for fc in act.fcurves:
+        if not fc.data_path.startswith("pose.bones"):
+            continue
+        bone = fc.data_path.split('"')[1]
+        prop = fc.data_path.rsplit(".", 1)[1]
+        if bone not in names or not hasattr(arm.pose.bones[bone], prop):
+            continue
+        pb = arm.pose.bones[bone]
+        if prop == "rotation_quaternion":
+            pb.rotation_mode = 'QUATERNION'
+        getattr(pb, prop)[fc.array_index] = fc.evaluate(pose[2])
+    bpy.data.actions.remove(act)
+    return True
+
+
 def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=None, report=print):
     """Foto do corpo inteiro em pose, luz Sun, fundo transparente (cartao do menu de escolha)."""
     import bpy
@@ -1011,6 +1042,8 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
     for im in bpy.data.images:
         if im.packed_file:
             im.unpack(method='REMOVE')
+    if not bake_seat_pose(arm, game_root):
+        report("aviso: pose sentada do jogo nao encontrada; o piloto fica em pose T se a action de base nao tocar")
     hide_for_libload(scene)
     path = os.path.join(out_dir, group_name + ".range")
     bpy.context.user_preferences.filepaths.save_version = 0   # sem .range1 ao salvar de novo
