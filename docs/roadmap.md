@@ -422,8 +422,23 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 ### Personagem automático (Fuse → armature base)
 
 Plano em [personagem-auto-rig-plan.md](personagem-auto-rig-plan.md) (2026-11-01): ligar malhas do Fuse numa armature
-base do Mixamo sem passar pelo site, com materiais, LOD, ragdoll e grupo num botão. Aguardando os arquivos de
-exemplo do usuário em `tests/assets/personagem/`.
+base do Mixamo sem passar pelo site, com materiais, LOD, ragdoll e grupo num botão. Pipeline completo; no RolimaRacer
+os pilotos são carregados por LibLoad (`scripts/pilotos.py`) e há 9 novos no menu. Falta o aceite com janela e o
+jogador da carreira/cutscene sem ragdoll; passo a passo para pilotos novos no plano.
+
+### Pistas em arquivos separados (depois)
+
+Ideia de 2026-11-01, deixada para depois dos pilotos. Hoje as pistas do RolimaRacer são cenas dentro do
+`RolimaRacer.range` (165 MB), abertas por `addScene` assíncrono + `preloadScene`; `PISTA_PATH`/`set_track_path`
+existem no `_prepareData` mas não são usados e a pasta `Track/` está vazia.
+- Ganho: arquivo principal menor, cada pista editada sozinha, memória só da pista ativa (menos do que parece:
+  o `addScene` já converte só a cena usada).
+- Por que não é como os pilotos: o LibLoad mistura objetos na cena atual (perde céu/luz/névoa/física da cena
+  da pista); dependências cruzadas (carros, `GroupAll_Pilotos`, partículas, overlays, props comuns); o `.cooked`
+  é um por arquivo; LibLoad assíncrono já derrubou o jogo com armatures, e o síncrono travaria a tela de loading.
+- Caminho sugerido: medir com UMA pista de teste (tempo de carga e memória contra o jeito atual). Se compensar,
+  a engine ganha um "addScene de arquivo" (abre a cena de outro `.range` como cena própria, com o `.cooked` dela
+  e progresso no loading), em vez de LibLoad puro.
 
 ### Outros
 
