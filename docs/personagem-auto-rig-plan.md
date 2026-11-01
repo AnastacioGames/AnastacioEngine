@@ -67,9 +67,19 @@ Base Fabio + `2 - File Exported from Fuse in (.obj)/_novos/<Nome>/<Nome>.obj` (o
 antigos ficaram em `_antigos`). Comparar com um
 personagem que já passou pelo Mixamo (deformação nas animações Idle, Running, Jumping da pasta de animações).
 
+## Base escolhida: Enzo com dois dedos (2026-11-01)
+
+- Rig do Mixamo do Enzo em `D:\ProjetoRolimaRacer\personagens - Blender Import(.obj) Export(.fbx) to Mixano\_novo\`:
+  `Enzo_sem_dedos.fbx` (25 ossos), `Enzo_dois_dedos.fbx` (41: polegar + indicador), `Enzo_3_dedos.fbx` (49).
+  FBX em T-pose, peças separadas com pesos do Mixamo, 20 texturas, 1,695 m, frente −Y.
+- **Base padrão: `Enzo_dois_dedos.fbx`**, sem os ossos de ponta (`HeadTop_End`, `*Toe_End`, `*Thumb4`,
+  `*Index4`) → 34 ossos, o mesmo esqueleto que o Fabio tinha ao sair do Mixamo. Prefixo `mixamorig:` mantido.
+- As outras duas ficam na pasta como opções futuras da biblioteca; o Enzo rigado pelo Mixamo também é o gabarito
+  para comparar com o resultado da ferramenta.
+
 ## Decisões
 
-- Feitas (2026-11-01): base Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo
+- Feitas (2026-11-01): base Enzo dois dedos (34 ossos), no lugar do Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo
   addon Anastacio Ragdoll; nome `Group<Nome>`; biblioteca de esqueletos dentro do editor.
 - Em aberto: quais bases entram no pacote público (licença Adobe); bases de mulher e criança.
 
