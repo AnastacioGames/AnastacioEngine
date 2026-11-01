@@ -1,5 +1,8 @@
 # Personagem automático (Fuse → armature base) — plano
 
+Export do Fuse: Export in new folder + Remove occluded polygons; sem Pack Textures, Triangulate, Flip
+Normals nem Combine; Character Scale 1.
+
 Status: planejado em 2026-11-01, revisto com as pastas reais do usuário. Nada implementado ainda.
 
 ## Processo de hoje (D:\ProjetoRolimaRacer\personagens)
@@ -60,7 +63,8 @@ Cada etapa é um operador separado (dá para rodar uma só) e o botão encadeia 
 
 ## Teste
 
-Base Fabio + `2 - File Exported from Fuse in (.obj)/Menino_2/Menino.obj` (corpo diferente). Comparar com um
+Base Fabio + `2 - File Exported from Fuse in (.obj)/_novos/<Nome>/<Nome>.obj` (os 9 personagens atuais; os
+antigos ficaram em `_antigos`). Comparar com um
 personagem que já passou pelo Mixamo (deformação nas animações Idle, Running, Jumping da pasta de animações).
 
 ## Decisões
@@ -82,10 +86,13 @@ personagem que já passou pelo Mixamo (deformação nas animações Idle, Runnin
 - **De pé:** se a malha estiver deitada, gira 90° em X; se ficar de cabeça para baixo (a fatia mais larga,
   os braços em T, cai na metade de baixo), gira 180°.
 - **Unidade:** altura acima de 20 = centímetros (Fuse e Mixamo), multiplica por 0,01.
-- **Frente da malha:** pés e rosto saem para a frente (o eixo dos braços é o lado). **Frente da base:** osso
+- **Frente da malha:** a peça `Eyes` do Fuse fica à frente do centro da cabeça; sem olhos, a ponta do pé passa
+  mais da canela para a frente do que o calcanhar para trás (o eixo dos braços em T é o lado). **Frente da base:** osso
   `LeftFoot` → ponta de `LeftToeBase`. Se forem diferentes, gira em Z para casar. Confiança baixa vira aviso.
 - **Posição:** pé no chão, centro em X/Y = 0. Transformações aplicadas (escala 1, rotação 0).
-- Medido: Fabio e Menino do Fuse olham para **+Y**; Fuse vem em cm (Menino 166 → 1,67 m; Fabio 1,78 m).
+- Medido: o Fabio (base) olha para **+Y**; os OBJ do Fuse olham para **−Y** (giram 180°) e vêm em cm.
+  Os 9 personagens de `_novos` (Azeite, Bia, Biel, Celesty, Enzo, Patty, Quarta_Feira, Sara, Tio) passam,
+  olhos e pés concordando (pé à frente da canela 9-16 cm); alturas 1,68-1,80 m.
   A diferença de altura entre corpos não é corrigida aqui: é o encaixe do esqueleto (etapa 3 do fluxo).
 - Teste `tools/debug/teste_autorig_alinhar.py`: como vem, de costas, de lado, deitado para os dois lados e de
   cabeça para baixo → PASS.

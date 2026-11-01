@@ -7,7 +7,7 @@ Importa o Menino do Fuse em 6 posicoes erradas e confere se align_to_base acerta
 import bpy, math
 from mathutils import Matrix
 import range_character_autorig as ar
-OBJ=r"D:/ProjetoRolimaRacer/personagens/2 - File Exported from Fuse in (.obj)/Menino_2/Menino.obj"
+OBJ=r"D:/ProjetoRolimaRacer/personagens/2 - File Exported from Fuse in (.obj)/_antigos/Menino_2/Menino.obj"
 arm=bpy.data.objects["Armature"]
 casos={"como_vem":None,"de_costas":Matrix.Rotation(math.pi,4,'Z'),"de_lado":Matrix.Rotation(math.pi/2,4,'Z'),
        "deitado":Matrix.Rotation(-math.pi/2,4,'X'),"deitado_outro_lado":Matrix.Rotation(math.pi/2,4,'X'),"de_cabeca_para_baixo":Matrix.Rotation(math.pi,4,'X')}

@@ -22,28 +22,37 @@ def bounds(verts):
     return mn, mx
 
 
-def _protrusion(verts, axis, lo, hi, mn, height):
-    """Quanto a fatia [lo, hi] da altura sai para + e para - do eixo, a partir do centro da fatia."""
-    sel = [v for v in verts if mn.z + lo * height <= v.z <= mn.z + hi * height]
-    if not sel:
+def _feet_vs_shin(verts, axis, mn, height):
+    """Pés (0-4 % da altura) comparados com o centro da canela (12-18 %): a ponta do pé passa mais para a
+    frente do que o calcanhar para trás. >0: frente no sentido + do eixo."""
+    shin = [v[axis] for v in verts if mn.z + 0.12 * height <= v.z <= mn.z + 0.18 * height]
+    feet = [v[axis] for v in verts if v.z <= mn.z + 0.04 * height]
+    if not shin or not feet:
         return 0.0
-    c = sum(v[axis] for v in sel) / len(sel)
-    return max(v[axis] for v in sel) - c + (min(v[axis] for v in sel) - c)  # >0: sai mais para +
+    c = sum(shin) / len(shin)
+    return (max(feet) - c) + (min(feet) - c)
 
 
 def mesh_front(objects):
-    """Frente da malha em T: pés (0-4 % da altura) e rosto (88-95 %) saem para a frente.
+    """Frente da malha em T. Retorna (direção, confiança relativa à altura).
 
-    Retorna (direção, confiança). O eixo dos braços abertos (o mais largo) é o lado; a frente é o outro."""
+    O eixo dos braços abertos (o mais largo) é o lado; a frente está no outro eixo. Sinal principal: a peça
+    "Eyes" do Fuse à frente do centro da cabeça. Sem olhos: ponta dos pés à frente da canela."""
     verts = world_verts(objects)
     mn, mx = bounds(verts)
     size = mx - mn
     height = size.z
-    side_axis = 0 if size.x >= size.y else 1
-    axis = 1 - side_axis
-    score = _protrusion(verts, axis, 0.0, 0.04, mn, height) + _protrusion(verts, axis, 0.88, 0.95, mn, height)
-    name = ("+" if score > 0 else "-") + "XY"[axis]
-    return name, abs(score) / max(height, 1e-6)
+    axis = 1 if size.x >= size.y else 0
+    eyes = [o for o in objects if o.type == 'MESH' and o.name.split(".")[0].lower() == "eyes"]
+    if eyes:
+        ev = world_verts(eyes)
+        eye_c = sum(v[axis] for v in ev) / len(ev)
+        head = [v[axis] for v in verts if v.z >= mn.z + 0.85 * height]
+        diff = eye_c - (min(head) + max(head)) / 2.0
+        if abs(diff) > 0.01 * height:
+            return ("+" if diff > 0 else "-") + "XY"[axis], abs(diff) / height
+    score = _feet_vs_shin(verts, axis, mn, height)
+    return ("+" if score > 0 else "-") + "XY"[axis], abs(score) / max(height, 1e-6)
 
 
 def armature_front(arm, toe="mixamorig:LeftToeBase", foot="mixamorig:LeftFoot"):
