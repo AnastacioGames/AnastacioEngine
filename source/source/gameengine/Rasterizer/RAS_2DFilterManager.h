@@ -160,6 +160,10 @@ public:
 	 * the frame about to be drawn. False when TAA is off or unsupported: no jitter at all. */
 	bool GetTaaJitter(float jitter[2]) const;
 
+	/** False while the frame can't use the TAA history (split screen cameras, stereo, wireframe):
+	 * no jitter, and the pass only sharpens. Set by the render pipeline before drawing. */
+	void SetTaaAllowed(bool allowed);
+
 	/** Enables a built-in post-processing effect, creating its filter pass if
 	 * needed. Multi-pass effects are implemented by KX_2DFilterManager.
 	 */
@@ -239,6 +243,7 @@ private:
 	float m_taaHistoryJitter[2] = {0.0f, 0.0f};
 	/// -1 unknown, 0 not enough texture units / unsupported (Web), 1 available.
 	int m_taaSupported = -1;
+	bool m_taaAllowed = true;
 
 	/// Jitter of a frame number (Halton 2,3 over 8 frames), in pixels.
 	static void TaaJitterOfFrame(int frame, float jitter[2]);

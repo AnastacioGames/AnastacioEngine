@@ -471,7 +471,7 @@ void RAS_2DFilterManager::TaaJitterOfFrame(int frame, float jitter[2])
 bool RAS_2DFilterManager::GetTaaJitter(float jitter[2]) const
 {
 	jitter[0] = jitter[1] = 0.0f;
-	if (m_taaSupported == 0) {
+	if (m_taaSupported == 0 || !m_taaAllowed) {
 		return false;
 	}
 	RAS_PassTo2DFilter::const_iterator it = m_filters.find(FILTERPASS_TAA);
@@ -483,9 +483,23 @@ bool RAS_2DFilterManager::GetTaaJitter(float jitter[2]) const
 	return true;
 }
 
+void RAS_2DFilterManager::SetTaaAllowed(bool allowed)
+{
+	m_taaAllowed = allowed;
+}
+
 void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, int height, const int viewport[4])
 {
 	m_frameInputs.taaHistoryValid = false;
+	if (!m_taaAllowed) {
+		// Drawn without jitter: nothing to remove, and the history would mix the cameras.
+		for (float &j : m_frameInputs.taaJitter) {
+			j = 0.0f;
+		}
+		m_frameInputs.taaHistory = 0;
+		m_taaValid = false;
+		return;
+	}
 	TaaJitterOfFrame(m_frameInputs.frame, m_frameInputs.taaJitter);
 	m_frameInputs.taaJitter[2] = m_taaHistoryJitter[0];
 	m_frameInputs.taaJitter[3] = m_taaHistoryJitter[1];
@@ -549,7 +563,7 @@ void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, in
 void RAS_2DFilterManager::CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen *outputofs, const int viewport[4])
 {
 #ifndef __EMSCRIPTEN__
-	if (!m_taaHistory || outputofs->GetSamples() ||
+	if (!m_taaAllowed || !m_taaHistory || outputofs->GetSamples() ||
 	    (int)outputofs->GetWidth() != m_taaWidth || (int)outputofs->GetHeight() != m_taaHeight)
 	{
 		m_taaValid = false;

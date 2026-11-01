@@ -29,6 +29,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   `tools/debug/cenas/teste_efeitos.range`): sem erro de shader; imagem estável parada (diferença média 0,5/255
   entre quadros); sem rastro girando a câmera; sem fantasma após corte. Índice de serrilhado da região da
   parede vermelha: 3,97 sem TAA, 2,35 com TAA, 5,09 com histórico desligado (só sharpen).
+- Revisão: tela dividida (câmera com viewport), estéreo e modo não texturizado desligam jitter e histórico
+  (`SetTaaAllowed`): o passe reprojetaria tudo com a matriz da última câmera. Painel TAA no padrão de box
+  (box próprio, ajustes num sub-box, aviso de FXAA junto num box separado).
 - Pendente: build Windows, teste em GPU real e num jogo (RolimaRacer: carro visto de trás vai borrar até a
   etapa 2), custo em ms, painel no editor (não houve build do editor nesta sessão).
 

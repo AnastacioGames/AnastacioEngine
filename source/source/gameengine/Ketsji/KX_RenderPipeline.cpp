@@ -828,10 +828,20 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	mt::mat4 projection = rendercam->GetProjectionMatrix(eye);
 	float taaJitter[2];
 	KX_2DFilterManager *taaFilters = scene->Get2DFilterManager();
-	if (taaFilters && cameraFrameData.m_stereoMode == RAS_Rasterizer::RAS_STEREO_NOSTEREO &&
-	    rasterizer->GetDrawingMode() == RAS_Rasterizer::RAS_TEXTURED && width > 0 && height > 0 &&
-	    taaFilters->GetTaaJitter(taaJitter))
-	{
+	if (taaFilters) {
+		/* One full screen camera only: the TAA pass reprojects the whole image with the matrices of
+		 * the last camera drawn, so split screen (viewport cameras) and stereo keep no history. */
+		bool allowed = cameraFrameData.m_stereoMode == RAS_Rasterizer::RAS_STEREO_NOSTEREO &&
+		               rasterizer->GetDrawingMode() == RAS_Rasterizer::RAS_TEXTURED && width > 0 && height > 0;
+		for (KX_Camera *cam : scene->GetCameraList()) {
+			if (cam->UseViewport()) {
+				allowed = false;
+				break;
+			}
+		}
+		taaFilters->SetTaaAllowed(allowed);
+	}
+	if (taaFilters && taaFilters->GetTaaJitter(taaJitter)) {
 		mt::mat4 offset = mt::mat4::Identity();
 		offset(0, 3) = 2.0f * taaJitter[0] / (float)width;
 		offset(1, 3) = 2.0f * taaJitter[1] / (float)height;
