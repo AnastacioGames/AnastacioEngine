@@ -102,7 +102,7 @@ static void kx_profile_filter_pass(int pass)
 			/* 5 is the SSAO composite and 12 the half resolution DOF (see the slot constants below). */
 			"ssgi", "ssgi_image", "ssr", "ssr_blur", "ssao", "ssao_image", "bloom_down0", "bloom_down1",
 			"bloom_down2", "bloom_down3", "bloom_up", "bloom_image", "camera_dof_half", "lightscatter", "lightscatter_image", "fxaa", "tonemap", "rain", "clouds",
-			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens", "camera_dof_reduce", "compositor"};
+			"vfog", "vfog_image", "lensflare", "camera_dof", "camera_lens", "camera_dof_reduce", "compositor", "taa"};
 		static std::string storage[259];
 		if (cache) {
 			storage[slot] = "filter.compositor_cache";
@@ -1186,6 +1186,8 @@ PyAttributeDef KX_2DFilterManager::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaEdgeThresholdMin", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSubpix", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSearchSteps", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("taaEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("taaSharpen", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("grainEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("grainStrength", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RO_FUNCTION("compositor", KX_2DFilterManager, pyattr_get_compositor),
@@ -1215,6 +1217,14 @@ PyObject *KX_2DFilterManager::pyattr_get_post(EXP_PyObjectPlus *self_v, const EX
 		return PyFloat_FromDouble(self->m_grainStrength);
 	}
 
+	RAS_2DFilter *taa = self->GetFilterPass(FILTERPASS_TAA, true);
+	if (name == "taaEnabled") {
+		return PyBool_FromLong(taa && taa->GetEnabled());
+	}
+	if (name == "taaSharpen") {
+		return PyFloat_FromDouble(taa ? taa->GetBuildInFilters()->taa_sharpen : self->m_sceneFilters.taa_sharpen);
+	}
+
 	RAS_2DFilter *fxaa = self->GetFilterPass(FILTERPASS_FXAA, true);
 	if (name == "fxaaEnabled") {
 		return PyBool_FromLong(fxaa && fxaa->GetEnabled());
@@ -1237,7 +1247,7 @@ int KX_2DFilterManager::pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYAT
 	KX_2DFilterManager *self = static_cast<KX_2DFilterManager *>(self_v);
 	const std::string& name = attrdef->m_name;
 
-	if (name == "fxaaEnabled" || name == "grainEnabled") {
+	if (name == "fxaaEnabled" || name == "grainEnabled" || name == "taaEnabled") {
 		const int enabled = PyObject_IsTrue(value);
 		if (enabled == -1) {
 			PyErr_Format(PyExc_TypeError, "filterManager.%s = bool: KX_2DFilterManager, expected True or False", name.c_str());
@@ -1245,6 +1255,9 @@ int KX_2DFilterManager::pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYAT
 		}
 		if (name == "grainEnabled") {
 			self->m_useGrain = enabled;
+		}
+		else if (name == "taaEnabled") {
+			self->EnsureTaaFilter(self->m_sceneFilters)->SetEnabled(enabled);
 		}
 		else {
 			self->EnsureFxaaPass()->SetEnabled(enabled);
@@ -1260,6 +1273,10 @@ int KX_2DFilterManager::pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYAT
 	const float factor = (float)CLAMPIS(number, 0.0, 1.0);
 	if (name == "grainStrength") {
 		self->m_grainStrength = factor;
+		return PY_SET_ATTR_SUCCESS;
+	}
+	if (name == "taaSharpen") {
+		self->EnsureTaaFilter(self->m_sceneFilters)->GetBuildInFilters()->taa_sharpen = factor;
 		return PY_SET_ATTR_SUCCESS;
 	}
 

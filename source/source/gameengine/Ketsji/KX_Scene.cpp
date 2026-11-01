@@ -452,6 +452,8 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	filters.fxaa_edge_threshold_min = settings.fxaa_edge_threshold_min;
 	filters.fxaa_subpix = settings.fxaa_subpix;
 	filters.fxaa_search_steps = settings.fxaa_search_steps;
+	filters.useTaa = settings.use_taa != 0;
+	filters.taa_sharpen = settings.taa_sharpen;
 	filters.useGrain = settings.use_grain != 0;
 	filters.grain_strength = settings.grain_strength;
     filters.ssgi_slot = GPU_material_ssgi_slot(scene);

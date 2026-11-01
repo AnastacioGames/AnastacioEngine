@@ -823,7 +823,21 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	RAS_Rasterizer::StereoEye eye = cameraFrameData.m_eye;
 	rasterizer->SetEye(eye);
 
-	rasterizer->SetProjectionMatrix(rendercam->GetProjectionMatrix(eye));
+	/* TAA: shift the projection by a sub-pixel offset that changes every frame (only the drawing
+	 * of this camera; culling, picking and the Python camera matrices keep the plain projection). */
+	mt::mat4 projection = rendercam->GetProjectionMatrix(eye);
+	float taaJitter[2];
+	KX_2DFilterManager *taaFilters = scene->Get2DFilterManager();
+	if (taaFilters && cameraFrameData.m_stereoMode == RAS_Rasterizer::RAS_STEREO_NOSTEREO &&
+	    rasterizer->GetDrawingMode() == RAS_Rasterizer::RAS_TEXTURED && width > 0 && height > 0 &&
+	    taaFilters->GetTaaJitter(taaJitter))
+	{
+		mt::mat4 offset = mt::mat4::Identity();
+		offset(0, 3) = 2.0f * taaJitter[0] / (float)width;
+		offset(1, 3) = 2.0f * taaJitter[1] / (float)height;
+		projection = offset * projection;
+	}
+	rasterizer->SetProjectionMatrix(projection);
 	rasterizer->SetViewMatrix(rendercam->GetModelviewMatrix(eye), rendercam->NodeGetWorldScaling());
 
 	if (isFirstScene) {

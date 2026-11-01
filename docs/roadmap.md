@@ -13,8 +13,9 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## TAA e upscaling
 
-- [Plano](plano-taa.md): etapa 1 TAA com jitter e reprojeção da câmera; etapa 2 velocity buffer
-  (objetos, GPU skinning, partículas); etapa 3 upscaling. Nada implementado ainda.
+- [Plano](plano-taa.md). Etapa 1 (TAA com jitter e reprojeção da câmera) implementada em 2026-11-01 e testada
+  só no Linux com renderização por software: falta build Windows, GPU real, custo em ms e um jogo real.
+  Etapa 2 velocity buffer (objetos, GPU skinning, partículas); etapa 3 upscaling.
 
 ## Efeitos pré-calculados
 

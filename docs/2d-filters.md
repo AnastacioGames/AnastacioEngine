@@ -40,6 +40,9 @@ engine testa a localização uma vez ao compilar).
 | `bgl_ViewMatrix` / `bgl_InverseViewMatrix` | `mat4` | Mundo -> câmera e inversa. |
 | `bgl_ProjectionMatrix` / `bgl_InverseProjectionMatrix` | `mat4` | Câmera -> clip e inversa (invertidas na CPU uma vez por quadro). |
 | `bgl_PreviousViewProjectionMatrix` | `mat4` | Projeção × view do quadro anterior, para reprojeção (TAA, acumulação temporal). |
+
+Com o TAA da cena ligado (Render > TAA), `bgl_ProjectionMatrix`, `unfinvprojmat` e a matriz do quadro anterior
+incluem o jitter de subpixel do quadro (menos de meio pixel). Os filtros customizados rodam depois do TAA.
 | `bgl_TextureCoordinateOffset[9]` | `vec2[]` | Vizinhança 3x3 em UV (legado). |
 
 `unfviewmat`, `unfprojmat`, `unfinvviewmat` e `unfinvprojmat` continuam valendo (nomes antigos dos

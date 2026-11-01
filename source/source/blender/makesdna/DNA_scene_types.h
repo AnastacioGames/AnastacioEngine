@@ -907,7 +907,8 @@ typedef struct SCENEFXSettings {
 	/* Global quality preset (SCENE_FX_QUALITY_*). Was pad[0]: 0 = Custom, so old files and
 	 * files from the original Range keep their own per-effect settings. */
 	char quality_preset;
-	char pad[1];
+	/* TAA (temporal anti-aliasing) on/off. Was pad[0]: old files load with it off. */
+	char use_taa;
 
 	/* FXAA has no settings struct of its own, its values live here. */
 	float fxaa_edge_threshold;
@@ -916,7 +917,8 @@ typedef struct SCENEFXSettings {
 	int fxaa_search_steps;
 
 	float grain_strength;
-	float pad_grain;
+	/* TAA sharpen of the current frame (0..1). Was pad_grain. */
+	float taa_sharpen;
 } SCENEFXSettings;
 
 /* FXAA defaults, the values the shaders used before they became settings. */
@@ -926,10 +928,14 @@ typedef struct SCENEFXSettings {
 #define SCENE_FX_FXAA_SEARCH_STEPS        10
 /* The shaders need a constant loop bound, so the step count is capped. */
 #define SCENE_FX_FXAA_SEARCH_STEPS_MAX    32
+/* TAA default sharpen. */
+#define SCENE_FX_TAA_SHARPEN              0.25f
 /* Film Grain default strength. */
 #define SCENE_FX_GRAIN_STRENGTH           0.035f
 /* Film Grain bit in expand_flag/editor_render_flag (chars, so they can't hold SCENE_FX_FLAG_GRAIN). */
 #define SCENE_FX_UI_GRAIN                 (1 << 6)
+/* TAA bit in expand_flag (show_expanded_taa). */
+#define SCENE_FX_UI_TAA                   (1 << 7)
 
 /* SCENEFXSettings.quality_preset. Custom changes nothing; the others write the existing
  * quality fields through BKE_scene_quality_preset_apply(). Auto = Medium on a dedicated GPU,

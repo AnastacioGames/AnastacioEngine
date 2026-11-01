@@ -1,6 +1,10 @@
 # Plano: TAA (anti-aliasing temporal) e, depois, upscaling
 
-Estado: plano, nada implementado (2026-11-01). Hoje a Engine só tem FXAA na imagem final
+Estado: etapa 1 implementada (2026-11-01, ver changelog); etapas 2 e 3 abertas.
+Uso: Render > TAA no editor, ou `scene.filterManager.taaEnabled = True` / `taaSharpen` no Python.
+Teste: `tools/debug/teste_taa.py` (instruções no topo do arquivo).
+
+Antes: Hoje a Engine só tem FXAA na imagem final
 (`KX_2DFilterManager::EnsureFxaaPass`). O changelog antigo já registrava TAA como lacuna: sem jitter
 de projeção, sem motion vectors e sem histórico da cor final.
 
@@ -16,14 +20,14 @@ de projeção, sem motion vectors e sem histórico da cor final.
   movimento de personagens basta guardar também as matrizes do quadro anterior.
 - **Matriz de projeção:** `RAS_Rasterizer::GetFrustumMatrix` é o ponto único para aplicar jitter.
 
-## Etapa 1: TAA só com movimento da câmera
+## Etapa 1: TAA só com movimento da câmera (feita)
 
 1. **Jitter:** sequência Halton(2,3) de 8 amostras, deslocamento de ±0,5 pixel somado ao
    `left/right/bottom/top` do frustum (ou às colunas de translação da projeção). Só na câmera principal;
    planar maps, `ImageRender`, sombras e cubemaps ficam sem jitter.
    Guardar a projeção sem jitter para culling, picking e `getScreenPosition` do Python.
 2. **Passe `FILTERPASS_TAA`:** novo shader `RAS_TAA2DFilter.glsl`, rodando em resolução cheia depois do
-   tonemap e antes de FXAA, lente e UI. Ao ligar TAA, o FXAA fica desligado.
+   tonemap e antes de FXAA, lente e UI. O FXAA continua independente (o painel avisa que os dois juntos amaciam mais).
    - reprojeção pela profundidade com a VP anterior (mesma conta do `RAS_Temporal2DFilter.glsl`);
    - tirar o jitter atual da UV antes de ler a cor;
    - clamp da vizinhança em YCoCg (variância, γ ≈ 1,0) contra ghosting;
@@ -32,8 +36,8 @@ de projeção, sem motion vectors e sem histórico da cor final.
    - sharpen leve opcional (estilo CAS) no fim.
 3. **Histórico:** ping-pong RGBA16F (RGBA8 se não houver float) do tamanho da tela. Invalidar quando
    trocar de câmera, redimensionar a janela, mudar de cena ou numa câmera com corte brusco.
-4. **Interface:** painel Render > Anti-aliasing com `None / FXAA / TAA`, mais força do sharpen.
-   Python: `scene.render.antialias` (ou equivalente seguindo o padrão do FXAA atual).
+4. **Interface:** painel Render > TAA (liga/desliga e Sharpen), ao lado do FXAA.
+   Python: `scene.filterManager.taaEnabled` e `taaSharpen`.
 5. **Web:** sem cópia de profundidade nem float em alguns dispositivos; desligar e voltar para o FXAA.
 
 Limite da etapa 1: objetos que se movem em relação à câmera deixam rastro ou borram. Serve para

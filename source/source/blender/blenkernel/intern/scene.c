@@ -1035,6 +1035,7 @@ void BKE_scene_init(Scene *sce)
 	sce->scenefx_settings.fxaa_edge_threshold_min = SCENE_FX_FXAA_EDGE_THRESHOLD_MIN;
 	sce->scenefx_settings.fxaa_subpix = SCENE_FX_FXAA_SUBPIX;
 	sce->scenefx_settings.fxaa_search_steps = SCENE_FX_FXAA_SEARCH_STEPS;
+	sce->scenefx_settings.taa_sharpen = SCENE_FX_TAA_SHARPEN;
 	sce->scenefx_settings.grain_strength = SCENE_FX_GRAIN_STRENGTH;
 
 	/* game data */

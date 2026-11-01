@@ -587,6 +587,18 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
             subcol.prop(scenefx_settings, "fxaa_subpix")
             subcol.prop(scenefx_settings, "fxaa_search_steps")
 
+        # TAA runs only in the game (no viewport toggle): it needs the jittered camera of the game render.
+        row = layout.row(align=True)
+        row.prop(scenefx_settings, "show_expanded_taa", text="TAA", emboss=True)
+        row.prop(scenefx_settings, "use_taa", text="")
+
+        if scenefx_settings.show_expanded_taa:
+            subcol = layout.column(align=True)
+            subcol.active = scenefx_settings.use_taa
+            subcol.prop(scenefx_settings, "taa_sharpen")
+            if scenefx_settings.use_taa and scenefx_settings.use_fxaa:
+                subcol.label(text="FXAA on top of TAA softens the image more", icon='INFO')
+
         row = layout.row(align=True)
         row.prop(scenefx_settings, "show_expanded_grain", text="Film Grain", emboss=True)
         row.prop(scenefx_settings, "render_editor_grain", text="", icon="RESTRICT_RENDER_OFF", emboss=True)

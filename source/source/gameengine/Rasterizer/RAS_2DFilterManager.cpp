@@ -44,6 +44,7 @@ extern "C" {
 	extern char datatoc_RAS_Dilation2DFilter_glsl[];
 	extern char datatoc_RAS_Erosion2DFilter_glsl[];
 	extern char datatoc_RAS_Fxaa2DFilter_glsl[];
+	extern char datatoc_RAS_TAA2DFilter_glsl[];
 	extern char datatoc_RAS_Laplacian2DFilter_glsl[];
 	extern char datatoc_RAS_Sobel2DFilter_glsl[];
 	extern char datatoc_RAS_Prewitt2DFilter_glsl[];
@@ -88,6 +89,9 @@ RAS_2DFilterManager::RAS_2DFilterManager(BuildInFilters filters)
 		// By default enable the filter.
 		fxaaFilter->SetEnabled(true);
 	}
+	if (filters.useTaa) {
+		EnsureTaaFilter(filters)->SetEnabled(true);
+	}
 	if (filters.useSSAO) {
 		RAS_2DFilterData ssaoData;
 		ssaoData.filterMode = FILTER_MODE::FILTER_SSAO;
@@ -120,6 +124,9 @@ RAS_2DFilterManager::~RAS_2DFilterManager()
 	for (TemporalHistory &history : m_temporalHistories) {
 		glDeleteTextures(1, &history.color);
 		glDeleteTextures(1, &history.depth);
+	}
+	if (m_taaHistory) {
+		glDeleteTextures(1, &m_taaHistory);
 	}
 }
 
@@ -158,15 +165,18 @@ unsigned int RAS_2DFilterManager::RenderOrderKey(unsigned int passIndex)
 		case FILTERPASS_BLOOM + 7:    return 20;
 		case FILTERPASS_CAMERA_DOF:   return 21;
 		case FILTERPASS_TONEMAP:      return 22;
-		case FILTERPASS_FXAA:         return 23;
-		case FILTERPASS_LENSFLARE:    return 24;
-		case FILTERPASS_CAMERA_LENS:  return 25;
+		/* TAA on the LDR image, before FXAA, lens flare, film grain and the custom filters
+		 * (none of them must be accumulated over frames). */
+		case FILTERPASS_TAA:          return 23;
+		case FILTERPASS_FXAA:         return 24;
+		case FILTERPASS_LENSFLARE:    return 25;
+		case FILTERPASS_CAMERA_LENS:  return 26;
 		/* The compositor tree is the last step of the frame, after the custom filters too. */
 		case FILTERPASS_COMPOSITOR:   return UINT_MAX;
 		default:
 			if (passIndex >= FILTERPASS_COMPOSITOR_CACHE && passIndex < FILTERPASS_COMPOSITOR_CACHE + 64) {
 				return UINT_MAX - 64 + (passIndex - FILTERPASS_COMPOSITOR_CACHE);
-			} // 0..14 unchanged, custom filters (>= 25) after the lens pass
+			} // 0..14 unchanged, custom filters (>= 27, key >= 28) after the lens pass
 			return (passIndex < FILTERPASS_RAIN) ? passIndex : passIndex + 1;
 	}
 }
@@ -442,6 +452,129 @@ void RAS_2DFilterManager::RenderTemporalResolve(RAS_2DFilter *filter, RAS_Raster
 	m_frameInputs.temporalHistoryValid = false;
 }
 
+void RAS_2DFilterManager::TaaJitterOfFrame(int frame, float jitter[2])
+{
+	/* Halton (2, 3), 8 samples, index from 1 (0 would give a zero offset). */
+	const int index = (frame & 7) + 1;
+	const int bases[2] = {2, 3};
+	for (int axis = 0; axis < 2; ++axis) {
+		float f = 1.0f;
+		float r = 0.0f;
+		for (int i = index; i > 0; i /= bases[axis]) {
+			f /= (float)bases[axis];
+			r += f * (float)(i % bases[axis]);
+		}
+		jitter[axis] = r - 0.5f;
+	}
+}
+
+bool RAS_2DFilterManager::GetTaaJitter(float jitter[2]) const
+{
+	jitter[0] = jitter[1] = 0.0f;
+	if (m_taaSupported == 0) {
+		return false;
+	}
+	RAS_PassTo2DFilter::const_iterator it = m_filters.find(FILTERPASS_TAA);
+	if (it == m_filters.end() || !it->second->Ok()) {
+		return false;
+	}
+	// RenderFilters() increments the frame before the filters: the frame being drawn is the next one.
+	TaaJitterOfFrame(m_frameInputs.frame + 1, jitter);
+	return true;
+}
+
+void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, int height, const int viewport[4])
+{
+	m_frameInputs.taaHistoryValid = false;
+	TaaJitterOfFrame(m_frameInputs.frame, m_frameInputs.taaJitter);
+	m_frameInputs.taaJitter[2] = m_taaHistoryJitter[0];
+	m_frameInputs.taaJitter[3] = m_taaHistoryJitter[1];
+
+#ifdef __EMSCRIPTEN__
+	// WebGL can't copy the float filter buffers into a texture: no history, the pass only sharpens.
+	(void)rasty;
+	(void)width;
+	(void)height;
+	(void)viewport;
+	m_taaSupported = 0;
+	m_frameInputs.taaHistory = 0;
+#else
+	if (m_taaSupported == -1) {
+		GLint maxUnits = 0;
+		glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits);
+		// Unit 22 is past the shared temporal history (20/21).
+		m_taaSupported = (maxUnits > 22) ? 1 : 0;
+		const char *off = getenv("RANGE_TAA_OFF");
+		if (off && off[0] == '1') {
+			m_taaSupported = 0;
+		}
+		if (!m_taaSupported) {
+			CM_Warning("TAA history off (RANGE_TAA_OFF=1 or fewer than 23 texture units): the pass only sharpens");
+		}
+	}
+	if (!m_taaSupported) {
+		m_frameInputs.taaHistory = 0;
+		return;
+	}
+	if (!m_taaHistory) {
+		glGenTextures(1, &m_taaHistory);
+	}
+	if (width != m_taaWidth || height != m_taaHeight) {
+		glBindTexture(GL_TEXTURE_2D, m_taaHistory);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		m_taaWidth = width;
+		m_taaHeight = height;
+		m_taaValid = false;
+	}
+	const mt::mat4 viewProjection = rasty->GetProjectionMatrix() * rasty->GetViewMatrix();
+	/* Stale (TAA off for a while, other scene), other viewport, or a camera cut / teleport. */
+	if (m_frameInputs.frame - m_taaLastFrame > 2 || !std::equal(viewport, viewport + 4, m_taaViewport) ||
+	    ViewProjectionJumped(viewProjection, m_taaViewProjection))
+	{
+		m_taaValid = false;
+	}
+	m_frameInputs.taaHistory = m_taaHistory;
+	m_frameInputs.taaHistoryValid = m_taaValid;
+	if (m_taaValid) {
+		m_frameInputs.taaHistoryViewProjection = mt::mat4(m_taaViewProjection);
+	}
+#endif
+}
+
+void RAS_2DFilterManager::CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen *outputofs, const int viewport[4])
+{
+#ifndef __EMSCRIPTEN__
+	if (!m_taaHistory || outputofs->GetSamples() ||
+	    (int)outputofs->GetWidth() != m_taaWidth || (int)outputofs->GetHeight() != m_taaHeight)
+	{
+		m_taaValid = false;
+		return;
+	}
+	outputofs->Bind();
+	glBindTexture(GL_TEXTURE_2D, m_taaHistory);
+	CopyViewportRect(viewport, m_taaWidth, m_taaHeight, m_taaWidth, m_taaHeight);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	(rasty->GetProjectionMatrix() * rasty->GetViewMatrix()).Pack(m_taaViewProjection);
+	std::copy(viewport, viewport + 4, m_taaViewport);
+	m_taaHistoryJitter[0] = m_frameInputs.taaJitter[0];
+	m_taaHistoryJitter[1] = m_frameInputs.taaJitter[1];
+	m_taaLastFrame = m_frameInputs.frame;
+	m_taaValid = true;
+#else
+	(void)rasty;
+	(void)outputofs;
+	(void)viewport;
+#endif
+	m_frameInputs.taaHistory = 0;
+	m_frameInputs.taaHistoryValid = false;
+}
+
 RAS_2DFilter *RAS_2DFilterManager::EnsureTonemapFilter(const BuildInFilters& filters)
 {
 	RAS_2DFilter *filter = GetFilterPass(FILTERPASS_TONEMAP, true);
@@ -505,6 +638,26 @@ RAS_2DFilter *RAS_2DFilterManager::EnsureFxaaFilter(const BuildInFilters& filter
 	filter = new RAS_2DFilter(fxaaData);
 	m_filters[FILTERPASS_FXAA] = filter;
 
+	return filter;
+}
+
+RAS_2DFilter *RAS_2DFilterManager::EnsureTaaFilter(const BuildInFilters& filters)
+{
+	RAS_2DFilter *filter = GetFilterPass(FILTERPASS_TAA, true);
+	if (filter) {
+		return filter;
+	}
+	RAS_2DFilterData taaData;
+	taaData.filterMode = FILTER_MODE::FILTER_CUSTOMFILTER;
+	taaData.filterPassIndex = FILTERPASS_TAA;
+	taaData.gameObject = nullptr;
+	taaData.mipmap = false;
+	taaData.propertyNames = {};
+	taaData.buildInFilters = filters;
+	taaData.shaderText = datatoc_RAS_TAA2DFilter_glsl;
+	filter = new RAS_2DFilter(taaData);
+	m_filters[taaData.filterPassIndex] = filter;
+	filter->SetEnabled(false);
 	return filter;
 }
 
@@ -692,8 +845,11 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		auto isFree = [colorofs, depthofs, usesDepth](RAS_OffScreen *ofs) {
 			return ofs != colorofs && !(usesDepth && ofs == depthofs);
 		};
+		/* TAA keeps its output as history: it can't be a multisampled eye off screen. */
+		const bool isTaa = (it->first == FILTERPASS_TAA) && filter->Ok();
+		const bool lastTarget = (it == pend) && !(isTaa && targetofs->GetSamples());
 		RAS_OffScreen *candidates[4] = {
-			(it == pend) ? targetofs : canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(colorofs->GetType())),
+			lastTarget ? targetofs : canvas->GetOffScreen(RAS_OffScreen::NextFilterOffScreen(colorofs->GetType())),
 			canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER0),
 			canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER1),
 			(targetofs->GetSamples() == 0) ? targetofs : nullptr
@@ -709,7 +865,18 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		/* Get the output off screen of the filter, could be the same as the input off screen
 		 * if no modifications were made to the targeted off screen.
 		 * This output off screen is used for the next filter as input off screen */
+		if (isTaa) {
+			PrepareTaaHistory(rasty, (int)ftargetofs->GetWidth(), (int)ftargetofs->GetHeight(), viewport);
+		}
 		previousofs = filter->Render(rasty, canvas, depthofs, colorofs, ftargetofs, sun_screen_pos);
+		if (isTaa) {
+			if (previousofs != colorofs) {
+				CommitTaaHistory(rasty, previousofs, viewport);
+			}
+			else {
+				m_taaValid = false;
+			}
+		}
 		if (ProfilePassHook) {
 			ProfilePassHook(it->first);
 		}

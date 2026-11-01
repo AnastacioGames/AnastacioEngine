@@ -8,6 +8,30 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - TAA (anti-aliasing temporal), etapa 1: só movimento da câmera
+
+- Plano em [plano-taa.md](plano-taa.md). Novo passe `FILTERPASS_TAA` (26), depois do Tonemap e antes de FXAA,
+  lens flare, lente/grão e filtros customizados (`RenderOrderKey`: TAA 23, FXAA 24, flare 25, lente 26).
+  `reservedPassIndex` passa a 27 (filtros customizados andam uma chave para frente).
+- Jitter Halton(2,3) de 8 quadros somado à projeção em `KX_RenderPipeline::RenderCamera` (só a câmera do jogo,
+  sem estéreo, modo texturizado). Culling, picking e matrizes da câmera no Python continuam sem jitter.
+- Shader `RAS_TAA2DFilter.glsl`: reprojeção pela profundidade mais próxima do 3x3 com a VP do histórico, os
+  dois jitters tirados do movimento; histórico lido com Catmull-Rom; clip na caixa de variância em YCoCg;
+  peso do quadro atual 0,08 parado e 0,25 em movimento; mistura com peso por luma; sharpen opcional.
+- Histórico próprio (RGBA16F, unidade 22) em `RAS_2DFilterManager`: invalidado em resize, troca de viewport,
+  corte de câmera (`ViewProjectionJumped`) e se o TAA ficou parado mais de 2 quadros. Saída nunca vai para um
+  eye off screen multisample (não dá para copiar). Web: sem histórico nem jitter. `RANGE_TAA_OFF=1` desliga o
+  histórico para comparação A/B.
+- Cena: `scenefx_settings.use_taa` e `taa_sharpen` (ocupam `pad[0]` e `pad_grain`; arquivos antigos abrem
+  com TAA desligado e sharpen 0,25 via versioning). Painel Render > TAA. Python:
+  `scene.filterManager.taaEnabled` e `taaSharpen` (cria o passe na hora se a cena carregou sem ele).
+- Teste (Linux, `build-linux`, Mesa llvmpipe em xvfb, `tools/debug/teste_taa.py` em
+  `tools/debug/cenas/teste_efeitos.range`): sem erro de shader; imagem estável parada (diferença média 0,5/255
+  entre quadros); sem rastro girando a câmera; sem fantasma após corte. Índice de serrilhado da região da
+  parede vermelha: 3,97 sem TAA, 2,35 com TAA, 5,09 com histórico desligado (só sharpen).
+- Pendente: build Windows, teste em GPU real e num jogo (RolimaRacer: carro visto de trás vai borrar até a
+  etapa 2), custo em ms, painel no editor (não houve build do editor nesta sessão).
+
 ## 2026-10-31 - NLA: correções no editor e no `playNLA()`; aba Car antes da Física
 
 - `playNLA()` (33f08f26): chamar de novo com os mesmos argumentos não reinicia (pode ir no Always com pulso);

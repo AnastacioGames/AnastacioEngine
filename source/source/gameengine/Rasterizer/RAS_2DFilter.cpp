@@ -191,7 +191,12 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"vfog_shadow2", // GE_VFOG_SHADOW2_UNIFORM
 	"vfog_shadowcolor0", // GE_VFOG_SHADOWCOLOR0_UNIFORM
 	"vfog_shadowcolor1", // GE_VFOG_SHADOWCOLOR1_UNIFORM
-	"vfog_shadowcolor2" // GE_VFOG_SHADOWCOLOR2_UNIFORM
+	"vfog_shadowcolor2", // GE_VFOG_SHADOWCOLOR2_UNIFORM
+
+	"ge_TAAHistory", // GE_TAA_HISTORY_UNIFORM
+	"ge_TAAHistoryViewProj", // GE_TAA_HISTORY_VIEWPROJ_UNIFORM
+	"ge_TAAJitter", // GE_TAA_JITTER_UNIFORM
+	"ge_TAAParams" // GE_TAA_PARAMS_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
@@ -566,6 +571,11 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 		glBindTexture(GL_TEXTURE_2D, m_frameInputs->temporalHistoryDepth);
 	}
 
+	if (m_predefinedUniforms[GE_TAA_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->taaHistory) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->taaHistoryUnit);
+		glBindTexture(GL_TEXTURE_2D, m_frameInputs->taaHistory);
+	}
+
 	if (m_predefinedUniforms[GE_CLOUDS_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->cloudHistory) {
 		glActiveTexture(GL_TEXTURE0 + m_frameInputs->cloudHistoryUnit);
 		glBindTexture(GL_TEXTURE_2D, m_frameInputs->cloudHistory);
@@ -634,6 +644,11 @@ void RAS_2DFilter::UnbindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *coloro
 		glActiveTexture(GL_TEXTURE0 + m_frameInputs->temporalHistoryUnit);
 		glBindTexture(GL_TEXTURE_2D, 0);
 		glActiveTexture(GL_TEXTURE0 + m_frameInputs->temporalHistoryDepthUnit);
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+
+	if (m_predefinedUniforms[GE_TAA_HISTORY_UNIFORM] != -1 && m_frameInputs && m_frameInputs->taaHistory) {
+		glActiveTexture(GL_TEXTURE0 + m_frameInputs->taaHistoryUnit);
 		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 
@@ -766,6 +781,25 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 			SetUniform(m_predefinedUniforms[GE_TEMPORAL_HISTORY_VIEWPROJ_UNIFORM],
 			           valid ? m_frameInputs->temporalHistoryViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
 		}
+	}
+
+	if (m_predefinedUniforms[GE_TAA_PARAMS_UNIFORM] != -1) {
+		const bool valid = m_frameInputs && m_frameInputs->taaHistory && m_frameInputs->taaHistoryValid;
+		if (m_predefinedUniforms[GE_TAA_HISTORY_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_TAA_HISTORY_UNIFORM], m_frameInputs ? m_frameInputs->taaHistoryUnit : 22);
+		}
+		if (m_predefinedUniforms[GE_TAA_HISTORY_VIEWPROJ_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_TAA_HISTORY_VIEWPROJ_UNIFORM],
+			           valid ? m_frameInputs->taaHistoryViewProjection : rasty->GetProjectionMatrix() * rasty->GetViewMatrix());
+		}
+		if (m_predefinedUniforms[GE_TAA_JITTER_UNIFORM] != -1) {
+			static const float noJitter[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			SetUniformfv(m_predefinedUniforms[GE_TAA_JITTER_UNIFORM], RAS_Uniform::UNI_FLOAT4,
+			             m_frameInputs ? m_frameInputs->taaJitter : noJitter, sizeof(float) * 4, 1);
+		}
+		/* Weight of the current frame: still pixels / moving pixels. */
+		const float params[4] = {valid ? 1.0f : 0.0f, m_buildInFilters.taa_sharpen, 0.08f, 0.25f};
+		SetUniformfv(m_predefinedUniforms[GE_TAA_PARAMS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
 	}
 
 	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {

@@ -657,6 +657,14 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "SCENEFXSettings", "float", "taa_sharpen")) {
+    /* TAA came in place of pad_grain: off, with the default sharpen ready. */
+    LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+      scene->scenefx_settings.use_taa = 0;
+      scene->scenefx_settings.taa_sharpen = SCENE_FX_TAA_SHARPEN;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "SCENEFXSettings", "float", "grain_strength")) {
     LISTBASE_FOREACH (Scene *, scene, &main->scene) {
       scene->scenefx_settings.grain_strength = SCENE_FX_GRAIN_STRENGTH;

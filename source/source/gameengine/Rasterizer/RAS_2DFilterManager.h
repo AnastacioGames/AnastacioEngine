@@ -77,11 +77,13 @@ public:
 		 * (desktop); runs right before it, see RenderOrderKey() */
 		FILTERPASS_CAMERA_DOF_REDUCE = 24,
 		/* The scene's compositor nodes (KX_CompositorFilter), last of the built-in passes */
-		FILTERPASS_COMPOSITOR   = 25
+		FILTERPASS_COMPOSITOR   = 25,
+		/* Temporal anti-aliasing (RAS_TAA2DFilter.glsl), right after Tonemap, before FXAA */
+		FILTERPASS_TAA          = 26
 	};
 	/* Number of steps reserved for BuildInFilters, this means that any filters added later will be relocated to later steps.
 	 * It must be past the last reserved pass: with 17 the custom filter of index 0 landed on FILTERPASS_LENSFLARE. */
-	const int reservedPassIndex = FILTERPASS_COMPOSITOR + 1;
+	const int reservedPassIndex = FILTERPASS_TAA + 1;
 	/* Textures drawn before the compositor pass (input chains of its Blur / Lens Distortion nodes):
 	 * reserved indices far past any custom filter, rendered right before FILTERPASS_COMPOSITOR. */
 	static const unsigned int FILTERPASS_COMPOSITOR_CACHE = 0x40000000;
@@ -151,6 +153,13 @@ public:
 	/// Same as EnsureTonemapFilter(), but for the FXAA filter.
 	RAS_2DFilter *EnsureFxaaFilter(const BuildInFilters& filters);
 
+	/// Same as EnsureTonemapFilter(), but for the TAA filter.
+	RAS_2DFilter *EnsureTaaFilter(const BuildInFilters& filters);
+
+	/** Sub-pixel offset (in pixels, -0.5..0.5) the cameras must add to their projection for
+	 * the frame about to be drawn. False when TAA is off or unsupported: no jitter at all. */
+	bool GetTaaJitter(float jitter[2]) const;
+
 	/** Enables a built-in post-processing effect, creating its filter pass if
 	 * needed. Multi-pass effects are implemented by KX_2DFilterManager.
 	 */
@@ -217,6 +226,26 @@ private:
 	void RenderTemporalResolve(RAS_2DFilter *filter, RAS_Rasterizer *rasty, RAS_ICanvas *canvas,
 	                           RAS_OffScreen *depthofs, RAS_OffScreen *colorofs, RAS_OffScreen *targetofs,
 	                           const float (&sun_screen_pos)[2], const int viewport[4]);
+
+	/** TAA history: the output of the TAA pass of the last frame (full resolution), the
+	 * viewport, view-projection and jitter it was drawn with. */
+	unsigned int m_taaHistory = 0;
+	int m_taaWidth = 0;
+	int m_taaHeight = 0;
+	int m_taaViewport[4] = {0, 0, 0, 0};
+	int m_taaLastFrame = 0;
+	bool m_taaValid = false;
+	float m_taaViewProjection[16] = {0.0f};
+	float m_taaHistoryJitter[2] = {0.0f, 0.0f};
+	/// -1 unknown, 0 not enough texture units / unsupported (Web), 1 available.
+	int m_taaSupported = -1;
+
+	/// Jitter of a frame number (Halton 2,3 over 8 frames), in pixels.
+	static void TaaJitterOfFrame(int frame, float jitter[2]);
+	/// Before the TAA pass: (re)allocate the history and give it to the filter if still valid.
+	void PrepareTaaHistory(RAS_Rasterizer *rasty, int width, int height, const int viewport[4]);
+	/// After the TAA pass: copy its output into the history.
+	void CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen *outputofs, const int viewport[4]);
 
 	/** Creates a filter matching the given filter data. Returns nullptr if no
 	 * filter can be created with such information.

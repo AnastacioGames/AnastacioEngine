@@ -132,6 +132,12 @@ public:
 		GE_VFOG_SHADOWCOLOR1_UNIFORM,
 		GE_VFOG_SHADOWCOLOR2_UNIFORM,
 
+		/* TAA (RAS_TAA2DFilter.glsl): its own full resolution history. */
+		GE_TAA_HISTORY_UNIFORM,
+		GE_TAA_HISTORY_VIEWPROJ_UNIFORM,
+		GE_TAA_JITTER_UNIFORM,
+		GE_TAA_PARAMS_UNIFORM,
+
 		MAX_PREDEFINED_UNIFORM_TYPE
 	};
 
@@ -165,6 +171,14 @@ public:
 		int temporalHistoryDepthUnit = 21;
 		bool temporalHistoryValid = false;
 		mt::mat4 temporalHistoryViewProjection = mt::mat4::Identity();
+
+		/// TAA history (final color after the TAA pass) and how it was drawn: view-projection
+		/// and jitter in pixels. taaJitter: xy this frame, zw the history.
+		unsigned int taaHistory = 0;
+		int taaHistoryUnit = 22;
+		bool taaHistoryValid = false;
+		mt::mat4 taaHistoryViewProjection = mt::mat4::Identity();
+		float taaJitter[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 	};
 
 protected:

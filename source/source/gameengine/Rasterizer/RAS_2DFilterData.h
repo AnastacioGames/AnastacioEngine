@@ -36,6 +36,10 @@ typedef struct BuildInFilters {
 	float fxaa_subpix;
 	int fxaa_search_steps;
 
+	/* TAA (temporal anti-aliasing, docs/plano-taa.md) */
+	bool useTaa;
+	float taa_sharpen;
+
 	/* Film Grain (camera lens pass) */
 	bool useGrain;
 	float grain_strength;
