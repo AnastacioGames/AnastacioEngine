@@ -178,6 +178,39 @@ na escolha (grade 3x4 com os botões a 72 %, cartão `<Nome>` na _menu, botão `
 Falta: aceite com janela, teste de queda na corrida, jogador da carreira (3ª pessoa) e cutscene sem ragdoll, tirar os pilotos de dentro do
 RolimaRacer.range, DDS.
 
+## Como pôr um piloto novo no jogo (passo a passo, RolimaRacer)
+
+Convenção: um nome só, `<Nome>` (ex.: `Patty`, `Quarta_Feira`, sem espaço). Grupo, Empty e pasta são
+`Group<Nome>`; o cartão do menu é `<Nome>` (o `replace_object` de `scripts/_button_shared.py` tira o `Group`).
+
+1. **Fuse:** exportar OBJ com *Export in new folder* + *Remove occluded polygons*, sem Pack, em
+   `D:\ProjetoRolimaRacer\personagens - File Exported from Fuse in (.obj)\_novos\<Nome>\<Nome>.obj`.
+2. **Gerar** (File > Import > Fuse Character no editor, ou linha de comando):
+   ```
+   buildin\AnastacioEngine.exe -b --factory-startup --python tools\create_fuse_character.py -- ^
+     "<...>\_novos\<Nome>\<Nome>.obj" <Nome> ^
+     "D:\ProjetoRolimaRacer\personagens - Personagem Link\_novos\Group<Nome>" --projeto D:\ProjetoRolimaRacer
+   ```
+   Sai `Group<Nome>.range` + `textures/` (atlas, `<Nome>_card.png`, `<Nome>_foto.png`). Conferir no log
+   `PERSONAGEM {...}` (sem `aviso`) e os triângulos: 6000 na parte de cima + 3000, LOD 2500/900.
+   O `--projeto` é obrigatório: dá o componente do ragdoll e a pose do cartão (animação do jogo).
+3. **Lista do jogo:** pôr `"Group<Nome>"` em `PILOTOS_NOVOS` de `D:\ProjetoRolimaRacer\scripts\pilotos.py`.
+   Só isso já põe o piloto no sorteio das CPUs e no LibLoad da corrida.
+4. **Menu de escolha:** backup dos dois `.range` e:
+   ```
+   buildin\AnastacioEngine.exe -b --factory-startup D:\ProjetoRolimaRacer\RolimaRacer.range ^
+     --python D:\ProjetoRolimaRacer	oolsdicionar_pilotos_menu.py -- <Nome> [<Nome2> ...]
+   ```
+   Repetir com `RolimaRacer_trailer.range` (é cópia do principal). Cria cartão, botão e foto e redistribui a grade
+   (3 colunas, 4 linhas: **cabem 12**; hoje já são 12. Para o 13º, a tela precisa de outro layout, como páginas ou setas).
+5. **Conferir sem abrir o jogo:** render da tela de escolha (câmera do `_menu` movida para `Plane.043`) e
+   `pilotos.disponiveis()`; depois o usuário testa com janela: prévia no hover, piloto na corrida, queda (ragdoll).
+6. **Commit** no repo do jogo: só os scripts com caminho explícito (`.range` não vai pelo git).
+
+Pilotos sem ragdoll (jogador da carreira em 3ª pessoa, `GroupMarco_TP`, e o da cutscene): mesmo gerador com
+`--sem-ragdoll`. Ainda falta ligar no jogo (o botão `GroupAldebaran_TP` aponta para um grupo que não existe).
+Pastas: pilotos antigos em `5 - Personagem Link\_antigos`, novos em `_novos`; o caminho vem de `pilotos.caminho()`.
+
 ## Decisões
 
 - Feitas (2026-11-01): base Enzo dois dedos (34 ossos), no lugar do Fabio; prefixo `mixamorig:` mantido; 22 ossos; LOD 3 níveis; ragdoll pelo
