@@ -74,8 +74,8 @@ def main():
     scene = bpy.context.scene
     objects = {
         key: add_empty(scene, "Obj_" + key)
-        for key in ("template_object", "spawn_point", "dependent_object", "look_at_target",
-                    "path_object", "path_curve", "path_look_at")
+        for key in sorted({key for _type, fields in ev.ACTIONS.values()
+                           for key, kind, _required in fields if kind == ev.OBJ})
     }
 
     # Cobertura: toda opção do enum RNA tem ação, e toda ação aponta para uma opção.

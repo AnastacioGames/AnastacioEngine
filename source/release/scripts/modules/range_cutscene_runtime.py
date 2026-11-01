@@ -165,7 +165,7 @@ def _find_dialogue_box(obj):
     if range_ui_runtime.get() is None:
         return None
     for ui in range_ui_runtime._instances:
-        for screen in ui.screens.values():
+        for screen in list(ui.huds) + list(ui.screens.values()):
             for box in screen.dialogues:
                 data = box.data
                 if data.get("source") in ("PROPERTY", "TEXT_OBJECT") and ui.obj_for(data) is obj:
