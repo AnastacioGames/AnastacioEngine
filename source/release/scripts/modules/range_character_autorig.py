@@ -788,6 +788,7 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
 # -- Cartao do menu (foto do piloto) ---------------------------------------------------------------------
 
 CARD_SIZE = (512, 1024)          # os cartoes do RolimaRacer sao 256x512 (corpo inteiro, fundo transparente)
+PHOTO_SIZE = 256                 # foto do rosto no botao de escolha
 CARD_POSE = ("RolimaRacer.range", "PLAYER_IDLE_CAPOEIRA 1_104", 50)   # ginga, como o cartao do Fabio   # (arquivo do jogo, acao, quadro)
 
 
@@ -838,7 +839,7 @@ def _pose_arms_down(arm):
         pb.matrix = Matrix.Translation(m.to_translation()) * q.to_matrix().to_4x4() *             Matrix.Translation(-m.to_translation()) * m
 
 
-def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, report=print):
+def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=None, report=print):
     """Foto do corpo inteiro em pose, luz Sun, fundo transparente (cartao do menu de escolha)."""
     import bpy
     scene = bpy.context.scene
@@ -891,6 +892,15 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, report=print)
         ob.layers = meshes[0].layers
     r.filepath = path
     bpy.ops.render.render(write_still=True)
+    # foto do botao (rosto, quadrada): mesma pose e luz, camera fechada na cabeca
+    head = next((pb for pb in arm.pose.bones if pb.name.endswith("Head")), None)
+    if head and photo_path:
+        hc = arm.matrix_world * head.head + Vector((0, 0, 0.08))
+        cam_data.ortho_scale = 0.42
+        cam.location = (hc.x + dist * math.sin(ang), hc.y + dist * math.cos(ang), hc.z)
+        r.resolution_x = r.resolution_y = PHOTO_SIZE
+        r.filepath = photo_path
+        bpy.ops.render.render(write_still=True)
     for ob in (cam, sun):
         bpy.data.objects.remove(ob, do_unlink=True)
     for pb in arm.pose.bones:          # volta para a pose de descanso
@@ -932,7 +942,8 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
         add_ragdoll(arm, game)
     card = os.path.join(tex_dir, name + "_card.png")
     try:
-        info["cartao"] = render_card(arm, [body], card, game_root, report=report)
+        info["cartao"] = render_card(arm, [body], card, game_root,
+                                     photo_path=os.path.join(tex_dir, name + "_foto.png"), report=report)
     except Exception as exc:
         report("aviso: cartao nao renderizado (%s)" % exc)
     finish_pilot(arm, body, group_name, component, report)

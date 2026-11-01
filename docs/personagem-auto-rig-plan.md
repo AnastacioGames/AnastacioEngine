@@ -173,7 +173,9 @@ No RolimaRacer os pilotos passam a ser carregados por LibLoad (`scripts/pilotos.
 Cartão do menu (2026-11-01): `render_card` fotografa a malha cheia (antes da redução) numa pose da animação do jogo
 (`CARD_POSE`, ginga da PLAYER_IDLE_CAPOEIRA, quadro 50), luz Sun, fundo transparente, 512x1024 em
 `textures/<Nome>_card.png`; sem jogo, pose manual com os braços abaixados.
-Falta: aceite com janela, teste de queda na corrida, botões dos novos no menu, tirar os pilotos de dentro do
+Foto do botão: `<Nome>_foto.png` 256x256, rosto na mesma pose e luz. No RolimaRacer.range e no trailer os 9 entraram
+na escolha (grade 3x4 com os botões a 72 %, cartão `<Nome>` na _menu, botão `btn_Group<Nome>`).
+Falta: aceite com janela, teste de queda na corrida, jogador da carreira (3ª pessoa) e cutscene sem ragdoll, tirar os pilotos de dentro do
 RolimaRacer.range, DDS.
 
 ## Decisões
