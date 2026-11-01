@@ -69,7 +69,7 @@ personagem que já passou pelo Mixamo (deformação nas animações Idle, Runnin
 
 ## Base escolhida: Enzo com dois dedos (2026-11-01)
 
-- Rig do Mixamo do Enzo em `D:\ProjetoRolimaRacer\personagens - Blender Import(.obj) Export(.fbx) to Mixano\_novo\`:
+- Rig do Mixamo do Enzo em `D:\ProjetoRolimaRacer\personagens - Blender Import(.obj) Export(.fbx) to Mixano\_novos\`:
   `Enzo_sem_dedos.fbx` (25 ossos), `Enzo_dois_dedos.fbx` (41: polegar + indicador), `Enzo_3_dedos.fbx` (49).
   FBX em T-pose, peças separadas com pesos do Mixamo, 20 texturas, 1,695 m, frente −Y.
 - **Base padrão: `Enzo_dois_dedos.fbx`**, sem os ossos de ponta (`HeadTop_End`, `*Toe_End`, `*Thumb4`,

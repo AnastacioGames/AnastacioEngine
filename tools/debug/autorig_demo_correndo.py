@@ -27,12 +27,12 @@ for fc in ac.fcurves:
         for k in fc.keyframe_points:
             k.co.y*=0.01; k.handle_left.y*=0.01; k.handle_right.y*=0.01
 # 1) gabarito Mixamo
-a=novos(); bpy.ops.import_scene.fbx(filepath=P+"3 - Blender Import(.obj) Export(.fbx) to Mixano/_novo/Enzo_dois_dedos.fbx")
+a=novos(); bpy.ops.import_scene.fbx(filepath=P+"3 - Blender Import(.obj) Export(.fbx) to Mixano/_novos/Enzo_dois_dedos.fbx")
 g=[o for o in sc.objects if o not in a]; garm=next(o for o in g if o.type=='ARMATURE')
 garm.name="Gabarito_Mixamo"; garm.location.x=-1.2
 garm.animation_data_create(); garm.animation_data.action=acao
 # base
-arm,src=ar.load_base(P+"3 - Blender Import(.obj) Export(.fbx) to Mixano/_novo/Enzo_dois_dedos.fbx")
+arm,src=ar.load_base(P+"3 - Blender Import(.obj) Export(.fbx) to Mixano/_novos/Enzo_dois_dedos.fbx")
 for nome,x in (("Enzo",0.0),("Patty",1.2)):
     obj=glob.glob(P+"2 - File Exported from Fuse in (.obj)/_novos/%s/*.obj"%nome)[0]
     a=novos(); bpy.ops.import_scene.obj(filepath=obj)
