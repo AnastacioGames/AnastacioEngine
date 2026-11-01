@@ -773,6 +773,10 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
     scene.objects.link(root)
     root.empty_draw_size = 0.3
     _prop(root, "is_pilot", False)
+    # Como os pilotos do jogo: so as pecas do ragdoll tem fisica. Malha STATIC (padrao do import) prende o
+    # ragdoll dentro do proprio corpo e bate no carro.
+    for o in [rest, fp, root] + lods:
+        o.game.physics_type = 'NO_COLLISION'
     # Como no RolimaRacer.range: o grupo tem armature, corpo e ragdoll; os LOD ficam fora (o corpo os chama
     # pelo lod_levels; dentro do grupo o addObject criaria todos na tela) e o Empty instancia o grupo.
     grp = bpy.data.groups.new(group_name)
@@ -892,24 +896,47 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=No
         ob.layers = meshes[0].layers
     r.filepath = path
     bpy.ops.render.render(write_still=True)
-    # foto do botao (rosto, quadrada): mesma pose e luz, camera fechada na cabeca
+    # foto do botao (rosto, quadrada): cabeca reta (a ginga tomba a cabeca), quase de frente e mais clara,
+    # como as fotos dos pilotos antigos
+    fill = None
     head = next((pb for pb in arm.pose.bones if pb.name.endswith("Head")), None)
     if head and photo_path:
-        hc = arm.matrix_world * head.head + Vector((0, 0, 0.08))
-        cam_data.ortho_scale = 0.42
+        _rest_pose(arm)
+        _pose_arms_down(arm)
+        scene.update()
+        ang = math.radians(12)
+        hc = arm.matrix_world * head.head + Vector((0, 0, 0.06))
+        cam_data.ortho_scale = 0.46
         cam.location = (hc.x + dist * math.sin(ang), hc.y + dist * math.cos(ang), hc.z)
+        cam.rotation_euler = (math.radians(90), 0, math.radians(180) - ang)
+        # ambiente cinza lava a cor; Sun + Hemi multiplicam a cor da pele e mantem a saturacao
+        sun_data.energy = 1.0
+        sun.rotation_euler = (math.radians(70), 0, math.radians(160))   # de cima e da frente (+Y), um pouco de lado
+        fill_data = bpy.data.lamps.new("CardFill", 'HEMI')
+        fill_data.energy = 0.55
+        fill = bpy.data.objects.new("CardFill", fill_data)
+        scene.objects.link(fill)
+        fill.layers = meshes[0].layers
+        fill.rotation_euler = (math.radians(90), 0, math.radians(180))   # vem da camera (+Y)
+        world.ambient_color = (0.03, 0.03, 0.03)
         r.resolution_x = r.resolution_y = PHOTO_SIZE
         r.filepath = photo_path
         bpy.ops.render.render(write_still=True)
-    for ob in (cam, sun):
+    for ob in (cam, sun, fill):
+        if ob is None:
+            continue
         bpy.data.objects.remove(ob, do_unlink=True)
-    for pb in arm.pose.bones:          # volta para a pose de descanso
+    _rest_pose(arm)
+    scene.update()
+    return path
+
+
+def _rest_pose(arm):
+    for pb in arm.pose.bones:
         pb.location = (0, 0, 0)
         pb.rotation_quaternion = (1, 0, 0, 0)
         pb.rotation_euler = (0, 0, 0)
         pb.scale = (1, 1, 1)
-    scene.update()
-    return path
 
 
 def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, game=GAME_RAGDOLL,
