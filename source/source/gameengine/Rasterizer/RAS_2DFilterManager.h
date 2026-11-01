@@ -233,7 +233,7 @@ private:
 
 	/** TAA history: the output of the TAA pass of the last frame (full resolution), the
 	 * viewport, view-projection and jitter it was drawn with. */
-	unsigned int m_taaHistory = 0;
+	RAS_OffScreen *m_taaHistoryOfs = nullptr;
 	int m_taaWidth = 0;
 	int m_taaHeight = 0;
 	int m_taaViewport[4] = {0, 0, 0, 0};
@@ -241,7 +241,7 @@ private:
 	bool m_taaValid = false;
 	float m_taaViewProjection[16] = {0.0f};
 	float m_taaHistoryJitter[2] = {0.0f, 0.0f};
-	/// -1 unknown, 0 not enough texture units / unsupported (Web), 1 available.
+	/// -1 unknown, 0 not enough texture units / RANGE_TAA_OFF / no buffer, 1 available.
 	int m_taaSupported = -1;
 	bool m_taaAllowed = true;
 

@@ -30,6 +30,7 @@
 #include "RAS_2DFilterManager.h"
 #include "RAS_2DFilter.h"
 #include "RAS_2DFilterOffScreen.h"
+#include "RAS_WebGLCompat.h"
 
 #include "CM_Message.h"
 
@@ -125,9 +126,7 @@ RAS_2DFilterManager::~RAS_2DFilterManager()
 		glDeleteTextures(1, &history.color);
 		glDeleteTextures(1, &history.depth);
 	}
-	if (m_taaHistory) {
-		glDeleteTextures(1, &m_taaHistory);
-	}
+	delete m_taaHistoryOfs;
 }
 
 void RAS_2DFilterManager::SetFrameTime(float time)
@@ -491,12 +490,12 @@ void RAS_2DFilterManager::SetTaaAllowed(bool allowed)
 void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, int height, const int viewport[4])
 {
 	m_frameInputs.taaHistoryValid = false;
+	m_frameInputs.taaHistory = 0;
 	if (!m_taaAllowed) {
 		// Drawn without jitter: nothing to remove, and the history would mix the cameras.
 		for (float &j : m_frameInputs.taaJitter) {
 			j = 0.0f;
 		}
-		m_frameInputs.taaHistory = 0;
 		m_taaValid = false;
 		return;
 	}
@@ -504,43 +503,38 @@ void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, in
 	m_frameInputs.taaJitter[2] = m_taaHistoryJitter[0];
 	m_frameInputs.taaJitter[3] = m_taaHistoryJitter[1];
 
-#ifdef __EMSCRIPTEN__
-	// WebGL can't copy the float filter buffers into a texture: no history, the pass only sharpens.
-	(void)rasty;
-	(void)width;
-	(void)height;
-	(void)viewport;
-	m_taaSupported = 0;
-	m_frameInputs.taaHistory = 0;
-#else
 	if (m_taaSupported == -1) {
 		GLint maxUnits = 0;
 		glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxUnits);
-		// Unit 22 is past the shared temporal history (20/21).
-		m_taaSupported = (maxUnits > 22) ? 1 : 0;
+		/* Unit 22 is past the shared temporal history (20/21). WebGL and small GPUs have 16 units:
+		 * the TAA pass binds nothing else there, so the last unit serves. */
+		m_frameInputs.taaHistoryUnit = (maxUnits > 22) ? 22 : (int)maxUnits - 1;
+		m_taaSupported = (maxUnits >= 12) ? 1 : 0;
 		const char *off = getenv("RANGE_TAA_OFF");
 		if (off && off[0] == '1') {
 			m_taaSupported = 0;
 		}
 		if (!m_taaSupported) {
-			CM_Warning("TAA history off (RANGE_TAA_OFF=1 or fewer than 23 texture units): the pass only sharpens");
+			CM_Warning("TAA history off (RANGE_TAA_OFF=1 or too few texture units): the pass only sharpens");
 		}
 	}
 	if (!m_taaSupported) {
-		m_frameInputs.taaHistory = 0;
 		return;
 	}
-	if (!m_taaHistory) {
-		glGenTextures(1, &m_taaHistory);
-	}
-	if (width != m_taaWidth || height != m_taaHeight) {
-		glBindTexture(GL_TEXTURE_2D, m_taaHistory);
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-		glBindTexture(GL_TEXTURE_2D, 0);
+	/* The history is an off screen the TAA output is drawn into (not a texture copy: WebGL can't
+	 * copy a float frame buffer). Same precision as the filter buffers. */
+	if (!m_taaHistoryOfs || width != m_taaWidth || height != m_taaHeight) {
+		delete m_taaHistoryOfs;
+		const RAS_Rasterizer::HdrType hdr = RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT :
+		                                                                      RAS_Rasterizer::RAS_HDR_NONE;
+		m_taaHistoryOfs = new RAS_OffScreen(width, height, 0, {{4, hdr}}, RAS_OffScreen::RAS_OFFSCREEN_CUSTOM);
+		if (!m_taaHistoryOfs->GetValid()) {
+			delete m_taaHistoryOfs;
+			m_taaHistoryOfs = nullptr;
+			m_taaSupported = 0;
+			CM_Warning("TAA history buffer could not be created: the pass only sharpens");
+			return;
+		}
 		m_taaWidth = width;
 		m_taaHeight = height;
 		m_taaValid = false;
@@ -552,27 +546,26 @@ void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, in
 	{
 		m_taaValid = false;
 	}
-	m_frameInputs.taaHistory = m_taaHistory;
+	m_frameInputs.taaHistory = m_taaHistoryOfs->GetColorBindCode();
 	m_frameInputs.taaHistoryValid = m_taaValid;
 	if (m_taaValid) {
 		m_frameInputs.taaHistoryViewProjection = mt::mat4(m_taaViewProjection);
 	}
-#endif
 }
 
 void RAS_2DFilterManager::CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen *outputofs, const int viewport[4])
 {
-#ifndef __EMSCRIPTEN__
-	if (!m_taaAllowed || !m_taaHistory || outputofs->GetSamples() ||
+	m_frameInputs.taaHistory = 0;
+	m_frameInputs.taaHistoryValid = false;
+	if (!m_taaAllowed || !m_taaHistoryOfs ||
 	    (int)outputofs->GetWidth() != m_taaWidth || (int)outputofs->GetHeight() != m_taaHeight)
 	{
 		m_taaValid = false;
 		return;
 	}
+	m_taaHistoryOfs->Bind();
+	rasty->DrawOffScreen(outputofs, m_taaHistoryOfs);
 	outputofs->Bind();
-	glBindTexture(GL_TEXTURE_2D, m_taaHistory);
-	CopyViewportRect(viewport, m_taaWidth, m_taaHeight, m_taaWidth, m_taaHeight);
-	glBindTexture(GL_TEXTURE_2D, 0);
 
 	(rasty->GetProjectionMatrix() * rasty->GetViewMatrix()).Pack(m_taaViewProjection);
 	std::copy(viewport, viewport + 4, m_taaViewport);
@@ -580,13 +573,6 @@ void RAS_2DFilterManager::CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen 
 	m_taaHistoryJitter[1] = m_frameInputs.taaJitter[1];
 	m_taaLastFrame = m_frameInputs.frame;
 	m_taaValid = true;
-#else
-	(void)rasty;
-	(void)outputofs;
-	(void)viewport;
-#endif
-	m_frameInputs.taaHistory = 0;
-	m_frameInputs.taaHistoryValid = false;
 }
 
 RAS_2DFilter *RAS_2DFilterManager::EnsureTonemapFilter(const BuildInFilters& filters)
