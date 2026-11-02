@@ -28,9 +28,10 @@ Jogar esconde o menu e liga o HUD; Som e Volume mandam no volume geral do jogo.
   **Fit to Scene** mede pelos objetos selecionados ou por todas as malhas). Object = jogador
   (seta); marcadores (pontos) = objetos com a propriedade Marker Property (padrão `minimap`)
   ou com o Marker Prefix no nome. Zoom Radius 0 = mapa inteiro parado; maior que 0 segue o
-  jogador, e Rotate with Player gira o mapa com ele. Formato redondo ou quadrado, borda, e
-  marcadores fora da área presos na borda. Edge Softness faz o mapa sumir em degradê de
-  alpha na borda (0 = recorte duro). Não redesenha a cena: só um quad com textura.
+  jogador, e Rotate with Player gira o mapa com ele. Shape: Circle e Square (sempre de lados
+  iguais, no meio do widget), Rectangle e Ellipse (ocupam o widget). Border Style: None
+  (recorte limpo), Solid (anel de cor, Border/Border Color) ou Soft (degradê de alpha,
+  Edge Softness). Marcadores fora da área ficam presos na borda. Não redesenha a cena: só um quad com textura.
   Fora da imagem vale a cor da borda da textura (clamp).
 - **Eventos do Button**: On Enter, On Exit, On Over, On Press, On Release, On Click.
   Toggle e Slider têm On Change.

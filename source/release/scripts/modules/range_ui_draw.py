@@ -255,9 +255,13 @@ def draw_image(bgl, data, bindcode, x, y, w, h):
 
 # -- Minimap ------------------------------------------------------------------
 
+# ROUND: baked antes das formas prontas (era elipse no widget não quadrado).
+_ROUND_SHAPES = ("CIRCLE", "ELLIPSE", "ROUND")
+
+
 def _shape_points(data, x, y, w, h):
     """Contorno do mini mapa (pontos em pixels, sentido anti-horário)."""
-    if data["shape"] == "ROUND":
+    if data["shape"] in _ROUND_SHAPES:
         cx, cy, rx, ry = x + w * 0.5, y + h * 0.5, w * 0.5, h * 0.5
         return [(cx + math.cos(a) * rx, cy + math.sin(a) * ry)
                 for a in (i * 2.0 * math.pi / 48 for i in range(48))]
@@ -287,6 +291,10 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
     """markers = [(mundo x, mundo y, yaw, é_jogador)].  A imagem cobre
     World Min..Max; fora dela vale a borda da textura (clamp)."""
     _blend(bgl)
+    if data["shape"] in ("CIRCLE", "SQUARE"):
+        # Formas de lados iguais: o maior quadrado no meio do widget.
+        side = min(w, h)
+        x, y, w, h = x + (w - side) * 0.5, y + (h - side) * 0.5, side, side
     player = next((m for m in markers if m[3]), None)
     vx, vy, hw, hh, turn = minimap_view(data, player, w, h)
     hw, hh = max(hw, 1e-6), max(hh, 1e-6)
@@ -348,13 +356,14 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
         bgl.glDisable(bgl.GL_TEXTURE_2D)
 
     side = min(w, h)
-    round_shape = data["shape"] == "ROUND"
+    round_shape = data["shape"] in _ROUND_SHAPES
     # Jogador por último, por cima dos outros.
     for mx, my, yaw, is_player in sorted(markers, key=lambda m: m[3]):
         px, py = to_screen(mx, my)
         size = side * (data["player_size"] if is_player else data["marker_size"])
         dx, dy = px - cx, py - cy
-        lx, ly = max(1.0, w * 0.5 - soft - size * 0.6), max(1.0, h * 0.5 - soft - size * 0.6)
+        pad = soft + data["border"] * side + size * 0.6
+        lx, ly = max(1.0, w * 0.5 - pad), max(1.0, h * 0.5 - pad)
         if round_shape:
             # Contorno é elipse quando o widget não é quadrado.
             dist = math.hypot(dx / lx, dy / ly)
@@ -385,13 +394,17 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
 
     border = data["border"] * side
     if border > 0.0:
-        bgl.glLineWidth(max(1.0, border))
+        # Anel preenchido em vez de GL_LINE_LOOP: espessura certa e sem
+        # degraus nas junções da linha.
+        edge = inner if soft > 0.0 else outline
+        bx, by = max(0.0, 1.0 - border / (w * 0.5)), max(0.0, 1.0 - border / (h * 0.5))
+        ring = [(cx + (px - cx) * bx, cy + (py - cy) * by) for px, py in edge]
         _color(bgl, data["border_color"])
-        bgl.glBegin(bgl.GL_LINE_LOOP)
-        for px, py in (inner if soft > 0.0 else outline):
-            bgl.glVertex2f(px, py)
+        bgl.glBegin(bgl.GL_TRIANGLE_STRIP)
+        for (ix, iy), (ox, oy) in zip(ring + ring[:1], edge + edge[:1]):
+            bgl.glVertex2f(ix, iy)
+            bgl.glVertex2f(ox, oy)
         bgl.glEnd()
-        bgl.glLineWidth(1.0)
 
 
 def _arc(bgl, cx, cy, r0, r1, a0, a1, steps):

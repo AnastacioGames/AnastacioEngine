@@ -337,10 +337,18 @@ class UIMinimapNode(UIHudNode, Node):
                                      "(0 = whole map, fixed)")
     rotate = BoolProperty(name="Rotate with Player", default=False,
                           description="The map turns so the player always faces up (needs Zoom Radius)")
-    shape = EnumProperty(name="Shape", default="ROUND",
-                         items=(("ROUND", "Round", ""), ("SQUARE", "Square", "")))
+    # A ordem guarda o valor salvo: o antigo Round (0) vira Circle.
+    shape = EnumProperty(name="Shape", default="CIRCLE",
+                         items=(("CIRCLE", "Circle", "Always round, centered in the widget"),
+                                ("SQUARE", "Square", "Always square, centered in the widget"),
+                                ("RECTANGLE", "Rectangle", "Fills the widget"),
+                                ("ELLIPSE", "Ellipse", "Round, stretched to the widget")))
     radius = FloatProperty(name="Roundness", default=0.1, min=0.0, max=1.0, subtype="FACTOR")
     bg_color = _color("Background", (0.05, 0.06, 0.08, 0.75))
+    border_style = EnumProperty(name="Border Style", default="SOFT",
+                                items=(("NONE", "None", "Clean cut, no border"),
+                                       ("SOLID", "Solid", "Border with a color"),
+                                       ("SOFT", "Soft", "Transparent fade at the edge")))
     edge_softness = FloatProperty(name="Edge Softness", default=0.08, min=0.0, max=0.5, subtype="FACTOR",
                                   description="Width of the fade to transparent at the edge, "
                                               "as a fraction of the shorter side")
@@ -377,15 +385,17 @@ class UIMinimapNode(UIHudNode, Node):
         row = layout.row()
         row.active = self.zoom > 0.0
         row.prop(self, "rotate")
-        row = layout.row(align=True)
-        row.prop(self, "shape", expand=True)
-        if self.shape == "SQUARE":
+        layout.prop(self, "shape")
+        if self.shape in ("SQUARE", "RECTANGLE"):
             layout.prop(self, "radius", slider=True)
         layout.prop(self, "bg_color")
-        layout.prop(self, "edge_softness", slider=True)
-        row = layout.row(align=True)
-        row.prop(self, "border")
-        row.prop(self, "border_color", text="")
+        layout.prop(self, "border_style")
+        if self.border_style == "SOFT":
+            layout.prop(self, "edge_softness", slider=True)
+        elif self.border_style == "SOLID":
+            row = layout.row(align=True)
+            row.prop(self, "border")
+            row.prop(self, "border_color", text="")
         row = layout.row(align=True)
         row.prop(self, "player_color", text="")
         row.prop(self, "player_size")
@@ -406,7 +416,8 @@ class UIMinimapNode(UIHudNode, Node):
             "tint": tuple(self.tint), "world_min": tuple(self.world_min),
             "world_max": tuple(self.world_max), "zoom": self.zoom, "rotate": self.rotate,
             "shape": self.shape, "radius": self.radius, "bg": tuple(self.bg_color),
-            "soft": self.edge_softness, "border": self.border, "border_color": tuple(self.border_color),
+            "soft": self.edge_softness if self.border_style == "SOFT" else 0.0,
+            "border": self.border if self.border_style == "SOLID" else 0.0, "border_color": tuple(self.border_color),
             "player_color": tuple(self.player_color), "player_size": self.player_size,
             "marker_prop": self.marker_prop, "marker_prefix": self.marker_prefix,
             "marker_color": tuple(self.marker_color), "marker_size": self.marker_size,

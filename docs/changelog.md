@@ -16,6 +16,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Desenho em `range_ui_draw.draw_minimap` (editor e jogo); `draw_widget` recebe `markers`.
 - Edge Softness: miolo opaco + anel com alpha descendo a 0 no contorno (sem serrilhado);
   marcadores presos dentro da parte opaca. Aprovado com janela.
+- Formas prontas (Circle/Square de lados iguais, Rectangle, Ellipse; o antigo Round abre
+  como Circle) e Border Style None/Solid/Soft; borda Solid virou anel preenchido em vez de
+  GL_LINE_LOOP.
 - Runtime (`range_ui_runtime.minimap_markers`): busca dos marcadores em cache, refeita só
   quando o número de objetos da cena muda; objetos removidos são ignorados.
 - Testado em background: Fit, Bake, desenho com bgl falso (giro e clamp) e marcadores com
