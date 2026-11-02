@@ -878,11 +878,11 @@ def _pose_arms_down(arm):
         pb.matrix = Matrix.Translation(m.to_translation()) * q.to_matrix().to_4x4() *             Matrix.Translation(-m.to_translation()) * m
 
 
-def limit_head_weights(mesh, arm, margin=0.02, fade=0.04,
+def limit_head_weights(mesh, arm, margin=0.0, fade=0.03,
                        chain=(("mixamorig:Head", "mixamorig:Neck"), ("mixamorig:Neck", "mixamorig:Spine2"))):
     """Peso da cabeca so perto e acima da base dela, peso do pescoco idem (o resto vai para o osso de baixo).
     A transferencia de pesos espalhava a cabeca no pescoco e nos ombros: ao girar a cabeca (head_look,
-    camera de lado) eles torciam junto. Numa faixa de `fade` a partir de base - margin o peso sobe aos poucos:
+    camera de lado) eles torciam junto. Abaixo da base (- margin) a cabeca nao pesa nada; numa faixa de `fade` acima dela o peso sobe aos poucos:
     a gola e o pescoco torcem em degrade, em vez de girar inteiros com a cabeca."""
     to_arm = arm.matrix_world.inverted() * mesh.matrix_world
     groups = {g.name: g for g in mesh.vertex_groups}
