@@ -963,12 +963,17 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=No
     sun = bpy.data.objects.new("CardSun", sun_data)
     scene.objects.link(sun)
     sun.rotation_euler = (math.radians(-55), math.radians(-25), math.radians(20))
-    world = scene.world or bpy.data.worlds.new("CardWorld")
+    # mundo e material so para a foto: o arquivo do piloto e LibLoadado, e o jogo monta o material com o
+    # mundo do arquivo dele (ambiente/nevoa deste mundo deixava o piloto lavado e cinza na corrida)
+    old_world = scene.world
+    world = bpy.data.worlds.new("CardWorld")
     scene.world = world
     world.ambient_color = (0.12, 0.12, 0.13)
+    old_mats = {}
     for o in meshes:
         for m in o.data.materials:
-            if m:
+            if m and m not in old_mats:
+                old_mats[m] = (m.ambient, m.specular_intensity)
                 m.ambient = 1.0
                 m.specular_intensity = 0.1
     r = scene.render
@@ -1015,6 +1020,10 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=No
         if ob is None:
             continue
         bpy.data.objects.remove(ob, do_unlink=True)
+    scene.world = old_world
+    bpy.data.worlds.remove(world)
+    for m, (amb, spec) in old_mats.items():
+        m.ambient, m.specular_intensity = amb, spec
     _rest_pose(arm)
     scene.update()
     return path
