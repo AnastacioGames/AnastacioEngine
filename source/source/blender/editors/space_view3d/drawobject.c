@@ -5369,7 +5369,15 @@ static int draw_game_text_font_id(Main *bmain, VFont *vfont)
 	if (vfont->packedfile) {
 		fontid = BLF_find(vfont->name);
 		if (fontid == -1) {
-			fontid = BLF_load_mem(vfont->name, (unsigned char *)vfont->packedfile->data, vfont->packedfile->size);
+			/* FreeType keeps the pointer, and undo frees the packed file: give BLF its own copy
+			 * (kept for the session, the font stays cached by name) */
+			const int size = vfont->packedfile->size;
+			unsigned char *mem = MEM_mallocN(size, "game text preview font");
+			memcpy(mem, vfont->packedfile->data, size);
+			fontid = BLF_load_mem(vfont->name, mem, size);
+			if (fontid == -1) {
+				MEM_freeN(mem);
+			}
 		}
 		return (fontid != -1) ? fontid : BLF_find("default");
 	}
