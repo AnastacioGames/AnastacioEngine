@@ -19,6 +19,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Formas prontas (Circle/Square de lados iguais, Rectangle, Ellipse; o antigo Round abre
   como Circle) e Border Style None/Solid/Soft; borda Solid virou anel preenchido em vez de
   GL_LINE_LOOP.
+- Camera Tilt: câmera virtual atrás do jogador olhando o chão; textura com coordenada
+  homogênea (glTexCoord4f) para perspectiva correta, marcadores projetados e maiores perto;
+  tilt 0 é idêntico à vista de cima.
 - Runtime (`range_ui_runtime.minimap_markers`): busca dos marcadores em cache, refeita só
   quando o número de objetos da cena muda; objetos removidos são ignorados.
 - Testado em background: Fit, Bake, desenho com bgl falso (giro e clamp) e marcadores com

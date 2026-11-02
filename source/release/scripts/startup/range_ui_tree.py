@@ -335,6 +335,9 @@ class UIMinimapNode(UIHudNode, Node):
     zoom = FloatProperty(name="Zoom Radius", default=0.0, min=0.0, soft_max=500.0, unit="LENGTH",
                          description="World distance visible from the player to the edge "
                                      "(0 = whole map, fixed)")
+    tilt = FloatProperty(name="Camera Tilt", default=0.0, min=0.0, max=1.0472, subtype="ANGLE",
+                         description="0 = map seen from above; higher = seen from behind the player, "
+                                     "in perspective (use with Zoom Radius and Rotate with Player)")
     rotate = BoolProperty(name="Rotate with Player", default=False,
                           description="The map turns so the player always faces up (needs Zoom Radius)")
     # A ordem guarda o valor salvo: o antigo Round (0) vira Circle.
@@ -385,6 +388,9 @@ class UIMinimapNode(UIHudNode, Node):
         row = layout.row()
         row.active = self.zoom > 0.0
         row.prop(self, "rotate")
+        row = layout.row()
+        row.active = self.zoom > 0.0
+        row.prop(self, "tilt", slider=True)
         layout.prop(self, "shape")
         if self.shape in ("SQUARE", "RECTANGLE"):
             layout.prop(self, "radius", slider=True)
@@ -414,7 +420,7 @@ class UIMinimapNode(UIHudNode, Node):
         return {
             "kind": "MINIMAP", "path": image.filepath if image else "",
             "tint": tuple(self.tint), "world_min": tuple(self.world_min),
-            "world_max": tuple(self.world_max), "zoom": self.zoom, "rotate": self.rotate,
+            "world_max": tuple(self.world_max), "zoom": self.zoom, "rotate": self.rotate, "tilt": self.tilt,
             "shape": self.shape, "radius": self.radius, "bg": tuple(self.bg_color),
             "soft": self.edge_softness if self.border_style == "SOFT" else 0.0,
             "border": self.border if self.border_style == "SOLID" else 0.0, "border_color": tuple(self.border_color),

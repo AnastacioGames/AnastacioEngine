@@ -302,27 +302,53 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
     (x0, y0), (x1, y1) = data["world_min"], data["world_max"]
     sx, sy = max(1e-6, x1 - x0), max(1e-6, y1 - y0)
     cx, cy = x + w * 0.5, y + h * 0.5
+    # Câmera virtual olhando o chão (z = 0) no referencial da vista: x para a
+    # direita, y para a frente (cima da tela).  Tilt 0 = de cima, igual a um
+    # mapa plano; maior = de trás do jogador, em perspectiva.  O jogador
+    # desce na tela conforme inclina, para mostrar mais do que vem à frente.
+    tilt = min(math.radians(60.0), max(0.0, data.get("tilt", 0.0)))
+    ky = math.tan(math.radians(25.0))
+    dist = hh / ky
+    kx = hw / dist
+    sa, ca = math.sin(tilt), math.cos(tilt)
+    fwd, up = (0.0, sa, -ca), (0.0, ca, sa)
+    ahead = hh * 0.6 * tilt / math.radians(60.0)
+    cam = (0.0, ahead - fwd[1] * dist, -fwd[2] * dist)
 
-    def to_world(px, py):
-        lx, ly = (px - cx) / (w * 0.5) * hw, (py - cy) / (h * 0.5) * hh
-        return vx + lx * ct - ly * st, vy + lx * st + ly * ct
+    def ground(px, py):
+        """Ponto da tela -> (x, y, q) do mundo em coordenadas homogêneas:
+        lineares na tela, então a placa interpola a textura em perspectiva."""
+        lx, ly = (px - cx) / (w * 0.5), (py - cy) / (h * 0.5)
+        dx = lx * kx
+        dy = fwd[1] + ly * ky * up[1]
+        q = -(fwd[2] + ly * ky * up[2])
+        gx = cam[2] * dx
+        gy = cam[1] * q + cam[2] * dy
+        return vx * q + gx * ct - gy * st, vy * q + gx * st + gy * ct, q
 
     def to_screen(wx, wy):
+        """Mundo -> (x, y na tela, escala pela distância) ou None atrás da câmera."""
         dx, dy = wx - vx, wy - vy
         lx, ly = dx * ct + dy * st, -dx * st + dy * ct
-        return cx + lx / hw * w * 0.5, cy + ly / hh * h * 0.5
+        vx_, vy_, vz_ = lx - cam[0], ly - cam[1], -cam[2]
+        depth = vy_ * fwd[1] + vz_ * fwd[2]
+        if depth <= 1e-6:
+            return None
+        sy_ = vy_ * up[1] + vz_ * up[2]
+        return (cx + vx_ / (depth * kx) * w * 0.5, cy + sy_ / (depth * ky) * h * 0.5,
+                max(0.5, min(1.5, dist / depth)))
 
     outline = _shape_points(data, x, y, w, h)
     # Borda suave: miolo opaco até o contorno de dentro e um anel em que o
     # alpha desce até 0 no contorno de fora (sem serrilhado no recorte).
     soft = data.get("soft", 0.0) * min(w, h)
-    kx, ky = max(0.0, 1.0 - soft / (w * 0.5)), max(0.0, 1.0 - soft / (h * 0.5))
-    inner = [(cx + (px - cx) * kx, cy + (py - cy) * ky) for px, py in outline]
+    ix, iy = max(0.0, 1.0 - soft / (w * 0.5)), max(0.0, 1.0 - soft / (h * 0.5))
+    inner = [(cx + (px - cx) * ix, cy + (py - cy) * iy) for px, py in outline]
 
     def layer(color, uv=None):
         def vertex(px, py, fade):
             if uv is not None:
-                bgl.glTexCoord2f(*uv(px, py))
+                bgl.glTexCoord4f(*uv(px, py))
             _color(bgl, (color[0], color[1], color[2], color[3] * fade))
             bgl.glVertex2f(px, py)
         bgl.glBegin(bgl.GL_TRIANGLE_FAN)
@@ -339,8 +365,8 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
         bgl.glEnd()
 
     def uv(px, py):
-        wx, wy = to_world(px, py)
-        return (wx - x0) / sx, (wy - y0) / sy
+        wx, wy, q = ground(px, py)
+        return (wx - x0 * q) / sx, (wy - y0 * q) / sy, 0.0, q
 
     layer(data["bg"])
     if bindcode:
@@ -359,17 +385,25 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
     round_shape = data["shape"] in _ROUND_SHAPES
     # Jogador por último, por cima dos outros.
     for mx, my, yaw, is_player in sorted(markers, key=lambda m: m[3]):
-        px, py = to_screen(mx, my)
-        size = side * (data["player_size"] if is_player else data["marker_size"])
+        projected = to_screen(mx, my)
+        if projected is None:
+            continue
+        px, py, scale = projected
+        if is_player:
+            # Frente (+Y local) do jogador medida na tela, antes de prender na
+            # borda: com perspectiva o ângulo do mundo não vale direto.
+            tip = to_screen(mx - math.sin(yaw), my + math.cos(yaw))
+            heading = math.atan2(tip[1] - py, tip[0] - px) if tip else math.pi * 0.5
+        size = side * scale * (data["player_size"] if is_player else data["marker_size"])
         dx, dy = px - cx, py - cy
         pad = soft + data["border"] * side + size * 0.6
         lx, ly = max(1.0, w * 0.5 - pad), max(1.0, h * 0.5 - pad)
         if round_shape:
             # Contorno é elipse quando o widget não é quadrado.
-            dist = math.hypot(dx / lx, dy / ly)
-            outside = dist > 1.0
+            norm = math.hypot(dx / lx, dy / ly)
+            outside = norm > 1.0
             if outside:
-                dx, dy = dx / dist, dy / dist
+                dx, dy = dx / norm, dy / norm
         else:
             outside = abs(dx) > lx or abs(dy) > ly
             dx, dy = max(-lx, min(lx, dx)), max(-ly, min(ly, dy))
@@ -377,8 +411,7 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
             continue
         px, py = cx + dx, cy + dy
         if is_player:
-            # Seta apontando para a frente (+Y local) do jogador.
-            a = yaw - turn + math.pi * 0.5
+            a = heading
             _color(bgl, data["player_color"])
             bgl.glBegin(bgl.GL_TRIANGLES)
             for da, r in ((0.0, 0.6), (2.5, 0.5), (-2.5, 0.5)):

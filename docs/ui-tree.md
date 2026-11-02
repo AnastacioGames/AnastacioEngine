@@ -28,7 +28,8 @@ Jogar esconde o menu e liga o HUD; Som e Volume mandam no volume geral do jogo.
   **Fit to Scene** mede pelos objetos selecionados ou por todas as malhas). Object = jogador
   (seta); marcadores (pontos) = objetos com a propriedade Marker Property (padrão `minimap`)
   ou com o Marker Prefix no nome. Zoom Radius 0 = mapa inteiro parado; maior que 0 segue o
-  jogador, e Rotate with Player gira o mapa com ele. Shape: Circle e Square (sempre de lados
+  jogador, e Rotate with Player gira o mapa com ele. Camera Tilt (0-60°) inclina a vista: 0 = de cima;
+  maior = de trás do jogador, em perspectiva (estilo GPS 3D), sem redesenhar a cena. Shape: Circle e Square (sempre de lados
   iguais, no meio do widget), Rectangle e Ellipse (ocupam o widget). Border Style: None
   (recorte limpo), Solid (anel de cor, Border/Border Color) ou Soft (degradê de alpha,
   Edge Softness). Marcadores fora da área ficam presos na borda. Não redesenha a cena: só um quad com textura.
