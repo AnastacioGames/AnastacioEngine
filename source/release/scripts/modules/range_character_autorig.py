@@ -1162,6 +1162,24 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=No
     return path
 
 
+def default_world():
+    """World como o do arquivo inicial do editor (o dos pilotos que já estavam certos no jogo).
+    O arquivo vazio vem sem world, e o LibLoad monta o shader do material com o world da
+    biblioteca: sem ele o piloto saía ciano e lavado na corrida."""
+    import bpy
+    w = bpy.data.worlds.new('World')
+    w.horizon_color = (0.089, 0.32, 1.0)
+    w.zenith_color = (0.15, 0.41, 1.0)
+    w.nadir_color = (0.0, 0.0, 0.0)
+    w.use_sky_blend = w.use_sky_real = w.use_sky_stars = True
+    w.use_sky_atmospheric = True
+    w.sky_type = 'ATMOSPHERIC'
+    w.light_settings.use_environment_light = True
+    w.light_settings.environment_color = 'SKY_COLOR'
+    w.light_settings.threshold = 0.005
+    return w
+
+
 def _rest_pose(arm):
     for pb in arm.pose.bones:
         pb.location = (0, 0, 0)
@@ -1180,6 +1198,7 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
         sys.path.insert(0, game_root)
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
+    scene.world = default_world()
     _ragdoll_addon()
     arm0, proxy = load_library_base(skeleton_folder)
     before = set(scene.objects)
