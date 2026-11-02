@@ -878,32 +878,43 @@ def _pose_arms_down(arm):
         pb.matrix = Matrix.Translation(m.to_translation()) * q.to_matrix().to_4x4() *             Matrix.Translation(-m.to_translation()) * m
 
 
-def limit_head_weights(mesh, arm, margin=-0.02, fade=0.03,
+def limit_head_weights(mesh, arm, margin=-0.02, fade=0.03, chin=0.01, chin_fade=0.015,
                        chain=(("mixamorig:Head", "mixamorig:Neck"), ("mixamorig:Neck", "mixamorig:Spine2"))):
     """Peso da cabeca so perto e acima da base dela, peso do pescoco idem (o resto vai para o osso de baixo).
     A transferencia de pesos espalhava a cabeca no pescoco e nos ombros: ao girar a cabeca (head_look,
-    camera de lado) eles torciam junto. Abaixo da base (- margin) a cabeca nao pesa nada; numa faixa de `fade` acima dela o peso sobe aos poucos:
-    a gola e o pescoco torcem em degrade, em vez de girar inteiros com a cabeca."""
+    camera de lado) eles torciam junto. Atras e dos lados a cabeca so pesa a partir de base - margin (2 cm
+    acima: a gola e os ombros ficam fora); na frente (o queixo, -Y) o corte desce para base - chin, senao o
+    queixo ficava parado no ar. Numa faixa acima do corte o peso sobe aos poucos (degrade).
+    Divide a soma osso + osso de baixo: rodar de novo num arquivo ja cortado refaz o corte, nao acumula."""
     to_arm = arm.matrix_world.inverted() * mesh.matrix_world
     groups = {g.name: g for g in mesh.vertex_groups}
-    for bone_name, lower_name in chain:
+    for k, (bone_name, lower_name) in enumerate(chain):
         bone = arm.data.bones.get(bone_name)
         g, low = groups.get(bone_name), groups.get(lower_name)
         if not bone or not g or not low:
             continue
-        floor = bone.head_local.z - margin
+        base = bone.head_local
         for v in mesh.data.vertices:
-            keep = min(1.0, max(0.0, ((to_arm * v.co).z - floor) / fade))
-            if keep >= 1.0:
-                continue
+            p = to_arm * v.co
+            floor, band = base.z - margin, fade
+            if k == 0:
+                # frente do pescoco (dy <= -6 cm) usa o corte do queixo; ate -2 cm vai em rampa
+                t = min(1.0, max(0.0, (-0.02 - (p.y - base.y)) / 0.04))
+                floor = floor + ((base.z - chin) - floor) * t
+                band = fade + (chin_fade - fade) * t
+            keep = min(1.0, max(0.0, (p.z - floor) / band))
             w = next((e.weight for e in v.groups if e.group == g.index), 0.0)
-            if w <= 0.0:
+            wl = next((e.weight for e in v.groups if e.group == low.index), 0.0)
+            if k == 0 and keep > 0.0 and p.z < base.z + 0.08:
+                w, wl = w + wl, 0.0        # refaz a partir da soma (corte anterior pode ter passado tudo ao Neck)
+            elif keep >= 1.0 or w <= 0.0:
                 continue
-            if keep > 0.0:
+            if w * keep > 0.0:
                 g.add([v.index], w * keep, 'REPLACE')
             else:
                 g.remove([v.index])
-            low.add([v.index], w * (1.0 - keep), 'ADD')
+            if wl + w * (1.0 - keep) > 0.0:
+                low.add([v.index], wl + w * (1.0 - keep), 'REPLACE')
 
 
 SEAT_POSE = ("RolimaRacer.range", "CARRO_Main_drive_position", 1)
