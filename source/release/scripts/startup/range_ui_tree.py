@@ -341,6 +341,9 @@ class UIMinimapNode(UIHudNode, Node):
                          items=(("ROUND", "Round", ""), ("SQUARE", "Square", "")))
     radius = FloatProperty(name="Roundness", default=0.1, min=0.0, max=1.0, subtype="FACTOR")
     bg_color = _color("Background", (0.05, 0.06, 0.08, 0.75))
+    edge_softness = FloatProperty(name="Edge Softness", default=0.08, min=0.0, max=0.5, subtype="FACTOR",
+                                  description="Width of the fade to transparent at the edge, "
+                                              "as a fraction of the shorter side")
     border = FloatProperty(name="Border", default=0.02, min=0.0, max=0.1,
                            description="Border thickness, as a fraction of the shorter side")
     border_color = _color("Border Color", (1.0, 1.0, 1.0, 0.8))
@@ -379,6 +382,7 @@ class UIMinimapNode(UIHudNode, Node):
         if self.shape == "SQUARE":
             layout.prop(self, "radius", slider=True)
         layout.prop(self, "bg_color")
+        layout.prop(self, "edge_softness", slider=True)
         row = layout.row(align=True)
         row.prop(self, "border")
         row.prop(self, "border_color", text="")
@@ -402,7 +406,7 @@ class UIMinimapNode(UIHudNode, Node):
             "tint": tuple(self.tint), "world_min": tuple(self.world_min),
             "world_max": tuple(self.world_max), "zoom": self.zoom, "rotate": self.rotate,
             "shape": self.shape, "radius": self.radius, "bg": tuple(self.bg_color),
-            "border": self.border, "border_color": tuple(self.border_color),
+            "soft": self.edge_softness, "border": self.border, "border_color": tuple(self.border_color),
             "player_color": tuple(self.player_color), "player_size": self.player_size,
             "marker_prop": self.marker_prop, "marker_prefix": self.marker_prefix,
             "marker_color": tuple(self.marker_color), "marker_size": self.marker_size,

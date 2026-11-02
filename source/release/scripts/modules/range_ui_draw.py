@@ -305,23 +305,42 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
         return cx + lx / hw * w * 0.5, cy + ly / hh * h * 0.5
 
     outline = _shape_points(data, x, y, w, h)
-    _color(bgl, data["bg"])
-    bgl.glBegin(bgl.GL_TRIANGLE_FAN)
-    for px, py in outline:
-        bgl.glVertex2f(px, py)
-    bgl.glEnd()
+    # Borda suave: miolo opaco até o contorno de dentro e um anel em que o
+    # alpha desce até 0 no contorno de fora (sem serrilhado no recorte).
+    soft = data.get("soft", 0.0) * min(w, h)
+    kx, ky = max(0.0, 1.0 - soft / (w * 0.5)), max(0.0, 1.0 - soft / (h * 0.5))
+    inner = [(cx + (px - cx) * kx, cy + (py - cy) * ky) for px, py in outline]
+
+    def layer(color, uv=None):
+        def vertex(px, py, fade):
+            if uv is not None:
+                bgl.glTexCoord2f(*uv(px, py))
+            _color(bgl, (color[0], color[1], color[2], color[3] * fade))
+            bgl.glVertex2f(px, py)
+        bgl.glBegin(bgl.GL_TRIANGLE_FAN)
+        vertex(cx, cy, 1.0)
+        for px, py in inner + inner[:1]:
+            vertex(px, py, 1.0)
+        bgl.glEnd()
+        if soft <= 0.0:
+            return
+        bgl.glBegin(bgl.GL_TRIANGLE_STRIP)
+        for (ix, iy), (ox, oy) in zip(inner + inner[:1], outline + outline[:1]):
+            vertex(ix, iy, 1.0)
+            vertex(ox, oy, 0.0)
+        bgl.glEnd()
+
+    def uv(px, py):
+        wx, wy = to_world(px, py)
+        return (wx - x0) / sx, (wy - y0) / sy
+
+    layer(data["bg"])
     if bindcode:
         bgl.glEnable(bgl.GL_TEXTURE_2D)
         bgl.glBindTexture(bgl.GL_TEXTURE_2D, bindcode)
         for axis in (bgl.GL_TEXTURE_WRAP_S, bgl.GL_TEXTURE_WRAP_T):
             bgl.glTexParameteri(bgl.GL_TEXTURE_2D, axis, bgl.GL_CLAMP_TO_EDGE)
-        _color(bgl, data["tint"])
-        bgl.glBegin(bgl.GL_TRIANGLE_FAN)
-        for px, py in [(cx, cy)] + outline + outline[:1]:
-            wx, wy = to_world(px, py)
-            bgl.glTexCoord2f((wx - x0) / sx, (wy - y0) / sy)
-            bgl.glVertex2f(px, py)
-        bgl.glEnd()
+        layer(data["tint"], uv)
         # A prévia usa a textura da imagem do Blender: devolve o padrão.
         for axis in (bgl.GL_TEXTURE_WRAP_S, bgl.GL_TEXTURE_WRAP_T):
             bgl.glTexParameteri(bgl.GL_TEXTURE_2D, axis, bgl.GL_REPEAT)
@@ -335,7 +354,7 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
         px, py = to_screen(mx, my)
         size = side * (data["player_size"] if is_player else data["marker_size"])
         dx, dy = px - cx, py - cy
-        lx, ly = max(1.0, w * 0.5 - size * 0.6), max(1.0, h * 0.5 - size * 0.6)
+        lx, ly = max(1.0, w * 0.5 - soft - size * 0.6), max(1.0, h * 0.5 - soft - size * 0.6)
         if round_shape:
             # Contorno é elipse quando o widget não é quadrado.
             dist = math.hypot(dx / lx, dy / ly)
@@ -369,7 +388,7 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
         bgl.glLineWidth(max(1.0, border))
         _color(bgl, data["border_color"])
         bgl.glBegin(bgl.GL_LINE_LOOP)
-        for px, py in outline:
+        for px, py in (inner if soft > 0.0 else outline):
             bgl.glVertex2f(px, py)
         bgl.glEnd()
         bgl.glLineWidth(1.0)

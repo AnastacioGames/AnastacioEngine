@@ -14,6 +14,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Zoom Radius, Rotate with Player, formato redondo/quadrado, borda, seta do jogador e pontos
   dos marcadores (propriedade ou prefixo do nome), presos na borda quando fora da área.
 - Desenho em `range_ui_draw.draw_minimap` (editor e jogo); `draw_widget` recebe `markers`.
+- Edge Softness: miolo opaco + anel com alpha descendo a 0 no contorno (sem serrilhado);
+  marcadores presos dentro da parte opaca. Aprovado com janela.
 - Runtime (`range_ui_runtime.minimap_markers`): busca dos marcadores em cache, refeita só
   quando o número de objetos da cena muda; objetos removidos são ignorados.
 - Testado em background: Fit, Bake, desenho com bgl falso (giro e clamp) e marcadores com
