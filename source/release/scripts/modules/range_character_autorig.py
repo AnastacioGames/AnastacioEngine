@@ -1214,7 +1214,7 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
     bpy.data.use_autopack = False
     for im in bpy.data.images:
         if im.packed_file:
-            im.unpack(method='REMOVE')
+            im.unpack(method='USE_ORIGINAL')   # 2.79 nao tem REMOVE; o arquivo ja esta no disco
     if not bake_seat_pose(arm, game_root):
         report("aviso: pose sentada do jogo nao encontrada; o piloto fica em pose T se a action de base nao tocar")
     hide_for_libload(scene)
