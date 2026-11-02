@@ -8,6 +8,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-03 - UI Tree: nó Minimap
+
+- Nó HUD **Minimap** (`range_ui_tree.py`): imagem do mapa, World Min/Max com Fit to Scene,
+  Zoom Radius, Rotate with Player, formato redondo/quadrado, borda, seta do jogador e pontos
+  dos marcadores (propriedade ou prefixo do nome), presos na borda quando fora da área.
+- Desenho em `range_ui_draw.draw_minimap` (editor e jogo); `draw_widget` recebe `markers`.
+- Runtime (`range_ui_runtime.minimap_markers`): busca dos marcadores em cache, refeita só
+  quando o número de objetos da cena muda; objetos removidos são ignorados.
+- Testado em background: Fit, Bake, desenho com bgl falso (giro e clamp) e marcadores com
+  objetos falsos. Aceite visual com janela pendente. Plano em
+  [plano-minimap-ui-tree.md](plano-minimap-ui-tree.md).
+
+
+
 ## 2026-11-01 - Retratos dos pilotos: estúdio isolado, Lanczos e menu sem recorte
 
 - `render_card`: cópias em cena temporária, limpeza em `finally`, materiais opacos e normal Non-Color

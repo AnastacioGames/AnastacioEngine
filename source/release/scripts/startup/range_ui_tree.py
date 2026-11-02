@@ -9,6 +9,7 @@ texto ui_tree_data.py, que o módulo range_ui_runtime lê no runtime.
 
 import bpy
 import nodeitems_utils
+from mathutils import Vector
 from bpy.props import (BoolProperty, EnumProperty, FloatProperty,
                        FloatVectorProperty, StringProperty)
 from bpy.types import Node, NodeSocket, NodeTree, Operator, Panel
@@ -318,6 +319,107 @@ class UIImageNode(UIHudNode, Node):
         return {}
 
 
+class UIMinimapNode(UIHudNode, Node):
+    """Mini mapa: imagem do mapa vista de cima e marcadores que seguem a
+    posição dos objetos.  Object = jogador (seta); os outros marcadores são
+    os objetos com a propriedade Marker Property ou com o prefixo no nome."""
+    bl_idname = "RangeUIMinimap"
+    bl_label = "Minimap"
+
+    image_name = StringProperty(name="Image", description="Map seen from above (empty = only the background)")
+    tint = _color("Tint", (1.0, 1.0, 1.0, 1.0))
+    world_min = FloatVectorProperty(name="World Min", size=2, default=(-50.0, -50.0),
+                                    description="World X/Y at the lower left corner of the image")
+    world_max = FloatVectorProperty(name="World Max", size=2, default=(50.0, 50.0),
+                                    description="World X/Y at the upper right corner of the image")
+    zoom = FloatProperty(name="Zoom Radius", default=0.0, min=0.0, soft_max=500.0, unit="LENGTH",
+                         description="World distance visible from the player to the edge "
+                                     "(0 = whole map, fixed)")
+    rotate = BoolProperty(name="Rotate with Player", default=False,
+                          description="The map turns so the player always faces up (needs Zoom Radius)")
+    shape = EnumProperty(name="Shape", default="ROUND",
+                         items=(("ROUND", "Round", ""), ("SQUARE", "Square", "")))
+    radius = FloatProperty(name="Roundness", default=0.1, min=0.0, max=1.0, subtype="FACTOR")
+    bg_color = _color("Background", (0.05, 0.06, 0.08, 0.75))
+    border = FloatProperty(name="Border", default=0.02, min=0.0, max=0.1,
+                           description="Border thickness, as a fraction of the shorter side")
+    border_color = _color("Border Color", (1.0, 1.0, 1.0, 0.8))
+    player_color = _color("Player", (1.0, 0.85, 0.1, 1.0))
+    player_size = FloatProperty(name="Player Size", default=0.08, min=0.01, max=0.5, subtype="FACTOR")
+    marker_prop = StringProperty(name="Marker Property", default="minimap",
+                                 description="Objects with this game property get a marker")
+    marker_prefix = StringProperty(name="Marker Prefix",
+                                   description="Objects whose name starts with this get a marker")
+    marker_color = _color("Markers", (1.0, 0.25, 0.2, 1.0))
+    marker_size = FloatProperty(name="Marker Size", default=0.04, min=0.01, max=0.5, subtype="FACTOR")
+    clamp_markers = BoolProperty(name="Keep Markers on Edge", default=True,
+                                 description="Markers out of the visible area stay on the edge")
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.width = 160
+        self.button_height = 160.0
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop_search(self, "object_name", context.scene, "objects", text="Player")
+        layout.prop_search(self, "image_name", bpy.data, "images")
+        layout.prop(self, "tint")
+        col = layout.column(align=True)
+        col.prop(self, "world_min")
+        col.prop(self, "world_max")
+        layout.operator(RANGE_OT_ui_tree_minimap_fit.bl_idname, icon="FULLSCREEN_ENTER")
+        layout.prop(self, "button_height")
+        layout.operator(RANGE_OT_ui_tree_image_aspect.bl_idname, icon="IMAGE_COL")
+        layout.prop(self, "zoom")
+        row = layout.row()
+        row.active = self.zoom > 0.0
+        row.prop(self, "rotate")
+        row = layout.row(align=True)
+        row.prop(self, "shape", expand=True)
+        if self.shape == "SQUARE":
+            layout.prop(self, "radius", slider=True)
+        layout.prop(self, "bg_color")
+        row = layout.row(align=True)
+        row.prop(self, "border")
+        row.prop(self, "border_color", text="")
+        row = layout.row(align=True)
+        row.prop(self, "player_color", text="")
+        row.prop(self, "player_size")
+        layout.prop(self, "marker_prop")
+        layout.prop(self, "marker_prefix")
+        row = layout.row(align=True)
+        row.prop(self, "marker_color", text="")
+        row.prop(self, "marker_size")
+        layout.prop(self, "clamp_markers")
+
+    def image(self):
+        return bpy.data.images.get(self.image_name) if self.image_name else None
+
+    def widget(self):
+        image = self.image()
+        return {
+            "kind": "MINIMAP", "path": image.filepath if image else "",
+            "tint": tuple(self.tint), "world_min": tuple(self.world_min),
+            "world_max": tuple(self.world_max), "zoom": self.zoom, "rotate": self.rotate,
+            "shape": self.shape, "radius": self.radius, "bg": tuple(self.bg_color),
+            "border": self.border, "border_color": tuple(self.border_color),
+            "player_color": tuple(self.player_color), "player_size": self.player_size,
+            "marker_prop": self.marker_prop, "marker_prefix": self.marker_prefix,
+            "marker_color": tuple(self.marker_color), "marker_size": self.marker_size,
+            "clamp": self.clamp_markers,
+        }
+
+    def preview_values(self):
+        return {}
+
+    def preview_markers(self):
+        """Exemplo para a prévia: jogador no meio, dois marcadores perto."""
+        (x0, y0), (x1, y1) = self.world_min, self.world_max
+        cx, cy, sx, sy = (x0 + x1) * 0.5, (y0 + y1) * 0.5, (x1 - x0), (y1 - y0)
+        return [(cx, cy, 0.0, True), (cx + sx * 0.15, cy + sy * 0.1, 0.0, False),
+                (cx - sx * 0.2, cy - sy * 0.05, 0.0, False)]
+
+
 class UIGaugeNode(UIHudNode, Node):
     """Velocímetro circular ligado a uma propriedade."""
     bl_idname = "RangeUIGauge"
@@ -563,7 +665,7 @@ class UISliderNode(UIControlNode, Node):
         return {self.prop_name: self.min_value + 0.5 * (self.max_value - self.min_value)}
 
 
-HUD_NODES = (UIProgressBarNode, UILabelNode, UIPanelNode, UIImageNode, UIGaugeNode,
+HUD_NODES = (UIProgressBarNode, UILabelNode, UIPanelNode, UIImageNode, UIMinimapNode, UIGaugeNode,
              UIToggleNode, UISliderNode, UIDialogueNode)
 
 
@@ -851,10 +953,34 @@ class RANGE_OT_ui_tree_image_aspect(Operator):
 
     def execute(self, context):
         node = context.active_node
-        image = node.image() if isinstance(node, UIImageNode) else None
+        image = node.image() if isinstance(node, (UIImageNode, UIMinimapNode)) else None
         if image is None or not image.size[0]:
             return {'CANCELLED'}
         node.button_height = node.width * image.size[1] / image.size[0]
+        return {'FINISHED'}
+
+
+class RANGE_OT_ui_tree_minimap_fit(Operator):
+    """Set World Min/Max to the area of the selected objects (or of all meshes)"""
+    bl_idname = "node.range_ui_tree_minimap_fit"
+    bl_label = "Fit to Scene"
+
+    def execute(self, context):
+        node = context.active_node
+        if not isinstance(node, UIMinimapNode):
+            return {'CANCELLED'}
+        objects = [o for o in context.scene.objects if o.select] or \
+            [o for o in context.scene.objects if o.type == "MESH"]
+        xs, ys = [], []
+        for obj in objects:
+            for corner in obj.bound_box:
+                p = obj.matrix_world * Vector(corner)
+                xs.append(p.x)
+                ys.append(p.y)
+        if not xs:
+            return {'CANCELLED'}
+        node.world_min = (min(xs), min(ys))
+        node.world_max = (max(xs), max(ys))
         return {'FINISHED'}
 
 
@@ -1115,12 +1241,13 @@ def _draw_previews():
         if is_hud:
             # Prévia com valor de exemplo (barra em 70%, propriedades = 0).
             bindcode = 0
-            if isinstance(node, UIImageNode):
+            if isinstance(node, (UIImageNode, UIMinimapNode)):
                 image = node.image()
                 if image is not None and not image.gl_load():
                     bindcode = image.bindcode[0]
+            markers = node.preview_markers() if isinstance(node, UIMinimapNode) else None
             range_ui_draw.draw_widget(bgl, blf, node.widget(), node.preview_values(),
-                                      x, y, w, h, bindcode=bindcode)
+                                      x, y, w, h, bindcode=bindcode, markers=markers)
         else:
             state = tree.preview_state if node.select else "NORMAL"
             range_ui_draw.draw_button(bgl, blf, node.style(), node.text, x, y, w, h, state)
@@ -1225,6 +1352,7 @@ CATEGORIES = [
         NodeItem(UIProgressBarNode.bl_idname),
         NodeItem(UILabelNode.bl_idname),
         NodeItem(UIGaugeNode.bl_idname),
+        NodeItem(UIMinimapNode.bl_idname),
         NodeItem(UIDialogueNode.bl_idname),
     ]),
     UICategory("RANGE_UI_ACTIONS", "Actions",
@@ -1232,7 +1360,8 @@ CATEGORIES = [
 ]
 
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
-    RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_image_aspect, RANGE_OT_ui_tree_capture,
+    RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_image_aspect, RANGE_OT_ui_tree_minimap_fit,
+    RANGE_OT_ui_tree_capture,
     RANGE_OT_ui_tree_template, RANGE_OT_ui_tree_setup_logic,
     NODE_PT_range_ui_tree,
     NODE_PT_range_ui_tree_tools)

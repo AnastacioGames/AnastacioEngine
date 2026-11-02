@@ -253,6 +253,128 @@ def draw_image(bgl, data, bindcode, x, y, w, h):
     bgl.glDisable(bgl.GL_TEXTURE_2D)
 
 
+# -- Minimap ------------------------------------------------------------------
+
+def _shape_points(data, x, y, w, h):
+    """Contorno do mini mapa (pontos em pixels, sentido anti-horário)."""
+    if data["shape"] == "ROUND":
+        cx, cy, rx, ry = x + w * 0.5, y + h * 0.5, w * 0.5, h * 0.5
+        return [(cx + math.cos(a) * rx, cy + math.sin(a) * ry)
+                for a in (i * 2.0 * math.pi / 48 for i in range(48))]
+    r = max(0.0, min(data["radius"] * min(w, h) * 0.5, w * 0.5, h * 0.5))
+    points = []
+    for cx, cy, quarter in ((x + w - r, y + h - r, 0), (x + r, y + h - r, 1),
+                            (x + r, y + r, 2), (x + w - r, y + r, 3)):
+        for i in range(9):
+            a = (quarter + i / 8.0) * math.pi / 2
+            points.append((cx + math.cos(a) * r, cy + math.sin(a) * r))
+    return points
+
+
+def minimap_view(data, player, w, h):
+    """(centro x, centro y, meia largura, meia altura, giro) da área do mundo
+    que aparece.  Sem zoom é o mapa inteiro, parado; com zoom segue o
+    jogador e, com rotate, gira para a frente dele ficar para cima."""
+    (x0, y0), (x1, y1) = data["world_min"], data["world_max"]
+    if data["zoom"] <= 0.0 or player is None:
+        return (x0 + x1) * 0.5, (y0 + y1) * 0.5, (x1 - x0) * 0.5, (y1 - y0) * 0.5, 0.0
+    s = data["zoom"] / max(1e-6, min(w, h))
+    turn = player[2] if data["rotate"] else 0.0
+    return player[0], player[1], w * s, h * s, turn
+
+
+def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
+    """markers = [(mundo x, mundo y, yaw, é_jogador)].  A imagem cobre
+    World Min..Max; fora dela vale a borda da textura (clamp)."""
+    _blend(bgl)
+    player = next((m for m in markers if m[3]), None)
+    vx, vy, hw, hh, turn = minimap_view(data, player, w, h)
+    hw, hh = max(hw, 1e-6), max(hh, 1e-6)
+    ct, st = math.cos(turn), math.sin(turn)
+    (x0, y0), (x1, y1) = data["world_min"], data["world_max"]
+    sx, sy = max(1e-6, x1 - x0), max(1e-6, y1 - y0)
+    cx, cy = x + w * 0.5, y + h * 0.5
+
+    def to_world(px, py):
+        lx, ly = (px - cx) / (w * 0.5) * hw, (py - cy) / (h * 0.5) * hh
+        return vx + lx * ct - ly * st, vy + lx * st + ly * ct
+
+    def to_screen(wx, wy):
+        dx, dy = wx - vx, wy - vy
+        lx, ly = dx * ct + dy * st, -dx * st + dy * ct
+        return cx + lx / hw * w * 0.5, cy + ly / hh * h * 0.5
+
+    outline = _shape_points(data, x, y, w, h)
+    _color(bgl, data["bg"])
+    bgl.glBegin(bgl.GL_TRIANGLE_FAN)
+    for px, py in outline:
+        bgl.glVertex2f(px, py)
+    bgl.glEnd()
+    if bindcode:
+        bgl.glEnable(bgl.GL_TEXTURE_2D)
+        bgl.glBindTexture(bgl.GL_TEXTURE_2D, bindcode)
+        for axis in (bgl.GL_TEXTURE_WRAP_S, bgl.GL_TEXTURE_WRAP_T):
+            bgl.glTexParameteri(bgl.GL_TEXTURE_2D, axis, bgl.GL_CLAMP_TO_EDGE)
+        _color(bgl, data["tint"])
+        bgl.glBegin(bgl.GL_TRIANGLE_FAN)
+        for px, py in [(cx, cy)] + outline + outline[:1]:
+            wx, wy = to_world(px, py)
+            bgl.glTexCoord2f((wx - x0) / sx, (wy - y0) / sy)
+            bgl.glVertex2f(px, py)
+        bgl.glEnd()
+        # A prévia usa a textura da imagem do Blender: devolve o padrão.
+        for axis in (bgl.GL_TEXTURE_WRAP_S, bgl.GL_TEXTURE_WRAP_T):
+            bgl.glTexParameteri(bgl.GL_TEXTURE_2D, axis, bgl.GL_REPEAT)
+        bgl.glBindTexture(bgl.GL_TEXTURE_2D, 0)
+        bgl.glDisable(bgl.GL_TEXTURE_2D)
+
+    side = min(w, h)
+    round_shape = data["shape"] == "ROUND"
+    # Jogador por último, por cima dos outros.
+    for mx, my, yaw, is_player in sorted(markers, key=lambda m: m[3]):
+        px, py = to_screen(mx, my)
+        size = side * (data["player_size"] if is_player else data["marker_size"])
+        dx, dy = px - cx, py - cy
+        lx, ly = max(1.0, w * 0.5 - size * 0.6), max(1.0, h * 0.5 - size * 0.6)
+        if round_shape:
+            # Contorno é elipse quando o widget não é quadrado.
+            dist = math.hypot(dx / lx, dy / ly)
+            outside = dist > 1.0
+            if outside:
+                dx, dy = dx / dist, dy / dist
+        else:
+            outside = abs(dx) > lx or abs(dy) > ly
+            dx, dy = max(-lx, min(lx, dx)), max(-ly, min(ly, dy))
+        if outside and not data["clamp"]:
+            continue
+        px, py = cx + dx, cy + dy
+        if is_player:
+            # Seta apontando para a frente (+Y local) do jogador.
+            a = yaw - turn + math.pi * 0.5
+            _color(bgl, data["player_color"])
+            bgl.glBegin(bgl.GL_TRIANGLES)
+            for da, r in ((0.0, 0.6), (2.5, 0.5), (-2.5, 0.5)):
+                bgl.glVertex2f(px + math.cos(a + da) * size * r, py + math.sin(a + da) * size * r)
+            bgl.glEnd()
+        else:
+            _color(bgl, data["marker_color"])
+            bgl.glBegin(bgl.GL_TRIANGLE_FAN)
+            for i in range(12):
+                a = i * math.pi / 6
+                bgl.glVertex2f(px + math.cos(a) * size * 0.5, py + math.sin(a) * size * 0.5)
+            bgl.glEnd()
+
+    border = data["border"] * side
+    if border > 0.0:
+        bgl.glLineWidth(max(1.0, border))
+        _color(bgl, data["border_color"])
+        bgl.glBegin(bgl.GL_LINE_LOOP)
+        for px, py in outline:
+            bgl.glVertex2f(px, py)
+        bgl.glEnd()
+        bgl.glLineWidth(1.0)
+
+
 def _arc(bgl, cx, cy, r0, r1, a0, a1, steps):
     bgl.glBegin(bgl.GL_TRIANGLE_STRIP)
     for i in range(steps + 1):
@@ -426,7 +548,7 @@ def draw_dialogue(bgl, blf, data, speaker, page, visible, x, y, w, h, show_next)
         bgl.glEnd()
 
 
-def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False):
+def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False, markers=None):
     """Desenha um widget (HUD ou controle) com os valores dados."""
     kind = data["kind"]
     if kind == "BAR":
@@ -437,6 +559,8 @@ def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False):
         draw_panel(bgl, data, x, y, w, h)
     elif kind == "IMAGE":
         draw_image(bgl, data, bindcode, x, y, w, h)
+    elif kind == "MINIMAP":
+        draw_minimap(bgl, data, bindcode, markers or (), x, y, w, h)
     elif kind == "GAUGE":
         draw_gauge(bgl, blf, data, bar_fraction(data, values), values, x, y, w, h)
     elif kind == "TOGGLE":

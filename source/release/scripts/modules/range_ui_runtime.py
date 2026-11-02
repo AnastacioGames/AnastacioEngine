@@ -24,6 +24,7 @@ Voltar do Android manda, abrem a primeira tela e escondem o HUD; numa outra
 tela, voltam para a primeira.
 """
 
+import math
 import sys
 import time
 
@@ -132,7 +133,7 @@ class Dialogue:
 
 
 # Fundo primeiro: Panel e Image ficam atrás do resto.
-_DRAW_ORDER = {"PANEL": 0, "IMAGE": 1}
+_DRAW_ORDER = {"PANEL": 0, "IMAGE": 1, "MINIMAP": 1}
 
 
 class Screen:
@@ -183,6 +184,7 @@ class UIRuntime:
         self.last_stick = 0
         self.sounds = {}
         self.textures = {}
+        self.minimap_objects = {}  # id(dados) -> [nº de objetos da cena, lista]
         self.speeds = {}  # id(objeto) -> [tempo, posição, km/h]
         self.last_draw = None
         self.last_tick = None
@@ -628,6 +630,32 @@ class UIRuntime:
         self.textures[path] = bindcode
         return bindcode
 
+    def minimap_markers(self, data):
+        """[(x, y, yaw, é_jogador)]: o Object do nó é o jogador; os outros
+        vêm da propriedade/prefixo.  A busca na cena só se refaz quando o
+        número de objetos muda ou algum da lista some (respawn no mesmo
+        frame mantém a contagem)."""
+        player = self.scene.objects.get(data["object"]) if data["object"] else None
+        objects = self.scene.objects
+        cache = self.minimap_objects.get(id(data))
+        if cache is None or cache[0] != len(objects) or any(o.invalid for o in cache[1]):
+            prop, prefix = data["marker_prop"], data["marker_prefix"]
+            found = [o for o in objects if not o.invalid and
+                     ((prop and prop in o) or (prefix and o.name.startswith(prefix)))]
+            cache = self.minimap_objects[id(data)] = [len(objects), found]
+        markers = []
+        for obj in cache[1]:
+            if obj is player:
+                continue
+            p = obj.worldPosition
+            markers.append((p.x, p.y, 0.0, False))
+        if player is not None and not player.invalid:
+            p = player.worldPosition
+            # Pela frente (Y local) e não pelo Euler: carro inclinado não distorce.
+            fx, fy = player.worldOrientation.col[1].xy
+            markers.append((p.x, p.y, math.atan2(fy, fx) - math.pi * 0.5, True))
+        return markers
+
     def hud_area(self, screen):
         """(esquerda, baixo, largura, altura) do viewport da câmera do HUD, ou
         None para a janela inteira."""
@@ -644,9 +672,11 @@ class UIRuntime:
     def draw_widgets(self, bgl, blf, screen, width, height):
         for data in screen.widgets:
             x, y, w, h = screen.place(data, width, height)
-            bindcode = self.texture(data["path"]) if data["kind"] == "IMAGE" and data["path"] else 0
+            kind = data["kind"]
+            bindcode = self.texture(data["path"]) if kind in ("IMAGE", "MINIMAP") and data["path"] else 0
+            markers = self.minimap_markers(data) if kind == "MINIMAP" else None
             range_ui_draw.draw_widget(bgl, blf, data, self.widget_values(data),
-                                      x, y, w, h, bindcode=bindcode)
+                                      x, y, w, h, bindcode=bindcode, markers=markers)
         for dialogue in screen.dialogues:
             if dialogue.visible:
                 self.draw_dialogue(bgl, blf, screen, dialogue, width, height)
