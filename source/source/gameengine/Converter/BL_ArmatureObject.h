@@ -110,6 +110,7 @@ public:
 
 	bool UpdateTimestep(double curtime);
 	/// Applies the Python bone rotation offsets on top of the action pose (animation pass).
+	void RestoreBoneRotationBases();
 	void ApplyBoneRotationOffsets(double curtime);
 
 	Object *GetArmatureObject();

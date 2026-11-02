@@ -2656,6 +2656,9 @@ void KX_Scene::UpdateAnimPoseTask(TaskPool *pool, void *taskdata, int UNUSED(thr
 	}
 
 	// If the object is a culled armature, then we manage only the animation time and end of its animations.
+	if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_ARMATURE) {
+		static_cast<BL_ArmatureObject *>(gameobj)->RestoreBoneRotationBases();
+	}
 	gameobj->UpdateActionManager(curtime, needs_update);
 
 	// Python bone offsets (setBoneRotationOffset) go on top of the action pose, before skinning.

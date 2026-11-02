@@ -463,6 +463,28 @@ static void pchan_set_quat(bPoseChannel *pchan, const float quat[4])
 	}
 }
 
+void BL_ArmatureObject::RestoreBoneRotationBases()
+{
+	// Undo last frame's offset before the actions run: an action that blends or adds onto the
+	// current pose would otherwise start from the turned bone and the turn would pile up (the
+	// pilot head spun all the way around).
+	for (std::pair<const std::string, BoneRotationOffset>& item : m_boneRotOffsets) {
+		BoneRotationOffset& o = item.second;
+		if (!o.hasWritten) {
+			continue;
+		}
+		bPoseChannel *pchan = BKE_pose_channel_find_name(m_objArma->pose, item.first.c_str());
+		if (!pchan) {
+			continue;
+		}
+		float cur[4];
+		pchan_get_quat(pchan, cur);
+		if (equals_v4v4(cur, o.written)) {
+			pchan_set_quat(pchan, o.base);
+		}
+	}
+}
+
 void BL_ArmatureObject::ApplyBoneRotationOffsets(double curtime)
 {
 	if (m_boneRotOffsets.empty() && !m_boneRotOffsetsDirty) {
