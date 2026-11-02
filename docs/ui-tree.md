@@ -34,6 +34,14 @@ Jogar esconde o menu e liga o HUD; Som e Volume mandam no volume geral do jogo.
   (recorte limpo), Solid (anel de cor, Border/Border Color) ou Soft (degradê de alpha,
   Edge Softness). Marcadores fora da área ficam presos na borda. Não redesenha a cena: só um quad com textura.
   Fora da imagem vale a cor da borda da textura (clamp).
+- **Add > Minimap** (3D View, com o jogador selecionado): cria tudo de uma vez — UI Tree
+  (ou usa a existente), HUD Screen, nó Minimap seguindo o objeto, foto do mapa e lógica da
+  UI com o HUD ligado. Estilos: Radar (círculo que gira), Whole Map (quadrado parado) e
+  GPS 3D (retângulo inclinado). Rivais/itens: propriedade de jogo `minimap`.
+- **Bake Map Image** (painel do nó): foto ortográfica de cima das malhas visíveis, sem o
+  jogador e os marcadores, fundo transparente, salva como `<arquivo>_minimap.png` ao lado do
+  .range; acerta World Min/Max. Salve o .range antes (senão vai para pasta temporária).
+- Só HUD, sem menu: Setup Game Logic já deixa `ui_hud` ligado.
 - **Eventos do Button**: On Enter, On Exit, On Over, On Press, On Release, On Click.
   Toggle e Slider têm On Change.
 - **Ações**: Print, Send Message, Go To Screen, Change Scene, Quit Game, Play Sound,

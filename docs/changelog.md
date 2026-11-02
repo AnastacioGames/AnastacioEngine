@@ -22,6 +22,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Camera Tilt: câmera virtual atrás do jogador olhando o chão; textura com coordenada
   homogênea (glTexCoord4f) para perspectiva correta, marcadores projetados e maiores perto;
   tilt 0 é idêntico à vista de cima.
+- Add > Minimap (3D View) com estilos Radar/Whole Map/GPS 3D e Bake Map Image (Blender
+  Internal numa câmera ortográfica temporária; especular das luzes desligado durante a foto,
+  senão o mapa sai branco; sem margem para o clamp estender o chão). Imagem e árvore com
+  Fake User (só o nome é guardado: sem isso sumiam ao salvar). setup_game_logic liga
+  `ui_hud` quando a árvore não tem menu.
 - Runtime (`range_ui_runtime.minimap_markers`): busca dos marcadores em cache, refeita só
   quando o número de objetos da cena muda; objetos removidos são ignorados.
 - Testado em background: Fit, Bake, desenho com bgl falso (giro e clamp) e marcadores com

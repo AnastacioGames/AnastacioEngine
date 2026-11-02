@@ -381,7 +381,9 @@ class UIMinimapNode(UIHudNode, Node):
         col = layout.column(align=True)
         col.prop(self, "world_min")
         col.prop(self, "world_max")
-        layout.operator(RANGE_OT_ui_tree_minimap_fit.bl_idname, icon="FULLSCREEN_ENTER")
+        row = layout.row(align=True)
+        row.operator(RANGE_OT_ui_tree_minimap_bake_image.bl_idname, icon="RENDER_STILL")
+        row.operator(RANGE_OT_ui_tree_minimap_fit.bl_idname, icon="FULLSCREEN_ENTER")
         layout.prop(self, "button_height")
         layout.operator(RANGE_OT_ui_tree_image_aspect.bl_idname, icon="IMAGE_COL")
         layout.prop(self, "zoom")
@@ -990,19 +992,260 @@ class RANGE_OT_ui_tree_minimap_fit(Operator):
         node = context.active_node
         if not isinstance(node, UIMinimapNode):
             return {'CANCELLED'}
-        objects = [o for o in context.scene.objects if o.select] or \
-            [o for o in context.scene.objects if o.type == "MESH"]
-        xs, ys = [], []
-        for obj in objects:
-            for corner in obj.bound_box:
-                p = obj.matrix_world * Vector(corner)
-                xs.append(p.x)
-                ys.append(p.y)
-        if not xs:
+        objects = [o for o in context.scene.objects if o.select] or _map_objects(context.scene, node)
+        bounds = _bounds(objects)
+        if bounds is None:
             return {'CANCELLED'}
-        node.world_min = (min(xs), min(ys))
-        node.world_max = (max(xs), max(ys))
+        node.world_min, node.world_max = bounds
         return {'FINISHED'}
+
+
+def _is_marker(obj, node):
+    """Jogador e marcadores do nó: andam no jogo, não entram na imagem."""
+    if obj.name == node.object_name:
+        return True
+    if node.marker_prop and node.marker_prop in obj.game.properties:
+        return True
+    return bool(node.marker_prefix) and obj.name.startswith(node.marker_prefix)
+
+
+def _map_objects(scene, node):
+    """Malhas visíveis que formam o mapa (pista, chão, prédios)."""
+    return [o for o in scene.objects if o.type == "MESH" and o.is_visible(scene)
+            and not o.hide_render and not _is_marker(o, node)]
+
+
+def _bounds(objects, margin=0.0):
+    xs, ys = [], []
+    for obj in objects:
+        for corner in obj.bound_box:
+            p = obj.matrix_world * Vector(corner)
+            xs.append(p.x)
+            ys.append(p.y)
+    if not xs:
+        return None
+    mx = (max(xs) - min(xs)) * margin
+    my = (max(ys) - min(ys)) * margin
+    return (min(xs) - mx, min(ys) - my), (max(xs) + mx, max(ys) + my)
+
+
+def bake_minimap_image(scene, node, size=1024):
+    """Foto ortográfica de cima das malhas do mapa (sem jogador nem
+    marcadores), com fundo transparente.  Salva o PNG ao lado do .range,
+    liga a imagem ao nó e acerta World Min/Max para a área exata da foto.
+    Devolve o caminho salvo ou levanta RuntimeError."""
+    import os
+    objects = _map_objects(scene, node)
+    # Sem margem: a borda da foto é o chão, e o clamp da textura o estende
+    # para fora em vez de mostrar uma faixa transparente.
+    bounds = _bounds(objects)
+    if bounds is None:
+        raise RuntimeError("Nenhuma malha visível para o mapa")
+    (x0, y0), (x1, y1) = bounds
+    sx, sy = max(x1 - x0, 1e-3), max(y1 - y0, 1e-3)
+    top = max((o.matrix_world * Vector(c)).z for o in objects for c in o.bound_box)
+
+    if bpy.data.filepath:
+        folder = os.path.dirname(bpy.path.abspath(bpy.data.filepath))
+        base = os.path.splitext(os.path.basename(bpy.data.filepath))[0]
+    else:
+        folder, base = bpy.app.tempdir, "untitled"
+    filename = "%s_minimap.png" % bpy.path.clean_name(base)
+    path = os.path.join(folder, filename)
+
+    r = scene.render
+    saved = (r.engine, r.resolution_x, r.resolution_y, r.resolution_percentage, r.alpha_mode,
+             r.filepath, r.image_settings.file_format, r.image_settings.color_mode,
+             r.use_border, scene.camera)
+    hidden = [o for o in scene.objects if not o.hide_render and o.type == "MESH" and o not in objects]
+    # Câmera e sol olhando de cima: o especular cobriria o mapa todo de branco.
+    shiny = [o.data for o in scene.objects if o.type == "LAMP" and o.data.use_specular]
+    cam_data = bpy.data.cameras.new("MinimapBake")
+    cam = bpy.data.objects.new("MinimapBake", cam_data)
+    lamp = None
+    try:
+        scene.objects.link(cam)
+        cam.layers = scene.layers
+        cam_data.type = "ORTHO"
+        cam_data.ortho_scale = max(sx, sy)
+        cam_data.clip_start, cam_data.clip_end = 0.1, top + 10000.0
+        cam.location = ((x0 + x1) * 0.5, (y0 + y1) * 0.5, top + 50.0)
+        cam.rotation_euler = (0.0, 0.0, 0.0)  # olha para -Z, +Y no alto da foto
+        if not any(o.type == "LAMP" and o.is_visible(scene) for o in scene.objects):
+            lamp = bpy.data.objects.new("MinimapBakeLight", bpy.data.lamps.new("MinimapBakeLight", "HEMI"))
+            scene.objects.link(lamp)
+            lamp.layers = scene.layers
+        for o in hidden:
+            o.hide_render = True
+        for lamp_data in shiny:
+            lamp_data.use_specular = False
+        scene.camera = cam
+        r.engine = "BLENDER_RENDER"
+        # Proporção da foto = proporção da área: a imagem cobre World Min/Max exatos.
+        long_side = max(sx, sy)
+        r.resolution_x = max(16, int(round(size * sx / long_side)))
+        r.resolution_y = max(16, int(round(size * sy / long_side)))
+        r.resolution_percentage = 100
+        r.use_border = False
+        r.alpha_mode = "TRANSPARENT"
+        r.image_settings.file_format = "PNG"
+        r.image_settings.color_mode = "RGBA"
+        r.filepath = path
+        bpy.ops.render.render(write_still=True, scene=scene.name)
+    finally:
+        for o in hidden:
+            o.hide_render = False
+        for lamp_data in shiny:
+            lamp_data.use_specular = True
+        (r.engine, r.resolution_x, r.resolution_y, r.resolution_percentage, r.alpha_mode,
+         r.filepath, r.image_settings.file_format, r.image_settings.color_mode,
+         r.use_border, scene.camera) = saved
+        scene.objects.unlink(cam)
+        bpy.data.objects.remove(cam)
+        bpy.data.cameras.remove(cam_data)
+        if lamp is not None:
+            lamp_data = lamp.data
+            scene.objects.unlink(lamp)
+            bpy.data.objects.remove(lamp)
+            bpy.data.lamps.remove(lamp_data)
+
+    image = next((i for i in bpy.data.images
+                  if bpy.path.abspath(i.filepath) == path), None)
+    if image is None:
+        image = bpy.data.images.load(path)
+    else:
+        image.reload()
+    if bpy.data.filepath:
+        image.filepath = "//" + filename  # o jogo lê do arquivo, relativo ao .range
+    image.use_fake_user = True  # o nó guarda só o nome: sem usuário a imagem some ao salvar
+    node.image_name = image.name
+    node.world_min, node.world_max = (x0, y0), (x1, y1)
+    return path
+
+
+class RANGE_OT_ui_tree_minimap_bake_image(Operator):
+    """Take a top-down picture of the scene (without the player and markers) and use it as the map image"""
+    bl_idname = "node.range_ui_tree_minimap_bake_image"
+    bl_label = "Bake Map Image"
+
+    def execute(self, context):
+        node = context.active_node
+        if not isinstance(node, UIMinimapNode):
+            return {'CANCELLED'}
+        try:
+            path = bake_minimap_image(context.scene, node)
+        except RuntimeError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        if not bpy.data.filepath:
+            self.report({'WARNING'}, "Salve o .range e gere de novo: a imagem está numa pasta temporária")
+        else:
+            self.report({'INFO'}, "Mapa salvo em %s" % path)
+        return {'FINISHED'}
+
+
+# Estilos do Add > Minimap: (shape, border, zoom em fração do mapa, rotate,
+# tilt, largura, altura, posição no HUD 640x360, âncora).
+MINIMAP_STYLES = {
+    "RADAR": ("CIRCLE", "SOFT", 0.3, True, 0.0, 150, 150, (474, -16), "TOP_RIGHT"),
+    "FULL": ("SQUARE", "SOLID", 0.0, False, 0.0, 150, 150, (474, -16), "TOP_RIGHT"),
+    "GPS": ("RECTANGLE", "SOFT", 0.25, True, 0.87, 220, 130, (404, -214), "BOTTOM_RIGHT"),
+}
+
+
+def _hud_frame(tree):
+    """HUD Screen da árvore; cria uma abaixo do que já existe se não houver."""
+    frame = next((n for n in tree.nodes if _is_screen(n) and n.ui_hud), None)
+    if frame is not None:
+        return frame
+    bottom = min((n.location.y - n.height for n in tree.nodes if n.parent is None), default=150.0)
+    frame = tree.nodes.new("NodeFrame")
+    frame.name = frame.label = "HUD"
+    frame.ui_screen = frame.ui_hud = True
+    frame.shrink = False
+    frame.width = 640.0
+    frame.location = (0.0, bottom - 150.0)
+    return frame
+
+
+def add_minimap(context, player, style="RADAR", bake_image=True):
+    """Tudo que o mini mapa precisa, a partir do objeto do jogador: UI Tree
+    (a existente ou uma nova), HUD Screen, nó Minimap, imagem do mapa,
+    lógica da UI e Bake.  Devolve o nó."""
+    scene = context.scene
+    tree = _baked_tree() or next((t for t in bpy.data.node_groups if t.bl_idname == UITree.bl_idname), None)
+    if tree is None:
+        tree = bpy.data.node_groups.new("UI", UITree.bl_idname)
+    tree.use_fake_user = True  # árvore sem usuário some ao salvar
+    frame = _hud_frame(tree)
+    shape, border, zoom, rotate, tilt, w, h, (x, y), anchor = MINIMAP_STYLES[style]
+    node = tree.nodes.new(UIMinimapNode.bl_idname)
+    node.parent = frame
+    node.location = (x, y)
+    node.width, node.button_height = w, h
+    node.anchor = anchor
+    node.object_name = player.name
+    node.shape, node.border_style = shape, border
+    node.rotate, node.tilt = rotate, tilt
+    for other in tree.nodes:
+        other.select = False
+    node.select = True
+    tree.nodes.active = node
+    # Sem foto nova: usa a de outro mini mapa da árvore, com a mesma área.
+    other = next((n for n in tree.nodes if isinstance(n, UIMinimapNode)
+                  and n != node and n.image()), None)
+    if bake_image:
+        bake_minimap_image(scene, node)
+    elif other is not None:
+        node.image_name = other.image_name
+        node.world_min, node.world_max = other.world_min, other.world_max
+    else:
+        bounds = _bounds(_map_objects(scene, node))
+        if bounds is not None:
+            node.world_min, node.world_max = bounds
+    (x0, y0), (x1, y1) = node.world_min, node.world_max
+    node.zoom = max(x1 - x0, y1 - y0) * zoom
+    owner = scene.camera
+    if owner is None:
+        owner = bpy.data.objects.new("UI", None)
+        scene.objects.link(owner)
+    setup_game_logic(owner, tree)
+    write_bake(tree, scene)
+    return node
+
+
+class RANGE_OT_add_minimap(Operator):
+    """Add a minimap to the HUD that follows the active object (the player): map image, UI Tree node and game logic"""
+    bl_idname = "object.range_add_minimap"
+    bl_label = "Minimap"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    style = EnumProperty(name="Style", default="RADAR", items=(
+        ("RADAR", "Radar", "Round, follows and turns with the player, soft edge"),
+        ("FULL", "Whole Map", "Square, the whole map without turning"),
+        ("GPS", "GPS 3D", "Rectangle seen from behind the player, in perspective")))
+    bake_image = BoolProperty(name="Bake Map Image", default=True,
+                              description="Take a top-down picture of the scene for the map")
+
+    @classmethod
+    def poll(cls, context):
+        return context.active_object is not None and context.mode == "OBJECT"
+
+    def execute(self, context):
+        try:
+            node = add_minimap(context, context.active_object, self.style, self.bake_image)
+        except RuntimeError as exc:
+            self.report({'ERROR'}, str(exc))
+            return {'CANCELLED'}
+        self.report({'INFO'}, "Mini mapa adicionado na UI Tree '%s' (marque outros objetos com a "
+                              "propriedade '%s')" % (node.id_data.name, node.marker_prop))
+        return {'FINISHED'}
+
+
+def _draw_add_minimap(self, context):
+    if context.scene.render.engine == "BLENDER_GAME":
+        self.layout.operator_menu_enum(RANGE_OT_add_minimap.bl_idname, "style",
+                                       text="Minimap", icon="WORLD")
 
 
 class RANGE_OT_ui_tree_capture(Operator):
@@ -1152,7 +1395,7 @@ GAME_PROPS = (("ui_screen", "STRING", "Menu"), ("ui_hud", "BOOL", False),
               ("dialogo", "STRING", ""))
 
 
-def setup_game_logic(obj):
+def setup_game_logic(obj, tree=None):
     """Always (pulso) + Python Module range_ui_runtime.main no objeto, e as
     propriedades que o template usa.  Não repete o que já existe."""
     game = obj.game
@@ -1172,6 +1415,12 @@ def setup_game_logic(obj):
         if name not in game.properties:
             bpy.ops.object.game_property_new(type=kind, name=name)
             game.properties[name].value = value
+    # Só HUD, sem menu: nenhum botão vai ligar o HUD nem abrir a tela
+    # "Menu" dos valores padrão, então ele começa visível.
+    tree = tree or _baked_tree()
+    if tree is not None and not any(_is_screen(n) and not n.ui_hud for n in tree.nodes):
+        game.properties["ui_hud"].value = True
+        game.properties["ui_screen"].value = ""
     scene.objects.active = active
 
 
@@ -1213,7 +1462,7 @@ class RANGE_OT_ui_tree_setup_logic(Operator):
         return context.scene.camera is not None
 
     def execute(self, context):
-        setup_game_logic(context.scene.camera)
+        setup_game_logic(context.scene.camera, getattr(context.space_data, "edit_tree", None))
         self.report({'INFO'}, "UI ligada na câmera %s" % context.scene.camera.name)
         return {'FINISHED'}
 
@@ -1382,6 +1631,7 @@ CATEGORIES = [
 
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
     RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_image_aspect, RANGE_OT_ui_tree_minimap_fit,
+    RANGE_OT_ui_tree_minimap_bake_image, RANGE_OT_add_minimap,
     RANGE_OT_ui_tree_capture,
     RANGE_OT_ui_tree_template, RANGE_OT_ui_tree_setup_logic,
     NODE_PT_range_ui_tree,
@@ -1417,6 +1667,7 @@ def register():
         name="Click Sound", subtype="FILE_PATH",
         description="Default sound for clicking any button on this screen")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
+    bpy.types.INFO_MT_add.append(_draw_add_minimap)
     space = bpy.types.SpaceNodeEditor
     _draw_handles.append(space.draw_handler_add(_draw_editor, (), "WINDOW", "PRE_VIEW"))
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
@@ -1438,6 +1689,7 @@ def unregister():
     del bpy.types.NodeFrame.ui_camera
     del bpy.types.NodeFrame.ui_hover_sound
     del bpy.types.NodeFrame.ui_click_sound
+    bpy.types.INFO_MT_add.remove(_draw_add_minimap)
     nodeitems_utils.unregister_node_categories("RANGE_UI_TREE")
     for cls in reversed(CLASSES):
         bpy.utils.unregister_class(cls)
