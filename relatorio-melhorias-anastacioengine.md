@@ -82,6 +82,13 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 
 ## Decisões técnicas vigentes
 
+### Retratos de personagens
+
+- O auto-rig renderiza cartão/foto em estúdio temporário isolado, com material opaco, normal Non-Color,
+  três luzes, AA e redução Lanczos-3 com alfa premultiplicado. Preserva arquivo/estado do piloto inclusive
+  em falha. Os nove novos do RolimaRacer foram regenerados e os dois menus atualizados em background;
+  aceite visual pendente. Procedimento e evidências no [plano](docs/personagem-auto-rig-plan.md).
+
 ### Render e materiais
 
 - **Lua visual pré-calculada (experimental):** opção individual no World substitui manchas/crateras

@@ -3,7 +3,8 @@
 Export do Fuse: Export in new folder + Remove occluded polygons; sem Pack Textures, Triangulate, Flip
 Normals nem Combine; Character Scale 1.
 
-Status: planejado em 2026-11-01, revisto com as pastas reais do usuário. Nada implementado ainda.
+Status: gerador implementado em 2026-11-01; nove pilotos e retratos validados em background.
+Aceite visual no menu pelo usuário continua pendente.
 
 ## Processo de hoje (D:\ProjetoRolimaRacer\personagens)
 
@@ -254,3 +255,34 @@ Pastas: pilotos antigos em `5 - Personagem Link\_antigos`, novos em `_novos`; o 
 2. Encaixe do esqueleto.
 3. Materiais, atlas, LOD, ragdoll e grupo (encadear as ferramentas que já existem).
 4. Biblioteca de esqueletos + "Salvar como base" + painel com botão único; doc de uso.
+
+
+## Retratos do menu (2026-11-01)
+
+`render_card` usa uma cena temporária com cópias da armature, malhas, materiais e textura normal.
+Não altera o world, a pose, os materiais ou as configurações de render do arquivo do piloto, inclusive
+quando o render falha. A normal da cópia usa Non-Color; material opaco elimina as sobreposições que
+ocorriam ao renderizar antes de `finish_pilot` (atlas ainda transparente, alpha zero). Testes com Enzo
+isolaram transparência como causa dominante; remover sombras ou mipmap na Bia finalizada
+não reproduziu a diferença grave das imagens antigas.
+
+Cartão: idle em pé (`PLAYER_IDLE 1_345`, quadro 50), enquadramento pela geometria deformada inteira,
+folga de 12 %, luz principal/preenchimento/contorno. Render 1024x2048, AA 16 amostras, reduzido para
+512x1024. Foto: pose reta, escala proporcional à cabeça com margem no cabelo, render 1024x1024,
+reduzido para 256x256. Redução Lanczos-3 com alfa premultiplicado evita franjas nas bordas transparentes;
+NumPy já acompanha o Python do editor. Os atlas limitam o detalhe disponível; não há detalhe inventado.
+
+No RolimaRacer, `scripts/_button_shared.py:replace_object` instancia o cartão na cena `_menu`.
+Os cartões novos herdavam o UV parcial do Fabio (V 0,2829–0,9318) e o aspecto do plano antigo:
+recortavam o corpo e alargavam a imagem. `Tools/adicionar_pilotos_menu.py` agora usa UV inteiro e
+aspecto 1:2 para novos cartões. `Tools/atualizar_retratos_pilotos.py` regenera em staging e atualiza
+as imagens empacotadas dos dois jogos com backup, sem salvar os arquivos dos pilotos.
+O guia reproduzível está em `D:/ProjetoRolimaRacer/docs/retratos-pilotos.md`.
+
+Regressão: `tools/debug/teste_autorig_retratos.py`, com piloto aberto em background, verifica PNG RGBA,
+tamanhos finais e preservação de estado tanto no sucesso quanto com falha injetada no Lanczos.
+Nove pilotos regenerados, 18 PNGs verificados e dois menus reabertos: packed bytes iguais aos PNGs,
+UV/aspecto corretos, referências antigas e cena inicial preservadas. Evidências locais em
+`artifacts/retratos-antes-depois.png`, `artifacts/pilot-portraits-final/validation.json` e logs de validação.
+Backups em `D:/ProjetoRolimaRacer/_backup_retratos_20261101/` (18 PNGs, manifesto e dois `.range`).
+Nenhum runtime foi aberto; falta o aceite visual do usuário.

@@ -828,7 +828,7 @@ def finish_pilot(arm, body, group_name, component=GAME_COMPONENT, report=print):
 
 CARD_SIZE = (512, 1024)          # os cartoes do RolimaRacer sao 256x512 (corpo inteiro, fundo transparente)
 PHOTO_SIZE = 256                 # foto do rosto no botao de escolha
-CARD_POSE = ("RolimaRacer.range", "PLAYER_IDLE_CAPOEIRA 1_104", 50)   # ginga, como o cartao do Fabio   # (arquivo do jogo, acao, quadro)
+CARD_POSE = ("RolimaRacer.range", "PLAYER_IDLE 1_345", 50)   # apresentacao em pe, sem inclinar a cabeca   # (arquivo do jogo, acao, quadro)
 
 
 def _pose_from_game(arm, game_root, pose=CARD_POSE):
@@ -948,100 +948,217 @@ def bake_seat_pose(arm, game_root, pose=SEAT_POSE):
     return True
 
 
-def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=None, report=print):
-    """Foto do corpo inteiro em pose, luz Sun, fundo transparente (cartao do menu de escolha)."""
+def _lanczos_png(source, destination, size):
+    """Reduz RGBA com Lanczos-3 e alfa premultiplicado, sem depender de Pillow no editor."""
     import bpy
-    scene = bpy.context.scene
-    if not _pose_from_game(arm, game_root):
-        report("cartao: animacao do jogo nao encontrada, pose manual")
-        _pose_arms_down(arm)
-    scene.update()
-    pts = [o.matrix_world * v.co for o in meshes for v in o.to_mesh(scene, True, 'RENDER').vertices]
-    zmin = min(p.z for p in pts)
-    zmax = max(p.z for p in pts)
-    h = zmax - zmin
-    ang = math.radians(25)             # 3/4, o personagem olha para +Y
-    right = Vector((-math.cos(ang), math.sin(ang), 0.0))   # eixo X da camera
-    xs = [p.dot(right) for p in pts]
-    w = max(xs) - min(xs)
-    mid = (max(xs) + min(xs)) / 2
-    cam_data = bpy.data.cameras.new("CardCam")
-    cam_data.type = 'ORTHO'
-    cam_data.ortho_scale = max(h, w * size[1] / size[0]) * 1.08   # cabe em pe e com os bracos abertos
-    cam = bpy.data.objects.new("CardCam", cam_data)
-    scene.objects.link(cam)
-    dist = 10.0
-    c = right * mid
-    cam.location = (c.x + dist * math.sin(ang), c.y + dist * math.cos(ang), zmin + h / 2)
-    cam.rotation_euler = (math.radians(90), 0, math.radians(180) - ang)
-    sun_data = bpy.data.lamps.new("CardSun", 'SUN')
-    sun_data.energy = 1.1
-    sun = bpy.data.objects.new("CardSun", sun_data)
-    scene.objects.link(sun)
-    sun.rotation_euler = (math.radians(-55), math.radians(-25), math.radians(20))
-    # mundo e material so para a foto: o arquivo do piloto e LibLoadado, e o jogo monta o material com o
-    # mundo do arquivo dele (ambiente/nevoa deste mundo deixava o piloto lavado e cinza na corrida)
-    old_world = scene.world
-    world = bpy.data.worlds.new("CardWorld")
-    scene.world = world
-    world.ambient_color = (0.12, 0.12, 0.13)
-    old_mats = {}
-    for o in meshes:
-        for m in o.data.materials:
-            if m and m not in old_mats:
-                old_mats[m] = (m.ambient, m.specular_intensity)
-                m.ambient = 1.0
-                m.specular_intensity = 0.1
-    r = scene.render
-    r.engine = 'BLENDER_RENDER'
-    r.resolution_x, r.resolution_y = size
-    r.resolution_percentage = 100
-    r.alpha_mode = 'TRANSPARENT'
-    r.image_settings.file_format = 'PNG'
-    r.image_settings.color_mode = 'RGBA'
-    r.use_antialiasing = True
-    scene.view_settings.view_transform = 'Default'   # cor como no jogo (2.79 abre em Filmic)
-    scene.camera = cam
-    for ob in (cam, sun):
-        ob.layers = meshes[0].layers
-    r.filepath = path
-    bpy.ops.render.render(write_still=True)
-    # foto do botao (rosto, quadrada): cabeca reta (a ginga tomba a cabeca), quase de frente e mais clara,
-    # como as fotos dos pilotos antigos
-    fill = None
-    head = next((pb for pb in arm.pose.bones if pb.name.endswith("Head")), None)
-    if head and photo_path:
-        _rest_pose(arm)
-        _pose_arms_down(arm)
+    import numpy as np   # distribuido com o Python do Blender 2.79
+
+    def weights(old, new):
+        ratio = old / float(new)
+        support = 3.0 * max(1.0, ratio)
+        result = []
+        for i in range(new):
+            center = (i + 0.5) * ratio - 0.5
+            row = []
+            for j in range(max(0, int(math.ceil(center - support))),
+                           min(old, int(math.floor(center + support)) + 1)):
+                x = abs(j - center) / max(1.0, ratio)
+                w = 1.0 if x < 1e-8 else (math.sin(math.pi*x) * math.sin(math.pi*x/3) /
+                                         (math.pi*math.pi*x*x/3))
+                row.append((j, w))
+            total = sum(w for j, w in row)
+            result.append([(j, w / total) for j, w in row])
+        return result
+
+    im = bpy.data.images.load(source, check_existing=False)
+    out = None
+    try:
+        width, height = im.size
+        nx, ny = size
+        px = np.asarray(im.pixels[:], dtype=np.float32).reshape(height, width, 4)
+        px[:, :, :3] *= px[:, :, 3:4]
+        wx, wy = weights(width, nx), weights(height, ny)
+        taps = max(len(row) for row in wx)
+        indices = np.zeros((nx, taps), dtype=np.int32)
+        kernel = np.zeros((nx, taps, 1), dtype=np.float32)
+        for x, row in enumerate(wx):
+            for k, (j, w) in enumerate(row):
+                indices[x, k], kernel[x, k, 0] = j, w
+        horizontal = np.empty((height, nx, 4), dtype=np.float32)
+        for y in range(height):
+            horizontal[y] = (px[y, indices] * kernel).sum(axis=1)
+        result = np.empty((ny, nx, 4), dtype=np.float32)
+        for y, row in enumerate(wy):
+            js = [j for j, w in row]
+            ws = np.asarray([w for j, w in row], dtype=np.float32)
+            result[y] = (horizontal[js] * ws[:, None, None]).sum(axis=0)
+        alpha = result[:, :, 3:4]
+        result[:, :, :3] /= np.maximum(alpha, 1e-6)
+        result[alpha[:, :, 0] <= 1e-6] = 0
+        np.clip(result, 0, 1, out=result)
+        out = bpy.data.images.new('CardLanczos', nx, ny, alpha=True)
+        out.pixels = result.ravel()
+        out.filepath_raw = destination
+        out.file_format = 'PNG'
+        out.save()
+    finally:
+        bpy.data.images.remove(im)
+        if out:
+            bpy.data.images.remove(out)
+
+
+def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=None, report=print):
+    """Retratos em cena isolada: nao altera pose, materiais, world ou render do piloto."""
+    import bpy
+    import os
+    import tempfile
+    scene = bpy.data.scenes.new('CardStudio')
+    objects, blocks = [], []
+
+    def link(ob):
+        scene.objects.link(ob)
+        ob.layers = [i == 0 for i in range(20)]
+        ob.hide_render = False
+        objects.append(ob)
+        return ob
+
+    def light(name, kind, energy, position, target):
+        data = bpy.data.lamps.new(name, kind)
+        blocks.append((bpy.data.lamps, data))
+        data.energy = energy
+        if kind == 'SUN':
+            data.shadow_method = 'NOSHADOW'
+        ob = link(bpy.data.objects.new(name, data))
+        ob.location = position
+        ob.rotation_euler = (Vector(target) - ob.location).to_track_quat('-Z', 'Y').to_euler()
+        return ob
+
+    def points():
+        pts = []
+        for ob in copies:
+            me = ob.to_mesh(scene, True, 'RENDER')
+            try:
+                pts.extend(ob.matrix_world * v.co for v in me.vertices)
+            finally:
+                bpy.data.meshes.remove(me)
+        return pts
+
+    def aim(target, angle):
+        cam.location = Vector(target) + Vector((10*math.sin(angle), 10*math.cos(angle), 0))
+        cam.rotation_euler = (Vector(target)-cam.location).to_track_quat('-Z', 'Y').to_euler()
+
+    def render(destination, final_size, factor):
+        r.resolution_x, r.resolution_y = [n * factor for n in final_size]
+        # PNG intermediario aplica a gestao de cor uma unica vez; reducao trata alfa nas bordas.
+        with tempfile.TemporaryDirectory(prefix='anastacio-card-') as tmp:
+            source = os.path.join(tmp, 'render.png')
+            r.filepath = source
+            bpy.ops.render.render(write_still=True, scene=scene.name)
+            _lanczos_png(source, destination, final_size)
+        report('retrato: %s (%dx%d, Lanczos)' % (destination, final_size[0], final_size[1]))
+
+    try:
+        pose_arm = link(arm.copy())
+        pose_arm.parent = None
+        pose_arm.matrix_world = arm.matrix_world.copy()
+        pose_arm.animation_data_clear()
+        for constraint in list(pose_arm.constraints):
+            pose_arm.constraints.remove(constraint)
+        for pb in pose_arm.pose.bones:
+            for constraint in list(pb.constraints):
+                pb.constraints.remove(constraint)
+        _rest_pose(pose_arm)
+        copies, materials = [], {}
+        for original in meshes:
+            ob = link(original.copy())
+            ob.data = original.data.copy()
+            blocks.append((bpy.data.meshes, ob.data))
+            ob.parent = None
+            ob.matrix_world = original.matrix_world.copy()
+            ob.animation_data_clear()
+            for mod in ob.modifiers:
+                if mod.type == 'ARMATURE':
+                    mod.object = pose_arm
+            for i, mat in enumerate(original.data.materials):
+                if mat is None:
+                    continue
+                if mat not in materials:
+                    m = mat.copy()
+                    blocks.append((bpy.data.materials, m))
+                    materials[mat] = m
+                    m.use_transparency = False
+                    m.alpha, m.ambient, m.emit = 1.0, 0.0, 0.0
+                    m.use_object_color = False
+                    m.specular_intensity = 0.08
+                    for slot in m.texture_slots:
+                        if slot and slot.texture and slot.texture.type == 'IMAGE':
+                            tex = slot.texture.copy()
+                            blocks.append((bpy.data.textures, tex))
+                            slot.texture = tex
+                            slot.use_map_alpha = False
+                            if slot.use_map_normal and tex.image:
+                                # build_atlas ainda nao passou por finish_pilot: normal nunca e sRGB.
+                                normal = tex.image.copy()
+                                blocks.append((bpy.data.images, normal))
+                                tex.image = normal
+                                normal.colorspace_settings.name = 'Non-Color'
+                ob.data.materials[i] = materials[mat]
+            copies.append(ob)
+        if not _pose_from_game(pose_arm, game_root):
+            _pose_arms_down(pose_arm)
         scene.update()
-        ang = math.radians(12)
-        hc = arm.matrix_world * head.head + Vector((0, 0, 0.06))
-        cam_data.ortho_scale = 0.46
-        cam.location = (hc.x + dist * math.sin(ang), hc.y + dist * math.cos(ang), hc.z)
-        cam.rotation_euler = (math.radians(90), 0, math.radians(180) - ang)
-        # ambiente cinza lava a cor; Sun + Hemi multiplicam a cor da pele e mantem a saturacao
-        sun_data.energy = 1.0
-        sun.rotation_euler = (math.radians(70), 0, math.radians(160))   # de cima e da frente (+Y), um pouco de lado
-        fill_data = bpy.data.lamps.new("CardFill", 'HEMI')
-        fill_data.energy = 0.55
-        fill = bpy.data.objects.new("CardFill", fill_data)
-        scene.objects.link(fill)
-        fill.layers = meshes[0].layers
-        fill.rotation_euler = (math.radians(90), 0, math.radians(180))   # vem da camera (+Y)
-        world.ambient_color = (0.03, 0.03, 0.03)
-        r.resolution_x = r.resolution_y = PHOTO_SIZE
-        r.filepath = photo_path
-        bpy.ops.render.render(write_still=True)
-    for ob in (cam, sun, fill):
-        if ob is None:
-            continue
-        bpy.data.objects.remove(ob, do_unlink=True)
-    scene.world = old_world
-    bpy.data.worlds.remove(world)
-    for m, (amb, spec) in old_mats.items():
-        m.ambient, m.specular_intensity = amb, spec
-    _rest_pose(arm)
-    scene.update()
+        pts = points()
+        zmin, zmax = min(p.z for p in pts), max(p.z for p in pts)
+        angle = math.radians(20)
+        right = Vector((-math.cos(angle), math.sin(angle), 0))
+        xs = [p.dot(right) for p in pts]
+        center = right * ((min(xs)+max(xs))/2)
+        center.z = (zmin+zmax)/2
+        data = bpy.data.cameras.new('CardCamera')
+        blocks.append((bpy.data.cameras, data))
+        data.type = 'ORTHO'
+        data.ortho_scale = max(zmax-zmin, (max(xs)-min(xs))*size[1]/size[0]) * 1.12
+        cam = link(bpy.data.objects.new('CardCamera', data))
+        scene.camera = cam
+        aim(center, angle)
+        world = bpy.data.worlds.new('CardWorld')
+        blocks.append((bpy.data.worlds, world))
+        scene.world = world
+        target = (center.x, center.y, zmax * 0.8)
+        light('CardKey', 'SUN', 0.85, (-3, 5, zmax+3), target)
+        light('CardFill', 'HEMI', 0.35, (3, 4, zmax), target)
+        light('CardRim', 'SUN', 0.45, (2, -4, zmax+2), target)
+        r = scene.render
+        r.engine = 'BLENDER_RENDER'
+        r.resolution_percentage = 100
+        r.alpha_mode = 'TRANSPARENT'
+        r.image_settings.file_format = 'PNG'
+        r.image_settings.color_mode = 'RGBA'
+        r.use_antialiasing = True
+        r.antialiasing_samples = '16'
+        scene.view_settings.view_transform = 'Default'
+        render(path, size, 2)
+        if photo_path:
+            _rest_pose(pose_arm)
+            _pose_arms_down(pose_arm)
+            scene.update()
+            head = next((p for p in pose_arm.pose.bones if p.name.endswith('Head')), None)
+            if head is None:
+                raise ValueError('retrato: esqueleto sem osso Head')
+            pts = points()
+            base = pose_arm.matrix_world * head.head
+            top = max(p.z for p in pts)
+            # Folga no cabelo; escala proporcional a cabeca (adulto/crianca), sem cortar o topo.
+            data.ortho_scale = (top-base.z) * 1.7
+            target = Vector((base.x, base.y, top - data.ortho_scale * 0.46))
+            aim(target, math.radians(8))
+            render(photo_path, (PHOTO_SIZE, PHOTO_SIZE), 4)
+    finally:
+        for ob in reversed(objects):
+            bpy.data.objects.remove(ob, do_unlink=True)
+        bpy.data.scenes.remove(scene)
+        for collection, block in reversed(blocks):
+            collection.remove(block)
     return path
 
 

@@ -424,7 +424,9 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 Plano em [personagem-auto-rig-plan.md](personagem-auto-rig-plan.md) (2026-11-01): ligar malhas do Fuse numa armature
 base do Mixamo sem passar pelo site, com materiais, LOD, ragdoll e grupo num botão. Pipeline completo; no RolimaRacer
 os pilotos são carregados por LibLoad (`scripts/pilotos.py`) e há 9 novos no menu. Falta o aceite com janela e o
-jogador da carreira/cutscene sem ragdoll; passo a passo para pilotos novos no plano.
+jogador da carreira/cutscene sem ragdoll; passo a passo para pilotos novos no plano. Os 18 retratos foram
+regenerados com estúdio isolado/Lanczos e os dois menus validados em background (UV e aspecto corrigidos);
+falta o aceite visual dos retratos pelo usuário.
 
 ### Pistas em arquivos separados (depois)
 

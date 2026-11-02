@@ -8,6 +8,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-01 - Retratos dos pilotos: estúdio isolado, Lanczos e menu sem recorte
+
+- `render_card`: cópias em cena temporária, limpeza em `finally`, materiais opacos e normal Non-Color
+  apenas nas cópias. A transparência anterior a `finish_pilot` causava sobreposição de rosto/cabelo e
+  aparência lavada. Nenhuma alteração no shading dos meshes do jogo ou nos arquivos dos pilotos.
+- Cartão idle em pé com enquadramento integral; foto proporcional à cabeça; três luzes, AA 16,
+  render 1024x2048/1024x1024 e redução Lanczos-3 premultiplicada para 512x1024/256x256.
+- RolimaRacer: corrigidos UV parcial herdado do Fabio e aspecto dos cartões novos; 18 PNGs regenerados,
+  backups e atualização de ambos os menus empacotados. Comparação com três referências antigas em
+  `artifacts/retratos-antes-depois.png`. Guia e procedimentos no [plano](personagem-auto-rig-plan.md).
+- Execução em background: nove estados/arquivos dos pilotos preservados; regressão de sucesso/falha
+  passou; ambos os jogos reabertos e imagens empacotadas/UV/aspecto/referências/cena inicial conferidos.
+  Módulo sincronizado em `build/bin/2.79/scripts/modules/`. Runtime não aberto; aceite visual pendente.
+- `check_docs --fix` sincronizou 53 referências/tamanhos já desatualizados no mapa de gameengine;
+  verificação final sem erros ou avisos.
+
+
+
 ## 2026-11-01 - TAA (anti-aliasing temporal), etapa 1: só movimento da câmera
 
 - Plano em [plano-taa.md](plano-taa.md). Novo passe `FILTERPASS_TAA` (26), depois do Tonemap e antes de FXAA,
