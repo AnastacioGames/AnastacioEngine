@@ -94,6 +94,8 @@ class VIEW3D_HT_header(Header):
         # manipulator toggle it used to sit beside. template_header_3D() also
         # draws the layers grid and the lock-camera-and-layers icon last.
         layout.template_header_3D()
+        # Opções dos gizmos da viewport (Navigate, botões no cabeçalho) ficam sempre no cabeçalho.
+        layout.popover(panel="VIEW3D_PT_gizmo", icon='DOWNARROW_HLT', text="")
         # Cada grupo da barra flutuante vai para o cabeçalho sozinho: jogo (Cook/Play/...) e ferramentas.
         game_in_header = view.show_game_controls_in_header
         tool_in_header = view.show_tool_controls_in_header
@@ -4007,7 +4009,7 @@ class VIEW3D_PT_gizmo(Panel):
         view = context.space_data
         prefs = context.user_preferences.view
 
-        # Blender 5: Viewport Gizmos (navegação) e Object Gizmos (transformação).
+        # Só Viewport Gizmos; mover/girar/escala são botões soltos junto ao toggle do gizmo.
         layout.label(text="Viewport Gizmos")
         row = layout.row(align=True)
         row.prop(prefs, "show_mini_axis", text="Navigate")
@@ -4016,12 +4018,6 @@ class VIEW3D_PT_gizmo(Panel):
         sub.prop(prefs, "mini_axis_size", text="Size")
         layout.prop(view, "show_game_controls_in_header", text="Game Buttons in Header")
         layout.prop(view, "show_tool_controls_in_header", text="Tool Buttons in Header")
-
-        layout.separator()
-        layout.label(text="Object Gizmos")
-        col = layout.column()
-        col.active = view.show_manipulator
-        col.prop(view, "transform_manipulators", expand=True)
 
 
 class VIEW3D_PT_pivot_point(Panel):

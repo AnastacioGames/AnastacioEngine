@@ -482,9 +482,14 @@ void view3d_header_tool_controls(uiLayout *row, bContext *C)
 	uiItemPopoverPanel(row, C, "VIEW3D_PT_object_type_visibility", "", ICON_RESTRICT_VIEW_OFF);
 	uiItemS(row);
 
-	/* Gizmo: toggle + popover com mover/girar/escala (antes eram 3 ícones soltos). */
+	/* Gizmo: toggle + mover/girar/escala lado a lado; as opções da viewport
+	 * (popover VIEW3D_PT_gizmo) ficam sempre no cabeçalho. */
 	uiItemR(row, &v3dptr, "show_manipulator", UI_ITEM_R_TOGGLE, "", ICON_MANIPUL);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_gizmo", "", ICON_DOWNARROW_HLT);
+	{
+		uiLayout *sub = uiLayoutRow(row, true);
+		uiLayoutSetActive(sub, (v3d->twflag & V3D_USE_MANIPULATOR) != 0);
+		uiItemR(sub, &v3dptr, "transform_manipulators", UI_ITEM_R_EXPAND | UI_ITEM_R_ICON_ONLY, "", ICON_NONE);
+	}
 	uiItemS(row);
 
 	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
