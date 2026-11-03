@@ -121,6 +121,9 @@ BL_ArmatureConstraint::~BL_ArmatureConstraint()
 EXP_Value *BL_ArmatureConstraint::GetReplica()
 {
 	BL_ArmatureConstraint *replica = new BL_ArmatureConstraint(*this);
+	/* Sem isto a cópia herdava o proxy Python do original: se um script já tinha tocado nas
+	 * constraints do objeto modelo, as duas liberavam o mesmo PyObject (crash na saída). */
+	replica->ProcessReplica();
 
 	return replica;
 }
