@@ -23,6 +23,13 @@
 #include "RAS_2DFilter.h"
 #include "RAS_2DFilterManager.h"
 #include "RAS_2DFilterOffScreen.h"
+
+static float s_ssgiStrengthScale = 1.0f;
+
+void RAS_2DFilter::SetSSGIStrengthScale(float scale)
+{
+	s_ssgiStrengthScale = scale;
+}
 #include "RAS_Rasterizer.h"
 #include "RAS_ICanvas.h"
 #include "RAS_OffScreen.h"
@@ -820,7 +827,7 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 
 	/* BuildIn Uniforms */
     if (m_predefinedUniforms[GE_SSGI_PARAMETERS_UNIFORM] != -1) {
-        float params[8] = {m_buildInFilters.ssgi_radius, m_buildInFilters.ssgi_strength,
+        float params[8] = {m_buildInFilters.ssgi_radius, m_buildInFilters.ssgi_strength * s_ssgiStrengthScale,
             m_buildInFilters.ssgi_thickness, (float)m_buildInFilters.ssgi_rays,
             (float)m_buildInFilters.ssgi_steps, (float)(m_buildInFilters.ssgi_slot - 1),
             (float)m_buildInFilters.ssgi_divisor, (float)m_buildInFilters.ssgi_denoise};

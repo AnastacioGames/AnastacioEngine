@@ -1,6 +1,7 @@
-"""Probe Volume GI (F1a) test scene: a closed room with a window, a sun, scattered static boxes,
-one dynamic box and an Empty-box "probe_volume". Saves one .range per quality (off/low/med/high)
-in the folder given after "--". The game quits itself after 10 s.
+"""Probe Volume GI test scene: a closed room with a window, a sun, a red and a green wall, scattered
+static boxes, one dynamic box and an Empty-box "probe_volume". Principled materials (Shading Nodes)
+so the grid's diffuse shows. Saves one .range per quality (off/low/med/high) in the folder given
+after "--". The game saves shot_<file>.png next to the .range at 8 s and quits itself after 10 s.
 
   AnastacioEngine.exe -b -P criar_cena_probe_volume.py -- <out_dir>
 """
@@ -16,16 +17,39 @@ QUIT = '''import bge, time
 own = bge.logic.getCurrentController().owner
 if 't0' not in own:
     own['t0'] = time.perf_counter()
-elif time.perf_counter() - own['t0'] > 10.0:
+t = time.perf_counter() - own['t0']
+if t > 8.0 and 'shot' not in own:
+    own['shot'] = True
+    bge.render.makeScreenshot('//shot_' + bge.logic.getCurrentScene().name + '.png')
+if t > 10.0:
     bge.logic.endGame()
 '''
 
 
-def box(name, loc, size, dynamic=False):
+MATS = {}
+
+
+def material(name, color):
+    if name not in MATS:
+        mat = bpy.data.materials.new(name)
+        mat.use_nodes = True
+        nt = mat.node_tree
+        nt.nodes.clear()
+        p = nt.nodes.new('ShaderNodeBsdfPrincipled')
+        p.inputs['Base Color'].default_value = color + (1,)
+        p.inputs['Roughness'].default_value = 0.8
+        out = nt.nodes.new('ShaderNodeOutputMaterial')
+        nt.links.new(p.outputs[0], out.inputs['Surface'])
+        MATS[name] = mat
+    return MATS[name]
+
+
+def box(name, loc, size, dynamic=False, mat=('Gray', (0.6, 0.6, 0.6))):
     bpy.ops.mesh.primitive_cube_add(location=loc)
     ob = bpy.context.object
     ob.name = name
     ob.scale = size
+    ob.data.materials.append(material(*mat))
     if dynamic:
         ob.game.physics_type = 'RIGID_BODY'
     return ob
@@ -35,13 +59,26 @@ def build(quality):
     bpy.ops.wm.read_homefile(use_empty=True)
     scene = bpy.context.scene
     scene.render.engine = 'BLENDER_GAME'
+    scene.name = 'probe_volume_%s' % (quality.lower() if quality else 'off')
+    gs = scene.game_settings
+    gs.use_shading_nodes = True
+    gs.resolution_x, gs.resolution_y = 960, 540
+    gs.vsync = 'OFF'
+    gs.use_frame_rate = False
+    MATS.clear()
+    w = bpy.data.worlds.new('Sky')
+    scene.world = w
+    w.horizon_color = (0.5, 0.65, 0.9)
+    w.zenith_color = (0.2, 0.35, 0.8)
+    w.light_settings.use_environment_light = True
+    w.light_settings.environment_energy = 1.0
     random.seed(1)
 
     box('Floor', (0, 0, -0.1), (10, 10, 0.1))
     box('Ceiling', (0, 0, 4.1), (10, 10, 0.1))
     box('WallN', (0, 10, 2), (10, 0.1, 2))
-    box('WallE', (10, 0, 2), (0.1, 10, 2))
-    box('WallW', (-10, 0, 2), (0.1, 10, 2))
+    box('WallE', (10, 0, 2), (0.1, 10, 2), mat=('Green', (0.1, 0.7, 0.1)))
+    box('WallW', (-10, 0, 2), (0.1, 10, 2), mat=('Red', (0.8, 0.1, 0.1)))
     # South wall with a window gap in the middle.
     box('WallS1', (-6, -10, 2), (4, 0.1, 2))
     box('WallS2', (6, -10, 2), (4, 0.1, 2))

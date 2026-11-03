@@ -40,6 +40,7 @@
 #include "RAS_OffScreen.h"
 #include "RAS_Texture.h"
 #include "RAS_ILightObject.h"
+#include "RAS_2DFilter.h"
 
 #include "DNA_texture_types.h"
 #include "DNA_object_types.h"
@@ -54,6 +55,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
+#include <cstring>
 
 namespace {
 
@@ -95,6 +97,9 @@ KX_TextureRendererManager::~KX_TextureRendererManager()
 		for (KX_TextureRenderer *renderer : m_renderers[i]) {
 			delete renderer;
 		}
+	}
+	if (!m_volumes.empty()) {
+		RAS_2DFilter::SetSSGIStrengthScale(1.0f);
 	}
 	for (KX_ProbeVolume *volume : m_volumes) {
 		delete volume;
@@ -167,7 +172,7 @@ void KX_TextureRendererManager::AddProbe(KX_GameObject *viewpoint, float radius,
 }
 
 void KX_TextureRendererManager::AddProbeVolume(KX_GameObject *box, float spacing, int quality, float clipEnd,
-                                               int ignoreLayers, bool freeze)
+                                               int ignoreLayers, bool freeze, float ssgiWeight)
 {
 #ifdef __EMSCRIPTEN__
 	if (!RAS_FloatRenderTargetSupported()) {
@@ -176,7 +181,8 @@ void KX_TextureRendererManager::AddProbeVolume(KX_GameObject *box, float spacing
 	}
 #endif
 	quality = std::min(std::max(quality, 0), 2);
-	m_volumes.push_back(new KX_ProbeVolume(box, spacing, (KX_ProbeVolume::Quality)quality, clipEnd, ignoreLayers, freeze));
+	m_volumes.push_back(new KX_ProbeVolume(box, spacing, (KX_ProbeVolume::Quality)quality, clipEnd, ignoreLayers, freeze,
+	                                         ssgiWeight));
 }
 
 KX_PlanarReflector *KX_TextureRendererManager::AddPlanarReflector(KX_GameObject *viewpoint, int size, float clipEnd)
@@ -290,6 +296,27 @@ bool KX_TextureRendererManager::FindProbe(const float position[3], ProbeSlot r_s
 		*r_weight2 = worldScore / (bestScore + worldScore);
 	}
 	return true;
+}
+
+float KX_TextureRendererManager::SampleProbeVolume(const float position[3], float r_sh[9][3]) const
+{
+	if (m_capturing || m_volumes.empty()) {
+		return 0.0f;
+	}
+	const mt::vec3 pos(position[0], position[1], position[2]);
+	float best = 0.0f;
+	float sh[9][3];
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (!volume->GetViewpointObject()) {
+			continue;
+		}
+		const float weight = volume->SampleSH(pos, sh);
+		if (weight > best) {
+			best = weight;
+			memcpy(r_sh, sh, sizeof(sh));
+		}
+	}
+	return best;
 }
 
 void KX_TextureRendererManager::CheckWorldChanged()
@@ -451,6 +478,38 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		}
 	}
 	GPU_material_set_linear_capture(false);
+
+	/* Moved objects (doors, lifts, scripted props), checked twice a second: the probes near one that
+	 * moved go first. Same filter as the capture, without the camera culling. */
+	static int moveCheck = 0;
+	if (++moveCheck >= 30) {
+		moveCheck = 0;
+		for (KX_ProbeVolume *volume : m_volumes) {
+			if (!volume->GetViewpointObject()) {
+				continue;
+			}
+			std::vector<KX_GameObject *> objects;
+			for (KX_GameObject *gameobj : m_scene->GetObjectList()) {
+				if (gameobj->GetMeshList().empty() || !gameobj->GetVisible() ||
+				    (gameobj->GetLayer() & volume->GetIgnoreLayers()) || KX_ProbeVolume::SkipObject(gameobj)) {
+					continue;
+				}
+				objects.push_back(gameobj);
+			}
+			volume->CheckMovedObjects(objects);
+		}
+	}
+
+	/* The SSGI adds its light over the grid's: weaker with the camera inside a volume, so it doesn't
+	 * count twice near the camera. */
+	float ssgiScale = 1.0f;
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (volume->GetViewpointObject()) {
+			const float w = volume->BoxWeight(cameraPos);
+			ssgiScale = std::min(ssgiScale, 1.0f + (volume->GetSSGIWeight() - 1.0f) * w);
+		}
+	}
+	RAS_2DFilter::SetSSGIStrengthScale(ssgiScale);
 
 	const double cpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 	if (!log) {

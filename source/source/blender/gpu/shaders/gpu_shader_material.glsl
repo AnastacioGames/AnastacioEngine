@@ -3526,6 +3526,10 @@ uniform vec4 unfprobebox2;
  * is 1; otherwise a few taps on a low mip (realtime probes, WebGL). */
 uniform vec3 unfprobesh[9];
 uniform vec3 unfprobesh2[9];
+/* Probe Volume GI: SH9 of the grid at this object (linear light) and x = its weight over the
+ * diffuse above (0 = outside every volume). The reflection still comes from the cubes. */
+uniform vec3 unfprobegridsh[9];
+uniform vec4 unfprobegrid;
 
 void env_probe_sample(samplerCube cube, vec4 pos, vec4 box, float maxlod, float hassh, vec3 wpos, vec3 wn, vec3 wr, float rough, out vec4 spec, out vec4 diff)
 {
@@ -3590,6 +3594,12 @@ void env_probe_mirror(vec4 mirror, vec4 diffibl, vec3 wn, vec3 wr, float rough, 
 	else {
 		result = mirror;
 		result_diff = diffibl;
+	}
+	if (unfprobegrid.x > 0.0) {
+		vec4 grid = vec4(sh9_eval(-wn, unfprobegridsh[0], unfprobegridsh[1], unfprobegridsh[2], unfprobegridsh[3],
+		                          unfprobegridsh[4], unfprobegridsh[5], unfprobegridsh[6], unfprobegridsh[7],
+		                          unfprobegridsh[8]), 1.0);
+		result_diff = mix(result_diff, grid, unfprobegrid.x);
 	}
 }
 

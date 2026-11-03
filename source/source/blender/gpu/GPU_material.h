@@ -580,6 +580,9 @@ void GPU_material_bind_probe(GPUMaterial *material, struct GPUTexture *cube, flo
                              const float (*sh)[3]);
 void GPU_material_bind_probe2(GPUMaterial *material, struct GPUTexture *cube, float maxlod, const float center[3], float radius, const float box[3],
                               const float (*sh)[3], float weight);
+/* Probe Volume GI: the grid's SH9 (linear light, interpolated at the object) replaces the probes'
+ * diffuse with weight (0 = no volume, sh may be NULL). */
+void GPU_material_bind_probe_grid(GPUMaterial *material, const float (*sh)[3], float weight);
 /* Binds the planar reflector's 2D render target and its capturing camera's projection*view matrix
  * (row-major float[16], as mt::mat4::Data() gives) for the Planar Reflection node. tex = NULL when
  * no KX_PlanarReflector exists for this object (node present but not Enabled, or not yet captured):

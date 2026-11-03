@@ -61,9 +61,12 @@ static double ms_since(std::chrono::steady_clock::time_point start)
 	return std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 }
 
-KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality quality, float clipEnd, int ignoreLayers, bool freeze)
+KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality quality, float clipEnd, int ignoreLayers, bool freeze,
+                               float ssgiWeight)
 	:KX_CubeMap(volume_env(clipEnd, ignoreLayers), box),
 	m_spacing(spacing),
+	m_clipEnd(clipEnd),
+	m_ssgiWeight(ssgiWeight),
 	m_cube(nullptr),
 	m_current(-1),
 	m_nextFace(0),
@@ -103,6 +106,8 @@ KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality qualit
 	}
 
 	const mt::vec3 center = box->NodeGetWorldPosition();
+	m_min = center - half;
+	m_max = center + half;
 	for (int z = 0; z < m_dims[2]; z++) {
 		for (int y = 0; y < m_dims[1]; y++) {
 			for (int x = 0; x < m_dims[0]; x++) {
@@ -114,6 +119,7 @@ KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality qualit
 				memset(probe.sh, 0, sizeof(probe.sh));
 				probe.valid = false;
 				probe.lastFrame = -1;
+				probe.dirty = false;
 				m_probes.push_back(probe);
 			}
 		}
@@ -195,6 +201,9 @@ int KX_ProbeVolume::PickNextProbe(const mt::vec3& cameraPos) const
 		float key = dist - (float)std::min(age, 2 * cycleFrames) / (float)cycleFrames;
 		if (age >= 2 * cycleFrames) {
 			key = dist - 1000.0f;
+		}
+		else if (probe.dirty) {
+			key = dist - 500.0f;
 		}
 		if (best == -1 || key < bestKey) {
 			best = i;
@@ -307,12 +316,103 @@ void KX_ProbeVolume::FacesDone(int count, double now)
 
 	reader->probe = m_current;
 	m_probes[m_current].lastFrame = m_frame;
+	m_probes[m_current].dirty = false;
 	m_current = -1;
 	m_stats.probesDone++;
 	if (++m_cycleDone % (int)m_probes.size() == 0) {
 		m_stats.lastCycleSeconds = now - m_cycleStart;
 		m_cycleStart = now;
 	}
+}
+
+float KX_ProbeVolume::BoxWeight(const mt::vec3& pos) const
+{
+	float outside = 0.0f;
+	for (int i = 0; i < 3; i++) {
+		outside = std::max(outside, std::max(m_min[i] - pos[i], pos[i] - m_max[i]));
+	}
+	return std::min(std::max(1.0f - outside / (0.5f * m_spacing), 0.0f), 1.0f);
+}
+
+float KX_ProbeVolume::SampleSH(const mt::vec3& pos, float r_sh[9][3]) const
+{
+	const float weight = BoxWeight(pos);
+	if (weight <= 0.0f) {
+		return 0.0f;
+	}
+
+	int i0[3];
+	float f[3];
+	for (int i = 0; i < 3; i++) {
+		const float size = std::max(m_max[i] - m_min[i], 1e-4f);
+		const float t = std::min(std::max((pos[i] - m_min[i]) / size, 0.0f), 1.0f) * (float)(m_dims[i] - 1);
+		i0[i] = std::min((int)t, m_dims[i] - 2);
+		f[i] = t - (float)i0[i];
+	}
+
+	memset(r_sh, 0, sizeof(float) * 27);
+	float sum = 0.0f;
+	for (int c = 0; c < 8; c++) {
+		const int x = i0[0] + (c & 1), y = i0[1] + ((c >> 1) & 1), z = i0[2] + ((c >> 2) & 1);
+		const Probe& probe = m_probes[(z * m_dims[1] + y) * m_dims[0] + x];
+		if (!probe.valid) {
+			continue;
+		}
+		const float w = ((c & 1) ? f[0] : 1.0f - f[0]) * (((c >> 1) & 1) ? f[1] : 1.0f - f[1]) *
+		                (((c >> 2) & 1) ? f[2] : 1.0f - f[2]);
+		if (w <= 0.0f) {
+			continue;
+		}
+		for (int k = 0; k < 9; k++) {
+			for (int ch = 0; ch < 3; ch++) {
+				r_sh[k][ch] += probe.sh[k][ch] * w;
+			}
+		}
+		sum += w;
+	}
+	if (sum < 1e-4f) {
+		return 0.0f;
+	}
+	for (int k = 0; k < 9; k++) {
+		for (int ch = 0; ch < 3; ch++) {
+			r_sh[k][ch] /= sum;
+		}
+	}
+	// While some of the 8 are not read yet the grid fades in over the old diffuse.
+	return weight * std::min(sum, 1.0f);
+}
+
+float KX_ProbeVolume::GetSSGIWeight() const
+{
+	return m_ssgiWeight;
+}
+
+void KX_ProbeVolume::CheckMovedObjects(const std::vector<KX_GameObject *>& objects)
+{
+	std::unordered_map<KX_GameObject *, mt::vec3> positions;
+	positions.reserve(objects.size());
+	for (KX_GameObject *gameobj : objects) {
+		const mt::vec3 pos = gameobj->NodeGetWorldPosition();
+		const auto it = m_objectPos.find(gameobj);
+		if (it == m_objectPos.end()) {
+			positions[gameobj] = pos;
+			continue;
+		}
+		if ((pos - it->second).Length() <= 0.25f) {
+			positions[gameobj] = it->second;
+			continue;
+		}
+		positions[gameobj] = pos;
+		/* The probes that see it (old or new place) are recaptured first; frozen grids stay as
+		 * they are. */
+		for (Probe& probe : m_probes) {
+			if ((probe.position - pos).Length() <= m_clipEnd || (probe.position - it->second).Length() <= m_clipEnd) {
+				probe.dirty = true;
+			}
+		}
+	}
+	// Objects gone (or out of reach) drop out; a new object at a reused address only marks too much.
+	m_objectPos.swap(positions);
 }
 
 bool KX_ProbeVolume::SkipObject(KX_GameObject *gameobj)

@@ -257,6 +257,9 @@ public:
 
 	BuildInFilters *GetBuildInFilters();
 
+	/// Factor over the SSGI strength, set each frame by the Probe Volume GI (1 = no volume).
+	static void SetSSGIStrengthScale(float scale);
+
 	void SetFrameInputs(const FrameInputs *inputs)
 	{
 		m_frameInputs = inputs;

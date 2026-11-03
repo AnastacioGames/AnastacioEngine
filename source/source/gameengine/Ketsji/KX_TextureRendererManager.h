@@ -108,7 +108,8 @@ public:
 	void AddProbe(KX_GameObject *viewpoint, float radius, int size, float clipEnd, bool realtime);
 	/** Add a Probe Volume GI grid inside the box Empty. quality: 0 Low, 1 Medium, 2 High.
 	 * Not added on the web without half float render targets (RGBA8 clips the light). */
-	void AddProbeVolume(KX_GameObject *box, float spacing, int quality, float clipEnd, int ignoreLayers, bool freeze);
+	void AddProbeVolume(KX_GameObject *box, float spacing, int quality, float clipEnd, int ignoreLayers, bool freeze,
+	                    float ssgiWeight);
 	/// Capture the World background (node World of Game PBR) to a cube map once, at game start.
 	void AddWorldProbe(int size);
 
@@ -137,6 +138,10 @@ public:
 	 * Falls back to the captured World. Returns false when none applies (the World reflection is used).
 	 */
 	bool FindProbe(const float position[3], ProbeSlot r_slots[2], float *r_weight2) const;
+
+	/** Probe Volume GI at position: the SH9 of the volume that holds it best (linear light). Returns
+	 * its weight over the probes' diffuse, 0 outside every volume and during the captures. */
+	float SampleProbeVolume(const float position[3], float r_sh[9][3]) const;
 
 	/** Execute all the texture renderer.
 	 * \param category The category of renderers to render.

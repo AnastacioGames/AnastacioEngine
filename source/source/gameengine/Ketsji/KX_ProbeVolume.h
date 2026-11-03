@@ -29,6 +29,7 @@
 
 #include "KX_CubeMap.h"
 
+#include <unordered_map>
 #include <vector>
 
 struct GPUTexture;
@@ -50,6 +51,8 @@ public:
 		bool valid;
 		/// Frame of the last finished capture, -1 = never.
 		int lastFrame;
+		/// An object near it moved: goes before the up-to-date probes (after the overdue ones).
+		bool dirty;
 	};
 
 	/// Counters for RANGE_PROBE_VOLUME_LOG, reset by the manager after printing.
@@ -78,6 +81,14 @@ private:
 	std::vector<Probe> m_probes;
 	int m_dims[3];
 	float m_spacing;
+	/// Box corners of the grid (first and last probe), fixed at creation.
+	mt::vec3 m_min;
+	mt::vec3 m_max;
+	float m_clipEnd;
+	/// SSGI strength factor with the camera inside the volume (the grid already gives the indirect light).
+	float m_ssgiWeight;
+	/// Position of each captured object at its last check: moving it past 0.25 m marks the probes near it.
+	std::unordered_map<KX_GameObject *, mt::vec3> m_objectPos;
 	/// Cube shared by every probe of the grid, reused as soon as its readback is requested.
 	GPUTexture *m_cube;
 	Reader m_readers[NUM_READERS];
@@ -105,7 +116,8 @@ public:
 	/** \param box Empty drawn as Cube: its box (display size * scale) holds the grid.
 	 * \param spacing Wanted distance between probes, grows until the grid fits the quality limit.
 	 */
-	KX_ProbeVolume(KX_GameObject *box, float spacing, Quality quality, float clipEnd, int ignoreLayers, bool freeze);
+	KX_ProbeVolume(KX_GameObject *box, float spacing, Quality quality, float clipEnd, int ignoreLayers, bool freeze,
+	               float ssgiWeight);
 	virtual ~KX_ProbeVolume();
 
 	virtual std::string GetName();
@@ -123,6 +135,16 @@ public:
 	bool NextFaceRange(int budget, const mt::vec3& cameraPos, int *r_first, int *r_count);
 	/// After rendering r_count faces: a probe with its 6 faces done asks its SH9 readback.
 	void FacesDone(int count, double now);
+
+	/** Trilinear SH9 of the 8 probes around pos (only the read ones). Returns its weight: 1 inside
+	 * the box, fading to 0 half a spacing outside it, and lower while the probes around are not read yet. */
+	float SampleSH(const mt::vec3& pos, float r_sh[9][3]) const;
+	/// 1 inside the box, 0 from half a spacing outside it.
+	float BoxWeight(const mt::vec3& pos) const;
+	float GetSSGIWeight() const;
+	/** Moved objects: compares the objects the grid captures with their last position and puts the
+	 * probes within clip end of one that moved more than 0.25 m first in the queue. */
+	void CheckMovedObjects(const std::vector<KX_GameObject *>& objects);
 
 	/// True for objects the grid must not capture (moving physics, deformed mesh, probe_volume_skip).
 	static bool SkipObject(KX_GameObject *gameobj);

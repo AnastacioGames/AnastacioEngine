@@ -3954,7 +3954,7 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 	 * property (probe spacing in m, 0 = 4) holds a grid of diffuse probes. Optional:
 	 * "probe_volume_quality" (0/1/2 or Low/Medium/High, default Medium), "probe_volume_clip_end"
 	 * (default 30), "probe_volume_ignore_layers" (layer bits) and "probe_volume_freeze" (capture
-	 * one cycle and stop). Moving physics, deformed meshes and "probe_volume_skip" objects stay out. */
+	 * one cycle and stop), "probe_volume_ssgi" (SSGI strength with the camera inside, default 0.5). Moving physics, deformed meshes and "probe_volume_skip" objects stay out. */
 	for (KX_GameObject *gameobj : sumolist) {
 		EXP_Value *spacingProp = gameobj->GetProperty("probe_volume");
 		if (!spacingProp) {
@@ -3987,8 +3987,10 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		const int ignoreLayers = layersProp ? (int)layersProp->GetNumber() : 0;
 		EXP_Value *freezeProp = gameobj->GetProperty("probe_volume_freeze");
 		const bool freeze = freezeProp && freezeProp->GetNumber() != 0.0;
+		EXP_Value *ssgiProp = gameobj->GetProperty("probe_volume_ssgi");
+		const float ssgiWeight = ssgiProp ? (std::min)((std::max)((float)ssgiProp->GetNumber(), 0.0f), 1.0f) : 0.5f;
 
-		kxscene->GetTextureRendererManager()->AddProbeVolume(gameobj, spacing, quality, clipEnd, ignoreLayers, freeze);
+		kxscene->GetTextureRendererManager()->AddProbeVolume(gameobj, spacing, quality, clipEnd, ignoreLayers, freeze, ssgiWeight);
 	}
 
 	/* Planar Reflection material node (Shader Editor): each object whose own material has the node

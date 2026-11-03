@@ -536,6 +536,8 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->probebox2loc = GPU_shader_get_uniform(shader, "unfprobebox2");
 		material->probeshloc = GPU_shader_get_uniform(shader, "unfprobesh");
 		material->probesh2loc = GPU_shader_get_uniform(shader, "unfprobesh2");
+		material->probegridshloc = GPU_shader_get_uniform(shader, "unfprobegridsh");
+		material->probegridloc = GPU_shader_get_uniform(shader, "unfprobegrid");
 		material->planarteximgloc = GPU_shader_get_uniform(shader, "unfplanartex");
 		material->planarviewprojloc = GPU_shader_get_uniform(shader, "unfplanarviewproj");
 		material->planarenabledloc = GPU_shader_get_uniform(shader, "unfplanarenabled");
@@ -852,6 +854,7 @@ void GPU_material_bind(
 		GPU_pass_bind(material->pass, time, mipmap);
 		material->probe_absent_valid[0] = false;
 		material->probe_absent_valid[1] = false;
+		material->probegrid_absent_valid = false;
 		material->objectlay_valid = false;
 		material->invcache_valid = false;
 
@@ -6341,6 +6344,25 @@ void GPU_material_bind_probe2(GPUMaterial *material, GPUTexture *cube, float max
 	if (material->probebox2loc != -1) {
 		GPU_shader_uniform_vector(shader, material->probebox2loc, 4, 1, ext);
 	}
+}
+
+void GPU_material_bind_probe_grid(GPUMaterial *material, const float (*sh)[3], float weight)
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || material->probegridloc == -1) {
+		return;
+	}
+	const bool absent = !(sh && weight > 0.0f);
+	if (absent && material->probegrid_absent_valid) {
+		return;
+	}
+	material->probegrid_absent_valid = absent;
+
+	const float info[4] = {absent ? 0.0f : weight, 0.0f, 0.0f, 0.0f};
+	if (!absent && material->probegridshloc != -1) {
+		GPU_shader_uniform_vector(shader, material->probegridshloc, 3, 9, sh[0]);
+	}
+	GPU_shader_uniform_vector(shader, material->probegridloc, 4, 1, info);
 }
 
 /* Binds the planar reflector for the Planar Reflection node (NULL = none: no KX_PlanarReflector

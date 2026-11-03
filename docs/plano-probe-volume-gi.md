@@ -1,6 +1,6 @@
 # Plano: Probe Volume GI (luz indireta por grade de sondas)
 
-Status: F1a escrita e compilada em 2026-11-03 (KX_ProbeVolume, captura parcial, luz linear, log RANGE_PROBE_VOLUME_LOG); falta medir com cena de teste. Próximo: F1b.
+Status: F1a medida e commitada (6903b915). F1b escrita em 2026-11-03: SH9 trilinear por objeto, peso do SSGI no volume, prioridade para objeto movido; falta aceite visual com janela. Próximo: F2.
 
 ## Contexto
 A ideia é ter luz indireta dinâmica, que acompanhe dia/noite, lanternas e portas e funcione fora da tela, onde o SSGI não chega. O caminho é uma grade automática de sondas atualizada aos poucos (no estilo DDGI, mas capturando por rasterização), que se liga e desliga. O rascunho anterior (docs/plano-probe-volume-gi.md) não foi gravado. Esta revisão confere cada ponto dele contra o código atual. Nada será executado hoje: o único entregável é o plano, que depois vai para `docs/plano-probe-volume-gi.md`.
@@ -159,3 +159,11 @@ Conferido em `KX_TextureRendererManager`, `KX_LightProbe`, `BL_BlenderShader::Up
 8. **Propriedades no Empty** (padrão das sondas): `probe_volume` (espaçamento em m, 0 = 4),
    `probe_volume_quality` (Low/Med/High), `probe_volume_clip_end`, `probe_volume_freeze`. Tamanho do
    volume = Empty desenhado como Cube (meia extensão = display size × escala), como o parallax em caixa.
+
+## F1b (2026-11-03)
+
+- `KX_ProbeVolume::SampleSH`: SH9 trilinear das 8 sondas em volta do centro do objeto (só as já lidas, renormalizado). Peso 1 dentro da caixa, cai a 0 meio espaçamento fora dela, e menor enquanto as 8 não foram lidas.
+- Material: uniforms `unfprobegridsh[9]` e `unfprobegrid` (sem variante); no fim de `env_probe_mirror`, depois do `srgb_to_linearrgb` das sondas, o SH9 da grade substitui o difuso pelo peso. O reflexo continua dos cubos. O texto do shader mudou, então o cache de shaders do .cooked recompila uma vez.
+- SSGI: força × `probe_volume_ssgi` (padrão 0,5) com a câmera dentro do volume, com transição na borda (`RAS_2DFilter::SetSSGIStrengthScale`).
+- Objetos movidos: a cada 30 quadros, objeto capturado que andou mais de 0,25 m marca como prioridade as sondas a até `clip_end` dele (abaixo das sondas atrasadas, para não travar as longe).
+- Cena de teste agora usa Principled (Shading Nodes), World, paredes vermelha e verde, e salva `shot_<cena>.png` em 8 s. Medium: CPU da grade 0,61-0,66 ms/quadro, sem erro de shader. O teto e os lados das caixas, antes quase pretos, recebem a luz rebatida.
