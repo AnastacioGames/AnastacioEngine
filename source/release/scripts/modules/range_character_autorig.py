@@ -260,8 +260,54 @@ def fit_skeleton(arm, base_source, objects):
                 s = 1.0 if p.x > 0 else -1.0
                 if abs(p.x) > sh:
                     p.x = s * (sh + (abs(p.x) - sh) * k)
+    center_arm_bones(eb, objects)
     bpy.ops.object.mode_set(mode='OBJECT')
     return new_arm
+
+
+def _arm_center(verts, x, near, band=0.025, reach=0.15):
+    """Centro (y, z) da seção do braço em x: vértices perto do osso, só a fatia fina em x."""
+    s = [v for v in verts if abs(v.x - x) < band and abs(v.z - near.z) < reach and abs(v.y - near.y) < reach]
+    if len(s) < 4:
+        return None
+    return Vector((0.0, (min(v.y for v in s) + max(v.y for v in s)) / 2, (min(v.z for v in s) + max(v.z for v in s)) / 2))
+
+
+def center_arm_bones(eb, objects):
+    """Leva braço, antebraço e mão (com dedos) ao centro da seção da malha, em Y e Z.
+
+    fit_skeleton só estica em X; ombro alto ou braço grosso deixavam o osso na pele (Aldebaran: 6 cm abaixo).
+    Na base do Mixamo o osso já fica no centro da seção (2-3 mm), então o alvo é o centro direto."""
+    core = [o for o in objects if o.name.split(".")[0].lower() not in ACCESSORIES] or objects
+    verts = world_verts(core)
+    for side in ("Left", "Right"):
+        chain = ["mixamorig:%s%s" % (side, n) for n in ("Arm", "ForeArm", "Hand")]
+        if not all(n in eb for n in chain):
+            continue
+        deltas = []
+        for i, n in enumerate(chain):
+            h = eb[n].head
+            # No ombro a fatia pegaria o tronco: mede um pouco para fora, no começo do braço.
+            off = (0.08 if h.x > 0 else -0.08) if i == 0 else 0.0
+            c = _arm_center(verts, h.x + off, h)
+            deltas.append(Vector((0.0, c.y - h.y, c.z - h.z)) if c else (deltas[-1] if deltas else Vector()))
+        # Ossos conectados: mover a ponta do pai já leva a cabeça do filho, então soma a partir do original.
+        moves = []
+        for b in eb:
+            if side not in b.name or not any(t in b.name for t in ("Arm", "Hand")):
+                continue
+            if b.name == chain[0]:
+                d_head, d_tail = deltas[0], deltas[1]
+            elif b.name == chain[1]:
+                d_head, d_tail = deltas[1], deltas[2]
+            else:
+                d_head = d_tail = deltas[2]
+            moves.append((b, b.head + d_head, b.tail + d_tail))
+        sh = eb.get("mixamorig:%sShoulder" % side)
+        if sh is not None:
+            moves.append((sh, sh.head.copy(), sh.tail + deltas[0]))
+        for b, head, tail in moves:
+            b.head, b.tail = head, tail
 
 
 # -- Pesos ------------------------------------------------------------------------------------------------
