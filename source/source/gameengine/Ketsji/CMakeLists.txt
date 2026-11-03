@@ -104,6 +104,7 @@ set(SRC
 	KX_ConstraintWrapper.cpp
 	KX_CubeMap.cpp
 	KX_LightProbe.cpp
+	KX_ProbeVolume.cpp
 	KX_ConsoleWindow.cpp
 	KX_CullingHandler.cpp
 	KX_AudioManager.cpp
@@ -235,6 +236,7 @@ set(SRC
 	KX_ConsoleWindow.h
 	KX_CubeMap.h
 	KX_LightProbe.h
+	KX_ProbeVolume.h
 	KX_CullingHandler.h
 	KX_AudioManager.h
 	KX_CutsceneManager.h

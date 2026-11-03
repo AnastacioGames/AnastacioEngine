@@ -201,6 +201,11 @@ float game_filmic_curve(float c, float contrast)
 
 void game_view_transform(vec4 col_from, float exposure, float gamma, float contrast, out vec4 col_to)
 {
+	/* contrast < 0: Probe Volume GI capture, which keeps linear light. */
+	if (contrast < 0.0) {
+		col_to = col_from;
+		return;
+	}
 	vec3 c = col_from.rgb * exp2(exposure);
 	vec3 d;
 	if (contrast > 0.0)

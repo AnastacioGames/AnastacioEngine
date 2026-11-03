@@ -728,7 +728,7 @@ static void gpu_cube_project_sh9(const float *rgba, int w, float r_coef[9][3])
  * the projection runs some frames later, when the fence says the copy is done, so nothing stalls. */
 struct GPUCubeSH9Reader {
 	GLuint pbo;
-	GLuint fbo; /* WebGL has no glGetTexImage: faces are read through a framebuffer */
+	GLuint fbo; /* faces are read through a framebuffer (faster than glGetTexImage, and WebGL has none) */
 	GLsync fence;
 	int w;
 	size_t size;
@@ -785,7 +785,11 @@ bool GPU_cube_sh9_reader_request(GPUCubeSH9Reader *reader, GPUTexture *tex)
 	reader->is_float = is_float;
 #endif
 	glPixelStorei(GL_PACK_ALIGNMENT, 4);
-#ifdef __EMSCRIPTEN__
+#ifndef __EMSCRIPTEN__
+	const bool is_float = true;
+#endif
+	/* Read through a framebuffer, on desktop too: glGetTexImage of the half float cube into the PBO
+	 * cost ~0.55 ms of CPU per request there, glReadPixels ~0.03 ms (Probe Volume GI, 2026-11-03). */
 	GLint prev = 0;
 	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &prev);
 	if (!reader->fbo) {
@@ -799,13 +803,6 @@ bool GPU_cube_sh9_reader_request(GPUCubeSH9Reader *reader, GPUTexture *tex)
 	}
 	glFramebufferTexture2D(GL_READ_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X, 0, 0);
 	glBindFramebuffer(GL_READ_FRAMEBUFFER, prev);
-#else
-	glBindTexture(GL_TEXTURE_CUBE_MAP, tex->bindcode);
-	for (int f = 0; f < 6; f++) {
-		glGetTexImage(GL_TEXTURE_CUBE_MAP_POSITIVE_X + f, lod, GL_RGBA, GL_FLOAT, (void *)(f * face));
-	}
-	glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-#endif
 	glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
 	reader->fence = glFenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
 	glFlush();

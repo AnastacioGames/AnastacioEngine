@@ -3950,6 +3950,47 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		kxscene->GetTextureRendererManager()->AddProbe(gameobj, radius, size, clipEnd, realtime);
 	}
 
+	/* Probe Volume GI (docs/plano-probe-volume-gi.md): an Empty drawn as Cube with a "probe_volume"
+	 * property (probe spacing in m, 0 = 4) holds a grid of diffuse probes. Optional:
+	 * "probe_volume_quality" (0/1/2 or Low/Medium/High, default Medium), "probe_volume_clip_end"
+	 * (default 30), "probe_volume_ignore_layers" (layer bits) and "probe_volume_freeze" (capture
+	 * one cycle and stop). Moving physics, deformed meshes and "probe_volume_skip" objects stay out. */
+	for (KX_GameObject *gameobj : sumolist) {
+		EXP_Value *spacingProp = gameobj->GetProperty("probe_volume");
+		if (!spacingProp) {
+			continue;
+		}
+		float spacing = (float)spacingProp->GetNumber();
+		if (spacing <= 0.0f) {
+			spacing = 4.0f;
+		}
+		spacing = (std::max)(spacing, 0.25f);
+		int quality = 1;
+		if (EXP_Value *qualityProp = gameobj->GetProperty("probe_volume_quality")) {
+			const std::string text = qualityProp->GetText();
+			if (text == "Low" || text == "low") {
+				quality = 0;
+			}
+			else if (text == "High" || text == "high") {
+				quality = 2;
+			}
+			else if (text == "Medium" || text == "medium" || text == "Med") {
+				quality = 1;
+			}
+			else {
+				quality = (int)qualityProp->GetNumber();
+			}
+		}
+		EXP_Value *clipProp = gameobj->GetProperty("probe_volume_clip_end");
+		const float clipEnd = (clipProp && clipProp->GetNumber() > 0.1) ? (float)clipProp->GetNumber() : 30.0f;
+		EXP_Value *layersProp = gameobj->GetProperty("probe_volume_ignore_layers");
+		const int ignoreLayers = layersProp ? (int)layersProp->GetNumber() : 0;
+		EXP_Value *freezeProp = gameobj->GetProperty("probe_volume_freeze");
+		const bool freeze = freezeProp && freezeProp->GetNumber() != 0.0;
+
+		kxscene->GetTextureRendererManager()->AddProbeVolume(gameobj, spacing, quality, clipEnd, ignoreLayers, freeze);
+	}
+
 	/* Planar Reflection material node (Shader Editor): each object whose own material has the node
 	 * with Enable on gets its own KX_PlanarReflector, mirrored through that object's plane -- "this
 	 * object uses its own material as a planar mirror", same association the legacy EnvMap/ENV_REALT

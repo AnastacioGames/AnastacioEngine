@@ -1824,9 +1824,20 @@ static void gpu_world_atmosphere_links(GPUMaterial *mat, World *wo, GPUNodeLink 
  * caminho mantem a conversao sRGB pura de sempre. Valores lidos na compilacao
  * do shader; exposure/gamma usam ponteiros da cena. */
 /* Contraste do view transform da cena: 0 = Standard; >0 = inclinacao da curva Filmic no cinza medio. */
+static float contrast_table[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f, 2.25f};
+
+/* Probe Volume GI captures linear light: a negative contrast makes game_view_transform return the
+ * color untouched. The materials read the table through uniform pointers, so no shader changes. */
+void GPU_material_set_linear_capture(bool linear)
+{
+	static const float display[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f, 2.25f};
+	for (int i = 0; i < 8; i++) {
+		contrast_table[i] = linear ? -1.0f : display[i];
+	}
+}
+
 static float *gpu_view_transform_contrast(const ColorManagedViewSettings *vs)
 {
-	static float contrast_table[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f, 2.25f};
 	int idx = 0;
 
 	if (STREQ(vs->view_transform, "Filmic")) {

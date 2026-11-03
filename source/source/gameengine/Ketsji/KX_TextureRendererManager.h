@@ -34,6 +34,7 @@ class KX_Camera;
 class KX_Scene;
 class KX_TextureRenderer;
 class KX_LightProbe;
+class KX_ProbeVolume;
 class KX_PlanarReflector;
 
 class RAS_Rasterizer;
@@ -70,13 +71,20 @@ private:
 	float m_worldSignature[16];
 	/// True while a renderer captures: materials then skip probes (no feedback into the cube map).
 	bool m_capturing;
+	/// Probe Volume GI grids, owned here (not in m_renderers: they capture a few faces per frame).
+	std::vector<KX_ProbeVolume *> m_volumes;
+
+	/// Run the probe volume schedulers: a budget of cube faces per frame for each grid.
+	void RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area);
 
 	/// Render a texture renderer, return true if the render was proceeded.
 	/// Ask a new World capture when its colors, sun or exposure changed since the last one.
 	void CheckWorldChanged();
 
+	/// firstFace/numFaces: face range of a partial capture (probe volume), which also skips NeedUpdate.
 	bool RenderRenderer(RAS_Rasterizer *rasty, KX_TextureRenderer *renderer,
-						KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area);
+						KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area,
+						int firstFace = 0, int numFaces = -1);
 
 public:
 	enum RendererType {
@@ -98,6 +106,9 @@ public:
 
 	/// Add a local reflection probe captured from the viewpoint object.
 	void AddProbe(KX_GameObject *viewpoint, float radius, int size, float clipEnd, bool realtime);
+	/** Add a Probe Volume GI grid inside the box Empty. quality: 0 Low, 1 Medium, 2 High.
+	 * Not added on the web without half float render targets (RGBA8 clips the light). */
+	void AddProbeVolume(KX_GameObject *box, float spacing, int quality, float clipEnd, int ignoreLayers, bool freeze);
 	/// Capture the World background (node World of Game PBR) to a cube map once, at game start.
 	void AddWorldProbe(int size);
 

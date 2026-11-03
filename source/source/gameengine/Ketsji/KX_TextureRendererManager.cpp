@@ -31,6 +31,7 @@
 #include "KX_PlanarMap.h"
 #include "KX_PlanarReflector.h"
 #include "KX_LightProbe.h"
+#include "KX_ProbeVolume.h"
 #include "KX_GameObject.h"
 #include "KX_LightObject.h"
 #include "KX_WorldInfo.h"
@@ -43,8 +44,16 @@
 #include "DNA_texture_types.h"
 #include "DNA_object_types.h"
 
+#include "GPU_material.h"
+
+#ifdef __EMSCRIPTEN__
+#  include "RAS_WebGLCompat.h"
+#endif
+
 #include "CM_Message.h"
 #include <algorithm>
+#include <chrono>
+#include <cstdlib>
 
 namespace {
 
@@ -87,6 +96,9 @@ KX_TextureRendererManager::~KX_TextureRendererManager()
 			delete renderer;
 		}
 	}
+	for (KX_ProbeVolume *volume : m_volumes) {
+		delete volume;
+	}
 
 	m_camera->Release();
 }
@@ -98,6 +110,11 @@ void KX_TextureRendererManager::InvalidateViewpoint(KX_GameObject *gameobj)
 			if (renderer->GetViewpointObject() == gameobj) {
 				renderer->SetViewpointObject(nullptr);
 			}
+		}
+	}
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (volume->GetViewpointObject() == gameobj) {
+			volume->SetViewpointObject(nullptr);
 		}
 	}
 }
@@ -147,6 +164,19 @@ void KX_TextureRendererManager::AddProbe(KX_GameObject *viewpoint, float radius,
 	KX_LightProbe *probe = new KX_LightProbe(viewpoint, radius, size, clipEnd, realtime);
 	m_renderers[VIEWPORT_INDEPENDENT].push_back(probe);
 	m_probes.push_back(probe);
+}
+
+void KX_TextureRendererManager::AddProbeVolume(KX_GameObject *box, float spacing, int quality, float clipEnd,
+                                               int ignoreLayers, bool freeze)
+{
+#ifdef __EMSCRIPTEN__
+	if (!RAS_FloatRenderTargetSupported()) {
+		CM_Warning("probe volume \"" << box->GetName() << "\": off, the browser can't render to half float");
+		return;
+	}
+#endif
+	quality = std::min(std::max(quality, 0), 2);
+	m_volumes.push_back(new KX_ProbeVolume(box, spacing, (KX_ProbeVolume::Quality)quality, clipEnd, ignoreLayers, freeze));
 }
 
 KX_PlanarReflector *KX_TextureRendererManager::AddPlanarReflector(KX_GameObject *viewpoint, int size, float clipEnd)
@@ -293,13 +323,16 @@ void KX_TextureRendererManager::CheckWorldChanged()
 }
 
 bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_TextureRenderer *renderer,
-                                               KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area)
+                                               KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area,
+                                               int firstFace, int numFaces)
 {
 	KX_GameObject *viewpoint = renderer->GetViewpointObject();
 	// The World capture has no viewpoint and draws only the background.
 	const bool worldOnly = (renderer == m_worldProbe);
+	// A partial capture is scheduled by its probe volume, not by NeedUpdate.
+	const bool partial = (numFaces >= 0);
 	// Doesn't need (or can) update.
-	if (!renderer->NeedUpdate() || !renderer->GetEnabled() || (!viewpoint && !worldOnly)) {
+	if ((!partial && !renderer->NeedUpdate()) || !renderer->GetEnabled() || (!viewpoint && !worldOnly)) {
 		return false;
 	}
 
@@ -335,7 +368,8 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 	renderer->BeginRender(rasty);
 	KX_TextureRendererEndGuard endRenderGuard(renderer, rasty);
 
-	for (unsigned short i = 0; i < renderer->GetNumFaces(); ++i) {
+	const int endFace = partial ? std::min(firstFace + numFaces, (int)renderer->GetNumFaces()) : renderer->GetNumFaces();
+	for (unsigned short i = firstFace; i < endFace; ++i) {
 		// Set camera settings unique per faces.
 		if (!renderer->SetupCameraFace(m_camera, i)) {
 			continue;
@@ -361,7 +395,12 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 			continue;
 		}
 
-		const std::vector<KX_GameObject *> objects = m_scene->CalculateVisibleMeshes(m_camera, RAS_Rasterizer::RAS_STEREO_LEFTEYE, ~renderer->GetIgnoreLayers(), false);
+		std::vector<KX_GameObject *> objects = m_scene->CalculateVisibleMeshes(m_camera, RAS_Rasterizer::RAS_STEREO_LEFTEYE, ~renderer->GetIgnoreLayers(), false);
+		if (partial) {
+			// The grid keeps static light: moving physics and deformed meshes stay out.
+			objects.erase(std::remove_if(objects.begin(), objects.end(), KX_ProbeVolume::SkipObject), objects.end());
+			static_cast<KX_ProbeVolume *>(renderer)->GetStats().objects += (int)objects.size();
+		}
 
 		/* Updating the lod per face is normally not expensive because a cube map normally show every objects
 		 * but here we update only visible object of a face including the clip end and start.
@@ -385,11 +424,67 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 	return true;
 }
 
+void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera,
+                                              const RAS_Rect& viewport, const RAS_Rect& area)
+{
+	static const bool log = getenv("RANGE_PROBE_VOLUME_LOG") != nullptr;
+	static std::chrono::steady_clock::time_point lastLog = std::chrono::steady_clock::now();
+	static int logFrames = 0;
+
+	const auto start = std::chrono::steady_clock::now();
+	const double now = std::chrono::duration<double>(start.time_since_epoch()).count();
+	KX_Camera *activeCam = m_scene->GetActiveCamera();
+	const mt::vec3 cameraPos = activeCam ? activeCam->NodeGetWorldPosition() : mt::zero3;
+
+	// The grid stores linear light: the materials skip the display transform while it captures.
+	GPU_material_set_linear_capture(true);
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (!volume->GetViewpointObject() || !volume->BeginFrame(cameraPos, now)) {
+			continue;
+		}
+		int left = volume->GetFacesPerFrame();
+		int first, count;
+		while (volume->NextFaceRange(left, cameraPos, &first, &count)) {
+			RenderRenderer(rasty, volume, sceneCamera, viewport, area, first, count);
+			volume->FacesDone(count, now);
+			left -= count;
+		}
+	}
+	GPU_material_set_linear_capture(false);
+
+	const double cpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+	if (!log) {
+		return;
+	}
+	for (KX_ProbeVolume *volume : m_volumes) {
+		volume->GetStats().cpuMs += cpuMs / m_volumes.size();
+	}
+	logFrames++;
+	const double sinceLog = std::chrono::duration<double>(std::chrono::steady_clock::now() - lastLog).count();
+	if (sinceLog < 1.0) {
+		return;
+	}
+	for (KX_ProbeVolume *volume : m_volumes) {
+		KX_ProbeVolume::Stats& st = volume->GetStats();
+		CM_Message("probe volume: " << logFrames << " frames, " << st.faces << " faces, " << st.probesDone <<
+		           " probes, cpu " << st.cpuMs / logFrames << " ms/frame, read " << st.readMs / logFrames <<
+		           " ms/frame (max " << st.readMaxMs << ", request " << st.requestMs / logFrames << "), objects/face " <<
+		           (st.faces ? st.objects / st.faces : 0) << ", reader waits " << st.readerWaits <<
+		           ", last cycle " << st.lastCycleSeconds << " s");
+		const double lastCycle = st.lastCycleSeconds;
+		st = KX_ProbeVolume::Stats();
+		st.lastCycleSeconds = lastCycle;
+	}
+	logFrames = 0;
+	lastLog = std::chrono::steady_clock::now();
+}
+
 void KX_TextureRendererManager::Render(RendererCategory category, RAS_Rasterizer *rasty, RAS_OffScreen *offScreen,
                                        KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area)
 {
 	const std::vector<KX_TextureRenderer *>& renderers = m_renderers[category];
-	if (renderers.empty() || rasty->GetDrawingMode() != RAS_Rasterizer::RAS_TEXTURED) {
+	const bool volumes = (category == VIEWPORT_INDEPENDENT && !m_volumes.empty());
+	if ((renderers.empty() && !volumes) || rasty->GetDrawingMode() != RAS_Rasterizer::RAS_TEXTURED) {
 		return;
 	}
 
@@ -405,6 +500,11 @@ void KX_TextureRendererManager::Render(RendererCategory category, RAS_Rasterizer
 	m_capturing = true;
 	for (KX_TextureRenderer *renderer : renderers) {
 		rendered |= RenderRenderer(rasty, renderer, sceneCamera, viewport, area);
+	}
+	if (volumes) {
+		RenderVolumes(rasty, sceneCamera, viewport, area);
+		// The volume faces unbind the off screen like any capture.
+		rendered = true;
 	}
 	m_capturing = false;
 
@@ -427,6 +527,8 @@ void KX_TextureRendererManager::Merge(KX_TextureRendererManager *other)
 	other->m_probes.clear();
 	m_planarReflectors.insert(m_planarReflectors.end(), other->m_planarReflectors.begin(), other->m_planarReflectors.end());
 	other->m_planarReflectors.clear();
+	m_volumes.insert(m_volumes.end(), other->m_volumes.begin(), other->m_volumes.end());
+	other->m_volumes.clear();
 	// The merged scene's World capture stays in the renderers list (owned there) but isn't used.
 	other->m_worldProbe = nullptr;
 }
@@ -437,5 +539,8 @@ void KX_TextureRendererManager::InvalidateRenderersProjectionMatrix()
 		for (KX_TextureRenderer* renderer : m_renderers[i]) {
 			renderer->InvalidateProjectionMatrix();
 		}
+	}
+	for (KX_ProbeVolume *volume : m_volumes) {
+		volume->InvalidateProjectionMatrix();
 	}
 }
