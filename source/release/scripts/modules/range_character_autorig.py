@@ -358,6 +358,88 @@ def transfer_weights(base_source, objects, arm, max_bones=4):
     return objects
 
 
+def fit_thumbs(arm, meshes, reach=0.04, radius=0.022, start=0.3):
+    """Polegar: estica a cadeia Thumb1-3 até a ponta do dedão da malha e passa para ela os vértices do dedo.
+
+    Os pesos por ponto mais próximo da base deixavam o dedão do Fuse preso à mão e ao indicador (Aldebaran:
+    nenhum vértice com peso forte no polegar). Ponta = vértice mais longe na direção da cadeia, a até `reach`
+    da linha. Vértices a até `radius` da linha, depois de `start` do comprimento, ficam só com os ossos do
+    polegar (misturados perto das juntas). meshes: todas as malhas presas à armature, LODs inclusive."""
+    import bpy
+    scene = bpy.context.scene
+    bones = arm.data.bones
+    mw = arm.matrix_world
+    changed = {}
+    for side in ("Left", "Right"):
+        names = ["mixamorig:%sHandThumb%d" % (side, i) for i in (1, 2, 3)]
+        if not all(n in bones for n in names):
+            continue
+        root = mw * bones[names[0]].head_local
+        tip0 = mw * bones[names[2]].tail_local
+        axis = (tip0 - root).normalized()
+        best = None
+        for o in meshes:
+            for v in o.data.vertices:
+                c = o.matrix_world * v.co
+                t = (c - root).dot(axis)
+                if t > 0 and (c - root - axis * t).length < reach and (best is None or t > best):
+                    best = t
+        if best is None:
+            continue
+        length0 = (tip0 - root).length
+        k = best / length0
+        joints = [root + (mw * bones[n].head_local - root) * k for n in names] + [root + (tip0 - root) * k]
+        changed[side] = (names, joints)
+    if not changed:
+        return 0
+    for o in scene.objects:
+        o.select = o is arm
+    scene.objects.active = arm
+    hidden, arm.hide = arm.hide, False
+    layers = list(scene.layers)
+    scene.layers = [a or b for a, b in zip(layers, arm.layers)]
+    bpy.ops.object.mode_set(mode='EDIT')
+    inv = mw.inverted()
+    eb = arm.data.edit_bones
+    for names, joints in changed.values():
+        for i, n in enumerate(names):
+            eb[n].head, eb[n].tail = inv * joints[i], inv * joints[i + 1]
+    bpy.ops.object.mode_set(mode='OBJECT')
+    arm.hide = hidden
+    scene.layers = layers
+    count = 0
+    for names, joints in changed.values():
+        root, tip = joints[0], joints[3]
+        length = (tip - root).length
+        axis = (tip - root).normalized()
+        cuts = [(j - root).length for j in joints]
+        for o in meshes:
+            groups = [o.vertex_groups.get(n) or o.vertex_groups.new(n) for n in names]
+            keep = set(g.index for g in groups)
+            for v in o.data.vertices:
+                c = o.matrix_world * v.co
+                t = (c - root).dot(axis)
+                if t < start * length or t > length + 0.01 or (c - root - axis * t).length > radius:
+                    continue
+                w = [0.0, 0.0, 0.0]
+                i = 0 if t < cuts[1] else (1 if t < cuts[2] else 2)
+                w[i] = 1.0
+                for j in (1, 2):  # mistura perto das juntas
+                    d = (t - cuts[j]) / 0.008
+                    if -1.0 < d < 1.0:
+                        w = [0.0, 0.0, 0.0]
+                        w[j - 1], w[j] = 0.5 - d / 2, 0.5 + d / 2
+                for gi in [e.group for e in v.groups if e.group not in keep]:
+                    o.vertex_groups[gi].remove([v.index])
+                for g, wi in zip(groups, w):
+                    if wi > 0.0:
+                        g.add([v.index], wi, 'REPLACE')
+                    else:
+                        g.remove([v.index])
+                count += 1
+    return count
+
+
 # -- Biblioteca de esqueletos -----------------------------------------------------------------------------
 #
 # datafiles/characters/<id>/base.range: só a armature e "WeightProxy" (malha simplificada, sem textura, que
@@ -1254,6 +1336,7 @@ def create_character(obj_path, skeleton_folder, name, out_dir, ragdoll=True, gam
     info = align_to_base(pieces, arm0, report=report)
     arm = fit_skeleton(arm0, proxy, pieces)
     transfer_weights(proxy, pieces, arm)
+    fit_thumbs(arm, pieces)
     group_name = "Group" + name
     tex_dir = os.path.join(out_dir, "textures")
     build_atlas(pieces, tex_dir, group_name)
