@@ -3640,6 +3640,9 @@ GPUPass *GPU_generate_pass(
 	if (stages && stages->shadow_pcss) {
 		flags |= GPU_SHADER_FLAGS_SHADOW_PCSS;
 	}
+	if (stages && stages->probe_volume) {
+		flags |= GPU_SHADER_FLAGS_PROBE_VOLUME;
+	}
 	if (stages && stages->shadow_csm) {
 		/* The cascades use fixed units (csmunit in GPU_material_bind_shadow_lamps); the lowest is
 		 * max - 3 * 4 - 1. A material with that many textures keeps them and loses the CSM sun. */
@@ -3651,7 +3654,9 @@ GPUPass *GPU_generate_pass(
 				}
 			}
 		}
-		if (ntex <= GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1) {
+		/* The probe volume atlas takes max - 3 * 4 - 2 (GPU_material_bind_probe_grid_atlas). */
+		const int atlas = stages->probe_volume ? 1 : 0;
+		if (ntex <= GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1 - atlas) {
 			flags |= GPU_SHADER_FLAGS_SHADOW_CSM;
 		}
 	}

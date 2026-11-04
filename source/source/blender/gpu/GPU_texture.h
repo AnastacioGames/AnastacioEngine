@@ -63,6 +63,12 @@ GPUTexture *GPU_texture_create_1D(int w, const float *pixels, char err_out[256])
 GPUTexture *GPU_texture_create_2D(int w, int h, const float *pixels, GPUHDRType hdr, char err_out[256]);
 GPUTexture *GPU_texture_create_cube(int size, GPUHDRType hdr, char err_out[256]);
 GPUTexture *GPU_texture_create_3D(int w, int h, int depth, int channels, const float *fpixels);
+/* RGBA16F 3D texture, linear filter, clamped (Probe Volume GI atlas); NULL on the Web. */
+GPUTexture *GPU_texture_create_3D_half(int w, int h, int depth);
+/* Replaces the whole content of a 3D texture with w * h * depth RGBA floats. */
+void GPU_texture_update_3D_float(GPUTexture *tex, const float *rgba);
+/* 1 px 3D texture for a sampler3D with nothing to read (NULL on the Web). */
+GPUTexture *GPU_texture_invalid_3D(void);
 GPUTexture *GPU_texture_create_depth(int w, int h, bool compare, char err_out[256]);
 GPUTexture *GPU_texture_create_vsm_shadow_map(int size, char err_out[256]);
 bool GPU_texture_resize_2D(GPUTexture *tex, int w, int h);

@@ -1,6 +1,6 @@
 # Plano: Probe Volume GI (luz indireta por grade de sondas)
 
-Status: F1a medida e commitada (6903b915). F1b escrita em 2026-11-03: SH9 trilinear por objeto, peso do SSGI no volume, prioridade para objeto movido; falta aceite visual com janela. Próximo: F2.
+Status: F1a (6903b915) e F1b (c4af8fba) commitadas; F2 escrita em 2026-11-03 (leitura por pixel no desktop). Falta aceite visual com janela de F1b/F2. Próximo: F3 (anti-vazamento).
 
 ## Contexto
 A ideia é ter luz indireta dinâmica, que acompanhe dia/noite, lanternas e portas e funcione fora da tela, onde o SSGI não chega. O caminho é uma grade automática de sondas atualizada aos poucos (no estilo DDGI, mas capturando por rasterização), que se liga e desliga. O rascunho anterior (docs/plano-probe-volume-gi.md) não foi gravado. Esta revisão confere cada ponto dele contra o código atual. Nada será executado hoje: o único entregável é o plano, que depois vai para `docs/plano-probe-volume-gi.md`.
@@ -167,3 +167,11 @@ Conferido em `KX_TextureRendererManager`, `KX_LightProbe`, `BL_BlenderShader::Up
 - SSGI: força × `probe_volume_ssgi` (padrão 0,5) com a câmera dentro do volume, com transição na borda (`RAS_2DFilter::SetSSGIStrengthScale`).
 - Objetos movidos: a cada 30 quadros, objeto capturado que andou mais de 0,25 m marca como prioridade as sondas a até `clip_end` dele (abaixo das sondas atrasadas, para não travar as longe).
 - Cena de teste agora usa Principled (Shading Nodes), World, paredes vermelha e verde, e salva `shot_<cena>.png` em 8 s. Medium: CPU da grade 0,61-0,66 ms/quadro, sem erro de shader. O teto e os lados das caixas, antes quase pretos, recebem a luz rebatida.
+
+## F2 (2026-11-03)
+
+- Atlas 3D RGBA16F por volume: 9 fatias em z (uma por coeficiente SH9), rgb pré-multiplicado por "sonda lida" e alfa = lida na fatia 0. O filtro linear do hardware faz a trilinear; z fica entre os centros de texel de uma fatia, então coeficientes não se misturam. São 9 leituras por pixel.
+- **Desvio do plano:** o atlas é enviado da CPU (`glTexSubImage3D`, só no quadro em que chega um SH9), sem projeção na GPU. A leitura por PBO já custa ~0,03 ms por sonda; com 256 sondas o envio são ~37 KB. Medido: ligar ou desligar o envio não muda o custo (0,80 x 0,79 ms/quadro de CPU da grade).
+- Variante `PROBE_VOLUME_GRID` (flag de shader `GPU_SHADER_FLAGS_PROBE_VOLUME`): só compila quando algum Empty do arquivo tem `probe_volume`, com Shading Nodes e 32 unidades de textura ou mais. Cenas sem volume não mudam de shader nem de chave de cache. O sampler3D usa a unidade `max - 3*4 - 2`; nessas cenas a CSM no laço Principled fica com uma textura de material a menos. Sem atlas ligado (viewport), o sampler aponta para a textura 3D vazia.
+- Web e materiais sem a variante continuam com o SH9 por objeto da F1b.
+- Cena de teste: sol com sombra, câmera virada para a parede vermelha e volume recuado 0,3 m das superfícies. Com as sondas em cima do chão e do teto elas enxergam o céu pela laje e o topo das caixas fica claro demais; é o vazamento da F3. Medium: CPU da grade 0,80-0,91 ms/quadro, leitura 0,35 ms/quadro, pico abaixo de 1,4 ms. A leitura subiu de 0,11 para 0,35 ms por causa da sombra nova da cena, não do atlas.

@@ -319,6 +319,27 @@ float KX_TextureRendererManager::SampleProbeVolume(const float position[3], floa
 	return best;
 }
 
+KX_ProbeVolume *KX_TextureRendererManager::FindProbeVolume(const float position[3]) const
+{
+	if (m_capturing) {
+		return nullptr;
+	}
+	const mt::vec3 pos(position[0], position[1], position[2]);
+	KX_ProbeVolume *best = nullptr;
+	float bestWeight = 0.0f;
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (!volume->GetViewpointObject()) {
+			continue;
+		}
+		const float weight = volume->BoxWeight(pos);
+		if (weight > bestWeight) {
+			best = volume;
+			bestWeight = weight;
+		}
+	}
+	return best;
+}
+
 void KX_TextureRendererManager::CheckWorldChanged()
 {
 	KX_WorldInfo *info = m_scene->GetWorldInfo();
@@ -478,6 +499,11 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		}
 	}
 	GPU_material_set_linear_capture(false);
+
+	// The per pixel atlas takes the SH9 read this frame.
+	for (KX_ProbeVolume *volume : m_volumes) {
+		volume->UpdateAtlas();
+	}
 
 	/* Moved objects (doors, lifts, scripted props), checked twice a second: the probes near one that
 	 * moved go first. Same filter as the capture, without the camera culling. */

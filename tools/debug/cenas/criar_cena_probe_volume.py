@@ -87,7 +87,10 @@ def build(quality):
     box('Dynamic', (0, 0, 3), (0.5, 0.5, 0.5), dynamic=True)
 
     bpy.ops.object.lamp_add(type='SUN', location=(0, -20, 10), rotation=(1.0, 0, 0))
-    bpy.ops.object.camera_add(location=(0, -8, 2), rotation=(1.5, 0, 0))
+    # Shadows: only the window lets the sun in, the rest of the room lives on the bounce.
+    bpy.context.object.data.shadow_method = 'RAY_SHADOW'
+    # Toward the red west wall, so its bounce on the boxes shows.
+    bpy.ops.object.camera_add(location=(6, -8, 2), rotation=(1.45, 0, 0.9))
     cam = bpy.context.object
     scene.camera = cam
 
@@ -95,7 +98,8 @@ def build(quality):
     vol = bpy.context.object
     vol.name = 'ProbeVolume'
     vol.empty_draw_type = 'CUBE'
-    vol.scale = (10, 10, 2)
+    # Inset from the floor, ceiling and walls: a probe on a surface sees through it (F3 fixes that).
+    vol.scale = (9.7, 9.7, 1.7)
     if quality is not None:
         bpy.ops.object.game_property_new(type='FLOAT', name='probe_volume')
         vol.game.properties['probe_volume'].value = 0.0

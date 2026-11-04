@@ -55,6 +55,7 @@ extern "C" {
 #include "KX_Scene.h"
 #include "KX_TextureRendererManager.h"
 #include "KX_PlanarReflector.h"
+#include "KX_ProbeVolume.h"
 
 #include <algorithm>
 #include <cstring>
@@ -339,10 +340,22 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		m_scene->GetTextureRendererManager()->FindProbe(pos, probes, &probeWeight2);
 		GPU_material_bind_probe(m_gpuMat, probes[0].cube, probes[0].maxLod, probes[0].center, probes[0].radius, probes[0].box, probes[0].sh);
 		GPU_material_bind_probe2(m_gpuMat, probes[1].cube, probes[1].maxLod, probes[1].center, probes[1].radius, probes[1].box, probes[1].sh, probeWeight2);
-		/* Probe Volume GI: the grid's diffuse at the object center replaces the probes' diffuse. */
-		float gridSh[9][3];
-		const float gridWeight = m_scene->GetTextureRendererManager()->SampleProbeVolume(pos, gridSh);
-		GPU_material_bind_probe_grid(m_gpuMat, gridSh, gridWeight);
+		/* Probe Volume GI: the grid's diffuse replaces the probes' diffuse, per pixel from the atlas
+		 * (desktop variant) or else from the SH9 at the object center. */
+		KX_ProbeVolume *volume = m_scene->GetTextureRendererManager()->FindProbeVolume(pos);
+		GPUTexture *atlas = (volume && GPU_material_use_probe_grid_atlas(m_gpuMat)) ? volume->GetAtlas() : nullptr;
+		if (atlas) {
+			const int *dims = volume->GetDims();
+			GPU_material_bind_probe_grid_atlas(m_gpuMat, atlas, volume->GetMin().Data(), volume->GetMax().Data(), dims,
+			                                   1.0f / (0.5f * volume->GetSpacing()));
+			GPU_material_bind_probe_grid(m_gpuMat, nullptr, 0.0f);
+		}
+		else {
+			GPU_material_bind_probe_grid_atlas(m_gpuMat, nullptr, nullptr, nullptr, nullptr, 0.0f);
+			float gridSh[9][3];
+			const float gridWeight = volume ? volume->SampleSH(mt::vec3(pos[0], pos[1], pos[2]), gridSh) : 0.0f;
+			GPU_material_bind_probe_grid(m_gpuMat, gridSh, gridWeight);
+		}
 
 		/* Planar Reflection node: this object's own mirror (KX_PlanarReflector), not a cubemap probe.
 		 * Skipped for materials that don't use the node (cheap flag check, no lookup). */

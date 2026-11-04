@@ -207,6 +207,7 @@ typedef struct GPUPassStages {
 	int star_quality;                  /* World Star Quality: 1 = Medium (STARS_MEDIUM), 2 = Low (STARS_LOW) */
 	bool shadow_pcss;                  /* Some lamp uses PCSS (SHADOW_PCSS) */
 	bool shadow_csm;                   /* Some sun uses cascades (SHADOW_CSM) */
+	bool probe_volume;                 /* Some Empty has a probe_volume (PROBE_VOLUME_GRID) */
 } GPUPassStages;
 
 GPUPass *GPU_generate_pass(ListBase *nodes, struct GPUNodeLink *outlinks[8],

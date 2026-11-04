@@ -142,6 +142,8 @@ public:
 	/** Probe Volume GI at position: the SH9 of the volume that holds it best (linear light). Returns
 	 * its weight over the probes' diffuse, 0 outside every volume and during the captures. */
 	float SampleProbeVolume(const float position[3], float r_sh[9][3]) const;
+	/// The volume that holds position best (nullptr outside every volume and during the captures).
+	KX_ProbeVolume *FindProbeVolume(const float position[3]) const;
 
 	/** Execute all the texture renderer.
 	 * \param category The category of renderers to render.

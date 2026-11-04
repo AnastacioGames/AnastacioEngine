@@ -87,6 +87,11 @@ private:
 	float m_clipEnd;
 	/// SSGI strength factor with the camera inside the volume (the grid already gives the indirect light).
 	float m_ssgiWeight;
+	/// SH9 of every probe for the per pixel lookup (PROBE_VOLUME_GRID), rebuilt when a readback lands.
+	GPUTexture *m_atlas;
+	bool m_atlasDirty;
+	std::vector<float> m_atlasData;
+
 	/// Position of each captured object at its last check: moving it past 0.25 m marks the probes near it.
 	std::unordered_map<KX_GameObject *, mt::vec3> m_objectPos;
 	/// Cube shared by every probe of the grid, reused as soon as its readback is requested.
@@ -142,6 +147,13 @@ public:
 	/// 1 inside the box, 0 from half a spacing outside it.
 	float BoxWeight(const mt::vec3& pos) const;
 	float GetSSGIWeight() const;
+	const mt::vec3& GetMin() const;
+	const mt::vec3& GetMax() const;
+	float GetSpacing() const;
+	/** Atlas of the per pixel lookup, uploaded again when an SH9 changed; nullptr on the Web or
+	 * before the first readback. Call with the GL context current. */
+	GPUTexture *UpdateAtlas();
+	GPUTexture *GetAtlas() const;
 	/** Moved objects: compares the objects the grid captures with their last position and puts the
 	 * probes within clip end of one that moved more than 0.25 m first in the queue. */
 	void CheckMovedObjects(const std::vector<KX_GameObject *>& objects);

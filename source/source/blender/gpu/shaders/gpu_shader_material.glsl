@@ -3530,6 +3530,14 @@ uniform vec3 unfprobesh2[9];
  * diffuse above (0 = outside every volume). The reflection still comes from the cubes. */
 uniform vec3 unfprobegridsh[9];
 uniform vec4 unfprobegrid;
+#ifdef PROBE_VOLUME_GRID
+/* Per pixel grid: atlas of 9 slabs (one per SH9 coefficient) of dims.z along z, rgb premultiplied
+ * by "probe read", slab 0 alpha = read. min.w = fade scale outside the box, max.w = on. */
+uniform sampler3D unfprobegridtex;
+uniform vec4 unfprobegridmin;
+uniform vec4 unfprobegridmax;
+uniform vec4 unfprobegriddims;
+#endif
 
 void env_probe_sample(samplerCube cube, vec4 pos, vec4 box, float maxlod, float hassh, vec3 wpos, vec3 wn, vec3 wr, float rough, out vec4 spec, out vec4 diff)
 {
@@ -3566,6 +3574,40 @@ void env_probe_sample(samplerCube cube, vec4 pos, vec4 box, float maxlod, float 
 	}
 }
 
+#ifdef PROBE_VOLUME_GRID
+/* Weight of the grid at wpos (0 = off, outside or not read yet) and its diffuse for normal wn. */
+float probe_grid_sample(vec3 wpos, vec3 wn, out vec3 diff)
+{
+	diff = vec3(0.0);
+	if (unfprobegridmax.w < 0.5) {
+		return 0.0;
+	}
+	vec3 outside = max(unfprobegridmin.xyz - wpos, wpos - unfprobegridmax.xyz);
+	float fade = clamp(1.0 - max(max(outside.x, outside.y), outside.z) * unfprobegridmin.w, 0.0, 1.0);
+	if (fade <= 0.0) {
+		return 0.0;
+	}
+	vec3 dims = unfprobegriddims.xyz;
+	vec3 g = clamp((wpos - unfprobegridmin.xyz) / max(unfprobegridmax.xyz - unfprobegridmin.xyz, vec3(1e-4)), 0.0, 1.0) * (dims - 1.0);
+	vec2 uv = (g.xy + 0.5) / dims.xy;
+	/* z stays between the texel centers of one slab: the filter never mixes two coefficients */
+	float slab = 1.0 / (9.0 * dims.z);
+	vec4 c0 = texture3D(unfprobegridtex, vec3(uv, (g.z + 0.5) * slab));
+	if (c0.a < 1e-3) {
+		return 0.0;
+	}
+	vec3 c[9];
+	c[0] = c0.rgb;
+	for (int k = 1; k < 9; k++) {
+		c[k] = texture3D(unfprobegridtex, vec3(uv, (float(k) * dims.z + g.z + 0.5) * slab)).rgb;
+	}
+	float inv = 1.0 / c0.a;
+	diff = sh9_eval(-wn, c[0] * inv, c[1] * inv, c[2] * inv, c[3] * inv, c[4] * inv, c[5] * inv, c[6] * inv,
+	                c[7] * inv, c[8] * inv);
+	return fade * min(c0.a, 1.0);
+}
+#endif
+
 void env_probe_mirror(vec4 mirror, vec4 diffibl, vec3 wn, vec3 wr, float rough, float linearize, vec3 viewpos, mat4 viewinv, out vec4 result, out vec4 result_diff)
 {
 	if (unfprobeinfo.x > 0.5) {
@@ -3595,6 +3637,14 @@ void env_probe_mirror(vec4 mirror, vec4 diffibl, vec3 wn, vec3 wr, float rough, 
 		result = mirror;
 		result_diff = diffibl;
 	}
+#ifdef PROBE_VOLUME_GRID
+	vec3 griddiff;
+	float gridw = probe_grid_sample((viewinv * vec4(viewpos, 1.0)).xyz, wn, griddiff);
+	if (gridw > 0.0) {
+		result_diff = mix(result_diff, vec4(griddiff, 1.0), gridw);
+	}
+	else
+#endif
 	if (unfprobegrid.x > 0.0) {
 		vec4 grid = vec4(sh9_eval(-wn, unfprobegridsh[0], unfprobegridsh[1], unfprobegridsh[2], unfprobegridsh[3],
 		                          unfprobegridsh[4], unfprobegridsh[5], unfprobegridsh[6], unfprobegridsh[7],

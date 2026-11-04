@@ -58,6 +58,8 @@ enum {
 	/* World Star Quality Medium / Low: lighter Realistic stars (#define STARS_MEDIUM / STARS_LOW). */
 	GPU_SHADER_FLAGS_STARS_MEDIUM		= (1 << 12),
 	GPU_SHADER_FLAGS_STARS_LOW			= (1 << 13),
+	/* Some Empty has a probe_volume: env_probe_mirror reads the grid atlas per pixel (#define PROBE_VOLUME_GRID). */
+	GPU_SHADER_FLAGS_PROBE_VOLUME		= (1 << 14),
 };
 
 /* Cooked program binaries: set by the game engine while a game runs, NULL otherwise.

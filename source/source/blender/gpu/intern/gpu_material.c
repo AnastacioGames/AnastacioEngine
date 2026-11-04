@@ -48,6 +48,8 @@
 #include "BKE_idprop.h"
 #include "BKE_image.h"
 #include "BKE_main.h"
+#include "DNA_property_types.h"
+#include "BKE_property.h"
 #include "BKE_node.h"
 #include "BKE_scene.h"
 #include "BKE_group.h"
@@ -367,6 +369,17 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	 * GPU_material_bind_shadow_lamps). With 16 units (Web) those units overlap the material's own
 	 * textures, so there the cascaded sun keeps no shadow in the Principled loop, as before. */
 	stages.shadow_csm = any_csm && GPU_max_textures() >= 32;
+	/* Probe Volume GI per pixel: a sampler3D on its own unit (max - 3 * 4 - 2), so only with 32
+	 * units; the Web keeps the per object SH9 (unfprobegridsh). */
+	stages.probe_volume = false;
+	if (GPU_max_textures() >= 32 && material->scene && BKE_scene_use_new_shading_nodes(material->scene)) {
+		for (Object *ob = G.main ? G.main->object.first : NULL; ob; ob = ob->id.next) {
+			if (ob->type == OB_EMPTY && BKE_bproperty_object_get(ob, "probe_volume")) {
+				stages.probe_volume = true;
+				break;
+			}
+		}
+	}
 
 	if (used) {
 		material->pass = GPU_generate_pass(&material->nodes, material->outlinks,
@@ -538,6 +551,10 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->probesh2loc = GPU_shader_get_uniform(shader, "unfprobesh2");
 		material->probegridshloc = GPU_shader_get_uniform(shader, "unfprobegridsh");
 		material->probegridloc = GPU_shader_get_uniform(shader, "unfprobegrid");
+		material->probegridtexloc = GPU_shader_get_uniform(shader, "unfprobegridtex");
+		material->probegridminloc = GPU_shader_get_uniform(shader, "unfprobegridmin");
+		material->probegridmaxloc = GPU_shader_get_uniform(shader, "unfprobegridmax");
+		material->probegriddimsloc = GPU_shader_get_uniform(shader, "unfprobegriddims");
 		material->planarteximgloc = GPU_shader_get_uniform(shader, "unfplanartex");
 		material->planarviewprojloc = GPU_shader_get_uniform(shader, "unfplanarviewproj");
 		material->planarenabledloc = GPU_shader_get_uniform(shader, "unfplanarenabled");
@@ -855,6 +872,19 @@ void GPU_material_bind(
 		material->probe_absent_valid[0] = false;
 		material->probe_absent_valid[1] = false;
 		material->probegrid_absent_valid = false;
+		material->probegridatlas_absent_valid = false;
+		if (material->probegridtexloc != -1) {
+			/* The sampler3D always gets its own unit, also where nothing binds an atlas (viewport). */
+			GPUShader *gridshader = GPU_pass_shader(material->pass);
+			GPUTexture *none = GPU_texture_invalid_3D();
+			if (none) {
+				GPU_texture_bind(none, GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 2);
+				GPU_shader_uniform_texture(gridshader, material->probegridtexloc, none);
+			}
+			const float off[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			GPU_shader_uniform_vector(gridshader, material->probegridmaxloc, 4, 1, off);
+			material->probegridatlas_absent_valid = true;
+		}
 		material->objectlay_valid = false;
 		material->invcache_valid = false;
 
@@ -6363,6 +6393,37 @@ void GPU_material_bind_probe_grid(GPUMaterial *material, const float (*sh)[3], f
 		GPU_shader_uniform_vector(shader, material->probegridshloc, 3, 9, sh[0]);
 	}
 	GPU_shader_uniform_vector(shader, material->probegridloc, 4, 1, info);
+}
+
+bool GPU_material_use_probe_grid_atlas(GPUMaterial *material)
+{
+	return material->pass && material->probegridtexloc != -1;
+}
+
+void GPU_material_bind_probe_grid_atlas(GPUMaterial *material, GPUTexture *atlas, const float min[3],
+                                        const float max[3], const int dims[3], float fadeScale)
+{
+	GPUShader *shader = GPU_pass_shader(material->pass);
+	if (!shader || material->probegridtexloc == -1) {
+		return;
+	}
+	if (!atlas && material->probegridatlas_absent_valid) {
+		return;
+	}
+	material->probegridatlas_absent_valid = !atlas;
+
+	float vmax[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+	if (atlas) {
+		GPU_texture_bind(atlas, GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 2);
+		GPU_shader_uniform_texture(shader, material->probegridtexloc, atlas);
+		const float vmin[4] = {min[0], min[1], min[2], fadeScale};
+		const float vdims[4] = {(float)dims[0], (float)dims[1], (float)dims[2], 0.0f};
+		copy_v3_v3(vmax, max);
+		vmax[3] = 1.0f;
+		GPU_shader_uniform_vector(shader, material->probegridminloc, 4, 1, vmin);
+		GPU_shader_uniform_vector(shader, material->probegriddimsloc, 4, 1, vdims);
+	}
+	GPU_shader_uniform_vector(shader, material->probegridmaxloc, 4, 1, vmax);
 }
 
 /* Binds the planar reflector for the Planar Reflection node (NULL = none: no KX_PlanarReflector

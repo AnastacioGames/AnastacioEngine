@@ -37,6 +37,7 @@
 #include <algorithm>
 #include <chrono>
 #include <cmath>
+#include <cstdlib>
 #include <cstring>
 
 static const int qualityFaces[3] = {2, 4, 8};
@@ -68,6 +69,8 @@ KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality qualit
 	m_clipEnd(clipEnd),
 	m_ssgiWeight(ssgiWeight),
 	m_cube(nullptr),
+	m_atlas(nullptr),
+	m_atlasDirty(false),
 	m_current(-1),
 	m_nextFace(0),
 	m_capturePos(mt::zero3),
@@ -136,6 +139,9 @@ KX_ProbeVolume::~KX_ProbeVolume()
 			face.DetachTexture(m_cube);
 		}
 		GPU_texture_free(m_cube);
+	}
+	if (m_atlas) {
+		GPU_texture_free(m_atlas);
 	}
 	for (Reader& reader : m_readers) {
 		if (reader.reader) {
@@ -238,6 +244,7 @@ bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 			}
 			probe.valid = true;
 			reader.probe = -1;
+			m_atlasDirty = true;
 		}
 	}
 	const double readMs = ms_since(start);
@@ -385,6 +392,60 @@ float KX_ProbeVolume::SampleSH(const mt::vec3& pos, float r_sh[9][3]) const
 float KX_ProbeVolume::GetSSGIWeight() const
 {
 	return m_ssgiWeight;
+}
+
+const mt::vec3& KX_ProbeVolume::GetMin() const
+{
+	return m_min;
+}
+
+const mt::vec3& KX_ProbeVolume::GetMax() const
+{
+	return m_max;
+}
+
+float KX_ProbeVolume::GetSpacing() const
+{
+	return m_spacing;
+}
+
+GPUTexture *KX_ProbeVolume::GetAtlas() const
+{
+	return m_atlas;
+}
+
+GPUTexture *KX_ProbeVolume::UpdateAtlas()
+{
+	if (!m_atlasDirty) {
+		return m_atlas;
+	}
+	m_atlasDirty = false;
+	const int dx = m_dims[0], dy = m_dims[1], dz = m_dims[2];
+	if (!m_atlas) {
+		// 9 slabs along z, one per SH9 coefficient (see probe_grid_sample in the material GLSL).
+		m_atlas = GPU_texture_create_3D_half(dx, dy, dz * 9);
+		if (!m_atlas) {
+			return nullptr;
+		}
+		m_atlasData.assign((size_t)dx * dy * dz * 9 * 4, 0.0f);
+	}
+	for (int z = 0; z < dz; z++) {
+		for (int y = 0; y < dy; y++) {
+			for (int x = 0; x < dx; x++) {
+				const Probe& probe = m_probes[(z * dy + y) * dx + x];
+				const float read = probe.valid ? 1.0f : 0.0f;
+				for (int k = 0; k < 9; k++) {
+					float *texel = &m_atlasData[((((size_t)k * dz + z) * dy + y) * dx + x) * 4];
+					for (int c = 0; c < 3; c++) {
+						texel[c] = probe.sh[k][c] * read;
+					}
+					texel[3] = read;
+				}
+			}
+		}
+	}
+	GPU_texture_update_3D_float(m_atlas, m_atlasData.data());
+	return m_atlas;
 }
 
 void KX_ProbeVolume::CheckMovedObjects(const std::vector<KX_GameObject *>& objects)

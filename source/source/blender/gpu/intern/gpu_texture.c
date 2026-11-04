@@ -1101,6 +1101,57 @@ void GPU_invalid_tex_init(void)
 	GG.collider_depth_tex = GG.invalid_tex_2D;
 }
 
+GPUTexture *GPU_texture_create_3D_half(int w, int h, int depth)
+{
+#ifdef __EMSCRIPTEN__
+	(void)w;
+	(void)h;
+	(void)depth;
+	return NULL;
+#else
+	GPUTexture *tex = MEM_callocN(sizeof(GPUTexture), "GPUTexture3DHalf");
+	tex->w = w;
+	tex->h = h;
+	tex->depth = depth;
+	tex->number = -1;
+	tex->refcount = 1;
+	tex->target = GL_TEXTURE_3D;
+	tex->target_base = GL_TEXTURE_3D;
+	glGenTextures(1, &tex->bindcode);
+	if (!tex->bindcode) {
+		GPU_texture_free(tex);
+		return NULL;
+	}
+	tex->number = 0;
+	glBindTexture(GL_TEXTURE_3D, tex->bindcode);
+	glTexImage3D(GL_TEXTURE_3D, 0, GL_RGBA16F, w, h, depth, 0, GL_RGBA, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_3D, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
+	GPU_texture_unbind(tex);
+	return tex;
+#endif
+}
+
+void GPU_texture_update_3D_float(GPUTexture *tex, const float *rgba)
+{
+#ifdef __EMSCRIPTEN__
+	(void)tex;
+	(void)rgba;
+#else
+	glBindTexture(GL_TEXTURE_3D, tex->bindcode);
+	glTexSubImage3D(GL_TEXTURE_3D, 0, 0, 0, 0, tex->w, tex->h, tex->depth, GL_RGBA, GL_FLOAT, rgba);
+	glBindTexture(GL_TEXTURE_3D, 0);
+#endif
+}
+
+GPUTexture *GPU_texture_invalid_3D(void)
+{
+	return GG.invalid_tex_3D;
+}
+
 void GPU_invalid_tex_bind(int mode)
 {
 	switch (mode) {
