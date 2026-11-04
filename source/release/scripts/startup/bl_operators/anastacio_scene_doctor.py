@@ -642,6 +642,20 @@ def rule_probe_volume(scene, objects):
                      "volumes around the places the player sees, raise probe_volume_quality, or accept the "
                      "wider spacing (Fix writes it, so the console warning goes away).") % (used, spacing),
                 [ob], fix))
+        if any(abs(a) > 1e-3 for a in ob.matrix_world.to_euler()):
+            def fix_rot(ob=ob, old=ob.rotation_euler.copy()):
+                ob.rotation_euler = (0.0, 0.0, 0.0)
+
+                def revert():
+                    ob.rotation_euler = old
+                return revert
+            issues.append(Issue(
+                "probe_volume_rotated", ob.name, 'MEDIUM',
+                tip_("Probe volume %s is rotated") % ob.name,
+                tip_("The probe grid always follows the world axes: the game ignores the Empty's rotation, so "
+                     "the probes don't cover the box you see. Clear the rotation and resize the box (Fix clears "
+                     "it), or use several boxes for a slanted room."),
+                [ob], fix_rot))
         lo = [ob.matrix_world.translation[i] - half[i] for i in range(3)]
         hi = [ob.matrix_world.translation[i] + half[i] for i in range(3)]
         loose = []

@@ -78,6 +78,25 @@ public:
 	}
 };
 
+/// Linear capture of the probe volumes for the guard's scope (materials and World skip the display transform).
+class VolumeCaptureGuard
+{
+	bool& m_flag;
+
+public:
+	explicit VolumeCaptureGuard(bool& flag)
+		:m_flag(flag)
+	{
+		m_flag = true;
+		GPU_material_set_linear_capture(true);
+	}
+	~VolumeCaptureGuard()
+	{
+		m_flag = false;
+		GPU_material_set_linear_capture(false);
+	}
+};
+
 }  // namespace
 
 KX_TextureRendererManager::KX_TextureRendererManager(KX_Scene *scene)
@@ -99,9 +118,6 @@ KX_TextureRendererManager::~KX_TextureRendererManager()
 			delete renderer;
 		}
 	}
-	if (!m_volumes.empty()) {
-		RAS_2DFilter::SetSSGIStrengthScale(1.0f);
-	}
 	for (KX_ProbeVolume *volume : m_volumes) {
 		delete volume;
 	}
@@ -118,9 +134,14 @@ void KX_TextureRendererManager::InvalidateViewpoint(KX_GameObject *gameobj)
 			}
 		}
 	}
-	for (KX_ProbeVolume *volume : m_volumes) {
-		if (volume->GetViewpointObject() == gameobj) {
-			volume->SetViewpointObject(nullptr);
+	// A removed box Empty takes its grid along (cube, atlas, readbacks); called with the GL context current.
+	for (auto it = m_volumes.begin(); it != m_volumes.end();) {
+		if ((*it)->GetViewpointObject() == gameobj) {
+			delete *it;
+			it = m_volumes.erase(it);
+		}
+		else {
+			++it;
 		}
 	}
 }
@@ -299,47 +320,28 @@ bool KX_TextureRendererManager::FindProbe(const float position[3], ProbeSlot r_s
 	return true;
 }
 
-float KX_TextureRendererManager::SampleProbeVolume(const float position[3], float r_sh[9][3]) const
-{
-	if (m_capturing || m_volumes.empty()) {
-		return 0.0f;
-	}
-	const mt::vec3 pos(position[0], position[1], position[2]);
-	float best = 0.0f;
-	float sh[9][3];
-	for (KX_ProbeVolume *volume : m_volumes) {
-		if (!volume->GetViewpointObject()) {
-			continue;
-		}
-		const float weight = volume->SampleSH(pos, sh);
-		if (weight > best) {
-			best = weight;
-			memcpy(r_sh, sh, sizeof(sh));
-		}
-	}
-	return best;
-}
-
 float KX_TextureRendererManager::GetProbeVolumeGain(const KX_ProbeVolume *volume) const
 {
 	// Each lap adds one more bounce; the gain keeps the sum finite.
 	return (m_capturingVolume && volume) ? volume->GetBounce() : 1.0f;
 }
 
-KX_ProbeVolume *KX_TextureRendererManager::FindProbeVolume(const float position[3]) const
+KX_ProbeVolume *KX_TextureRendererManager::FindProbeVolume(const mt::vec3& aabbMin, const mt::vec3& aabbMax) const
 {
 	// The manual probes keep their own light; the grid reads itself (bounces).
-	if (m_capturing && !m_capturingVolume) {
+	if ((m_capturing && !m_capturingVolume) || m_volumes.empty()) {
 		return nullptr;
 	}
-	const mt::vec3 pos(position[0], position[1], position[2]);
+	const mt::vec3 center = (aabbMin + aabbMax) * 0.5f;
 	KX_ProbeVolume *best = nullptr;
 	float bestWeight = 0.0f;
 	for (KX_ProbeVolume *volume : m_volumes) {
 		if (!volume->GetViewpointObject()) {
 			continue;
 		}
-		const float weight = volume->BoxWeight(pos);
+		// A box partly inside wins over the fade of a volume next to it (1 + share inside).
+		const float overlap = volume->BoxOverlap(aabbMin, aabbMax);
+		const float weight = (overlap > 0.0f) ? 1.0f + overlap : volume->BoxWeight(center);
 		if (weight > bestWeight) {
 			best = volume;
 			bestWeight = weight;
@@ -495,23 +497,22 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 	KX_Camera *activeCam = m_scene->GetActiveCamera();
 	const mt::vec3 cameraPos = activeCam ? activeCam->NodeGetWorldPosition() : mt::zero3;
 
-	// The grid stores linear light: the materials skip the display transform while it captures.
-	GPU_material_set_linear_capture(true);
-	m_capturingVolume = true;
-	for (KX_ProbeVolume *volume : m_volumes) {
-		if (!volume->GetViewpointObject() || !volume->BeginFrame(cameraPos, now)) {
-			continue;
-		}
-		int left = volume->GetFacesPerFrame();
-		int first, count;
-		while (volume->NextFaceRange(left, cameraPos, &first, &count)) {
-			RenderRenderer(rasty, volume, sceneCamera, viewport, area, first, count);
-			volume->FacesDone(count, now);
-			left -= count;
+	{
+		// The grid stores linear light: the materials skip the display transform while it captures.
+		VolumeCaptureGuard captureGuard(m_capturingVolume);
+		for (KX_ProbeVolume *volume : m_volumes) {
+			if (!volume->GetViewpointObject() || !volume->BeginFrame(cameraPos, now)) {
+				continue;
+			}
+			int left = volume->GetFacesPerFrame();
+			int first, count;
+			while (volume->NextFaceRange(left, cameraPos, &first, &count)) {
+				RenderRenderer(rasty, volume, sceneCamera, viewport, area, first, count);
+				volume->FacesDone(count, now);
+				left -= count;
+			}
 		}
 	}
-	m_capturingVolume = false;
-	GPU_material_set_linear_capture(false);
 
 	// The per pixel atlas takes the SH9 read this frame.
 	for (KX_ProbeVolume *volume : m_volumes) {
@@ -520,9 +521,8 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 
 	/* Moved objects (doors, lifts, scripted props), checked twice a second: the probes near one that
 	 * moved go first. Same filter as the capture, without the camera culling. */
-	static int moveCheck = 0;
-	if (++moveCheck >= 30) {
-		moveCheck = 0;
+	if (++m_moveCheck >= 30) {
+		m_moveCheck = 0;
 		for (KX_ProbeVolume *volume : m_volumes) {
 			if (!volume->GetViewpointObject()) {
 				continue;
@@ -548,7 +548,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 			ssgiScale = std::min(ssgiScale, 1.0f + (volume->GetSSGIWeight() - 1.0f) * w);
 		}
 	}
-	RAS_2DFilter::SetSSGIStrengthScale(ssgiScale);
+	m_ssgiScale = ssgiScale;
 
 	const double cpuMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
 	if (!log) {

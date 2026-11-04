@@ -3732,6 +3732,8 @@ RAS_OffScreen *KX_Scene::Render2DFilters(RAS_Rasterizer *rasty, RAS_ICanvas *can
 	}
 
 	m_filterManager->ReloadChangedSources();
+	// Per scene: an overlay scene without volumes keeps its full SSGI.
+	RAS_2DFilter::SetSSGIStrengthScale(GetTextureRendererManager()->GetSSGIScale());
 	return m_filterManager->RenderFilters(rasty, canvas, inputofs, targetofs, sun_screen_pos);
 }
 

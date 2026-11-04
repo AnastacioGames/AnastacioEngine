@@ -685,7 +685,8 @@ void KX_WorldInfo::RenderBackground(RAS_Rasterizer *rasty)
 			GPU_material_unbind(gpumat);
 		}
 		else {
-			if (m_do_color_management) {
+			// The probe volume captures store linear light: the solid color stays linear there.
+			if (m_do_color_management && !GPU_material_linear_capture()) {
 				float srgbcolor[4];
 				linearrgb_to_srgb_v4(srgbcolor, m_horizoncolor.Data());
 				rasty->SetClearColor(srgbcolor[0], srgbcolor[1], srgbcolor[2], srgbcolor[3]);
@@ -701,7 +702,8 @@ void KX_WorldInfo::RenderBackground(RAS_Rasterizer *rasty)
 		/* Grey color computed by linearrgb_to_srgb_v3_v3 with a color of
 		 * 0.050, 0.050, 0.050 (the default world horizon color).
 		 */
-		rasty->SetClearColor(0.247784f, 0.247784f, 0.247784f, 1.0f);
+		const float grey = GPU_material_linear_capture() ? 0.05f : 0.247784f;
+		rasty->SetClearColor(grey, grey, grey, 1.0f);
 		rasty->Clear(RAS_Rasterizer::RAS_COLOR_BUFFER_BIT);
 	}
 }

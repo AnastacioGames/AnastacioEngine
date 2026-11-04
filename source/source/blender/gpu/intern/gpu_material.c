@@ -372,7 +372,11 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	/* Probe Volume GI per pixel: a sampler3D on its own unit (max - 3 * 4 - 2), so only with 32
 	 * units; the Web keeps the per object SH9 (unfprobegridsh). */
 	stages.probe_volume = false;
-	if (GPU_max_textures() >= 32 && material->scene && BKE_scene_use_new_shading_nodes(material->scene)) {
+	/* Quality preset Very Low (ae_probe_volume_quality -1) turns every grid off: no variant either. */
+	IDProperty *pv_preset = (material->scene && material->scene->id.properties) ?
+	        IDP_GetPropertyFromGroup(material->scene->id.properties, "ae_probe_volume_quality") : NULL;
+	const bool pv_off = pv_preset && pv_preset->type == IDP_INT && IDP_Int(pv_preset) < 0;
+	if (!pv_off && GPU_max_textures() >= 32 && material->scene && BKE_scene_use_new_shading_nodes(material->scene)) {
 		for (Object *ob = G.main ? G.main->object.first : NULL; ob; ob = ob->id.next) {
 			if (ob->type == OB_EMPTY && BKE_bproperty_object_get(ob, "probe_volume")) {
 				stages.probe_volume = true;
@@ -1861,9 +1865,17 @@ static float contrast_table[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f
 
 /* Probe Volume GI captures linear light: a negative contrast makes game_view_transform return the
  * color untouched. The materials read the table through uniform pointers, so no shader changes. */
+static bool gpu_linear_capture = false;
+
+bool GPU_material_linear_capture(void)
+{
+	return gpu_linear_capture;
+}
+
 void GPU_material_set_linear_capture(bool linear)
 {
 	static const float display[8] = {0.0f, 1.10f, 1.30f, 1.45f, 1.60f, 1.80f, 2.00f, 2.25f};
+	gpu_linear_capture = linear;
 	for (int i = 0; i < 8; i++) {
 		contrast_table[i] = linear ? -1.0f : display[i];
 	}

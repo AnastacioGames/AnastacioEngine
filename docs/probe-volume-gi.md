@@ -7,14 +7,16 @@ continua vindo das sondas manuais e do World. Fica desligado até existir um Emp
 ## Como ligar
 
 1. Adicione um Empty com Display **Cube** e escale-o para cobrir a área (sala, rua, galpão). O tamanho
-   da caixa é o Display Size vezes a escala.
+   da caixa é o Display Size vezes a escala. A grade segue sempre os eixos do mundo: a rotação do
+   Empty é ignorada (o console e o Scene Doctor avisam). Sala inclinada pede várias caixas.
 2. Em Game Properties, crie `probe_volume` (Float): o espaçamento entre sondas em metros. 0 = 4 m.
 3. Rode o jogo. As sondas são capturadas aos poucos, algumas faces por quadro. A primeira volta
    leva de 1 a 3 s.
 
 O volume pode ocupar a sala inteira, encostando no chão, no teto e nas paredes. A engine empurra para
 fora as sondas que ficam em cima de uma superfície e desliga as que ficam dentro de paredes ou caixas.
-Isso usa a colisão: parede e chão sem colisão não são vistos (o Scene Doctor avisa).
+Isso usa a colisão: parede e chão sem colisão não são vistos (o Scene Doctor avisa). Caixas com colisão
+Box ou Convex Hull também contam. As camadas de `probe_volume_ignore_layers` ficam fora desse teste.
 
 ## Propriedades opcionais (no mesmo Empty)
 
@@ -25,7 +27,7 @@ Isso usa a colisão: parede e chão sem colisão não são vistos (o Scene Docto
 | `probe_volume_ssgi` | Float | 0,5 | Força do SSGI com a câmera dentro do volume, para não somar a luz duas vezes. |
 | `probe_volume_clip_end` | Float | 30 | Distância que cada sonda enxerga. |
 | `probe_volume_ignore_layers` | Int | 0 | Camadas (bits) que a grade não captura. |
-| `probe_volume_freeze` | Bool | não | Captura uma volta e para (luz fixa, custo zero depois). |
+| `probe_volume_freeze` | Bool | não | Captura uma volta e para (luz fixa, custo zero depois; o console mostra "frozen"). |
 | `probe_volume_skip` | Bool, em outro objeto | - | O objeto fica fora da captura. |
 
 Ficam fora da captura sozinhos: física dinâmica, rigid body, veículo e malha deformada (armature ou
@@ -56,7 +58,9 @@ mostra a etapa como "Probes and reflections (Probe Volume GI)".
 ## Onde vale e onde não vale
 
 - **Desktop:** a luz da grade é lida por pixel (as 8 sondas em volta do ponto), num shader que só é
-  compilado em arquivos com volume.
+  compilado em arquivos com volume (e não no preset Very Low). Material com textura demais para sobrar
+  a unidade do atlas usa a luz no centro do objeto.
+- O volume de cada objeto é escolhido pela caixa da malha: o que contém a maior parte dela.
 - **Web:** a luz é lida no centro de cada objeto, porque lá falta unidade de textura. Sem render em
   half float no navegador, o volume não liga.
 - Material com luz ou AO pintados na textura soma com a grade e pode ficar claro demais.

@@ -378,6 +378,8 @@ void GPU_material_vertex_attributes(GPUMaterial *material,
 bool GPU_material_do_color_management(GPUMaterial *mat);
 /* Probe Volume GI: materials skip the display transform (linear light) while true. */
 void GPU_material_set_linear_capture(bool linear);
+/* True while the probe volumes capture (linear light, no display transform). */
+bool GPU_material_linear_capture(void);
 /* World environment (sky/atmosphere/HDRI) links for the new shading nodes (Principled).
  * `view`/`vn` are the view-space position and normal links. Returns false when there is no world. */
 bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn, GPUNodeLink *rough,

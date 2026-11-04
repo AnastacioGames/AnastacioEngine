@@ -96,7 +96,13 @@ private:
 	std::vector<float> m_atlasData;
 
 	/// Position of each captured object at its last check: moving it past 0.25 m marks the probes near it.
-	std::unordered_map<KX_GameObject *, mt::vec3> m_objectPos;
+	struct ObjectPos {
+		mt::vec3 pos;
+		/// Number of the last CheckMovedObjects that saw the object.
+		int check;
+	};
+	std::unordered_map<KX_GameObject *, ObjectPos> m_objectPos;
+	int m_moveCheck = 0;
 	/// Cube shared by every probe of the grid, reused as soon as its readback is requested.
 	GPUTexture *m_cube;
 	Reader m_readers[NUM_READERS];
@@ -108,6 +114,8 @@ private:
 
 	int m_facesPerFrame;
 	bool m_freeze;
+	/// Freeze mode after the first full cycle: no new capture starts, the readers drain.
+	bool m_stopCapture;
 	/// Set once a full cycle with every SH9 read is done in freeze mode: the scheduler stops.
 	bool m_frozen;
 	/// The probes were pushed out of the surfaces and the buried ones disabled (first frame).
@@ -152,6 +160,8 @@ public:
 	float SampleSH(const mt::vec3& pos, float r_sh[9][3]) const;
 	/// 1 inside the box, 0 from half a spacing outside it.
 	float BoxWeight(const mt::vec3& pos) const;
+	/// Share (0..1) of the world box aabbMin..aabbMax inside the grid box.
+	float BoxOverlap(const mt::vec3& aabbMin, const mt::vec3& aabbMax) const;
 	float GetSSGIWeight() const;
 	/// Gain of the grid light the grid's own captures read (bounces).
 	float GetBounce() const;

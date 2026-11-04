@@ -80,6 +80,7 @@ KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality qualit
 	m_capturePos(mt::zero3),
 	m_facesPerFrame(qualityFaces[quality]),
 	m_freeze(freeze),
+	m_stopCapture(false),
 	m_frozen(false),
 	m_classified(false),
 	m_activeProbes(0),
@@ -112,6 +113,16 @@ KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality qualit
 	if (m_spacing > wanted * 1.01f) {
 		CM_Warning("probe volume \"" << box->GetName() << "\": spacing " << wanted << " m gives more than " <<
 		           maxProbes << " probes, using " << m_spacing << " m");
+	}
+
+	// The grid is axis aligned: a rotated Empty would show a box the probes don't follow.
+	const mt::mat3 rot = box->NodeGetWorldOrientation();
+	for (int i = 0; i < 3; i++) {
+		if (fabsf(rot(i, i) - 1.0f) > 1e-3f) {
+			CM_Warning("probe volume \"" << box->GetName() << "\": the Empty is rotated, the grid ignores the rotation "
+			           "(it stays aligned to the world axes)");
+			break;
+		}
 	}
 
 	const mt::vec3 center = box->NodeGetWorldPosition();
@@ -231,6 +242,8 @@ namespace {
 /// Static collision meshes, the ones the grid captures.
 struct SurfaceFilter
 {
+	/// Same layers the capture skips (probe_volume_ignore_layers).
+	int m_ignoreLayers = 0;
 	bool m_hit;
 	mt::vec3 m_point;
 	mt::vec3 m_normal;
@@ -239,7 +252,7 @@ struct SurfaceFilter
 	{
 		KX_GameObject *gameobj = client->m_gameobject;
 		return gameobj && !client->isSensor() && !gameobj->GetMeshList().empty() && gameobj->GetVisible() &&
-		       !KX_ProbeVolume::SkipObject(gameobj);
+		       !(gameobj->GetLayer() & m_ignoreLayers) && !KX_ProbeVolume::SkipObject(gameobj);
 	}
 
 	bool RayHit(KX_ClientObjectInfo *UNUSED(client), KX_RayCast *result, void *UNUSED(data))
@@ -278,7 +291,10 @@ void KX_ProbeVolume::ClassifyProbes()
 	const float reach = 0.5f * m_spacing;
 	const float start = 0.05f;
 	int pushed = 0, disabled = 0;
+	// Containment test reach: a ray from outside back to the probe finds the solid it is in.
+	const float inside = std::min(4.0f * m_spacing, m_clipEnd);
 	SurfaceFilter filter;
+	filter.m_ignoreLayers = GetIgnoreLayers();
 	for (Probe& probe : m_probes) {
 		// Push out: a ray that starts a little behind the probe catches the surface it sits on.
 		for (int pass = 0; pass < 2; pass++) {
@@ -305,6 +321,22 @@ void KX_ProbeVolume::ClassifyProbes()
 			    mt::dot(filter.m_normal, dir) > 0.0f) {
 				probe.disabled = true;
 				break;
+			}
+		}
+		/* Inside a convex collider (Box, Convex Hull): a ray starting inside it hits nothing, so the
+		 * back face test misses. A ray from outside back to the probe hits the solid's face while the
+		 * ray from the probe out hits nothing (or only at its start): the probe is in the solid. */
+		for (int a = 0; a < 6 && !probe.disabled; a++) {
+			const mt::vec3& dir = axes[a];
+			const mt::vec3 outside = probe.position + dir * inside;
+			if (!surface_ray(env, outside, probe.position, filter) || mt::dot(filter.m_normal, dir) <= 0.0f) {
+				continue;
+			}
+			const bool out = surface_ray(env, probe.position, outside, filter) &&
+			                 mt::dot(filter.m_point - probe.position, dir) > 1e-3f &&
+			                 filter.m_normal.LengthSquared() > 0.25f;
+			if (!out) {
+				probe.disabled = true;
 			}
 		}
 		if (probe.disabled) {
@@ -354,17 +386,23 @@ bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 	for (const Probe& probe : m_probes) {
 		allValid &= (probe.valid || probe.disabled);
 	}
-	if (m_freeze && allValid && m_cycleDone >= m_activeProbes) {
+	/* Freeze: after one full cycle no new capture starts; the readbacks still in flight land over
+	 * the next frames, then the grid stays as it is. */
+	if (m_freeze && !m_stopCapture && allValid && m_cycleDone >= m_activeProbes) {
+		m_stopCapture = true;
+		m_current = -1;
+	}
+	if (m_stopCapture && !m_frozen) {
 		bool idle = true;
 		for (const Reader& reader : m_readers) {
 			idle &= (reader.probe == -1);
 		}
-		if (idle && !m_frozen) {
+		if (idle) {
 			m_frozen = true;
 			CM_Message("probe volume \"" << GetViewpointObject()->GetName() << "\": frozen after the first cycle");
 		}
 	}
-	return !m_frozen;
+	return !m_stopCapture;
 }
 
 bool KX_ProbeVolume::NextFaceRange(int budget, const mt::vec3& cameraPos, int *r_first, int *r_count)
@@ -439,6 +477,16 @@ float KX_ProbeVolume::BoxWeight(const mt::vec3& pos) const
 		outside = std::max(outside, std::max(m_min[i] - pos[i], pos[i] - m_max[i]));
 	}
 	return std::min(std::max(1.0f - outside / (0.5f * m_spacing), 0.0f), 1.0f);
+}
+
+float KX_ProbeVolume::BoxOverlap(const mt::vec3& aabbMin, const mt::vec3& aabbMax) const
+{
+	float inter = 1.0f;
+	for (int i = 0; i < 3; i++) {
+		const float ext = std::max(aabbMax[i] - aabbMin[i], 1e-3f);
+		inter *= std::min(std::max(std::min(aabbMax[i], m_max[i]) - std::max(aabbMin[i], m_min[i]), 0.0f) / ext, 1.0f);
+	}
+	return inter;
 }
 
 float KX_ProbeVolume::SampleSH(const mt::vec3& pos, float r_sh[9][3]) const
@@ -568,30 +616,33 @@ GPUTexture *KX_ProbeVolume::UpdateAtlas()
 
 void KX_ProbeVolume::CheckMovedObjects(const std::vector<KX_GameObject *>& objects)
 {
-	std::unordered_map<KX_GameObject *, mt::vec3> positions;
-	positions.reserve(objects.size());
+	// Updated in place: each entry keeps the check number that last saw its object.
+	const int check = ++m_moveCheck;
 	for (KX_GameObject *gameobj : objects) {
 		const mt::vec3 pos = gameobj->NodeGetWorldPosition();
-		const auto it = m_objectPos.find(gameobj);
+		auto it = m_objectPos.find(gameobj);
 		if (it == m_objectPos.end()) {
-			positions[gameobj] = pos;
+			m_objectPos.emplace(gameobj, ObjectPos{pos, check});
 			continue;
 		}
-		if ((pos - it->second).Length() <= 0.25f) {
-			positions[gameobj] = it->second;
+		it->second.check = check;
+		const mt::vec3 old = it->second.pos;
+		if ((pos - old).Length() <= 0.25f) {
 			continue;
 		}
-		positions[gameobj] = pos;
+		it->second.pos = pos;
 		/* The probes that see it (old or new place) are recaptured first; frozen grids stay as
 		 * they are. */
 		for (Probe& probe : m_probes) {
-			if ((probe.position - pos).Length() <= m_clipEnd || (probe.position - it->second).Length() <= m_clipEnd) {
+			if ((probe.position - pos).Length() <= m_clipEnd || (probe.position - old).Length() <= m_clipEnd) {
 				probe.dirty = true;
 			}
 		}
 	}
 	// Objects gone (or out of reach) drop out; a new object at a reused address only marks too much.
-	m_objectPos.swap(positions);
+	for (auto it = m_objectPos.begin(); it != m_objectPos.end();) {
+		it = (it->second.check == check) ? std::next(it) : m_objectPos.erase(it);
+	}
 }
 
 bool KX_ProbeVolume::SkipObject(KX_GameObject *gameobj)

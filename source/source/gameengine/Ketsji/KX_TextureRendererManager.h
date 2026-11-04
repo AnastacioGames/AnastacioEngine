@@ -27,6 +27,8 @@
 #ifndef __KX_TEXTURE_RENDERER_MANAGER_H__
 #define __KX_TEXTURE_RENDERER_MANAGER_H__
 
+#include "mathfu.h"
+
 #include <vector>
 
 class KX_GameObject;
@@ -75,6 +77,9 @@ private:
 	bool m_capturingVolume;
 	/// Probe Volume GI grids, owned here (not in m_renderers: they capture a few faces per frame).
 	std::vector<KX_ProbeVolume *> m_volumes;
+	float m_ssgiScale = 1.0f;
+	/// Frames until the next moved objects check of the volumes.
+	int m_moveCheck = 0;
 
 	/// Run the probe volume schedulers: a budget of cube faces per frame for each grid.
 	void RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area);
@@ -141,11 +146,18 @@ public:
 	 */
 	bool FindProbe(const float position[3], ProbeSlot r_slots[2], float *r_weight2) const;
 
-	/** Probe Volume GI at position: the SH9 of the volume that holds it best (linear light). Returns
-	 * its weight over the probes' diffuse, 0 outside every volume and during the captures. */
-	float SampleProbeVolume(const float position[3], float r_sh[9][3]) const;
-	/// The volume that holds position best (nullptr outside every volume and during the captures).
-	KX_ProbeVolume *FindProbeVolume(const float position[3]) const;
+	bool HasProbeVolumes() const
+	{
+		return !m_volumes.empty();
+	}
+	/** The volume that holds the object's world box best: the most of the box inside, else the
+	 * nearest one fading out near its edge (nullptr outside every volume and during the captures). */
+	KX_ProbeVolume *FindProbeVolume(const mt::vec3& aabbMin, const mt::vec3& aabbMax) const;
+	/// SSGI strength factor of this scene's camera (lower inside a volume), read by its 2D filters.
+	float GetSSGIScale() const
+	{
+		return m_ssgiScale;
+	}
 	/// Gain of the grid light: below 1 while the grid captures (bounces that fade out), 1 otherwise.
 	float GetProbeVolumeGain(const KX_ProbeVolume *volume) const;
 

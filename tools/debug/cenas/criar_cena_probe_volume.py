@@ -105,6 +105,10 @@ def build(quality):
         vol.game.properties['probe_volume'].value = 0.0
         bpy.ops.object.game_property_new(type='STRING', name='probe_volume_quality')
         vol.game.properties['probe_volume_quality'].value = quality
+        if os.environ.get('PV_FREEZE'):
+            # Capture one cycle and stop (the log must say "frozen").
+            bpy.ops.object.game_property_new(type='BOOL', name='probe_volume_freeze')
+            vol.game.properties['probe_volume_freeze'].value = True
         if os.environ.get('PV_BOUNCE'):
             # Gain of each bounce (engine default 0.5).
             bpy.ops.object.game_property_new(type='FLOAT', name='probe_volume_bounce')

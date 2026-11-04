@@ -44,6 +44,7 @@ extern "C" {
 #include "RAS_BucketManager.h"
 #include "RAS_Mesh.h"
 #include "RAS_MeshUser.h"
+#include "RAS_BoundingBox.h"
 #include "RAS_Deformer.h"
 #include "RAS_InstancingBuffer.h"
 #include "RAS_Rasterizer.h"
@@ -343,7 +344,27 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		/* Probe Volume GI: the grid's diffuse replaces the probes' diffuse, per pixel from the atlas
 		 * (desktop variant) or else from the SH9 at the object center. */
 		KX_TextureRendererManager *trm = m_scene->GetTextureRendererManager();
-		KX_ProbeVolume *volume = trm->FindProbeVolume(pos);
+		KX_ProbeVolume *volume = nullptr;
+		// The object's world box picks the volume (a long wall whose origin sits outside it still gets it).
+		mt::vec3 boxMin = position, boxMax = position;
+		if (trm->HasProbeVolumes()) {
+			if (RAS_BoundingBox *bbox = meshUser->GetBoundingBox()) {
+				mt::vec3 lmin, lmax;
+				bbox->GetAabb(lmin, lmax);
+				const mt::mat4& m = meshUser->GetMatrix();
+				for (int i = 0; i < 3; i++) {
+					float lo = m(i, 3), hi = m(i, 3);
+					for (int j = 0; j < 3; j++) {
+						const float a = m(i, j) * lmin[j], b = m(i, j) * lmax[j];
+						lo += std::min(a, b);
+						hi += std::max(a, b);
+					}
+					boxMin[i] = lo;
+					boxMax[i] = hi;
+				}
+			}
+			volume = trm->FindProbeVolume(boxMin, boxMax);
+		}
 		const float gain = trm->GetProbeVolumeGain(volume);
 		GPUTexture *atlas = (volume && GPU_material_use_probe_grid_atlas(m_gpuMat)) ? volume->GetAtlas() : nullptr;
 		if (atlas) {
@@ -355,7 +376,14 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		else {
 			GPU_material_bind_probe_grid_atlas(m_gpuMat, nullptr, nullptr, nullptr, nullptr, 0.0f, 1.0f);
 			float gridSh[9][3];
-			const float gridWeight = volume ? volume->SampleSH(mt::vec3(pos[0], pos[1], pos[2]), gridSh) : 0.0f;
+			// Center of the object's box, clamped into the grid box when part of it is inside.
+			mt::vec3 at = (boxMin + boxMax) * 0.5f;
+			if (volume && volume->BoxOverlap(boxMin, boxMax) > 0.0f) {
+				for (int i = 0; i < 3; i++) {
+					at[i] = std::min(std::max(at[i], volume->GetMin()[i]), volume->GetMax()[i]);
+				}
+			}
+			const float gridWeight = volume ? volume->SampleSH(at, gridSh) : 0.0f;
 			for (int k = 0; gridWeight > 0.0f && k < 9; k++) {
 				for (int c = 0; c < 3; c++) {
 					gridSh[k][c] *= gain;

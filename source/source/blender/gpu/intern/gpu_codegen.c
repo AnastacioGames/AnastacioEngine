@@ -3640,13 +3640,9 @@ GPUPass *GPU_generate_pass(
 	if (stages && stages->shadow_pcss) {
 		flags |= GPU_SHADER_FLAGS_SHADOW_PCSS;
 	}
-	if (stages && stages->probe_volume) {
-		flags |= GPU_SHADER_FLAGS_PROBE_VOLUME;
-	}
-	if (stages && stages->shadow_csm) {
-		/* The cascades use fixed units (csmunit in GPU_material_bind_shadow_lamps); the lowest is
-		 * max - 3 * 4 - 1. A material with that many textures keeps them and loses the CSM sun. */
-		int ntex = 0;
+	/* Units taken by the material's own textures, below the fixed units of the atlas and cascades. */
+	int ntex = 0;
+	if (stages && (stages->probe_volume || stages->shadow_csm)) {
 		for (GPUNode *node = nodes->first; node; node = node->next) {
 			for (GPUInput *input = node->inputs.first; input; input = input->next) {
 				if (codegen_input_has_texture(input) && input->texid + 1 > ntex) {
@@ -3654,8 +3650,18 @@ GPUPass *GPU_generate_pass(
 				}
 			}
 		}
-		/* The probe volume atlas takes max - 3 * 4 - 2 (GPU_material_bind_probe_grid_atlas). */
-		const int atlas = stages->probe_volume ? 1 : 0;
+	}
+	/* The probe volume atlas takes unit max - 3 * 4 - 2 (GPU_material_bind_probe_grid_atlas). A
+	 * material with that many textures keeps them and uses the per object SH9 of the grid. */
+	const bool atlas_unit = stages && stages->probe_volume &&
+	                        ntex <= GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 2;
+	if (atlas_unit) {
+		flags |= GPU_SHADER_FLAGS_PROBE_VOLUME;
+	}
+	if (stages && stages->shadow_csm) {
+		/* The cascades use fixed units (csmunit in GPU_material_bind_shadow_lamps); the lowest is
+		 * max - 3 * 4 - 1. A material with that many textures keeps them and loses the CSM sun. */
+		const int atlas = atlas_unit ? 1 : 0;
 		if (ntex <= GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 1 - atlas) {
 			flags |= GPU_SHADER_FLAGS_SHADOW_CSM;
 		}
