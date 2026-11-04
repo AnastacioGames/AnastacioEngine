@@ -72,7 +72,8 @@ public:
 	};
 
 private:
-	enum { NUM_READERS = 4 };
+	/// SH9 readbacks in flight: the warm up starts a few probes per frame and each read takes some frames.
+	enum { NUM_READERS = 12 };
 
 	struct Reader {
 		GPUCubeSH9Reader *reader = nullptr;
@@ -116,6 +117,14 @@ private:
 	bool m_freeze;
 	/// Freeze mode after the first full cycle: no new capture starts, the readers drain.
 	bool m_stopCapture;
+	/** Idle: the light stopped changing (2 cycles in a row) and nothing moved, so no capture runs
+	 * until Wake() or a moved object marks a probe. */
+	bool m_idle = false;
+	/// Largest relative change of a probe's light in the current cycle.
+	float m_cycleDelta = 0.0f;
+	int m_stableCycles = 0;
+	/// Until the light settles the first time: big budget and no temporal mix (fast start).
+	bool m_warmup = true;
 	/// Set once a full cycle with every SH9 read is done in freeze mode: the scheduler stops.
 	bool m_frozen;
 	/// The probes were pushed out of the surfaces and the buried ones disabled (first frame).
@@ -147,6 +156,11 @@ public:
 	const int *GetDims() const;
 	Stats& GetStats();
 	int GetFacesPerFrame() const;
+	/// Faces to capture this frame: more during the first cycles (warm up), then GetFacesPerFrame().
+	int GetFaceBudget() const;
+	bool IsIdle() const;
+	/// Something the grid sees changed (sun, World): leaves the idle mode.
+	void Wake();
 
 	/** Scheduler, called once per frame before the captures: applies the finished readbacks and
 	 * returns false when nothing is to be captured (frozen or every reader busy). */

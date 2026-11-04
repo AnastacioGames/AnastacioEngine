@@ -353,7 +353,8 @@ KX_ProbeVolume *KX_TextureRendererManager::FindProbeVolume(const mt::vec3& aabbM
 void KX_TextureRendererManager::CheckWorldChanged()
 {
 	KX_WorldInfo *info = m_scene->GetWorldInfo();
-	if (!m_worldProbe || !info) {
+	// The World capture and the probe volumes (idle until the light changes) both follow it.
+	if ((!m_worldProbe && m_volumes.empty()) || !info) {
 		return;
 	}
 
@@ -376,7 +377,12 @@ void KX_TextureRendererManager::CheckWorldChanged()
 
 	if (!std::equal(sig, sig + 16, m_worldSignature)) {
 		std::copy_n(sig, 16, m_worldSignature);
-		m_worldProbe->ForceUpdate();
+		if (m_worldProbe) {
+			m_worldProbe->ForceUpdate();
+		}
+		for (KX_ProbeVolume *volume : m_volumes) {
+			volume->Wake();
+		}
 	}
 }
 
@@ -504,7 +510,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 			if (!volume->GetViewpointObject() || !volume->BeginFrame(cameraPos, now)) {
 				continue;
 			}
-			int left = volume->GetFacesPerFrame();
+			int left = volume->GetFaceBudget();
 			int first, count;
 			while (volume->NextFaceRange(left, cameraPos, &first, &count)) {
 				RenderRenderer(rasty, volume, sceneCamera, viewport, area, first, count);
@@ -568,7 +574,8 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		           " probes, cpu " << st.cpuMs / logFrames << " ms/frame, read " << st.readMs / logFrames <<
 		           " ms/frame (max " << st.readMaxMs << ", request " << st.requestMs / logFrames << "), objects/face " <<
 		           (st.faces ? st.objects / st.faces : 0) << ", reader waits " << st.readerWaits <<
-		           ", last cycle " << st.lastCycleSeconds << " s, light " << volume->AverageLight());
+		           ", last cycle " << st.lastCycleSeconds << " s, light " << volume->AverageLight() <<
+		           (volume->IsIdle() ? ", idle" : ""));
 		const double lastCycle = st.lastCycleSeconds;
 		st = KX_ProbeVolume::Stats();
 		st.lastCycleSeconds = lastCycle;

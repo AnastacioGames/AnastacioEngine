@@ -10,8 +10,9 @@ continua vindo das sondas manuais e do World. Fica desligado até existir um Emp
    da caixa é o Display Size vezes a escala. A grade segue sempre os eixos do mundo: a rotação do
    Empty é ignorada (o console e o Scene Doctor avisam). Sala inclinada pede várias caixas.
 2. Em Game Properties, crie `probe_volume` (Float): o espaçamento entre sondas em metros. 0 = 4 m.
-3. Rode o jogo. As sondas são capturadas aos poucos, algumas faces por quadro. A primeira volta
-   leva de 1 a 3 s.
+3. Rode o jogo. No começo a grade captura rápido até a luz assentar (alguns segundos). Depois
+   para de capturar e só volta quando algo muda: um objeto se move, aparece ou some, ou o sol e o
+   World mudam. Lâmpadas comuns que mudam não acordam a grade.
 
 O volume pode ocupar a sala inteira, encostando no chão, no teto e nas paredes. A engine empurra para
 fora as sondas que ficam em cima de uma superfície e desliga as que ficam dentro de paredes ou caixas.

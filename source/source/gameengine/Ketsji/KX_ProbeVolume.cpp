@@ -189,6 +189,28 @@ KX_ProbeVolume::Stats& KX_ProbeVolume::GetStats()
 	return m_stats;
 }
 
+int KX_ProbeVolume::GetFaceBudget() const
+{
+	/* Warm up: until the bounces settle the first time the budget is big (the readers cap it), so
+	 * the light is ready soon after the start instead of fading in over many seconds. */
+	return m_warmup ? std::max(m_facesPerFrame, 24) : m_facesPerFrame;
+}
+
+bool KX_ProbeVolume::IsIdle() const
+{
+	return m_idle;
+}
+
+void KX_ProbeVolume::Wake()
+{
+	if (m_idle) {
+		CM_Message("probe volume \"" << GetViewpointObject()->GetName() << "\": light changed, capturing again");
+	}
+	m_idle = false;
+	m_stableCycles = 0;
+	m_cycleDelta = 0.0f;
+}
+
 int KX_ProbeVolume::GetFacesPerFrame() const
 {
 	return m_facesPerFrame;
@@ -416,8 +438,18 @@ bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 		float sh[9][3];
 		if (GPU_cube_sh9_reader_poll(reader.reader, sh)) {
 			Probe& probe = m_probes[reader.probe];
-			// Temporal mix: no flicker when the sun turns slowly.
-			const float a = probe.valid ? 0.5f : 1.0f;
+			// Temporal mix: no flicker when the sun turns slowly (none in the warm up, it only slows it).
+			const float a = (probe.valid && !m_warmup) ? 0.5f : 1.0f;
+			if (probe.valid) {
+				// How much the light still changes (idle mode once it settles).
+				for (int c = 0; c < 3; c++) {
+					const float change = fabsf(sh[0][c] - probe.sh[0][c]) / std::max(fabsf(probe.sh[0][c]), 0.05f);
+					m_cycleDelta = std::max(m_cycleDelta, change);
+				}
+			}
+			else {
+				m_cycleDelta = 1.0f;
+			}
 			for (int k = 0; k < 9; k++) {
 				for (int c = 0; c < 3; c++) {
 					probe.sh[k][c] += (sh[k][c] - probe.sh[k][c]) * a;
@@ -454,7 +486,16 @@ bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 			CM_Message("probe volume \"" << GetViewpointObject()->GetName() << "\": frozen after the first cycle");
 		}
 	}
-	return !m_stopCapture;
+	if (m_idle) {
+		// A moved object marked probes near it: capture them (and settle again).
+		for (const Probe& probe : m_probes) {
+			if (probe.dirty) {
+				Wake();
+				break;
+			}
+		}
+	}
+	return !m_stopCapture && !m_idle;
 }
 
 bool KX_ProbeVolume::NextFaceRange(int budget, const mt::vec3& cameraPos, int *r_first, int *r_count)
@@ -519,6 +560,19 @@ void KX_ProbeVolume::FacesDone(int count, double now)
 	if (++m_cycleDone % std::max(1, m_activeProbes) == 0) {
 		m_stats.lastCycleSeconds = now - m_cycleStart;
 		m_cycleStart = now;
+		// Below 2 % change for 2 cycles in a row: the light is settled, stop capturing.
+		bool dirty = false;
+		for (const Probe& probe : m_probes) {
+			dirty |= probe.dirty;
+		}
+		m_stableCycles = (m_cycleDelta < 0.02f && !dirty) ? m_stableCycles + 1 : 0;
+		m_cycleDelta = 0.0f;
+		if (m_stableCycles >= 2 && !m_freeze) {
+			m_idle = true;
+			m_warmup = false;
+			m_current = -1;
+			CM_Message("probe volume \"" << GetViewpointObject()->GetName() << "\": light settled, idle until something changes");
+		}
 	}
 }
 
@@ -728,6 +782,14 @@ void KX_ProbeVolume::CheckMovedObjects(const std::vector<KX_GameObject *>& objec
 		auto it = m_objectPos.find(gameobj);
 		if (it == m_objectPos.end()) {
 			m_objectPos.emplace(gameobj, ObjectPos{pos, check});
+			// Added after the start (Add Object, made visible): the probes that see it update.
+			if (check > 1) {
+				for (Probe& probe : m_probes) {
+					if ((probe.position - pos).Length() <= m_clipEnd) {
+						probe.dirty = true;
+					}
+				}
+			}
 			continue;
 		}
 		it->second.check = check;
@@ -746,7 +808,17 @@ void KX_ProbeVolume::CheckMovedObjects(const std::vector<KX_GameObject *>& objec
 	}
 	// Objects gone (or out of reach) drop out; a new object at a reused address only marks too much.
 	for (auto it = m_objectPos.begin(); it != m_objectPos.end();) {
-		it = (it->second.check == check) ? std::next(it) : m_objectPos.erase(it);
+		if (it->second.check == check) {
+			++it;
+			continue;
+		}
+		// Gone (ended, hidden): the probes that saw it update.
+		for (Probe& probe : m_probes) {
+			if ((probe.position - it->second.pos).Length() <= m_clipEnd) {
+				probe.dirty = true;
+			}
+		}
+		it = m_objectPos.erase(it);
 	}
 }
 
