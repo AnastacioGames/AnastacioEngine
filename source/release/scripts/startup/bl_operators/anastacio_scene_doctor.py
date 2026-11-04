@@ -676,6 +676,22 @@ def rule_probe_volume(scene, objects):
                      "meshes. A wall or floor without collision is not seen: the probes behind it can leak "
                      "light through. Give the walls and floors collision (Static) or move the volume."),
                 sorted(loose, key=lambda o: o.name)))
+    fx = getattr(scene, "scenefx_settings", None)
+    volumes = [ob for ob in objects if ob.type == 'EMPTY' and "probe_volume" in ob.game.properties]
+    if volumes and fx is not None and not fx.use_ssao:
+        def fix_ssao(fx=fx):
+            fx.use_ssao = True
+
+            def revert():
+                fx.use_ssao = False
+            return revert
+        issues.append(Issue(
+            "probe_volume_ssao", scene.name, 'LOW',
+            tip_("Probe volume without SSAO"),
+            tip_("The probe grid doesn't see objects smaller than its spacing, so the contact shadow under "
+                 "and between them fades. SSAO (Scene > Effects) brings it back. Fix turns it on; the quality "
+                 "preset can still turn it off on weak PCs."),
+            volumes, fix_ssao))
     return issues
 
 

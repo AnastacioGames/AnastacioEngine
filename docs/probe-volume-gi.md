@@ -23,7 +23,7 @@ Box ou Convex Hull também contam. As camadas de `probe_volume_ignore_layers` fi
 | Propriedade | Tipo | Padrão | O que faz |
 |---|---|---|---|
 | `probe_volume_quality` | String ou Int | do preset | `Low`, `Medium` ou `High` (0, 1, 2): faces por quadro e limite de sondas (64, 128, 256). |
-| `probe_volume_bounce` | Float | 0,5 | Ganho de cada rebatida da luz da grade. 0 = só a luz direta rebatida uma vez. Máximo 0,95. |
+| `probe_volume_bounce` | Float | 0,3 | Ganho de cada rebatida da luz da grade. 0 = só a luz direta rebatida uma vez. Máximo 0,95. |
 | `probe_volume_ssgi` | Float | 0,5 | Força do SSGI com a câmera dentro do volume, para não somar a luz duas vezes. |
 | `probe_volume_clip_end` | Float | 30 | Distância que cada sonda enxerga. |
 | `probe_volume_ignore_layers` | Int | 0 | Camadas (bits) que a grade não captura. |
@@ -67,6 +67,8 @@ mostra a etapa como "Probes and reflections (Probe Volume GI)".
   half float no navegador, o volume não liga.
 - Material com luz ou AO pintados na textura soma com a grade e pode ficar claro demais.
 - Sala fechada, toda clara e com rebatida alta perde contraste. Baixe `probe_volume_bounce`.
+- A grade não vê objeto menor que o espaçamento: a sombra de contato embaixo dele some. Ligue o SSAO
+  (Scene > Effects) para devolver essa sombra.
 
 ## Depuração
 

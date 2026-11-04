@@ -3955,7 +3955,7 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 	 * "probe_volume_quality" (0/1/2 or Low/Medium/High, default Medium), "probe_volume_clip_end"
 	 * (default 30), "probe_volume_ignore_layers" (layer bits) and "probe_volume_freeze" (capture
 	 * one cycle and stop), "probe_volume_ssgi" (SSGI strength with the camera inside, default 0.5), "probe_volume_bounce" (gain of each
-	 * bounce of the grid light, 0 = direct light only, default 0.5). Moving physics, deformed meshes and "probe_volume_skip" objects stay out. */
+	 * bounce of the grid light, 0 = direct light only, default 0.3). Moving physics, deformed meshes and "probe_volume_skip" objects stay out. */
 	/* Global quality preset (ae_probe_volume_quality, written by BKE_scene_quality_preset_apply): caps the
 	 * grids, -1 = off (Very Low). Absent (Custom never applied) = no cap. */
 	int presetVolumeQuality = 2;
@@ -4010,7 +4010,7 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 		const float ssgiWeight = ssgiProp ? (std::min)((std::max)((float)ssgiProp->GetNumber(), 0.0f), 1.0f) : 0.5f;
 		EXP_Value *bounceProp = gameobj->GetProperty("probe_volume_bounce");
 		// Below 1: the bounces add up to a finite light.
-		const float bounce = bounceProp ? (std::min)((std::max)((float)bounceProp->GetNumber(), 0.0f), 0.95f) : 0.5f;
+		const float bounce = bounceProp ? (std::min)((std::max)((float)bounceProp->GetNumber(), 0.0f), 0.95f) : 0.3f;
 
 		kxscene->GetTextureRendererManager()->AddProbeVolume(gameobj, spacing, quality, clipEnd, ignoreLayers, freeze, ssgiWeight,
 		                                                     bounce);
