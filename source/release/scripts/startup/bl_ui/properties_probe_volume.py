@@ -154,7 +154,79 @@ class OBJECT_OT_probe_volume_skip(Operator):
         return {'FINISHED'}
 
 
-class OBJECT_PT_probe_volume(Panel):
+class EmptyProbePanel:
+    bl_space_type = 'PROPERTIES'
+    bl_region_type = 'WINDOW'
+    bl_context = "data"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return ob is not None and ob.type == 'EMPTY' and context.scene.render.engine == 'BLENDER_GAME'
+
+
+class DATA_PT_probe_volume(EmptyProbePanel, Panel):
+    bl_label = "Probe Volume"
+
+    def draw_header(self, context):
+        self.layout.operator("object.probe_volume_toggle", text="",
+                             icon='CHECKBOX_HLT' if is_volume(context.object) else 'CHECKBOX_DEHLT', emboss=False)
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
+        if not is_volume(ob):
+            layout.label(text="Lights the area inside this box with probes (bounced light)", icon='INFO')
+            return
+        props = ob.game.properties
+
+        box = layout.box()
+        box.label(text="Grid:", icon='MESH_GRID')
+        row = box.row(align=True)
+        current = _quality(ob)
+        for key, text in (('PRESET', "Preset"), ('LOW', "Low"), ('MEDIUM', "Med"), ('HIGH', "High")):
+            row.operator("object.probe_volume_quality", text=text, depress=(current == key)).quality = key
+        box.prop(props["probe_volume"], "value", text="Spacing (m)")
+        dims, spacing, used, limit = _grid(ob)
+        total = dims[0] * dims[1] * dims[2]
+        if used > spacing * 1.01:
+            box.label(text="%dx%dx%d = %d probes, spread to %.1f m (limit %d)" % (dims[0], dims[1], dims[2], total, used, limit),
+                      icon='ERROR')
+        else:
+            box.label(text="%dx%dx%d = %d probes" % (dims[0], dims[1], dims[2], total), icon='INFO')
+
+        box = layout.box()
+        box.label(text="Light:", icon='LAMP_SUN')
+        if "probe_volume_bounce" in props:
+            box.prop(props["probe_volume_bounce"], "value", text="Bounce")
+        if "probe_volume_ssgi" in props:
+            box.prop(props["probe_volume_ssgi"], "value", text="SSGI Inside")
+
+        if ob.empty_draw_type != 'CUBE':
+            layout.label(text="Display the Empty as Cube: the box is the volume", icon='ERROR')
+        if any(abs(a) > 1e-3 for a in ob.matrix_world.to_euler()):
+            layout.label(text="Rotation is ignored, the grid follows the world axes", icon='ERROR')
+
+
+class DATA_PT_probe_volume_advanced(EmptyProbePanel, Panel):
+    bl_label = "Probe Volume: Advanced"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    @classmethod
+    def poll(cls, context):
+        return EmptyProbePanel.poll(context) and is_volume(context.object)
+
+    def draw(self, context):
+        props = context.object.game.properties
+        box = self.layout.box()
+        box.label(text="Capture:", icon='RENDER_STILL')
+        for name, label in (("probe_volume_clip_end", "Clip End"), ("probe_volume_ignore_layers", "Ignore Layers"),
+                            ("probe_volume_freeze", "Freeze")):
+            if name in props:
+                box.prop(props[name], "value", text=label)
+
+
+class OBJECT_PT_probe_volume_skip(Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "object"
@@ -164,58 +236,15 @@ class OBJECT_PT_probe_volume(Panel):
     @classmethod
     def poll(cls, context):
         ob = context.object
-        if ob is None or context.scene.render.engine != 'BLENDER_GAME':
-            return False
-        if ob.type == 'EMPTY':
-            return True
-        # Other objects: only the skip switch, and only when the scene has a volume.
-        return ob.type == 'MESH' and any(is_volume(o) for o in context.scene.objects)
-
-    def draw_header(self, context):
-        ob = context.object
-        if ob.type == 'EMPTY':
-            self.layout.operator("object.probe_volume_toggle", text="",
-                                 icon='CHECKBOX_HLT' if is_volume(ob) else 'CHECKBOX_DEHLT', emboss=False)
+        return (ob is not None and ob.type == 'MESH' and context.scene.render.engine == 'BLENDER_GAME' and
+                any(is_volume(o) for o in context.scene.objects))
 
     def draw(self, context):
-        layout = self.layout
-        ob = context.object
-        if ob.type != 'EMPTY':
-            skip = "probe_volume_skip" in ob.game.properties
-            layout.operator("object.probe_volume_skip", text="Skip in Probe Volume",
-                            icon='CHECKBOX_HLT' if skip else 'CHECKBOX_DEHLT')
-            return
-        if not is_volume(ob):
-            layout.label(text="Check the box to light the area inside this Empty with probes")
-            return
-        props = ob.game.properties
-
-        row = layout.row(align=True)
-        row.label(text="Quality:")
-        current = _quality(ob)
-        for key, text in (('PRESET', "Preset"), ('LOW', "Low"), ('MEDIUM', "Med"), ('HIGH', "High")):
-            row.operator("object.probe_volume_quality", text=text, depress=(current == key)).quality = key
-
-        layout.prop(props["probe_volume"], "value", text="Spacing (m)")
-        dims, spacing, used, limit = _grid(ob)
-        total = dims[0] * dims[1] * dims[2]
-        if used > spacing * 1.01:
-            layout.label(text="%dx%dx%d = %d probes, spread to %.1f m (limit %d)" % (dims[0], dims[1], dims[2], total, used, limit),
-                         icon='ERROR')
-        else:
-            layout.label(text="%dx%dx%d = %d probes" % (dims[0], dims[1], dims[2], total), icon='INFO')
-        if "probe_volume_bounce" in props:
-            layout.prop(props["probe_volume_bounce"], "value", text="Bounce")
-        if ob.empty_draw_type != 'CUBE':
-            layout.label(text="Display the Empty as Cube: the box is the volume", icon='ERROR')
-        if any(abs(a) > 1e-3 for a in ob.matrix_world.to_euler()):
-            layout.label(text="Rotation is ignored, the grid follows the world axes", icon='ERROR')
-
-        box = layout.box()
-        box.label(text="Advanced")
-        for name, _typ, _value, label in OPTIONS[1:]:
-            if name in props:
-                box.prop(props[name], "value", text=label)
+        box = self.layout.box()
+        box.label(text="Probe Volume:", icon='MESH_GRID')
+        skip = "probe_volume_skip" in context.object.game.properties
+        box.operator("object.probe_volume_skip", text="Skip in Probe Volume",
+                     icon='CHECKBOX_HLT' if skip else 'CHECKBOX_DEHLT', emboss=False)
 
 
 classes = (
@@ -223,7 +252,9 @@ classes = (
     OBJECT_OT_probe_volume_toggle,
     OBJECT_OT_probe_volume_quality,
     OBJECT_OT_probe_volume_skip,
-    OBJECT_PT_probe_volume,
+    DATA_PT_probe_volume,
+    DATA_PT_probe_volume_advanced,
+    OBJECT_PT_probe_volume_skip,
 )
 
 if __name__ == "__main__":  # only for live edit.
