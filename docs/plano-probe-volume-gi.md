@@ -1,6 +1,6 @@
 # Plano: Probe Volume GI (luz indireta por grade de sondas)
 
-Status: F1a (6903b915), F1b (c4af8fba), F2 (539d85cc) e F3 (anti-vazamento e rebatidas) commitadas em 2026-11-03. Falta aceite visual com janela. Próximo: F4 (acabamento).
+Status: F1a (6903b915), F1b (c4af8fba), F2 (539d85cc), F3 (a4d802ab) e F4 commitadas em 2026-11-03. Falta: aceite visual com janela, iGPU real, Chebyshev no High, interruptor em Python e site. Guia de uso: [probe-volume-gi.md](probe-volume-gi.md).
 
 ## Contexto
 A ideia é ter luz indireta dinâmica, que acompanhe dia/noite, lanternas e portas e funcione fora da tela, onde o SSGI não chega. O caminho é uma grade automática de sondas atualizada aos poucos (no estilo DDGI, mas capturando por rasterização), que se liga e desliga. O rascunho anterior (docs/plano-probe-volume-gi.md) não foi gravado. Esta revisão confere cada ponto dele contra o código atual. Nada será executado hoje: o único entregável é o plano, que depois vai para `docs/plano-probe-volume-gi.md`.
@@ -186,3 +186,13 @@ Conferido em `KX_TextureRendererManager`, `KX_LightProbe`, `BL_BlenderShader::Up
 - **Rebatidas:** a captura da grade lê o próprio atlas com ganho `probe_volume_bounce` (padrão 0,5, 0 = só luz direta, máx. 0,95). As sondas manuais continuam sem ler a grade. Não precisou de atlas com dois buffers: o atlas é enviado da CPU depois das capturas do quadro.
 - **Chebyshev (High):** adiado. Com a classificação e o deslocamento o vazamento da cena de teste sumiu.
 - Cena de teste com o volume ocupando a sala inteira: Medium move 71 de 72 sondas e desliga 2 (dentro de caixas). Luz média das sondas (log `light`): ganho 0 = 1,6, 0,5 = 2,15, 0,9 = 2,45; estabiliza em ~3 voltas. Custo igual ao da F2: Low 0,50 ms/quadro, Medium 0,94, High 1,70 (CPU da grade), pico de leitura abaixo de 1,1 ms, nenhuma espera de leitor.
+
+## F4 (2026-11-03)
+
+- **Campo global sem DNA:** o preset de qualidade da cena (Scene > Quality) ganhou a coluna `ae_probe_volume_quality`, gravada como propriedade da cena igual às do SSGI. Very Low = -1 (desligado), Low = 0, Medium = 1, High e Ultra = 2. O conversor usa o menor entre o preset e o `probe_volume_quality` do Empty; sem a propriedade no Empty, segue o preset. Arquivo da Range upstream (preset 0 = Custom) não grava nada e fica em Medium.
+- **Auto:** iGPU, Web e Android resolvem para Low. O `RANGE_WEAK_GPU` se apresenta como iGPU e cai em Low também; conferido (5x5x2, 2 faces/quadro).
+- **Scene Doctor:** regra `rule_probe_volume`. Sondas acima do limite da qualidade (MEDIUM, conserto grava o espaçamento que a engine usaria) e malhas sem colisão dentro do volume (LOW: a classificação da F3 não as vê).
+- **Performance Report:** etapa de GPU nova `render.probes` (sondas, cubos e grade), separada de `render.shadows`, e dica quando passa de um quarto do orçamento na GPU 16x mais lenta.
+- **Custo de GPU** (desktop, sem limite de FPS): Low 0,24 ms, Medium 0,48 ms, High 1,03 ms por quadro. Com o jogo preso em 60 FPS a GPU baixa o clock e todas as etapas aparecem 5-20x maiores no profiler (a grade chegou a mostrar 10 ms). Isso já valia para o relatório; medir sem limite.
+- **Documentação:** [probe-volume-gi.md](probe-volume-gi.md). Não há página rst (o rst é só da API Python) e o site fica para depois.
+- **Não feito:** interruptor em Python (KX_PythonInit tem WIP alheio), Chebyshev no High, teste na iGPU real e build Web.

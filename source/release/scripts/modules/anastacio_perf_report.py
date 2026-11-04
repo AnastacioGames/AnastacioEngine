@@ -40,6 +40,7 @@ WEAK_GPU_DEFAULT = 16
 GPU_STEP_NAMES = {
     'render.begin': 'Frame start (clear, sky)',
     'render.shadows': 'Shadows',
+    'render.probes': 'Probes and reflections (Probe Volume GI)',
     'render.camera_setup': 'Camera setup',
     'render.sky': 'Sky (background, stars, moon)',
     'render.cameras': 'Objects and materials',
@@ -407,6 +408,18 @@ def sky_advice(steps, settings, weak):
     else:
         text += ' ' + _('Set Sky Quality to Low for weak PCs.')
     return level, text
+
+
+def probe_advice(steps, weak):
+    """Tip for the probe captures (cube maps, planar mirrors' probes, Probe Volume GI) when heavy on a weak GPU."""
+    ms = dict(steps).get('render.probes', 0.0)
+    factor = weak if weak > 1 else WEAK_GPU_DEFAULT
+    if ms * factor < GPU_BUDGET_MS / 4:
+        return None
+    level = 'bad' if ms * factor >= GPU_BUDGET_MS / 2 else 'warn'
+    return level, _('Probe captures cost %.2f ms on this GPU, about %.0f ms on a GPU %dx slower. Lower '
+                    'probe_volume_quality (or the Quality preset), turn on probe_volume_freeze for static '
+                    'light, shorten probe_volume_clip_end, or use fewer realtime probes.') % (ms, ms * factor, factor)
 
 
 def read_shader_log(folder, load_end=LOAD_FRAMES):
@@ -780,9 +793,10 @@ def write_html(folder, title=None):
     w.append('<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">')
     w.append('<title>%s</title><style>%s</style><script>%s</script></head><body><main>' % (_esc(_('Performance Report')), CSS, THEME_JS))
     tips = advice(a, shader_items)
-    sky_tip = sky_advice(read_gpu_profile(folder), settings, weak)
-    if sky_tip:
-        tips.insert(0, sky_tip)
+    gpu_steps = read_gpu_profile(folder)
+    extra = [t for t in (sky_advice(gpu_steps, settings, weak), probe_advice(gpu_steps, weak)) if t]
+    if extra:
+        tips[:0] = extra
         tips.sort(key=lambda t: {'bad': 0, 'warn': 1}.get(t[0], 2))
     worst_level = tips[0][0] if tips else 'good'
     verdict = {'good': _('Runs smoothly'), 'warn': _('Some things worth a look'), 'bad': _('Needs work')}[worst_level]

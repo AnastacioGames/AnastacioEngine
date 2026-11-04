@@ -16,6 +16,7 @@ Rules are plain functions in RULES: rule(scene) returns a list of Issue; Issue.f
 the change. New checks only need a new function in that list."""
 
 import json
+import math
 import os
 import time
 
@@ -590,6 +591,78 @@ def rule_instancing_unique_meshes(scene, objects):
     return issues
 
 
+# Probe Volume GI: probes per quality (engine KX_ProbeVolume, qualityMaxProbes) and the default spacing.
+PROBE_VOLUME_MAX = {0: 64, 1: 128, 2: 256}
+PROBE_VOLUME_SPACING = 4.0
+
+
+def _probe_volume_quality(ob):
+    prop = ob.game.properties.get("probe_volume_quality")
+    if prop is None:
+        return 1
+    value = prop.value
+    if isinstance(value, str):
+        return {"low": 0, "medium": 1, "med": 1, "high": 2}.get(value.lower(), 1)
+    return min(max(int(value), 0), 2)
+
+
+def _probe_volume_dims(half, spacing):
+    dims = [max(2, int(math.ceil(2.0 * h / spacing - 1e-6)) + 1) for h in half]
+    return dims, dims[0] * dims[1] * dims[2]
+
+
+def rule_probe_volume(scene, objects):
+    """Probe Volume GI (Empty with "probe_volume"): a grid over its quality limit spreads its probes out
+    (the light gets coarse), and the anti leak only sees meshes with collision."""
+    issues = []
+    for ob in objects:
+        if ob.type != 'EMPTY' or "probe_volume" not in ob.game.properties:
+            continue
+        spacing = float(ob.game.properties["probe_volume"].value) or PROBE_VOLUME_SPACING
+        spacing = max(spacing, 0.25)
+        half = [max(abs(ob.matrix_world.to_scale()[i]) * ob.empty_draw_size, 0.01) for i in range(3)]
+        quality = _probe_volume_quality(ob)
+        limit = PROBE_VOLUME_MAX[quality]
+        dims, total = _probe_volume_dims(half, spacing)
+        if total > limit:
+            used = spacing
+            while _probe_volume_dims(half, used)[1] > limit:
+                used *= 1.1
+
+            def fix(prop=ob.game.properties["probe_volume"], old=ob.game.properties["probe_volume"].value, new=round(used + 0.05, 1)):
+                prop.value = new
+
+                def revert():
+                    prop.value = old
+                return revert
+            issues.append(Issue(
+                "probe_volume_many", ob.name, 'MEDIUM',
+                tip_("Probe volume %s needs %d probes, its quality allows %d") % (ob.name, total, limit),
+                tip_("The game spreads the probes to %.1f m apart instead of %.1f m. Split the box into smaller "
+                     "volumes around the places the player sees, raise probe_volume_quality, or accept the "
+                     "wider spacing (Fix writes it, so the console warning goes away).") % (used, spacing),
+                [ob], fix))
+        lo = [ob.matrix_world.translation[i] - half[i] for i in range(3)]
+        hi = [ob.matrix_world.translation[i] + half[i] for i in range(3)]
+        loose = []
+        for other in objects:
+            if other.type != 'MESH' or other.game.physics_type != 'NO_COLLISION':
+                continue
+            p = other.matrix_world.translation
+            if all(lo[i] <= p[i] <= hi[i] for i in range(3)):
+                loose.append(other)
+        if loose:
+            issues.append(Issue(
+                "probe_volume_no_collision", ob.name, 'LOW',
+                tip_("%d meshes inside probe volume %s have no collision") % (len(loose), ob.name),
+                tip_("The grid pushes its probes out of walls and floors by casting rays at the collision "
+                     "meshes. A wall or floor without collision is not seen: the probes behind it can leak "
+                     "light through. Give the walls and floors collision (Static) or move the volume."),
+                sorted(loose, key=lambda o: o.name)))
+    return issues
+
+
+
 RULES = (
     rule_textures,
     rule_heavy_meshes,
@@ -600,6 +673,7 @@ RULES = (
     rule_instancing_unique_meshes,
     rule_sounds,
     rule_scripts_every_frame,
+    rule_probe_volume,
 )
 
 

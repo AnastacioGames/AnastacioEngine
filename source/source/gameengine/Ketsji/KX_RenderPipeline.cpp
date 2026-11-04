@@ -420,13 +420,22 @@ void KX_RenderPipeline::Render()
 			// use_gpu_particle_collider), independent of shadow buffers above.
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_collisiondepth);
 			RenderCollisionDepthBuffer(scene);
-			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_texturerenderers);
-			// Render only independent texture renderers here.
-			scene->RenderTextureRenderers(KX_TextureRendererManager::VIEWPORT_INDEPENDENT, rasterizer, nullptr, nullptr, RAS_Rect(), RAS_Rect());
-			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 		}
 
 		RANGE_PROFILE_MARK_GPU(prof, "render.shadows");
+
+		// Probes, cube maps and the Probe Volume GI grids: their own GPU step in the profile.
+		m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_texturerenderers);
+		for (KX_Scene *scene : scenes) {
+			if (!scene->IsVisible()) {
+				continue;
+			}
+			// Render only independent texture renderers here.
+			scene->RenderTextureRenderers(KX_TextureRendererManager::VIEWPORT_INDEPENDENT, rasterizer, nullptr, nullptr, RAS_Rect(), RAS_Rect());
+		}
+		m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
+
+		RANGE_PROFILE_MARK_GPU(prof, "render.probes");
 
 		KX_RenderData renderData = GetRenderData();
 

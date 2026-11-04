@@ -3956,6 +3956,18 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 	 * (default 30), "probe_volume_ignore_layers" (layer bits) and "probe_volume_freeze" (capture
 	 * one cycle and stop), "probe_volume_ssgi" (SSGI strength with the camera inside, default 0.5), "probe_volume_bounce" (gain of each
 	 * bounce of the grid light, 0 = direct light only, default 0.5). Moving physics, deformed meshes and "probe_volume_skip" objects stay out. */
+	/* Global quality preset (ae_probe_volume_quality, written by BKE_scene_quality_preset_apply): caps the
+	 * grids, -1 = off (Very Low). Absent (Custom never applied) = no cap. */
+	int presetVolumeQuality = 2;
+	bool hasVolumePreset = false;
+	{
+		IDProperty *props = kxscene->GetBlenderScene()->id.properties;
+		IDProperty *prop = props ? IDP_GetPropertyFromGroup(props, "ae_probe_volume_quality") : nullptr;
+		if (prop && prop->type == IDP_INT) {
+			presetVolumeQuality = (std::min)(IDP_Int(prop), 2);
+			hasVolumePreset = true;
+		}
+	}
 	for (KX_GameObject *gameobj : sumolist) {
 		EXP_Value *spacingProp = gameobj->GetProperty("probe_volume");
 		if (!spacingProp) {
@@ -3966,7 +3978,12 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 			spacing = 4.0f;
 		}
 		spacing = (std::max)(spacing, 0.25f);
-		int quality = 1;
+		if (presetVolumeQuality < 0) {
+			CM_Message("probe volume \"" << gameobj->GetName() << "\": off (quality preset Very Low)");
+			continue;
+		}
+		// Without its own quality the grid follows the preset (Medium without one).
+		int quality = hasVolumePreset ? presetVolumeQuality : 1;
 		if (EXP_Value *qualityProp = gameobj->GetProperty("probe_volume_quality")) {
 			const std::string text = qualityProp->GetText();
 			if (text == "Low" || text == "low") {
@@ -3982,6 +3999,7 @@ void BL_PostConvertBlenderObjects(KX_Scene *kxscene, const BL_SceneConverter& sc
 				quality = (int)qualityProp->GetNumber();
 			}
 		}
+		quality = (std::min)(quality, presetVolumeQuality);
 		EXP_Value *clipProp = gameobj->GetProperty("probe_volume_clip_end");
 		const float clipEnd = (clipProp && clipProp->GetNumber() > 0.1) ? (float)clipProp->GetNumber() : 30.0f;
 		EXP_Value *layersProp = gameobj->GetProperty("probe_volume_ignore_layers");
