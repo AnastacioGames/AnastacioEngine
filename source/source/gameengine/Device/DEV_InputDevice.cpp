@@ -196,7 +196,16 @@ DEV_InputDevice::~DEV_InputDevice()
 
 void DEV_InputDevice::ConvertKeyEvent(int incode, int val, unsigned int unicode)
 {
-	const SCA_EnumInputs type = m_reverseKeyTranslateTable[incode];
+	const auto it = m_reverseKeyTranslateTable.find(incode);
+	if (it == m_reverseKeyTranslateTable.end() || it->second == NOKEY) {
+		/* Tecla sem mapeamento (ex.: Print Screen): nao vira NOKEY, que e o "0" (vazio) dos
+		 * COMPOSITEPADS dos mapas de entrada e acionaria esses pads. So o texto passa. */
+		if (val > 0 && unicode != 0) {
+			m_text += (wchar_t)unicode;
+		}
+		return;
+	}
+	const SCA_EnumInputs type = it->second;
 	m_physicalKeys[type] = (val > 0);
 	ConvertEvent(type, m_virtualKeys[type] ? 1 : val, unicode);
 }
