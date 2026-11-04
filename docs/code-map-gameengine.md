@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-01 (`HEAD` `b214efdb`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-03 (`HEAD` `2373d1b6`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -50,7 +50,7 @@ cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`,
 
 ---
 
-## `Ketsji/KX_PythonInit.cpp` (3.890 linhas)
+## `Ketsji/KX_PythonInit.cpp` (3.896 linhas)
 
 Bootstrap do Python embutido e módulos `Range`/`bge`. O registro dos **tipos** (`KX_GameObject`, `KX_Scene`…)
 não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específico de Web (`__EMSCRIPTEN__`) em 69,
@@ -61,22 +61,22 @@ não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específic
 | Utilitários do módulo `Range` (funções globais `gPy*`) | aleatório/gravidade/caminho 214–243, `gPyStartGame`/`EndGame`/`RestartGame` 261–289, `SaveGlobalDict`/`LoadGlobalDict` 300–318, `GetProfileInfo` 336, `SendMessage` 349, `GetSpectrum` 372 |
 | Taxas e relógio | tic rate, render rate, animation rate, exit key, max frames, clock/time scale 384–602 |
 | Lista de arquivos e cenas | `.blend`/`.range`/`.rasec` 607–660, `AddScene`/`GetCurrentScene`/`GetSceneList` 671–707 |
-| Informação de sistema | `pyPrintStats` 863, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 945 |
-| Bibliotecas externas | `gLibLoad` 964, `gLibNew` 1183, `gLibFree` 1237, `gLibList` 1253, `gPyNextFrame` 1279 |
+| Informação de sistema | `pyPrintStats` 864, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 946 |
+| Bibliotecas externas | `gLibLoad` 965, `gLibNew` 1184, `gLibFree` 1238, `gLibList` 1254, `gPyNextFrame` 1280 |
 | Tabela `game_methods[]` | 997 |
-| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1416–1610 |
-| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1921, janela/fullscreen 1507–1524 |
+| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1417–1611 |
+| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1922, janela/fullscreen 1507–1524 |
 | Áudio e debug na tela | `MasterVolume` 1585–1597, `ShowFramerate`/`ShowProfile`/`ShowProperties`/`AutoDebugList` 1606–1650, `GetDisplayDimensions` 1660 |
 | Tabela `rasterizer_methods[]` | 1679 |
-| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2290 (~430 linhas, constantes de tipos/estados) |
-| Ambiente `sys` e caminhos | `backupPySysObjects` 2720 … `restorePySysObjects` 2795, `appendPythonPath` 2823, `addImportMain`/`removeImportMain` 2834–2839 |
-| Módulo `Range` e compatibilidade | `addSubModule` 2856, `initRANGE` 2864, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2902, `installLegacyAudFactoryAlias` 2956 (alias `bge`/`aud`) |
-| Init/saída do Python | `initPlayerPython` 3004, `exitPlayerPython` 3044, console 2528–2595, `initGamePython` 3135, `exitGamePython` 3229 |
-| Console e joystick | `createPythonConsole` 3251, `getPythonJoystick` 3263, `updatePythonJoysticks` 3268 |
-| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3309 |
-| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3443 (~190 linhas de constantes) |
-| Módulo `Application` | `initApplicationPythonBinding` 3638 |
-| Config persistente do jogo | `saveGamePythonConfig` 3700, `loadGamePythonConfig` 3779, `pathGamePythonConfig` 3856 (contém código Web/IDBFS) |
+| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2291 (~430 linhas, constantes de tipos/estados) |
+| Ambiente `sys` e caminhos | `backupPySysObjects` 2721 … `restorePySysObjects` 2796, `appendPythonPath` 2824, `addImportMain`/`removeImportMain` 2835–2840 |
+| Módulo `Range` e compatibilidade | `addSubModule` 2857, `initRANGE` 2865, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2904, `installLegacyAudFactoryAlias` 2958 (alias `bge`/`aud`) |
+| Init/saída do Python | `initPlayerPython` 3006, `exitPlayerPython` 3046, console 2528–2595, `initGamePython` 3137, `exitGamePython` 3234 |
+| Console e joystick | `createPythonConsole` 3257, `getPythonJoystick` 3269, `updatePythonJoysticks` 3274 |
+| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3315 |
+| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3449 (~190 linhas de constantes) |
+| Módulo `Application` | `initApplicationPythonBinding` 3644 |
+| Config persistente do jogo | `saveGamePythonConfig` 3706, `loadGamePythonConfig` 3785, `pathGamePythonConfig` 3862 (contém código Web/IDBFS) |
 
 Observação: `initPlayerPython` (editor não usa) é o caminho do standalone; o editor entra por `BPY_python_start`.
 

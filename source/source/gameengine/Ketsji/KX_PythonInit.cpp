@@ -139,6 +139,7 @@ extern "C" {
 
 #include "KX_PyMath.h"
 #include "KX_PyNetwork.h"
+#include "KX_PyTrack.h"
 #include "KX_AudioManager.h"
 
 #include "EXP_PyObjectPlus.h"
@@ -2876,13 +2877,14 @@ PyMODINIT_FUNC initRANGE()
 	addSubModule(modules, mod, initNetworkPythonBinding(), "Range.network");
 	addSubModule(modules, mod, initAudioPythonBinding(), "Range.audio");
 	addSubModule(modules, mod, initVideoTexturePythonBinding(), "Range.texture");
+	addSubModule(modules, mod, initTrackPythonBinding(), "Range.track");
 
 	/* Keep projects authored for BGE/UPBGE and for Range 1.5 (lowercase "range") working without
 	 * modifying their scripts. The aliases deliberately share the Range module objects, so state
 	 * such as bge.logic.globalDict is identical when a project imports several spellings. */
 	static const char *aliases[] = {"bge", "range"};
 	static const char *submodules[] = {"application", "constraints", "events", "logic", "render",
-	                                   "types", "imgui", "network", "audio", "texture"};
+	                                   "types", "imgui", "network", "audio", "texture", "track"};
 	for (const char *alias : aliases) {
 		PyDict_SetItemString(modules, alias, mod);
 		for (const char *sub : submodules) {
@@ -3202,6 +3204,9 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 		PyErr_Print();
 	}
 
+	// Range.track: tracks are read again from the Text datablocks of this game.
+	KX_TrackClearCache();
+
 	// Range.locale: game localization, pure Python in scripts/modules/range_locale.py.
 	KX_ResetLocale();
 	if (PyObject *localeMod = PyImport_ImportModule("range_locale")) {
@@ -3229,6 +3234,7 @@ void initGamePython(Main *main, PyObject *pyGlobalDict)
 void exitGamePython()
 {
 	KX_ResetLocale();
+	KX_TrackClearCache();
 	restoreObjectConvertFlags();
 	KX_Python_RestoreConsoleRedirect();
 

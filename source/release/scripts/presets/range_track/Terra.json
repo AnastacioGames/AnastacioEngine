@@ -1,0 +1,135 @@
+{
+  "format": "range_track_preset",
+  "version": 1,
+  "name": "Rua de terra",
+  "description": "Brazilian dirt street: packed red earth with wheel ruts, grass verge, simple houses, poles and trees",
+  "profile": {
+    "symmetric": true,
+    "bands": [
+      {
+        "name": "Terra",
+        "kind": "ASPHALT",
+        "side": "BOTH",
+        "width": 3.4,
+        "height": 0.0,
+        "lane_count": 0,
+        "collision": true,
+        "material": "Track_Terra_Rua",
+        "material_color": [
+          0.42,
+          0.31,
+          0.2
+        ],
+        "texture": "dirt_road"
+      },
+      {
+        "name": "Mato",
+        "kind": "SIDEWALK",
+        "side": "BOTH",
+        "width": 1.5,
+        "height": 0.05,
+        "collision": true,
+        "material": "Track_Grama",
+        "material_color": [
+          0.2,
+          0.42,
+          0.14
+        ]
+      },
+      {
+        "name": "Talude",
+        "kind": "SLOPE",
+        "side": "BOTH",
+        "width": 5.0,
+        "slope_deg": -12.0,
+        "collision": false,
+        "material": "Track_Talude",
+        "material_color": [
+          0.36,
+          0.4,
+          0.22
+        ]
+      },
+      {
+        "name": "Morro",
+        "kind": "HILL",
+        "side": "BOTH",
+        "width": 220.0,
+        "height": 22.0,
+        "collision": false,
+        "material": "Track_Grama",
+        "material_color": [
+          0.2,
+          0.42,
+          0.14
+        ]
+      }
+    ]
+  },
+  "settings": {
+    "sample_step": 1.0,
+    "chunk_length": 75.0,
+    "uv_repeat": 7.0,
+    "bank_auto": true,
+    "bank_gain": 0.05,
+    "bank_max": 4.0,
+    "terrain_enabled": true,
+    "terrain_margin": 260.0,
+    "terrain_cell": 5.0,
+    "hill_height": 22.0,
+    "hill_scale": 200.0,
+    "horizon_enabled": true
+  },
+  "rules": [
+    {
+      "kind": "HOUSES",
+      "band": "",
+      "side": "BOTH",
+      "spacing": 11.0,
+      "density": 0.45,
+      "offset": 3.0,
+      "curve_min_deg": 25.0,
+      "name_prefix": "terrea_colonial,terrea_laje,puxadinho,tijolo_aparente,muro_alto",
+      "seed": 7
+    },
+    {
+      "kind": "POLES",
+      "band": "",
+      "side": "RIGHT",
+      "spacing": 40.0,
+      "density": 0.8,
+      "offset": 1.8,
+      "seed": 7
+    },
+    {
+      "kind": "SIGNS",
+      "band": "",
+      "side": "BOTH",
+      "spacing": 80.0,
+      "density": 1.0,
+      "offset": 1.0,
+      "curve_min_deg": 30.0,
+      "seed": 7
+    },
+    {
+      "kind": "PEOPLE",
+      "band": "",
+      "side": "BOTH",
+      "spacing": 4.0,
+      "density": 0.3,
+      "offset": 1.0,
+      "seed": 7
+    },
+    {
+      "kind": "TREES",
+      "band": "",
+      "side": "BOTH",
+      "spacing": 20.0,
+      "density": 1.0,
+      "offset": 3.0,
+      "source_scene": "Kits",
+      "name_prefix": "Arvore_tipo_",
+      "seed": 7
+    }
+  ]
+}

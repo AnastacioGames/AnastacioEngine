@@ -156,6 +156,7 @@ set(SRC
 	KX_PyConstraintBinding.cpp
 	KX_PyMath.cpp
 	KX_PyNetwork.cpp
+	KX_PyTrack.cpp
 	KX_PythonComponent.cpp
 	KX_PythonComponentManager.cpp
 	KX_PythonInit.cpp

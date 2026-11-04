@@ -1,0 +1,36 @@
+{
+  "format": "range_track_preset",
+  "version": 1,
+  "name": "Autodromo",
+  "description": "Racing circuit: wide asphalt, kerbs on the curves, grass run-off, catch fence",
+  "profile": {
+    "symmetric": true,
+    "bands": [
+      {"name": "Asfalto", "kind": "ASPHALT", "side": "BOTH", "width": 6.0, "height": 0.0, "lane_count": 0,
+       "collision": true, "material": "Track_Asfalto", "material_color": [0.16, 0.16, 0.17]},
+      {"name": "Zebra", "kind": "CURB", "side": "BOTH", "width": 1.2, "height": 0.04, "kerb_on_curves": true,
+       "collision": true, "material": "Track_Guia", "material_color": [0.62, 0.61, 0.58]},
+      {"name": "Grama", "kind": "SIDEWALK", "side": "BOTH", "width": 8.0, "height": -0.04, "collision": true,
+       "material": "Track_Grama", "material_color": [0.20, 0.42, 0.14]},
+      {"name": "Grade", "kind": "BORDER", "side": "BOTH", "width": 0.2, "border_type": "FENCE", "border_height": 2.5,
+       "collision": true, "material": "Track_Grade", "material_color": [0.30, 0.32, 0.30]},
+      {"name": "Talude", "kind": "SLOPE", "side": "BOTH", "width": 3.0, "slope_deg": -10.0, "collision": false,
+       "material": "Track_Talude", "material_color": [0.36, 0.40, 0.22]},
+      {"name": "Morro", "kind": "HILL", "side": "BOTH", "width": 200.0, "height": 20.0, "collision": false,
+       "material": "Track_Grama", "material_color": [0.20, 0.42, 0.14]}
+    ]
+  },
+  "settings": {
+    "sample_step": 1.0, "chunk_length": 100.0, "uv_repeat": 10.0,
+    "bank_auto": true, "bank_gain": 0.06, "bank_max": 5.0,
+    "terrain_enabled": true, "terrain_margin": 260.0, "terrain_cell": 5.0,
+    "hill_height": 20.0, "hill_scale": 260.0, "horizon_enabled": true
+  },
+  "rules": [
+    {"kind": "PEOPLE", "band": "", "side": "BOTH", "spacing": 1.5, "density": 0.7, "offset": 2.0, "seed": 6},
+    {"kind": "SIGNS", "band": "", "side": "BOTH", "spacing": 80.0, "density": 1.0, "offset": 1.5,
+     "curve_min_deg": 25.0, "seed": 6},
+    {"kind": "TREES", "band": "", "side": "BOTH", "spacing": 40.0, "density": 1.0, "offset": 12.0,
+     "source_scene": "Kits", "name_prefix": "Arvore_tipo_", "seed": 6}
+  ]
+}

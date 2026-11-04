@@ -8,6 +8,25 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-03 - Track Tool: Range.track em C++ (F5)
+
+- Módulo `Range.track` (alias `bge.track`) em `Ketsji/KX_PyTrack.cpp`: `get(nome)`, `names()`,
+  `fromJson(texto)`, `reload()` e o tipo `Track` (`project`, `pointAt`, `tangentAt`, `lateralAt`,
+  `bankAt`, `widthAt`, `edgeAt`, `racingLine`, `isOnRoad`, `surfaceAt`, `name`, `length`, `cyclic`,
+  `count`, `surfaces`). Doc em `source/doc/python_api/rst/bge.track.rst`.
+- Lê o Text `TRACK_<nome>.json` (formato v1, cJSON de `extern/cjson`) dos Mains do conversor (arquivo
+  do jogo + LibLoad) no primeiro `get()` e guarda por nome; a lista de Mains mudou (LibLoad/LibFree)
+  = cache esquecido; limpo no início e no fim do jogo. Semântica passo a passo de
+  `range_track/runtime.py` (amostra mais próxima por grade XY de 12 m com peso 2 na altura,
+  4 segmentos em volta, raiz da equação de 2º grau da lateral interpolada).
+- Teste `--server`: `tools/debug/track_tool/criar_cena_track_cpp.py` com os vetores de
+  `tools/debug/track_tool/ref/`: 3171/3171, erro máximo 1,5e-5 m (Vector em float) e `project`
+  idêntico até 1e-9. LibLoad/LibFree de um arquivo só com `TRACK_lib.json` aparecem e somem em
+  `names()`/`get()`. `project()` ~0,0007 ms por chamada pelo Python (20 carros), contra ~0,027 ms
+  do `runtime.py`.
+
+
+
 ## 2026-11-03 - UI Tree: nó Minimap
 
 - Nó HUD **Minimap** (`range_ui_tree.py`): imagem do mapa, World Min/Max com Fit to Scene,
