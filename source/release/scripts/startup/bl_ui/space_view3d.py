@@ -1451,7 +1451,7 @@ class INFO_MT_add(Menu):
 
         layout.menu("INFO_MT_lamp_add", icon='OUTLINER_OB_LAMP')
         if rd == "BLENDER_GAME" and hasattr(bpy.types, "OBJECT_OT_probe_volume_add"):
-            layout.operator("object.probe_volume_add", text="Probe Volume", icon='MESH_GRID')
+            layout.operator("object.probe_volume_add", text="Light Probe Volume", icon='MESH_GRID')
         layout.separator(factor=1)
 
         if rd != "BLENDER_GAME":

@@ -637,7 +637,7 @@ def rule_probe_volume(scene, objects):
                 return revert
             issues.append(Issue(
                 "probe_volume_many", ob.name, 'MEDIUM',
-                tip_("Probe volume %s needs %d probes, its quality allows %d") % (ob.name, total, limit),
+                tip_("Light Probe Volume %s needs %d probes, its quality allows %d") % (ob.name, total, limit),
                 tip_("The game spreads the probes to %.1f m apart instead of %.1f m. Split the box into smaller "
                      "volumes around the places the player sees, raise probe_volume_quality, or accept the "
                      "wider spacing (Fix writes it, so the console warning goes away).") % (used, spacing),
@@ -654,7 +654,7 @@ def rule_probe_volume(scene, objects):
                 return revert
             issues.append(Issue(
                 "probe_volume_rotated", ob.name, 'MEDIUM',
-                tip_("Probe volume %s is rotated") % ob.name,
+                tip_("Light Probe Volume %s is rotated") % ob.name,
                 tip_("The probe grid always follows the world axes: the game ignores the Empty's rotation, so "
                      "the probes don't cover the box you see. Clear the rotation and resize the box (Fix clears "
                      "it), or use several boxes for a slanted room."),
@@ -671,7 +671,7 @@ def rule_probe_volume(scene, objects):
         if loose:
             issues.append(Issue(
                 "probe_volume_no_collision", ob.name, 'LOW',
-                tip_("%d meshes inside probe volume %s have no collision") % (len(loose), ob.name),
+                tip_("%d meshes inside Light Probe Volume %s have no collision") % (len(loose), ob.name),
                 tip_("The grid pushes its probes out of walls and floors by casting rays at the collision "
                      "meshes. A wall or floor without collision is not seen: the probes behind it can leak "
                      "light through. Give the walls and floors collision (Static) or move the volume."),
@@ -687,7 +687,7 @@ def rule_probe_volume(scene, objects):
             return revert
         issues.append(Issue(
             "probe_volume_ssao", scene.name, 'LOW',
-            tip_("Probe volume without SSAO"),
+            tip_("Light Probe Volume without SSAO"),
             tip_("The probe grid doesn't see objects smaller than its spacing, so the contact shadow under "
                  "and between them fades. SSAO (Scene > Effects) brings it back. Fix turns it on; the quality "
                  "preset can still turn it off on weak PCs."),

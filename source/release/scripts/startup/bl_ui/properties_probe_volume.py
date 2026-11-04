@@ -110,21 +110,21 @@ def _enabled_set(ob, value):
 
 
 bpy.types.Object.ae_probe_volume = bpy.props.BoolProperty(
-    name="Probe Volume",
-    description="Light the area inside this box Empty with a grid of probes (bounced light)",
+    name="Light Probe Volume",
+    description="Light the area inside this box with bounced light from walls and floor (a grid of light probes)",
     get=_enabled_get, set=_enabled_set)
 
 
 class OBJECT_OT_probe_volume_add(Operator):
-    """Add a Probe Volume: a box Empty whose grid of probes gives the bounced light inside it"""
+    """Add a Light Probe Volume: a box Empty that lights the area inside it with bounced light from walls and floor"""
     bl_idname = "object.probe_volume_add"
-    bl_label = "Probe Volume"
+    bl_label = "Light Probe Volume"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
         bpy.ops.object.empty_add(type='CUBE', location=context.scene.cursor_location)
         ob = context.object
-        ob.name = "ProbeVolume"
+        ob.name = "LightProbeVolume"
         # A small room; scale it to cover the area.
         ob.scale = (5.0, 5.0, 2.0)
         ob.location.z += 2.0
@@ -133,7 +133,7 @@ class OBJECT_OT_probe_volume_add(Operator):
 
 
 class OBJECT_OT_probe_volume_toggle(Operator):
-    """Turn this box Empty into a Probe Volume, or back into a plain Empty"""
+    """Turn this box Empty into a Light Probe Volume, or back into a plain Empty"""
     bl_idname = "object.probe_volume_toggle"
     bl_label = "Probe Volume"
     bl_options = {'REGISTER', 'UNDO'}
@@ -151,7 +151,7 @@ class OBJECT_OT_probe_volume_toggle(Operator):
 class OBJECT_OT_probe_volume_quality(Operator):
     """Quality of this grid: Preset follows Scene > Quality, the others cap the probes (64, 128, 256)"""
     bl_idname = "object.probe_volume_quality"
-    bl_label = "Probe Volume Quality"
+    bl_label = "Light Probe Volume Quality"
     bl_options = {'REGISTER', 'UNDO'}
 
     quality = EnumProperty(items=(
@@ -172,9 +172,9 @@ class OBJECT_OT_probe_volume_quality(Operator):
 
 
 class OBJECT_OT_probe_volume_skip(Operator):
-    """Keep this object out of the Probe Volume captures (it still receives their light)"""
+    """Keep this object out of the Light Probe Volume captures (it still receives their light)"""
     bl_idname = "object.probe_volume_skip"
-    bl_label = "Skip in Probe Volume"
+    bl_label = "Skip in Light Probe Volume"
     bl_options = {'REGISTER', 'UNDO'}
 
     def execute(self, context):
@@ -198,7 +198,7 @@ class EmptyProbePanel:
 
 
 class DATA_PT_probe_volume(EmptyProbePanel, Panel):
-    bl_label = "Probe Volume"
+    bl_label = "Light Probe Volume"
 
     def draw_header(self, context):
         self.layout.prop(context.object, "ae_probe_volume", text="")
@@ -207,7 +207,7 @@ class DATA_PT_probe_volume(EmptyProbePanel, Panel):
         layout = self.layout
         ob = context.object
         if not is_volume(ob):
-            layout.label(text="Lights the area inside this box with probes (bounced light)", icon='INFO')
+            layout.label(text="Lights the area inside this box with bounced light from walls and floor", icon='INFO')
             return
         props = ob.game.properties
 
@@ -250,7 +250,7 @@ class OBJECT_PT_probe_volume_skip(Panel):
     bl_space_type = 'PROPERTIES'
     bl_region_type = 'WINDOW'
     bl_context = "object"
-    bl_label = "Probe Volume"
+    bl_label = "Light Probe Volume"
     bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
@@ -261,9 +261,9 @@ class OBJECT_PT_probe_volume_skip(Panel):
 
     def draw(self, context):
         box = self.layout.box()
-        box.label(text="Probe Volume:", icon='MESH_GRID')
+        box.label(text="Light Probe Volume:", icon='MESH_GRID')
         skip = "probe_volume_skip" in context.object.game.properties
-        box.operator("object.probe_volume_skip", text="Skip in Probe Volume",
+        box.operator("object.probe_volume_skip", text="Skip in Light Probe Volume",
                      icon='CHECKBOX_HLT' if skip else 'CHECKBOX_DEHLT', emboss=False)
 
 
