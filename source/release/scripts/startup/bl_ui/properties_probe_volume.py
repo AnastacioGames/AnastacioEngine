@@ -78,6 +78,43 @@ def _grid(ob):
         used *= 1.1
 
 
+ALL_PROPS = ["probe_volume", "probe_volume_quality"] + [o[0] for o in OPTIONS]
+
+
+def _enabled_get(ob):
+    return is_volume(ob)
+
+
+def _enabled_set(ob, value):
+    """Off keeps the settings on the object (ae_probe_volume_backup), so turning it on again restores them."""
+    if ob.type != 'EMPTY' or value == is_volume(ob):
+        return
+    props = ob.game.properties
+    if value:
+        ob.empty_draw_type = 'CUBE'
+        backup = ob.get("ae_probe_volume_backup")
+        _setup(ob)
+        if backup:
+            for name in ALL_PROPS:
+                if name in backup.keys():
+                    old = backup[name]
+                    if name == "probe_volume_quality":
+                        _add_prop(ob, name, 'STRING', str(old))
+                    elif name in props:
+                        props[name].value = old
+            del ob["ae_probe_volume_backup"]
+    else:
+        ob["ae_probe_volume_backup"] = {name: props[name].value for name in ALL_PROPS if name in props}
+        for name in ALL_PROPS:
+            _remove_prop(ob, name)
+
+
+bpy.types.Object.ae_probe_volume = bpy.props.BoolProperty(
+    name="Probe Volume",
+    description="Light the area inside this box Empty with a grid of probes (bounced light)",
+    get=_enabled_get, set=_enabled_set)
+
+
 class OBJECT_OT_probe_volume_add(Operator):
     """Add a Probe Volume: a box Empty whose grid of probes gives the bounced light inside it"""
     bl_idname = "object.probe_volume_add"
@@ -107,12 +144,7 @@ class OBJECT_OT_probe_volume_toggle(Operator):
 
     def execute(self, context):
         ob = context.object
-        if is_volume(ob):
-            for name in ["probe_volume", "probe_volume_quality"] + [o[0] for o in OPTIONS]:
-                _remove_prop(ob, name)
-        else:
-            ob.empty_draw_type = 'CUBE'
-            _setup(ob)
+        ob.ae_probe_volume = not is_volume(ob)
         return {'FINISHED'}
 
 
@@ -169,8 +201,7 @@ class DATA_PT_probe_volume(EmptyProbePanel, Panel):
     bl_label = "Probe Volume"
 
     def draw_header(self, context):
-        self.layout.operator("object.probe_volume_toggle", text="",
-                             icon='CHECKBOX_HLT' if is_volume(context.object) else 'CHECKBOX_DEHLT', emboss=False)
+        self.layout.prop(context.object, "ae_probe_volume", text="")
 
     def draw(self, context):
         layout = self.layout
