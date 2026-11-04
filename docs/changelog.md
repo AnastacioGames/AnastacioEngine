@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-04 - Range.track: project(pos, near)
+
+- `Track.project(pos, near=None)`: com `near` (o `s` do quadro anterior) a amostra mais próxima é
+  procurada só a até 50 m dele, e o carro não salta para outro trecho que passa perto (grampo, retas
+  paralelas). Mais de 15 m longe desse trecho (respawn) = busca na pista toda, como sem `near`.
+- Teste em `criar_cena_track_cpp.py` (grampo com retas a 8 m): API 10/10, vetores 3171/3171.
+
 ## 2026-11-03 - Track Tool: Range.track em C++ (F5)
 
 - Módulo `Range.track` (alias `bge.track`) em `Ketsji/KX_PyTrack.cpp`: `get(nome)`, `names()`,

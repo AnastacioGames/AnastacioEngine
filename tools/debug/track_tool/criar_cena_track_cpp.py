@@ -161,6 +161,32 @@ def run():
         ('Track type', isinstance(tr, Range.track.Track)),
         ('fromJson', Range.track.fromJson(json.dumps({'s': [0, 1], 'px': [0, 1]})).length == 1.0),
     ]
+    # project(pos, near): grampo com duas retas paralelas a 8 m (ida y=0, volta y=8)
+    pts = [(float(x), 0.0, 1.0, 0.0) for x in range(0, 101)]
+    pts += [(100.0 + 4.0 * math.sin(a * math.pi / 12), 4.0 - 4.0 * math.cos(a * math.pi / 12),
+             math.cos(a * math.pi / 12), math.sin(a * math.pi / 12)) for a in range(1, 12)]
+    pts += [(float(x), 8.0, -1.0, 0.0) for x in range(100, -1, -1)]
+    acc, ss = 0.0, [0.0]
+    for a, b in zip(pts, pts[1:]):
+        acc += math.hypot(b[0] - a[0], b[1] - a[1])
+        ss.append(acc)
+    hp = Range.track.fromJson(json.dumps({'s': ss, 'px': [p[0] for p in pts], 'py': [p[1] for p in pts],
+                                          'tx': [p[2] for p in pts], 'ty': [p[3] for p in pts]}), 'grampo')
+    s_ida = hp.project((50.0, 0.0))[0]
+    g = hp.project((50.0, 4.2))[0]                      # mais perto da volta: sem near vai para a volta
+    n1 = hp.project((50.0, 4.2), near=s_ida)[0]          # com near fica na ida
+    n2 = hp.project((50.0, 4.2), s_ida)[0]               # posicional
+    lost = hp.project((50.0, 8.0), near=s_ida)[0]        # perto da volta mas a 8 m: ainda na janela
+    far = hp.project((50.0, 30.0), near=s_ida)[0]        # 30 m da ida (> 15 m): busca global, acha a volta
+    none = hp.project((50.0, 4.2), near=None)[0]
+    lines.append('grampo: ida %%.2f, sem near %%.2f, near %%.2f, longe %%.2f' %% (s_ida, g, n1, far))
+    checks += [
+        ('near: sem near vai para a volta', g > hp.length / 2),
+        ('near: fica na ida', abs(n1 - s_ida) < 0.5 and n1 == n2),
+        ('near=None igual a sem near', none == g),
+        ('near: longe da janela = busca global', far > hp.length / 2),
+        ('near: s ruim levanta TypeError', _raises(lambda: hp.project((0, 0), near='x'))),
+    ]
     if LIB:
         before = Range.track.names()
         Range.logic.LibLoad(LIB, 'Scene', load_scripts=True)
@@ -179,6 +205,14 @@ def run():
         if n.startswith('LibLoad: names'):
             lines.append('  ' + n)
     return lines
+
+
+def _raises(fn):
+    try:
+        fn()
+    except TypeError:
+        return True
+    return False
 
 
 def tick(cont):

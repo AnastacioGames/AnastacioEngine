@@ -371,14 +371,55 @@ SegmentFit SolveSegment(const TrackData &d, int i, double x, double y, double z,
 	return {1, e2, t, u, e2, dz};
 }
 
-Projection Project(const TrackData &d, const double pos[3], bool hasZ)
+/// Janela da busca local de project(pos, near): metros para trás/frente de near.
+const double kNearWindow = 50.0;
+/// Mais longe que isso da amostra achada na janela = perdido (respawn): busca global.
+const double kNearLost = 15.0;
+
+/** Passo 1 com dica: amostra mais próxima (mesma nota de NearestSample) só nas amostras a até
+ * kNearWindow metros de near. Mantém o carro no trecho em que estava quando dois trechos da pista
+ * passam perto. Devolve -1 se a melhor ficar além de kNearLost. */
+int NearestSampleNear(const TrackData &d, double x, double y, double z, bool hasZ, double near)
+{
+	const int n = d.count;
+	const int c = Locate(d, near).i;
+	const double step = (d.step > 1e-6) ? d.step : std::max(1e-3, d.length / std::max(1, n - 1));
+	const int w = std::min(n / 2, int(std::ceil(kNearWindow / step)) + 1);
+	double best = std::numeric_limits<double>::infinity();
+	int bk = -1;
+	for (int o = -w; o <= w; ++o) {
+		int k = c + o;
+		if (d.cyclic) {
+			k = ((k % n) + n) % n;
+		}
+		else if (k < 0 || k >= n) {
+			continue;
+		}
+		const double dx = d.px[k] - x, dy = d.py[k] - y;
+		double m = dx * dx + dy * dy;
+		if (hasZ) {
+			const double dz = d.pz[k] - z;
+			m += 4.0 * dz * dz;
+		}
+		if (m < best) {
+			best = m;
+			bk = k;
+		}
+	}
+	return (best <= kNearLost * kNearLost) ? bk : -1;
+}
+
+Projection Project(const TrackData &d, const double pos[3], bool hasZ, const double *near = nullptr)
 {
 	const double x = pos[0], y = pos[1], z = pos[2];
 	const int n = d.count;
 	if (n == 1) {
 		return {0.0, 0.0, 0.0, 0.0};
 	}
-	const int k = NearestSample(d, x, y, z, hasZ);
+	int k = near ? NearestSampleNear(d, x, y, z, hasZ, *near) : -1;
+	if (k < 0) {
+		k = NearestSample(d, x, y, z, hasZ);
+	}
 	/* Passo 2: segmentos k-2..k+1 (cíclica dá a volta; aberta só os que existem), sem repetir. */
 	int segs[4];
 	int nseg = 0;
@@ -708,14 +749,23 @@ bool ReadS(PyObject *value, double &s)
 	return !(s == -1.0 && PyErr_Occurred());
 }
 
-PyObject *Track_project(PyObject *self, PyObject *value)
+PyObject *Track_project(PyObject *self, PyObject *args, PyObject *kwds)
 {
+	static const char *kwlist[] = {"pos", "near", nullptr};
+	PyObject *value, *nearObj = Py_None;
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "O|O:project", (char **)kwlist, &value, &nearObj)) {
+		return nullptr;
+	}
 	double pos[3];
 	bool hasZ;
 	if (!ReadPos(value, pos, hasZ, "project")) {
 		return nullptr;
 	}
-	const Projection p = Project(Data(self), pos, hasZ);
+	double near = 0.0;
+	if (nearObj != Py_None && !ReadS(nearObj, near)) {
+		return nullptr;
+	}
+	const Projection p = Project(Data(self), pos, hasZ, (nearObj != Py_None) ? &near : nullptr);
 	return Py_BuildValue("(did)", p.s, (p.u >= 0.0) ? 1 : -1, std::fabs(p.u));
 }
 
@@ -874,10 +924,11 @@ PyObject *Track_repr(PyObject *self)
 }
 
 PyMethodDef Track_methods[] = {
-	{"project", (PyCFunction)Track_project, METH_O,
-	 "project(pos) -> (s, side, dist): meters along the track at the projected point, side +1 left / "
-	 "-1 right and lateral distance from the center line. With z, height picks the right level on "
-	 "bridges and crossings."},
+	{"project", (PyCFunction)Track_project, METH_VARARGS | METH_KEYWORDS,
+	 "project(pos, near=None) -> (s, side, dist): meters along the track at the projected point, side +1 "
+	 "left / -1 right and lateral distance from the center line. With z, height picks the right level on "
+	 "bridges and crossings. near = the s of the previous frame: searches 50 m around it so the car never "
+	 "jumps to a nearby stretch of the track (falls back to the whole track when more than 15 m away)."},
 	{"pointAt", (PyCFunction)Track_pointAt, METH_O, "pointAt(s) -> Vector: center line point at s meters."},
 	{"tangentAt", (PyCFunction)Track_tangentAt, METH_O, "tangentAt(s) -> Vector: unit 3D direction at s."},
 	{"lateralAt", (PyCFunction)Track_lateralAt, METH_O,

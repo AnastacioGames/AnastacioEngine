@@ -16,7 +16,8 @@ Units are meters and radians. "Left" is the positive lateral side.
    import Range
 
    track = Range.track.get("Pista_4")
-   s, side, dist = track.project(own.worldPosition)
+   s, side, dist = track.project(own.worldPosition, near=own.get("track_s"))
+   own["track_s"] = s
    lap_progress = s / track.length
    target = track.racingLine(s + 15.0)
 
@@ -62,9 +63,19 @@ Units are meters and radians. "Left" is the positive lateral side.
    height is ignored; with ``z`` the height picks the right level on bridges and crossings.
    ``s`` wraps around on a closed circuit and is clamped to ``[0, length]`` on an open track.
 
-   .. method:: project(pos)
+   .. method:: project(pos, near=None)
 
       Projection of a position on the track.
+
+      Pass the ``s`` of the previous frame as ``near`` for cars: the search stays within 50 m of it,
+      so a car never jumps to another stretch of the track that passes close by (hairpins, parallel
+      straights). When the position is more than 15 m away from that stretch (respawn, teleport)
+      the whole track is searched, as without ``near``.
+
+      .. code-block:: python
+
+         s, side, dist = track.project(own.worldPosition, near=own.get("track_s"))
+         own["track_s"] = s
 
       :return: ``(s, side, dist)``: meters along the track, ``1`` left / ``-1`` right of the
          center line and lateral distance from it (>= 0).
