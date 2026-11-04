@@ -202,28 +202,17 @@ class DATA_PT_probe_volume(EmptyProbePanel, Panel):
         if "probe_volume_ssgi" in props:
             box.prop(props["probe_volume_ssgi"], "value", text="SSGI Inside")
 
-        if ob.empty_draw_type != 'CUBE':
-            layout.label(text="Display the Empty as Cube: the box is the volume", icon='ERROR')
-        if any(abs(a) > 1e-3 for a in ob.matrix_world.to_euler()):
-            layout.label(text="Rotation is ignored, the grid follows the world axes", icon='ERROR')
-
-
-class DATA_PT_probe_volume_advanced(EmptyProbePanel, Panel):
-    bl_label = "Probe Volume: Advanced"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return EmptyProbePanel.poll(context) and is_volume(context.object)
-
-    def draw(self, context):
-        props = context.object.game.properties
-        box = self.layout.box()
+        box = layout.box()
         box.label(text="Capture:", icon='RENDER_STILL')
         for name, label in (("probe_volume_clip_end", "Clip End"), ("probe_volume_ignore_layers", "Ignore Layers"),
                             ("probe_volume_freeze", "Freeze")):
             if name in props:
                 box.prop(props[name], "value", text=label)
+
+        if ob.empty_draw_type != 'CUBE':
+            layout.label(text="Display the Empty as Cube: the box is the volume", icon='ERROR')
+        if any(abs(a) > 1e-3 for a in ob.matrix_world.to_euler()):
+            layout.label(text="Rotation is ignored, the grid follows the world axes", icon='ERROR')
 
 
 class OBJECT_PT_probe_volume_skip(Panel):
@@ -253,7 +242,6 @@ classes = (
     OBJECT_OT_probe_volume_quality,
     OBJECT_OT_probe_volume_skip,
     DATA_PT_probe_volume,
-    DATA_PT_probe_volume_advanced,
     OBJECT_PT_probe_volume_skip,
 )
 

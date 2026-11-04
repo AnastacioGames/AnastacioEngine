@@ -71,20 +71,48 @@ class DATA_PT_reverb_area(DataButtonsPanel, Panel):
         ra = ob.reverb_area
         layout.active = ob.use_reverb_area
 
-        col = layout.column()
-        col.prop(ra, "preset")
-        col.prop(ra, "shape")
-        col.prop(ob, "empty_draw_size", text="Size")
-        col.prop(ra, "inner_factor", slider=True)
-        col.prop(ra, "priority")
+        box = layout.box()
+        box.label(text="Area:", icon='SOUND')
+        box.prop(ra, "preset")
+        box.prop(ra, "shape")
+        box.prop(ob, "empty_draw_size", text="Size")
+        box.prop(ra, "inner_factor", slider=True)
+        box.prop(ra, "priority")
+        box.label(text="Affects 3D speakers while the active camera is inside the area", icon='INFO')
 
-        row = layout.row(align=True)
+        box = layout.box()
+        box.label(text="Reverb:", icon='SPEAKER')
+        box.label(text="Editing any value switches Behavior to Custom")
+        split = box.split()
+        col = split.column(align=True)
+        col.prop(ra, "gain")
+        col.prop(ra, "gain_hf")
+        col.prop(ra, "density")
+        col.prop(ra, "diffusion")
+        col.prop(ra, "decay_time")
+        col.prop(ra, "decay_hf_ratio")
+        col.prop(ra, "decay_limit_hf")
+        col = split.column(align=True)
+        col.label(text="Reflections:")
+        col.prop(ra, "reflections_gain", text="Gain")
+        col.prop(ra, "reflections_delay", text="Delay")
+        col.prop(ra, "late_reverb_gain", text="Late Gain")
+        col.prop(ra, "late_reverb_delay", text="Late Delay")
+        col.prop(ra, "air_absorption_gain_hf")
+        col.prop(ra, "room_rolloff_factor")
+
+        box = layout.box()
+        box.label(text="Filter:", icon='FILTER')
+        row = box.row(align=True)
         row.prop(ra, "use_filter")
         sub = row.row(align=True)
         sub.active = ra.use_filter
         sub.prop(ra, "filter_type", text="")
-
-        layout.label(text="Affects 3D speakers while the active camera is inside the area", icon='INFO')
+        row = box.row(align=True)
+        row.active = ra.use_filter
+        row.prop(ra, "filter_gain", text="Gain")
+        row.prop(ra, "filter_gain_lf", text="LF")
+        row.prop(ra, "filter_gain_hf", text="HF")
 
 
 class DATA_PT_lightning(DataButtonsPanel, Panel):
@@ -100,89 +128,44 @@ class DATA_PT_lightning(DataButtonsPanel, Panel):
         ls = ob.lightning
         layout.active = ob.use_lightning
 
-        col = layout.column()
-        col.label(text="Where:")
-        row = col.row(align=True)
+        box = layout.box()
+        box.label(text="Where:", icon='MAN_TRANS')
+        row = box.row(align=True)
         row.prop(ls, "shape", text="")
         row.prop(ob, "empty_draw_size", text="Size")
-        col.prop(ls, "target")
-        sub = col.column()
+        box.prop(ls, "target")
+        sub = box.column()
         sub.active = ls.target is None
         sub.prop(ls, "height")
         sub.prop(ls, "use_hit_ground")
 
-        col = layout.column()
-        col.label(text="When:")
-        col.row().prop(ls, "mode", expand=True)
+        box = layout.box()
+        box.label(text="When:", icon='TIME')
+        box.row().prop(ls, "mode", expand=True)
         if ls.mode == 'AUTOMATIC':
-            col.prop(ls, "rate")
-            col.prop(ls, "big_chance", slider=True)
-            row = col.row(align=True)
+            box.prop(ls, "rate")
+            box.prop(ls, "big_chance", slider=True)
+            row = box.row(align=True)
             row.prop(ls, "start_time")
             row.prop(ls, "end_time")
         else:
-            col.label(text="obj.strikeLightning() or Edit Object > Lightning Strike", icon='INFO')
+            box.label(text="obj.strikeLightning() or Edit Object > Lightning Strike", icon='INFO')
 
-        col = layout.column()
-        col.label(text="Look:")
-        row = col.row(align=True)
+        box = layout.box()
+        box.label(text="Look:", icon='LAMP_SUN')
+        row = box.row(align=True)
         row.prop(ls, "intensity")
         row.prop(ls, "width")
-        col.prop(ls, "color")
-        col.prop(ls, "flash_distance")
-        col.prop(ls, "use_preview")
-        col.prop(ls, "use_sound", text="Thunder Sound")
-        layout.label(text="The screen flash needs World > Rain on", icon='INFO')
-
-
-class DATA_PT_reverb_area_advanced(DataButtonsPanel, Panel):
-    bl_label = "Reverb Area: Advanced"
-    bl_options = {'DEFAULT_CLOSED'}
-
-    @classmethod
-    def poll(cls, context):
-        return DataButtonsPanel.poll(context) and context.object.use_reverb_area
-
-    def draw(self, context):
-        layout = self.layout
-
-        ra = context.object.reverb_area
-
-        layout.label(text="Editing any value switches Behavior to Custom")
-
-        split = layout.split()
-        col = split.column(align=True)
-        col.label(text="Reverb:")
-        col.prop(ra, "gain")
-        col.prop(ra, "gain_hf")
-        col.prop(ra, "density")
-        col.prop(ra, "diffusion")
-        col.prop(ra, "decay_time")
-        col.prop(ra, "decay_hf_ratio")
-        col.prop(ra, "decay_limit_hf")
-
-        col = split.column(align=True)
-        col.label(text="Reflections:")
-        col.prop(ra, "reflections_gain", text="Gain")
-        col.prop(ra, "reflections_delay", text="Delay")
-        col.prop(ra, "late_reverb_gain", text="Late Gain")
-        col.prop(ra, "late_reverb_delay", text="Late Delay")
-        col.prop(ra, "air_absorption_gain_hf")
-        col.prop(ra, "room_rolloff_factor")
-
-        col = layout.column(align=True)
-        col.active = ra.use_filter
-        col.label(text="Filter:")
-        row = col.row(align=True)
-        row.prop(ra, "filter_gain", text="Gain")
-        row.prop(ra, "filter_gain_lf", text="LF")
-        row.prop(ra, "filter_gain_hf", text="HF")
+        box.prop(ls, "color")
+        box.prop(ls, "flash_distance")
+        box.prop(ls, "use_preview")
+        box.prop(ls, "use_sound", text="Thunder Sound")
+        box.label(text="The screen flash needs World > Rain on", icon='INFO')
 
 
 classes = (
     DATA_PT_empty,
     DATA_PT_reverb_area,
-    DATA_PT_reverb_area_advanced,
     DATA_PT_lightning,
 )
 
