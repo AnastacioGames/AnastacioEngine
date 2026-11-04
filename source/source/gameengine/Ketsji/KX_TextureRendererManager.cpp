@@ -83,7 +83,8 @@ public:
 KX_TextureRendererManager::KX_TextureRendererManager(KX_Scene *scene)
 	:m_scene(scene),
 	m_worldProbe(nullptr),
-	m_capturing(false)
+	m_capturing(false),
+	m_capturingVolume(false)
 {
 	const RAS_CameraData& camdata = RAS_CameraData();
 	m_camera = new KX_Camera(m_scene, KX_Scene::m_callbacks, camdata, true);
@@ -172,7 +173,7 @@ void KX_TextureRendererManager::AddProbe(KX_GameObject *viewpoint, float radius,
 }
 
 void KX_TextureRendererManager::AddProbeVolume(KX_GameObject *box, float spacing, int quality, float clipEnd,
-                                               int ignoreLayers, bool freeze, float ssgiWeight)
+                                               int ignoreLayers, bool freeze, float ssgiWeight, float bounce)
 {
 #ifdef __EMSCRIPTEN__
 	if (!RAS_FloatRenderTargetSupported()) {
@@ -182,7 +183,7 @@ void KX_TextureRendererManager::AddProbeVolume(KX_GameObject *box, float spacing
 #endif
 	quality = std::min(std::max(quality, 0), 2);
 	m_volumes.push_back(new KX_ProbeVolume(box, spacing, (KX_ProbeVolume::Quality)quality, clipEnd, ignoreLayers, freeze,
-	                                         ssgiWeight));
+	                                         ssgiWeight, bounce));
 }
 
 KX_PlanarReflector *KX_TextureRendererManager::AddPlanarReflector(KX_GameObject *viewpoint, int size, float clipEnd)
@@ -319,9 +320,16 @@ float KX_TextureRendererManager::SampleProbeVolume(const float position[3], floa
 	return best;
 }
 
+float KX_TextureRendererManager::GetProbeVolumeGain(const KX_ProbeVolume *volume) const
+{
+	// Each lap adds one more bounce; the gain keeps the sum finite.
+	return (m_capturingVolume && volume) ? volume->GetBounce() : 1.0f;
+}
+
 KX_ProbeVolume *KX_TextureRendererManager::FindProbeVolume(const float position[3]) const
 {
-	if (m_capturing) {
+	// The manual probes keep their own light; the grid reads itself (bounces).
+	if (m_capturing && !m_capturingVolume) {
 		return nullptr;
 	}
 	const mt::vec3 pos(position[0], position[1], position[2]);
@@ -486,6 +494,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 
 	// The grid stores linear light: the materials skip the display transform while it captures.
 	GPU_material_set_linear_capture(true);
+	m_capturingVolume = true;
 	for (KX_ProbeVolume *volume : m_volumes) {
 		if (!volume->GetViewpointObject() || !volume->BeginFrame(cameraPos, now)) {
 			continue;
@@ -498,6 +507,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 			left -= count;
 		}
 	}
+	m_capturingVolume = false;
 	GPU_material_set_linear_capture(false);
 
 	// The per pixel atlas takes the SH9 read this frame.
@@ -555,7 +565,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		           " probes, cpu " << st.cpuMs / logFrames << " ms/frame, read " << st.readMs / logFrames <<
 		           " ms/frame (max " << st.readMaxMs << ", request " << st.requestMs / logFrames << "), objects/face " <<
 		           (st.faces ? st.objects / st.faces : 0) << ", reader waits " << st.readerWaits <<
-		           ", last cycle " << st.lastCycleSeconds << " s");
+		           ", last cycle " << st.lastCycleSeconds << " s, light " << volume->AverageLight());
 		const double lastCycle = st.lastCycleSeconds;
 		st = KX_ProbeVolume::Stats();
 		st.lastCycleSeconds = lastCycle;

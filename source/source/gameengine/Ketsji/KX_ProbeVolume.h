@@ -53,6 +53,8 @@ public:
 		int lastFrame;
 		/// An object near it moved: goes before the up-to-date probes (after the overdue ones).
 		bool dirty;
+		/// Inside or behind a surface (F3): never captured, weight 0 in the lookups.
+		bool disabled;
 	};
 
 	/// Counters for RANGE_PROBE_VOLUME_LOG, reset by the manager after printing.
@@ -87,6 +89,7 @@ private:
 	float m_clipEnd;
 	/// SSGI strength factor with the camera inside the volume (the grid already gives the indirect light).
 	float m_ssgiWeight;
+	float m_bounce;
 	/// SH9 of every probe for the per pixel lookup (PROBE_VOLUME_GRID), rebuilt when a readback lands.
 	GPUTexture *m_atlas;
 	bool m_atlasDirty;
@@ -107,6 +110,9 @@ private:
 	bool m_freeze;
 	/// Set once a full cycle with every SH9 read is done in freeze mode: the scheduler stops.
 	bool m_frozen;
+	/// The probes were pushed out of the surfaces and the buried ones disabled (first frame).
+	bool m_classified;
+	int m_activeProbes;
 	int m_frame;
 	/// Probes finished since the cycle start and when it started (seconds), for the log.
 	int m_cycleDone;
@@ -122,7 +128,7 @@ public:
 	 * \param spacing Wanted distance between probes, grows until the grid fits the quality limit.
 	 */
 	KX_ProbeVolume(KX_GameObject *box, float spacing, Quality quality, float clipEnd, int ignoreLayers, bool freeze,
-	               float ssgiWeight);
+	               float ssgiWeight, float bounce);
 	virtual ~KX_ProbeVolume();
 
 	virtual std::string GetName();
@@ -147,6 +153,10 @@ public:
 	/// 1 inside the box, 0 from half a spacing outside it.
 	float BoxWeight(const mt::vec3& pos) const;
 	float GetSSGIWeight() const;
+	/// Gain of the grid light the grid's own captures read (bounces).
+	float GetBounce() const;
+	/// Mean of the SH9 DC term over the valid probes (log: the bounces must settle, not creep up).
+	float AverageLight() const;
 	const mt::vec3& GetMin() const;
 	const mt::vec3& GetMax() const;
 	float GetSpacing() const;
@@ -160,6 +170,11 @@ public:
 
 	/// True for objects the grid must not capture (moving physics, deformed mesh, probe_volume_skip).
 	static bool SkipObject(KX_GameObject *gameobj);
+
+	/** Anti leak: rays along the 6 axes through the static collision meshes. A probe close to a
+	 * surface it faces moves out of it; one that sees the back of a surface (inside a wall, under
+	 * the floor) is disabled. Needs the physics: run on the first frame. */
+	void ClassifyProbes();
 
 	virtual bool SetupCamera(KX_Camera *sceneCamera, KX_Camera *camera);
 	virtual void BeginRender(RAS_Rasterizer *rasty);

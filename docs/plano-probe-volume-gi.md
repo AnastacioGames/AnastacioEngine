@@ -1,6 +1,6 @@
 # Plano: Probe Volume GI (luz indireta por grade de sondas)
 
-Status: F1a (6903b915) e F1b (c4af8fba) commitadas; F2 escrita em 2026-11-03 (leitura por pixel no desktop). Falta aceite visual com janela de F1b/F2. Próximo: F3 (anti-vazamento).
+Status: F1a (6903b915), F1b (c4af8fba), F2 (539d85cc) e F3 (anti-vazamento e rebatidas) commitadas em 2026-11-03. Falta aceite visual com janela. Próximo: F4 (acabamento).
 
 ## Contexto
 A ideia é ter luz indireta dinâmica, que acompanhe dia/noite, lanternas e portas e funcione fora da tela, onde o SSGI não chega. O caminho é uma grade automática de sondas atualizada aos poucos (no estilo DDGI, mas capturando por rasterização), que se liga e desliga. O rascunho anterior (docs/plano-probe-volume-gi.md) não foi gravado. Esta revisão confere cada ponto dele contra o código atual. Nada será executado hoje: o único entregável é o plano, que depois vai para `docs/plano-probe-volume-gi.md`.
@@ -175,3 +175,14 @@ Conferido em `KX_TextureRendererManager`, `KX_LightProbe`, `BL_BlenderShader::Up
 - Variante `PROBE_VOLUME_GRID` (flag de shader `GPU_SHADER_FLAGS_PROBE_VOLUME`): só compila quando algum Empty do arquivo tem `probe_volume`, com Shading Nodes e 32 unidades de textura ou mais. Cenas sem volume não mudam de shader nem de chave de cache. O sampler3D usa a unidade `max - 3*4 - 2`; nessas cenas a CSM no laço Principled fica com uma textura de material a menos. Sem atlas ligado (viewport), o sampler aponta para a textura 3D vazia.
 - Web e materiais sem a variante continuam com o SH9 por objeto da F1b.
 - Cena de teste: sol com sombra, câmera virada para a parede vermelha e volume recuado 0,3 m das superfícies. Com as sondas em cima do chão e do teto elas enxergam o céu pela laje e o topo das caixas fica claro demais; é o vazamento da F3. Medium: CPU da grade 0,80-0,91 ms/quadro, leitura 0,35 ms/quadro, pico abaixo de 1,4 ms. A leitura subiu de 0,11 para 0,35 ms por causa da sombra nova da cena, não do atlas.
+
+## F3 (2026-11-03)
+
+- **Classificação das sondas** (primeiro quadro, já com a física): raios nos 6 eixos contra as malhas estáticas com colisão (`KX_RayCast` com normal da face; sem ela o Bullet vira a normal para o raio e uma batida por trás parece pela frente).
+  - Sonda a menos de `min(0,3 × espaçamento, 0,5 m)` de uma superfície que ela vê pela frente é empurrada para fora (o raio começa 5 cm atrás, para pegar a superfície em que ela está apoiada).
+  - Sonda que vê o verso de uma superfície a até meio espaçamento (dentro de parede ou caixa, embaixo do chão) é desligada: nunca é capturada e tem peso zero nas duas leituras.
+  - Objeto sem colisão não entra na classificação.
+- **Deslocamento pela normal:** a leitura por pixel anda um quarto do espaçamento para fora da superfície antes da trilinear.
+- **Rebatidas:** a captura da grade lê o próprio atlas com ganho `probe_volume_bounce` (padrão 0,5, 0 = só luz direta, máx. 0,95). As sondas manuais continuam sem ler a grade. Não precisou de atlas com dois buffers: o atlas é enviado da CPU depois das capturas do quadro.
+- **Chebyshev (High):** adiado. Com a classificação e o deslocamento o vazamento da cena de teste sumiu.
+- Cena de teste com o volume ocupando a sala inteira: Medium move 71 de 72 sondas e desliga 2 (dentro de caixas). Luz média das sondas (log `light`): ganho 0 = 1,6, 0,5 = 2,15, 0,9 = 2,45; estabiliza em ~3 voltas. Custo igual ao da F2: Low 0,50 ms/quadro, Medium 0,94, High 1,70 (CPU da grade), pico de leitura abaixo de 1,1 ms, nenhuma espera de leitor.

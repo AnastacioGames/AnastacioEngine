@@ -588,7 +588,7 @@ void GPU_material_bind_probe_grid(GPUMaterial *material, const float (*sh)[3], f
  * (1 / distance outside the box where it reaches 0). atlas NULL = off. No-op without the variant. */
 bool GPU_material_use_probe_grid_atlas(GPUMaterial *material);
 void GPU_material_bind_probe_grid_atlas(GPUMaterial *material, struct GPUTexture *atlas, const float min[3],
-                                        const float max[3], const int dims[3], float fadeScale);
+                                        const float max[3], const int dims[3], float fadeScale, float gain);
 /* Binds the planar reflector's 2D render target and its capturing camera's projection*view matrix
  * (row-major float[16], as mt::mat4::Data() gives) for the Planar Reflection node. tex = NULL when
  * no KX_PlanarReflector exists for this object (node present but not Enabled, or not yet captured):

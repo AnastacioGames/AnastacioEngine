@@ -3588,6 +3588,9 @@ float probe_grid_sample(vec3 wpos, vec3 wn, out vec3 diff)
 		return 0.0;
 	}
 	vec3 dims = unfprobegriddims.xyz;
+	/* a quarter of the spacing out of the surface (-wn is the outward normal): the probes behind a
+	 * wall or under the floor weigh less */
+	wpos -= wn * (0.5 / max(unfprobegridmin.w, 1e-4));
 	vec3 g = clamp((wpos - unfprobegridmin.xyz) / max(unfprobegridmax.xyz - unfprobegridmin.xyz, vec3(1e-4)), 0.0, 1.0) * (dims - 1.0);
 	vec2 uv = (g.xy + 0.5) / dims.xy;
 	/* z stays between the texel centers of one slab: the filter never mixes two coefficients */
@@ -3601,7 +3604,8 @@ float probe_grid_sample(vec3 wpos, vec3 wn, out vec3 diff)
 	for (int k = 1; k < 9; k++) {
 		c[k] = texture3D(unfprobegridtex, vec3(uv, (float(k) * dims.z + g.z + 0.5) * slab)).rgb;
 	}
-	float inv = 1.0 / c0.a;
+	/* w = bounce gain while the grid captures itself, 1 otherwise */
+	float inv = unfprobegriddims.w / c0.a;
 	diff = sh9_eval(-wn, c[0] * inv, c[1] * inv, c[2] * inv, c[3] * inv, c[4] * inv, c[5] * inv, c[6] * inv,
 	                c[7] * inv, c[8] * inv);
 	return fade * min(c0.a, 1.0);

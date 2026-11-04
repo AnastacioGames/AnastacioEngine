@@ -342,18 +342,25 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		GPU_material_bind_probe2(m_gpuMat, probes[1].cube, probes[1].maxLod, probes[1].center, probes[1].radius, probes[1].box, probes[1].sh, probeWeight2);
 		/* Probe Volume GI: the grid's diffuse replaces the probes' diffuse, per pixel from the atlas
 		 * (desktop variant) or else from the SH9 at the object center. */
-		KX_ProbeVolume *volume = m_scene->GetTextureRendererManager()->FindProbeVolume(pos);
+		KX_TextureRendererManager *trm = m_scene->GetTextureRendererManager();
+		KX_ProbeVolume *volume = trm->FindProbeVolume(pos);
+		const float gain = trm->GetProbeVolumeGain(volume);
 		GPUTexture *atlas = (volume && GPU_material_use_probe_grid_atlas(m_gpuMat)) ? volume->GetAtlas() : nullptr;
 		if (atlas) {
 			const int *dims = volume->GetDims();
 			GPU_material_bind_probe_grid_atlas(m_gpuMat, atlas, volume->GetMin().Data(), volume->GetMax().Data(), dims,
-			                                   1.0f / (0.5f * volume->GetSpacing()));
+			                                   1.0f / (0.5f * volume->GetSpacing()), gain);
 			GPU_material_bind_probe_grid(m_gpuMat, nullptr, 0.0f);
 		}
 		else {
-			GPU_material_bind_probe_grid_atlas(m_gpuMat, nullptr, nullptr, nullptr, nullptr, 0.0f);
+			GPU_material_bind_probe_grid_atlas(m_gpuMat, nullptr, nullptr, nullptr, nullptr, 0.0f, 1.0f);
 			float gridSh[9][3];
 			const float gridWeight = volume ? volume->SampleSH(mt::vec3(pos[0], pos[1], pos[2]), gridSh) : 0.0f;
+			for (int k = 0; gridWeight > 0.0f && k < 9; k++) {
+				for (int c = 0; c < 3; c++) {
+					gridSh[k][c] *= gain;
+				}
+			}
 			GPU_material_bind_probe_grid(m_gpuMat, gridSh, gridWeight);
 		}
 

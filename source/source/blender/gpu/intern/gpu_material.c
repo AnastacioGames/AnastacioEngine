@@ -6401,7 +6401,7 @@ bool GPU_material_use_probe_grid_atlas(GPUMaterial *material)
 }
 
 void GPU_material_bind_probe_grid_atlas(GPUMaterial *material, GPUTexture *atlas, const float min[3],
-                                        const float max[3], const int dims[3], float fadeScale)
+                                        const float max[3], const int dims[3], float fadeScale, float gain)
 {
 	GPUShader *shader = GPU_pass_shader(material->pass);
 	if (!shader || material->probegridtexloc == -1) {
@@ -6417,7 +6417,7 @@ void GPU_material_bind_probe_grid_atlas(GPUMaterial *material, GPUTexture *atlas
 		GPU_texture_bind(atlas, GPU_max_textures() - 3 * GPU_MATERIAL_NUM_SHADOW_LAMPS - 2);
 		GPU_shader_uniform_texture(shader, material->probegridtexloc, atlas);
 		const float vmin[4] = {min[0], min[1], min[2], fadeScale};
-		const float vdims[4] = {(float)dims[0], (float)dims[1], (float)dims[2], 0.0f};
+		const float vdims[4] = {(float)dims[0], (float)dims[1], (float)dims[2], gain};
 		copy_v3_v3(vmax, max);
 		vmax[3] = 1.0f;
 		GPU_shader_uniform_vector(shader, material->probegridminloc, 4, 1, vmin);

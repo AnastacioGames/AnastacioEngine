@@ -71,6 +71,8 @@ private:
 	float m_worldSignature[16];
 	/// True while a renderer captures: materials then skip probes (no feedback into the cube map).
 	bool m_capturing;
+	/// The grid captures itself: its materials read the atlas with the bounce gain.
+	bool m_capturingVolume;
 	/// Probe Volume GI grids, owned here (not in m_renderers: they capture a few faces per frame).
 	std::vector<KX_ProbeVolume *> m_volumes;
 
@@ -109,7 +111,7 @@ public:
 	/** Add a Probe Volume GI grid inside the box Empty. quality: 0 Low, 1 Medium, 2 High.
 	 * Not added on the web without half float render targets (RGBA8 clips the light). */
 	void AddProbeVolume(KX_GameObject *box, float spacing, int quality, float clipEnd, int ignoreLayers, bool freeze,
-	                    float ssgiWeight);
+	                    float ssgiWeight, float bounce);
 	/// Capture the World background (node World of Game PBR) to a cube map once, at game start.
 	void AddWorldProbe(int size);
 
@@ -144,6 +146,8 @@ public:
 	float SampleProbeVolume(const float position[3], float r_sh[9][3]) const;
 	/// The volume that holds position best (nullptr outside every volume and during the captures).
 	KX_ProbeVolume *FindProbeVolume(const float position[3]) const;
+	/// Gain of the grid light: below 1 while the grid captures (bounces that fade out), 1 otherwise.
+	float GetProbeVolumeGain(const KX_ProbeVolume *volume) const;
 
 	/** Execute all the texture renderer.
 	 * \param category The category of renderers to render.

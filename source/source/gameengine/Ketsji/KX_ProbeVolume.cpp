@@ -26,6 +26,9 @@
 
 #include "KX_Camera.h"
 #include "KX_GameObject.h"
+#include "KX_ClientObjectInfo.h"
+#include "KX_RayCast.h"
+#include "KX_Scene.h"
 
 #include "GPU_texture.h"
 
@@ -63,20 +66,23 @@ static double ms_since(std::chrono::steady_clock::time_point start)
 }
 
 KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality quality, float clipEnd, int ignoreLayers, bool freeze,
-                               float ssgiWeight)
+                               float ssgiWeight, float bounce)
 	:KX_CubeMap(volume_env(clipEnd, ignoreLayers), box),
 	m_spacing(spacing),
 	m_clipEnd(clipEnd),
 	m_ssgiWeight(ssgiWeight),
-	m_cube(nullptr),
+	m_bounce(bounce),
 	m_atlas(nullptr),
 	m_atlasDirty(false),
+	m_cube(nullptr),
 	m_current(-1),
 	m_nextFace(0),
 	m_capturePos(mt::zero3),
 	m_facesPerFrame(qualityFaces[quality]),
 	m_freeze(freeze),
 	m_frozen(false),
+	m_classified(false),
+	m_activeProbes(0),
 	m_frame(0),
 	m_cycleDone(0),
 	m_cycleStart(-1.0)
@@ -123,6 +129,7 @@ KX_ProbeVolume::KX_ProbeVolume(KX_GameObject *box, float spacing, Quality qualit
 				probe.valid = false;
 				probe.lastFrame = -1;
 				probe.dirty = false;
+				probe.disabled = false;
 				m_probes.push_back(probe);
 			}
 		}
@@ -189,7 +196,7 @@ int KX_ProbeVolume::PickNextProbe(const mt::vec3& cameraPos) const
 {
 	/* Near the camera first, but every probe has a deadline of 2 cycles: an overdue (or never
 	 * captured) probe goes before the others, so the far ones don't stall. */
-	const int cycleFrames = std::max(1, (int)m_probes.size() * 6 / m_facesPerFrame);
+	const int cycleFrames = std::max(1, m_activeProbes * 6 / m_facesPerFrame);
 	const float maxDist = m_spacing * (float)(m_dims[0] + m_dims[1] + m_dims[2]);
 	int best = -1;
 	float bestKey = 0.0f;
@@ -199,7 +206,7 @@ int KX_ProbeVolume::PickNextProbe(const mt::vec3& cameraPos) const
 		for (const Reader& reader : m_readers) {
 			inFlight |= (reader.probe == i);
 		}
-		if (inFlight) {
+		if (inFlight || probe.disabled) {
 			continue;
 		}
 		const int age = (probe.lastFrame < 0) ? (1 << 30) : (m_frame - probe.lastFrame);
@@ -219,8 +226,101 @@ int KX_ProbeVolume::PickNextProbe(const mt::vec3& cameraPos) const
 	return best;
 }
 
+namespace {
+
+/// Static collision meshes, the ones the grid captures.
+struct SurfaceFilter
+{
+	bool m_hit;
+	mt::vec3 m_point;
+	mt::vec3 m_normal;
+
+	bool NeedRayCast(KX_ClientObjectInfo *client, void *UNUSED(data))
+	{
+		KX_GameObject *gameobj = client->m_gameobject;
+		return gameobj && !client->isSensor() && !gameobj->GetMeshList().empty() && gameobj->GetVisible() &&
+		       !KX_ProbeVolume::SkipObject(gameobj);
+	}
+
+	bool RayHit(KX_ClientObjectInfo *UNUSED(client), KX_RayCast *result, void *UNUSED(data))
+	{
+		m_hit = true;
+		m_point = result->m_hitPoint;
+		m_normal = result->m_hitNormal;
+		return true;
+	}
+};
+
+bool surface_ray(PHY_IPhysicsEnvironment *env, const mt::vec3& from, const mt::vec3& to, SurfaceFilter& filter)
+{
+	filter.m_hit = false;
+	// Face normal: Bullet turns the normal toward the ray, a back hit would look like a front one.
+	KX_RayCast::Callback<SurfaceFilter, void> callback(&filter, nullptr, nullptr, true);
+	KX_RayCast::RayTest(env, from, to, callback);
+	return filter.m_hit;
+}
+
+}
+
+void KX_ProbeVolume::ClassifyProbes()
+{
+	m_classified = true;
+	m_activeProbes = (int)m_probes.size();
+	KX_GameObject *box = GetViewpointObject();
+	KX_Scene *scene = box ? box->GetScene() : nullptr;
+	PHY_IPhysicsEnvironment *env = scene ? scene->GetPhysicsEnvironment() : nullptr;
+	if (!env) {
+		return;
+	}
+	static const mt::vec3 axes[6] = {mt::axisX3, -mt::axisX3, mt::axisY3, -mt::axisY3, mt::axisZ3, -mt::axisZ3};
+	// Room the probe keeps from a surface it faces, and how far a buried probe looks for the back.
+	const float keep = std::min(0.3f * m_spacing, 0.5f);
+	const float reach = 0.5f * m_spacing;
+	const float start = 0.05f;
+	int pushed = 0, disabled = 0;
+	SurfaceFilter filter;
+	for (Probe& probe : m_probes) {
+		// Push out: a ray that starts a little behind the probe catches the surface it sits on.
+		for (int pass = 0; pass < 2; pass++) {
+			mt::vec3 push = mt::zero3;
+			for (const mt::vec3& dir : axes) {
+				const mt::vec3 from = probe.position - dir * start;
+				if (!surface_ray(env, from, probe.position + dir * keep, filter)) {
+					continue;
+				}
+				const float dist = mt::dot(filter.m_point - probe.position, dir);
+				if (mt::dot(filter.m_normal, dir) < 0.0f && dist < keep) {
+					push -= dir * (keep - std::max(dist, 0.0f));
+				}
+			}
+			if (push.LengthSquared() < 1e-8f) {
+				break;
+			}
+			probe.position += push;
+			pushed += (pass == 0);
+		}
+		// Buried: the back of a surface within reach in some axis.
+		for (const mt::vec3& dir : axes) {
+			if (surface_ray(env, probe.position, probe.position + dir * reach, filter) &&
+			    mt::dot(filter.m_normal, dir) > 0.0f) {
+				probe.disabled = true;
+				break;
+			}
+		}
+		if (probe.disabled) {
+			disabled++;
+			m_activeProbes--;
+		}
+	}
+	CM_Message("probe volume \"" << box->GetName() << "\": " << pushed << " probes moved out of a surface, " <<
+	           disabled << " inside or behind one disabled");
+}
+
 bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 {
+	if (!m_classified) {
+		ClassifyProbes();
+	}
 	m_frame++;
 	if (m_cycleStart < 0.0) {
 		m_cycleStart = now;
@@ -252,9 +352,9 @@ bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 	m_stats.readMaxMs = std::max(m_stats.readMaxMs, readMs);
 
 	for (const Probe& probe : m_probes) {
-		allValid &= probe.valid;
+		allValid &= (probe.valid || probe.disabled);
 	}
-	if (m_freeze && allValid && m_cycleDone >= (int)m_probes.size()) {
+	if (m_freeze && allValid && m_cycleDone >= m_activeProbes) {
 		bool idle = true;
 		for (const Reader& reader : m_readers) {
 			idle &= (reader.probe == -1);
@@ -326,7 +426,7 @@ void KX_ProbeVolume::FacesDone(int count, double now)
 	m_probes[m_current].dirty = false;
 	m_current = -1;
 	m_stats.probesDone++;
-	if (++m_cycleDone % (int)m_probes.size() == 0) {
+	if (++m_cycleDone % std::max(1, m_activeProbes) == 0) {
 		m_stats.lastCycleSeconds = now - m_cycleStart;
 		m_cycleStart = now;
 	}
@@ -387,6 +487,24 @@ float KX_ProbeVolume::SampleSH(const mt::vec3& pos, float r_sh[9][3]) const
 	}
 	// While some of the 8 are not read yet the grid fades in over the old diffuse.
 	return weight * std::min(sum, 1.0f);
+}
+
+float KX_ProbeVolume::AverageLight() const
+{
+	float sum = 0.0f;
+	int count = 0;
+	for (const Probe& probe : m_probes) {
+		if (probe.valid) {
+			sum += (probe.sh[0][0] + probe.sh[0][1] + probe.sh[0][2]) / 3.0f;
+			count++;
+		}
+	}
+	return count ? sum / count : 0.0f;
+}
+
+float KX_ProbeVolume::GetBounce() const
+{
+	return m_bounce;
 }
 
 float KX_ProbeVolume::GetSSGIWeight() const

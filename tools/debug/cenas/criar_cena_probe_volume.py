@@ -98,13 +98,17 @@ def build(quality):
     vol = bpy.context.object
     vol.name = 'ProbeVolume'
     vol.empty_draw_type = 'CUBE'
-    # Inset from the floor, ceiling and walls: a probe on a surface sees through it (F3 fixes that).
-    vol.scale = (9.7, 9.7, 1.7)
+    # The whole room: the probes on the floor, ceiling and walls are pushed out by the engine (F3).
+    vol.scale = (10.0, 10.0, 2.0)
     if quality is not None:
         bpy.ops.object.game_property_new(type='FLOAT', name='probe_volume')
         vol.game.properties['probe_volume'].value = 0.0
         bpy.ops.object.game_property_new(type='STRING', name='probe_volume_quality')
         vol.game.properties['probe_volume_quality'].value = quality
+        if os.environ.get('PV_BOUNCE'):
+            # Gain of each bounce (engine default 0.5).
+            bpy.ops.object.game_property_new(type='FLOAT', name='probe_volume_bounce')
+            vol.game.properties['probe_volume_bounce'].value = float(os.environ['PV_BOUNCE'])
 
     # Quit timer on the camera.
     text = bpy.data.texts.new('quit.py')
