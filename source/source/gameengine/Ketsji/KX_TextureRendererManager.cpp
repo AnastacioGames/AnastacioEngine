@@ -439,6 +439,7 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 		const mt::mat4 viewmat = mt::mat4::FromAffineTransform(camtrans);
 
 		rasty->SetViewMatrix(viewmat);
+		rasty->InvalidateLights();
 		m_camera->SetModelviewMatrix(viewmat, RAS_Rasterizer::RAS_STEREO_LEFTEYE);
 
 		// No-op for every renderer except KX_PlanarReflector, which caches it for the material node.
@@ -476,6 +477,8 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 	if (viewpoint) {
 		viewpoint->SetVisible(visible, false);
 	}
+	// The scene camera draws next: its lights must be loaded again in its own view.
+	rasty->InvalidateLights();
 
 	return true;
 }

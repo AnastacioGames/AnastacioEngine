@@ -110,9 +110,9 @@ def build(quality):
             bpy.ops.object.game_property_new(type='FLOAT', name='probe_volume_bounce')
             vol.game.properties['probe_volume_bounce'].value = float(os.environ['PV_BOUNCE'])
 
-    # Quit timer on the camera.
+    # Quit timer on the camera (PV_NOQUIT=1 keeps the game open for a look with the window).
     text = bpy.data.texts.new('quit.py')
-    text.write(QUIT)
+    text.write('' if os.environ.get('PV_NOQUIT') else QUIT)
     scene.objects.active = cam
     bpy.ops.logic.sensor_add(type='ALWAYS', object=cam.name)
     cam.game.sensors[-1].use_pulse_true_level = True

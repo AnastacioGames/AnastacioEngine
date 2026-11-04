@@ -1667,6 +1667,12 @@ void RAS_Rasterizer::SetClientObject(void *obj)
 	m_clientobject = obj;
 }
 
+void RAS_Rasterizer::InvalidateLights()
+{
+	m_lastlightlayer = -1;
+	m_lastauxinfo = nullptr;
+}
+
 void RAS_Rasterizer::SetAuxilaryClientInfo(void *inf)
 {
 	m_auxilaryClientInfo = inf;

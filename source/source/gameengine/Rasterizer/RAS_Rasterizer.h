@@ -754,6 +754,10 @@ public:
 	void SetClientObject(void *obj);
 
 	void SetAuxilaryClientInfo(void *inf);
+	/** The lights are loaded in view space and only reloaded when the layer or scene changes: call
+	 * after changing the view matrix inside a frame (cube captures), or the next pass keeps them in
+	 * the old view (wrong sun direction and shadow). */
+	void InvalidateLights();
 
 	/**
 	 * Prints information about what the hardware supports.
