@@ -6,6 +6,10 @@ continua vindo das sondas manuais e do World. Fica desligado até existir um Emp
 
 ## Como ligar
 
+O jeito rápido: **Add > Probe Volume** cria o Empty pronto, e o painel **Probe Volume** (aba Object)
+mostra qualidade, espaçamento, quantas sondas a caixa vai ter, rebatida e as opções avançadas. Em
+outros objetos o mesmo painel tem **Skip in Probe Volume**. O painel só edita as propriedades abaixo.
+
 1. Adicione um Empty com Display **Cube** e escale-o para cobrir a área (sala, rua, galpão). O tamanho
    da caixa é o Display Size vezes a escala. A grade segue sempre os eixos do mundo: a rotação do
    Empty é ignorada (o console e o Scene Doctor avisam). Sala inclinada pede várias caixas.
