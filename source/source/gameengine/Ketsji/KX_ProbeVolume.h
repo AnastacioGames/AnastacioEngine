@@ -53,7 +53,7 @@ public:
 		int lastFrame;
 		/// An object near it moved: goes before the up-to-date probes (after the overdue ones).
 		bool dirty;
-		/// Inside or behind a surface (F3): never captured, weight 0 in the lookups.
+		/// Inside or behind a surface (F3): never captured, filled from its neighbors (Dilate).
 		bool disabled;
 	};
 
@@ -129,6 +129,8 @@ private:
 	Stats m_stats;
 
 	int PickNextProbe(const mt::vec3& cameraPos) const;
+	/// Disabled probes take the mean SH9 of their captured neighbors.
+	void Dilate();
 	Reader *FreeReader();
 
 public:

@@ -38,6 +38,7 @@
 #include "CM_Message.h"
 
 #include <algorithm>
+#include <cfloat>
 #include <chrono>
 #include <cmath>
 #include <cstdlib>
@@ -295,8 +296,74 @@ void KX_ProbeVolume::ClassifyProbes()
 	const float inside = std::min(4.0f * m_spacing, m_clipEnd);
 	SurfaceFilter filter;
 	filter.m_ignoreLayers = GetIgnoreLayers();
+	auto inBox = [&](const mt::vec3& p) {
+		for (int i = 0; i < 3; i++) {
+			if (p[i] < m_min[i] - 1e-3f || p[i] > m_max[i] + 1e-3f) {
+				return false;
+			}
+		}
+		return true;
+	};
+	/* Buried test at p. Returns true when p is behind a surface or inside a solid, with in r_free the
+	 * nearest free point along the axes inside the grid box (p when there is none). */
+	auto buried = [&](const mt::vec3& p, mt::vec3 *r_free) {
+		bool hidden = false;
+		float bestMove = FLT_MAX;
+		for (const mt::vec3& dir : axes) {
+			// The back of a surface within reach: the free side is right past it.
+			if (surface_ray(env, p, p + dir * reach, filter) && mt::dot(filter.m_normal, dir) > 0.0f) {
+				hidden = true;
+				const float move = mt::dot(filter.m_point - p, dir) + keep;
+				// Only toward the grid box: a probe in the middle of a wall has the outside as close.
+				if (move < bestMove && inBox(p + dir * move)) {
+					bestMove = move;
+					*r_free = p + dir * move;
+				}
+				continue;
+			}
+			/* Inside a convex collider (Box, Convex Hull): a ray starting inside it hits nothing, so
+			 * the back face test misses. A ray from outside back to p hits the solid's face while
+			 * the ray from p out hits nothing, only at its start, or only beyond that face (it went
+			 * through the solid it started in, e.g. to the room wall behind). */
+			const mt::vec3 outside = p + dir * inside;
+			if (!surface_ray(env, outside, p, filter) || mt::dot(filter.m_normal, dir) <= 0.0f) {
+				continue;
+			}
+			const float face = mt::dot(filter.m_point - p, dir);
+			bool out = false;
+			if (surface_ray(env, p, outside, filter)) {
+				const float hit = mt::dot(filter.m_point - p, dir);
+				out = hit > 1e-3f && hit <= face + 1e-3f && filter.m_normal.LengthSquared() > 0.25f;
+			}
+			if (!out) {
+				hidden = true;
+				if (face + keep < bestMove && inBox(p + dir * (face + keep))) {
+					bestMove = face + keep;
+					*r_free = p + dir * (face + keep);
+				}
+			}
+		}
+		if (bestMove == FLT_MAX) {
+			*r_free = p;
+		}
+		return hidden;
+	};
+	int moved = 0;
 	for (Probe& probe : m_probes) {
-		// Push out: a ray that starts a little behind the probe catches the surface it sits on.
+		/* Buried (inside a wall, under the floor, in a box): first moved to the free side when that
+		 * stays in the grid box, then off the surfaces; still buried after that = disabled (filled
+		 * from its neighbors, see Dilate). */
+		mt::vec3 free;
+		// Up to once per axis: a probe in a corner is inside a wall and the floor at once.
+		for (int step = 0; step < 3; step++) {
+			if (!buried(probe.position, &free) || !inBox(free) || (free - probe.position).LengthSquared() < 1e-8f) {
+				break;
+			}
+			probe.position = free;
+			moved += (step == 0);
+		}
+		/* Push out: a ray that starts a little behind the probe catches the surface it sits on. The
+		 * push never goes through a surface (a probe on the floor's edge would leave the room). */
 		for (int pass = 0; pass < 2; pass++) {
 			mt::vec3 push = mt::zero3;
 			for (const mt::vec3& dir : axes) {
@@ -309,40 +376,17 @@ void KX_ProbeVolume::ClassifyProbes()
 					push -= dir * (keep - std::max(dist, 0.0f));
 				}
 			}
-			if (push.LengthSquared() < 1e-8f) {
+			/* Never out of the grid box: a probe on its edge sits in the room's wall, not past it. The
+			 * crossing ray starts a little ahead: the probe touches the surface it sits on. */
+			if (push.LengthSquared() < 1e-8f || !inBox(probe.position + push) ||
+			    surface_ray(env, probe.position + push * (start / std::max(push.Length(), start)), probe.position + push, filter)) {
 				break;
 			}
 			probe.position += push;
 			pushed += (pass == 0);
 		}
-		// Buried: the back of a surface within reach in some axis.
-		for (const mt::vec3& dir : axes) {
-			if (surface_ray(env, probe.position, probe.position + dir * reach, filter) &&
-			    mt::dot(filter.m_normal, dir) > 0.0f) {
-				probe.disabled = true;
-				break;
-			}
-		}
-		/* Inside a convex collider (Box, Convex Hull): a ray starting inside it hits nothing, so the
-		 * back face test misses. A ray from outside back to the probe hits the solid's face while the
-		 * ray from the probe out hits nothing, only at its start, or only beyond that face (it went
-		 * through the solid it started in, e.g. to the room wall behind): the probe is in the solid. */
-		for (int a = 0; a < 6 && !probe.disabled; a++) {
-			const mt::vec3& dir = axes[a];
-			const mt::vec3 outside = probe.position + dir * inside;
-			if (!surface_ray(env, outside, probe.position, filter) || mt::dot(filter.m_normal, dir) <= 0.0f) {
-				continue;
-			}
-			// Distance of the solid's outer face along dir.
-			const float face = mt::dot(filter.m_point - probe.position, dir);
-			bool out = false;
-			if (surface_ray(env, probe.position, outside, filter)) {
-				const float hit = mt::dot(filter.m_point - probe.position, dir);
-				out = hit > 1e-3f && hit <= face + 1e-3f && filter.m_normal.LengthSquared() > 0.25f;
-			}
-			if (!out) {
-				probe.disabled = true;
-			}
+		if (buried(probe.position, &free)) {
+			probe.disabled = true;
 		}
 		if (probe.disabled) {
 			disabled++;
@@ -350,7 +394,7 @@ void KX_ProbeVolume::ClassifyProbes()
 		}
 	}
 	CM_Message("probe volume \"" << box->GetName() << "\": " << pushed << " probes moved out of a surface, " <<
-	           disabled << " inside or behind one disabled");
+	           moved << " out of a wall or solid, " << disabled << " inside or behind one disabled");
 }
 
 bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
@@ -387,6 +431,9 @@ bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 	const double readMs = ms_since(start);
 	m_stats.readMs += readMs;
 	m_stats.readMaxMs = std::max(m_stats.readMaxMs, readMs);
+	if (m_atlasDirty) {
+		Dilate();
+	}
 
 	for (const Probe& probe : m_probes) {
 		allValid &= (probe.valid || probe.disabled);
@@ -472,6 +519,53 @@ void KX_ProbeVolume::FacesDone(int count, double now)
 	if (++m_cycleDone % std::max(1, m_activeProbes) == 0) {
 		m_stats.lastCycleSeconds = now - m_cycleStart;
 		m_cycleStart = now;
+	}
+}
+
+void KX_ProbeVolume::Dilate()
+{
+	/* A disabled probe (in a wall, under the floor) takes the mean of its captured neighbors: with
+	 * weight 0 the lookups next to walls would fall back to the old diffuse (a dark band). A second
+	 * pass also reads the probes filled by the first (corners). */
+	const int dx = m_dims[0], dy = m_dims[1], dz = m_dims[2];
+	for (int pass = 0; pass < 2; pass++) {
+		for (int z = 0; z < dz; z++) {
+			for (int y = 0; y < dy; y++) {
+				for (int x = 0; x < dx; x++) {
+					Probe& probe = m_probes[(z * dy + y) * dx + x];
+					if (!probe.disabled) {
+						continue;
+					}
+					float sum[9][3] = {};
+					int count = 0;
+					for (int nz = std::max(z - 1, 0); nz <= std::min(z + 1, dz - 1); nz++) {
+						for (int ny = std::max(y - 1, 0); ny <= std::min(y + 1, dy - 1); ny++) {
+							for (int nx = std::max(x - 1, 0); nx <= std::min(x + 1, dx - 1); nx++) {
+								const Probe& other = m_probes[(nz * dy + ny) * dx + nx];
+								if (!other.valid || (other.disabled && pass == 0) || &other == &probe) {
+									continue;
+								}
+								for (int k = 0; k < 9; k++) {
+									for (int c = 0; c < 3; c++) {
+										sum[k][c] += other.sh[k][c];
+									}
+								}
+								count++;
+							}
+						}
+					}
+					if (count == 0 || (pass == 1 && probe.valid)) {
+						continue;
+					}
+					for (int k = 0; k < 9; k++) {
+						for (int c = 0; c < 3; c++) {
+							probe.sh[k][c] = sum[k][c] / count;
+						}
+					}
+					probe.valid = true;
+				}
+			}
+		}
 	}
 }
 
