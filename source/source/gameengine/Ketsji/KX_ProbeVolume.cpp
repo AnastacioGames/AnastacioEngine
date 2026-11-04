@@ -325,16 +325,21 @@ void KX_ProbeVolume::ClassifyProbes()
 		}
 		/* Inside a convex collider (Box, Convex Hull): a ray starting inside it hits nothing, so the
 		 * back face test misses. A ray from outside back to the probe hits the solid's face while the
-		 * ray from the probe out hits nothing (or only at its start): the probe is in the solid. */
+		 * ray from the probe out hits nothing, only at its start, or only beyond that face (it went
+		 * through the solid it started in, e.g. to the room wall behind): the probe is in the solid. */
 		for (int a = 0; a < 6 && !probe.disabled; a++) {
 			const mt::vec3& dir = axes[a];
 			const mt::vec3 outside = probe.position + dir * inside;
 			if (!surface_ray(env, outside, probe.position, filter) || mt::dot(filter.m_normal, dir) <= 0.0f) {
 				continue;
 			}
-			const bool out = surface_ray(env, probe.position, outside, filter) &&
-			                 mt::dot(filter.m_point - probe.position, dir) > 1e-3f &&
-			                 filter.m_normal.LengthSquared() > 0.25f;
+			// Distance of the solid's outer face along dir.
+			const float face = mt::dot(filter.m_point - probe.position, dir);
+			bool out = false;
+			if (surface_ray(env, probe.position, outside, filter)) {
+				const float hit = mt::dot(filter.m_point - probe.position, dir);
+				out = hit > 1e-3f && hit <= face + 1e-3f && filter.m_normal.LengthSquared() > 0.25f;
+			}
 			if (!out) {
 				probe.disabled = true;
 			}
@@ -483,7 +488,13 @@ float KX_ProbeVolume::BoxOverlap(const mt::vec3& aabbMin, const mt::vec3& aabbMa
 {
 	float inter = 1.0f;
 	for (int i = 0; i < 3; i++) {
-		const float ext = std::max(aabbMax[i] - aabbMin[i], 1e-3f);
+		const float ext = aabbMax[i] - aabbMin[i];
+		if (ext < 1e-3f) {
+			// Flat axis (a floor plane): inside or not.
+			const float mid = 0.5f * (aabbMin[i] + aabbMax[i]);
+			inter *= (mid >= m_min[i] && mid <= m_max[i]) ? 1.0f : 0.0f;
+			continue;
+		}
 		inter *= std::min(std::max(std::min(aabbMax[i], m_max[i]) - std::max(aabbMin[i], m_min[i]), 0.0f) / ext, 1.0f);
 	}
 	return inter;

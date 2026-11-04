@@ -643,11 +643,14 @@ def rule_probe_volume(scene, objects):
                      "wider spacing (Fix writes it, so the console warning goes away).") % (used, spacing),
                 [ob], fix))
         if any(abs(a) > 1e-3 for a in ob.matrix_world.to_euler()):
-            def fix_rot(ob=ob, old=ob.rotation_euler.copy()):
-                ob.rotation_euler = (0.0, 0.0, 0.0)
+            def fix_rot(ob=ob, old=ob.matrix_world.copy()):
+                # World rotation off (any rotation mode, parent included), position and scale kept.
+                from mathutils import Matrix
+                loc, _rot, scale = old.decompose()
+                ob.matrix_world = Matrix.Translation(loc) * Matrix.Scale(scale[0], 4, (1, 0, 0)) *                     Matrix.Scale(scale[1], 4, (0, 1, 0)) * Matrix.Scale(scale[2], 4, (0, 0, 1))
 
                 def revert():
-                    ob.rotation_euler = old
+                    ob.matrix_world = old
                 return revert
             issues.append(Issue(
                 "probe_volume_rotated", ob.name, 'MEDIUM',

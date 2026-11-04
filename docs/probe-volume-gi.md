@@ -60,7 +60,9 @@ mostra a etapa como "Probes and reflections (Probe Volume GI)".
 - **Desktop:** a luz da grade é lida por pixel (as 8 sondas em volta do ponto), num shader que só é
   compilado em arquivos com volume (e não no preset Very Low). Material com textura demais para sobrar
   a unidade do atlas usa a luz no centro do objeto.
-- O volume de cada objeto é escolhido pela caixa da malha: o que contém a maior parte dela.
+- O volume de cada objeto é escolhido pela caixa da malha: o que contém a maior parte dela. Uma malha
+  só usa um volume: um chão único que atravessa duas salas com volumes separados recebe a luz de uma
+  delas. Divida a malha por sala.
 - **Web:** a luz é lida no centro de cada objeto, porque lá falta unidade de textura. Sem render em
   half float no navegador, o volume não liga.
 - Material com luz ou AO pintados na textura soma com a grade e pode ficar claro demais.
