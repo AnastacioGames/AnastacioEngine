@@ -35,7 +35,7 @@ def _bezier_points(curve_obj):
                 c = Vector(p.co[:3])
                 pts.append((c, c.copy(), c.copy()))
             return pts, bool(sp.use_cyclic_u)
-    raise ValueError("curva sem spline utilizável: %s" % curve_obj.name)
+    raise ValueError("curve without a usable spline: %s" % curve_obj.name)
 
 
 def _dense_polyline(curve_obj, step):
@@ -227,7 +227,7 @@ def sample(curve_obj, settings=None, profile=None):
         cum.append(cum[-1] + (b - a).length)
     total = cum[-1]
     if total <= 1e-6:
-        raise ValueError("traçado com comprimento zero: %s" % curve_obj.name)
+        raise ValueError("track with zero length: %s" % curve_obj.name)
     nseg = max(1, int(round(total / step_req)))
     step = total / nseg
     count = nseg if cyclic else nseg + 1

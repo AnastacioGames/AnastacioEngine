@@ -158,7 +158,7 @@ def bake(track_obj, frames=None, edges=None):
     json_name = runtime.text_name(track_obj.name)
     py_name = runtime.module_name(track_obj.name) + ".py"
     if len(json_name) > 63 or len(py_name) > 63:
-        raise ValueError("nome do traçado longo demais para o Text (máx. 52 caracteres): %s"
+        raise ValueError("track name too long for the Text (max. 52 characters): %s"
                          % track_obj.name)
     _write_text(bpy, json_name, text)
     _write_text(bpy, py_name, to_module(text))

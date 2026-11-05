@@ -46,23 +46,22 @@ class RangeTrackBand(bpy.types.PropertyGroup):
     kind = EnumProperty(name="Kind", items=BAND_KINDS, default='ASPHALT')
     side = EnumProperty(name="Side", items=SIDES, default='BOTH')
     width = FloatProperty(name="Width", default=1.0, min=0.0, soft_max=500.0, unit='LENGTH',
-                          description="Largura da faixa (ASPHALT: meia largura; MESH: meia largura "
-                                      "do asfalto na seção, referência para width_left/right)")
+                          description="Band width (ASPHALT: half width; MESH: asphalt half width in the section, reference for width_left/right)")
     height = FloatProperty(name="Height", default=0.0, soft_min=-5.0, soft_max=50.0, unit='LENGTH',
-                           description="Degrau em relação à faixa anterior (HILL: altura do morro)")
+                           description="Step from the previous band (HILL: hill height)")
     slope_deg = FloatProperty(name="Slope", default=0.0, min=-89.0, max=89.0,
-                              description="Talude: graus, + sobe (corte), - desce (aterro)")
+                              description="Slope: degrees, + goes up (cut), - goes down (fill)")
     material = PointerProperty(name="Material", type=bpy.types.Material)
     border_type = EnumProperty(name="Border", items=BORDER_TYPES, default='NONE')
     border_height = FloatProperty(name="Border Height", default=0.95, min=0.0, soft_max=10.0,
                                   unit='LENGTH')
     mesh_object = PointerProperty(name="Section Mesh", type=bpy.types.Object,
-                                  description="Malha da seção (MESH): Y local = lateral, Z = altura")
+                                  description="Section mesh (MESH): local Y = side, Z = height")
     collision = BoolProperty(name="Collision", default=True)
     lane_count = IntProperty(name="Lanes", default=0, min=0, max=8,
-                             description="Faixas de rolamento no total (linhas tracejadas entre elas)")
+                             description="Total driving lanes (dashed lines between them)")
     kerb_on_curves = BoolProperty(name="Kerb on Curves", default=False,
-                                  description="Zebra vermelha/branca onde a curva é fechada")
+                                  description="Red and white kerb where the curve is tight")
 
 
 class RangeTrackProfile(bpy.types.PropertyGroup):
@@ -75,14 +74,14 @@ class RangeTrackProfile(bpy.types.PropertyGroup):
 class RangeTrackPoint(bpy.types.PropertyGroup):
     index = IntProperty(name="Point", default=0, min=0)
     width_left = FloatProperty(name="Width Left", default=0.0, min=0.0, unit='LENGTH',
-                               description="Meia largura do asfalto à esquerda (0 = perfil)")
+                               description="Asphalt half width on the left (0 = profile)")
     width_right = FloatProperty(name="Width Right", default=0.0, min=0.0, unit='LENGTH',
-                                description="Meia largura do asfalto à direita (0 = perfil)")
+                                description="Asphalt half width on the right (0 = profile)")
     bank_mode = EnumProperty(name="Bank", items=BANK_MODES, default='AUTO')
     bank_deg = FloatProperty(name="Bank Angle", default=0.0, min=-45.0, max=45.0,
-                             description="Graus, + = cai para a esquerda")
+                             description="Degrees, + = falls to the left")
     surface = StringProperty(name="Surface", default="",
-                             description="Piso a partir deste ponto (vazio = mantém o anterior)")
+                             description="Surface from this point on (empty = keeps the previous one)")
 
 
 class RangeTrackSegment(bpy.types.PropertyGroup):
@@ -90,18 +89,18 @@ class RangeTrackSegment(bpy.types.PropertyGroup):
     s_end = FloatProperty(name="End", default=100.0, min=0.0, unit='LENGTH')
     side = EnumProperty(name="Side", items=SIDES, default='BOTH')
     band = StringProperty(name="Band", default="",
-                          description="Nome (ou tipo) da faixa afetada")
+                          description="Name (or type) of the affected band")
     kind = StringProperty(name="Kind", default="",
-                          description="Troca o tipo da faixa (vazio = mantém)")
+                          description="Changes the band type (empty = keeps it)")
     width = FloatProperty(name="Width", default=-1.0, min=-1.0, unit='LENGTH',
-                          description="Nova largura (< 0 mantém; 0 some com a faixa)")
+                          description="New width (< 0 keeps it; 0 removes the band)")
     height = FloatProperty(name="Height", default=-1.0, min=-1.0, unit='LENGTH',
-                           description="Novo degrau/altura (< 0 mantém)")
+                           description="New step or height (< 0 keeps it)")
     slope_deg = FloatProperty(name="Slope", default=0.0, min=-89.0, max=89.0,
-                              description="Novo talude em graus (0 mantém)")
+                              description="New slope in degrees (0 keeps it)")
     border_type = EnumProperty(name="Border", items=SEGMENT_BORDER_TYPES, default='KEEP')
     blend = FloatProperty(name="Blend", default=10.0, min=0.0, unit='LENGTH',
-                          description="Transição (m) antes de s_start e depois de s_end")
+                          description="Transition (m) before s_start and after s_end")
 
 
 class RangeTrackRule(bpy.types.PropertyGroup):
@@ -128,7 +127,7 @@ class RangeTrackSettings(bpy.types.PropertyGroup):
     uv_repeat = FloatProperty(name="UV Repeat", default=8.0, min=0.01, unit='LENGTH')
     bank_auto = BoolProperty(name="Auto Bank", default=True)
     bank_gain = FloatProperty(name="Bank Gain", default=0.08, min=0.0, max=1.0,
-                              description="Graus de inclinação por grau de curva no ponto")
+                              description="Bank degrees per degree of curve at the point")
     bank_max = FloatProperty(name="Bank Max", default=6.0, min=0.0, max=45.0)
     points = CollectionProperty(type=RangeTrackPoint)
     segments = CollectionProperty(type=RangeTrackSegment)
@@ -173,9 +172,9 @@ class RangeTrackSettings(bpy.types.PropertyGroup):
 class RangeTrackAnchor(bpy.types.PropertyGroup):
     track = StringProperty(name="Track", default="")
     s = FloatProperty(name="s", default=0.0, unit='LENGTH')
-    side = IntProperty(name="Side", default=1, min=-1, max=1, description="-1 direita, +1 esquerda")
+    side = IntProperty(name="Side", default=1, min=-1, max=1, description="-1 right, +1 left")
     offset = FloatProperty(name="Offset", default=1.0, unit='LENGTH',
-                           description="Metros além da borda da faixa band")
+                           description="Meters beyond the edge of the band")
     band = StringProperty(name="Band", default="BORDER")
     height = FloatProperty(name="Height", default=0.0, unit='LENGTH')
     follow_bank = BoolProperty(name="Follow Bank", default=False)
@@ -214,7 +213,7 @@ def register():
     bpy.types.Object.range_track = PointerProperty(type=RangeTrackSettings)
     bpy.types.Object.range_track_owner = StringProperty(
         name="Track Owner", default="",
-        description="Traçado que gerou este objeto (apagado ao gerar de novo)")
+        description="Track that generated this object (deleted when generating again)")
     bpy.types.Object.range_track_anchor = PointerProperty(type=RangeTrackAnchor)
     bpy.types.Scene.range_track_profiles = CollectionProperty(type=RangeTrackProfile)
     bpy.types.Scene.range_track_active_profile = IntProperty(default=0)  # extra p/ UIList

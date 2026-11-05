@@ -81,7 +81,7 @@ def prepare(track_obj, settings=None):
     profile = props.find_profile(st.profile, scene)
     if profile is None:
         names = props.default_profiles(scene)
-        warnings.append("perfil '%s' não encontrado; usando '%s'" % (st.profile, names[0]))
+        warnings.append("profile '%s' not found; using '%s'" % (st.profile, names[0]))
         st.profile = names[0]
         profile = props.find_profile(st.profile, scene)
     fr = frames_mod.sample(track_obj, st, profile)
@@ -140,7 +140,7 @@ def generate(track_obj, parts=frozenset(PARTS_ALL)):
                 mod.update_anchors(scene, track_obj, fr, ed)
             except Exception as ex:
                 traceback.print_exc()
-                warnings.append("âncoras falharam: %s" % ex)
+                warnings.append("anchors failed: %s" % ex)
         created[part] = objs
         times[part] = time.perf_counter() - t0
 

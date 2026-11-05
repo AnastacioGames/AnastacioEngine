@@ -944,7 +944,7 @@ def _auto_bake(_scene):
     try:
         write_bake(tree, bpy.context.scene)
     except Exception as exc:  # um Bake quebrado não pode impedir de jogar/salvar
-        print("[UI Tree] Bake automático falhou: %s" % exc)
+        print("[UI Tree] Automatic bake failed: %s" % exc)
 
 
 class RANGE_OT_ui_tree_bake(Operator):
@@ -960,7 +960,7 @@ class RANGE_OT_ui_tree_bake(Operator):
     def execute(self, context):
         data = write_bake(context.space_data.edit_tree, context.scene)
         count = sum(len(s["buttons"]) for s in data["screens"])
-        self.report({'INFO'}, "UI: %d tela(s), %d botão(ões)" % (len(data["screens"]), count))
+        self.report({'INFO'}, bpy.app.translations.pgettext_tip("UI: %d screen(s), %d button(s)") % (len(data["screens"]), count))
         return {'FINISHED'}
 
 
@@ -1138,7 +1138,7 @@ class RANGE_OT_ui_tree_minimap_bake_image(Operator):
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
         if not bpy.data.filepath:
-            self.report({'WARNING'}, "Salve o .range e gere de novo: a imagem está numa pasta temporária")
+            self.report({'WARNING'}, bpy.app.translations.pgettext_tip("Save the .range and generate again: the image is in a temporary folder"))
         else:
             self.report({'INFO'}, "Mapa salvo em %s" % path)
         return {'FINISHED'}
@@ -1262,7 +1262,7 @@ class RANGE_OT_ui_tree_capture(Operator):
         frame = _active_frame(context)
         scene = context.scene
         if scene.camera is None:
-            self.report({'ERROR'}, "A cena não tem câmera")
+            self.report({'ERROR'}, bpy.app.translations.pgettext_tip("The scene has no camera"))
             return {'CANCELLED'}
         bpy.ops.render.opengl()
         path = os.path.join(bpy.app.tempdir, "ui_backdrop_%s.png" % bpy.path.clean_name(frame.name))
@@ -1463,7 +1463,7 @@ class RANGE_OT_ui_tree_setup_logic(Operator):
 
     def execute(self, context):
         setup_game_logic(context.scene.camera, getattr(context.space_data, "edit_tree", None))
-        self.report({'INFO'}, "UI ligada na câmera %s" % context.scene.camera.name)
+        self.report({'INFO'}, bpy.app.translations.pgettext_tip("UI attached to camera %s") % context.scene.camera.name)
         return {'FINISHED'}
 
 

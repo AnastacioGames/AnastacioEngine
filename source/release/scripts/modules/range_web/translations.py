@@ -119,7 +119,7 @@ _PT_BR = {
 # Nomes de operadores Python usam o contexto "Operator"; o resto usa o padrão "*".
 _CONTEXTS = ("*", "Operator")
 
-from . import translations_android, translations_c, translations_catalog, translations_labels, translations_more, translations_perf, translations_rules, translations_tools, translations_ui
+from . import translations_android, translations_c, translations_catalog, translations_features, translations_labels, translations_more, translations_perf, translations_rules, translations_tools, translations_ui
 from .translations_es_ru import ES as _ES, RU as _RU
 
 # Textos de UI da Range/UPBGE fora do catálogo do Blender (gerados; ver translations_ui.py).
@@ -145,7 +145,8 @@ for _table, _labels in ((_PT_BR, translations_labels.PT_BR), (_ES, translations_
                         (_RU, translations_more.RU), (_PT_BR, translations_perf.PT_BR),
                         (_ES, translations_perf.ES), (_RU, translations_perf.RU),
                         (_PT_BR, translations_tools.PT_BR), (_ES, translations_tools.ES),
-                        (_RU, translations_tools.RU)):
+                        (_RU, translations_tools.RU), (_PT_BR, translations_features.PT_BR),
+                        (_ES, translations_features.ES), (_RU, translations_features.RU)):
     for _msgid, _msgstr in _labels.items():
         _table.setdefault(_msgid, _msgstr)
 

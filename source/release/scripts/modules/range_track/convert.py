@@ -69,7 +69,7 @@ def convert_curve_array(track_mesh_obj):
     props.register()
     curve, arr, cmod = find_source_curve(track_mesh_obj)
     if curve is None or curve.type != 'CURVE':
-        raise ValueError("%s não tem Array (Fit Curve) / Curve modifier com curva"
+        raise ValueError("%s has no Array (Fit Curve) / Curve modifier with a curve"
                          % track_mesh_obj.name)
     scene = props.track_scene(track_mesh_obj)
 

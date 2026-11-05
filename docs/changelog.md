@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - i18n: textos novos desde 01/11 em pt_BR, es e ru
+
+- Nova tabela `translations_features.py` (349 textos): Wet Surfaces, Track Tool, Light Probe Volume, regras novas do Scene Doctor,
+  Game Trace, Minimap, UI Tree, casas brasileiras e textos soltos. es/ru pedem revisão nativa.
+- Tooltips e mensagens em português no código passaram para inglês (`range_track`, `range_ui_tree.py`). As mensagens do
+  `range_ui_tree.py` agora usam `pgettext_tip`. Os erros internos de `range_track` ficam em inglês, sem tradução.
+- A varredura dos arquivos alterados caiu de 359 para 45 textos sem tradução: nomes próprios, siglas e palavras iguais nos idiomas.
+
 ## 2026-11-05 - KTX2: normal map por marca no arquivo e orientação das linhas
 
 - `imb_ktx2_write` agora chama `basis_compressor` direto, com os mesmos ajustes de `basis_compress2`, que não aceita key/values.
