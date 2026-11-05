@@ -3818,6 +3818,20 @@ static void BL_StaticBatchObjects(EXP_ListValue<KX_GameObject> *objectlist, bool
 		if (blenderobj->body_type != OB_BODY_TYPE_STATIC && blenderobj->body_type != OB_BODY_TYPE_NO_COLLISION) {
 			continue;
 		}
+		/* Geometry Instancing materials draw through the instancing node, which takes precedence over the
+		 * batching node (RAS_DisplayArrayBucket::GenerateTree): a merged array would be drawn whole once
+		 * per instance (N^2 vertices). Their objects are already one draw call each material. */
+		bool usesInstancing = false;
+		for (int i = 1; i <= blenderobj->totcol; ++i) {
+			Material *ma = give_current_material(blenderobj, i);
+			if (ma && (ma->shade_flag & MA_INSTANCING)) {
+				usesInstancing = true;
+				break;
+			}
+		}
+		if (usesInstancing) {
+			continue;
+		}
 		/* A LoD switch replaces the mesh and splits the object out of the batch, rebuilding the merged
 		 * arrays during the game. Objects with LoD levels keep their own draw. */
 		KX_LodManager *lodManager = gameobj->GetLodManager();

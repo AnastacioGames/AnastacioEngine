@@ -703,21 +703,41 @@ void GPU_material_bind_instancing_attrib(GPUMaterial *material, void *matrixoffs
 	}
 
 	// Color
-	if (material->ininstcolloc != -1) {
+	/* The instancing buffer only holds the color/layer/info blocks the material's builtins ask for
+	 * (BL_BlenderShader::GetInstancingAttribs), but the shader can keep these attributes active anyway
+	 * (the vertex stage always writes their varyings). Pointing them at a missing block made the GPU
+	 * fetch out of the buffer on every vertex (~45x slower draws on AMD, driver timeouts): use a
+	 * constant value instead. */
+	if (material->ininstcolloc != -1 && !(material->builtins & GPU_INSTANCING_COLOR)) {
+		glDisableVertexAttribArray(material->ininstcolloc);
+		glVertexAttribDivisorARB(material->ininstcolloc, 0);
+		glVertexAttrib4f(material->ininstcolloc, 1.0f, 1.0f, 1.0f, 1.0f);
+	}
+	else if (material->ininstcolloc != -1) {
 		glEnableVertexAttribArray(material->ininstcolloc);
 		glVertexAttribPointer(material->ininstcolloc, 4, GL_FLOAT, GL_FALSE, 0, coloroffset);
 		glVertexAttribDivisorARB(material->ininstcolloc, 1);
 	}
 
 	// Layer
-	if (material->ininstlayloc != -1) {
+	if (material->ininstlayloc != -1 && !(material->builtins & GPU_INSTANCING_LAYER)) {
+		glDisableVertexAttribArray(material->ininstlayloc);
+		glVertexAttribDivisorARB(material->ininstlayloc, 0);
+		glVertexAttribI4i(material->ininstlayloc, 0, 0, 0, 0);
+	}
+	else if (material->ininstlayloc != -1) {
 		glEnableVertexAttribArray(material->ininstlayloc);
 		glVertexAttribIPointer(material->ininstlayloc, 1, GL_INT, 0, layeroffset);
 		glVertexAttribDivisorARB(material->ininstlayloc, 1);
 	}
 
-	// Layer
-	if (material->ininstinfoloc != -1) {
+	// Info
+	if (material->ininstinfoloc != -1 && !(material->builtins & GPU_INSTANCING_INFO)) {
+		glDisableVertexAttribArray(material->ininstinfoloc);
+		glVertexAttribDivisorARB(material->ininstinfoloc, 0);
+		glVertexAttrib3f(material->ininstinfoloc, 0.0f, 0.0f, 0.0f);
+	}
+	else if (material->ininstinfoloc != -1) {
 		glEnableVertexAttribArray(material->ininstinfoloc);
 		glVertexAttribPointer(material->ininstinfoloc, 3, GL_FLOAT, GL_FALSE, 0, infooffset);
 		glVertexAttribDivisorARB(material->ininstinfoloc, 1);

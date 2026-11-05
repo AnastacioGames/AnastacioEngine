@@ -187,3 +187,51 @@ sai da medição; a RA4 precisa de variante parada; CSM tem 2 ou 3 cascatas; lei
 `glFinish`; `check_docs` usa arquivos rastreados. Sequência acordada: medir a alternância entre passes →
 cache limitado de buffers se o custo for relevante → empacotamento parcial na CPU (P1). Cache de metadados do
 Static Batch fora da prioridade.
+
+## Medição A1 (2026-11-04)
+
+Cena parada nova: [criar_cena_ra4_passes.py](../tools/debug/cenas/criar_cena_ra4_passes.py)
+(nada se move, recolore ou some); orquestrador [medir_ra4_passes.py](../tools/debug/cenas/medir_ra4_passes.py).
+Runtime ~10 s por caso, `getRenderStats` + `RANGE_PROFILE`, 120 quadros de aquecimento descartados.
+Máquina de desenvolvimento do usuário; `main` a partir de 7212f1e4. Saída em `artifacts/ra4_passes/`.
+
+| Caso | uploads/quadro | passes de sombra | `render.shadows` (ms) 400 inst. | 2000 inst. | 5000 inst. |
+|---|---|---|---|---|---|
+| sem sombra | 0 | 0 | — | — | — |
+| sol, 2 cascatas, espalhado | 2 | 2 | 0,20 | 0,40 | 1,00 |
+| sol, 3 cascatas, espalhado | 3 | 3 | 0,20 | 0,58 | 1,28 |
+| sol, 3 cascatas, juntos | 3 | 3 | 0,30 | 0,93 | 2,38 |
+| luz pontual | 4 | 6 | 0,20 | 0,40 | 0,90 |
+
+Tempos refeitos em 2026-11-04 depois da correção do desenho N² (seção abaixo); a primeira rodada
+estava inflada pelo bug. Contagens de upload iguais nas duas rodadas. Todos os casos ficaram presos a 60 FPS.
+
+O que mostra:
+
+- **Mecanismo confirmado.** Com a cena parada, cada passe de sombra com lista diferente reenvia o grupo inteiro
+  (0 uploads sem sombra, 2/3 com CSM). Na luz pontual, 4 uploads em 6 passes: faces vizinhas com a mesma lista
+  aproveitam o cache. Mesmo com os objetos juntos, as 3 cascatas deram 3 uploads (as listas diferem).
+- **Custo pequeno.** Passar de 2 para 3 cascatas com 5000 instâncias somou ~0,28 ms, incluindo culling
+  e desenho do passe extra. O upload de 5000 instâncias custa, portanto, no máximo ~0,3 ms por passe aqui.
+  A 400 instâncias fica no limite da resolução do profiler (0,1 ms).
+- **Sem gargalo de GPU.** Com a correção, 5000 instâncias com sol em 3 cascatas cabem folgado em 60 FPS.
+  O caso "juntos" é mais caro pela sobreposição de geometria, não pelos uploads.
+- Não medido: custo de GPU/driver de orfanar o buffer várias vezes por quadro.
+
+**Decisão sugerida:** não implementar o cache de buffers por lista agora. O ganho máximo esperado é ~0,3 ms
+por passe em grupos de milhares de instâncias. Reabrir se um jogo real mostrar `render.shadows` alto com
+`instancingUploads` alto por quadro. Pelo mesmo motivo, P1 (empacotar só o que mudou) também fica sem prioridade.
+
+## Achado na investigação da GPU: instancing desenhava N² (corrigido localmente)
+
+A medição A1 mostrou ~166 ms de GPU com 5000 cubos numa RX 6800M. Isolando sem sombra: 2000 cubos com
+instancing 19,8 ms × 0,43 ms sem instancing, mesmos objetos visíveis e desenhos; cubos minúsculos não mudavam
+(não era pixel); `GL_STATIC_DRAW`/`glBufferSubData` não mudavam (não era memória do buffer); iGPU também ~30×.
+Um diagnóstico do estado dos atributos no desenho mostrou `indices=14400` para 400 instâncias de um cubo de 36:
+o Static Batch automático tinha mesclado os objetos, e o nó de instancing, que tem prioridade
+([RAS_DisplayArrayBucket.cpp:218](../source/source/gameengine/Rasterizer/RAS_DisplayArrayBucket.cpp#L218)),
+desenhava o lote inteiro por instância.
+
+Correção em `BL_StaticBatchObjects`: material de instancing fica fora do batch. Depois: 2000 instâncias 0,38 ms;
+5000 com CSM 1,37 ms. Com isso, a medição A1 (custo de reenvio por passe) continua válida, mas os tempos de
+GPU da primeira tabela estavam inflados pelo bug.

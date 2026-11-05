@@ -8,6 +8,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-04 - Instancing fora do Static Batch (desenho N²)
+
+- Bug: objetos com material Geometry Instancing entravam no Static Batch (o automático, padrão desde
+  34b530cc, ou o manual). O nó de instancing tem prioridade sobre o de batching
+  (`RAS_DisplayArrayBucket::GenerateTree`), então cada instância desenhava o lote mesclado inteiro:
+  400 cubos viravam 160 mil, com geometria em lugar errado. Esferas em 2000 instâncias derrubaram o driver AMD.
+- Correção: `BL_StaticBatchObjects` ignora objetos com material de instancing.
+- Também em `GPU_material_bind_instancing_attrib`: atributos de cor/layer/info que o shader mantém ativos
+  mas o material não pediu apontavam para offsets não inicializados. Agora recebem valor constante.
+  Não era a causa da lentidão.
+- Medido (RX 6800M, cena `criar_cena_ra4_passes.py`): 2000 instâncias 19,8 → 0,38 ms de GPU na câmera;
+  5000 com sol CSM ~122 → 1,37 ms; iGPU com 400: 9,0 ms antes. RA4 original: uploads só nos quadros
+  com mudança, 1 desenho. Detalhes em [revisao-directx-claude.md](revisao-directx-claude.md).
+
 ## 2026-11-04 - Range.track: project(pos, near)
 
 - `Track.project(pos, near=None)`: com `near` (o `s` do quadro anterior) a amostra mais próxima é
