@@ -801,6 +801,19 @@ KX_ExitInfo LA_Launcher::EngineMainLoop()
 	emscripten_set_main_loop_arg(
 		[](void *launcher) {
 			LA_Launcher *self = static_cast<LA_Launcher *>(launcher);
+			/* Frame cap without waiting (KX_KetsjiEngine::WaitUntil returns at once on the Web):
+			 * browser frames that come before the game's next frame are skipped, so a 120 Hz
+			 * screen still runs a 60 FPS game at 60. A margin of 2 ms absorbs rAF jitter. */
+			static double next = 0.0;
+			const double now = emscripten_get_now();
+			const double rate = self->m_ketsjiEngine->GetTicRate();
+			if (rate > 0.0) {
+				const double step = 1000.0 / rate;
+				if (now < next - 2.0) {
+					return;
+				}
+				next = (now - next > step) ? now + step : next + step;
+			}
 			self->m_emscriptenExitInfo = self->EngineNextFrame();
 			if (self->m_emscriptenExitInfo.m_code != KX_ExitInfo::NO_REQUEST) {
 				emscripten_cancel_main_loop();
