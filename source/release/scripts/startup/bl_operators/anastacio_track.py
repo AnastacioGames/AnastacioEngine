@@ -1056,6 +1056,81 @@ class RANGE_TRACK_OT_probes_preview(_TrackOp, Operator):
         return {'FINISHED'}
 
 
+class RANGE_TRACK_OT_probes_generate(_TrackOp, Operator):
+    """Create the Light Probe Volume boxes along the track (replaces only the ones this track made)"""
+    bl_idname = "range_track.probes_generate"
+    bl_label = "Generate Light Probe Volumes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def invoke(self, context, event):
+        track = _active_track(context)
+        try:
+            result = probe_plan(context.scene, track)
+        except Exception as ex:
+            traceback.print_exc()
+            self.report({'ERROR'}, tip_("Light Probe Volume preview failed: %s") % ex)
+            return {'CANCELLED'}
+        probe_preview_store(context.scene, track, result)
+        _redraw_views(context)
+        if result.over_limit:
+            msg = result.text()
+            if getattr(result, "suggested", None):
+                msg += "; " + tip_("A spacing of %.1f m fits the limit") % result.suggested
+            self.report({'ERROR'}, msg)
+            return {'CANCELLED'}
+        self._text = result.text()
+        self._warnings = list(result.warnings)
+        return context.window_manager.invoke_props_dialog(self, width=420)
+
+    def draw(self, context):
+        col = self.layout.column()
+        col.label(getattr(self, "_text", ""), icon='LIGHT')
+        for w in getattr(self, "_warnings", ()):
+            col.label(w, icon='ERROR')
+        col.label(tip_("Old volumes made by this track are replaced; hand-made ones stay."))
+
+    def execute(self, context):
+        track = _active_track(context)
+        scene = context.scene
+        mode = _to_object_mode(context)
+        selected = [ob for ob in scene.objects if ob.select]
+        try:
+            text, _objs, _faces, warnings = run_generate(scene, track, {'PROBES'})
+        except Exception as ex:
+            traceback.print_exc()
+            _set_error(track, "%s: %s" % (type(ex).__name__, ex))
+            self.report({'ERROR'}, tip_("Light Probe Volume generation failed: %s") % ex)
+            return {'CANCELLED'}
+        finally:
+            for ob in scene.objects:
+                ob.select = ob in selected
+            if track.name in scene.objects:
+                scene.objects.active = track
+            _restore_mode(context, track, mode)
+        _probe_preview.pop(track.name, None)
+        _redraw_views(context)
+        n = len(_rt("probes").owned_volumes(track.name))
+        if warnings:
+            self.report({'WARNING'}, "%d volumes; %s" % (n, "; ".join(warnings)[:300]))
+        else:
+            self.report({'INFO'}, tip_("%d Light Probe Volumes created") % n)
+        return {'FINISHED'}
+
+
+class RANGE_TRACK_OT_probes_clear(_TrackOp, Operator):
+    """Delete the Light Probe Volumes this track made (hand-made volumes stay)"""
+    bl_idname = "range_track.probes_clear"
+    bl_label = "Clear Light Probe Volumes"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    def execute(self, context):
+        track = _active_track(context)
+        n = _rt("probes").clear_volumes(track.name)
+        _redraw_views(context)
+        self.report({'INFO'}, tip_("%d Light Probe Volumes deleted") % n)
+        return {'FINISHED'}
+
+
 def _redraw_views(context):
     screen = getattr(context, "screen", None)
     if screen is None:
@@ -1743,6 +1818,14 @@ class VIEW3D_PT_range_track_probes(_TrackPanel, Panel):
         row = layout.row(align=True)
         row.operator("range_track.probes_preview", icon='VISIBLE_IPO_ON')
         result, current = probe_preview_get(context.scene, track)
+        count = len(_rt("probes").owned_volumes(track.name))
+        row2 = layout.row(align=True)
+        row2.operator("range_track.probes_generate", text=tip_("Generate"), icon='FILE_REFRESH')
+        sub = row2.row(align=True)
+        sub.enabled = count > 0
+        sub.operator("range_track.probes_clear", text=tip_("Clear"), icon='X')
+        if count:
+            layout.label(tip_("%d volumes in the scene (group %s)") % (count, track.name + "_ProbeVolumes"))
         if result is not None:
             row.operator("range_track.probes_preview", text="", icon='X').clear = True
             box = layout.box()
@@ -1766,6 +1849,8 @@ classes = (
     RANGE_TRACK_OT_convert,
     RANGE_TRACK_OT_generate,
     RANGE_TRACK_OT_probes_preview,
+    RANGE_TRACK_OT_probes_generate,
+    RANGE_TRACK_OT_probes_clear,
     RANGE_TRACK_OT_live_watch,
     RANGE_TRACK_OT_live_toggle,
     RANGE_TRACK_OT_list_action,

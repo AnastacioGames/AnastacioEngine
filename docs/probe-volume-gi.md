@@ -76,6 +76,19 @@ mostra a etapa como "Probes and reflections (Probe Volume GI)".
 - A grade não vê objeto menor que o espaçamento: a sombra de contato embaixo dele some. Ligue o SSAO
   (Scene > Effects) para devolver essa sombra.
 
+## Volumes ao longo de uma pista (Track Tool)
+
+Numa pista, em vez de uma caixa gigante (o espaçamento cresce e a luz fica borrada), use o subpainel
+**Track > Light Probe Volumes** com o traçado selecionado ([plano](plano-track-probes.md)):
+
+- **Preview** mostra as caixas no overlay e a conta "N boxes, M probes (limit L)", sem criar nada.
+  Em laranja, as caixas em que o jogo aumentaria o espaçamento.
+- **Generate** cria uma cadeia de Empties `PV_<pista>_000…` no grupo `<pista>_ProbeVolumes`, alinhados
+  ao mundo e cobrindo só a faixa da pista (até a borda, mais margem), com as sondas de caixas vizinhas
+  nos mesmos pontos. Regerar troca só esses; volumes feitos à mão ficam. **Clear** apaga os gerados.
+- Padrão: Medium, 6 m, 4 m acima da pista, limite total 15.000. Uma pista de 1,9 km dá ~120 caixas e
+  ~14 mil sondas. Acima do limite, o Generate recusa e sugere o espaçamento que cabe.
+
 ## Depuração
 
 `RANGE_PROBE_VOLUME_LOG=1` imprime no console, a cada segundo, o seguinte:

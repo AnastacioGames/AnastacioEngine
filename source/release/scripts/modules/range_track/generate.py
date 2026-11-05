@@ -14,6 +14,7 @@ from . import layout
 from . import props
 
 PARTS_ALL = ('ROAD', 'TERRAIN', 'DECOR', 'BAKE')
+PARTS_OPTIONAL = ('PROBES',)   # só quando pedida (Light Probe Volumes, docs/plano-track-probes.md)
 PART_KEY = "range_track_part"       # ID property com a parte que gerou o objeto
 
 
@@ -103,8 +104,12 @@ def generate(track_obj, parts=frozenset(PARTS_ALL)):
     times['FRAMES'] = time.perf_counter() - t0
 
     t0 = time.perf_counter()
-    obj_parts = parts - {'BAKE'}
+    obj_parts = parts - {'BAKE', 'PROBES'}
     removed = clear_generated(track_obj, obj_parts) if obj_parts else 0
+    if 'PROBES' in parts:
+        pmod, _err = _import('probes')
+        if pmod is not None:
+            removed += pmod.clear_volumes(track_obj.name)
     times['CLEAR'] = time.perf_counter() - t0
 
     created = {}
@@ -112,6 +117,7 @@ def generate(track_obj, parts=frozenset(PARTS_ALL)):
         ('ROAD', 'sweep', 'generate_road'),
         ('TERRAIN', 'terrain', 'generate_terrain'),
         ('DECOR', 'decor', 'generate_decor'),
+        ('PROBES', 'probes', 'generate_probes'),
     ]
     for part, modname, fn in calls:
         if part not in parts:

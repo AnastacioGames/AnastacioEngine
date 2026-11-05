@@ -147,10 +147,78 @@ def test_track(name):
     common_checks(name, fr, ed, res, cfg)
 
 
+def test_generate():
+    """P2: Generate/Clear na cena (regerar dá os mesmos Empties; volume manual intocado)."""
+    sys.modules.pop("range_track.generate", None)
+    from range_track import generate as gen
+    try:
+        from bl_ui import properties_probe_volume as ppv
+    except Exception:
+        ppv = None
+    sc = bpy.context.scene
+    ob = make_curve(sc, "PistaGen", [(0, 0, 0), (120, 0, 0), (160, 40, 3), (120, 90, 6), (40, 70, 4),
+                                     (-20, 40, 2)], cyclic=True)
+    manual = bpy.data.objects.new("VolumeManual", None)
+    manual.empty_draw_type = 'CUBE'
+    sc.objects.link(manual)
+    sc.objects.active = manual
+    bpy.ops.object.game_property_new(type='FLOAT', name="probe_volume")
+
+    def snapshot():
+        return sorted((o.name, tuple(round(v, 4) for v in o.location), tuple(round(v, 4) for v in o.scale))
+                      for o in probes.owned_volumes(ob.name))
+
+    r1 = gen.generate(ob, {'PROBES'})
+    s1 = snapshot()
+    r2 = gen.generate(ob, {'PROBES'})
+    s2 = snapshot()
+    fr, ed = frames_of(ob)
+    pl = probes.plan(fr, ed, probes.Config.from_settings(ob.range_track))
+    print("PistaGen:", pl.text(), "criados", len(s1), "avisos", r1['warnings'] + r2['warnings'])
+    check(len(s1) == len(pl.boxes) > 0, "gera um Empty por caixa (%d de %d)" % (len(s1), len(pl.boxes)))
+    check(s1 == s2, "regerar 2x dá os mesmos Empties (nome, posição, escala)")
+    check(r2['removed'] == len(s1), "regerar apaga os anteriores (%d)" % r2['removed'])
+    check(len([o for o in bpy.data.objects if o.name.startswith("PV_PistaGen")]) == len(s1),
+          "sem sobra de Empties antigos")
+    grp = bpy.data.groups.get("PistaGen_ProbeVolumes")
+    check(grp is not None and len(grp.objects) == len(s1), "todos no grupo PistaGen_ProbeVolumes")
+    vols = probes.owned_volumes(ob.name)
+    v0 = vols[0]
+    gp = v0.game.properties
+    check(abs(gp["probe_volume"].value - 6.0) < 1e-6 and gp["probe_volume_quality"].value == "medium",
+          "propriedades de jogo: espaçamento 6 e qualidade medium")
+    check(all(o.empty_draw_type == 'CUBE' for o in vols), "Display Cube")
+    if ppv is not None:
+        bad = 0
+        byname = {"PV_PistaGen_%03d" % n: b for n, b in enumerate(pl.boxes)}
+        for o in vols:
+            dims, _sp, used, _lim = ppv._grid(o)
+            b = byname[o.name]
+            if list(dims) != list(b.dims) or abs(used - b.used_spacing) > 1e-3:
+                bad += 1
+                if bad == 1:
+                    print("   dif", o.name, dims, b.dims, used, b.used_spacing, tuple(o.scale), b.half)
+        check(bad == 0, "grade do painel Light Probe Volume = grade do plano (%d diferentes)" % bad)
+    # Gerar outra parte não toca nos volumes.
+    gen.clear_generated(ob, {'ROAD'})
+    check(len(probes.owned_volumes(ob.name)) == len(s1), "limpar ROAD não apaga os volumes")
+    n = probes.clear_volumes(ob.name)
+    check(n == len(s1) and not probes.owned_volumes(ob.name), "Clear apaga os %d volumes" % n)
+    check(bpy.data.groups.get("PistaGen_ProbeVolumes") is None, "Clear apaga o grupo vazio")
+    check("VolumeManual" in bpy.data.objects and "probe_volume" in manual.game.properties,
+          "volume feito à mão intocado")
+    # Acima do limite: recusa sem criar nada.
+    ob.range_track.probe_max_total = 50
+    r3 = gen.generate(ob, {'PROBES'})
+    check(not probes.owned_volumes(ob.name) and any("PROBES" in w for w in r3['warnings']),
+          "acima do limite: não cria e avisa (%s)" % r3['warnings'][:1])
+
+
 if argv:
     test_track(argv[0])
 else:
     test_synthetic()
+    test_generate()
 print("FALHAS: %d" % len(FAILS))
 for f in FAILS:
     print("  -", f)

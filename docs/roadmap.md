@@ -13,7 +13,7 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   do RolimaRacer.
 - [Light Probe Volumes na pista](plano-track-probes.md): operador que cobre a faixa da pista com uma
   cadeia de Empties `probe_volume` (prévia com a conta de sondas, grupo próprio, apagar/regerar) e
-  orçamento de captura compartilhado entre volumes em C++. Etapas P1-P4; P1 (prévia) feita em 2026-11-05.
+  orçamento de captura compartilhado entre volumes em C++. Etapas P1-P4; P1 (prévia) e P2 (Generate/Clear) feitas em 2026-11-05.
 
 ## Probe Volume GI (luz indireta por grade de sondas)
 

@@ -94,6 +94,8 @@ Lições do protótipo:
   - regras de decoração (lista);
   - botões **Generate Road**, **Generate Terrain**, **Generate Decoration**, **Bake Track Data**;
     "Live" refaz só a estrada ao editar (com espera curta).
+  - subpainel **Light Probe Volumes** ([plano](plano-track-probes.md)): Preview (conta e caixas no
+    overlay), **Generate** (confirma com a conta) e **Clear**.
 - Overlay na viewport (bgl): bordas das faixas, marca de s a cada 100 m, setas de inclinação e trechos
   coloridos.
 - Operador **Convert Curve+Array to Track**: lê o Bezier e o perfil por malha, passa para Z Up,

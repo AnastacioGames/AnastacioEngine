@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - Track Tool: gerar e apagar Light Probe Volumes na pista (P2)
+
+- Botões **Generate** e **Clear** no subpainel Track > Light Probe Volumes. Generate refaz a prévia,
+  confirma com a conta (`invoke_props_dialog`) e recusa acima do limite com o espaçamento que cabe.
+- `probes.generate_probes`: um Empty Cube por caixa (`PV_<pista>_000`, centro e escala = meia caixa),
+  propriedades de jogo `probe_volume` = espaçamento, `probe_volume_quality` e os padrões do painel,
+  grupo `<pista>_ProbeVolumes`, `range_track_owner` + `range_track_part = PROBES`. `clear_volumes` apaga
+  só esses e o grupo vazio. `generate()` ganhou a parte opcional `PROBES` (fora de `ALL`); limpar
+  outras partes não toca nos volumes.
+- Teste em `test_probes.py`: regerar 2× dá os mesmos Empties, volume manual intocado, grade do painel
+  igual à do plano, recusa acima do limite. Pista_4 (cópia, operadores em background): 119 volumes em
+  0,4 s, Scene Doctor sem aviso de limite.
+
 ## 2026-11-05 - Track Tool: prévia de Light Probe Volumes ao longo da pista (P1)
 
 - Plano em [plano-track-probes.md](plano-track-probes.md). Só Python; nada é criado na cena ainda (P2).

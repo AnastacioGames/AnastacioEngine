@@ -1,6 +1,6 @@
 # Plano: Light Probe Volumes gerados pelo Track Tool
 
-Status: P1 feita (2026-11-05, prévia + teste headless); P2-P4 abertas. Base: [plano-track-tool.md](plano-track-tool.md),
+Status: P1 e P2 feitas (2026-11-05: prévia, Generate/Clear e testes headless); P3-P4 abertas. Base: [plano-track-tool.md](plano-track-tool.md),
 [probe-volume-gi.md](probe-volume-gi.md), [plano-probe-volume-gi.md](plano-probe-volume-gi.md).
 
 ## Objetivo

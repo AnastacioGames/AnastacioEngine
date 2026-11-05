@@ -312,3 +312,92 @@ def box_edges(box):
     idx = ((0, 1), (2, 3), (4, 5), (6, 7), (0, 2), (1, 3), (4, 6), (5, 7),
            (0, 4), (1, 5), (2, 6), (3, 7))
     return [(c[a], c[b]) for a, b in idx]
+
+
+# --------------------------------------------------------------------------------------------
+# P2: Empties probe_volume na cena (lidos pelo jogo como volumes feitos à mão)
+
+PART = 'PROBES'
+PART_KEY = "range_track_part"
+GROUP_SUFFIX = "_ProbeVolumes"
+# Mesmos padrões do painel Light Probe Volume (bl_ui/properties_probe_volume.py).
+GAME_PROPS = (
+    ("probe_volume_bounce", 'FLOAT', 0.3),
+    ("probe_volume_clip_end", 'FLOAT', 30.0),
+    ("probe_volume_ssgi", 'FLOAT', 0.5),
+    ("probe_volume_ignore_layers", 'INT', 0),
+    ("probe_volume_freeze", 'BOOL', False),
+)
+
+
+def group_name(track_name):
+    return track_name + GROUP_SUFFIX
+
+
+def owned_volumes(track_name):
+    """Empties de luz indireta gerados pelo traçado (só os marcados com a parte PROBES)."""
+    import bpy
+    return [ob for ob in bpy.data.objects
+            if getattr(ob, "range_track_owner", "") == track_name and ob.get(PART_KEY) == PART]
+
+
+def clear_volumes(track_name):
+    """Apaga os volumes gerados pelo traçado e o grupo, se ficar vazio. Retorna quantos apagou."""
+    import bpy
+    obs = owned_volumes(track_name)
+    for ob in obs:
+        for sc in list(ob.users_scene):
+            sc.objects.unlink(ob)
+        bpy.data.objects.remove(ob, do_unlink=True)
+    grp = bpy.data.groups.get(group_name(track_name))
+    if grp is not None and len(grp.objects) == 0:
+        bpy.data.groups.remove(grp)
+    return len(obs)
+
+
+def _add_game_prop(scene, ob, name, typ, value):
+    import bpy
+    if name not in ob.game.properties:
+        active = scene.objects.active
+        scene.objects.active = ob
+        bpy.ops.object.game_property_new(type=typ, name=name)
+        scene.objects.active = active
+    ob.game.properties[name].value = value
+
+
+def generate_probes(scene, track_obj, fr, ed):
+    """Cria um Empty Cube por caixa do plano (nomes PV_<pista>_000), no grupo <pista>_ProbeVolumes.
+    Recusa (ValueError) quando o total passa do limite. Não apaga nada: quem chama limpa antes."""
+    import bpy
+    cfg = Config.from_settings(track_obj.range_track)
+    res = plan(fr, ed, cfg)
+    if res.over_limit:
+        sug = suggest_spacing(fr, ed, cfg)
+        raise ValueError("%s; %s" % (res.text(), "spacing %.1f m fits" % sug if sug else "raise the limit"))
+    grp = bpy.data.groups.get(group_name(track_obj.name)) or bpy.data.groups.new(group_name(track_obj.name))
+    template, out = None, []
+    for n, b in enumerate(res.boxes):
+        name = "PV_%s_%03d" % (track_obj.name, n)
+        if template is None:
+            ob = bpy.data.objects.new(name, None)
+            ob.empty_draw_type = 'CUBE'
+            ob.empty_draw_size = 1.0
+            scene.objects.link(ob)
+            _add_game_prop(scene, ob, "probe_volume", 'FLOAT', cfg.spacing)
+            _add_game_prop(scene, ob, "probe_volume_quality", 'STRING', cfg.quality.lower())
+            for pname, typ, value in GAME_PROPS:
+                _add_game_prop(scene, ob, pname, typ, value)
+            template = ob
+        else:
+            ob = template.copy()
+            ob.name = name
+            scene.objects.link(ob)
+        ob.location = b.center
+        ob.scale = b.half
+        ob.range_track_owner = track_obj.name
+        ob[PART_KEY] = PART
+        if ob.name not in grp.objects:
+            grp.objects.link(ob)
+        out.append(ob)
+    scene.update()     # matrix_world (lido pelo painel e pelo jogo) com a escala nova
+    return out
