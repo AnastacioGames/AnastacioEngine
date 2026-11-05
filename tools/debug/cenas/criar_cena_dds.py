@@ -46,7 +46,7 @@ for idx, alpha in enumerate((False, True)):
     slot = mat.texture_slots.add()
     slot.texture = tex
     slot.texture_coords = 'UV'
-    bpy.ops.mesh.primitive_cube_add(radius=1, location=(-1.6 + idx * 3.2, 0, 1))
+    bpy.ops.mesh.primitive_cube_add(radius=1, location=(-1.6 + idx * 3.2, 0, 1), calc_uvs=True)
     cube = scene.objects.active
     cube.name = name
     cube.game.physics_type = 'NO_COLLISION'
@@ -55,6 +55,8 @@ for idx, alpha in enumerate((False, True)):
 
 # Tangent-space normal map (bumps): prepared as BC5, Z rebuilt in the shader.
 image = bpy.data.images.new('BumpNormal', 128, 128, alpha=False)
+# Non-Color before the pixels: changing it later regenerates the image and drops them.
+image.colorspace_settings.name = 'Non-Color'
 yy, xx = np.mgrid[0:128, 0:128] / 128.0
 nx = .5 * np.sin(xx * 6.2831853 * 4)
 ny = .5 * np.sin(yy * 6.2831853 * 4)
@@ -64,7 +66,6 @@ pixels[..., 0], pixels[..., 1], pixels[..., 2] = nx * .5 + .5, ny * .5 + .5, nz 
 image.pixels = pixels.reshape(-1).tolist()
 image.filepath_raw = os.path.join(folder, 'BumpNormal.png')
 image.file_format = 'PNG'
-image.colorspace_settings.name = 'Non-Color'
 image.save()
 image.pack()
 mat = bpy.data.materials.new('BumpNormal')
@@ -78,7 +79,7 @@ slot.texture_coords = 'UV'
 slot.use_map_color_diffuse = False
 slot.use_map_normal = True
 slot.normal_map_space = 'TANGENT'
-bpy.ops.mesh.primitive_cube_add(radius=1, location=(0, 3, 1))
+bpy.ops.mesh.primitive_cube_add(radius=1, location=(0, 3, 1), calc_uvs=True)
 cube = scene.objects.active
 cube.name = 'BumpNormal'
 cube.game.physics_type = 'NO_COLLISION'
