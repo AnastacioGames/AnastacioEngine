@@ -439,15 +439,15 @@ void RAS_Rasterizer::DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen
 
 	RAS_OffScreen::RestoreScreen();
 	/* Reduced render (dynamic resolution): FSR 1 instead of the plain stretch. Only without
-	 * VR lens distortion, which has its own resampling. RANGE_UPSCALE=fsr turns it on for now:
+	 * VR lens distortion, which has its own resampling. FSR is the default (RANGE_UPSCALE=bilinear restores the plain stretch):
 	 * EASU upscales into a full size target, then RCAS sharpens it onto the screen.
 	 * RANGE_UPSCALE=easu skips RCAS. RANGE_FSR_SHARP sets the RCAS stops (0 = strongest, default 0.2). */
 	static const int fsrMode = []() {
 		const char *mode = getenv("RANGE_UPSCALE");
-		if (!mode) {
-			return 0;
+		if (!mode || !mode[0]) {
+			return 2;
 		}
-		return (strcmp(mode, "fsr") == 0) ? 2 : (strcmp(mode, "easu") == 0) ? 1 : 0;
+		return (strcmp(mode, "bilinear") == 0) ? 0 : (strcmp(mode, "easu") == 0) ? 1 : 2;
 	}();
 	static const float fsrSharp = []() {
 		const char *stops = getenv("RANGE_FSR_SHARP");
