@@ -411,8 +411,12 @@ void RAS_DisplayArrayBucket::RunBatchingNode(const RAS_DisplayArrayNodeTuple& tu
 
 	// Retrieve batch group from first active mesh slot.
 	RAS_BatchGroup *group = m_activeMeshSlots.front()->m_meshUser->GetBatchGroup();
+	RAS_MeshUser *referenceMeshUser = group->GetReferenceMeshUser();
+	/* Light selection (RAS_Rasterizer::ProcessLighting) reads the layer from the client object. Without it the
+	 * batch kept whatever object was set before, often none: no lamps, so no sun and no shadows. */
+	rasty->SetClientObject(referenceMeshUser->GetClientObject());
 	// Use batch group reference mesh user for layer and object color.
-	material->ActivateMeshUser(group->GetReferenceMeshUser(), rasty, managerData->m_trans);
+	material->ActivateMeshUser(referenceMeshUser, rasty, managerData->m_trans);
 
 	RAS_AttributeArrayStorage *attribStorage = m_nodeData.m_attribStorage;
 	attribStorage->BindPrimitives();

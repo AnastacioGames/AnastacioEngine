@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-04 - Static Batch sem luz do sol nem sombras
+
+- Bug: o nó de batching não definia o objeto atual (`SetClientObject`) antes de ativar o material. A seleção
+  de luzes (`RAS_Rasterizer::ProcessLighting`) lê a camada dele; sem objeto, nenhuma lâmpada: o lote ficava só com
+  luz ambiente, sem sol e sem sombras recebidas. Afetava o Static Batch automático (padrão desde 34b530cc).
+- Correção: `RunBatchingNode` define o objeto de referência do lote. Aceito com janela (cena RA4-passes
+  com e sem Static Batch iguais).
+
 ## 2026-11-04 - Instancing fora do Static Batch (desenho N²)
 
 - Bug: objetos com material Geometry Instancing entravam no Static Batch (o automático, padrão desde
