@@ -197,6 +197,10 @@ extern "C" bool imb_ktx2_write(const ImBuf *ibuf, const char *path, bool normal,
     params.set_srgb_options(srgb);
     params.set_ldr_srgb_channel_weights(srgb);
     params.m_mip_gen = false;
+    params.m_status_output = false;
+    params.m_print_stats = false;
+    params.m_compute_stats = false;
+    params.m_validate_output_data = false;
     params.m_create_ktx2_file = true;
     if (normal) params.m_ktx2_uastc_supercompression = basist::KTX2_SS_ZSTANDARD;
     params.set_format_mode_and_quality_effort(mode, quality, 4, false);
