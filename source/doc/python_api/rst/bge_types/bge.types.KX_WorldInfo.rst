@@ -125,6 +125,11 @@ base class --- :class:`EXP_PyObjectPlus`
       ``lightning_rate``, ``lightning_intensity``, ``lightning_distance``, ``lightning_width``,
       ``cloud_coverage``, ``cloud_scale``, ``cloud_speed``, ``flare_scale``, ``flare_intensity``, ``mist_*``.
 
+      Wet Surfaces (rain): boolean ``wet``; integer ``wet_smooth_quality`` (0 Off, 1 Low, 2 Medium, 3 High);
+      floats ``wet_darkness`` (0-1), ``wet_gloss`` (0-1), ``wet_distance`` (meters), ``wet_dry_time`` (seconds),
+      ``wet_smooth_strength`` (0-1), ``wet_smooth_radius`` (0.25-4), ``wet_smooth_angle`` (Keep Edges, radians)
+      and ``wet_smooth_distance`` (meters).
+
       Clouds, Sky Layers and Volumetric Clouds (the toggles need the clouds pass, built at load when any of
       the three is enabled in the World): booleans ``use_sky_layers``, ``use_volumetric_clouds``,
       ``vcloud_shadow_enable``; integers ``cloud_detail`` (1-8), ``vcloud_quality`` (0 Low, 1 Medium, 2 High);

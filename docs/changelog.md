@@ -19,6 +19,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Teste em background com `tools/debug/cenas/criar_cena_trace_doctor.py`: sugestões certas, Fix salvo no arquivo,
   Revert volta. Aceito com janela pelo usuário no mesmo dia.
 
+## 2026-11-05 - Docs: chaves wet_* do setWeather no rst do KX_WorldInfo
+
+- `bge.types.KX_WorldInfo.rst`: `setWeather`/`getWeather` listam as chaves das superfícies molhadas da chuva
+  (`wet`, `wet_smooth_quality`, `wet_darkness`, `wet_gloss`, `wet_distance`, `wet_dry_time`, `wet_smooth_*`),
+  que o C++ já aceitava (363ee888, b6b02bc0) mas a referência da API não mostrava.
 
 ## 2026-11-05 - Web: carga KTX2 x DDS medida; limite de FPS sem espera ativa
 
