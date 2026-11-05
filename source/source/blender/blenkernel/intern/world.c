@@ -53,15 +53,16 @@
 
 /* Rain > Wet Surfaces: how wet the surfaces are now (0 dry .. 1 wet). Gets wet in ~3 s while it
  * rains (Rain on with Intensity > 0) and dries over Dry Time after it stops. Called once per
- * redraw by the 3D View and the game (a few float ops, nothing per object); the first call
- * after loading starts at the current weather. Returns 0 when Wet Surfaces is off. */
+ * redraw by the 3D View and the game (a few float ops, nothing per object). It is only an
+ * overlay in the rain pass, the materials are never touched: the dry look is the original
+ * image, and the level ends exactly on 0. Starts dry after loading. Returns 0 when off. */
 float BKE_world_rain_wet_level(World *wrld, double now)
 {
 	const bool raining = (wrld->weather_flag & WO_WEATHER_RAIN) && wrld->rain_intensity > 0.001f;
 	const float target = raining ? 1.0f : 0.0f;
 
 	if (wrld->rain_wet_time <= 0.0 || now < wrld->rain_wet_time) {
-		wrld->rain_wet_level = target;
+		wrld->rain_wet_level = 0.0f;
 	}
 	else if (wrld->rain_wet_level != target) {
 		/* Long pauses (window idle, breakpoint) count as at most one second. */
@@ -75,6 +76,10 @@ float BKE_world_rain_wet_level(World *wrld, double now)
 			wrld->rain_wet_level = max_ff(wrld->rain_wet_level - step, target);
 	}
 	wrld->rain_wet_time = now;
+	if (!(wrld->rain_wet_flag & WO_RAIN_WET_ENABLE) || !(wrld->weather_flag & WO_WEATHER_RAIN)) {
+		/* Off, or the rain itself turned off: back to dry at once (next rain starts dry). */
+		wrld->rain_wet_level = 0.0f;
+	}
 
 	return (wrld->rain_wet_flag & WO_RAIN_WET_ENABLE) ? wrld->rain_wet_level : 0.0f;
 }

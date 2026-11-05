@@ -647,6 +647,12 @@ void main()
 		return;
 	}
 
+	/* Only Wet Surfaces drying keeps the pass running (the rain stopped): no overcast, so the
+	 * image matches the dry one and ends exactly on it when the level reaches 0. */
+	if (intensity <= 0.001 && ge_RainLightning.x <= 0.001 && !(ge_RainPuddle1.x > 0.5 && ge_RainPuddle1.y > 0.001)) {
+		darken = 0.0;
+	}
+
 	/* Ceu nublado: escurece e dessatura levemente a cena inteira. */
 	float luma = dot(direct.rgb, vec3(0.299, 0.587, 0.114));
 	vec3 overcast = mix(direct.rgb, vec3(luma) * 0.85, darken);

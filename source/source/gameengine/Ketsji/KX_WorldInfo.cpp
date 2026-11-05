@@ -196,6 +196,7 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	 * Left out on purpose: vfog_resolution (the size of the fog buffers, fixed at load). */
 	static const struct { const char *name; short World::*field; int flag; } extraFlags[] = {
 		{"use_sky_layers", &World::sky_layer_flag, WO_SKY_LAYERS_ENABLE},
+		{"wet", &World::rain_wet_flag, WO_RAIN_WET_ENABLE},
 		{"use_volumetric_clouds", &World::vcloud_flag, WO_VCLOUDS_ENABLE},
 		{"vcloud_shadow_enable", &World::vcloud_flag, WO_VCLOUDS_SHADOW_ENABLE},
 		{"vfog_use_lamps", &World::vfog_flag, WO_VFOG_LAMPS},
@@ -215,6 +216,8 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	};
 	const struct { const char *name; float *ptr; } extraFloats[] = {
 		{"cloud_color_r", &world->cloud_color[0]}, {"cloud_color_g", &world->cloud_color[1]},
+		{"wet_darkness", &world->rain_wet_darkness}, {"wet_gloss", &world->rain_wet_gloss},
+		{"wet_distance", &world->rain_wet_distance}, {"wet_dry_time", &world->rain_wet_dry_time},
 		{"cloud_color_b", &world->cloud_color[2]},
 		{"vcloud_coverage", &world->vcloud_coverage}, {"vcloud_scale", &world->vcloud_scale},
 		{"vcloud_speed", &world->vcloud_speed}, {"vcloud_altitude", &world->vcloud_altitude},
@@ -377,6 +380,7 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 	 * Left out on purpose: vfog_resolution (the size of the fog buffers, fixed at load). */
 	static const struct { const char *name; short World::*field; int flag; } extraFlags[] = {
 		{"use_sky_layers", &World::sky_layer_flag, WO_SKY_LAYERS_ENABLE},
+		{"wet", &World::rain_wet_flag, WO_RAIN_WET_ENABLE},
 		{"use_volumetric_clouds", &World::vcloud_flag, WO_VCLOUDS_ENABLE},
 		{"vcloud_shadow_enable", &World::vcloud_flag, WO_VCLOUDS_SHADOW_ENABLE},
 		{"vfog_use_lamps", &World::vfog_flag, WO_VFOG_LAMPS},
@@ -396,6 +400,8 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 	};
 	const struct { const char *name; float *ptr; } extraFloats[] = {
 		{"cloud_color_r", &world->cloud_color[0]}, {"cloud_color_g", &world->cloud_color[1]},
+		{"wet_darkness", &world->rain_wet_darkness}, {"wet_gloss", &world->rain_wet_gloss},
+		{"wet_distance", &world->rain_wet_distance}, {"wet_dry_time", &world->rain_wet_dry_time},
 		{"cloud_color_b", &world->cloud_color[2]},
 		{"vcloud_coverage", &world->vcloud_coverage}, {"vcloud_scale", &world->vcloud_scale},
 		{"vcloud_speed", &world->vcloud_speed}, {"vcloud_altitude", &world->vcloud_altitude},
