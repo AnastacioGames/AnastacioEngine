@@ -1588,14 +1588,19 @@ static char *code_generate_vertex(ListBase *nodes, const char *usercode, const G
 #endif
 					if (use_instancing) {
 						BLI_dynstr_appendf(
-							ds, "\tvar%d.xyz = normalize(gl_NormalMatrix * (att%d.xyz * %s));\n",
+							ds, "\tvar%d.xyz = gl_NormalMatrix * (att%d.xyz * %s);\n",
 							input->attribid, input->attribid, GPU_builtin_name(GPU_INSTANCING_MATRIX_ATTRIB));
 					}
 					else {
 						BLI_dynstr_appendf(
-							ds, "\tvar%d.xyz = normalize(gl_NormalMatrix * att%d.xyz);\n",
+							ds, "\tvar%d.xyz = gl_NormalMatrix * att%d.xyz;\n",
 							input->attribid, input->attribid);
 					}
+					/* normalize(0) is NaN on some GPUs (Adreno): a zero tangent then turns the whole
+					 * surface black instead of falling back to the vertex normal in tbn_perturb */
+					BLI_dynstr_appendf(
+						ds, "\tvar%d.xyz *= inversesqrt(max(dot(var%d.xyz, var%d.xyz), 1e-20));\n",
+						input->attribid, input->attribid, input->attribid);
 					BLI_dynstr_appendf(
 					        ds, "\tvar%d.w = att%d.w;\n",
 					        input->attribid, input->attribid);

@@ -2135,7 +2135,8 @@ vec3 tbn_perturb(vec4 tangent, vec3 normal, vec3 texnormal)
 	vec3 N = normalize(normal);
 	vec3 T = tangent.xyz - N * dot(N, tangent.xyz);
 	float tl = dot(T, T);
-	if (tl < 1e-12) {
+	/* also false for NaN: a broken tangent falls back to the plain normal */
+	if (!(tl >= 1e-12)) {
 		return N;
 	}
 	T *= inversesqrt(tl);
