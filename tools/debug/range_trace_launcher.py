@@ -223,7 +223,7 @@ class Launcher(tk.Tk):
 
         # Cabeçalho com o logo da engine (sempre escuro) e a troca de tema.
         faixa = tk.Frame(self, bg=CABECALHO)
-        faixa.pack(fill='x', pady=(0, 14))
+        faixa.pack(fill='x', pady=(0, 8))
         topo = tk.Frame(faixa, bg=CABECALHO)
         topo.pack(fill='x', padx=24, pady=(8, 6))
         if 'logo' not in self.imagens:
@@ -271,12 +271,12 @@ class Launcher(tk.Tk):
         corpo = self.cartao('Módulos')
         for m, descricao in MODULOS:
             linha = tk.Frame(corpo, bg=CARTAO)
-            linha.pack(fill='x', pady=3)
+            linha.pack(fill='x', pady=1)
             ttk.Checkbutton(linha, variable=self.mods[m]).pack(side='left')
             tk.Label(linha, text=m, bg=CARTAO, fg=OURO, font=(FONTE, 11, 'bold'), width=7,
                      anchor='w').pack(side='left')
             tk.Label(linha, text=descricao, bg=CARTAO, fg=TEXTO, font=(FONTE, 10), anchor='w', justify='left',
-                     wraplength=380).pack(side='left', fill='x')
+                     wraplength=int(760 * self.escala)).pack(side='left', fill='x')
 
         # Trilho de câmera (módulo sector), na coluna da direita: campos em duas colunas.
         self.coluna = direita
@@ -343,11 +343,12 @@ class Launcher(tk.Tk):
 
         # Rodapé.
         rodape = tk.Frame(self, bg=FUNDO)
-        rodape.pack(fill='x', padx=24, pady=(2, 22))
+        # Antes das colunas no empacotamento: o botão de rodar fica sempre visível, mesmo em tela baixa.
+        rodape.pack(fill='x', padx=24, pady=(4, 10), side='bottom', before=colunas)
         ttk.Checkbutton(rodape, text='Abrir o relatório ao fechar o jogo', variable=self.abrir,
                         style='Fundo.TCheckbutton').pack(anchor='w')
         acoes = tk.Frame(rodape, bg=FUNDO)
-        acoes.pack(fill='x', pady=(12, 0))
+        acoes.pack(fill='x', pady=(6, 0))
         tk.Label(acoes, textvariable=self.status, bg=FUNDO, fg=APAGADO, font=(FONTE, 10), anchor='w',
                  justify='left', wraplength=int(760 * self.escala)).pack(side='left', fill='x', expand=True)
         self.botao = botao(acoes, '\u25b6  Jogar com trace', self.iniciar, destaque=True)
@@ -360,15 +361,15 @@ class Launcher(tk.Tk):
 
     def cartao(self, titulo, botao_extra=None):
         caixa = tk.Frame(self.coluna, bg=CARTAO, highlightthickness=1, highlightbackground=BORDA)
-        caixa.pack(fill='x', pady=(0, 14))
+        caixa.pack(fill='x', pady=(0, 8))
         cabeca = tk.Frame(caixa, bg=CARTAO)
-        cabeca.pack(fill='x', padx=16, pady=(12, 6))
+        cabeca.pack(fill='x', padx=16, pady=(8, 4))
         tk.Label(cabeca, text=titulo.upper(), bg=CARTAO, fg=OURO, font=(FONTE, 9, 'bold')).pack(side='left')
         if botao_extra:
             self.botao_ultimo = botao(cabeca, botao_extra[0], botao_extra[1])
             self.botao_ultimo.pack(side='right')
         corpo = tk.Frame(caixa, bg=CARTAO)
-        corpo.pack(fill='x', padx=16, pady=(0, 14))
+        corpo.pack(fill='x', padx=16, pady=(0, 8))
         return corpo
 
     def carregar_trilho(self):
