@@ -5,18 +5,21 @@
  * KTX2 / Basis Universal: one file that becomes BC (desktop), ETC2 or ASTC (phones) at load.
  * The loader transcodes into the same DDSData blocks the DDS path uses, so the GPU upload is shared.
  *
- * Files are written by imb_ktx2_write() with ImBuf rows in memory order (bottom row first), so the
- * transcoded blocks and RGBA pixels already have the orientation ImBuf and OpenGL expect.
+ * Files from imb_ktx2_write() keep ImBuf rows in memory order (bottom row first) and say so with
+ * KTXorientation "ru"; without that key a file is top first, the KTX2 default, and gets flipped here.
  * Colour textures are ETC1S; tangent-space normal maps are UASTC with X in RGB and Y in alpha,
- * the layout Basis needs to produce BC5 / EAC RG11 (the shader rebuilds Z when blue is 0).
+ * the layout Basis needs to produce BC5 / EAC RG11 (the shader rebuilds Z when blue is 0). Only the
+ * AnastacioNormalXY key means that layout: any other UASTC file is a plain colour texture.
  */
 
 #include <cstdlib>
 #include <cstring>
 #include <cmath>
 #include <mutex>
+#include <vector>
 
 #include "basisu_transcoder.h"
+#include "FlipDXT.h"
 
 extern "C" {
 #include "BLI_utildefines.h"
@@ -75,9 +78,66 @@ bool pick_target(bool normal, bool alpha, Target &t)
 	return false;
 }
 
-/* level 0 as RGBA8 into ibuf->rect; normal maps go from (X, X, X, Y) back to (X, Y, Z, 255) */
-bool decode_rgba(basist::ktx2_transcoder &tr, ImBuf *ibuf, bool normal)
+/* the one rule for both load paths */
+bool is_normal_xy(const basist::ktx2_transcoder &tr)
 {
+	const basisu::uint8_vec *mark = tr.find_key("AnastacioNormalXY");
+	return mark && mark->size() && (*mark)[0] == '1';
+}
+
+/* KTXorientation is "rd" (the default) or "ru" for 2D: the second letter is the row direction */
+bool rows_top_first(const basist::ktx2_transcoder &tr)
+{
+	const basisu::uint8_vec *orientation = tr.find_key("KTXorientation");
+	return !(orientation && orientation->size() >= 2 && (*orientation)[1] == 'u');
+}
+
+void flip_rows(ImBuf *ibuf)
+{
+	const size_t row = (size_t)ibuf->x;
+	std::vector<unsigned int> line(row);
+	for (int y = 0; y < ibuf->y / 2; y++) {
+		unsigned int *a = ibuf->rect + y * row, *b = ibuf->rect + (ibuf->y - 1 - y) * row;
+		memcpy(line.data(), a, row * 4);
+		memcpy(a, b, row * 4);
+		memcpy(b, line.data(), row * 4);
+	}
+}
+
+/* Prepare Textures files from before the mark are read as colour; a small mip is enough to warn
+ * about one, since X/X/X/Y has grey RGB and a varying alpha. */
+void warn_old_normal(basist::ktx2_transcoder &tr)
+{
+	const uint32_t levels = tr.get_levels() ? tr.get_levels() : 1;
+	const uint32_t level = levels > 4 ? levels - 4 : levels - 1;
+	basist::ktx2_image_level_info info;
+	if (!tr.get_image_level_info(info, level, 0, 0)) {
+		return;
+	}
+	const uint32_t pixels = info.m_orig_width * info.m_orig_height;
+	std::vector<unsigned char> p((size_t)pixels * 4);
+	if (!tr.transcode_image_level(level, 0, 0, p.data(), pixels, basist::transcoder_texture_format::cTFRGBA32)) {
+		return;
+	}
+	bool varying = false;
+	for (uint32_t i = 0; i < pixels; i++) {
+		const unsigned char *c = &p[(size_t)i * 4];
+		if (c[0] != c[1] || c[0] != c[2]) {
+			return;
+		}
+		varying = varying || c[3] != p[3];
+	}
+	if (varying) {
+		printf("KTX2: UASTC file without the normal map mark looks like an old normal map; "
+		       "run Prepare Textures or export again\n");
+	}
+}
+
+/* level 0 as RGBA8 into ibuf->rect, bottom row first; normal maps go from (X, X, X, Y) back to
+ * (X, Y, Z, 255) */
+bool decode_rgba(basist::ktx2_transcoder &tr, ImBuf *ibuf)
+{
+	const bool normal = is_normal_xy(tr);
 	if (!ibuf->rect && !imb_addrectImBuf(ibuf)) {
 		return false;
 	}
@@ -85,6 +145,9 @@ bool decode_rgba(basist::ktx2_transcoder &tr, ImBuf *ibuf, bool normal)
 	if (!tr.transcode_image_level(0, 0, 0, ibuf->rect, pixels, basist::transcoder_texture_format::cTFRGBA32)) {
 		imb_freerectImBuf(ibuf);
 		return false;
+	}
+	if (rows_top_first(tr)) {
+		flip_rows(ibuf);
 	}
 	if (normal) {
 		unsigned char *p = (unsigned char *)ibuf->rect;
@@ -131,7 +194,7 @@ bool imb_ktx2_decode_rect(struct ImBuf *ibuf)
 	if (!tr.init(ibuf->dds_data.ktx2, ibuf->dds_data.ktx2_size) || !tr.start_transcoding()) {
 		return false;
 	}
-	return decode_rgba(tr, ibuf, tr.is_uastc());
+	return decode_rgba(tr, ibuf);
 }
 
 struct ImBuf *imb_load_ktx2(const unsigned char *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE])
@@ -153,7 +216,8 @@ struct ImBuf *imb_load_ktx2(const unsigned char *mem, size_t size, int flags, ch
 		printf("KTX2: only 2D LDR ETC1S/UASTC textures are supported\n");
 		return NULL;
 	}
-	const bool normal = tr.is_uastc();
+	const bool normal = is_normal_xy(tr);
+	const bool flip = rows_top_first(tr);
 	const bool alpha = !normal && tr.get_has_alpha();
 	ImBuf *ibuf = IMB_allocImBuf(width, height, alpha ? 32 : 24, 0);
 	if (!ibuf) {
@@ -170,9 +234,18 @@ struct ImBuf *imb_load_ktx2(const unsigned char *mem, size_t size, int flags, ch
 		return NULL;
 	}
 
+	if (tr.is_uastc() && !normal) {
+		warn_old_normal(tr);
+	}
+
 	Target t;
-	const bool blocks = pot(width) && pot(height) && !(flags & (IB_ignore_alpha | IB_alphamode_premul)) &&
-	                    pick_target(normal, alpha, t);
+	bool blocks = pot(width) && pot(height) && !(flags & (IB_ignore_alpha | IB_alphamode_premul)) &&
+	              pick_target(normal, alpha, t);
+	if (blocks && flip && t.fourcc != FOURCC_DXT1 && t.fourcc != FOURCC_DXT5 && t.fourcc != FOURCC_ATI2) {
+		/* FlipDXTCImage has no ETC2/ASTC: pixels can be flipped, these blocks cannot */
+		printf("KTX2: top-first file on ETC2/ASTC, decoding to RGBA\n");
+		blocks = false;
+	}
 	if (blocks) {
 		const unsigned int levels = tr.get_levels() ? tr.get_levels() : 1;
 		size_t total = 0;
@@ -191,6 +264,9 @@ struct ImBuf *imb_load_ktx2(const unsigned char *mem, size_t size, int flags, ch
 			done++;
 		}
 		if (data && done) {
+			if (flip) {
+				FlipDXTCImage(width, height, done, t.fourcc, data);
+			}
 			ibuf->dds_data.fourcc = t.fourcc;
 			ibuf->dds_data.nummipmaps = done;
 			ibuf->dds_data.data = data;
@@ -210,7 +286,7 @@ struct ImBuf *imb_load_ktx2(const unsigned char *mem, size_t size, int flags, ch
 			printf("KTX2: block transcode failed, decoding to RGBA\n");
 		}
 	}
-	if (!decode_rgba(tr, ibuf, normal)) {
+	if (!decode_rgba(tr, ibuf)) {
 		printf("KTX2: RGBA decode failed\n");
 		IMB_freeImBuf(ibuf);
 		return NULL;

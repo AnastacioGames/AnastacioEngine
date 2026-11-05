@@ -299,7 +299,7 @@ def prepared_path(image, colors=None, normals=None):
     return path
 
 
-KTX2_VERSION = 'basisu-073eb6a0-etc1s-uastc-v1'
+KTX2_VERSION = 'basisu-073eb6a0-etc1s-uastc-v2'
 KTX2_QUALITY = 75
 KTX2_ID = b'\xabKTX 20\xbb\r\n\x1a\n'
 

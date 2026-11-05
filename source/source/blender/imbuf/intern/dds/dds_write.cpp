@@ -128,7 +128,8 @@ extern "C" bool imb_dds_write_dxt(const ImBuf *ibuf, const char *path, int forma
 
 /* KTX2 / Basis Universal. Colour: ETC1S (transcodes losslessly to ETC1/ETC2, also BC1/BC3/ASTC).
  * Tangent-space normal: UASTC with X in RGB and Y in alpha, the layout Basis turns into BC5 / EAC RG11.
- * Rows are written in ImBuf order (bottom first), the orientation the loader hands to OpenGL.
+ * Rows are written in ImBuf order (bottom first), the orientation the loader hands to OpenGL, and
+ * KTXorientation says so; AnastacioNormalXY marks that X/Y layout, which UASTC alone does not imply.
  * quality is 0-100 (higher = better, larger); mipmaps come from the same filter as the DDS path. */
 extern "C" bool imb_ktx2_write(const ImBuf *ibuf, const char *path, bool normal,
                                int max_size, int quality, bool srgb)
@@ -176,18 +177,38 @@ extern "C" bool imb_ktx2_write(const ImBuf *ibuf, const char *path, bool normal,
         pixels = reduce(pixels, w, h, srgb, normal);
         w = std::max(1, w / 2); h = std::max(1, h / 2);
     }
-    uint32_t flags = basisu::cFlagKTX2 | basisu::cFlagThreaded;
-    if (srgb) flags |= basisu::cFlagSRGB;
-    if (normal) flags |= basisu::cFlagKTX2UASTCSuperCompression;
-    size_t size = 0;
-    void *data = basisu::basis_compress2(normal ? basist::basis_tex_format::cUASTC_LDR_4x4 :
-                                                  basist::basis_tex_format::cETC1S,
-                                         levels, flags, quality, 4, &size);
-    if (!data) return false;
+    /* the same settings basis_compress2() uses, which has no way to pass key/values */
+    const basist::basis_tex_format mode = normal ? basist::basis_tex_format::cUASTC_LDR_4x4 :
+                                                   basist::basis_tex_format::cETC1S;
+    basisu::job_pool pool(std::max<uint32_t>(1, basisu::get_num_hardware_threads()));
+    basisu::basis_compressor_params params;
+    params.set_format_mode(mode);
+    params.m_pJob_pool = &pool;
+    params.m_multithreading = true;
+    params.m_tex_type = basist::cBASISTexType2D;
+    params.m_source_images.resize(1);
+    params.m_source_images[0] = levels[0];
+    if (levels.size() > 1) {
+        params.m_source_mipmap_images.resize(1);
+        params.m_source_mipmap_images[0].resize(levels.size() - 1);
+        for (uint32_t i = 1; i < levels.size(); ++i) params.m_source_mipmap_images[0][i - 1] = levels[i];
+    }
+    params.m_write_output_basis_or_ktx2_files = false;
+    params.set_srgb_options(srgb);
+    params.set_ldr_srgb_channel_weights(srgb);
+    params.m_mip_gen = false;
+    params.m_create_ktx2_file = true;
+    if (normal) params.m_ktx2_uastc_supercompression = basist::KTX2_SS_ZSTANDARD;
+    params.set_format_mode_and_quality_effort(mode, quality, 4, false);
+    /* "ru": rows go up, the ImBuf order. The loader reads both keys, see ktx2_api.cpp */
+    basist::add_key_value(params.m_key_values, "KTXorientation", "ru");
+    if (normal) basist::add_key_value(params.m_key_values, "AnastacioNormalXY", "1");
+    basisu::basis_compressor compressor;
+    if (!compressor.init(params) || compressor.process() != basisu::basis_compressor::cECSuccess) return false;
+    const basisu::uint8_vec &file = compressor.get_output_ktx2_file();
     FILE *f = BLI_fopen(path, "wb");
-    bool ok = f && fwrite(data, 1, size, f) == size;
+    bool ok = f && fwrite(file.get_ptr(), 1, file.size(), f) == file.size();
     if (f && fclose(f) != 0) ok = false;
-    basisu::basis_free_data(data);
     if (!ok && f) BLI_delete(path, false, false);
     return ok;
 #else

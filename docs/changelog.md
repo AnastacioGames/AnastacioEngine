@@ -8,6 +8,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - KTX2: normal map por marca no arquivo e orientação das linhas
+
+- `imb_ktx2_write` agora chama `basis_compressor` direto, com os mesmos ajustes de `basis_compress2`, que não aceita key/values.
+  Grava `KTXorientation = ru` em todo arquivo e `AnastacioNormalXY = 1` nos normal maps. Os blocos comprimidos saem idênticos
+  aos de antes (conferido por hash em cor, alfa e normal).
+- `ktx2_api.cpp`: só a marca define normal map, com a mesma regra em `imb_load_ktx2` e `imb_ktx2_decode_rect`. UASTC sem marca é
+  cor comum, com alpha conforme o arquivo.
+- Arquivo sem `KTXorientation` segue o padrão KTX2 (de cima para baixo) e é invertido ao carregar: pixels por `flip_rows`, BC1/BC3
+  por `FlipDXTCImage`. ETC2/ASTC não têm inversão de blocos, então esse caso decodifica para RGBA e avisa no console.
+- Compatibilidade: `KTX2_VERSION` passou para v2, o que refaz `//textures_ktx2/` e os pacotes no próximo export. Um pacote já
+  exportado leva o próprio runtime e segue coerente. Se um `.ktx2` antigo for aberto por um runtime novo, o normal map vira cor com
+  aviso no console (`warn_old_normal`) e a cor antiga (ETC1S) aparece de cabeça para baixo, sem aviso: nada a distingue de um
+  arquivo de fora.
+- Testes em background: `tools/debug/cenas/testar_ktx2_marca.py` e `ktx2_externo.cpp`. Falta o aceite visual com janela e o teste
+  Web e celular.
+
 ## 2026-11-05 - Light Probe Volumes: orçamento de captura compartilhado (Track Tool P3)
 
 - Os volumes dividem um só orçamento de faces por quadro, do mais perto da câmera ao mais longe
