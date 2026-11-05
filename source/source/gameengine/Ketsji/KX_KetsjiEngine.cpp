@@ -939,6 +939,12 @@ void KX_KetsjiEngine::ServerSleep()
 
 void KX_KetsjiEngine::WaitUntil(double deadline)
 {
+#ifdef __EMSCRIPTEN__
+	/* requestAnimationFrame already paces the frames, and without threads a sleep is a busy loop:
+	 * waiting here held the page's only thread most of each frame. */
+	(void)deadline;
+	return;
+#endif
 	/* Spin/sleep mix: spin half of the time left, then sleep half of what is left, looped.
 	 * Spinning keeps the CPU clock up (one long sleep lets it drop and adds lag on fast PCs);
 	 * sleeping keeps it from overheating. Under the minimum sleep (Windows timer is ~1 ms even
