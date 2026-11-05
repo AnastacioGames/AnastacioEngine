@@ -21,6 +21,7 @@ Não há troca de imagem no editor nesta versão: isso evita alterações em pin
   `max_size=0` mantém dimensões; qualidade aceita 0–18. A API grava uma cópia do buffer atual;
   a ferramenta cria snapshot da fonte para evitar converter pixels antigos após edição externa.
 - BC1/DXT1 para alpha inteiramente opaco; BC3/DXT5 para transparência. DXT1 explícito recusa alpha.
+- BC5/ATI2 (2026-11-05) para normal maps tangent-space: só X/Y, mipmaps renormalizados, Z reconstruído no shader.
   rgbcx v1.12, revisão fixada, licença MIT; modo BC1 ideal, sem uso de transparência para codificar preto.
 - Apenas imagens byte, arquivo simples, POT, maiores que 64 pixels, sRGB e usadas exclusivamente em
   entradas conhecidas de cor de materiais. Também aceita o canal alpha junto da cor.
@@ -52,6 +53,8 @@ arquivo separadamente. O export principal não reescreve bibliotecas nem percorr
 Web (2026-11-05): o Export Web também grava a cópia do jogo com as texturas preparadas em DDS. O navegador de
 desktop sobe os blocos S3TC direto (`WEBGL_compressed_texture_s3tc`, log "DDS: WebGL S3TC on"); celular e
 Android WebView, sem a extensão, descomprimem para RGBA no load. Conferido no Edge com a cena `criar_cena_dds.py`.
+BC5 na Web (2026-11-05): normal maps sobem como RGTC2 quando há `EXT_texture_compression_rgtc`
+(log "DDS: WebGL RGTC on"); sem a extensão, descomprimem com Z reconstruído. Conferido no Edge.
 
 O loader DDS existente ainda descomprime o primeiro nível na CPU e retém RGBA junto dos blocos.
 O fator aproximado de 4–8x se refere à textura na GPU, na mesma resolução e com mipmaps equivalentes;
@@ -71,7 +74,7 @@ não é uma promessa de redução total de RAM, tempo de load ou aumento de FPS.
 
 ## Próximas fases
 
-BC5 para normais, BC7, conversão em background, suporte mais amplo a grafos e preview reversível no
+BC7, conversão em background, suporte mais amplo a grafos e preview reversível no
 editor ficam para revisão posterior. Não foi ampliado o formato `.cooked` nesta entrega.
 
 ## Valida??o final Windows (2026-10-22)
