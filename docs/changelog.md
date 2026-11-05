@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - Web: carga KTX2 x DDS medida; limite de FPS sem espera ativa
+
+- Cena `tools/debug/cenas/criar_cena_web_carga.py`: 6 cubos, 12 texturas 2048 (cor + normal map), export Web em
+  KTX2 e DDS. Chrome headless no PC, sem rede: download 7,9 MB (KTX2) x 50,9 MB (DDS); texturas carregam em
+  2,6 s (KTX2 transcodificado para BC) x 0,84 s (DDS); 3,2 s x 1,1 s sem compressão na GPU. VRAM estimada pelo
+  formato: ~48 MB nos dois no PC; no celular ~48 MB (KTX2 → ETC2) x ~256 MB (DDS decodificado para RGBA).
+- `KX_KetsjiEngine::WaitUntil` volta na hora na Web: sem threads o sleep é laço, e o limitador prendia a thread
+  da página (~6,6 s de 8 s girando o relógio). O laço do `LA_Launcher` pula os rAF que chegam antes do próximo
+  quadro do jogo: 60 FPS continuam 60 em tela de 120 Hz; thread principal ~86% ociosa (04c23849).
+- Cena DDS/KTX2 de teste: cubos com UV e normal map não preta (2fbaba66). Linux pendente (roadmap).
+
+
 ## 2026-11-05 - Track Tool: gerar e apagar Light Probe Volumes na pista (P2)
 
 - Botões **Generate** e **Clear** no subpainel Track > Light Probe Volumes. Generate refaz a prévia,

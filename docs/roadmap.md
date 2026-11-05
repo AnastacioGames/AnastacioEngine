@@ -276,6 +276,14 @@ Editor compilado com i18n e painel Web traduzido no Windows (ver changelog de 20
 `RangeRuntime` e `RangeEngine` compilam e rodam em Linux nativo; pacote compilado em container Ubuntu 22.04
 (glibc 2.35) com as `.so` em `lib/`. Ver [linux-build.md](linux-build.md). Pendente:
 
+- **KTX2 / Basis Universal no Linux (2026-11-05) — testar na outra máquina:** só compilado e testado no Windows e na Web.
+  (1) Recompilar `RangeEngine` e `RangeRuntime` (o `extern/basis_universal` entra com encoder; fora do MSVC usa
+  `-w -fno-strict-aliasing` e SSE desligado). (2) Rodar `RangeEngine -b --factory-startup --python
+  tools/debug/cenas/criar_cena_dds.py -- /tmp/dds` e ver `DDS_SCENE_CREATED`. (3) No editor, Game > Performance >
+  Prepare Textures numa cena com textura de cor e normal map e exportar a Web com **Prepared textures = KTX2**: deve
+  criar `//textures_ktx2/`. (4) Rodar o jogo no `AnastacioRuntime`: o log deve mostrar `KTX2: GPU formats BC1/BC3 BC5`
+  e o relevo da normal map igual ao Windows. (5) Opcional: `tools/debug/cenas/criar_cena_web_carga.py` (exporta
+  KTX2 e DDS, ~6 min) e abrir os dois pacotes no Chrome do Linux.
 - **Export RangeArmor no Linux (musikai/Fumangy, 2026-10-20) — fazer ao abrir no Linux**: corrigido no
   código, falta validar lá. (1) Gerar o pacote com `tools/linux/package-runtime.sh` e conferir que
   `2.79/python/bin/python3.11` está dentro e roda fora da máquina de build (sem `/opt/anastacio-python311`).
