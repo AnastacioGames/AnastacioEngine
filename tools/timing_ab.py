@@ -25,7 +25,7 @@ except ImportError:
 def run(tmp, scene, fixed, pacing, timer_res):
     out = os.path.join(tmp, "trace_%d_%s_%d" % (fixed, pacing, timer_res))
     os.makedirs(out, exist_ok=True)
-    env = dict(os.environ, RANGE_TRACE=out, RANGE_TRACE_MODULES="frames", RANGE_PACING=pacing,
+    env = dict(os.environ, GAME_TRACE=out, GAME_TRACE_MODULES="frames", RANGE_PACING=pacing,
                FT_SECONDS=SECONDS, FT_SLEEP=WORK, RANGE_NO_CRASH_DIALOG="1")
     env.pop("RANGE_NO_TIMER_RES", None)
     if not timer_res:

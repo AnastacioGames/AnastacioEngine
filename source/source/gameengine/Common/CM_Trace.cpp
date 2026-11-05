@@ -71,6 +71,16 @@ const struct {
 	{"threads", CM_TRACE_THREADS},
 };
 
+} // namespace
+
+const char *CM_TraceGetEnv(const char *name, const char *oldName)
+{
+	const char *value = getenv(name);
+	return (value && value[0]) ? value : getenv(oldName);
+}
+
+namespace {
+
 struct TraceState
 {
 	std::mutex mutex;
@@ -83,12 +93,12 @@ struct TraceState
 
 	TraceState()
 	{
-		const char *dir = getenv("RANGE_TRACE");
+		const char *dir = CM_TraceGetEnv("GAME_TRACE", "RANGE_TRACE");
 		if (!dir || !dir[0]) {
 			return;
 		}
 
-		const char *list = getenv("RANGE_TRACE_MODULES");
+		const char *list = CM_TraceGetEnv("GAME_TRACE_MODULES", "RANGE_TRACE_MODULES");
 		std::string names = (list && list[0]) ? list : "all";
 		if (names == "all") {
 			for (const auto& entry : moduleNames) {

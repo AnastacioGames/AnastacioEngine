@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - Range Trace passa a se chamar Game Trace
+
+- A ferramenta é do fork, não da Range Engine. Variáveis `GAME_TRACE`, `GAME_TRACE_MODULES` e `GAME_TRACE_RAIL`;
+  o C++ (`CM_TraceGetEnv`) ainda aceita os nomes `RANGE_TRACE*` quando os novos não existem, para exe e scripts
+  de versões diferentes continuarem funcionando.
+- Arquivos: `docs/game-trace.md`, `tools/debug/game_trace_launcher.py`, atalho `Game Trace.lnk`. O launcher lê
+  `range_trace_launcher.json` se ainda não houver `game_trace_launcher.json`. Performance Report, pacote Web
+  (`/game_trace`), `timing_ab.py` e `.bat` usam os nomes novos. Entradas antigas deste changelog mantêm o nome antigo.
+
+
 ## 2026-11-05 - Track Tool: gerar e apagar Light Probe Volumes na pista (P2)
 
 - Botões **Generate** e **Clear** no subpainel Track > Light Probe Volumes. Generate refaz a prévia,
@@ -37,6 +47,27 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Padrão meio-termo: Medium, espaçamento 6 m, altura 4 m, limite 15.000 (Pista_4: 119 caixas, ~13,9 mil sondas).
 
 
+## 2026-11-05 - Range Trace: "como corrigir" no relatório (Trace Doctor, etapa 1)
+
+- Plano em [plano-trace-doctor.md](plano-trace-doctor.md). Só Python (`tools/debug/relatorio_trace.py`), sem C++.
+- Tabela de regras `sintoma -> sugestão` (`REGRAS_FN`): imagem enviada à GPU no jogo, On Demand convertido no
+  jogo, LibLoad/AddScene no jogo, shaders compilados ao carregar cena no jogo (`load_shaders.compiled`) ou no
+  meio do jogo (`create` no `shaders.txt`), e script caro (média ≥ 0,5 ms/frame ou pior frame ≥ 5 ms).
+  Seção nova "Como corrigir" no `relatorio.html` e no `resumo.md`, agrupada por alvo, com vezes, frames
+  lentos em que foi o culpado e ganho estimado (custo medido do sintoma, não previsão).
+- Frames lentos ganham a coluna "como corrigir". O culpado de carga passa a ser a **maior** carga do frame
+  (antes era a primeira: no RolimaRacer apontava uma imagem de 1 ms num frame com outra de 47 ms).
+- Sem dados, a regra não dispara e o relatório diz qual módulo falta. A regra de Static Batch fica calada:
+  o evento `object` grava só a marca manual, e o Auto Static Batch (padrão desde 2026-10-30) e a física do
+  objeto não estão no trace. Os campos ficam para a etapa 2. O trace também não grava o objeto dono de
+  um script, por isso a sugestão de script cita só o nome.
+- Conferido em `trace-cpu-rolima13-seminst2`, em `trace-cpu-rolima3` (cópias) e num trace sintético com o
+  módulo `load`. Falta validar com o usuário num trace real com `load` e `shaders`.
+- Testado num trace completo do RolimaRacer (Modo IA, todos os módulos): coluna preenchida nos 12 frames lentos.
+  Script caro em média que, num frame, gasta 10× a média (e ≥ 5 ms) recebe a dica de pico isolado nesse frame
+  (`AddAllPlayers`, 3,1 s); culpado "Overhead" ganhou dica geral.
+- Visual: títulos e barra de seções com os mesmos ícones do Performance Report (lidos de
+  `anastacio_perf_report.SECTION_ICONS`, um lugar só), mais ícones de trilho, deixados de fora e arquivos.
 
 ## 2026-11-04 - Static Batch sem luz do sol nem sombras
 

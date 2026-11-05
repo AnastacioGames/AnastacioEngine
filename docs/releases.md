@@ -109,7 +109,7 @@ Primeira versão grande depois da 0.5.4. Novidades:
 - **Render:** sombra de sol em cascatas (CSM) no Principled, PCSS (sombra suave por distância), SH9 em sondas,
   partículas flipbook, Sky Quality (céu leve no celular), HLOD com troca por célula, Auto Static Batch.
 - **Ferramentas:** Scene Doctor (colisão simplificada, DDS, Prepare Audio), Performance Report
-  (Game ▸ Performance), FPS Counter, Range Trace por módulos, barra e menus da 3D View no estilo Blender 5.
+  (Game ▸ Performance), FPS Counter, Game Trace por módulos, barra e menus da 3D View no estilo Blender 5.
 - **Smart 2D Filter:** uniforms Bool, Choice e Object; Custom Filter com Smart Filter.
 - **Python:** `Range.types.TrackLine` para IA de corrida, `setBoneRotationOffset`, World Sound por mensagem,
   Start Asleep na física, escala de tempo que vale para animação, cutscene e física juntas.

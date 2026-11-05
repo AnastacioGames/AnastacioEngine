@@ -296,7 +296,7 @@ void LA_Launcher::InitEngine()
 	}
 	m_pythonConsole.use = (gm.flag & GAME_PYTHON_CONSOLE);
 
-	// Range Trace: which GPU and driver drew the session (hybrid laptops may pick either one).
+	// Game Trace: which GPU and driver drew the session (hybrid laptops may pick either one).
 	if (CM_TraceModules()) {
 		const char *vendor = (const char *)glGetString(GL_VENDOR);
 		const char *renderer = (const char *)glGetString(GL_RENDERER);

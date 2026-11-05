@@ -1,4 +1,4 @@
-# Relatorio do Range Trace (CM_Trace.h, docs/range-trace.md).
+# Relatorio do Game Trace (CM_Trace.h, docs/game-trace.md).
 #
 #   python tools/debug/relatorio_trace.py <pasta do trace> [--resumo]
 #
@@ -82,16 +82,17 @@ def analisar_frames(eventos):
             frames[e['f']] = e
     cargas = defaultdict(list)
     for e in eventos:
+        # Cada carga guarda o texto e a referencia (regra, alvo) da sugestao "como corrigir".
         if e['ev'] == 'scene_load':
-            cargas[e['f']].append('cena %s (%.0f ms)' % (e['scene'], e['ms']))
+            cargas[e['f']].append(('cena %s (%.0f ms)' % (e['scene'], e['ms']), ('cena', e['scene']), e['ms']))
         elif e['ev'] == 'load_shaders':
             ms = e.get('textures_ms', 0) + e.get('shaders_ms', 0)
             if ms >= 1:
-                cargas[e['f']].append('texturas+shaders %s (%.0f ms)' % (e['scene'], ms))
+                cargas[e['f']].append(('texturas+shaders %s (%.0f ms)' % (e['scene'], ms), ('shader', e['scene']), ms))
         elif e['ev'] == 'convert_object':
-            cargas[e['f']].append('On Demand %s (%.0f ms)' % (e['name'], e['ms']))
+            cargas[e['f']].append(('On Demand %s (%.0f ms)' % (e['name'], e['ms']), ('on_demand', e['name']), e['ms']))
         elif e['ev'] == 'image' and e['ms'] >= 1:
-            cargas[e['f']].append('imagem %s (%.0f ms)' % (e['name'], e['ms']))
+            cargas[e['f']].append(('imagem %s (%.0f ms)' % (e['name'], e['ms']), ('imagem', e['name']), e['ms']))
 
     jogo = [fr for f, fr in frames.items() if f > FRAMES_DE_LOAD]
     med = mediana([custo(fr) for fr in jogo])
@@ -101,8 +102,10 @@ def analisar_frames(eventos):
         if custo(fr) <= limite:
             break
         # O custo medido no fim do frame f inclui o render do frame anterior.
-        junto = cargas.get(fr['f'], []) + cargas.get(fr['f'] - 1, [])
-        picos.append(dict(f=fr['f'], t=fr['t'], ms=custo(fr), cats=principais(fr['c']), cargas=junto))
+        # A maior primeiro: e ela que vira o culpado provavel.
+        junto = sorted(cargas.get(fr['f'], []) + cargas.get(fr['f'] - 1, []), key=lambda c: c[2], reverse=True)
+        picos.append(dict(f=fr['f'], t=fr['t'], ms=custo(fr), cats=principais(fr['c']), cargas=[c[0] for c in junto],
+                          cargas_ref=[c[1] for c in junto]))
 
     # Trilho: posicao de cada frame (ultimo evento rail do frame) cruzada com o custo do frame seguinte.
     trilho = {}
@@ -351,12 +354,16 @@ def apontar_culpados(a, eventos):
     for pk in a['picos']:
         motivos = []
         sc = scripts.get(pk['f'], {})
+        refs = []  # (regra, alvo) de cada motivo, na mesma ordem
         if sc:
             nome, (ms, _n) = max(sc.items(), key=lambda kv: kv[1][0])
             if ms >= CULPADO_SCRIPT_MS and ms >= CULPADO_SCRIPT_FRACAO * pk['ms']:
                 motivos.append('script %s (%.1f ms)' % (nome, ms))
+                refs.append(('script', nome))
+                pk['culpado_script_ms'] = ms
         if pk['cargas']:
             motivos.append('carga: ' + pk['cargas'][0])
+            refs.append(pk['cargas_ref'][0])
         wk = work.get(pk['f'])
         if wk:
             picos_w = []
@@ -366,10 +373,13 @@ def apontar_culpados(a, eventos):
                     picos_w.append((v / max(med, 1), k, v, med))
             for _r, k, v, med in sorted(picos_w, reverse=True)[:2]:
                 motivos.append('%s %d (normal %.0f)' % (k, v, med))
+                refs.append(('work', k))
         if not motivos and pk['cats']:
             motivos.append('categoria %s (%.1f ms)' % pk['cats'][0])
+            refs.append(('categoria', pk['cats'][0][0]))
         pk['culpado'] = motivos[0] if motivos else '-'
         pk['motivos'] = motivos
+        pk['culpado_ref'] = refs[0] if refs else None
 
     # Sessao: o que mais pesa em media nos frames de jogo.
     jogo = [fr for f, fr in a['frames'].items() if f > FRAMES_DE_LOAD]
@@ -390,6 +400,256 @@ def apontar_culpados(a, eventos):
         if pk['culpado'] != '-':
             contagem[pk['culpado'].split(' (')[0]] += 1
     a['culpados'] = dict(sessao=sessao, repetidos=sorted(contagem.items(), key=lambda kv: kv[1], reverse=True)[:5])
+
+
+# --- Como corrigir: regras "sintoma -> sugestao" (plano em docs/plano-trace-doctor.md) -----------------------
+# Cada regra le so eventos que o trace grava; sem o dado, a regra nao dispara. Ganho estimado = o custo medido
+# do proprio sintoma (soma dos ms das cargas, ou media de ms por frame de um script), nunca uma previsao.
+
+SUG_CARGA_MS = 1.0                # carga no jogo abaixo disto nao vira sugestao
+SUG_IMG_GRANDE = 2048 * 2048      # pixels a partir dos quais sugere reduzir a textura
+SUG_SCRIPT_MEDIA_MS = 0.5         # script caro em media...
+SUG_SCRIPT_PIOR_MS = 5.0          # ...ou num frame isolado
+SUG_SB_MIN_OBJ = 10               # malhas com o mesmo material para sugerir Static Batch
+SUG_SB_TRIS = 500                 # "malha pequena"
+
+REGRAS = {
+    # regra: (rotulo do alvo, unidade do ganho)
+    'imagem': ('imagem', 'ms'),
+    'on_demand': ('objeto', 'ms'),
+    'cena': ('cena', 'ms'),
+    'shader': ('shader', 'ms'),
+    'script': ('script', 'ms/frame'),
+    'static_batch': ('material', 'draws'),
+}
+
+# Dica geral para culpados sem regra propria (contador do work ou categoria do profiler): sem ganho em ms.
+DICAS_WORK = {
+    'draws': 'muitos draw calls: Static Batch, menos materiais por objeto ou LOD',
+    'matBinds': 'muitas trocas de material: juntar materiais (atlas) ou Static Batch',
+    'nodes': 'muitos transforms atualizados: ver "Objetos que mais geram trabalho" (objeto parado que se move?)',
+    'syncs': 'muitos syncs de transform: ver "Objetos que mais geram trabalho"',
+    'instancing': 'muitos envios de instancing: menos instancias mudando por frame',
+}
+DICAS_CAT = {
+    'MainRender': 'desenho da camera: LOD, Decimate, Static Batch ou menos objetos a vista',
+    'Rasterizer': 'desenho da camera: LOD, Decimate, Static Batch ou menos objetos a vista',
+    'Shadows': 'sombras: menos cascatas/distancia ou Cast Shadow desligado em objetos pequenos',
+    'ShadowCulling': 'sombras: menos cascatas/distancia ou Cast Shadow desligado em objetos pequenos',
+    'Physics': 'fisica: colisao por primitiva em vez de malha (Scene Doctor) e menos corpos ativos',
+    'Logic': 'logica: ligue o modulo scripts para ver qual script pesa',
+    'Components': 'componentes Python: ligue o modulo scripts para ver qual pesa',
+    'Animations': 'animacao: menos acoes/camadas ou atualizar personagens longe com menos frequencia',
+    'Skinning': 'skinning: menos ossos/vertices deformados ou LOD nos personagens',
+    'GPU Latency': 'espera pela GPU: o gargalo e a placa (resolucao, sombras, efeitos de tela), nao a CPU',
+    'Overhead': 'tempo fora das categorias do profiler (troca ou carga de cena, espera do swap): veja o que '
+                'carregou neste frame e no anterior',
+    'Actuators': 'atuadores: logic bricks com muitos atuadores ativos no mesmo frame',
+}
+
+
+def _sugestao(sug, regra, alvo, texto, ms, detalhe=''):
+    """Soma ocorrencias da mesma (regra, alvo)."""
+    s = sug.setdefault((regra, alvo), dict(regra=regra, alvo=alvo, texto=texto, detalhe=detalhe, vezes=0, ganho=0.0,
+                                           lentos=0))
+    s['vezes'] += 1
+    s['ganho'] += ms
+    if detalhe and not s['detalhe']:
+        s['detalhe'] = detalhe
+
+
+def regra_imagens(a, eventos, sug):
+    usada_por = defaultdict(set)
+    for mat, e in a['materiais'].items():
+        for i in e.get('images', []):
+            usada_por[i].add(mat)
+    for e in eventos:
+        if e['ev'] != 'image' or e['f'] <= FRAMES_DE_LOAD or e['ms'] < SUG_CARGA_MS:
+            continue
+        if e['w'] * e['h'] >= SUG_IMG_GRANDE:
+            texto = ('reduzir a textura (%dx%d) ou passar para DDS, e pre-carregar: desenhar o material uma vez na '
+                     'tela de loading' % (e['w'], e['h']))
+        else:
+            texto = ('pre-carregar: desenhar um objeto com este material uma vez na tela de loading, para o envio a '
+                     'GPU sair do jogo')
+        mats = sorted(usada_por.get(e['name'], ()))
+        _sugestao(sug, 'imagem', e['name'], texto, e['ms'], ('materiais: ' + ', '.join(mats[:4])) if mats else '')
+
+
+def regra_on_demand(a, eventos, sug):
+    for e in eventos:
+        if e['ev'] != 'convert_object' or e['f'] <= FRAMES_DE_LOAD or e['ms'] < SUG_CARGA_MS:
+            continue
+        _sugestao(sug, 'on_demand', e['name'],
+                  'Load Mode "With Scene", ou chamar scene.convertObject() antes deste trecho (na tela de loading)',
+                  e['ms'], 'convertido na cena %s, %d objeto(s)' % (e['scene'], e.get('objects', 1)))
+
+
+def regra_cenas(a, eventos, sug):
+    for e in a['cenas']:
+        if e['f'] <= FRAMES_DE_LOAD or e['scene'].startswith('..') or e['ms'] < SUG_CARGA_MS:
+            continue
+        _sugestao(sug, 'cena', e['scene'],
+                  'LibLoad assincrono ou carregar esta cena na tela de loading' if e['libload'] else
+                  'adicionar esta cena antes (na tela de loading) e so mostrar quando precisar',
+                  e['ms'], 'LibLoad' if e['libload'] else 'AddScene')
+
+
+def regra_shaders(a, eventos, sug):
+    for e in eventos:
+        if e['ev'] == 'load_shaders' and e['f'] > FRAMES_DE_LOAD and e.get('compiled', 0) > 0 \
+                and e.get('shaders_ms', 0) >= SUG_CARGA_MS:
+            _sugestao(sug, 'shader', e['scene'],
+                      'aquecer os shaders desta cena no load (prefetch) ou carrega-la antes; no jogo exportado o '
+                      'cache de shaders do usuario evita a compilacao a partir da 2a abertura',
+                      e['shaders_ms'], '%d compilado(s), %d reaproveitado(s)' % (e['compiled'], e.get('reused', 0)))
+    for it in a['extras'].get('shaders', {}).get('itens', []):
+        if it['tipo'] == 'create' and it['f'] > FRAMES_DE_LOAD and it['ms'] >= SUG_CARGA_MS:
+            alvo = it['nome'] if it['nome'] != '-' else '(sem nome no shaders.txt)'
+            _sugestao(sug, 'shader', alvo,
+                      'shader compilado no meio do jogo: desenhar o material uma vez no load (prefetch) para '
+                      'compila-lo antes', it['ms'])
+
+
+PICO_SCRIPT = ('pico isolado: o trabalho de um frame so (carregar, criar objetos, ler arquivo) pode ir para o '
+               'loading ou ser dividido em varios frames')
+
+
+def regra_scripts(a, eventos, sug):
+    for nome, _ms, _n, nf, pior, media in a['extras'].get('scripts', {}).get('linhas', []):
+        if media < SUG_SCRIPT_MEDIA_MS and pior < SUG_SCRIPT_PIOR_MS:
+            continue
+        texto = ('caro em media: rodar a logica pesada a cada N frames, guardar em cache as buscas na cena '
+                 '(scene.objects, getDistanceTo em laco) e sair cedo quando nao ha nada a fazer'
+                 if media >= SUG_SCRIPT_MEDIA_MS else
+                 PICO_SCRIPT)
+        sug[('script', nome)] = dict(regra='script', alvo=nome, texto=texto, vezes=nf, ganho=media, lentos=0, media=media,
+                                     detalhe='pior frame %.1f ms; o trace nao grava o objeto dono' % pior)
+
+
+def regra_static_batch(a, eventos, sug):
+    # O evento object grava so a marca manual. Sem saber se a cena usa o Auto Static Batch (padrao desde
+    # 2026-10-30) e o tipo de fisica, a regra apontaria objetos ja no lote: so dispara com esses campos.
+    sem_auto = {c['scene'] for c in a['cenas'] if c.get('auto_static_batch') is False}
+    if not sem_auto:
+        return
+    grupos = defaultdict(list)
+    for o in a['com_malha'].values():
+        if o['scene'] not in sem_auto or o.get('static_batch') or not o['active_layer'] or o.get('visible') is False:
+            continue
+        if o.get('physics') not in ('static', 'no_collision'):
+            continue
+        if a['tris'](o) > SUG_SB_TRIS:
+            continue
+        mats = {m for nome in o['meshes'] for m in a['malhas'].get(nome, {}).get('materials', [])}
+        if len(mats) == 1:
+            grupos[mats.pop()].append(o['name'])
+    for mat, nomes in grupos.items():
+        if len(nomes) >= SUG_SB_MIN_OBJ:
+            sug[('static_batch', mat)] = dict(
+                regra='static_batch', alvo=mat, vezes=len(nomes), ganho=len(nomes) - 1, lentos=0,
+                texto='ligar Static Batch nestes %d objetos estaticos (ou o Auto Static Batch da cena)' % len(nomes),
+                detalhe=', '.join(sorted(nomes)[:6]) + (' ...' if len(nomes) > 6 else ''))
+
+
+REGRAS_FN = (regra_imagens, regra_on_demand, regra_cenas, regra_shaders, regra_scripts, regra_static_batch)
+
+
+def gerar_sugestoes(a, eventos):
+    """Aplica as regras, liga cada frame lento a sua sugestao e diz quais regras ficaram sem dados."""
+    sug = {}
+    for fn in REGRAS_FN:
+        fn(a, eventos, sug)
+    for pk in a['picos']:
+        ref = pk.get('culpado_ref')
+        s = sug.get(ref) if ref else None
+        if s:
+            s['lentos'] += 1
+            pk['corrigir'] = s['texto']
+            ms = pk.get('culpado_script_ms', 0)
+            if ref[0] == 'script' and ms >= max(SUG_SCRIPT_PIOR_MS, 10 * s['media']):
+                # Script caro em media, mas neste frame foi um pico isolado (10x a media): a dica e outra.
+                pk['corrigir'] = PICO_SCRIPT
+        elif ref and ref[0] == 'work':
+            pk['corrigir'] = 'dica geral: ' + DICAS_WORK.get(ref[1], 'ver a secao Trabalho')
+        elif ref and ref[0] == 'categoria' and ref[1] in DICAS_CAT:
+            pk['corrigir'] = 'dica geral: ' + DICAS_CAT[ref[1]]
+        else:
+            pk['corrigir'] = '-'
+    # Primeiro as cargas (ms de travada), depois scripts (ms/frame) e Static Batch (draws), cada grupo pelo ganho.
+    ordem = {'ms': 0, 'ms/frame': 1, 'draws': 2}
+    lista = sorted(sug.values(), key=lambda s: (ordem[REGRAS[s['regra']][1]], -s['ganho']))
+    mods = set(a['modulos'])
+    faltam = []
+    if 'usage' not in mods:
+        faltam.append('imagem (modulo usage)')
+    if 'load' not in mods:
+        faltam.append('On Demand, cena e shader da cena (modulo load)')
+    if 'scripts' not in a['extras']:
+        faltam.append('script (modulo scripts)')
+    if 'shaders' not in a['extras']:
+        faltam.append('shader no jogo (opcao shaders do launcher)')
+    if not any(c.get('auto_static_batch') is False for c in a['cenas']):
+        faltam.append('Static Batch (o trace ainda nao grava o Auto Static Batch da cena nem a fisica do objeto)')
+    a['sugestoes'] = dict(lista=lista, faltam=faltam)
+
+
+def texto_ganho(s):
+    un = REGRAS[s['regra']][1]
+    if un == 'ms':
+        return '%.1f ms' % s['ganho']
+    if un == 'ms/frame':
+        return '%.2f ms/frame' % s['ganho']
+    return '%d draws' % s['ganho']
+
+
+def linhas_sugestoes(a):
+    """(tipo, alvo, como corrigir, vezes, frames lentos, ganho, detalhe), agrupado por alvo na ordem do ganho."""
+    return [(REGRAS[s['regra']][0], s['alvo'], s['texto'], s['vezes'], s['lentos'], texto_ganho(s), s['detalhe'] or '-')
+            for s in a.get('sugestoes', {}).get('lista', [])]
+
+
+def resumo_sugestoes(a, w):
+    sg = a.get('sugestoes')
+    if not sg:
+        return
+    w('')
+    w('## Como corrigir (%d)' % len(sg['lista']))
+    w('')
+    w('Ganho estimado = custo medido do sintoma: ms somados das cargas no jogo (a travada que some) ou ms por '
+      'frame do script. "Vezes" = ocorrencias (para script, frames em que rodou). "Lentos" = frames lentos em que '
+      'foi o culpado.')
+    if sg['lista']:
+        w('')
+        w('| tipo | alvo | como corrigir | vezes | lentos | ganho | detalhe |')
+        w('|---|---|---|---|---|---|---|')
+        for linha in linhas_sugestoes(a)[:TOP_RESUMO * 2]:
+            w('| %s | %s | %s | %d | %d | %s | %s |' % linha)
+    else:
+        w('')
+        w('Nenhuma regra disparou com os dados deste trace.')
+    if sg['faltam']:
+        w('')
+        w('Regras sem dados neste trace: ' + '; '.join(sg['faltam']) + '.')
+
+
+def html_sugestoes(a, w):
+    sg = a.get('sugestoes')
+    if not sg:
+        return
+    w(secao('corrigir', 'Como corrigir', len(sg['lista']),
+            'Cada sugestao vem de uma regra "sintoma -> correcao" sobre dados que este trace gravou. Ganho estimado = '
+            'custo medido do sintoma: ms somados das cargas no jogo (a travada que some) ou ms por frame do script; '
+            'nao e uma previsao do frame depois. "Vezes" = ocorrencias (para script, frames em que rodou); '
+            '"frames lentos" = em quantos ela foi o culpado.'))
+    if sg['lista']:
+        w(tabela(('tipo', 'alvo', 'como corrigir', 'vezes', 'frames lentos', 'ganho estimado', 'detalhe'),
+                 linhas_sugestoes(a), (3, 4), filtro=True))
+    else:
+        w('<p class="nota">Nenhuma regra disparou com os dados deste trace.</p>')
+    if sg['faltam']:
+        w('<p class="nota">Regras sem dados neste trace: %s.</p>' % esc('; '.join(sg['faltam'])))
+    w('</section>')
 
 
 def obs_objeto(o):
@@ -447,7 +707,7 @@ def resumo_trilho(a, w):
 def resumo_md(a):
     out = []
     w = out.append
-    w('# Range Trace - resumo')
+    w('# Game Trace - resumo')
     w('')
     w('Modulos: %s. Ultimo evento aos %.0f s%s.' % (', '.join(a['modulos']) or '-', a['duracao'],
                                              '' if a['fim'] else ' (sem evento "end": jogo fechado a forca ou travou)'))
@@ -500,11 +760,13 @@ def resumo_md(a):
             if c.get('repetidos'):
                 w('Culpados que mais se repetem: ' + '; '.join('%s (%dx)' % kv for kv in c['repetidos']) + '.')
                 w('')
-            w('| frame | segundo | ms | culpado provavel | categorias | carregou junto |')
-            w('|---|---|---|---|---|---|')
+            w('| frame | segundo | ms | culpado provavel | como corrigir | categorias | carregou junto |')
+            w('|---|---|---|---|---|---|---|')
             for pk in a['picos'][:TOP_RESUMO]:
-                w('| %d | %.1f | %.1f | %s | %s | %s |' % (pk['f'], pk['t'], pk['ms'], pk.get('culpado', '-'),
-                                                          texto_cats(pk['cats']), '; '.join(pk['cargas']) or '-'))
+                w('| %d | %.1f | %.1f | %s | %s | %s | %s |' % (
+                    pk['f'], pk['t'], pk['ms'], pk.get('culpado', '-'), pk.get('corrigir', '-'),
+                    texto_cats(pk['cats']), '; '.join(pk['cargas']) or '-'))
+    resumo_sugestoes(a, w)
     c = a.get('culpados', {})
     if c.get('sessao'):
         w('')
@@ -598,6 +860,8 @@ header.topo .wrap { padding-block:20px 0; display:grid; gap:14px; }
   text-transform:uppercase; letter-spacing:.06em; border:1px solid var(--line); color:var(--muted); }
 .chip.ok { color:var(--ok); border-color:currentColor; } .chip.warn { color:var(--warn); border-color:currentColor; }
 .chip.bad { color:var(--bad); border-color:currentColor; }
+h2 .ic { width:20px; height:20px; color:var(--accent); flex:none; vertical-align:-3px; margin-right:6px; }
+nav.secoes a .ic { width:13px; height:13px; flex:none; margin-right:5px; vertical-align:-2px; }
 nav.secoes { display:flex; gap:2px; overflow-x:auto; margin:0 -4px; }
 nav.secoes a { padding:8px 10px; color:var(--muted); text-decoration:none; font:500 15px/1 var(--f-display);
   letter-spacing:.04em; text-transform:uppercase; border-bottom:2px solid transparent; white-space:nowrap; }
@@ -763,8 +1027,35 @@ def tabela(cabecalho, linhas, numericas=(), filtro=False, id_=None, calor=(), pi
     return ''.join(h)
 
 
+def _icones():
+    """Icones das secoes: os mesmos do Performance Report (um lugar so), mais os que so o trace tem."""
+    try:
+        sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'source',
+                                        'release', 'scripts', 'modules'))
+        from anastacio_perf_report import SECTION_ICONS as pr, _section_icon
+    except Exception:
+        return {}
+    finally:
+        sys.path.pop(0)
+    por_id = {
+        'corrigir': pr['What to do'], 'tempo': pr['Frame time'], 'lentos': pr['Spikes'],
+        'trabalho': pr['Work per frame'], 'scripts': pr['Scripts'], 'runtime': pr['Memory'],
+        'shaders': pr['Shaders and images prepared during play'], 'cenas': pr['Scene loading'],
+        'desperdicio': pr['Loaded but never drawn'], 'cargas': pr['Loading during play'],
+        'imagens': pr['Shaders and images prepared during play'],
+        # So no trace: trilho (curva com ponto), deixados de fora (caixa com x), arquivos (pasta).
+        'trilho': '<path d="M4 19c4 0 3-7 8-7s4-7 8-7"/><circle cx="4" cy="19" r="1.6"/><circle cx="20" cy="5" r="1.6"/>',
+        'fora': '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 9l6 6M15 9l-6 6"/>',
+        'arquivos': '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>',
+    }
+    return {k: _section_icon(v) for k, v in por_id.items()}
+
+
+ICONES = _icones()
+
+
 def secao(id_, titulo, n=None, nota=None):
-    s = '<section id="%s"><h2>%s%s</h2>' % (id_, esc(titulo), '' if n is None else ' <span class="n">%s</span>' % esc(n))
+    s = '<section id="%s"><h2>%s%s%s</h2>' % (id_, ICONES.get(id_, ''), esc(titulo), '' if n is None else ' <span class="n">%s</span>' % esc(n))
     if nota:
         s += '<p class="nota">%s</p>' % nota
     return s
@@ -998,9 +1289,10 @@ def html_picos(a, w):
     if c.get('repetidos'):
         w('<p class="nota">Culpados que mais se repetem nos frames lentos: %s.</p>'
           % esc('; '.join('%s (%dx)' % kv for kv in c['repetidos'])))
-    linhas = [(pk['f'], '%.1f' % pk['t'], '%.1f' % pk['ms'], pk.get('culpado', '-'), chips_cats(pk['cats']),
-               '; '.join(pk['cargas']) or '-') for pk in a['picos']]
-    w(tabela(('frame', 'segundo', 'ms', 'culpado provavel', 'categorias (ms)', 'carregou junto'), linhas, (0, 1, 2),
+    linhas = [(pk['f'], '%.1f' % pk['t'], '%.1f' % pk['ms'], pk.get('culpado', '-'), pk.get('corrigir', '-'),
+               chips_cats(pk['cats']), '; '.join(pk['cargas']) or '-') for pk in a['picos']]
+    w(tabela(('frame', 'segundo', 'ms', 'culpado provavel', 'como corrigir', 'categorias (ms)', 'carregou junto'),
+             linhas, (0, 1, 2),
              calor=(2,), piso={2: a['pico_limite']}))
     w('</section>')
 
@@ -1108,7 +1400,7 @@ def html_arquivos(a, w):
 
 JS = r'''
 (function(){
-  var raiz=document.documentElement, KEY='range-trace-tema';
+  var raiz=document.documentElement, KEY='game-trace-tema';
   try{var t=localStorage.getItem(KEY); if(t) raiz.setAttribute('data-theme',t);}catch(e){}
   var bt=document.getElementById('tema');
   if(bt) bt.addEventListener('click',function(){
@@ -1196,7 +1488,7 @@ def relatorio_html(a, meta=None, pasta=''):
         quando = '%s/%s/%s %s:%s' % (d[6:8], d[4:6], d[0:4], d[9:11], d[11:13])
     w('<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">'
       '<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">'
-      '<title>Range Trace%s</title>' % (' - ' + esc(jogo) if jogo else ''))
+      '<title>Game Trace%s</title>' % (' - ' + esc(jogo) if jogo else ''))
     w('<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>'
       '<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600&'
       'family=IBM+Plex+Sans:wght@400;500&family=JetBrains+Mono:wght@400;500;600&display=swap">')
@@ -1210,6 +1502,8 @@ def relatorio_html(a, meta=None, pasta=''):
         secoes.append(('trilho', 'Trilho'))
     if a['frames']:
         secoes.append(('lentos', 'Frames lentos'))
+    if a.get('sugestoes'):
+        secoes.append(('corrigir', 'Como corrigir'))
     if 'work' in a['extras'] or 'objetos' in a['extras']:
         secoes.append(('trabalho', 'Trabalho'))
     if 'scripts' in a['extras']:
@@ -1226,7 +1520,7 @@ def relatorio_html(a, meta=None, pasta=''):
         secoes.append(('arquivos', 'Arquivos'))
 
     w('<header class="topo"><div class="wrap">')
-    w('<div class="titulo"><h1>Range Trace</h1>%s<span class="fim">%s<button class="tema" id="tema" type="button">Tema</button></span></div>' % (
+    w('<div class="titulo"><h1>Game Trace</h1>%s<span class="fim">%s<button class="tema" id="tema" type="button">Tema</button></span></div>' % (
         '<span class="jogo">%s</span>' % esc(jogo) if jogo else '',
         '<span class="chip ok">sessao completa</span>' if a['fim'] else '<span class="chip bad">sem evento end</span>'))
     info = []
@@ -1237,7 +1531,7 @@ def relatorio_html(a, meta=None, pasta=''):
     if meta.get('exe'):
         info.append('<span>%s</span>' % esc(os.path.basename(meta['exe'])))
     w('<div class="meta">%s</div>' % ''.join(info))
-    w('<nav class="secoes" aria-label="Secoes">%s</nav>' % ''.join('<a href="#%s">%s</a>' % (i, esc(t)) for i, t in secoes))
+    w('<nav class="secoes" aria-label="Secoes">%s</nav>' % ''.join('<a href="#%s">%s%s</a>' % (i, ICONES.get(i, ''), esc(t)) for i, t in secoes))
     w('</div></header><main class="wrap">')
     if not a['fim']:
         w('<p class="aviso" style="margin-top:16px">Sem evento "end": o jogo foi fechado a forca ou travou. Os dados vao ate o ultimo evento gravado.</p>')
@@ -1248,6 +1542,7 @@ def relatorio_html(a, meta=None, pasta=''):
     html_tempo(a, w, (ini, go, fim))
     html_trilho(a, w)
     html_picos(a, w)
+    html_sugestoes(a, w)
     html_work(a, w)
     html_scripts(a, w)
     html_runtime(a, w)
@@ -1341,6 +1636,7 @@ def main():
     a = analisar(eventos)
     a['extras'] = analisar_extras(pasta, eventos)
     apontar_culpados(a, eventos)
+    gerar_sugestoes(a, eventos)
     md = resumo_md(a)
     with open(os.path.join(pasta, 'resumo.md'), 'w', encoding='utf-8') as f:
         f.write(md)

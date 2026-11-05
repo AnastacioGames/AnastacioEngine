@@ -132,7 +132,7 @@ flowchart LR
         S4["Lógica: sensores e controladores"]
         S5["Atuadores"]
         S6["Terremoto e física Bullet"]
-        S7["Trilho do Range Trace, referência<br/>de otimização (LOD/HLOD), sol automático"]
+        S7["Trilho do Game Trace, referência<br/>de otimização (LOD/HLOD), sol automático"]
         S8["UpdateParents e Game FX da câmera"]
         S9["Partículas GPU, chuva, raios,<br/>flicker das luzes"]
         S10["Rede: EndTick (servidor envia)"]

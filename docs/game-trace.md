@@ -1,4 +1,4 @@
-# Range Trace
+# Game Trace
 
 Log opcional de uma sessão de jogo: o que a engine carregou, quanto custou e o que foi de fato desenhado.
 Serve para o pente fino de um jogo: achar o que carrega à toa e as cargas no meio do jogo que podem travar.
@@ -6,9 +6,9 @@ Código: `source/source/gameengine/Common/CM_Trace.h/.cpp`. Relatório: `tools/d
 
 ## Como usar
 
-Com janela: `tools\debug\Range Trace.lnk` ou
+Com janela: `tools\debug\Game Trace.lnk` ou
 `tools\debug\abrir_trace_launcher.bat [jogo.range]`. A janela escolhe jogo, executável, pasta de saída e
-módulos, lembra as escolhas em `%APPDATA%\AnastacioEngine\range_trace_launcher.json` (nada é gravado no
+módulos, lembra as escolhas em `%APPDATA%\AnastacioEngine\game_trace_launcher.json` (nada é gravado no
 `.range`), roda o jogo e abre o relatório quando ele fecha.
 Mostra o ícone do jogo (`icon.png` na pasta do jogo), lista os últimos relatórios (abrir, pasta, apagar)
 e tem tema claro e escuro. Usa o Python do sistema (`pythonw`, com tkinter). É ferramenta de
@@ -24,8 +24,9 @@ Abre o jogo no `AnastacioRuntime.exe` (sem argumento abre o RolimaRacer). Jogue 
 e feche o jogo normalmente. O `.bat` gera e abre `debug-logs\trace-<data-hora>\relatorio.html`; ao lado fica
 `resumo.md`, curto o bastante para colar numa IA.
 
-Sem o `.bat`: `RANGE_TRACE=<pasta>` liga o trace (grava `<pasta>\trace.jsonl`) e
-`RANGE_TRACE_MODULES=load,usage` escolhe os módulos (sem a variável, ou `all`, liga todos).
+Sem o `.bat`: `GAME_TRACE=<pasta>` liga o trace (grava `<pasta>\trace.jsonl`) e
+`GAME_TRACE_MODULES=load,usage` escolhe os módulos (sem a variável, ou `all`, liga todos).
+Os nomes antigos (`RANGE_TRACE*`, de antes da troca de nome) ainda são aceitos.
 Depois: `python tools/debug/relatorio_trace.py <pasta> [--resumo]`. Funciona também no editor (Play),
 cada partida termina com um evento `end` no mesmo arquivo.
 
@@ -38,7 +39,7 @@ Desligado, cada ponto instrumentado custa um `if`. Num jogo exportado nada muda 
 | `load` | Por cena convertida (inicial, AddScene, LibLoad): tempo de conversão, texturas e shaders; cada objeto (tipo, camada ativa, malhas), cada malha (triângulos, materiais), cada material (imagens dos nós e slots), objetos deixados de fora pelo Load Mode; objetos On Demand convertidos no meio do jogo | Só no load |
 | `usage` | Primeiro frame em que cada objeto passa no culling da câmera ou de uma sombra; cada imagem enviada para a GPU (tamanho, ms, frame) | Um teste de ponteiro por objeto visível por frame |
 | `frames` | Uma linha por frame: tempo total e as categorias do profiler acima de 0,05 ms | Uma linha por frame (~60 KB por minuto) |
-| `sector` | Câmera num trilho (ver abaixo): posição, progresso na curva e para onde a câmera olha, por frame | Só com `RANGE_TRACE_RAIL` |
+| `sector` | Câmera num trilho (ver abaixo): posição, progresso na curva e para onde a câmera olha, por frame | Só com `GAME_TRACE_RAIL` |
 | `scripts` | Por frame: ms e chamadas de cada componente Python (pela classe) e controlador Python (pelo script), acima de 0,02 ms | Uma linha por frame com script |
 | `runtime` | Memória do processo a cada segundo, cada som iniciado (Sound actuator, Speaker, World Sound) e cada cena adicionada/removida (inclusive replace e async) | Pequeno |
 | `work` | Por frame: draw calls, trocas de material e luz e os contadores de `CM_WorkCounters.h` acima de 0. O launcher liga junto `RANGE_AUDIT_TRANSFORMS` (`objetos.txt`: objetos que mais geram trabalho) | Uma linha por frame |
@@ -54,7 +55,7 @@ Runtime (memória no início/pico/fim, cenas e sons).
 
 ## Trilho de câmera (sector)
 
-`RANGE_TRACE_RAIL=cena;curva;objeto;segundos[;reverse|forward[;início[;esperar]]]`, com o módulo `sector` (o launcher liga `frames`
+`GAME_TRACE_RAIL=cena;curva;objeto;segundos[;reverse|forward[;início[;esperar]]]`, com o módulo `sector` (o launcher liga `frames`
 junto; a opção Velocidade do launcher — Normal, 1,5×, 2× ou 3× — divide os segundos da volta). Quando a cena é convertida, o objeto (normalmente uma câmera) passa a seguir a primeira spline da
 curva com velocidade constante em tempo real e vira a câmera ativa. Olha para a média das direções de 4 a
 16 m à frente, suavizada (constante de 0,15 s), com o horizonte nivelado. No fim da curva o jogo fecha
@@ -102,6 +103,14 @@ o nome do original (os On Demand aparecem primeiro na cena temporária `..Conver
   escolhe, nesta ordem: script que tomou ≥ 1 ms e ≥ 20% do frame (módulo `scripts`), carga no frame,
   contador do `work` ≥ 3× a mediana, ou a categoria que mais pesou. Acima da tabela, "Quem mais pesa" lista
   as categorias e scripts mais caros em média e os culpados que mais se repetem.
+- **Como corrigir:** regras "sintoma → sugestão" sobre os dados do trace ([plano](plano-trace-doctor.md)):
+  imagem enviada no jogo (pré-carregar; reduzir ou DDS a partir de 2048×2048), objeto On Demand convertido no jogo
+  (Load Mode With Scene ou `convertObject` antes), LibLoad/AddScene no jogo, shader compilado no jogo (aquecer no
+  load) e script caro em média ou num frame isolado. Agrupado por alvo, com vezes, frames lentos em que foi o
+  culpado e ganho estimado (o custo medido do sintoma: ms somados das cargas ou ms/frame do script). A tabela de
+  frames lentos ganha a coluna "como corrigir"; culpado sem regra (contador do `work` ou categoria) recebe uma
+  dica geral. Regra sem dados não dispara, e o relatório lista quais ficaram sem dados. Static Batch só dispara
+  quando o trace gravar o Auto Static Batch da cena e a física do objeto (etapa 2).
 - **Trilho de câmera:** a curva dividida em 40 trechos; faixa e mapa visto de cima coloridos de verde a
   vermelho pelo custo médio. Trecho quente = acima de 125% da mediana dos trechos e 1 ms a mais. Os primeiros
   10 frames do trilho ficam de fora (fim do load). A coluna de categorias diz o que pesa: MainRender e

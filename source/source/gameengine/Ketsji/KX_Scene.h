@@ -791,8 +791,8 @@ public:
 	KX_CutsceneManager *GetCutsceneManager();
 	const KX_CutsceneManager *GetCutsceneManager() const;
 
-	/** Range Trace "sector": move a camera along curve points (curve local space) at constant
-	 * real-time speed, looking ahead, and quit the game at the end (docs/range-trace.md). */
+	/** Game Trace "sector": move a camera along curve points (curve local space) at constant
+	 * real-time speed, looking ahead, and quit the game at the end (docs/game-trace.md). */
 	void StartTraceRail(KX_GameObject *camera, KX_GameObject *curve, std::vector<mt::vec3> points, double seconds,
 	                    bool reverse, const std::string& start, const std::string& wait);
 	void UpdateTraceRail();

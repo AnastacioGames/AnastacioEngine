@@ -1,8 +1,8 @@
 """Anastacio Trace Launcher: a window that picks the game, the player and the trace modules,
-runs the game and opens the report when it closes (docs/range-trace.md).
+runs the game and opens the report when it closes (docs/game-trace.md).
 
-Choices are remembered in %APPDATA%\\AnastacioEngine\\range_trace_launcher.json; nothing is
-written next to the game. Usage: pythonw tools/debug/range_trace_launcher.py [jogo.range]
+Choices are remembered in %APPDATA%\\AnastacioEngine\\game_trace_launcher.json; nothing is
+written next to the game. Usage: pythonw tools/debug/game_trace_launcher.py [jogo.range]
 """
 import json
 import os
@@ -17,7 +17,8 @@ from tkinter import filedialog, messagebox, ttk
 RAIZ = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 RELATORIO = os.path.join(RAIZ, 'tools', 'debug', 'relatorio_trace.py')
 CONFIG = os.path.join(os.environ.get('APPDATA', os.path.expanduser('~')), 'AnastacioEngine',
-                      'range_trace_launcher.json')
+                      'game_trace_launcher.json')
+CONFIG_ANTIGO = os.path.join(os.path.dirname(CONFIG), 'range_trace_launcher.json')
 LOGO = os.path.join(RAIZ, 'source', 'release', 'datafiles', 'anastacio_engine_logo_v2.png')
 ICONE = os.path.join(RAIZ, 'source', 'release', 'windows', 'icons', 'anastacio-engine-icon-transparent-v1.ico')
 # Gravado em cada pasta de trace pelo launcher, para a lista de relatórios saber de que jogo é.
@@ -36,7 +37,7 @@ MODULOS = (
     ('shaders', 'Shaders e texturas: cada shader compilado e textura criada, com o frame e os ms'),
     ('profile', 'Profiler completo e logs do jogo (range_profile, log do runtime, ragdoll do Rolima)'),
 )
-# Módulos que o launcher liga por variável própria, fora do RANGE_TRACE_MODULES.
+# Módulos que o launcher liga por variável própria, fora do GAME_TRACE_MODULES.
 SO_LAUNCHER = ('shaders', 'profile')
 # Campos do trilho (módulo sector), lembrados por jogo.
 CAMPOS_TRILHO = (('cena', 'Cena', 14), ('curva', 'Curva', 16), ('camera', 'Câmera', 20), ('inicio', 'Início', 14),
@@ -80,7 +81,9 @@ aplicar_tema('escuro')
 def ler_config():
     cfg = dict(PADRAO)
     try:
-        with open(CONFIG, encoding='utf-8') as f:
+        # Escolhas salvas antes da troca de nome (Range Trace).
+        caminho = CONFIG if os.path.exists(CONFIG) else CONFIG_ANTIGO
+        with open(caminho, encoding='utf-8') as f:
             cfg.update(json.load(f))
     except (OSError, ValueError):
         pass
@@ -490,9 +493,10 @@ class Launcher(tk.Tk):
                        'modo_ia': (self.pista_ia.get().strip() or 'Pista_1') if self.modo_ia.get() else None},
                       f, ensure_ascii=False)
         do_trace = [m for m in modulos if m not in SO_LAUNCHER] or ['frames']
-        env = dict(os.environ, RANGE_TRACE=self.pasta_trace, RANGE_TRACE_MODULES=','.join(do_trace))
-        for var in ('RANGE_TRACE_RAIL', 'RANGE_AUDIT_TRANSFORMS', 'RANGE_SHADER_LOG', 'RANGE_PROFILE',
-                    'ROLIMA_RAGDOLL_TRACE', 'ROLIMA_MODO_IA'):
+        env = dict(os.environ, GAME_TRACE=self.pasta_trace, GAME_TRACE_MODULES=','.join(do_trace))
+        for var in ('GAME_TRACE_RAIL', 'RANGE_AUDIT_TRANSFORMS', 'RANGE_SHADER_LOG', 'RANGE_PROFILE',
+                    'ROLIMA_RAGDOLL_TRACE', 'ROLIMA_MODO_IA',
+                    'RANGE_TRACE', 'RANGE_TRACE_MODULES', 'RANGE_TRACE_RAIL'):
             env.pop(var, None)
         if 'work' in modulos:
             env['RANGE_AUDIT_TRANSFORMS'] = os.path.join(self.pasta_trace, 'objetos.txt')
@@ -506,7 +510,7 @@ class Launcher(tk.Tk):
             os.makedirs(tmp, exist_ok=True)
             env['TEMP'] = env['TMP'] = tmp
         if 'sector' in modulos:
-            env['RANGE_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
+            env['GAME_TRACE_RAIL'] = ';'.join((trilho['cena'], trilho['curva'], trilho['camera'],
                                                 '%g' % max(segundos, 1.0), 'reverse' if trilho['inverter'] else 'forward',
                                                 trilho['inicio'] or 'auto', trilho['esperar']))
         if self.modo_ia.get():

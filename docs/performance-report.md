@@ -2,7 +2,7 @@
 
 Ferramenta da engine (vai no editor publicado) para qualquer jogo: **Game > Performance > Play and Measure**
 roda a cena no `AnastacioRuntime` com o trace ligado e, quando o jogo fecha, gera `report.html` e abre no
-navegador. Inspirada no Range Trace (que continua sendo a ferramenta do RolimaRacer, ver `range-trace.md`) e
+navegador. Inspirada no Game Trace (que continua sendo a ferramenta do RolimaRacer, ver `game-trace.md`) e
 usando o mesmo motor de gravação (`CM_Trace`).
 
 - Código: `source/release/scripts/startup/bl_operators/anastacio_performance_report.py` (operadores e pasta),

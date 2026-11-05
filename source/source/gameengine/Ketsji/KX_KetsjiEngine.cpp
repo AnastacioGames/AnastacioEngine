@@ -163,7 +163,7 @@ const std::string KX_KetsjiEngine::m_renderQueriesLabels[QUERY_MAX] = {
 	"Time:" // QUERY_TIME
 };
 
-/// Range Trace "work": update work and GPU calls of the last frame (CM_WorkCounters.h), only the counters above 0.
+/// Game Trace "work": update work and GPU calls of the last frame (CM_WorkCounters.h), only the counters above 0.
 static void trace_work()
 {
 	static const char *names[CM_WORK_COUNTER_MAX] = {"nodes", "syncs", "bounds", "matrices", "notifies", "lightUniforms",
@@ -674,8 +674,8 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 	}
 }
 
-/// Range Trace: image sent to the GPU (first draw that needs it, or a prefetch at load).
-/// Range Trace "frames": total time and the categories above 0.05 ms, short keys to keep lines small.
+/// Game Trace: image sent to the GPU (first draw that needs it, or a prefetch at load).
+/// Game Trace "frames": total time and the categories above 0.05 ms, short keys to keep lines small.
 static void trace_frame(const double *categoryMs, const std::string *labels, int numCategories)
 {
 	double total = 0.0;

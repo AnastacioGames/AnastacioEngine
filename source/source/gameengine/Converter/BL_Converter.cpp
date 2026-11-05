@@ -802,12 +802,12 @@ static const char *trace_object_type(const Object *ob)
 	}
 }
 
-/** Range Trace "load": catalog of what a scene conversion created (objects, meshes, materials with
+/** Game Trace "load": catalog of what a scene conversion created (objects, meshes, materials with
  * their images) and what it left out, for tools/debug/relatorio_trace.py to cross with the usage events. */
-/// Range Trace "sector": RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;start[;wait]]] starts the camera rail when that scene is converted.
+/// Game Trace "sector": GAME_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;start[;wait]]] starts the camera rail when that scene is converted.
 static void trace_start_rail(BL_SceneConverter& converter, KX_Scene *scene)
 {
-	const char *env = getenv("RANGE_TRACE_RAIL");
+	const char *env = CM_TraceGetEnv("GAME_TRACE_RAIL", "RANGE_TRACE_RAIL");
 	if (!env || !env[0]) {
 		return;
 	}
@@ -835,7 +835,7 @@ static void trace_start_rail(BL_SceneConverter& converter, KX_Scene *scene)
 		points = BL_SampleCutscenePath(curve->GetBlenderObject());
 	}
 	if (!camera || points.size() < 2) {
-		CM_Error("Range Trace rail: scene \"" << parts[0] << "\" needs curve \"" << parts[1] << "\" and object \""
+		CM_Error("Game Trace rail: scene \"" << parts[0] << "\" needs curve \"" << parts[1] << "\" and object \""
 		         << parts[2] << "\" (" << (curve ? "curve found" : "curve missing") << ", "
 		         << (camera ? "object found" : "object missing") << ")");
 		CM_TraceEvent("rail_end", "\"scene\":" + CM_TraceStr(parts[0]) + ",\"reason\":\"not_found\"");

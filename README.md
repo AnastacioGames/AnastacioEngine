@@ -44,7 +44,7 @@ céu e lens flare mais leves em iGPU e simulador de PC fraco no Performance Repo
   Crop e Bilateral Blur; Node Editor com faixa de efeitos e presets no estilo Blender 5.
 - **Render:** sombra de sol em cascatas (CSM), PCSS, SH9 em sondas, partículas flipbook, Sky Quality, HLOD e
   Auto Static Batch.
-- **Ferramentas:** Scene Doctor, Performance Report, FPS Counter, Range Trace e barra/menus no estilo Blender 5.
+- **Ferramentas:** Scene Doctor, Performance Report, FPS Counter, Game Trace e barra/menus no estilo Blender 5.
 - **Export:** Compile Scripts entrega só `.pyc`; pacote Universal (Windows + Linux numa pasta).
 - **Gravação de tela no Linux:** grava em AVI (o MP4 com som segue no Windows).
 - Revisão ampla do núcleo e muitas correções.
