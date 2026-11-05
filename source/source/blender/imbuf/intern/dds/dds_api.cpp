@@ -31,6 +31,7 @@ extern "C" {
 #include <BlockDXT.h>
 #include <ColorBlock.h>
 #include <stdio.h> // printf
+#include <math.h>
 #include <fstream>
 #include <string.h> // memcpy
 
@@ -86,7 +87,7 @@ int imb_is_a_dds(const unsigned char *mem) // note: use at most first 32 bytes
 
 static bool dds_is_dxt(unsigned int fourcc)
 {
-	return fourcc == FOURCC_DXT1 || fourcc == FOURCC_DXT3 || fourcc == FOURCC_DXT5;
+	return fourcc == FOURCC_DXT1 || fourcc == FOURCC_DXT3 || fourcc == FOURCC_DXT5 || fourcc == FOURCC_ATI2;
 }
 
 static unsigned int dds_block_size(unsigned int fourcc)
@@ -125,6 +126,9 @@ static unsigned int dds_levels_present(unsigned int width, unsigned int height, 
 static bool dds_blocks_have_alpha(const unsigned char *data, unsigned int width, unsigned int height,
                                   unsigned int fourcc)
 {
+	if (fourcc == FOURCC_ATI2) {
+		return false; /* normal map: two channels, no alpha */
+	}
 	const unsigned int blocks = ((width + 3) / 4) * ((height + 3) / 4);
 	for (unsigned int i = 0; i < blocks; i++) {
 		if (fourcc == FOURCC_DXT1) {
@@ -198,6 +202,19 @@ bool imb_dds_decode_rect(struct ImBuf *ibuf)
 				BlockDXT3 dxt;
 				memcpy(&dxt, src, sizeof(dxt));
 				dxt.decodeBlock(&block);
+			}
+			else if (fourcc == FOURCC_ATI2) {
+				BlockATI2 ati;
+				memcpy(&ati, src, sizeof(ati));
+				ati.decodeBlock(&block);
+				/* X/Y in red/green: rebuild the unit Z the RGB normal map had */
+				for (unsigned int k = 0; k < 16; k++) {
+					Color32 &c = block.color(k);
+					const float x = c.r / 127.5f - 1.0f, y = c.g / 127.5f - 1.0f;
+					const float z = sqrtf(MAX2(0.0f, 1.0f - x * x - y * y));
+					c.b = (uint8)(z * 127.5f + 128.0f > 255.0f ? 255 : z * 127.5f + 128.0f);
+					c.a = 255;
+				}
 			}
 			else {
 				BlockDXT5 dxt;

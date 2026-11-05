@@ -332,6 +332,7 @@ void RNA_api_image(StructRNA *srna)
 		{0, "AUTO", 0, "Automatic", "BC1 for opaque images, BC3 for alpha"},
 		{1, "DXT1", 0, "DXT1 / BC1", "Opaque images only"},
 		{3, "DXT5", 0, "DXT5 / BC3", "Color and alpha"},
+		{5, "BC5", 0, "BC5 / ATI2", "Tangent-space normal maps: X/Y only, Z rebuilt when sampled"},
 		{0, NULL, 0, NULL, NULL}
 	};
 	func = RNA_def_function(srna, "save_dds", "rna_Image_save_dds");

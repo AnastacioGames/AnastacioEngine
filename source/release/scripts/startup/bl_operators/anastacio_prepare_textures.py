@@ -98,7 +98,52 @@ def color_usage():
     return uses - blocked
 
 
-def skip_reason(image, colors=None):
+def normal_usage():
+    """Images used only as tangent-space normal maps: these become BC5 (X/Y, Z rebuilt)."""
+    uses, blocked = set(), set()
+    for mat in bpy.data.materials:
+        for slot in mat.texture_slots:
+            if slot and slot.texture and slot.texture.type == 'IMAGE' and slot.texture.image:
+                image = slot.texture.image.name
+                tex = slot.texture
+                other = any(getattr(slot, attr, False) for attr in (
+                    'use_map_color_diffuse', 'use_map_parallax', 'use_map_color_spec', 'use_map_mirror',
+                    'use_map_diffuse', 'use_map_specular', 'use_map_ambient', 'use_map_hardness',
+                    'use_map_raymir', 'use_map_emit', 'use_map_translucency', 'use_map_displacement',
+                    'use_map_warp', 'use_map_roughness', 'use_map_metallic', 'use_map_sss', 'use_map_alpha'))
+                if (slot.use_map_normal and tex.use_normal_map and not other and
+                        getattr(slot, 'normal_map_space', 'TANGENT') == 'TANGENT'):
+                    uses.add(image)
+                else:
+                    blocked.add(image)
+        for node in _walk_nodes(mat.node_tree):
+            image = getattr(node, 'image', None)
+            if image is None:
+                continue
+            found = False
+            for output in node.outputs:
+                for link in output.links:
+                    found = True
+                    if (output.name == 'Color' and link.to_node.type == 'NORMAL_MAP' and
+                            link.to_node.space == 'TANGENT'):
+                        uses.add(image.name)
+                    else:
+                        blocked.add(image.name)
+            if not found:
+                blocked.add(image.name)
+    return uses - blocked
+
+
+def image_format(image, colors=None, normals=None):
+    """'BC5' for tangent-space normal maps, 'AUTO' (BC1/BC3) for colors, None otherwise."""
+    if image.name in (normal_usage() if normals is None else normals):
+        return 'BC5'
+    if image.name in (color_usage() if colors is None else colors):
+        return 'AUTO'
+    return None
+
+
+def skip_reason(image, colors=None, normals=None):
     if image.library:
         return 'Linked library (prepare in its source project)'
     if image.source != 'FILE' or image.type != 'IMAGE':
@@ -118,6 +163,12 @@ def skip_reason(image, colors=None):
         return 'Non power-of-two (resize explicitly first)'
     if os.path.splitext(image.filepath)[1].lower() not in {'.png', '.jpg', '.jpeg', '.tga', '.bmp'}:
         return 'Source format excluded'
+    if image.name in (normal_usage() if normals is None else normals):
+        if image.name in (color_usage() if colors is None else colors):
+            return 'Used as color and normal map'
+        if re.search(r'(^|[_ .-])(lightmap|rgbm)([_ .-]|$)', image.name.lower()):
+            return 'Lightmap'
+        return ''
     if image.colorspace_settings.name != 'sRGB':
         return 'Data / non-sRGB image'
     if re.search(r'(^|[_ .-])(n|normal|normals|lightmap|rgbm)([_ .-]|$)', image.name.lower()):
@@ -137,7 +188,7 @@ def dds_info(path):
     if len(header) != 128 or header[:4] != b'DDS ':
         raise ValueError('Invalid DDS header')
     values = struct.unpack('<32I', header)
-    if values[1] != 124 or header[84:88] not in (b'DXT1', b'DXT5'):
+    if values[1] != 124 or header[84:88] not in (b'DXT1', b'DXT5', b'ATI2'):
         raise ValueError('Unsupported DDS format')
     w, h, levels = values[4], values[3], values[7]
     if not w or not h or w & (w - 1) or h & (h - 1) or levels != max(w, h).bit_length():
@@ -158,7 +209,8 @@ def prepare_image(image, max_size=2048, quality=10):
     reason = skip_reason(image)
     if reason:
         raise ValueError(reason)
-    options = {'max_size': max_size, 'quality': quality, 'format': 'AUTO'}
+    fmt = image_format(image)
+    options = {'max_size': max_size, 'quality': quality, 'format': fmt}
     fingerprint = _source_hash(image, options)
     folder = os.path.join(os.path.dirname(bpy.data.filepath), 'textures_dds')
     os.makedirs(folder, exist_ok=True)
@@ -193,7 +245,8 @@ def prepare_image(image, max_size=2048, quality=10):
             source_image.reload()
             if tuple(source_image.size) != tuple(image.size):
                 raise ValueError('Source dimensions changed: reload the original image first')
-            source_image.save_dds(filepath=temporary, format='AUTO', max_size=max_size, quality=quality, srgb=True)
+            source_image.save_dds(filepath=temporary, format=fmt, max_size=max_size, quality=quality,
+                                  srgb=fmt != 'BC5')
             dds_info(temporary)
             if _source_hash(image, options) != fingerprint:
                 raise ValueError('Source changed during preparation')
@@ -220,13 +273,15 @@ def _record(image):
         return {}
 
 
-def prepared_path(image, colors=None):
+def prepared_path(image, colors=None, normals=None):
     record = _record(image)
     if record.get('version') != VERSION:
         raise ValueError('Prepare textures again (cache version changed)')
-    reason = skip_reason(image, colors)
+    reason = skip_reason(image, colors, normals)
     if reason:
         raise ValueError(reason)
+    if record['options'].get('format') != image_format(image, colors, normals):
+        raise ValueError('Image usage changed (color / normal map): prepare textures again')
     if _source_hash(image, record['options']) != record['fingerprint']:
         raise ValueError('Source or settings changed: prepare textures again')
     path = bpy.path.abspath(record['path'])
@@ -244,13 +299,13 @@ def export_prepared_textures():
     Linked libraries and external LibLoad files must be prepared/exported separately.
     """
     swaps = []
-    colors = color_usage()
+    colors, normals = color_usage(), normal_usage()
     try:
         for original in list(bpy.data.images):
             if KEY not in original or original.library:
                 continue
             try:
-                path = prepared_path(original, colors)
+                path = prepared_path(original, colors, normals)
             except (OSError, ValueError, KeyError, TypeError) as error:
                 # A stale texture keeps its original in the export instead of stopping it.
                 print('Export: %s keeps its original image (%s)' % (original.name, error))
@@ -333,9 +388,9 @@ class GAME_OT_prepare_textures(Operator):
 
     def invoke(self, context, event):
         self.entries.clear()
-        colors = color_usage()
+        colors, normals = color_usage(), normal_usage()
         for image in bpy.data.images:
-            reason = skip_reason(image, colors)
+            reason = skip_reason(image, colors, normals)
             entry = self.entries.add()
             entry.image_name = image.name
             entry.eligible = not reason
@@ -345,7 +400,8 @@ class GAME_OT_prepare_textures(Operator):
             else:
                 entry.width, entry.height = image.size
                 # Estimate only: reading every pixel is too slow here, save_dds(AUTO) decides.
-                entry.format = 'DXT5' if image.depth == 32 and image.use_alpha else 'DXT1'
+                entry.format = ('BC5' if image.name in normals else
+                                'DXT5' if image.depth == 32 and image.use_alpha else 'DXT1')
                 entry.status = '(Prepared)' if KEY in image else ''
         return context.window_manager.invoke_props_dialog(self, width=820)
 

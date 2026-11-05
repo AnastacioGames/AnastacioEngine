@@ -1076,6 +1076,10 @@ void GPU_create_gl_tex(
 EM_JS(int, gpu_webgl_has_s3tc, (void), {
 	return GLctx.getExtension('WEBGL_compressed_texture_s3tc') ? 1 : 0;
 });
+/* BC5 normal maps: RGTC is a separate extension (desktop browsers on D3D11/GL3 class GPUs). */
+EM_JS(int, gpu_webgl_has_rgtc, (void), {
+	return GLctx.getExtension('EXT_texture_compression_rgtc') ? 1 : 0;
+});
 #endif
 
 static bool gpu_has_s3tc(void)
@@ -1093,6 +1097,24 @@ static bool gpu_has_s3tc(void)
 #  endif
 #else
 	return GLEW_EXT_texture_compression_s3tc;
+#endif
+}
+
+static bool gpu_has_rgtc(void)
+{
+#if defined(__EMSCRIPTEN__)
+#  ifdef WITH_DDS
+	static int has = -1;
+	if (has < 0) {
+		has = gpu_webgl_has_rgtc();
+		fprintf(stderr, "DDS: WebGL RGTC %s\n", has ? "on (BC5 normal maps compressed)" : "off (BC5 decoded to RGBA)");
+	}
+	return has != 0;
+#  else
+	return false;
+#  endif
+#else
+	return GLEW_VERSION_3_0 || GLEW_ARB_texture_compression_rgtc || GLEW_EXT_texture_compression_rgtc;
 #endif
 }
 
@@ -1114,6 +1136,10 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 			format = GL_COMPRESSED_RGBA_S3TC_DXT3_EXT;
 		else if (ibuf->dds_data.fourcc == FOURCC_DXT5)
 			format = GL_COMPRESSED_RGBA_S3TC_DXT5_EXT;
+	}
+	if (ibuf->dds_data.fourcc == FOURCC_ATI2) {
+		/* RG texture: the shader rebuilds Z when it samples blue == 0 */
+		format = (gpu_has_rgtc() && !(disable_s3tc && disable_s3tc[0] == '1')) ? GL_COMPRESSED_RG_RGTC2 : 0;
 	}
 
 	if (format == 0) {

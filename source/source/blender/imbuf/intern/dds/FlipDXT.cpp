@@ -169,6 +169,42 @@ static void FlipDXT5BlockHalf(uint8_t *block)
 	FlipDXT1BlockHalf(block + 8);
 }
 
+// BC5/ATI2: two DXT5 alpha-style blocks (red, then green), each flipped like the DXT5 alpha part.
+static void FlipBC4BlockFull(uint8_t *block)
+{
+	unsigned int line_0_1 = block[2] + 256 * (block[3] + 256 * block[4]);
+	unsigned int line_2_3 = block[5] + 256 * (block[6] + 256 * block[7]);
+	unsigned int line_1_0 = ((line_0_1 & 0x000fff) << 12) | ((line_0_1 & 0xfff000) >> 12);
+	unsigned int line_3_2 = ((line_2_3 & 0x000fff) << 12) | ((line_2_3 & 0xfff000) >> 12);
+	block[2] = line_3_2 & 0xff;
+	block[3] = (line_3_2 & 0xff00) >> 8;
+	block[4] = (line_3_2 & 0xff0000) >> 16;
+	block[5] = line_1_0 & 0xff;
+	block[6] = (line_1_0 & 0xff00) >> 8;
+	block[7] = (line_1_0 & 0xff0000) >> 16;
+}
+
+static void FlipBC4BlockHalf(uint8_t *block)
+{
+	unsigned int line_0_1 = block[2] + 256 * (block[3] + 256 * block[4]);
+	unsigned int line_1_0 = ((line_0_1 & 0x000fff) << 12) | ((line_0_1 & 0xfff000) >> 12);
+	block[2] = line_1_0 & 0xff;
+	block[3] = (line_1_0 & 0xff00) >> 8;
+	block[4] = (line_1_0 & 0xff0000) >> 16;
+}
+
+static void FlipATI2BlockFull(uint8_t *block)
+{
+	FlipBC4BlockFull(block);
+	FlipBC4BlockFull(block + 8);
+}
+
+static void FlipATI2BlockHalf(uint8_t *block)
+{
+	FlipBC4BlockHalf(block);
+	FlipBC4BlockHalf(block + 8);
+}
+
 // Flips a DXTC image, by flipping and swapping DXTC blocks as appropriate.
 int FlipDXTCImage(unsigned int width, unsigned int height, unsigned int levels, int fourcc, uint8_t *data)
 {
@@ -197,6 +233,11 @@ int FlipDXTCImage(unsigned int width, unsigned int height, unsigned int levels, 
 		case FOURCC_DXT5:
 			full_block_function = FlipDXT5BlockFull;
 			half_block_function = FlipDXT5BlockHalf;
+			block_bytes = 16;
+			break;
+		case FOURCC_ATI2:
+			full_block_function = FlipATI2BlockFull;
+			half_block_function = FlipATI2BlockHalf;
 			block_bytes = 16;
 			break;
 		default:

@@ -284,6 +284,7 @@ typedef struct ImBuf {
 #define FOURCC_DXT3  (DDS_MAKEFOURCC('D','X','T','3'))
 #define FOURCC_DXT4  (DDS_MAKEFOURCC('D','X','T','4'))
 #define FOURCC_DXT5  (DDS_MAKEFOURCC('D','X','T','5'))
+#define FOURCC_ATI2  (DDS_MAKEFOURCC('A','T','I','2'))
 
 #endif  /* DDS */
 extern const char *imb_ext_image[];

@@ -247,8 +247,20 @@ vec3 game_view_untransform(vec3 d, float exposure, float gamma, float contrast)
 	return c * exp2(-exposure);
 }
 
+/* BC5 (RGTC2) normal maps sample as (x, y, 0): blue exactly 0 never happens in a tangent-space
+ * RGB map (that would be Z = -1), so rebuild the unit Z there. */
+vec3 normal_map_color(vec3 color)
+{
+	if (color.b == 0.0) {
+		vec2 xy = color.rg * 2.0 - 1.0;
+		color.b = sqrt(max(0.0, 1.0 - dot(xy, xy))) * 0.5 + 0.5;
+	}
+	return color;
+}
+
 void color_to_normal(vec3 color, out vec3 normal)
 {
+	color = normal_map_color(color);
 	normal.x =  2.0 * ((color.r) - 0.5);
 	normal.y = -2.0 * ((color.g) - 0.5);
 	normal.z =  2.0 * ((color.b) - 0.5);
@@ -256,6 +268,7 @@ void color_to_normal(vec3 color, out vec3 normal)
 
 void color_to_normal_new_shading(vec3 color, out vec3 normal)
 {
+	color = normal_map_color(color);
 	normal.x =  2.0 * ((color.r) - 0.5);
 	normal.y =  2.0 * ((color.g) - 0.5);
 	normal.z =  2.0 * ((color.b) - 0.5);
@@ -1844,6 +1857,7 @@ void mtex_normal(vec3 texco, sampler2D ima, float lodbias, out vec3 normal)
 	// the normal used points inward.
 	// Should this ever change this negate must be removed.
 	vec4 color = texture2D(ima, texco.xy, lodbias);
+	color.rgb = normal_map_color(color.rgb);
 	normal = 2.0 * (vec3(-color.r, color.g, color.b) - vec3(-0.5, 0.5, 0.5));
 }
 
