@@ -139,6 +139,31 @@ class RangeTrackSettings(bpy.types.PropertyGroup):
     hill_height = FloatProperty(name="Hill Height", default=28.0, min=0.0, unit='LENGTH')
     hill_scale = FloatProperty(name="Hill Scale", default=220.0, min=1.0, unit='LENGTH')
     horizon_enabled = BoolProperty(name="Horizon", default=True)
+    # Light Probe Volumes ao longo da pista (probes.py)
+    probe_spacing = FloatProperty(name="Probe Spacing", default=6.0, min=0.5, max=50.0, unit='LENGTH',
+                                  description="Distance between the probes of the generated volumes")
+    probe_height = FloatProperty(name="Height", default=4.0, min=0.0, unit='LENGTH',
+                                 description="Height of the volumes above the track")
+    probe_floor = FloatProperty(name="Below", default=1.0, min=0.0, unit='LENGTH',
+                                description="Depth of the volumes below the track")
+    probe_margin = FloatProperty(name="Side Margin", default=2.0, min=0.0, unit='LENGTH',
+                                 description="Extra width beyond the covered band, on each side")
+    probe_upto = EnumProperty(name="Cover Up To", default='BORDER', items=(
+        ('ASPHALT', "Asphalt", "Only the asphalt"),
+        ('SIDEWALK', "Sidewalk", "Up to the sidewalk"),
+        ('BORDER', "Border", "Up to the border"),
+    ))
+    probe_quality = EnumProperty(name="Quality", default='MEDIUM', items=(
+        ('LOW', "Low", "Up to 64 probes per volume"),
+        ('MEDIUM', "Medium", "Up to 128 probes per volume"),
+        ('HIGH', "High", "Up to 256 probes per volume"),
+    ))
+    probe_max_total = IntProperty(name="Probe Limit", default=15000, min=1,
+                                  description="Total probes of all generated volumes")
+    probe_max_turn = FloatProperty(name="Max Turn", default=15.0, min=1.0, max=180.0,
+                                   description="Degrees of curve inside one volume")
+    probe_max_waste = FloatProperty(name="Max Waste", default=2.5, min=1.0, max=50.0,
+                                    description="Volume of a box divided by the volume of the band it covers")
     # extras (índices ativos para UIList)
     active_point = IntProperty(default=0)
     active_segment = IntProperty(default=0)

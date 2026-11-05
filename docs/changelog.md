@@ -8,6 +8,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - Track Tool: prévia de Light Probe Volumes ao longo da pista (P1)
+
+- Plano em [plano-track-probes.md](plano-track-probes.md). Só Python; nada é criado na cena ainda (P2).
+- `range_track/probes.py`: divide a pista em trechos (curva até `probe_max_turn`, caixa até `probe_max_waste`
+  vezes o volume da faixa, grade dentro do limite da qualidade) e devolve caixas alinhadas ao mundo, em
+  múltiplos do espaçamento (sondas de caixas vizinhas no mesmo ponto). Conta de sondas igual à do
+  `KX_ProbeVolume`. A parte de uma caixa que já está dentro da vizinha é cortada (fica um plano em comum).
+- Seção larga demais para a qualidade (ex.: pista em diagonal no Medium a 4 m) vira um aviso só, com o
+  espaçamento que cabe, em vez de centenas de caixas.
+- Painel **Track > Light Probe Volumes**: configurações `probe_*` no traçado, botão Preview (conta e
+  caixas no overlay, laranja onde a engine aumentaria o espaçamento) e espaçamento sugerido acima do limite.
+- Teste `tools/debug/track_tool/test_probes.py` (cobertura, alinhamento, sobreposição, limite). Pista_4
+  (1,9 km): 78 caixas / 8.356 sondas em Medium a 8 m; 178 / 40.254 em High a 4 m. Todas as checagens OK.
+- Padrão meio-termo: Medium, espaçamento 6 m, altura 4 m, limite 15.000 (Pista_4: 119 caixas, ~13,9 mil sondas).
+
+
+
 ## 2026-11-04 - Static Batch sem luz do sol nem sombras
 
 - Bug: o nó de batching não definia o objeto atual (`SetClientObject`) antes de ativar o material. A seleção

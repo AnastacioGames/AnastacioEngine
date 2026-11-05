@@ -77,6 +77,9 @@ BAND_FIELDS = (
 )
 SETTINGS_ROAD = ("sample_step", "chunk_length", "uv_repeat", "surface")
 SETTINGS_BANK = ("bank_auto", "bank_gain", "bank_max")
+SETTINGS_PROBES = ("probe_spacing", "probe_quality", "probe_upto", "probe_height", "probe_floor", "probe_margin",
+                   "probe_max_total")
+SETTINGS_PROBES_ADV = ("probe_max_turn", "probe_max_waste")
 SETTINGS_TERRAIN = ("terrain_enabled", "terrain_margin", "terrain_cell", "hill_height", "hill_scale", "horizon_enabled")
 POINT_FIELDS = ("index", "width_left", "width_right", "bank_mode", "bank_deg", "surface")
 SEGMENT_FIELDS = ("s_start", "s_end", "side", "band", "kind", "width", "height", "slope_deg", "border_type", "blend")
@@ -112,7 +115,7 @@ def _rt(sub):
     return importlib.import_module("range_track." + sub)
 
 
-MODULES = ("frames", "layout", "generate", "convert", "decor")
+MODULES = ("frames", "layout", "generate", "convert", "decor", "probes")
 
 
 def import_error():
@@ -745,6 +748,76 @@ def _draw_overlay_view():
     bgl.glColor4f(1.0, 1.0, 1.0, 1.0)
 
 
+# --------------------------------------------------------------------------------------------
+# Light Probe Volumes: prévia (plano calculado pelo botão Preview, desenhado até a pista mudar)
+# --------------------------------------------------------------------------------------------
+
+_probe_preview = {}     # nome do traçado -> (chave, Plan, [(a, b) bordas boas], [(a, b) bordas que crescem])
+
+PROBE_COLOR = (0.2, 0.85, 1.0, 0.8)
+PROBE_GROWN_COLOR = (1.0, 0.45, 0.1, 0.9)
+
+
+def probe_plan(scene, track_ob):
+    """Plan das caixas do traçado com as configurações do painel."""
+    gen, probes = _rt("generate"), _rt("probes")
+    _scene, st, _profile, fr, ed, _warnings = gen.prepare(track_ob)
+    cfg = probes.Config.from_settings(st)
+    result = probes.plan(fr, ed, cfg)
+    result.suggested = probes.suggest_spacing(fr, ed, cfg) if result.over_limit else None
+    return result
+
+
+def probe_preview_store(scene, track_ob, result):
+    probes = _rt("probes")
+    good, grown = [], []
+    for b in result.boxes:
+        (grown if b.grown else good).extend(probes.box_edges(b))
+    _probe_preview[track_ob.name] = (track_key(scene, track_ob), result, good, grown)
+
+
+def probe_preview_get(scene, track_ob):
+    """(Plan, atual?) da última prévia do traçado, ou (None, False)."""
+    hit = _probe_preview.get(track_ob.name)
+    if hit is None:
+        return None, False
+    try:
+        current = hit[0] == track_key(scene, track_ob)
+    except Exception:
+        current = False
+    return hit[1], current
+
+
+def _draw_probe_preview():
+    import bgl
+    context = bpy.context
+    scene = context.scene
+    if scene is None or not _probe_preview:
+        return
+    bgl.glEnable(bgl.GL_BLEND)
+    bgl.glLineWidth(1.5)
+    for name in list(_probe_preview):
+        ob = scene.objects.get(name)
+        if ob is None or not ob.is_visible(scene):
+            continue
+        result, current = probe_preview_get(scene, ob)
+        if result is None or not current:
+            continue
+        _key, _res, good, grown = _probe_preview[name]
+        for color, edges in ((PROBE_COLOR, good), (PROBE_GROWN_COLOR, grown)):
+            if not edges:
+                continue
+            bgl.glColor4f(*color)
+            bgl.glBegin(bgl.GL_LINES)
+            for a, b in edges:
+                bgl.glVertex3f(a.x, a.y, a.z)
+                bgl.glVertex3f(b.x, b.y, b.z)
+            bgl.glEnd()
+    bgl.glLineWidth(1.0)
+    bgl.glDisable(bgl.GL_BLEND)
+    bgl.glColor4f(1.0, 1.0, 1.0, 1.0)
+
+
 def _draw_overlay_text():
     import blf
     from bpy_extras.view3d_utils import location_3d_to_region_2d
@@ -949,6 +1022,47 @@ class RANGE_TRACK_OT_generate(_TrackOp, Operator):
         else:
             self.report({'INFO'}, text)
         return {'FINISHED'}
+
+
+class RANGE_TRACK_OT_probes_preview(_TrackOp, Operator):
+    """Show the Light Probe Volume boxes along the track and count their probes (nothing is created)"""
+    bl_idname = "range_track.probes_preview"
+    bl_label = "Preview Light Probe Volumes"
+
+    clear: BoolProperty(name="Hide", default=False, options={'SKIP_SAVE'})
+
+    def execute(self, context):
+        track = _active_track(context)
+        if self.clear:
+            _probe_preview.pop(track.name, None)
+            _redraw_views(context)
+            return {'FINISHED'}
+        mode = _to_object_mode(context)
+        try:
+            result = probe_plan(context.scene, track)
+        except Exception as ex:
+            traceback.print_exc()
+            self.report({'ERROR'}, tip_("Light Probe Volume preview failed: %s") % ex)
+            return {'CANCELLED'}
+        finally:
+            _restore_mode(context, track, mode)
+        probe_preview_store(context.scene, track, result)
+        _redraw_views(context)
+        text = result.text()
+        if result.warnings:
+            self.report({'WARNING'}, "%s; %s" % (text, "; ".join(result.warnings)[:300]))
+        else:
+            self.report({'INFO'}, text)
+        return {'FINISHED'}
+
+
+def _redraw_views(context):
+    screen = getattr(context, "screen", None)
+    if screen is None:
+        return
+    for area in screen.areas:
+        if area.type == 'VIEW_3D':
+            area.tag_redraw()
 
 
 class RANGE_TRACK_OT_live_watch(Operator):
@@ -1614,6 +1728,33 @@ class VIEW3D_PT_range_track_terrain(_TrackPanel, Panel):
         layout.operator("range_track.generate", text=tip_("Generate Terrain"), icon='FILE_REFRESH').parts = 'TERRAIN'
 
 
+class VIEW3D_PT_range_track_probes(_TrackPanel, Panel):
+    bl_label = "Light Probe Volumes"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        track = _active_track(context)
+        st = settings_of(track)
+        col = layout.column(align=True)
+        _draw_fields(col, st, SETTINGS_PROBES)
+        col = layout.column(align=True)
+        _draw_fields(col, st, SETTINGS_PROBES_ADV)
+        row = layout.row(align=True)
+        row.operator("range_track.probes_preview", icon='VISIBLE_IPO_ON')
+        result, current = probe_preview_get(context.scene, track)
+        if result is not None:
+            row.operator("range_track.probes_preview", text="", icon='X').clear = True
+            box = layout.box()
+            if not current:
+                box.label(tip_("The track changed: press Preview again"), icon='INFO')
+            box.label(result.text(), icon='ERROR' if result.over_limit or result.warnings else 'LIGHT')
+            for w in result.warnings:
+                box.label(w)
+            if getattr(result, "suggested", None):
+                box.label(tip_("A spacing of %.1f m fits the limit") % result.suggested)
+
+
 def menu_func_add(self, context):
     self.layout.operator("range_track.add", text=tip_("Track"), icon='CURVE_PATH')
 
@@ -1624,6 +1765,7 @@ classes = (
     RANGE_TRACK_OT_add,
     RANGE_TRACK_OT_convert,
     RANGE_TRACK_OT_generate,
+    RANGE_TRACK_OT_probes_preview,
     RANGE_TRACK_OT_live_watch,
     RANGE_TRACK_OT_live_toggle,
     RANGE_TRACK_OT_list_action,
@@ -1644,6 +1786,7 @@ classes = (
     VIEW3D_PT_range_track_segments,
     VIEW3D_PT_range_track_decor,
     VIEW3D_PT_range_track_terrain,
+    VIEW3D_PT_range_track_probes,
 )
 
 
@@ -1665,6 +1808,7 @@ def register_props():
         space = bpy.types.SpaceView3D
         _draw_handles.append(space.draw_handler_add(_draw_overlay_view, (), 'WINDOW', 'POST_VIEW'))
         _draw_handles.append(space.draw_handler_add(_draw_overlay_text, (), 'WINDOW', 'POST_PIXEL'))
+        _draw_handles.append(space.draw_handler_add(_draw_probe_preview, (), 'WINDOW', 'POST_VIEW'))
     try:
         menu = _curve_add_menu()
         if menu_func_add not in getattr(menu.draw, "_draw_funcs", ()):

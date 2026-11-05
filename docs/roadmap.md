@@ -11,6 +11,9 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   próprio em blocos, decoração por regra, dado de pista no jogo (`project`, `pointAt`). Etapas F0-F6, nada
   implementado; protótipo nos scripts `Tools/gerar_cenario_pista.py` e `ajustar_inclinacao_pista.py`
   do RolimaRacer.
+- [Light Probe Volumes na pista](plano-track-probes.md): operador que cobre a faixa da pista com uma
+  cadeia de Empties `probe_volume` (prévia com a conta de sondas, grupo próprio, apagar/regerar) e
+  orçamento de captura compartilhado entre volumes em C++. Etapas P1-P4; P1 (prévia) feita em 2026-11-05.
 
 ## Probe Volume GI (luz indireta por grade de sondas)
 
