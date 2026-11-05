@@ -118,6 +118,8 @@ float BLF_default_width_max(void) ATTR_WARN_UNUSED_RESULT;
 float BLF_descender(int fontid) ATTR_WARN_UNUSED_RESULT;
 float BLF_ascender(int fontid) ATTR_WARN_UNUSED_RESULT;
 bool BLF_has_glyph(int fontid, unsigned int unicode) ATTR_WARN_UNUSED_RESULT;
+/* Font memory (kept alive by the caller) for the characters a font lacks. */
+void BLF_fallback_set_mem(const unsigned char *mem, int mem_size);
 
 /* The following function return the width and height of the string, but
  * just in one call, so avoid extra freetype2 stuff.

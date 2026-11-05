@@ -39,6 +39,7 @@ char *blf_dir_metrics_search(const char *filename);
 /* int blf_dir_split(const char *str, char *file, int *size);  *//* UNUSED */
 
 int blf_font_init(void);
+struct FT_FaceRec_ *blf_font_fallback_face(void);
 void blf_font_exit(void);
 
 void blf_draw_buffer__start(struct FontBLF *font);

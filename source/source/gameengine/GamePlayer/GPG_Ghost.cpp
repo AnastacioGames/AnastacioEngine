@@ -94,6 +94,8 @@ extern int datatoc_roboto_medium_ttf_size;
 extern char datatoc_roboto_medium_ttf[];
 extern int datatoc_roboto_mono_medium_ttf_size;
 extern char datatoc_roboto_mono_medium_ttf[];
+extern int datatoc_inter_medium_ttf_size;
+extern char datatoc_inter_medium_ttf[];
 
 }
 
@@ -1145,6 +1147,8 @@ int main(int argc,
 	BLT_lang_init();
 	BLT_lang_set("");
 
+	/* Roboto lacks arrows and symbols such as U+2191: draw those from Inter, as in the editor. */
+	BLF_fallback_set_mem((const unsigned char *)datatoc_inter_medium_ttf, datatoc_inter_medium_ttf_size);
 	BLF_load_mem("default", (unsigned char *)datatoc_roboto_medium_ttf, datatoc_roboto_medium_ttf_size);
 	if (blf_mono_font == -1) {
 		blf_mono_font = BLF_load_mem_unique("monospace", (unsigned char *)datatoc_roboto_mono_medium_ttf, datatoc_roboto_mono_medium_ttf_size);
