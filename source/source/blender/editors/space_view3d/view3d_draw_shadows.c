@@ -135,6 +135,10 @@ static void gpu_render_lamp_update(Scene *scene, View3D *v3d,
 	if (lamp) {
 		GPU_lamp_update(lamp, lay, (ob->restrictflag & OB_RESTRICT_RENDER), obmat);
 		GPU_lamp_update_colors(lamp, la->r, la->g, la->b, la->energy);
+		/* Live values: editing them only redraws (rna_Lamp_value_update), no GLSL rebuild. */
+		GPU_lamp_update_distance(lamp, la->dist, la->att1, la->att2,
+		                         la->coeff_const, la->coeff_lin, la->coeff_quad);
+		GPU_lamp_update_spot(lamp, la->spotsize, la->spotblend);
 
 		layers = lay & v3d->lay;
 		if (srl)

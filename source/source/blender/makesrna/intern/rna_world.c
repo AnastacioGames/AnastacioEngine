@@ -252,6 +252,14 @@ static void rna_World_draw_update(Main *bmain, Scene *UNUSED(scene), PointerRNA 
 {
 	World *wo = ptr->id.data;
 
+	/* Materials with Constant World/Mist get these values written into their GLSL: rebuild. */
+	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
+		if (ma->constflag & (MA_CONSTANT_WORLD | MA_CONSTANT_MIST)) {
+			DAG_id_tag_update(&wo->id, 0);
+			break;
+		}
+	}
+
 	BKE_icon_changed(BKE_icon_id_ensure(&wo->id));
 	WM_main_add_notifier(NC_WORLD | ND_WORLD_DRAW, wo);
 	WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);

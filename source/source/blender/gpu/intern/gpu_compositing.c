@@ -1640,6 +1640,193 @@ bool GPU_fx_do_composite_pass(
 		}
 	}
 
+	/* clouds pass, mirrors World > Weather > Clouds from the in-game filter (RAS_Clouds2DFilter.glsl).
+	 * Runs before Lens Flare and Rain: the Volumetric history reuses 3 of every 4 tiles from the
+	 * previous redraw, so it must hold only sky and clouds; rain drops, flare ghosts and the
+	 * lightning flash changing every frame turned into a 16 px checkerboard. */
+	if (fx->sce_effects & SCENE_FX_FLAG_CLOUDS) {
+		GPUShader *clouds_shader;
+		clouds_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_CLOUDS, is_persp);
+		if (clouds_shader && scene->world) {
+			World *world = scene->world;
+
+			/* Real elapsed time, same reasoning as the rain pass above. */
+			float clouds_params[4] = {
+			    world->cloud_coverage, world->cloud_scale, world->cloud_speed,
+			    (float)fmod(PIL_check_seconds_timer(), 10000.0)};
+
+			GPUCLOUDSShaderInterface *interface = GPU_shader_get_interface(clouds_shader);
+
+			GPU_shader_bind(clouds_shader);
+
+			GPU_texture_bind(src, numslots++);
+			GPU_shader_uniform_texture(clouds_shader, interface->color_uniform, src);
+
+			GPU_texture_bind(fx->depth_buffer, numslots++);
+			GPU_texture_filter_mode(fx->depth_buffer, false, true, false);
+			GPU_shader_uniform_texture(clouds_shader, interface->depth_uniform, fx->depth_buffer);
+
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_params_uniform, 4, 1, clouds_params);
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_color_uniform, 3, 1, world->cloud_color);
+			/* 1: Clouds, 2: Sky Layers (each only when not hidden in the viewport) */
+			const float clouds_mask =
+			        (float)(((world->weather_flag & ~world->weather_editor_hide & WO_WEATHER_CLOUDS) ? 1 : 0) +
+			                (((world->sky_layer_flag & (WO_SKY_LAYERS_ENABLE | WO_SKY_LAYERS_EDITOR_HIDE)) ==
+			                  WO_SKY_LAYERS_ENABLE) ? 2 : 0) +
+			                (((world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
+			                  WO_VCLOUDS_ENABLE) ? 4 : 0));
+			const float sky_layers_params[4] = {
+			    world->sky_layer_coverage, world->sky_layer_scale, world->sky_layer_speed, clouds_params[3]};
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_mask_uniform, 1, 1, &clouds_mask);
+			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_params_uniform, 4, 1, sky_layers_params);
+			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_color_uniform, 3, 1, world->sky_layer_color);
+			const float clouds_quality[3] = {
+			    (float)world->cloud_detail, (float)world->sky_layer_detail, world->sky_layer_relief};
+			GPU_shader_uniform_vector(clouds_shader, interface->clouds_quality_uniform, 3, 1, clouds_quality);
+
+			/* Volumetric Clouds (Stage 1 scaffolding): flat shading reusing the same FBM. */
+			const float vclouds_params1[4] = {
+			    world->vcloud_coverage, world->vcloud_scale, world->vcloud_speed, clouds_params[3]};
+			const float vclouds_params2[4] = {
+			    world->vcloud_altitude, world->vcloud_thickness, world->vcloud_density, world->vcloud_detail_scale};
+			const float vclouds_params3[4] = {
+			    world->vcloud_silver_intensity, (float)world->vcloud_quality,
+			    (world->vcloud_flag & WO_VCLOUDS_SHADOW_ENABLE) ? 1.0f : 0.0f, world->vcloud_shadow_strength};
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params1_uniform, 4, 1, vclouds_params1);
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params2_uniform, 4, 1, vclouds_params2);
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params3_uniform, 4, 1, vclouds_params3);
+			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_color_uniform, 3, 1, world->vcloud_color);
+
+			/* Sun direction for the volumetric raymarch (self-shadow/silver lining), same
+			 * source object used by the light scattering/lens flare passes above. */
+			{
+				float vclouds_sundir[3] = {0.0f, 0.0f, 1.0f};
+				if (scene->world_sun) {
+					copy_v3_v3(vclouds_sundir, scene->world_sun->obmat[2]);
+				}
+				GPU_shader_uniform_vector(clouds_shader, interface->vclouds_sundir_uniform, 3, 1, vclouds_sundir);
+			}
+
+			/* Temporal reuse (Volumetric Clouds only): needs glCopyImageSubData for the depth copy.
+			 * WebGL/GLES headers don't declare GL 4.3, so the history is off there. */
+#ifdef GL_VERSION_4_3
+			const bool use_history = (world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
+			                         WO_VCLOUDS_ENABLE &&
+			                         (GLEW_VERSION_4_3 || GLEW_ARB_copy_image);
+#else
+			const bool use_history = false;
+#endif
+			float cur_persmat[4][4];
+			mul_m4_m4m4(cur_persmat, projmat, viewmat);
+			{
+				/* In the 3D View the grid, outlines and gizmos are drawn into the color buffer without
+				 * depth, so the history holds them as "sky": reprojecting it while the view moves
+				 * smears them into trails. Only reuse while the view is still (clouds still animate). */
+				const bool valid = use_history && fx->cloud_history_valid &&
+				                   equals_m4m4(cur_persmat, fx->cloud_history_persmat);
+				const float valid_f = valid ? 1.0f : 0.0f;
+				const float frame_f = (float)(fx->cloud_history_frame & 3);
+				if (valid) {
+					glActiveTexture(GL_TEXTURE6);
+					glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
+					glActiveTexture(GL_TEXTURE7);
+					glBindTexture(GL_TEXTURE_2D, fx->cloud_history_depth);
+					glActiveTexture(GL_TEXTURE0);
+					glUniform1i(interface->history_uniform, 6);
+					glUniform1i(interface->history_depth_uniform, 7);
+				}
+				GPU_shader_uniform_vector(clouds_shader, interface->history_valid_uniform, 1, 1, &valid_f);
+				GPU_shader_uniform_vector(clouds_shader, interface->frame_uniform, 1, 1, &frame_f);
+				GPU_shader_uniform_vector(clouds_shader, interface->history_viewproj_uniform, 16, 1,
+				                          valid ? (float *)fx->cloud_history_persmat : (float *)cur_persmat);
+			}
+
+			/* draw */
+			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
+
+			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+
+			if (use_history) {
+				/* Copy the pass output (fx buffer or the window/offscreen, whichever is bound)
+				 * and the depth for the next redraw. */
+				int vp[4];
+				glGetIntegerv(GL_VIEWPORT, vp);
+				const int depth_w = GPU_texture_width(fx->depth_buffer);
+				const int depth_h = GPU_texture_height(fx->depth_buffer);
+				if (vp[2] != depth_w || vp[3] != depth_h) {
+					fx->cloud_history_valid = false;
+				}
+				else {
+					if (!fx->cloud_history || fx->cloud_history_w != vp[2] || fx->cloud_history_h != vp[3]) {
+						if (!fx->cloud_history) {
+							glGenTextures(1, &fx->cloud_history);
+							glGenTextures(1, &fx->cloud_history_depth);
+						}
+						glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
+						glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, vp[2], vp[3], 0, GL_RGBA, GL_FLOAT, NULL);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+						/* glCopyImageSubData needs the exact same internal format as the source. */
+						GLint depth_format = GL_DEPTH_COMPONENT24;
+						glBindTexture(GL_TEXTURE_2D, GPU_texture_opengl_bindcode(fx->depth_buffer));
+						glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &depth_format);
+						glBindTexture(GL_TEXTURE_2D, fx->cloud_history_depth);
+						glTexImage2D(GL_TEXTURE_2D, 0, depth_format, vp[2], vp[3], 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+						fx->cloud_history_w = vp[2];
+						fx->cloud_history_h = vp[3];
+					}
+					glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
+					glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vp[0], vp[1], vp[2], vp[3]);
+					glBindTexture(GL_TEXTURE_2D, 0);
+#ifdef GL_VERSION_4_3
+					glCopyImageSubData(GPU_texture_opengl_bindcode(fx->depth_buffer), GL_TEXTURE_2D, 0, 0, 0, 0,
+					                   fx->cloud_history_depth, GL_TEXTURE_2D, 0, 0, 0, 0, vp[2], vp[3], 1);
+#endif
+					copy_m4_m4(fx->cloud_history_persmat, cur_persmat);
+					fx->cloud_history_valid = true;
+					fx->cloud_history_frame++;
+				}
+			}
+			else {
+				fx->cloud_history_valid = false;
+			}
+			if (use_history) {
+				glActiveTexture(GL_TEXTURE6);
+				glBindTexture(GL_TEXTURE_2D, 0);
+				glActiveTexture(GL_TEXTURE7);
+				glBindTexture(GL_TEXTURE_2D, 0);
+				glActiveTexture(GL_TEXTURE0);
+			}
+
+			/* disable bindings */
+			GPU_texture_unbind(src);
+			GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
+			GPU_texture_unbind(fx->depth_buffer);
+
+			/* may not be attached, in that case this just returns */
+			if (target) {
+				GPU_framebuffer_texture_detach(target);
+				if (ofs) {
+					GPU_offscreen_bind(ofs, false);
+				}
+				else {
+					GPU_framebuffer_restore();
+				}
+			}
+
+			/* swap here, after src/target have been unbound */
+			SWAP(GPUTexture *, target, src);
+			numslots = 0;
+		}
+	}
+
 	/* lens flare pass, mirrors World > Weather > Lens Flare from the in-game filter */
 	if (fx->sce_effects & SCENE_FX_FLAG_LENSFLARE) {
 		GPUShader *lensflare_shader;
@@ -1804,190 +1991,6 @@ bool GPU_fx_do_composite_pass(
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
 
 			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-			/* disable bindings */
-			GPU_texture_unbind(src);
-			GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
-			GPU_texture_unbind(fx->depth_buffer);
-
-			/* may not be attached, in that case this just returns */
-			if (target) {
-				GPU_framebuffer_texture_detach(target);
-				if (ofs) {
-					GPU_offscreen_bind(ofs, false);
-				}
-				else {
-					GPU_framebuffer_restore();
-				}
-			}
-
-			/* swap here, after src/target have been unbound */
-			SWAP(GPUTexture *, target, src);
-			numslots = 0;
-		}
-	}
-
-	/* clouds pass, mirrors World > Weather > Clouds from the in-game filter (RAS_Clouds2DFilter.glsl) */
-	if (fx->sce_effects & SCENE_FX_FLAG_CLOUDS) {
-		GPUShader *clouds_shader;
-		clouds_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_CLOUDS, is_persp);
-		if (clouds_shader && scene->world) {
-			World *world = scene->world;
-
-			/* Real elapsed time, same reasoning as the rain pass above. */
-			float clouds_params[4] = {
-			    world->cloud_coverage, world->cloud_scale, world->cloud_speed,
-			    (float)fmod(PIL_check_seconds_timer(), 10000.0)};
-
-			GPUCLOUDSShaderInterface *interface = GPU_shader_get_interface(clouds_shader);
-
-			GPU_shader_bind(clouds_shader);
-
-			GPU_texture_bind(src, numslots++);
-			GPU_shader_uniform_texture(clouds_shader, interface->color_uniform, src);
-
-			GPU_texture_bind(fx->depth_buffer, numslots++);
-			GPU_texture_filter_mode(fx->depth_buffer, false, true, false);
-			GPU_shader_uniform_texture(clouds_shader, interface->depth_uniform, fx->depth_buffer);
-
-			GPU_shader_uniform_vector(clouds_shader, interface->clouds_params_uniform, 4, 1, clouds_params);
-			GPU_shader_uniform_vector(clouds_shader, interface->clouds_color_uniform, 3, 1, world->cloud_color);
-			/* 1: Clouds, 2: Sky Layers (each only when not hidden in the viewport) */
-			const float clouds_mask =
-			        (float)(((world->weather_flag & ~world->weather_editor_hide & WO_WEATHER_CLOUDS) ? 1 : 0) +
-			                (((world->sky_layer_flag & (WO_SKY_LAYERS_ENABLE | WO_SKY_LAYERS_EDITOR_HIDE)) ==
-			                  WO_SKY_LAYERS_ENABLE) ? 2 : 0) +
-			                (((world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
-			                  WO_VCLOUDS_ENABLE) ? 4 : 0));
-			const float sky_layers_params[4] = {
-			    world->sky_layer_coverage, world->sky_layer_scale, world->sky_layer_speed, clouds_params[3]};
-			GPU_shader_uniform_vector(clouds_shader, interface->clouds_mask_uniform, 1, 1, &clouds_mask);
-			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_params_uniform, 4, 1, sky_layers_params);
-			GPU_shader_uniform_vector(clouds_shader, interface->sky_layers_color_uniform, 3, 1, world->sky_layer_color);
-			const float clouds_quality[3] = {
-			    (float)world->cloud_detail, (float)world->sky_layer_detail, world->sky_layer_relief};
-			GPU_shader_uniform_vector(clouds_shader, interface->clouds_quality_uniform, 3, 1, clouds_quality);
-
-			/* Volumetric Clouds (Stage 1 scaffolding): flat shading reusing the same FBM. */
-			const float vclouds_params1[4] = {
-			    world->vcloud_coverage, world->vcloud_scale, world->vcloud_speed, clouds_params[3]};
-			const float vclouds_params2[4] = {
-			    world->vcloud_altitude, world->vcloud_thickness, world->vcloud_density, world->vcloud_detail_scale};
-			const float vclouds_params3[4] = {
-			    world->vcloud_silver_intensity, (float)world->vcloud_quality,
-			    (world->vcloud_flag & WO_VCLOUDS_SHADOW_ENABLE) ? 1.0f : 0.0f, world->vcloud_shadow_strength};
-			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params1_uniform, 4, 1, vclouds_params1);
-			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params2_uniform, 4, 1, vclouds_params2);
-			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_params3_uniform, 4, 1, vclouds_params3);
-			GPU_shader_uniform_vector(clouds_shader, interface->vclouds_color_uniform, 3, 1, world->vcloud_color);
-
-			/* Sun direction for the volumetric raymarch (self-shadow/silver lining), same
-			 * source object used by the light scattering/lens flare passes above. */
-			{
-				float vclouds_sundir[3] = {0.0f, 0.0f, 1.0f};
-				if (scene->world_sun) {
-					copy_v3_v3(vclouds_sundir, scene->world_sun->obmat[2]);
-				}
-				GPU_shader_uniform_vector(clouds_shader, interface->vclouds_sundir_uniform, 3, 1, vclouds_sundir);
-			}
-
-			/* Temporal reuse (Volumetric Clouds only): needs glCopyImageSubData for the depth copy.
-			 * WebGL/GLES headers don't declare GL 4.3, so the history is off there. */
-#ifdef GL_VERSION_4_3
-			const bool use_history = (world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
-			                         WO_VCLOUDS_ENABLE &&
-			                         (GLEW_VERSION_4_3 || GLEW_ARB_copy_image);
-#else
-			const bool use_history = false;
-#endif
-			float cur_persmat[4][4];
-			mul_m4_m4m4(cur_persmat, projmat, viewmat);
-			{
-				/* In the 3D View the grid, outlines and gizmos are drawn into the color buffer without
-				 * depth, so the history holds them as "sky": reprojecting it while the view moves
-				 * smears them into trails. Only reuse while the view is still (clouds still animate). */
-				const bool valid = use_history && fx->cloud_history_valid &&
-				                   equals_m4m4(cur_persmat, fx->cloud_history_persmat);
-				const float valid_f = valid ? 1.0f : 0.0f;
-				const float frame_f = (float)(fx->cloud_history_frame & 3);
-				if (valid) {
-					glActiveTexture(GL_TEXTURE6);
-					glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
-					glActiveTexture(GL_TEXTURE7);
-					glBindTexture(GL_TEXTURE_2D, fx->cloud_history_depth);
-					glActiveTexture(GL_TEXTURE0);
-					glUniform1i(interface->history_uniform, 6);
-					glUniform1i(interface->history_depth_uniform, 7);
-				}
-				GPU_shader_uniform_vector(clouds_shader, interface->history_valid_uniform, 1, 1, &valid_f);
-				GPU_shader_uniform_vector(clouds_shader, interface->frame_uniform, 1, 1, &frame_f);
-				GPU_shader_uniform_vector(clouds_shader, interface->history_viewproj_uniform, 16, 1,
-				                          valid ? (float *)fx->cloud_history_persmat : (float *)cur_persmat);
-			}
-
-			/* draw */
-			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
-
-			glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-
-			if (use_history) {
-				/* Copy the pass output (fx buffer or the window/offscreen, whichever is bound)
-				 * and the depth for the next redraw. */
-				int vp[4];
-				glGetIntegerv(GL_VIEWPORT, vp);
-				const int depth_w = GPU_texture_width(fx->depth_buffer);
-				const int depth_h = GPU_texture_height(fx->depth_buffer);
-				if (vp[2] != depth_w || vp[3] != depth_h) {
-					fx->cloud_history_valid = false;
-				}
-				else {
-					if (!fx->cloud_history || fx->cloud_history_w != vp[2] || fx->cloud_history_h != vp[3]) {
-						if (!fx->cloud_history) {
-							glGenTextures(1, &fx->cloud_history);
-							glGenTextures(1, &fx->cloud_history_depth);
-						}
-						glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
-						glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, vp[2], vp[3], 0, GL_RGBA, GL_FLOAT, NULL);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-						/* glCopyImageSubData needs the exact same internal format as the source. */
-						GLint depth_format = GL_DEPTH_COMPONENT24;
-						glBindTexture(GL_TEXTURE_2D, GPU_texture_opengl_bindcode(fx->depth_buffer));
-						glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &depth_format);
-						glBindTexture(GL_TEXTURE_2D, fx->cloud_history_depth);
-						glTexImage2D(GL_TEXTURE_2D, 0, depth_format, vp[2], vp[3], 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-						glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
-						fx->cloud_history_w = vp[2];
-						fx->cloud_history_h = vp[3];
-					}
-					glBindTexture(GL_TEXTURE_2D, fx->cloud_history);
-					glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vp[0], vp[1], vp[2], vp[3]);
-					glBindTexture(GL_TEXTURE_2D, 0);
-#ifdef GL_VERSION_4_3
-					glCopyImageSubData(GPU_texture_opengl_bindcode(fx->depth_buffer), GL_TEXTURE_2D, 0, 0, 0, 0,
-					                   fx->cloud_history_depth, GL_TEXTURE_2D, 0, 0, 0, 0, vp[2], vp[3], 1);
-#endif
-					copy_m4_m4(fx->cloud_history_persmat, cur_persmat);
-					fx->cloud_history_valid = true;
-					fx->cloud_history_frame++;
-				}
-			}
-			else {
-				fx->cloud_history_valid = false;
-			}
-			if (use_history) {
-				glActiveTexture(GL_TEXTURE6);
-				glBindTexture(GL_TEXTURE_2D, 0);
-				glActiveTexture(GL_TEXTURE7);
-				glBindTexture(GL_TEXTURE_2D, 0);
-				glActiveTexture(GL_TEXTURE0);
-			}
 
 			/* disable bindings */
 			GPU_texture_unbind(src);

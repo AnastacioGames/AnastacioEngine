@@ -40,6 +40,7 @@
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
+#include "BKE_icons.h"
 #include "BKE_main.h"
 #include "BKE_texture.h"
 
@@ -201,6 +202,53 @@ static void rna_Lamp_shadow_frustum_update(Main *bmain, Scene *scene, PointerRNA
 		return;
 	}
 
+	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
+}
+
+/* Color, Energy, Distance, falloff values and Spot Blend are live uniforms (the 3D View copies
+ * them into the GPULamp on every draw), so dragging them only redraws instead of freeing the GLSL
+ * of every material in lamp_changed(). Rebuild only where the value is fixed in the shader:
+ * materials with Constant Lamp, an Area lamp's distance and a Sun's Spot Blend on/off. */
+static bool rna_Lamp_values_in_shader(Main *bmain, Lamp *la)
+{
+	if (la->type == LA_AREA || la->type == LA_SUN)
+		return true;
+	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
+		if (ma->constflag & MA_CONSTANT_LAMP)
+			return true;
+	}
+	return false;
+}
+
+static void rna_Lamp_value_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	Lamp *la = ptr->id.data;
+
+	if (rna_Lamp_values_in_shader(bmain, la)) {
+		rna_Lamp_draw_update(bmain, scene, ptr);
+		return;
+	}
+	BKE_icon_changed(BKE_icon_id_ensure(&la->id));
+	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
+}
+
+/* Color and Energy reach the shader as uniforms for every lamp type. */
+static void rna_Lamp_color_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	Lamp *la = ptr->id.data;
+	bool constant = false;
+
+	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
+		if (ma->constflag & MA_CONSTANT_LAMP) {
+			constant = true;
+			break;
+		}
+	}
+	if (constant) {
+		rna_Lamp_draw_update(bmain, scene, ptr);
+		return;
+	}
+	BKE_icon_changed(BKE_icon_id_ensure(&la->id));
 	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
 }
 
@@ -422,18 +470,18 @@ static void rna_def_lamp(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 0, 1000, 1, 3);
 	RNA_def_property_ui_text(prop, "Distance",
 	                         "Falloff distance - the light is at half the original intensity at this point");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_value_update");
 
 	prop = RNA_def_property(srna, "energy", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_ui_range(prop, 0, 10, 1, 3);
 	RNA_def_property_ui_text(prop, "Energy", "Amount of light that the lamp emits");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_color_update");
 
 	prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "r");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Color", "Light color");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_color_update");
 
 	prop = RNA_def_property(srna, "use_own_layer", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_LAYER);
@@ -536,34 +584,34 @@ static void rna_def_lamp_falloff(StructRNA *srna)
 	RNA_def_property_float_sdna(prop, NULL, "att1");
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Linear Attenuation", "Linear distance attenuation");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_value_update");
 
 	prop = RNA_def_property(srna, "quadratic_attenuation", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "att2");
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Quadratic Attenuation", "Quadratic distance attenuation");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_value_update");
 
 	prop = RNA_def_property(srna, "constant_coefficient", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "coeff_const");
 	RNA_def_property_range(prop, 0.0f, FLT_MAX);
 	RNA_def_property_ui_text(prop, "Constant Coefficient",
 	                         "Constant distance attenuation coefficient");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_value_update");
 
 	prop = RNA_def_property(srna, "linear_coefficient", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "coeff_lin");
 	RNA_def_property_range(prop, 0.0f, FLT_MAX);
 	RNA_def_property_ui_text(prop, "Linear Coefficient",
 	                         "Linear distance attenuation coefficient");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_value_update");
 
 	prop = RNA_def_property(srna, "quadratic_coefficient", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "coeff_quad");
 	RNA_def_property_range(prop, 0.0f, FLT_MAX);
 	RNA_def_property_ui_text(prop, "Quadratic Coefficient",
 	                         "Quadratic distance attenuation coefficient");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_value_update");
 
 	prop = RNA_def_property(srna, "radius", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_float_sdna(prop, NULL, "radius");
@@ -954,7 +1002,7 @@ static void rna_def_spot_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "spotblend");
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Spot Blend", "The softness of the spotlight edge");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_value_update");
 
 	prop = RNA_def_property(srna, "spot_size", PROP_FLOAT, PROP_ANGLE);
 	RNA_def_property_float_sdna(prop, NULL, "spotsize");
