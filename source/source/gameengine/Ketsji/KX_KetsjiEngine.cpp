@@ -77,6 +77,7 @@ extern "C" {
 #include "SCA_IInputDevice.h"
 #include "KX_Camera.h"
 #include "KX_GameObject.h"
+#include "PHY_IGraphicController.h"
 #include "KX_LightObject.h"
 #include "KX_Globals.h"
 #include "KX_PythonJoystick.h"
@@ -1112,6 +1113,19 @@ void KX_KetsjiEngine::SnapshotInterpolation()
 	}
 }
 
+/* The DBVT culling tree (scene Occlusion Culling) keeps its own copy of each box: move it with the
+ * drawn transform, or a fast object is tested one step away from where it is drawn and a child of a
+ * moving camera vanishes at the screen edge. Physics is left alone. */
+static void SyncInterpolatedCulling(KX_GameObject *gameobj)
+{
+	if (gameobj) {
+		PHY_IGraphicController *ctrl = gameobj->GetGraphicController();
+		if (ctrl) {
+			ctrl->SetGraphicTransform();
+		}
+	}
+}
+
 void KX_KetsjiEngine::ApplyInterpolation()
 {
 	m_interpSaved.clear();
@@ -1151,6 +1165,7 @@ void KX_KetsjiEngine::ApplyInterpolation()
 			node->SetWorldOrientation(mt::quat::Slerp(q0, q1, alpha).ToMatrix());
 			node->SetWorldScale(prev.scaling + (cur.scaling - prev.scaling) * alpha);
 			node->ClearModified();  // Marks it dirty for the render matrix and culling.
+			SyncInterpolatedCulling(gameobj);
 		}
 	}
 }
@@ -1163,6 +1178,7 @@ void KX_KetsjiEngine::RestoreInterpolation()
 		node->SetWorldOrientation(saved.second.orientation);
 		node->SetWorldScale(saved.second.scaling);
 		node->ClearModified();
+		SyncInterpolatedCulling(static_cast<KX_GameObject *>(node->GetClientObject()));
 	}
 	m_interpSaved.clear();
 }
