@@ -49,8 +49,9 @@ O painel independente RangeArmor continua consumindo o `.rasec` preparado pelo e
 
 Bibliotecas linkadas e arquivos usados por `LibLoad` são projetos independentes: preparar/exportar cada
 arquivo separadamente. O export principal não reescreve bibliotecas nem percorre scripts para encontrá-los.
-Web/Android continuam usando os originais: seus exportadores não entram nesse contexto de remapeamento.
-O uso de S3TC no Web depende da plataforma; esta entrega mantém a política de não gerar DDS para Web.
+Web (2026-11-05): o Export Web também grava a cópia do jogo com as texturas preparadas em DDS. O navegador de
+desktop sobe os blocos S3TC direto (`WEBGL_compressed_texture_s3tc`, log "DDS: WebGL S3TC on"); celular e
+Android WebView, sem a extensão, descomprimem para RGBA no load. Conferido no Edge com a cena `criar_cena_dds.py`.
 
 O loader DDS existente ainda descomprime o primeiro nível na CPU e retém RGBA junto dos blocos.
 O fator aproximado de 4–8x se refere à textura na GPU, na mesma resolução e com mipmaps equivalentes;

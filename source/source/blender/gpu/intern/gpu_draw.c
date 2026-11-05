@@ -1069,6 +1069,33 @@ void GPU_create_gl_tex(
  * This is so the viewport and the BGE can share some code.
  * Returns false if the provided ImBuf doesn't have a supported DXT compression format
  */
+#if defined(WITH_DDS) && defined(__EMSCRIPTEN__)
+#  include <emscripten.h>
+/* WebGL: S3TC is a browser extension (almost every desktop browser, no phone). getExtension also
+ * turns it on, which glCompressedTexImage2D needs. glew-mx does not see WebGL extensions. */
+EM_JS(int, gpu_webgl_has_s3tc, (void), {
+	return GLctx.getExtension('WEBGL_compressed_texture_s3tc') ? 1 : 0;
+});
+#endif
+
+static bool gpu_has_s3tc(void)
+{
+#if defined(__EMSCRIPTEN__)
+#  ifdef WITH_DDS
+	static int has = -1;
+	if (has < 0) {
+		has = gpu_webgl_has_s3tc();
+		fprintf(stderr, "DDS: WebGL S3TC %s\n", has ? "on (compressed upload)" : "off (decoded to RGBA)");
+	}
+	return has != 0;
+#  else
+	return false;
+#  endif
+#else
+	return GLEW_EXT_texture_compression_s3tc;
+#endif
+}
+
 bool GPU_upload_dxt_texture(ImBuf *ibuf)
 {
 #ifdef WITH_DDS
@@ -1080,7 +1107,7 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 
 	/* Diagnostic opt-out for fallback validation and performance comparisons. */
 	const char *disable_s3tc = getenv("ANASTACIO_NO_S3TC");
-	if (GLEW_EXT_texture_compression_s3tc && !(disable_s3tc && disable_s3tc[0] == '1')) {
+	if (gpu_has_s3tc() && !(disable_s3tc && disable_s3tc[0] == '1')) {
 		if (ibuf->dds_data.fourcc == FOURCC_DXT1)
 			format = GL_COMPRESSED_RGBA_S3TC_DXT1_EXT;
 		else if (ibuf->dds_data.fourcc == FOURCC_DXT3)

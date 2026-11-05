@@ -331,6 +331,26 @@ class SCENE_OT_range_web_validate(Operator):
         return {'FINISHED'}
 
 
+def _save_game_copy(game, game_copy):
+    """Copy of the saved .range for the package; textures prepared as DDS go in as DDS.
+
+    Desktop browsers upload the S3TC blocks straight to the GPU (WEBGL_compressed_texture_s3tc);
+    phones without it decode them to RGBA at load. Paths are kept as saved (relative_remap off):
+    the package puts the .range and its extra files at the same relative places.
+    """
+    import shutil
+    from bl_operators import anastacio_prepare_textures as textures
+    from bl_operators.anastacio_export_assets import _without_save_handlers
+    if not any(textures.KEY in image for image in bpy.data.images):
+        shutil.copy2(game, game_copy)
+        return
+    with textures.export_prepared_textures(), _without_save_handlers():
+        saved = bpy.ops.wm.save_as_mainfile(filepath=game_copy, copy=True, relative_remap=False,
+                                            compress=False, check_existing=False)
+    if 'FINISHED' not in saved:
+        raise RuntimeError("could not save the game copy with the DDS textures")
+
+
 class SCENE_OT_range_web_export(Operator):
     """Validates again and generates the Web package; errors block it and the previous export is preserved"""
     bl_idname = "scene.range_web_export"
@@ -371,7 +391,7 @@ class SCENE_OT_range_web_export(Operator):
             with tempfile.TemporaryDirectory() as scratch:
                 name = "pkg"
                 game_copy = os.path.join(scratch, os.path.splitext(os.path.basename(game))[0] + ".range")
-                shutil.copy2(game, game_copy)
+                _save_game_copy(game, game_copy)
                 cmd = [python, packager, "--game", game_copy, "--name", name,
                        "--runtime-dir", info.directory, "--out-dir", scratch]
                 cmd += ["--extra-root", collect_bpy.project_root()]
