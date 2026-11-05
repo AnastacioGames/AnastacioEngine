@@ -1710,8 +1710,14 @@ bool GPU_fx_do_composite_pass(
 			/* Temporal reuse (Volumetric Clouds only): needs glCopyImageSubData for the depth copy.
 			 * WebGL/GLES headers don't declare GL 4.3, so the history is off there. */
 #ifdef GL_VERSION_4_3
+			/* The history is this pass's whole output, so it also holds Clouds - Procedural and
+			 * Sky Layers: while those move, the 3 reused tiles show them from older frames and the
+			 * sky turns into 16 px blocks. Reuse only when they are off or still. */
+			const bool moving_2d_layers =
+			        ((((int)clouds_mask) & 1) && world->cloud_speed != 0.0f) ||
+			        ((((int)clouds_mask) & 2) && world->sky_layer_speed != 0.0f);
 			const bool use_history = (world->vcloud_flag & (WO_VCLOUDS_ENABLE | WO_VCLOUDS_EDITOR_HIDE)) ==
-			                         WO_VCLOUDS_ENABLE &&
+			                         WO_VCLOUDS_ENABLE && !moving_2d_layers &&
 			                         (GLEW_VERSION_4_3 || GLEW_ARB_copy_image);
 #else
 			const bool use_history = false;
