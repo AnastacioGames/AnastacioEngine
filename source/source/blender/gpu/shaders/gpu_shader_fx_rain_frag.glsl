@@ -438,6 +438,41 @@ vec3 rainLightning(vec3 col, vec2 uv, float depth, vec2 res, vec4 lightning)
 	return col * (1.0 + lightning.x * 1.2) + tint * (lightning.x * (0.04 + 0.3 * sky) + halo * 0.35 * sky);
 }
 
+/* Wet Surfaces normal: the depth-derivative normal is flat per triangle, so a smooth-shaded
+ * sphere showed every facet in the wet sheen. Rebuild it from central differences over wider
+ * steps (3, 8, 16 px), which span neighbouring triangles and follow the curved surface; a step that
+ * crosses into another object (depth jump) falls back to its near side or is skipped. */
+vec3 wetSmoothNormal(sampler2D depthTex, vec2 uv, vec3 P, vec3 facetN, vec3 camPos)
+{
+	vec2 texel = 1.0 / vec2(textureSize(depthTex, 0));
+	float camDist = length(P - camPos);
+	vec3 acc = vec3(0.0);
+	for (int i = 0; i < 3; i++) {
+		float r = (i == 0) ? 3.0 : (i == 1) ? 8.0 : 16.0;
+		float lim = camDist * r * texel.y * 6.0;
+		vec2 ox = vec2(r * texel.x, 0.0);
+		vec2 oy = vec2(0.0, r * texel.y);
+		vec3 px = getWorldPositionFromDepth(uv + ox, texture(depthTex, uv + ox).x);
+		vec3 nx = getWorldPositionFromDepth(uv - ox, texture(depthTex, uv - ox).x);
+		vec3 py = getWorldPositionFromDepth(uv + oy, texture(depthTex, uv + oy).x);
+		vec3 ny = getWorldPositionFromDepth(uv - oy, texture(depthTex, uv - oy).x);
+		bool vpx = length(px - P) < lim, vnx = length(nx - P) < lim;
+		bool vpy = length(py - P) < lim, vny = length(ny - P) < lim;
+		if (!(vpx || vnx) || !(vpy || vny)) {
+			continue;
+		}
+		vec3 dx = (vpx && vnx) ? px - nx : (vpx ? px - P : P - nx);
+		vec3 dy = (vpy && vny) ? py - ny : (vpy ? py - P : P - ny);
+		vec3 n = cross(dx, dy);
+		if (dot(n, n) < 1e-12) {
+			continue;
+		}
+		n = normalize(n);
+		acc += (dot(n, facetN) < 0.0) ? -n : n;
+	}
+	return (dot(acc, acc) > 1e-8) ? normalize(acc) : facetN;
+}
+
 void main()
 {
 	vec2 texcoord = uvcoord.xy;
@@ -521,16 +556,20 @@ void main()
 		 * sky; ground (up-facing) more than walls. rain_wet.x is the wet level (wets while it rains,
 		 * dries after), so the cost is zero once it is dry. */
 		if (wetOn && !isBackground && camDist <= rain_wet.w) {
+			vec3 Nw = wetSmoothNormal(depthbuffer, texcoord, worldPos, normal, camPos);
 			float wetFade = 1.0 - smoothstep(rain_wet.w * 0.75, rain_wet.w, camDist);
-			float w = rain_wet.x * wetFade * mix(0.6, 1.0, smoothstep(0.0, 0.7, normal.z));
+			float w = rain_wet.x * wetFade * mix(0.6, 1.0, smoothstep(0.0, 0.7, Nw.z));
 			finalColor *= 1.0 - rain_wet.y * 0.5 * w;
-			vec3 Rw = reflect(-V, normal);
+			vec3 Rw = reflect(-V, Nw);
 			vec3 skyW = mix(rain_sky_horizon, rain_sky_zenith, sqrt(clamp(Rw.z, 0.0, 1.0)));
 			skyW = mix(skyW, vec3(dot(skyW, vec3(0.299, 0.587, 0.114))) * 0.85, darken);
-			float fresW = mix(0.04, 1.0, pow(1.0 - max(dot(normal, V), 0.0), 5.0));
-			finalColor = mix(finalColor, skyW, clamp(fresW * rain_wet.z * w * 0.6, 0.0, 1.0));
+			float fresW = mix(0.04, 1.0, pow(1.0 - max(dot(Nw, V), 0.0), 5.0));
+			/* Only rays going up see the sky: undersides (bottom of a sphere) reflect the ground,
+			 * which the darkening already gives, so no bright sky rim there. */
+			float skyVis = smoothstep(-0.1, 0.25, Rw.z);
+			finalColor = mix(finalColor, skyW, clamp(fresW * rain_wet.z * w * 0.6 * skyVis, 0.0, 1.0));
 			vec3 Hw = normalize(normalize(vec3(0.3, 0.2, 1.0)) + V);
-			finalColor += vec3(pow(max(dot(normal, Hw), 0.0), 80.0)) * rain_wet.z * w * 0.25;
+			finalColor += vec3(pow(max(dot(Nw, Hw), 0.0), 80.0)) * rain_wet.z * w * 0.25;
 		}
 
 		/* Puddles: wet darker ground with standing water reflecting the sky. Computed before

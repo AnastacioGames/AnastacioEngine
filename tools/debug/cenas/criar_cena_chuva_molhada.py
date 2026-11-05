@@ -70,6 +70,11 @@ for i, (cor, x) in enumerate((((0.15, 0.35, 0.8), -4.0), ((0.9, 0.75, 0.2), 0.0)
     bpy.ops.mesh.primitive_cube_add(radius=1, location=(x, 3.0, 1))
     add(bpy.context.active_object, material("Cubo%d" % i, cor)).name = "Cubo%d" % i
 
+# Esfera Smooth: o brilho molhado tem que ficar liso, sem marcar as faces.
+bpy.ops.mesh.primitive_uv_sphere_add(segments=24, ring_count=12, size=1.6, location=(2.0, -2.5, 1.6))
+bpy.ops.object.shade_smooth()
+add(bpy.context.active_object, material("Esfera", (0.75, 0.75, 0.78), 0.5)).name = "Esfera"
+
 bpy.ops.mesh.primitive_plane_add(radius=2.5, location=(-6.5, -1.0, 0.6))
 rampa = add(bpy.context.active_object, material("Rampa", (0.8, 0.8, 0.8)))
 rampa.name = "Rampa"
