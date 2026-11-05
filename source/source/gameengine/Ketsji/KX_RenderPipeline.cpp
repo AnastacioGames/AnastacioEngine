@@ -1278,7 +1278,22 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 	/* We can't deduce what camera should be passed to the python callbacks
 	 * because the post draw callbacks are per scenes and not per cameras.
 	 */
-	scene->RunDrawingCallbacks(KX_Scene::POST_DRAW, nullptr);
+	{
+		/* The scene draw leaves the legacy GL lighting (with GL_COLOR_MATERIAL) on, which shaded
+		 * bgl/blf drawing: colors came out dark and with a gradient. Draw the callbacks unlit. */
+#ifdef __EMSCRIPTEN__
+		const GLboolean lighting = GL_FALSE; /* WebGL has no fixed-function lighting. */
+#else
+		const GLboolean lighting = glIsEnabled(GL_LIGHTING);
+#endif
+		if (lighting) {
+			glDisable(GL_LIGHTING);
+		}
+		scene->RunDrawingCallbacks(KX_Scene::POST_DRAW, nullptr);
+		if (lighting) {
+			glEnable(GL_LIGHTING);
+		}
+	}
 
 	// Python draw callback can also call debug draw functions, so we have to clear debug shapes.
 	scene->FlushDebugDraw(rasterizer, canvas);

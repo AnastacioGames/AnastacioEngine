@@ -507,6 +507,8 @@ void uiStyleInit(void)
 	/* XXX, this should be moved into a style,
 	 * but for now best only load the monospaced font once. */
 	BLI_assert(blf_mono_font == -1);
+	/* Roboto (mono) lacks arrows and symbols such as U+2191: draw those from Inter. */
+	BLF_fallback_set_mem((const uchar *)datatoc_inter_medium_ttf, datatoc_inter_medium_ttf_size);
 	if (U.font_path_ui_mono[0]) {
 		blf_mono_font = BLF_load_unique(U.font_path_ui_mono);
 	}

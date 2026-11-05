@@ -342,8 +342,23 @@ GlyphBLF *blf_glyph_add(FontBLF *font, unsigned int index, unsigned int c)
 		return g;
 	}
 
+	/* The font lacks this character (index 0 is the "missing" box): take it from the fallback font. */
+	FT_Face face = font->face;
+	bool from_fallback = false;
+	if (index == 0 && c > 32) {
+		FT_Face fallback = blf_font_fallback_face();
+		FT_UInt fallback_index = fallback ? FT_Get_Char_Index(fallback, c) : 0;
+		if (fallback_index != 0 &&
+		    FT_Set_Char_Size(fallback, 0, (FT_F26Dot6)(font->size * 64), font->dpi, font->dpi) == 0)
+		{
+			face = fallback;
+			index = fallback_index;
+			from_fallback = true;
+		}
+	}
+
 	if (font->flags & BLF_MONOCHROME) {
-		err = FT_Load_Glyph(font->face, (FT_UInt)index, FT_LOAD_TARGET_MONO);
+		err = FT_Load_Glyph(face, (FT_UInt)index, FT_LOAD_TARGET_MONO);
 	}
 	else {
 		int flags = FT_LOAD_NO_BITMAP;
@@ -363,7 +378,7 @@ GlyphBLF *blf_glyph_add(FontBLF *font, unsigned int index, unsigned int c)
 			flags |= FT_LOAD_TARGET_NORMAL | FT_LOAD_NO_HINTING;
 		}
 
-		err = FT_Load_Glyph(font->face, (FT_UInt)index, flags);
+		err = FT_Load_Glyph(face, (FT_UInt)index, flags);
 	}
 
 	if (err) {
@@ -372,7 +387,7 @@ GlyphBLF *blf_glyph_add(FontBLF *font, unsigned int index, unsigned int c)
 	}
 
 	/* get the glyph. */
-	slot = font->face->glyph;
+	slot = face->glyph;
 
 	if (font->flags & BLF_MONOCHROME) {
 		err = FT_Render_Glyph(slot, FT_RENDER_MODE_MONO);
@@ -395,7 +410,8 @@ GlyphBLF *blf_glyph_add(FontBLF *font, unsigned int index, unsigned int c)
 
 	g = (GlyphBLF *)MEM_callocN(sizeof(GlyphBLF), "blf_glyph_add");
 	g->c = c;
-	g->idx = (FT_UInt)index;
+	/* Kerning is looked up in font->face: a fallback glyph has no index there. */
+	g->idx = from_fallback ? 0 : (FT_UInt)index;
 	g->offset_x = -1;
 	g->offset_y = -1;
 	bitmap = slot->bitmap;

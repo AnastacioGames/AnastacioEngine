@@ -64,6 +64,32 @@
 static FT_Library ft_lib;
 static SpinLock ft_lib_mutex;
 
+/* Font used for the characters the current font lacks (arrows, symbols...). */
+static const unsigned char *ft_fallback_mem = NULL;
+static int ft_fallback_mem_size = 0;
+static FT_Face ft_fallback_face = NULL;
+static bool ft_fallback_failed = false;
+
+void BLF_fallback_set_mem(const unsigned char *mem, int mem_size)
+{
+	ft_fallback_mem = mem;
+	ft_fallback_mem_size = mem_size;
+}
+
+/* Called with ft_lib_mutex held. */
+FT_Face blf_font_fallback_face(void)
+{
+	if (!ft_fallback_face && !ft_fallback_failed && ft_fallback_mem) {
+		if (FT_New_Memory_Face(ft_lib, ft_fallback_mem, ft_fallback_mem_size, 0, &ft_fallback_face) ||
+		    FT_Select_Charmap(ft_fallback_face, ft_encoding_unicode))
+		{
+			ft_fallback_face = NULL;
+			ft_fallback_failed = true;
+		}
+	}
+	return ft_fallback_face;
+}
+
 int blf_font_init(void)
 {
 	BLI_spin_init(&ft_lib_mutex);
@@ -72,6 +98,9 @@ int blf_font_init(void)
 
 void blf_font_exit(void)
 {
+	/* FT_Done_FreeType also frees the fallback face. */
+	ft_fallback_face = NULL;
+	ft_fallback_failed = false;
 	FT_Done_FreeType(ft_lib);
 	BLI_spin_end(&ft_lib_mutex);
 }
