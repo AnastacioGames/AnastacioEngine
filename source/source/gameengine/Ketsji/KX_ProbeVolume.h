@@ -176,6 +176,8 @@ public:
 	float SampleSH(const mt::vec3& pos, float r_sh[9][3]) const;
 	/// 1 inside the box, 0 from half a spacing outside it.
 	float BoxWeight(const mt::vec3& pos) const;
+	/// Distance from pos to the grid box, 0 inside it.
+	float BoxDistance(const mt::vec3& pos) const;
 	/// Share (0..1) of the world box aabbMin..aabbMax inside the grid box.
 	float BoxOverlap(const mt::vec3& aabbMin, const mt::vec3& aabbMax) const;
 	float GetSSGIWeight() const;

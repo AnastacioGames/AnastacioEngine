@@ -52,6 +52,7 @@
 #endif
 
 #include "CM_Message.h"
+#include <limits>
 #include <algorithm>
 #include <chrono>
 #include <cstdlib>
@@ -506,16 +507,45 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 	{
 		// The grid stores linear light: the materials skip the display transform while it captures.
 		VolumeCaptureGuard captureGuard(m_capturingVolume);
+		/* One budget of faces for all the grids, nearest box first: a track with many boxes costs
+		 * about the same as one. BeginFrame runs on every grid, it lands the finished readbacks. */
+		std::vector<std::pair<float, KX_ProbeVolume *> > awake;
+		int total = 0;
 		for (KX_ProbeVolume *volume : m_volumes) {
-			if (!volume->GetViewpointObject() || !volume->BeginFrame(cameraPos, now)) {
-				continue;
+			if (volume->GetViewpointObject() && volume->BeginFrame(cameraPos, now)) {
+				awake.emplace_back(volume->BoxDistance(cameraPos), volume);
+				total = std::max(total, volume->GetFaceBudget());
 			}
-			int left = volume->GetFaceBudget();
+		}
+		// A/B measurements only: every grid with its own budget, as before the shared one.
+		static const bool ownBudgets = getenv("RANGE_PROBE_VOLUME_OWN_BUDGET") != nullptr;
+		if (ownBudgets) {
+			total = std::numeric_limits<int>::max() / 2;
+		}
+		std::stable_sort(awake.begin(), awake.end(),
+		                 [](const std::pair<float, KX_ProbeVolume *>& a, const std::pair<float, KX_ProbeVolume *>& b) {
+			return a.first < b.first;
+		});
+		// Every 4th frame another grid goes first: a near one that never settles can't stall the far ones.
+		if (awake.size() > 1 && (++m_volumeTurn & 3) == 0) {
+			const size_t turn = (m_volumeTurn >> 2) % awake.size();
+			std::rotate(awake.begin(), awake.begin() + turn, awake.begin() + turn + 1);
+		}
+		for (const std::pair<float, KX_ProbeVolume *>& item : awake) {
+			KX_ProbeVolume *volume = item.second;
+			// Never above the grid's own budget (mixed qualities).
+			int left = std::min(total, volume->GetFaceBudget());
+			total -= left;
 			int first, count;
 			while (volume->NextFaceRange(left, cameraPos, &first, &count)) {
 				RenderRenderer(rasty, volume, sceneCamera, viewport, area, first, count);
 				volume->FacesDone(count, now);
 				left -= count;
+			}
+			// Unused faces (readers busy) go to the next grid.
+			total += left;
+			if (total <= 0) {
+				break;
 			}
 		}
 	}

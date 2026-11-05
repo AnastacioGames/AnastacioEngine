@@ -1,6 +1,6 @@
 # Plano: Light Probe Volumes gerados pelo Track Tool
 
-Status: P1 e P2 feitas (2026-11-05: prévia, Generate/Clear e testes headless); P3-P4 abertas. Base: [plano-track-tool.md](plano-track-tool.md),
+Status: P1, P2 e P3 feitas (2026-11-05: prévia, Generate/Clear, testes headless e orçamento global medido); P4 aberta. Base: [plano-track-tool.md](plano-track-tool.md),
 [probe-volume-gi.md](probe-volume-gi.md), [plano-probe-volume-gi.md](plano-probe-volume-gi.md).
 
 ## Objetivo
@@ -95,6 +95,23 @@ do padrão (só quando pedida).
 Medições só em cena controlada gerada por script, nunca no jogo. Docs: seção nova em
 [probe-volume-gi.md](probe-volume-gi.md) e na interface do [plano-track-tool.md](plano-track-tool.md);
 registro no changelog ao fim.
+
+## Medição da P3 (2026-11-05)
+
+Cena `tools/debug/cenas/criar_cena_probe_volume_cadeia.py`, RX 6800M, 60 fps, rodadas de 10 s pelo Performance
+Report, 2 rodadas de cada; o World muda aos 5 s. "Sem" = `RANGE_PROBE_VOLUME_OWN_BUDGET=1` (orçamento por volume).
+
+| Medida | 1 vol. sem | 1 vol. com | 20 vol. sem | 20 vol. com |
+|---|---|---|---|---|
+| Quadros em 10 s | 602 / 596 | 602 / 602 | 458 / 430 | 601 / 601 |
+| Quadros acima de 16,7 ms de trabalho | - | - | 63 / 63 | 0 / 0 |
+| Trabalho por quadro nos primeiros 3 s | - | - | ~53 ms (~18 fps) | ~2 ms (60 fps) |
+| Trabalho por quadro após mudar o World | - | - | ~4,3 ms | ~1,7 ms |
+
+Custo: a luz completa demora mais. Sem o orçamento compartilhado, os 20 volumes terminam o aquecimento em ~4 s; com ele,
+seguem capturando 24 faces por quadro depois dos 10 s. O timer de GPU de `render.probes` não serviu nesta GPU: dá 6-10 ms com
+1 volume e não acompanha as faces (clock baixo com pouca carga é a hipótese). `RANGE_PROBE_VOLUME_LOG` com 20 volumes
+causa um pico de ~25 ms por segundo; não usar o log ao medir tempo de quadro.
 
 ## Riscos
 

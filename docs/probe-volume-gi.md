@@ -91,6 +91,9 @@ Numa pista, em vez de uma caixa gigante (o espaçamento cresce e a luz fica borr
 
 ## Depuração
 
+Vários volumes dividem um orçamento de faces por quadro: o mais perto da câmera captura primeiro, e a cada 4 quadros
+outro volume passa à frente. Para comparar, `RANGE_PROBE_VOLUME_OWN_BUDGET=1` devolve um orçamento a cada volume.
+
 `RANGE_PROBE_VOLUME_LOG=1` imprime no console, a cada segundo, o seguinte:
 - faces e sondas capturadas;
 - ms de CPU e de leitura;

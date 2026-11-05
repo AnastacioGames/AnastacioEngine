@@ -80,8 +80,10 @@ private:
 	float m_ssgiScale = 1.0f;
 	/// Frames until the next moved objects check of the volumes.
 	int m_moveCheck = 0;
+	/// Counts the frames of the far grid turn in the shared capture budget.
+	unsigned int m_volumeTurn = 0;
 
-	/// Run the probe volume schedulers: a budget of cube faces per frame for each grid.
+	/// Run the probe volume schedulers: one budget of cube faces per frame shared by the grids.
 	void RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area);
 
 	/// Render a texture renderer, return true if the render was proceeded.

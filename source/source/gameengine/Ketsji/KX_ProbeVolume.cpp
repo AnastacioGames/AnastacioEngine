@@ -632,6 +632,16 @@ float KX_ProbeVolume::BoxWeight(const mt::vec3& pos) const
 	return std::min(std::max(1.0f - outside / (0.5f * m_spacing), 0.0f), 1.0f);
 }
 
+float KX_ProbeVolume::BoxDistance(const mt::vec3& pos) const
+{
+	float sq = 0.0f;
+	for (int i = 0; i < 3; i++) {
+		const float d = std::max(std::max(m_min[i] - pos[i], pos[i] - m_max[i]), 0.0f);
+		sq += d * d;
+	}
+	return sqrtf(sq);
+}
+
 float KX_ProbeVolume::BoxOverlap(const mt::vec3& aabbMin, const mt::vec3& aabbMax) const
 {
 	float inter = 1.0f;

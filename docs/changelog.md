@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - Light Probe Volumes: orçamento de captura compartilhado (Track Tool P3)
+
+- Os volumes dividem um só orçamento de faces por quadro, do mais perto da câmera ao mais longe
+  (`KX_TextureRendererManager::RenderVolumes`, `KX_ProbeVolume::BoxDistance`). Cena de 20 volumes: de ~18 fps nos primeiros
+  3 s para 60 fps; a luz completa passa a demorar mais. `RANGE_PROBE_VOLUME_OWN_BUDGET=1` volta ao modo antigo para medir.
+
 ## 2026-11-05 - Game Trace: sugestões aplicáveis no Scene Doctor (Trace Doctor, etapa 2)
 
 - O trace grava `physics`, `parent` e `logic` em cada `object` e `auto_static_batch` em cada `scene_load`
