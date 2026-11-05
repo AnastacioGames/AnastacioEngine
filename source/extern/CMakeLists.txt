@@ -38,6 +38,10 @@ endif()
 
 
 add_subdirectory(rangetree)
+
+if(WITH_IMAGE_DDS)
+	add_subdirectory(basis_universal)
+endif()
 add_subdirectory(wcwidth)
 
 if(WITH_BULLET)

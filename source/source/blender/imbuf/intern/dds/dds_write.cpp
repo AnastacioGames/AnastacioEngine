@@ -7,6 +7,9 @@
 #define RGBCX_IMPLEMENTATION
 #define RGBCX_USE_SMALLER_TABLES 1
 #include "../../../../../extern/rgbcx/rgbcx.h"
+#ifdef WITH_KTX2_ENCODER
+#  include "basisu_comp.h"
+#endif
 extern "C" {
 #include "BLI_fileops.h"
 #include "IMB_imbuf_types.h"
@@ -121,4 +124,74 @@ extern "C" bool imb_dds_write_dxt(const ImBuf *ibuf, const char *path, int forma
     if (fclose(f) != 0) ok = false;
     if (!ok) BLI_delete(path, false, false);
     return ok;
+}
+
+/* KTX2 / Basis Universal. Colour: ETC1S (transcodes losslessly to ETC1/ETC2, also BC1/BC3/ASTC).
+ * Tangent-space normal: UASTC with X in RGB and Y in alpha, the layout Basis turns into BC5 / EAC RG11.
+ * Rows are written in ImBuf order (bottom first), the orientation the loader hands to OpenGL.
+ * quality is 0-100 (higher = better, larger); mipmaps come from the same filter as the DDS path. */
+extern "C" bool imb_ktx2_write(const ImBuf *ibuf, const char *path, bool normal,
+                               int max_size, int quality, bool srgb)
+{
+#ifdef WITH_KTX2_ENCODER
+    if (!ibuf || !ibuf->rect || ibuf->rect_float || !pot(ibuf->x) || !pot(ibuf->y) ||
+        max_size < 0 || quality < 0 || quality > 100) return false;
+    if (normal) srgb = false;
+    static std::once_flag initialized;
+    std::call_once(initialized, []() { basisu::basisu_encoder_init(); });
+    int w = ibuf->x, h = ibuf->y;
+    const unsigned char *src = (const unsigned char *)ibuf->rect;
+    std::vector<float> pixels(size_t(w) * h * 4);
+    for (size_t i = 0; i < size_t(w) * h; ++i) {
+        for (int c = 0; c < 3; ++c) {
+            const float v = src[i * 4 + c] / 255.f;
+            pixels[i * 4 + c] = srgb ? linear(v) : v;
+        }
+        pixels[i * 4 + 3] = src[i * 4 + 3] / 255.f;
+        if (normal) renormalize(&pixels[i * 4]);
+    }
+    while (max_size && (w > max_size || h > max_size)) {
+        pixels = reduce(pixels, w, h, srgb, normal);
+        w = std::max(1, w / 2); h = std::max(1, h / 2);
+    }
+    basisu::vector<basisu::image> levels;
+    for (;;) {
+        basisu::image img(w, h);
+        for (int y = 0; y < h; ++y) for (int x = 0; x < w; ++x) {
+            const float *p = &pixels[(size_t(y) * w + x) * 4];
+            basisu::color_rgba &d = img(x, y);
+            if (normal) {
+                d.r = d.g = d.b = byte(p[0]);
+                d.a = byte(p[1]);
+            }
+            else {
+                d.r = byte(srgb ? srgb_encode(p[0]) : p[0]);
+                d.g = byte(srgb ? srgb_encode(p[1]) : p[1]);
+                d.b = byte(srgb ? srgb_encode(p[2]) : p[2]);
+                d.a = byte(p[3]);
+            }
+        }
+        levels.push_back(img);
+        if (w == 1 && h == 1) break;
+        pixels = reduce(pixels, w, h, srgb, normal);
+        w = std::max(1, w / 2); h = std::max(1, h / 2);
+    }
+    uint32_t flags = basisu::cFlagKTX2 | basisu::cFlagThreaded;
+    if (srgb) flags |= basisu::cFlagSRGB;
+    if (normal) flags |= basisu::cFlagKTX2UASTCSuperCompression;
+    size_t size = 0;
+    void *data = basisu::basis_compress2(normal ? basist::basis_tex_format::cUASTC_LDR_4x4 :
+                                                  basist::basis_tex_format::cETC1S,
+                                         levels, flags, quality, 4, &size);
+    if (!data) return false;
+    FILE *f = BLI_fopen(path, "wb");
+    bool ok = f && fwrite(data, 1, size, f) == size;
+    if (f && fclose(f) != 0) ok = false;
+    basisu::basis_free_data(data);
+    if (!ok && f) BLI_delete(path, false, false);
+    return ok;
+#else
+    (void)ibuf; (void)path; (void)normal; (void)max_size; (void)quality; (void)srgb;
+    return false;
+#endif
 }

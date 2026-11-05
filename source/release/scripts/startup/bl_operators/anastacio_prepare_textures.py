@@ -203,6 +203,48 @@ def dds_info(path):
     return w, h, header[84:88].decode('ascii'), size - 128
 
 
+def _convert(image, options, fingerprint, path, write):
+    """Convert an immutable snapshot of the source and publish it at path only after success."""
+    folder = os.path.dirname(path)
+    os.makedirs(folder, exist_ok=True)
+    fd, temporary = tempfile.mkstemp(prefix='.prepare-', suffix=os.path.splitext(path)[1], dir=folder)
+    os.close(fd)
+    snapshot = None
+    source_image = None
+    try:
+        # Decode an immutable snapshot, rather than an old editor pixel cache after
+        # an external paint application changed the source file on disk.
+        suffix = os.path.splitext(image.filepath)[1]
+        source_fd, snapshot = tempfile.mkstemp(prefix='.source-', suffix=suffix, dir=folder)
+        with os.fdopen(source_fd, 'wb') as stream:
+            if image.packed_file:
+                stream.write(bytes(image.packed_file.data))
+            else:
+                import shutil
+                with open(bpy.path.abspath(image.filepath), 'rb') as original:
+                    shutil.copyfileobj(original, stream)
+        if _source_hash(image, options, _hash_file(snapshot)) != fingerprint:
+            raise ValueError('Source changed while taking the conversion snapshot')
+        source_image = bpy.data.images.load(snapshot, check_existing=False)
+        source_image.colorspace_settings.name = image.colorspace_settings.name
+        source_image.alpha_mode = image.alpha_mode
+        source_image.use_alpha = image.use_alpha
+        source_image.reload()
+        if tuple(source_image.size) != tuple(image.size):
+            raise ValueError('Source dimensions changed: reload the original image first')
+        write(source_image, temporary)
+        if _source_hash(image, options) != fingerprint:
+            raise ValueError('Source changed during preparation')
+        os.replace(temporary, path)
+    finally:
+        if source_image is not None:
+            bpy.data.images.remove(source_image)
+        if snapshot and os.path.exists(snapshot):
+            os.remove(snapshot)
+        if os.path.exists(temporary):
+            os.remove(temporary)
+
+
 def prepare_image(image, max_size=2048, quality=10):
     if not bpy.data.filepath:
         raise ValueError('Save the project first')
@@ -213,51 +255,17 @@ def prepare_image(image, max_size=2048, quality=10):
     options = {'max_size': max_size, 'quality': quality, 'format': fmt}
     fingerprint = _source_hash(image, options)
     folder = os.path.join(os.path.dirname(bpy.data.filepath), 'textures_dds')
-    os.makedirs(folder, exist_ok=True)
     name = bpy.path.clean_name(image.name)[:40] or 'image'
     path = os.path.join(folder, '%s_%s.dds' % (name, fingerprint[:24]))
     record = _record(image)
     valid = (record.get('fingerprint') == fingerprint and os.path.isfile(path) and
              record.get('dds_sha256') == _hash_file(path))
     if not valid:
-        fd, temporary = tempfile.mkstemp(prefix='.prepare-', suffix='.dds', dir=folder)
-        os.close(fd)
-        snapshot = None
-        source_image = None
-        try:
-            # Decode an immutable snapshot, rather than an old editor pixel cache after
-            # an external paint application changed the source file on disk.
-            suffix = os.path.splitext(image.filepath)[1]
-            source_fd, snapshot = tempfile.mkstemp(prefix='.source-', suffix=suffix, dir=folder)
-            with os.fdopen(source_fd, 'wb') as stream:
-                if image.packed_file:
-                    stream.write(bytes(image.packed_file.data))
-                else:
-                    import shutil
-                    with open(bpy.path.abspath(image.filepath), 'rb') as original:
-                        shutil.copyfileobj(original, stream)
-            if _source_hash(image, options, _hash_file(snapshot)) != fingerprint:
-                raise ValueError('Source changed while taking the conversion snapshot')
-            source_image = bpy.data.images.load(snapshot, check_existing=False)
-            source_image.colorspace_settings.name = image.colorspace_settings.name
-            source_image.alpha_mode = image.alpha_mode
-            source_image.use_alpha = image.use_alpha
-            source_image.reload()
-            if tuple(source_image.size) != tuple(image.size):
-                raise ValueError('Source dimensions changed: reload the original image first')
+        def write(source_image, temporary):
             source_image.save_dds(filepath=temporary, format=fmt, max_size=max_size, quality=quality,
                                   srgb=fmt != 'BC5')
             dds_info(temporary)
-            if _source_hash(image, options) != fingerprint:
-                raise ValueError('Source changed during preparation')
-            os.replace(temporary, path)
-        finally:
-            if source_image is not None:
-                bpy.data.images.remove(source_image)
-            if snapshot and os.path.exists(snapshot):
-                os.remove(snapshot)
-            if os.path.exists(temporary):
-                os.remove(temporary)
+        _convert(image, options, fingerprint, path, write)
     w, h, fmt, size = dds_info(path)
     image[KEY] = json.dumps({'version': VERSION, 'path': bpy.path.relpath(path),
                             'fingerprint': fingerprint, 'options': options,
@@ -291,8 +299,43 @@ def prepared_path(image, colors=None, normals=None):
     return path
 
 
+KTX2_VERSION = 'basisu-073eb6a0-etc1s-uastc-v1'
+KTX2_QUALITY = 75
+KTX2_ID = b'\xabKTX 20\xbb\r\n\x1a\n'
+
+
+def ktx2_path(image, colors=None, normals=None):
+    """KTX2 (Basis Universal) copy of a prepared image, for the Web/Android package.
+
+    Same eligibility, size limit and colour / normal choice as the prepared DDS; cached in
+    //textures_ktx2/ by source hash. ETC1S for colour, UASTC for tangent-space normal maps.
+    """
+    prepared_path(image, colors, normals)
+    record = _record(image)
+    fmt = record['options'].get('format')
+    max_size = record['options'].get('max_size', 2048)
+    options = {'container': KTX2_VERSION, 'max_size': max_size, 'quality': KTX2_QUALITY, 'format': fmt}
+    fingerprint = _source_hash(image, options)
+    folder = os.path.join(os.path.dirname(bpy.data.filepath), 'textures_ktx2')
+    name = bpy.path.clean_name(image.name)[:40] or 'image'
+    path = os.path.join(folder, '%s_%s.ktx2' % (name, fingerprint[:24]))
+    valid = False
+    if os.path.isfile(path):
+        with open(path, 'rb') as stream:
+            valid = stream.read(12) == KTX2_ID
+    if not valid:
+        def write(source_image, temporary):
+            source_image.save_ktx2(filepath=temporary, normal=fmt == 'BC5', max_size=max_size,
+                                   quality=KTX2_QUALITY, srgb=fmt != 'BC5')
+            with open(temporary, 'rb') as stream:
+                if stream.read(12) != KTX2_ID:
+                    raise ValueError('KTX2 encoder produced an invalid file')
+        _convert(image, options, fingerprint, path, write)
+    return path
+
+
 @contextlib.contextmanager
-def export_prepared_textures():
+def export_prepared_textures(container='DDS'):
     """Remap users to temporary packed DDS copies only while saving desktop exports.
 
     The original Image, its pixels, packed bytes, filepath and metadata are untouched.
@@ -305,8 +348,8 @@ def export_prepared_textures():
             if KEY not in original or original.library:
                 continue
             try:
-                path = prepared_path(original, colors, normals)
-            except (OSError, ValueError, KeyError, TypeError) as error:
+                path = (ktx2_path if container == 'KTX2' else prepared_path)(original, colors, normals)
+            except (OSError, ValueError, KeyError, TypeError, RuntimeError) as error:
                 # A stale texture keeps its original in the export instead of stopping it.
                 print('Export: %s keeps its original image (%s)' % (original.name, error))
                 continue
@@ -316,7 +359,7 @@ def export_prepared_textures():
             swaps.append((original, image, name, fake))
             image.colorspace_settings.name = original.colorspace_settings.name
             # Byte imbufs are internally straight even for premultiplied source files.
-            # DDS blocks must match the decoded fallback: export normalized straight alpha.
+            # DDS/KTX2 blocks must match the decoded fallback: export normalized straight alpha.
             image.alpha_mode = 'STRAIGHT'
             image.use_alpha = original.use_alpha
             image.use_clamp_x = original.use_clamp_x

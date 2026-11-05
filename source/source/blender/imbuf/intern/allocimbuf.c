@@ -221,6 +221,9 @@ void IMB_freeImBuf(ImBuf *ibuf)
 			if (ibuf->dds_data.data != NULL) {
 				free(ibuf->dds_data.data); /* dds_data.data is allocated by DirectDrawSurface::readData(), so don't use MEM_freeN! */
 			}
+			if (ibuf->dds_data.ktx2 != NULL) {
+				free(ibuf->dds_data.ktx2);
+			}
 			MEM_freeN(ibuf);
 		}
 	}
@@ -512,7 +515,8 @@ bool IMB_dds_ensure_rect(ImBuf *ibuf)
 		return false;
 	}
 #ifdef WITH_DDS
-	if (ibuf->rect == NULL && ibuf->rect_float == NULL && ibuf->dds_data.data != NULL) {
+	if (ibuf->rect == NULL && ibuf->rect_float == NULL &&
+	    (ibuf->dds_data.data != NULL || ibuf->dds_data.ktx2 != NULL)) {
 		return imb_dds_decode_rect(ibuf);
 	}
 #endif
@@ -579,6 +583,8 @@ ImBuf *IMB_dupImBuf(const ImBuf *ibuf1)
 	tbuf.dds_data.data = NULL;
 	tbuf.dds_data.size = 0;
 	tbuf.dds_data.nummipmaps = 0;
+	tbuf.dds_data.ktx2 = NULL;
+	tbuf.dds_data.ktx2_size = 0;
 
 	/* set malloc flag */
 	tbuf.mall               = ibuf2->mall;

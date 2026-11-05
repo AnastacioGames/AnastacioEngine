@@ -138,6 +138,8 @@ void GPU_create_gl_tex_compressed(
         unsigned int *bind, unsigned int *pix, int x, int y, int mipmap,
         int textarget, struct Image *ima, struct ImBuf *ibuf);
 bool GPU_upload_dxt_texture(struct ImBuf *ibuf);
+/* tell imbuf which compressed formats KTX2 textures may transcode to (after GL init) */
+void GPU_ktx2_init_formats(void);
 void GPU_free_image(struct Image *ima);
 void GPU_free_images(struct Main *bmain);
 void GPU_free_images_anim(struct Main *bmain);

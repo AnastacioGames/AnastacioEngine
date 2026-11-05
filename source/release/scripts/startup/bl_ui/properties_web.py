@@ -175,6 +175,17 @@ class RangeWebSettings(PropertyGroup):
                     "as saved in the scene. Off: the published game never shows them",
         default=False,
     )
+    texture_format: bpy.props.EnumProperty(
+        name="Prepared textures",
+        description="Format of the textures prepared in Game > Performance > Prepare Textures",
+        items=(
+            ('KTX2', "KTX2 (all devices)", "Basis Universal: compressed on the GPU of desktop browsers (BC) "
+                                           "and phones (ETC2 / ASTC). Converted on export, cached in //textures_ktx2/"),
+            ('DDS', "DDS (desktop browsers)", "The prepared DDS files: compressed on desktop browsers, "
+                                              "decoded to RGBA on phones"),
+        ),
+        default='KTX2',
+    )
     output_directory: bpy.props.StringProperty(
         name="Destination",
         description="Output directory of the Web package",
@@ -259,6 +270,7 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         row.prop(web, "auto_preflight")
         row.prop(web, "open_after_export")
         box.prop(web, "keep_debug_overlays")
+        box.prop(web, "texture_format")
         box.operator("scene.range_web_export", icon='EXPORT')
         box.label(text="Validates again before exporting; errors block the export", icon='INFO')
 
@@ -332,11 +344,12 @@ class SCENE_OT_range_web_validate(Operator):
 
 
 def _save_game_copy(game, game_copy):
-    """Copy of the saved .range for the package; textures prepared as DDS go in as DDS.
+    """Copy of the saved .range for the package; prepared textures go in as KTX2 or DDS.
 
-    Desktop browsers upload the S3TC blocks straight to the GPU (WEBGL_compressed_texture_s3tc);
-    phones without it decode them to RGBA at load. Paths are kept as saved (relative_remap off):
-    the package puts the .range and its extra files at the same relative places.
+    KTX2 (default) transcodes at load to what the GPU takes: BC on desktop browsers, ETC2 / ASTC
+    on phones, RGBA otherwise. DDS uploads S3TC on desktop browsers and is decoded on phones.
+    Paths are kept as saved (relative_remap off): the package puts the .range and its extra files
+    at the same relative places.
     """
     import shutil
     from bl_operators import anastacio_prepare_textures as textures
@@ -344,11 +357,12 @@ def _save_game_copy(game, game_copy):
     if not any(textures.KEY in image for image in bpy.data.images):
         shutil.copy2(game, game_copy)
         return
-    with textures.export_prepared_textures(), _without_save_handlers():
+    container = bpy.context.scene.range_web.texture_format
+    with textures.export_prepared_textures(container), _without_save_handlers():
         saved = bpy.ops.wm.save_as_mainfile(filepath=game_copy, copy=True, relative_remap=False,
                                             compress=False, check_existing=False)
     if 'FINISHED' not in saved:
-        raise RuntimeError("could not save the game copy with the DDS textures")
+        raise RuntimeError("could not save the game copy with the prepared textures")
 
 
 class SCENE_OT_range_web_export(Operator):

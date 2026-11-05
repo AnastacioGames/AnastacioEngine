@@ -399,6 +399,17 @@ short IMB_saveiff(struct ImBuf *ibuf, const char *filepath, int flags);
 /* Export a copy as BC1/BC3 DDS: format 0=AUTO, 1=BC1, 3=BC3. POT byte images only. */
 bool IMB_dds_write_dxt(const struct ImBuf *ibuf, const char *path, int format,
                        int max_size, int quality, bool srgb);
+/* Export a copy as KTX2 (Basis Universal): ETC1S colour, or UASTC tangent-space normal map.
+ * quality 0-100. Needs an encoder build (desktop); POT byte images only. */
+bool IMB_ktx2_write(const struct ImBuf *ibuf, const char *path, bool normal,
+                    int max_size, int quality, bool srgb);
+/* Compressed formats the GPU takes, set once GL is up: KTX2 files transcode to the best one. */
+#define IMB_KTX2_GPU_BC   (1 << 0) /* BC1/BC3 (S3TC) */
+#define IMB_KTX2_GPU_BC5  (1 << 1) /* RGTC2 */
+#define IMB_KTX2_GPU_ETC2 (1 << 2) /* ETC2 + EAC */
+#define IMB_KTX2_GPU_ASTC (1 << 3) /* ASTC 4x4 LDR */
+void IMB_ktx2_set_gpu_formats(int formats);
+int IMB_ktx2_gpu_formats(void);
 bool IMB_prepare_write_ImBuf(const bool isfloat, struct ImBuf *ibuf);
 
 /**

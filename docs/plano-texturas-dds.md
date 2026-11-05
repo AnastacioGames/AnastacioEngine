@@ -60,6 +60,42 @@ O loader DDS existente ainda descomprime o primeiro nível na CPU e retém RGBA 
 O fator aproximado de 4–8x se refere à textura na GPU, na mesma resolução e com mipmaps equivalentes;
 não é uma promessa de redução total de RAM, tempo de load ou aumento de FPS.
 
+## KTX2 / Basis Universal (Web e Android)
+
+Implementado em 2026-11-05. A biblioteca Basis Universal (revisão 073eb6a0, Apache-2.0) fica em
+`source/extern/basis_universal`, com licença em `release/text/basisu-license.txt`.
+
+- **Arquivo:** um só, que vira no load o formato que a GPU aceita, nesta ordem: BC (navegador de desktop),
+  ETC2/EAC (celular) e ASTC 4x4. Sem nenhum desses formatos, vira RGBA.
+- **Formatos:**
+  - Cores usam ETC1S. A conversão para ETC1/ETC2 não perde nada, e o arquivo é pequeno.
+  - Normal maps tangent-space usam UASTC, com X no RGB e Y no alpha. Elas viram BC5 ou EAC RG11, e o
+    shader reconstrói Z como no BC5 do DDS.
+  - Normal map só com ASTC disponível vira RGBA: o WebGL não tem swizzle de textura.
+- **Encoder:** `Image.save_ktx2(filepath, normal, max_size, quality=0-100, srgb)`. Usa os mesmos mipmaps
+  do DDS (luz linear, alpha ponderado, normais renormalizadas). Só existe nos builds de desktop; o
+  `.wasm` leva apenas o transcodificador (+0,9 MB, de 23,7 para 24,6 MB).
+- **Loader:** imbuf (`ktx2_api.cpp`) converte para o mesmo `DDSData` do DDS, então o upload é o mesmo.
+  Com `IB_dds_blocks`, ficam só os blocos e uma cópia do KTX2, de onde os pixels são decodificados se
+  algo pedir. Linhas na ordem do ImBuf (de baixo para cima), sem flip no load.
+- **Export Web:** Web > Export > **Prepared textures** = KTX2 (padrão) ou DDS. O KTX2 sai das imagens já
+  preparadas (Prepare Textures), com a mesma elegibilidade e tamanho máximo, e fica em cache por hash em
+  `//textures_ktx2/`.
+- **Testes:**
+  - `ANASTACIO_KTX2_TARGET=bc|etc2|astc|rgba` limita os formatos para testar.
+  - `tools/debug/cenas/criar_cena_ktx2.py` monta a cena KTX2 a partir da cena DDS.
+  - Sonda no player Windows:
+    - BC: 33777, 33779 e 36285.
+    - ETC2: 37492, 37496 e 37490.
+    - RGBA: 32856.
+    - Mip 1 presente e `gl_error` 0 em todos.
+  - No Edge, o pacote Web passou nos caminhos BC, ETC2, ASTC e RGBA.
+- **Pendente:**
+  - aceite visual;
+  - celular real (Android WebView, ETC2/ASTC);
+  - medidas de VRAM e de tempo de transcodificação;
+  - build Linux.
+
 ## Validação e reprodução
 
 - `tools/tests/validate_prepare_textures_engine.py`: API, orientação, alpha, mipmaps, cache,

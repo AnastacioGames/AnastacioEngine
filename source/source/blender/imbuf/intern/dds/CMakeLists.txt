@@ -58,10 +58,37 @@ set(SRC
 	Stream.cpp
 	dds_api.cpp
 	dds_write.cpp
+	ktx2_api.cpp
 )
 
 set(LIB
+	extern_basisu
 )
+
+# must match extern/basis_universal/CMakeLists.txt: the transcoder headers change with them
+list(APPEND INC_SYS
+	../../../../../extern/basis_universal/transcoder
+	../../../../../extern/basis_universal/encoder
+)
+add_definitions(
+	-DBASISD_SUPPORT_KTX2=1
+	-DBASISD_SUPPORT_KTX2_ZSTD=1
+	-DBASISU_SUPPORT_OPENCL=0
+	-DBASISU_USE_WUFFS_LDR_LOADER=0
+	-DBASISU_DISABLE_ANDROID_ASTC_DECOMP=1
+	-DBASISD_SUPPORT_PVRTC1=0
+	-DBASISD_SUPPORT_PVRTC2=0
+	-DBASISD_SUPPORT_ATC=0
+	-DBASISD_SUPPORT_FXT1=0
+)
+if(NOT EMSCRIPTEN)
+	add_definitions(-DWITH_KTX2_ENCODER)
+	if(MSVC AND CMAKE_SIZEOF_VOID_P EQUAL 8)
+		add_definitions(-DBASISU_SUPPORT_SSE=1)
+	else()
+		add_definitions(-DBASISU_SUPPORT_SSE=0)
+	endif()
+endif()
 
 if(WITH_IMAGE_DDS)
 	add_definitions(-DWITH_DDS)

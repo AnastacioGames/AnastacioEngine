@@ -53,6 +53,17 @@ bool IMB_dds_write_dxt(const ImBuf *ibuf, const char *path, int format,
 #endif
 }
 
+bool IMB_ktx2_write(const ImBuf *ibuf, const char *path, bool normal,
+                    int max_size, int quality, bool srgb)
+{
+#ifdef WITH_DDS
+	return imb_ktx2_write(ibuf, path, normal, max_size, quality, srgb);
+#else
+	(void)ibuf; (void)path; (void)normal; (void)max_size; (void)quality; (void)srgb;
+	return false;
+#endif
+}
+
 static bool prepare_write_imbuf(const ImFileType *type, ImBuf *ibuf)
 {
 	return IMB_prepare_write_ImBuf((type->flag & IM_FTYPE_FLOAT), ibuf);

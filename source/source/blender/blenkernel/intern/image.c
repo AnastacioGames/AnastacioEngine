@@ -965,6 +965,9 @@ static uintptr_t image_mem_size(Image *image)
 			if (ibuf->dds_data.data) {
 				size += ibuf->dds_data.size;
 			}
+			if (ibuf->dds_data.ktx2) {
+				size += ibuf->dds_data.ktx2_size;
+			}
 			if (ibuf->rect_float) {
 				size += MEM_allocN_len(ibuf->rect_float);
 			}

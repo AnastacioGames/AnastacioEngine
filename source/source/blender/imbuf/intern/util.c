@@ -72,6 +72,7 @@ const char *imb_ext_image[] = {
 #endif
 #ifdef WITH_DDS
 	".dds",
+	".ktx2",
 #endif
 #ifdef WITH_CINEON
 	".dpx",

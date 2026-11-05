@@ -75,6 +75,7 @@ const ImFileType IMB_FILE_TYPES[] = {
 #endif
 #ifdef WITH_DDS
 	{NULL, NULL, imb_is_a_dds, NULL, imb_ftype_default, imb_load_dds, NULL, NULL, NULL, 0, IMB_FTYPE_DDS, COLOR_ROLE_DEFAULT_BYTE},
+	{NULL, NULL, imb_is_a_ktx2, NULL, imb_ftype_default, imb_load_ktx2, NULL, NULL, NULL, 0, IMB_FTYPE_DDS, COLOR_ROLE_DEFAULT_BYTE},
 #endif
 #ifdef WITH_OPENIMAGEIO
 	{NULL, NULL, NULL, imb_is_a_photoshop, imb_ftype_default, NULL, imb_load_photoshop, NULL, NULL, IM_FTYPE_FLOAT, IMB_FTYPE_PSD, COLOR_ROLE_DEFAULT_FLOAT},

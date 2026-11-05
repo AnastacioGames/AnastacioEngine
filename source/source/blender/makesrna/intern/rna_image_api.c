@@ -124,6 +124,21 @@ static void rna_Image_save_dds(Image *image, Main *bmain, ReportList *reports,
 	BKE_image_release_ibuf(image, ibuf, lock);
 }
 
+static void rna_Image_save_ktx2(Image *image, Main *bmain, ReportList *reports,
+                               const char *filepath, bool normal, int max_size, int quality, bool srgb)
+{
+	char path[FILE_MAX];
+	BLI_strncpy(path, filepath, sizeof(path));
+	BLI_path_abs(path, ID_BLEND_PATH(bmain, &image->id));
+	void *lock;
+	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
+	if (!IMB_ktx2_write(ibuf, path, normal, max_size, quality, srgb)) {
+		BKE_report(reports, RPT_ERROR, "KTX2 export failed: requires a byte, power-of-two image, "
+				   "a writable destination and a desktop build with the Basis Universal encoder");
+	}
+	BKE_image_release_ibuf(image, ibuf, lock);
+}
+
 static void rna_Image_save(Image *image, Main *bmain, bContext *C, ReportList *reports)
 {
 	void *lock;
@@ -343,6 +358,18 @@ void RNA_api_image(StructRNA *srna)
 	RNA_def_enum(func, "format", dds_formats, 0, "Format", "Compression format");
 	RNA_def_int(func, "max_size", 2048, 0, 16384, "Maximum Size", "Zero keeps original dimensions", 0, 16384);
 	RNA_def_int(func, "quality", 10, 0, 18, "Quality", "Encoder effort", 0, 18);
+	RNA_def_boolean(func, "srgb", true, "sRGB", "Filter color in linear light; disable for data maps");
+
+	func = RNA_def_function(srna, "save_ktx2", "rna_Image_save_ktx2");
+	RNA_def_function_ui_description(func, "Export a copy as KTX2 (Basis Universal) with mipmaps: transcodes to "
+	                                "BC, ETC2 or ASTC on the device, preserving the original image");
+	RNA_def_function_flag(func, FUNC_USE_MAIN | FUNC_USE_REPORTS);
+	parm = RNA_def_string_file_path(func, "filepath", NULL, FILE_MAX, "File Path", "Destination path");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_boolean(func, "normal", false, "Normal Map",
+	                "Tangent-space normal map (UASTC, X/Y kept for BC5 / EAC RG11); otherwise color (ETC1S)");
+	RNA_def_int(func, "max_size", 2048, 0, 16384, "Maximum Size", "Zero keeps original dimensions", 0, 16384);
+	RNA_def_int(func, "quality", 75, 0, 100, "Quality", "Higher is better and larger", 0, 100);
 	RNA_def_boolean(func, "srgb", true, "sRGB", "Filter color in linear light; disable for data maps");
 
 	func = RNA_def_function(srna, "save", "rna_Image_save");

@@ -32,6 +32,7 @@
 #include "BKE_scene.h"
 
 #include "GPU_basic_shader.h"
+#include "GPU_draw.h"
 #include "GPU_extensions.h"
 #include "GPU_glew.h"
 #include "GPU_texture.h"
@@ -305,6 +306,7 @@ void gpu_extensions_init(void)
 
 	GPU_invalid_tex_init();
 	GPU_basic_shaders_init();
+	GPU_ktx2_init_formats();
 }
 
 void gpu_extensions_exit(void)

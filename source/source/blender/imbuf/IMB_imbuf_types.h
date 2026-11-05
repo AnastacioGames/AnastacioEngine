@@ -47,6 +47,9 @@ typedef struct DDSData {
 	unsigned int nummipmaps; /* The number of mipmaps in the dds file */
 	unsigned char *data; /* The compressed image data */
 	unsigned int size; /* The size of the compressed data */
+	/* KTX2 source (malloc'd), kept when only GPU blocks were transcoded: decodes pixels on demand */
+	unsigned char *ktx2;
+	unsigned int ktx2_size;
 } DDSData;
 
 /**
@@ -285,6 +288,11 @@ typedef struct ImBuf {
 #define FOURCC_DXT4  (DDS_MAKEFOURCC('D','X','T','4'))
 #define FOURCC_DXT5  (DDS_MAKEFOURCC('D','X','T','5'))
 #define FOURCC_ATI2  (DDS_MAKEFOURCC('A','T','I','2'))
+/* blocks transcoded from KTX2 (Basis Universal) for mobile GPUs */
+#define FOURCC_ETC2  (DDS_MAKEFOURCC('E','T','C','2')) /* ETC2 RGB8, 8 bytes per block */
+#define FOURCC_ETCA  (DDS_MAKEFOURCC('E','T','C','A')) /* ETC2 RGBA8 EAC, 16 bytes */
+#define FOURCC_EAC2  (DDS_MAKEFOURCC('E','A','C','2')) /* EAC RG11 normal X/Y, 16 bytes */
+#define FOURCC_AST4  (DDS_MAKEFOURCC('A','S','T','4')) /* ASTC 4x4 RGBA, 16 bytes */
 
 #endif  /* DDS */
 extern const char *imb_ext_image[];

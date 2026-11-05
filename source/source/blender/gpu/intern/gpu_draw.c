@@ -1080,6 +1080,26 @@ EM_JS(int, gpu_webgl_has_s3tc, (void), {
 EM_JS(int, gpu_webgl_has_rgtc, (void), {
 	return GLctx.getExtension('EXT_texture_compression_rgtc') ? 1 : 0;
 });
+/* KTX2 targets on phones: ETC2/EAC (every GLES3 GPU) and ASTC (most recent ones). */
+EM_JS(int, gpu_webgl_has_etc, (void), {
+	return GLctx.getExtension('WEBGL_compressed_texture_etc') ? 1 : 0;
+});
+EM_JS(int, gpu_webgl_has_astc, (void), {
+	return GLctx.getExtension('WEBGL_compressed_texture_astc') ? 1 : 0;
+});
+#endif
+
+#ifndef GL_COMPRESSED_RG11_EAC
+#  define GL_COMPRESSED_RG11_EAC 0x9272
+#endif
+#ifndef GL_COMPRESSED_RGB8_ETC2
+#  define GL_COMPRESSED_RGB8_ETC2 0x9274
+#endif
+#ifndef GL_COMPRESSED_RGBA8_ETC2_EAC
+#  define GL_COMPRESSED_RGBA8_ETC2_EAC 0x9278
+#endif
+#ifndef GL_COMPRESSED_RGBA_ASTC_4x4_KHR
+#  define GL_COMPRESSED_RGBA_ASTC_4x4_KHR 0x93B0
 #endif
 
 static bool gpu_has_s3tc(void)
@@ -1118,6 +1138,46 @@ static bool gpu_has_rgtc(void)
 #endif
 }
 
+static bool gpu_has_s3tc(void);
+static bool gpu_has_rgtc(void);
+
+void GPU_ktx2_init_formats(void)
+{
+#ifdef WITH_DDS
+	int formats = 0;
+	const char *disable_s3tc = getenv("ANASTACIO_NO_S3TC");
+	if (!(disable_s3tc && disable_s3tc[0] == '1')) {
+		if (gpu_has_s3tc())
+			formats |= IMB_KTX2_GPU_BC;
+		if (gpu_has_rgtc())
+			formats |= IMB_KTX2_GPU_BC5;
+	}
+#  if defined(__EMSCRIPTEN__)
+	if (gpu_webgl_has_etc())
+		formats |= IMB_KTX2_GPU_ETC2;
+	if (gpu_webgl_has_astc())
+		formats |= IMB_KTX2_GPU_ASTC;
+#  else
+	if (GLEW_VERSION_4_3 || GLEW_ARB_ES3_compatibility)
+		formats |= IMB_KTX2_GPU_ETC2;
+	if (GLEW_KHR_texture_compression_astc_ldr)
+		formats |= IMB_KTX2_GPU_ASTC;
+#  endif
+	/* test override: ANASTACIO_KTX2_TARGET=bc|etc2|astc|rgba keeps only that family */
+	const char *target = getenv("ANASTACIO_KTX2_TARGET");
+	if (target && target[0]) {
+		const int keep = STREQ(target, "bc") ? (IMB_KTX2_GPU_BC | IMB_KTX2_GPU_BC5) :
+		                 STREQ(target, "etc2") ? IMB_KTX2_GPU_ETC2 :
+		                 STREQ(target, "astc") ? IMB_KTX2_GPU_ASTC : 0;
+		formats &= keep;
+	}
+	IMB_ktx2_set_gpu_formats(formats);
+	fprintf(stderr, "KTX2: GPU formats%s%s%s%s%s\n", formats ? "" : " none (decoded to RGBA)",
+	        (formats & IMB_KTX2_GPU_BC) ? " BC1/BC3" : "", (formats & IMB_KTX2_GPU_BC5) ? " BC5" : "",
+	        (formats & IMB_KTX2_GPU_ETC2) ? " ETC2/EAC" : "", (formats & IMB_KTX2_GPU_ASTC) ? " ASTC" : "");
+#endif
+}
+
 bool GPU_upload_dxt_texture(ImBuf *ibuf)
 {
 #ifdef WITH_DDS
@@ -1126,6 +1186,11 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 
 	width = ibuf->x;
 	height = ibuf->y;
+
+	/* no blocks: a KTX2 decoded to RGBA on purpose (no suitable GPU format), not a failure */
+	if (ibuf->dds_data.data == NULL) {
+		return false;
+	}
 
 	/* Diagnostic opt-out for fallback validation and performance comparisons. */
 	const char *disable_s3tc = getenv("ANASTACIO_NO_S3TC");
@@ -1141,6 +1206,18 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 		/* RG texture: the shader rebuilds Z when it samples blue == 0 */
 		format = (gpu_has_rgtc() && !(disable_s3tc && disable_s3tc[0] == '1')) ? GL_COMPRESSED_RG_RGTC2 : 0;
 	}
+	/* transcoded from KTX2 only when GPU_ktx2_init_formats() reported the format */
+	const int ktx2 = IMB_ktx2_gpu_formats();
+	if (ktx2 & IMB_KTX2_GPU_ETC2) {
+		if (ibuf->dds_data.fourcc == FOURCC_ETC2)
+			format = GL_COMPRESSED_RGB8_ETC2;
+		else if (ibuf->dds_data.fourcc == FOURCC_ETCA)
+			format = GL_COMPRESSED_RGBA8_ETC2_EAC;
+		else if (ibuf->dds_data.fourcc == FOURCC_EAC2)
+			format = GL_COMPRESSED_RG11_EAC; /* normal X/Y: blue samples 0, the shader rebuilds Z */
+	}
+	if ((ktx2 & IMB_KTX2_GPU_ASTC) && ibuf->dds_data.fourcc == FOURCC_AST4)
+		format = GL_COMPRESSED_RGBA_ASTC_4x4_KHR;
 
 	if (format == 0) {
 		fprintf(stderr, "Unable to find a suitable DXT compression, falling back to uncompressed\n");
@@ -1164,7 +1241,7 @@ bool GPU_upload_dxt_texture(ImBuf *ibuf)
 	if (GLEW_EXT_texture_filter_anisotropic)
 		glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, GPU_get_anisotropic());
 
-	blocksize = (ibuf->dds_data.fourcc == FOURCC_DXT1) ? 8 : 16;
+	blocksize = (ibuf->dds_data.fourcc == FOURCC_DXT1 || ibuf->dds_data.fourcc == FOURCC_ETC2) ? 8 : 16;
 
 	/* texture quality: skip the top levels stored in the file, keeping at least one */
 	int skip = 0;

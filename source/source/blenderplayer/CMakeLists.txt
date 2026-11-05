@@ -290,6 +290,7 @@ endif()
 		extern_binreloc
 		extern_minilzo
 		extern_recastnavigation
+		extern_basisu
 		extern_imgui
 		extern_implot
 		extern_rangetree

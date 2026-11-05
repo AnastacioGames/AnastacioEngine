@@ -175,6 +175,9 @@ bool imb_dds_decode_rect(struct ImBuf *ibuf)
 	if (ibuf->rect) {
 		return true;
 	}
+	if (ibuf->dds_data.ktx2) {
+		return imb_ktx2_decode_rect(ibuf);
+	}
 	if (ibuf->dds_data.data == NULL || !dds_is_dxt(fourcc)) {
 		return false;
 	}

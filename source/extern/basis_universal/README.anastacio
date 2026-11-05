@@ -1,0 +1,2 @@
+basis_universal 073eb6a0a34a23d77e75e54f41dcd9653a52da83 (2026-10-30), https://github.com/BinomialLLC/basis_universal
+Subset: transcoder/, encoder/ (no OpenCL kernels dir, no Wuffs), zstd/. Apache-2.0, see LICENSE/NOTICE.
