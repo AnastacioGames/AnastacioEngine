@@ -37,6 +37,7 @@
 #include "BLI_listbase.h"
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
+#include "BLI_math_base.h"
 
 #include "BKE_animsys.h"
 #include "BKE_icons.h"
@@ -49,6 +50,34 @@
 #include "BKE_world.h"
 
 #include "GPU_material.h"
+
+/* Rain > Wet Surfaces: how wet the surfaces are now (0 dry .. 1 wet). Gets wet in ~3 s while it
+ * rains (Rain on with Intensity > 0) and dries over Dry Time after it stops. Called once per
+ * redraw by the 3D View and the game (a few float ops, nothing per object); the first call
+ * after loading starts at the current weather. Returns 0 when Wet Surfaces is off. */
+float BKE_world_rain_wet_level(World *wrld, double now)
+{
+	const bool raining = (wrld->weather_flag & WO_WEATHER_RAIN) && wrld->rain_intensity > 0.001f;
+	const float target = raining ? 1.0f : 0.0f;
+
+	if (wrld->rain_wet_time <= 0.0 || now < wrld->rain_wet_time) {
+		wrld->rain_wet_level = target;
+	}
+	else if (wrld->rain_wet_level != target) {
+		/* Long pauses (window idle, breakpoint) count as at most one second. */
+		const double dt_d = now - wrld->rain_wet_time;
+		const float dt = (float)(dt_d < 1.0 ? dt_d : 1.0);
+		const float time = raining ? 3.0f : max_ff(wrld->rain_wet_dry_time, 0.01f);
+		const float step = dt / time;
+		if (wrld->rain_wet_level < target)
+			wrld->rain_wet_level = min_ff(wrld->rain_wet_level + step, target);
+		else
+			wrld->rain_wet_level = max_ff(wrld->rain_wet_level - step, target);
+	}
+	wrld->rain_wet_time = now;
+
+	return (wrld->rain_wet_flag & WO_RAIN_WET_ENABLE) ? wrld->rain_wet_level : 0.0f;
+}
 
 /** Free (or release) any data used by this world (does not free the world itself). */
 void BKE_world_free(World *wrld)
@@ -361,6 +390,10 @@ void BKE_world_init(World *wrld)
 	wrld->rain_ripple_size = 1.0f;
 	wrld->rain_ripple_rate = 0.8f;
 	wrld->rain_splash_normal = 1.0f;
+	wrld->rain_wet_darkness = 0.5f;
+	wrld->rain_wet_gloss = 0.5f;
+	wrld->rain_wet_distance = 80.0f;
+	wrld->rain_wet_dry_time = 20.0f;
 	wrld->rain_puddle_amount = 0.5f;
 	wrld->rain_puddle_size = 4.0f;
 	wrld->rain_puddle_darkness = 0.4f;

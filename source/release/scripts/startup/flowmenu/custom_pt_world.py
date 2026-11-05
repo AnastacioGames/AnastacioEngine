@@ -716,6 +716,16 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                 sub.prop(weather, "rain_puddle_min_up", text="Upward Surface")
                 sub.label(text="Only objects with \"puddles_effect\" (all when none has it)", icon='INFO')
 
+            box = _rain_section(col, weather, "show_expanded_rain_wet", "Wet Surfaces", "use_rain_wet")
+            if weather.show_expanded_rain_wet:
+                sub = box.column()
+                sub.active = weather.use_rain_wet
+                sub.prop(weather, "rain_wet_darkness", text="Darkness", slider=True)
+                sub.prop(weather, "rain_wet_gloss", text="Gloss", slider=True)
+                sub.prop(weather, "rain_wet_distance", text="Distance")
+                sub.prop(weather, "rain_wet_dry_time", text="Dry Time (s)")
+                sub.label(text="Gets wet while it rains, dries after Intensity 0", icon='INFO')
+
             box = _rain_section(col, weather, "show_expanded_rain_aura", "Aura", "use_rain_aura")
             if weather.show_expanded_rain_aura:
                 sub = box.column()

@@ -26,6 +26,7 @@ uniform sampler2D ge_RainMask; // KX_RainSurfaceMask: R = 1 ripples + 2 splash, 
 uniform vec3 ge_RainMaskFlags; // x: ripples only on marked objects, y: same for splash, z: puddles
 uniform vec4 ge_RainPuddle1; // use puddles, amount, size (m), darkness
 uniform vec4 ge_RainPuddle2; // reflection, distance, minimum upward normal, use SSR
+uniform vec4 ge_RainWet; // Wet Surfaces: level (0 dry .. 1 wet), darkness, gloss, distance
 uniform vec3 ge_RainSkyHorizon; // World horizon/zenith: what the puddles reflect
 uniform vec3 ge_RainSkyZenith;
 uniform vec3 ge_RainColor;
@@ -641,7 +642,7 @@ void main()
 	float rippleRate = ge_RainParams5.y > 0.0 ? ge_RainParams5.y : 0.8;
 
 	/* Puddles stay after the rain stops (Intensity 0); they dry with Amount. */
-	if (intensity <= 0.001 && ge_RainLightning.x <= 0.001 && !(ge_RainPuddle1.x > 0.5 && ge_RainPuddle1.y > 0.001)) {
+	if (intensity <= 0.001 && ge_RainLightning.x <= 0.001 && !(ge_RainPuddle1.x > 0.5 && ge_RainPuddle1.y > 0.001) && ge_RainWet.x <= 0.001) {
 		gl_FragColor = direct;
 		return;
 	}
@@ -676,12 +677,13 @@ void main()
 	}
 
 	bool rippleOn = useRipple && rippleIntensity > 0.001;
+	bool wetOn = ge_RainWet.x > 0.001;
 	bool puddlesOn = ge_RainPuddle1.x > 0.5 && ge_RainPuddle1.y > 0.001;
 	/* Only in Puddles: Puddle1.x = 1 + 1 (ripples) + 2 (splash); both can be on together. */
 	float puddleOnly = ge_RainPuddle1.x > 0.5 ? floor(ge_RainPuddle1.x - 0.5) : 0.0;
 	bool ripplePuddleOnly = mod(puddleOnly, 2.0) > 0.5;
 	splashInPuddles = puddleOnly > 1.5;
-	if (rippleOn || puddlesOn) {
+	if (rippleOn || puddlesOn || wetOn) {
 		/* Surface under the pixel, shared by puddles and ripples. Derivatives stay outside the
 		 * per-pixel branches below. */
 		float depth = texture(bgl_DepthTexture, texcoord).x;
@@ -714,6 +716,22 @@ void main()
 		float shelterCover = isBackground ? 0.0 : rainShelterSoft(worldPos);
 		float shelterKeep = mix(1.0, rainShelterGround(), shelterCover);
 		bool sheltered = shelterKeep < 0.001;
+		/* Wet Surfaces: everything near the camera darkens and gets a wet sheen reflecting the
+		 * sky; ground (up-facing) more than walls. ge_RainWet.x is the wet level (wets while it rains,
+		 * dries after), so the cost is zero once it is dry. */
+		if (wetOn && !isBackground && !sheltered && camDist <= ge_RainWet.w) {
+			float wetFade = 1.0 - smoothstep(ge_RainWet.w * 0.75, ge_RainWet.w, camDist);
+			float w = ge_RainWet.x * wetFade * mix(0.6, 1.0, smoothstep(0.0, 0.7, normal.z)) * shelterKeep;
+			finalColor *= 1.0 - ge_RainWet.y * 0.5 * w;
+			vec3 Rw = reflect(-V, normal);
+			vec3 skyW = mix(ge_RainSkyHorizon, ge_RainSkyZenith, sqrt(clamp(Rw.z, 0.0, 1.0)));
+			skyW = mix(skyW, vec3(dot(skyW, vec3(0.299, 0.587, 0.114))) * 0.85, darken);
+			float fresW = mix(0.04, 1.0, pow(1.0 - max(dot(normal, V), 0.0), 5.0));
+			finalColor = mix(finalColor, skyW, clamp(fresW * ge_RainWet.z * w * 0.6, 0.0, 1.0));
+			vec3 Hw = normalize(normalize(vec3(0.3, 0.2, 1.0)) + V);
+			finalColor += vec3(pow(max(dot(normal, Hw), 0.0), 80.0)) * ge_RainWet.z * w * 0.25;
+		}
+
 		bool puddleHere = puddlesOn && !isBackground && !sheltered && camDist <= puddleDist && normal.z >= ge_RainPuddle2.z &&
 		    (ge_RainMaskFlags.z < 0.5 || rainMarked(texcoord, 4.0, viewZ));
 		float water = 0.0;

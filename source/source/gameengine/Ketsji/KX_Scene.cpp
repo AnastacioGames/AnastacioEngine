@@ -102,6 +102,10 @@
 #include "DNA_python_component_types.h"
 #include "BLI_listbase.h"
 #include "DNA_world_types.h"
+extern "C" {
+#include "BKE_world.h"
+#include "PIL_time.h"
+}
 #include "DNA_object_types.h"
 #include "DNA_node_types.h"
 #include "BKE_scene.h" // SETLOOPER
@@ -570,6 +574,10 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_puddle_reflection = world->rain_puddle_reflection;
 			filters.rain_puddle_distance = world->rain_puddle_distance;
 			filters.rain_puddle_min_up = world->rain_puddle_min_up;
+			filters.rain_wet[0] = BKE_world_rain_wet_level(world, PIL_check_seconds_timer());
+			filters.rain_wet[1] = world->rain_wet_darkness;
+			filters.rain_wet[2] = world->rain_wet_gloss;
+			filters.rain_wet[3] = world->rain_wet_distance;
 		}
 		/* World colors: what the puddles reflect and the SSR fallback for rays without a hit. */
 		filters.rain_sky_horizon[0] = world->horr;

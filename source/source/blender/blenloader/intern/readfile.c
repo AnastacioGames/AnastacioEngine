@@ -3751,6 +3751,10 @@ static void direct_link_world(FileData *fd, World *wrld)
 	wrld->adt = newdataadr(fd, wrld->adt);
 	direct_link_animdata(fd, wrld->adt);
 
+	/* Rain > Wet Surfaces runtime: start from the current weather, not the saved wetness. */
+	wrld->rain_wet_time = 0.0;
+	wrld->rain_wet_level = 0.0f;
+
 	for (a = 0; a < MAX_MTEX; a++) {
 		wrld->mtex[a] = newdataadr(fd, wrld->mtex[a]);
 	}

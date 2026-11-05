@@ -244,6 +244,15 @@ typedef struct World {
 	 * rain_shelter_ground: quanto das gotas/poças no chão fica sob um rain_shelter (0 = seco). */
 	float rain_velocity, rain_velocity_stretch, rain_velocity_max, rain_shelter_ground;
 
+	/* Rain > Wet Surfaces: while it rains every surface darkens and gets a wet sheen with the
+	 * sky reflected, then dries over rain_wet_dry_time seconds after the rain stops.
+	 * rain_wet_level/rain_wet_time are runtime (cleared on load). */
+	float rain_wet_darkness, rain_wet_gloss, rain_wet_distance, rain_wet_dry_time;
+	double rain_wet_time;
+	float rain_wet_level;
+	short rain_wet_flag; /* WO_RAIN_WET_* */
+	short rain_wet_pad;
+
 	ListBase gpumaterial;		/* runtime */
 
 	/* game engine: properties shared by all objects through the World ("World Properties") */
@@ -363,6 +372,10 @@ typedef struct World {
 /* Volumetric Clouds (3o modo de nuvens): bits 0-14 de weather_flag ja estavam ocupados
  * (checado lendo todo o bloco acima), unico bit livre em short e o 15. */
 #define WO_WEATHER_VOLUMETRIC_CLOUDS  (1 << 15)
+
+/* World.rain_wet_flag */
+#define WO_RAIN_WET_ENABLE    (1 << 0)
+#define WO_RAIN_WET_EXPANDED  (1 << 1)
 
 /* World.vcloud_flag */
 #define WO_VCLOUDS_ENABLE          (1 << 0)

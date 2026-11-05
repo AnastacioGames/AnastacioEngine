@@ -14,6 +14,7 @@ uniform float rain_ripple_normal; // ripple normal strength, 1 = default
 uniform vec4 rain_params5; // ripple size, ripple rate, splash normal, splash minimum upward normal
 uniform vec4 rain_puddle1; // use puddles, amount, size (m), darkness
 uniform vec4 rain_puddle2; // reflection, distance, minimum upward normal, use SSR
+uniform vec4 rain_wet; // Wet Surfaces: level (0 dry .. 1 wet), darkness, gloss, distance
 uniform vec3 rain_sky_horizon; // World horizon/zenith: what the puddles reflect
 uniform vec3 rain_sky_zenith;
 uniform vec3 rain_color;
@@ -458,7 +459,7 @@ void main()
 	float rippleRate = rain_params5.y > 0.0 ? rain_params5.y : 0.8;
 
 	/* Puddles stay after the rain stops (Intensity 0); they dry with Amount. */
-	if (intensity <= 0.001 && rain_lightning.x <= 0.001 && !(rain_puddle1.x > 0.5 && rain_puddle1.y > 0.001)) {
+	if (intensity <= 0.001 && rain_lightning.x <= 0.001 && !(rain_puddle1.x > 0.5 && rain_puddle1.y > 0.001) && rain_wet.x <= 0.001) {
 		gl_FragColor = direct;
 		return;
 	}
@@ -488,12 +489,13 @@ void main()
 	}
 
 	bool rippleOn = useRipple && rippleIntensity > 0.001;
+	bool wetOn = rain_wet.x > 0.001;
 	bool puddlesOn = rain_puddle1.x > 0.5 && rain_puddle1.y > 0.001;
 	/* Only in Puddles: Puddle1.x = 1 + 1 (ripples) + 2 (splash); both can be on together. */
 	float puddleOnly = rain_puddle1.x > 0.5 ? floor(rain_puddle1.x - 0.5) : 0.0;
 	bool ripplePuddleOnly = mod(puddleOnly, 2.0) > 0.5;
 	splashInPuddles = puddleOnly > 1.5;
-	if (rippleOn || puddlesOn) {
+	if (rippleOn || puddlesOn || wetOn) {
 		/* Surface under the pixel, shared by puddles and ripples. Derivatives stay outside the
 		 * per-pixel branches below. */
 		float depth = texture(depthbuffer, texcoord).x;
@@ -508,6 +510,22 @@ void main()
 		}
 		float camDist = length(worldPos - camPos);
 		vec3 V = normalize(camPos - worldPos);
+
+		/* Wet Surfaces: everything near the camera darkens and gets a wet sheen reflecting the
+		 * sky; ground (up-facing) more than walls. rain_wet.x is the wet level (wets while it rains,
+		 * dries after), so the cost is zero once it is dry. */
+		if (wetOn && !isBackground && camDist <= rain_wet.w) {
+			float wetFade = 1.0 - smoothstep(rain_wet.w * 0.75, rain_wet.w, camDist);
+			float w = rain_wet.x * wetFade * mix(0.6, 1.0, smoothstep(0.0, 0.7, normal.z));
+			finalColor *= 1.0 - rain_wet.y * 0.5 * w;
+			vec3 Rw = reflect(-V, normal);
+			vec3 skyW = mix(rain_sky_horizon, rain_sky_zenith, sqrt(clamp(Rw.z, 0.0, 1.0)));
+			skyW = mix(skyW, vec3(dot(skyW, vec3(0.299, 0.587, 0.114))) * 0.85, darken);
+			float fresW = mix(0.04, 1.0, pow(1.0 - max(dot(normal, V), 0.0), 5.0));
+			finalColor = mix(finalColor, skyW, clamp(fresW * rain_wet.z * w * 0.6, 0.0, 1.0));
+			vec3 Hw = normalize(normalize(vec3(0.3, 0.2, 1.0)) + V);
+			finalColor += vec3(pow(max(dot(normal, Hw), 0.0), 80.0)) * rain_wet.z * w * 0.25;
+		}
 
 		/* Puddles: wet darker ground with standing water reflecting the sky. Computed before
 		 * the ripples, which can be limited to the puddle water. */

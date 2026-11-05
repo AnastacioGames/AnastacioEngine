@@ -57,6 +57,7 @@
 #include "PIL_time.h"
 
 #include "BKE_rain_lightning.h"
+#include "BKE_world.h"
 
 static const float fullscreencos[4][2] = {{-1.0f, -1.0f}, {1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0f, 1.0f}};
 static const float fullscreenuvs[4][2] = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}};
@@ -130,6 +131,7 @@ typedef struct {
   int rain_params5_uniform;
   int rain_puddle1_uniform;
   int rain_puddle2_uniform;
+  int rain_wet_uniform;
   int rain_sky_horizon_uniform;
   int rain_sky_zenith_uniform;
 } GPURAINShaderInterface;
@@ -1990,6 +1992,12 @@ bool GPU_fx_do_composite_pass(
 			GPU_shader_uniform_vector(rain_shader, interface->rain_params5_uniform, 4, 1, rain_params5);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_puddle1_uniform, 4, 1, rain_puddle1);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_puddle2_uniform, 4, 1, rain_puddle2);
+			/* Wet Surfaces: one level per redraw (wets/dries over time), applied in this pass. */
+			{
+				const float rain_wet[4] = {BKE_world_rain_wet_level(world, PIL_check_seconds_timer()),
+				                           world->rain_wet_darkness, world->rain_wet_gloss, world->rain_wet_distance};
+				GPU_shader_uniform_vector(rain_shader, interface->rain_wet_uniform, 4, 1, rain_wet);
+			}
 			GPU_shader_uniform_vector(rain_shader, interface->rain_sky_horizon_uniform, 3, 1, rain_sky_horizon);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_sky_zenith_uniform, 3, 1, rain_sky_zenith);
 
@@ -2809,6 +2817,7 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->rain_params5_uniform = GPU_shader_get_uniform(shader, "rain_params5");
 			interface->rain_puddle1_uniform = GPU_shader_get_uniform(shader, "rain_puddle1");
 			interface->rain_puddle2_uniform = GPU_shader_get_uniform(shader, "rain_puddle2");
+			interface->rain_wet_uniform = GPU_shader_get_uniform(shader, "rain_wet");
 			interface->rain_sky_horizon_uniform = GPU_shader_get_uniform(shader, "rain_sky_horizon");
 			interface->rain_sky_zenith_uniform = GPU_shader_get_uniform(shader, "rain_sky_zenith");
 

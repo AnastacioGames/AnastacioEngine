@@ -1345,6 +1345,41 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Puddle Upward Surface", "Minimum upward-facing normal for puddles; 0.9 keeps them on nearly flat ground");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	prop = RNA_def_property(srna, "use_rain_wet", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "rain_wet_flag", WO_RAIN_WET_ENABLE);
+	RNA_def_property_ui_text(prop, "Wet Surfaces",
+	                         "While it rains every surface darkens and gets a wet sheen reflecting the sky; "
+	                         "it dries over Dry Time after the rain stops (Intensity 0). No material changes");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "show_expanded_rain_wet", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "rain_wet_flag", WO_RAIN_WET_EXPANDED);
+	RNA_def_property_ui_text(prop, "Expanded", "Show the Wet Surfaces rain settings");
+	RNA_def_property_ui_icon(prop, ICON_RIGHTARROW, 1);
+	RNA_def_property_update(prop, 0, NULL);
+
+	prop = RNA_def_property(srna, "rain_wet_darkness", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Wet Darkness", "How much darker the surfaces get when wet");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_wet_gloss", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Wet Gloss", "Strength of the wet sheen: sky reflection and highlight");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_wet_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 1.0f, 10000.0f);
+	RNA_def_property_ui_range(prop, 5.0f, 500.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Wet Distance", "Distance from the camera where the wet look fades out");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_wet_dry_time", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 3600.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 300.0f, 100, 1);
+	RNA_def_property_ui_text(prop, "Dry Time", "Seconds the surfaces take to dry after the rain stops (Intensity 0)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "use_rain_aura", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_AURA);
 	RNA_def_property_ui_text(prop, "Aura", "Manga-style short spray strokes on the upper silhouette of the objects with the aura property (every nearby object when none has it)");

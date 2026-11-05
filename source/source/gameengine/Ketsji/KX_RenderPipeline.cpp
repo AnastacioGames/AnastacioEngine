@@ -36,6 +36,10 @@
 #include "RAS_FramingManager.h"
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
+extern "C" {
+#include "BKE_world.h"
+#include "PIL_time.h"
+}
 #include "DNA_lamp_types.h" // LA_SHADMAP_VARIANCE
 #include "RAS_ILightObject.h"
 #include <algorithm>
@@ -1144,6 +1148,10 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				rainParams->rain_puddle_reflection = world->rain_puddle_reflection;
 				rainParams->rain_puddle_distance = world->rain_puddle_distance;
 				rainParams->rain_puddle_min_up = world->rain_puddle_min_up;
+				rainParams->rain_wet[0] = BKE_world_rain_wet_level(const_cast<World *>(world), PIL_check_seconds_timer());
+				rainParams->rain_wet[1] = world->rain_wet_darkness;
+				rainParams->rain_wet[2] = world->rain_wet_gloss;
+				rainParams->rain_wet[3] = world->rain_wet_distance;
 				rainParams->rain_sky_horizon[0] = world->horr;
 				rainParams->rain_sky_horizon[1] = world->horg;
 				rainParams->rain_sky_horizon[2] = world->horb;

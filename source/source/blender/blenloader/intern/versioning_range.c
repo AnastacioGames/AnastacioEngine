@@ -612,6 +612,16 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_wet_dry_time")) {
+    /* Rain > Wet Surfaces: off (new flag), only the default values. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_wet_darkness = 0.5f;
+      wo->rain_wet_gloss = 0.5f;
+      wo->rain_wet_distance = 80.0f;
+      wo->rain_wet_dry_time = 20.0f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_puddle_amount")) {
     /* Pocas da chuva: desligadas (flag nova), so recebem os valores padrao. */
     LISTBASE_FOREACH (World *, wo, &main->world) {
