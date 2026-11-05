@@ -59,4 +59,4 @@ objeto. Sem isso a regra apontaria objetos que já estão no lote. Ela só dispa
   cada verificação. Itens `trace_on_demand` e `trace_static_batch`, com Fix e Revert.
 - Teste em background (`tools/debug/cenas/criar_cena_trace_doctor.py`): o trace aponta o On Demand (130 ms) e os
   12 cubos; Fix muda o Load Mode e marca o Static Batch, o arquivo salvo guarda a mudança, Revert volta e os
-  itens reaparecem. Falta o aceite com janela num jogo real.
+  itens reaparecem. Aceito com janela pelo usuário em 2026-11-05: plano concluído.

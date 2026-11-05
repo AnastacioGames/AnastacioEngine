@@ -486,8 +486,6 @@ existem no `_prepareData` mas não são usados e a pasta `Track/` está vazia.
 
 - **Game Trace ([game-trace.md](game-trace.md))** — fases 1 a 4 feitas (scripts/runtime no relatório e no
   launcher em 2026-10-24); culpado provável por frame lento no relatório (2026-11-01, falta conferir num trace real). Falta usar num jogo real com som (o `--server` não toca).
-- **Trace Doctor ([plano](plano-trace-doctor.md))** — etapas 1 e 2 feitas em 2026-11-05. Falta o aceite com
-  janela do botão **Game Trace...** do Scene Doctor num jogo real (testado em background numa cena gerada).
 - **Static Batch:** Auto Static Batch medido em 2026-10-30 no benchmark da Thunder: igual ao manual e empatado
   com a Thunder ([batching estático e culling](batching-estatico-e-culling.md)). Ligado por padrão em cena nova desde 2026-10-30; aceito com janela em 2026-10-30.
 - **Travadas do RolimaRacer (2026-10-10):** `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo. Abertos:

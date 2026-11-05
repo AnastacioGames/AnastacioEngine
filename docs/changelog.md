@@ -17,7 +17,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   On Demand convertido no jogo. O Scene Doctor ganhou **Game Trace...**: abre o arquivo e mostra cada sugestão
   com Fix e Revert, conferida de novo no `.range` aberto.
 - Teste em background com `tools/debug/cenas/criar_cena_trace_doctor.py`: sugestões certas, Fix salvo no arquivo,
-  Revert volta. Falta aceite com janela num jogo real.
+  Revert volta. Aceito com janela pelo usuário no mesmo dia.
 
 
 ## 2026-11-05 - Range Trace passa a se chamar Game Trace
