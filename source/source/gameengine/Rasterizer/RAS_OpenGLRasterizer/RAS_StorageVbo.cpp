@@ -158,5 +158,16 @@ void RAS_StorageVbo::IndexPrimitivesInstancing(unsigned int numinstance)
 
 void RAS_StorageVbo::IndexPrimitivesBatching(const std::vector<intptr_t>& indices, const std::vector<int>& counts)
 {
-	glMultiDrawElements(m_mode, counts.data(), GL_UNSIGNED_INT, (const void **)indices.data(), counts.size());
+#ifndef __EMSCRIPTEN__
+	if (glMultiDrawElements) {
+		glMultiDrawElements(m_mode, counts.data(), GL_UNSIGNED_INT, (const void **)indices.data(), counts.size());
+		return;
+	}
+#endif
+	// WebGL / GLES have no glMultiDrawElements: one draw per batch part, same indices.
+	for (size_t i = 0; i < counts.size(); ++i) {
+		if (counts[i] > 0) {
+			glDrawElements(m_mode, counts[i], GL_UNSIGNED_INT, (const void *)indices[i]);
+		}
+	}
 }
