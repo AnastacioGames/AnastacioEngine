@@ -8,6 +8,7 @@ No jogo (script fsr_test.py, objeto camera):
   FSR_SHOT    caminho .png: captura no quadro 60
   FSR_RESULT  arquivo texto com o tempo medio de quadro 60-300 (opcional)
   FSR_FRAMES  ultimo quadro (padrao 300); o jogo fecha nele
+Na geracao, FSR_BAKE_SCALE, FSR_BAKE_SHOT e FSR_BAKE_FRAMES mudam esses padroes (Web, sem variaveis de ambiente).
 Nada se move durante a medicao.
 """
 import bpy
@@ -151,6 +152,10 @@ def tick(cont):
                 f.write(line + '\n')
         bge.logic.endGame()
 '''
+# Web has no environment: FSR_BAKE_SCALE / FSR_BAKE_FRAMES at generation become the script defaults.
+GAME_SCRIPT = GAME_SCRIPT.replace("'FSR_SCALE', '1.0'", "'FSR_SCALE', '%s'" % os.environ.get('FSR_BAKE_SCALE', '1.0'))
+GAME_SCRIPT = GAME_SCRIPT.replace("'FSR_SHOT', ''", "'FSR_SHOT', '%s'" % os.environ.get('FSR_BAKE_SHOT', ''))
+GAME_SCRIPT = GAME_SCRIPT.replace("'FSR_FRAMES', '300'", "'FSR_FRAMES', '%s'" % os.environ.get('FSR_BAKE_FRAMES', '300'))
 text = bpy.data.texts.new('fsr_test.py')
 text.write(GAME_SCRIPT)
 scene.objects.active = cam
