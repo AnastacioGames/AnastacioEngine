@@ -22,7 +22,7 @@ import time
 
 import bpy
 from bpy.app.translations import pgettext_tip as tip_
-from bpy.props import IntProperty
+from bpy.props import IntProperty, StringProperty
 from bpy.types import Operator, Panel
 
 SEVERITY_ORDER = {'HIGH': 0, 'MEDIUM': 1, 'LOW': 2}
@@ -61,6 +61,8 @@ _issues = []
 _ignored = set()
 _applied = []
 _last_scene = ""
+# sugestoes.json of a Game Trace run (tools/debug/relatorio_trace.py), read again at every check.
+_trace_path = ""
 
 
 def _scene_objects(scene):
@@ -696,6 +698,60 @@ def rule_probe_volume(scene, objects):
 
 
 
+def _trace_suggestions():
+    if not _trace_path:
+        return []
+    with open(_trace_path, encoding="utf-8") as f:
+        return json.load(f).get("sugestoes", [])
+
+
+def rule_game_trace(scene, objects):
+    """Fixes the Game Trace measured in a game run, checked again against the open file."""
+    issues = []
+    names = {ob.name: ob for ob in objects}
+    source = tip_("Measured by the Game Trace: %s.")
+    for sug in _trace_suggestions():
+        gain = sug.get("ganho", "")
+        if sug.get("regra") == "on_demand":
+            ob = names.get(sug.get("objeto", ""))
+            if ob is None or ob.game_load_mode != 'ON_DEMAND':
+                continue  # not in this scene, or already changed
+
+            def fix(ob=ob):
+                ob.game_load_mode = 'SCENE'
+
+                def revert():
+                    ob.game_load_mode = 'ON_DEMAND'
+                return revert
+            issues.append(Issue(
+                "trace_on_demand", ob.name, 'MEDIUM',
+                tip_("%s is converted during the game (On Demand)") % ob.name,
+                (source % gain) + " " + tip_("Fix sets Load Mode to With Scene: it is created at load and stops "
+                                             "costing a stall in the game, but uses memory from the start."),
+                [ob], fix))
+        elif sug.get("regra") == "static_batch":
+            obs = [names[n] for n in sug.get("objetos", []) if n in names]
+            obs = [ob for ob in obs if _static_batch_candidate(ob) and not _has_logic(ob)]
+            if len(obs) < 2:
+                continue
+
+            def fix(obs=obs):
+                for ob in obs:
+                    ob.use_static_batch = True
+
+                def revert():
+                    for ob in obs:
+                        ob.use_static_batch = False
+                return revert
+            issues.append(Issue(
+                "trace_static_batch", sug.get("alvo", ""), 'MEDIUM',
+                tip_("%d static object(s) with %s drawn one by one") % (len(obs), sug.get("alvo", "")),
+                (source % gain) + " " + tip_("Fix marks Static Batch on them (Auto Static Batch is off in this "
+                                             "scene). Check that no script moves them before fixing."),
+                sorted(obs, key=lambda o: o.name), fix))
+    return issues
+
+
 RULES = (
     rule_textures,
     rule_heavy_meshes,
@@ -707,6 +763,7 @@ RULES = (
     rule_sounds,
     rule_scripts_every_frame,
     rule_probe_volume,
+    rule_game_trace,
 )
 
 
@@ -776,6 +833,44 @@ class GAME_OT_scene_doctor(Operator):
             self.report({'INFO'}, tip_("Scene Doctor: %d issue(s), see Properties > Scene") % len(issues))
         else:
             self.report({'INFO'}, tip_("Scene Doctor: nothing to improve"))
+        return {'FINISHED'}
+
+
+class GAME_OT_scene_doctor_trace(Operator):
+    """Load the fixes a Game Trace run suggested (sugestoes.json in the trace folder) and check the scene"""
+    bl_idname = "game.scene_doctor_trace"
+    bl_label = "Game Trace Suggestions"
+
+    filepath: StringProperty(subtype='FILE_PATH')
+    filter_glob: StringProperty(default="*.json", options={'HIDDEN'})
+
+    def invoke(self, context, event):
+        context.window_manager.fileselect_add(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        global _trace_path
+        try:
+            with open(self.filepath, encoding="utf-8") as f:
+                ok = "sugestoes" in json.load(f)
+        except (OSError, ValueError):
+            ok = False
+        if not ok:
+            self.report({'ERROR'}, tip_("Not a sugestoes.json of the Game Trace: %s") % self.filepath)
+            return {'CANCELLED'}
+        _trace_path = self.filepath
+        return bpy.ops.game.scene_doctor()
+
+
+class GAME_OT_scene_doctor_trace_clear(Operator):
+    """Stop using the Game Trace suggestions"""
+    bl_idname = "game.scene_doctor_trace_clear"
+    bl_label = "Clear Game Trace Suggestions"
+
+    def execute(self, context):
+        global _trace_path
+        _trace_path = ""
+        _run(context)
         return {'FINISHED'}
 
 
@@ -874,7 +969,13 @@ class SCENE_PT_scene_doctor(Panel):
 
     def draw(self, context):
         layout = self.layout
-        layout.operator("game.scene_doctor", text="Check Scene", icon='VIEWZOOM')
+        row = layout.row(align=True)
+        row.operator("game.scene_doctor", text="Check Scene", icon='VIEWZOOM')
+        row.operator("game.scene_doctor_trace", text="Game Trace...", icon='FILE_TEXT')
+        if _trace_path:
+            row = layout.row(align=True)
+            row.label(text=tip_("Game Trace: %s") % os.path.basename(os.path.dirname(_trace_path)), translate=False)
+            row.operator("game.scene_doctor_trace_clear", text="", icon='X')
 
         if _applied:
             box = layout.box()
@@ -927,5 +1028,7 @@ classes = (
     GAME_OT_scene_doctor_fix,
     GAME_OT_scene_doctor_revert,
     GAME_OT_scene_doctor_ignore,
+    GAME_OT_scene_doctor_trace,
+    GAME_OT_scene_doctor_trace_clear,
     SCENE_PT_scene_doctor,
 )

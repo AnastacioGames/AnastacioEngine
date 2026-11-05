@@ -850,6 +850,23 @@ static void trace_start_rail(BL_SceneConverter& converter, KX_Scene *scene)
 	scene->StartTraceRail(camera, curve, std::move(points), seconds > 0.0 ? seconds : 60.0, reverse, start, wait);
 }
 
+/// Physics type of an object for the trace (the Static Batch rule of the report only takes static ones).
+static const char *trace_physics_type(const Object *ob)
+{
+	switch (ob->body_type) {
+		case OB_BODY_TYPE_NO_COLLISION: return "no_collision";
+		case OB_BODY_TYPE_STATIC: return "static";
+		case OB_BODY_TYPE_DYNAMIC: return "dynamic";
+		case OB_BODY_TYPE_RIGID: return "rigid";
+		case OB_BODY_TYPE_SOFT: return "soft";
+		case OB_BODY_TYPE_OCCLUDER: return "occluder";
+		case OB_BODY_TYPE_SENSOR: return "sensor";
+		case OB_BODY_TYPE_NAVMESH: return "navmesh";
+		case OB_BODY_TYPE_CHARACTER: return "character";
+	}
+	return "other";
+}
+
 static void trace_scene_load(BL_SceneConverter& converter, KX_Scene *scene, double seconds, bool libloading)
 {
 	const std::string sceneName = CM_TraceStr(scene->GetName());
@@ -869,7 +886,10 @@ static void trace_scene_load(BL_SceneConverter& converter, KX_Scene *scene, doub
 		              ((ob && (ob->lay & sceneLay)) ? "true" : "false") + ",\"visible\":" +
 		              (gameobj->GetVisible() ? "true" : "false") + ",\"navmesh\":" +
 		              ((ob && ob->body_type == OB_BODY_TYPE_NAVMESH) ? "true" : "false") + ",\"static_batch\":" +
-		              ((ob && (ob->gameflag2 & OB_STATIC_BATCH)) ? "true" : "false") + ",\"meshes\":" + trace_json_list(meshNames));
+		              ((ob && (ob->gameflag2 & OB_STATIC_BATCH)) ? "true" : "false") + ",\"physics\":\"" +
+		              (ob ? trace_physics_type(ob) : "other") + "\",\"parent\":" + ((ob && ob->parent) ? "true" : "false") +
+		              ",\"logic\":" + ((ob && (ob->controllers.first || ob->actuators.first || ob->components.first)) ? "true" : "false") +
+		              ",\"meshes\":" + trace_json_list(meshNames));
 	}
 
 	for (KX_Mesh *mesh : meshes) {
@@ -911,7 +931,8 @@ static void trace_scene_load(BL_SceneConverter& converter, KX_Scene *scene, doub
 	CM_TraceEvent("scene_load", "\"scene\":" + sceneName + ",\"ms\":" + std::to_string(seconds * 1000.0) +
 	              ",\"libload\":" + (libloading ? "true" : "false") + ",\"objects\":" +
 	              std::to_string(converter.GetObjects().size()) + ",\"meshes\":" + std::to_string(meshes.size()) +
-	              ",\"materials\":" + std::to_string(materials.size()));
+	              ",\"materials\":" + std::to_string(materials.size()) + ",\"auto_static_batch\":" +
+	              ((scene->GetBlenderScene()->gm.lodflag & SCE_AUTO_STATIC_BATCH) ? "true" : "false"));
 }
 
 void BL_Converter::ConvertScene(BL_SceneConverter& converter, bool libloading, bool actions)

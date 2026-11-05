@@ -88,6 +88,8 @@ Uma linha JSON por evento: `{"t":segundos,"f":frame,"ev":"tipo",...}`. Tipos: `s
 `scene_remove`, `end`.
 Objetos são casados por nome entre cenas, porque réplicas e objetos On Demand entram na cena de destino com
 o nome do original (os On Demand aparecem primeiro na cena temporária `..ConvertSceneObject..`).
+`object` grava também `physics` (tipo de física), `parent` e `logic` (tem logic bricks ou componentes);
+`scene_load` grava `auto_static_batch`.
 
 ## Como ler o relatório
 
@@ -110,7 +112,13 @@ o nome do original (os On Demand aparecem primeiro na cena temporária `..Conver
   culpado e ganho estimado (o custo medido do sintoma: ms somados das cargas ou ms/frame do script). A tabela de
   frames lentos ganha a coluna "como corrigir"; culpado sem regra (contador do `work` ou categoria) recebe uma
   dica geral. Regra sem dados não dispara, e o relatório lista quais ficaram sem dados. Static Batch só dispara
-  quando o trace gravar o Auto Static Batch da cena e a física do objeto (etapa 2).
+  em cena com o Auto Static Batch desligado: 10 ou mais malhas pequenas (até 500 triângulos), estáticas, sem
+  lógica nem pai, com o mesmo material e fora do lote (traces gravados antes de 2026-11-05 não têm esses campos).
+- **Aplicar no editor:** o relatório grava `sugestoes.json` na pasta do trace, só com as correções seguras e
+  reversíveis (Static Batch e Load Mode "With Scene" de objetos On Demand). No editor, **Properties > Scene >
+  Scene Doctor > Game Trace...** abre esse arquivo; cada sugestão vira um item com Fix e Revert, conferido de
+  novo no `.range` aberto (o objeto existe nesta cena, ainda está On Demand, ainda é candidato ao Static Batch).
+  Imagens, scripts, cenas e shaders continuam só como texto no relatório.
 - **Trilho de câmera:** a curva dividida em 40 trechos; faixa e mapa visto de cima coloridos de verde a
   vermelho pelo custo médio. Trecho quente = acima de 125% da mediana dos trechos e 1 ms a mais. Os primeiros
   10 frames do trilho ficam de fora (fim do load). A coluna de categorias diz o que pesa: MainRender e
