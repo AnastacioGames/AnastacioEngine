@@ -15,6 +15,8 @@ uniform vec4 rain_params5; // ripple size, ripple rate, splash normal, splash mi
 uniform vec4 rain_puddle1; // use puddles, amount, size (m), darkness
 uniform vec4 rain_puddle2; // reflection, distance, minimum upward normal, use SSR
 uniform vec4 rain_wet; // Wet Surfaces: level (0 dry .. 1 wet), darkness, gloss, distance
+uniform vec4 rain_wet_smooth; // Smooth Normals: steps (0-3), radius, cos(Keep Edges), distance
+uniform float rain_wet_smooth_strength; // 0 = flat .. 1 = smoothed
 uniform vec3 rain_sky_horizon; // World horizon/zenith: what the puddles reflect
 uniform vec3 rain_sky_zenith;
 uniform vec3 rain_color;
@@ -438,17 +440,22 @@ vec3 rainLightning(vec3 col, vec2 uv, float depth, vec2 res, vec4 lightning)
 	return col * (1.0 + lightning.x * 1.2) + tint * (lightning.x * (0.04 + 0.3 * sky) + halo * 0.35 * sky);
 }
 
-/* Wet Surfaces normal: the depth-derivative normal is flat per triangle, so a smooth-shaded
- * sphere showed every facet in the wet sheen. Rebuild it from central differences over wider
- * steps (3, 8, 16 px), which span neighbouring triangles and follow the curved surface; a step that
- * crosses into another object (depth jump) falls back to its near side or is skipped. */
-vec3 wetSmoothNormal(sampler2D depthTex, vec2 uv, vec3 P, vec3 facetN, vec3 camPos)
+/* Wet Surfaces > Smooth Normals: the depth-derivative normal is flat per triangle, so a
+ * shade-smooth sphere showed every facet in the wet sheen. Rebuild it from central differences
+ * over wider steps (4, 12, 24 px * Radius, as many as Quality: sm.x = 0..3), which span
+ * neighbouring triangles. A step that crosses into another object (depth jump) uses its near
+ * side; a step that bends more than Keep Edges (sm.z = cos angle) is skipped, so cube corners
+ * stay sharp while sphere facets blend. */
+vec3 wetSmoothNormal(sampler2D depthTex, vec2 uv, vec3 P, vec3 facetN, vec3 camPos, vec4 sm)
 {
 	vec2 texel = 1.0 / vec2(textureSize(depthTex, 0));
 	float camDist = length(P - camPos);
 	vec3 acc = vec3(0.0);
 	for (int i = 0; i < 3; i++) {
-		float r = (i == 0) ? 3.0 : (i == 1) ? 8.0 : 16.0;
+		if (float(i) >= sm.x) {
+			break;
+		}
+		float r = ((i == 0) ? 4.0 : (i == 1) ? 12.0 : 24.0) * sm.y;
 		float lim = camDist * r * texel.y * 6.0;
 		vec2 ox = vec2(r * texel.x, 0.0);
 		vec2 oy = vec2(0.0, r * texel.y);
@@ -468,7 +475,13 @@ vec3 wetSmoothNormal(sampler2D depthTex, vec2 uv, vec3 P, vec3 facetN, vec3 camP
 			continue;
 		}
 		n = normalize(n);
-		acc += (dot(n, facetN) < 0.0) ? -n : n;
+		if (dot(n, facetN) < 0.0) {
+			n = -n;
+		}
+		if (dot(n, facetN) < sm.z) {
+			continue;
+		}
+		acc += n;
 	}
 	return (dot(acc, acc) > 1e-8) ? normalize(acc) : facetN;
 }
@@ -556,7 +569,10 @@ void main()
 		 * sky; ground (up-facing) more than walls. rain_wet.x is the wet level (wets while it rains,
 		 * dries after), so the cost is zero once it is dry. */
 		if (wetOn && !isBackground && camDist <= rain_wet.w) {
-			vec3 Nw = wetSmoothNormal(depthbuffer, texcoord, worldPos, normal, camPos);
+			vec3 Nw = normal;
+			if (rain_wet_smooth.x > 0.5 && rain_wet_smooth_strength > 0.001 && camDist < rain_wet_smooth.w) {
+				Nw = normalize(mix(normal, wetSmoothNormal(depthbuffer, texcoord, worldPos, normal, camPos, rain_wet_smooth), rain_wet_smooth_strength));
+			}
 			float wetFade = 1.0 - smoothstep(rain_wet.w * 0.75, rain_wet.w, camDist);
 			float w = rain_wet.x * wetFade * mix(0.6, 1.0, smoothstep(0.0, 0.7, Nw.z));
 			finalColor *= 1.0 - rain_wet.y * 0.5 * w;

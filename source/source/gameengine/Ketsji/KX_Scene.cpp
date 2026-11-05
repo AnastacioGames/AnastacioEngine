@@ -578,6 +578,11 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 			filters.rain_wet[1] = world->rain_wet_darkness;
 			filters.rain_wet[2] = world->rain_wet_gloss;
 			filters.rain_wet[3] = world->rain_wet_distance;
+			filters.rain_wet_smooth[0] = (float)world->rain_wet_smooth_steps;
+			filters.rain_wet_smooth[1] = world->rain_wet_smooth_radius;
+			filters.rain_wet_smooth[2] = cosf(world->rain_wet_smooth_angle);
+			filters.rain_wet_smooth[3] = world->rain_wet_smooth_distance;
+			filters.rain_wet_smooth_strength = world->rain_wet_smooth_strength;
 		}
 		/* World colors: what the puddles reflect and the SSR fallback for rays without a hit. */
 		filters.rain_sky_horizon[0] = world->horr;

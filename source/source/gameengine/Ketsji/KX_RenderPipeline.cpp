@@ -1152,6 +1152,11 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 				rainParams->rain_wet[1] = world->rain_wet_darkness;
 				rainParams->rain_wet[2] = world->rain_wet_gloss;
 				rainParams->rain_wet[3] = world->rain_wet_distance;
+				rainParams->rain_wet_smooth[0] = (float)world->rain_wet_smooth_steps;
+				rainParams->rain_wet_smooth[1] = world->rain_wet_smooth_radius;
+				rainParams->rain_wet_smooth[2] = cosf(world->rain_wet_smooth_angle);
+				rainParams->rain_wet_smooth[3] = world->rain_wet_smooth_distance;
+				rainParams->rain_wet_smooth_strength = world->rain_wet_smooth_strength;
 				rainParams->rain_sky_horizon[0] = world->horr;
 				rainParams->rain_sky_horizon[1] = world->horg;
 				rainParams->rain_sky_horizon[2] = world->horb;

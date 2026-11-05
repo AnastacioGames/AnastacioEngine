@@ -251,7 +251,12 @@ typedef struct World {
 	double rain_wet_time;
 	float rain_wet_level;
 	short rain_wet_flag; /* WO_RAIN_WET_* */
-	short rain_wet_pad;
+	/* Smooth Normals: the wet sheen rebuilds the normal from depth, flat per triangle;
+	 * these blur it over 0-3 steps (Off/Low/Medium/High) of radius px * rain_wet_smooth_radius,
+	 * keeping edges sharper than rain_wet_smooth_angle (radians), up to rain_wet_smooth_distance. */
+	short rain_wet_smooth_steps;
+	float rain_wet_smooth_radius, rain_wet_smooth_angle, rain_wet_smooth_distance;
+	float rain_wet_smooth_strength; /* 0 = flat normal .. 1 = fully smoothed */
 
 	ListBase gpumaterial;		/* runtime */
 

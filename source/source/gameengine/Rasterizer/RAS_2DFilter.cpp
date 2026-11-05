@@ -152,6 +152,8 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_RainPuddle1", // GE_RAIN_PUDDLE1_UNIFORM
 	"ge_RainPuddle2", // GE_RAIN_PUDDLE2_UNIFORM
 	"ge_RainWet", // GE_RAIN_WET_UNIFORM
+	"ge_RainWetSmooth", // GE_RAIN_WET_SMOOTH_UNIFORM
+	"ge_RainWetSmoothStrength", // GE_RAIN_WET_SMOOTH_STRENGTH_UNIFORM
 	"ge_RainSkyHorizon", // GE_RAIN_SKY_HORIZON_UNIFORM
 	"ge_RainSkyZenith", // GE_RAIN_SKY_ZENITH_UNIFORM
 	"ge_CloudsParams", // GE_CLOUDS_PARAMS_UNIFORM
@@ -942,6 +944,12 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 	}
 	if (m_predefinedUniforms[GE_RAIN_WET_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_WET_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.rain_wet, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_WET_SMOOTH_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_WET_SMOOTH_UNIFORM], RAS_Uniform::UNI_FLOAT4, m_buildInFilters.rain_wet_smooth, sizeof(float) * 4, 1);
+	}
+	if (m_predefinedUniforms[GE_RAIN_WET_SMOOTH_STRENGTH_UNIFORM] != -1) {
+		SetUniformfv(m_predefinedUniforms[GE_RAIN_WET_SMOOTH_STRENGTH_UNIFORM], RAS_Uniform::UNI_FLOAT, &m_buildInFilters.rain_wet_smooth_strength, sizeof(float), 1);
 	}
 	if (m_predefinedUniforms[GE_RAIN_SKY_HORIZON_UNIFORM] != -1) {
 		SetUniformfv(m_predefinedUniforms[GE_RAIN_SKY_HORIZON_UNIFORM], RAS_Uniform::UNI_FLOAT3, m_buildInFilters.rain_sky_horizon, sizeof(float) * 3, 1);

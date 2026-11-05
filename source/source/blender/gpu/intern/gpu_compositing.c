@@ -132,6 +132,8 @@ typedef struct {
   int rain_puddle1_uniform;
   int rain_puddle2_uniform;
   int rain_wet_uniform;
+  int rain_wet_smooth_uniform;
+  int rain_wet_smooth_strength_uniform;
   int rain_sky_horizon_uniform;
   int rain_sky_zenith_uniform;
 } GPURAINShaderInterface;
@@ -1997,6 +1999,11 @@ bool GPU_fx_do_composite_pass(
 				const float rain_wet[4] = {BKE_world_rain_wet_level(world, PIL_check_seconds_timer()),
 				                           world->rain_wet_darkness, world->rain_wet_gloss, world->rain_wet_distance};
 				GPU_shader_uniform_vector(rain_shader, interface->rain_wet_uniform, 4, 1, rain_wet);
+				const float rain_wet_smooth[4] = {(float)world->rain_wet_smooth_steps, world->rain_wet_smooth_radius,
+				                                  cosf(world->rain_wet_smooth_angle), world->rain_wet_smooth_distance};
+				GPU_shader_uniform_vector(rain_shader, interface->rain_wet_smooth_uniform, 4, 1, rain_wet_smooth);
+				GPU_shader_uniform_vector(rain_shader, interface->rain_wet_smooth_strength_uniform, 1, 1,
+				                          &world->rain_wet_smooth_strength);
 			}
 			GPU_shader_uniform_vector(rain_shader, interface->rain_sky_horizon_uniform, 3, 1, rain_sky_horizon);
 			GPU_shader_uniform_vector(rain_shader, interface->rain_sky_zenith_uniform, 3, 1, rain_sky_zenith);
@@ -2818,6 +2825,8 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			interface->rain_puddle1_uniform = GPU_shader_get_uniform(shader, "rain_puddle1");
 			interface->rain_puddle2_uniform = GPU_shader_get_uniform(shader, "rain_puddle2");
 			interface->rain_wet_uniform = GPU_shader_get_uniform(shader, "rain_wet");
+			interface->rain_wet_smooth_uniform = GPU_shader_get_uniform(shader, "rain_wet_smooth");
+			interface->rain_wet_smooth_strength_uniform = GPU_shader_get_uniform(shader, "rain_wet_smooth_strength");
 			interface->rain_sky_horizon_uniform = GPU_shader_get_uniform(shader, "rain_sky_horizon");
 			interface->rain_sky_zenith_uniform = GPU_shader_get_uniform(shader, "rain_sky_zenith");
 

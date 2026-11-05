@@ -38,6 +38,7 @@
 #include "BLI_string.h"
 #include "BLI_string_utils.h"
 #include "BLI_math_base.h"
+#include "BLI_math_rotation.h"
 
 #include "BKE_animsys.h"
 #include "BKE_icons.h"
@@ -399,6 +400,11 @@ void BKE_world_init(World *wrld)
 	wrld->rain_wet_gloss = 0.5f;
 	wrld->rain_wet_distance = 80.0f;
 	wrld->rain_wet_dry_time = 20.0f;
+	wrld->rain_wet_smooth_steps = 2;
+	wrld->rain_wet_smooth_radius = 1.0f;
+	wrld->rain_wet_smooth_angle = DEG2RADF(30.0f);
+	wrld->rain_wet_smooth_distance = 30.0f;
+	wrld->rain_wet_smooth_strength = 1.0f;
 	wrld->rain_puddle_amount = 0.5f;
 	wrld->rain_puddle_size = 4.0f;
 	wrld->rain_puddle_darkness = 0.4f;

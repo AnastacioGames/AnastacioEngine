@@ -1380,6 +1380,50 @@ static void rna_def_world_weather(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Dry Time", "Seconds the surfaces take to dry after the rain stops (Intensity 0)");
 	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
+	{
+		static const EnumPropertyItem wet_smooth_items[] = {
+			{0, "OFF", 0, "Off", "Flat normal per triangle: cheapest, low-poly curves show their facets"},
+			{1, "LOW", 0, "Low", "One smoothing step (4 depth reads per wet pixel)"},
+			{2, "MEDIUM", 0, "Medium", "Two smoothing steps (8 depth reads per wet pixel)"},
+			{3, "HIGH", 0, "High", "Three smoothing steps (12 depth reads per wet pixel): smoothest, heaviest"},
+			{0, NULL, 0, NULL, NULL}
+		};
+		prop = RNA_def_property(srna, "rain_wet_smooth_quality", PROP_ENUM, PROP_NONE);
+		RNA_def_property_enum_sdna(prop, NULL, "rain_wet_smooth_steps");
+		RNA_def_property_enum_items(prop, wet_smooth_items);
+		RNA_def_property_ui_text(prop, "Smooth Normals",
+		                         "Smooth the wet sheen over curved low-poly surfaces (shade smooth spheres show "
+		                         "their facets otherwise); higher costs more GPU");
+		RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	}
+
+	prop = RNA_def_property(srna, "rain_wet_smooth_radius", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.25f, 4.0f);
+	RNA_def_property_ui_range(prop, 0.25f, 4.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Smooth Radius",
+	                         "Size of the smoothing on screen (1 = 4/12/24 px steps); larger hides bigger facets "
+	                         "but blends more of the surroundings");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_wet_smooth_angle", PROP_FLOAT, PROP_ANGLE);
+	RNA_def_property_range(prop, 0.0174533f, 1.5707964f); /* 1 to 90 degrees */
+	RNA_def_property_ui_text(prop, "Keep Edges",
+	                         "Edges sharper than this angle stay sharp (a cube corner is 90 degrees, sphere "
+	                         "facets about 15); lower keeps more edges");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_wet_smooth_strength", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Smooth Strength", "Blend from the flat normal (0) to the smoothed one (1)");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
+	prop = RNA_def_property(srna, "rain_wet_smooth_distance", PROP_FLOAT, PROP_DISTANCE);
+	RNA_def_property_range(prop, 0.0f, 10000.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 500.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Smooth Distance",
+	                         "Smooth only up to this distance from the camera; farther the facets are too small to see");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+
 	prop = RNA_def_property(srna, "use_rain_aura", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "weather_flag", WO_WEATHER_RAIN_AURA);
 	RNA_def_property_ui_text(prop, "Aura", "Manga-style short spray strokes on the upper silhouette of the objects with the aura property (every nearby object when none has it)");

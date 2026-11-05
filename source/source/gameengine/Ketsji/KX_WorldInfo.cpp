@@ -211,6 +211,7 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 	static const struct { const char *name; short World::*field; short min, max; } extraShorts[] = {
 		{"cloud_detail", &World::cloud_detail, 1, 8},
 		{"vcloud_quality", &World::vcloud_quality, 0, 2},
+		{"wet_smooth_quality", &World::rain_wet_smooth_steps, 0, 3},
 		{"vfog_quality", &World::vfog_quality, 0, 2},
 		{"vfog_max_lights", &World::vfog_max_lights, 1, 8},
 	};
@@ -218,6 +219,8 @@ bool KX_WorldInfo::SetWeatherRuntimeProperty(const char *identifier, float value
 		{"cloud_color_r", &world->cloud_color[0]}, {"cloud_color_g", &world->cloud_color[1]},
 		{"wet_darkness", &world->rain_wet_darkness}, {"wet_gloss", &world->rain_wet_gloss},
 		{"wet_distance", &world->rain_wet_distance}, {"wet_dry_time", &world->rain_wet_dry_time},
+		{"wet_smooth_radius", &world->rain_wet_smooth_radius}, {"wet_smooth_angle", &world->rain_wet_smooth_angle},
+		{"wet_smooth_distance", &world->rain_wet_smooth_distance}, {"wet_smooth_strength", &world->rain_wet_smooth_strength},
 		{"cloud_color_b", &world->cloud_color[2]},
 		{"vcloud_coverage", &world->vcloud_coverage}, {"vcloud_scale", &world->vcloud_scale},
 		{"vcloud_speed", &world->vcloud_speed}, {"vcloud_altitude", &world->vcloud_altitude},
@@ -395,6 +398,7 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 	static const struct { const char *name; short World::*field; short min, max; } extraShorts[] = {
 		{"cloud_detail", &World::cloud_detail, 1, 8},
 		{"vcloud_quality", &World::vcloud_quality, 0, 2},
+		{"wet_smooth_quality", &World::rain_wet_smooth_steps, 0, 3},
 		{"vfog_quality", &World::vfog_quality, 0, 2},
 		{"vfog_max_lights", &World::vfog_max_lights, 1, 8},
 	};
@@ -402,6 +406,8 @@ bool KX_WorldInfo::GetWeatherRuntimeProperty(const char *identifier, float &valu
 		{"cloud_color_r", &world->cloud_color[0]}, {"cloud_color_g", &world->cloud_color[1]},
 		{"wet_darkness", &world->rain_wet_darkness}, {"wet_gloss", &world->rain_wet_gloss},
 		{"wet_distance", &world->rain_wet_distance}, {"wet_dry_time", &world->rain_wet_dry_time},
+		{"wet_smooth_radius", &world->rain_wet_smooth_radius}, {"wet_smooth_angle", &world->rain_wet_smooth_angle},
+		{"wet_smooth_distance", &world->rain_wet_smooth_distance}, {"wet_smooth_strength", &world->rain_wet_smooth_strength},
 		{"cloud_color_b", &world->cloud_color[2]},
 		{"vcloud_coverage", &world->vcloud_coverage}, {"vcloud_scale", &world->vcloud_scale},
 		{"vcloud_speed", &world->vcloud_speed}, {"vcloud_altitude", &world->vcloud_altitude},

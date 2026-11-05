@@ -137,6 +137,9 @@ typedef struct BuildInFilters {
 	float rain_puddle_min_up;
 	/* Rain > Wet Surfaces: level (0 dry .. 1 wet, BKE_world_rain_wet_level), darkness, gloss, distance */
 	float rain_wet[4];
+	/* Smooth Normals: steps (0-3), radius, cos(Keep Edges), distance; and strength */
+	float rain_wet_smooth[4];
+	float rain_wet_smooth_strength;
 	/* World horizon/zenith colors: what the puddles reflect */
 	float rain_sky_horizon[3];
 	float rain_sky_zenith[3];

@@ -726,6 +726,17 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                 sub.prop(weather, "rain_wet_dry_time", text="Dry Time (s)")
                 sub.label(text="Gets wet while it rains, dries after Intensity 0", icon='INFO')
 
+                # Smooth Normals: the sheen follows curved low-poly surfaces (shade smooth).
+                smooth = sub.box()
+                smooth.label(text="Smooth Normals")
+                smooth.prop(weather, "rain_wet_smooth_quality", text="Quality")
+                col_s = smooth.column(align=True)
+                col_s.active = weather.rain_wet_smooth_quality != 'OFF'
+                col_s.prop(weather, "rain_wet_smooth_strength", text="Strength", slider=True)
+                col_s.prop(weather, "rain_wet_smooth_radius", text="Radius")
+                col_s.prop(weather, "rain_wet_smooth_angle", text="Keep Edges")
+                col_s.prop(weather, "rain_wet_smooth_distance", text="Distance")
+
             box = _rain_section(col, weather, "show_expanded_rain_aura", "Aura", "use_rain_aura")
             if weather.show_expanded_rain_aura:
                 sub = box.column()

@@ -612,6 +612,17 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_wet_smooth_radius")) {
+    /* Rain > Wet Surfaces > Smooth Normals: Medium, edges over 30 degrees kept sharp. */
+    LISTBASE_FOREACH (World *, wo, &main->world) {
+      wo->rain_wet_smooth_steps = 2;
+      wo->rain_wet_smooth_radius = 1.0f;
+      wo->rain_wet_smooth_angle = DEG2RADF(30.0f);
+      wo->rain_wet_smooth_distance = 30.0f;
+      wo->rain_wet_smooth_strength = 1.0f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_wet_dry_time")) {
     /* Rain > Wet Surfaces: off (new flag), only the default values. */
     LISTBASE_FOREACH (World *, wo, &main->world) {
