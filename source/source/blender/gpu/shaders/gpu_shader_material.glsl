@@ -2849,6 +2849,15 @@ void do_sky_simple(vec3 view, vec3 sundir, vec3 suncol, float energy, float suns
 		outcol += world_stars(view, sundir, 0.0) * (1.0 - rough);
 }
 
+/* World > Atmospheric values arrive as live uniforms (dragging them must not recompile every
+ * material), packed here into the two vec4 that do_sky_atmospheric reads. */
+void world_atmosphere_pack(vec3 rcol, float rdensity, float tonemap, float intensity, float mdensity,
+                           float mie_g, float altitude, out vec4 rlh, out vec4 atmo)
+{
+	rlh = vec4(rcol * (rdensity * 22.4e-6), tonemap);
+	atmo = vec4(intensity, mdensity * 21e-6, mie_g, altitude);
+}
+
 /* rlh: Rayleigh coefficients (rgb) and w = 1 for the sky's own tonemap (0 when Filmic follows);
  * atmo: intensity, Mie coefficient, Mie direction g, viewer altitude in meters. */
 void do_sky_atmospheric(vec3 view, vec4 rlh, vec4 atmo, vec3 sundir, vec3 suncolor, float energy,

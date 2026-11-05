@@ -64,10 +64,12 @@ static const EnumPropertyItem rna_enum_world_sound_event_items[] = {
 #include "MEM_guardedalloc.h"
 
 #include "BLI_listbase.h"
+#include "BLI_math_vector.h"
 #include "BLI_string.h"
 
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
+#include "BKE_icons.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
 #include "BKE_texture.h"
@@ -242,11 +244,15 @@ static void rna_World_draw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), Poi
 }
 #endif
 
+/* Values the viewport reads live (shader uniforms read from the World on every bind, weather /
+ * clouds / fog passes read the DNA every frame): only redraw. Tagging the World would run
+ * world_changed(), which frees the GLSL of every material and the sky, and the 3D View froze
+ * while recompiling all of them on every step of a slider or color drag. */
 static void rna_World_draw_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	World *wo = ptr->id.data;
 
-	DAG_id_tag_update(&wo->id, 0);
+	BKE_icon_changed(BKE_icon_id_ensure(&wo->id));
 	WM_main_add_notifier(NC_WORLD | ND_WORLD_DRAW, wo);
 	WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
 
@@ -256,6 +262,28 @@ static void rna_World_draw_update(Main *bmain, Scene *UNUSED(scene), PointerRNA 
 	if (bmain->wm.first) {
 		ED_view3d_realtime_viewport_update((wmWindowManager *)bmain->wm.first);
 	}
+}
+
+/* Same as rna_World_draw_update, for settings that change which code the shaders get
+ * (aurora, environment lighting, mist on/off and falloff): those still rebuild them. */
+static void rna_World_shader_draw_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	World *wo = ptr->id.data;
+
+	DAG_id_tag_update(&wo->id, 0);
+	rna_World_draw_update(bmain, scene, ptr);
+}
+
+/* Horizon/Zenith are live uniforms, but the materials skip the sky lighting while both are
+ * black: when one of them is black the shaders may need the other path, so rebuild. */
+static void rna_World_sky_color_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	World *wo = ptr->id.data;
+
+	if (is_zero_v3(&wo->horr) || is_zero_v3(&wo->zenr))
+		rna_World_shader_draw_update(bmain, scene, ptr);
+	else
+		rna_World_draw_update(bmain, scene, ptr);
 }
 
 /* Ripples/Splash > Only in Puddles need the puddles: turning one on turns them on too. */
@@ -456,19 +484,19 @@ static void rna_def_lighting(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_environment_light", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", WO_ENV_LIGHT);
 	RNA_def_property_ui_text(prop, "Use Environment Lighting", "Add light coming from the environment");
-	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_shader_draw_update");
 
 	prop = RNA_def_property(srna, "environment_energy", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "ao_env_energy");
 	RNA_def_property_ui_range(prop, 0, FLT_MAX, 1, 3);
 	RNA_def_property_ui_text(prop, "Environment Color", "Defines the strength of environment light");
-	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_shader_draw_update");
 
 	prop = RNA_def_property(srna, "environment_color", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "aocolor");
 	RNA_def_property_enum_items(prop, prop_color_items);
 	RNA_def_property_ui_text(prop, "Environment Color", "Defines where the color of the environment light comes from");
-	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_shader_draw_update");
 
 	/* indirect lighting */
 	prop = RNA_def_property(srna, "use_indirect_light", PROP_BOOLEAN, PROP_NONE);
@@ -604,7 +632,7 @@ static void rna_def_world_mist(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_mist", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", WO_MIST);
 	RNA_def_property_ui_text(prop, "Use Mist", "Occlude objects with the environment color as they are further away");
-	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_shader_draw_update");
 
 	prop = RNA_def_property(srna, "intensity", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "misi");
@@ -630,7 +658,7 @@ static void rna_def_world_mist(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "misthi");
 	RNA_def_property_range(prop, 0, 100);
 	RNA_def_property_ui_text(prop, "Height", "Control how much mist density decreases with height");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "height_fog", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_float_sdna(prop, NULL, "mistheight");
@@ -650,7 +678,7 @@ static void rna_def_world_mist(BlenderRNA *brna)
 	RNA_def_property_enum_sdna(prop, NULL, "mistype");
 	RNA_def_property_enum_items(prop, falloff_items);
 	RNA_def_property_ui_text(prop, "Falloff", "Type of transition used to fade mist");
-	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_shader_draw_update");
 
 	prop = RNA_def_property(srna, "mist_blend_type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "aomix");
@@ -1727,13 +1755,13 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Horizon Color", "Color at the horizon");
 	/* RNA_def_property_update(prop, 0, "rna_World_update"); */
 	/* render-only uses this */
-	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_sky_color_update");
 
 	prop = RNA_def_property(srna, "zenith_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "zenr");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Zenith Color", "Color at the zenith");
-	RNA_def_property_update(prop, 0, "rna_World_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_sky_color_update");
 
 	prop = RNA_def_property(srna, "nadir_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "nadr");
@@ -1765,7 +1793,7 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0, 0.08);
 	RNA_def_property_ui_range(prop, 0.0, 0.08, 0.001, 4);
 	RNA_def_property_ui_text(prop, "Sun Size", "Sun Size");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "use_sky_moon", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_funcs(prop, "rna_World_use_sky_moon_get", "rna_World_use_sky_moon_set");
@@ -1782,25 +1810,25 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "moon_size");
 	RNA_def_property_range(prop, 0.001f, 1.0f);
 	RNA_def_property_ui_text(prop, "Moon Size", "Angular size of the visual moon; 0.1 matches the large comparison moon, 1.0 allows a giant moon");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "moon_brightness", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "moon_brightness");
 	RNA_def_property_range(prop, 0.0f, 1.0f);
 	RNA_def_property_ui_text(prop, "Moon Brightness", "Brightness of the moon disc and its short halo");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "ground_color", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "ground");
 	RNA_def_property_range(prop, 0.0, 1.0);
 	RNA_def_property_ui_text(prop, "Ground Color", "Distance to ground");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "sky_turbidity", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "turbidity");
 	RNA_def_property_range(prop, 0.0, 1.0);
 	RNA_def_property_ui_text(prop, "Turbidity", "Atmospheric turbidity");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	/* sky type */
 	prop = RNA_def_property(srna, "use_sky_blend", PROP_BOOLEAN, PROP_NONE);
@@ -1867,7 +1895,7 @@ void RNA_def_world(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_sky_aurora", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "aurora_flag", WO_AURORA_ENABLE);
 	RNA_def_property_ui_text(prop, "Aurora", "Draw an animated aurora in the night sky");
-	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_draw_update");
+	RNA_def_property_update(prop, NC_WORLD | ND_WORLD_DRAW, "rna_World_shader_draw_update");
 
 	static EnumPropertyItem aurora_colors_items[] = {
 		{WO_AURORA_GREEN, "GREEN", 0, "Green", "Green curtains, the most common aurora"},
@@ -1904,40 +1932,40 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, 1000.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 100.0f, 10, 2);
 	RNA_def_property_ui_text(prop, "Intensity", "Brightness of the atmospheric sky; the sun lamp energy does not change it");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "atmosphere_rayleigh_color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "atmo_rayleigh_col");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Air Color", "Color scattered by the air (Rayleigh): blue on Earth; the sunset gets the opposite color");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "atmosphere_rayleigh_density", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "atmo_rayleigh_density");
 	RNA_def_property_range(prop, 0.0f, 20.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 5.0f, 10, 2);
 	RNA_def_property_ui_text(prop, "Air Density", "Amount of air (1 = Earth); more air gives a deeper blue and a redder sunset");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "atmosphere_mie_density", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "atmo_mie_density");
 	RNA_def_property_range(prop, 0.0f, 50.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 2);
 	RNA_def_property_ui_text(prop, "Haze", "Dust and humidity (Mie, 1 = Earth); more haze gives a whiter sky and a bigger glow around the sun");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "atmosphere_mie_direction", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "atmo_mie_g");
 	RNA_def_property_range(prop, 0.0f, 0.99f);
 	RNA_def_property_ui_text(prop, "Sun Glow", "How much the haze concentrates the light around the sun");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "atmosphere_altitude", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_float_sdna(prop, NULL, "atmo_altitude");
 	RNA_def_property_range(prop, 1.0f, 60000.0f);
 	RNA_def_property_ui_range(prop, 1.0f, 20000.0f, 100, 0);
 	RNA_def_property_ui_text(prop, "Altitude", "Height of the viewer in the atmosphere, in meters; high up the sky gets darker");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	/* nested structs */
 	prop = RNA_def_property(srna, "light_settings", PROP_POINTER, PROP_NONE);

@@ -1863,16 +1863,20 @@ static void gpu_world_sh9_link(GPUMaterial *mat, Tex *tex, int mapping, GPUNodeL
 static void gpu_world_atmosphere_links(GPUMaterial *mat, World *wo, GPUNodeLink **rlh, GPUNodeLink **atmo)
 {
 	Scene *scene = mat->scene;
-	float r[4], a[4];
-	mul_v3_v3fl(r, wo->atmo_rayleigh_col, wo->atmo_rayleigh_density * 22.4e-6f);
-	r[3] = (BKE_scene_use_new_shading_nodes(scene) && STREQ(scene->view_settings.view_transform, "Filmic")) ? 0.0f : 1.0f;
-	a[0] = wo->atmo_intensity;
-	a[1] = wo->atmo_mie_density * 21e-6f;
-	a[2] = wo->atmo_mie_g;
-	a[3] = wo->atmo_altitude;
-	/* linked here: GPU_link copies the values while r and a still exist */
-	GPU_link(mat, "set_rgba", GPU_uniform(r), rlh);
-	GPU_link(mat, "set_rgba", GPU_uniform(a), atmo);
+	/* static: GPU_uniform keeps the pointer */
+	static float tonemap_values[2] = {0.0f, 1.0f};
+	const bool filmic = BKE_scene_use_new_shading_nodes(scene) && STREQ(scene->view_settings.view_transform, "Filmic");
+	/* Live uniforms read from the World on every bind: dragging Air Color, Intensity, Haze...
+	 * only redraws, it no longer recompiles every material (world_changed). */
+	GPU_link(mat, "world_atmosphere_pack",
+	         GPU_dynamic_uniform(wo->atmo_rayleigh_col, GPU_DYNAMIC_NONE, NULL),
+	         GPU_dynamic_uniform(&wo->atmo_rayleigh_density, GPU_DYNAMIC_NONE, NULL),
+	         GPU_uniform(&tonemap_values[filmic ? 0 : 1]),
+	         GPU_dynamic_uniform(&wo->atmo_intensity, GPU_DYNAMIC_NONE, NULL),
+	         GPU_dynamic_uniform(&wo->atmo_mie_density, GPU_DYNAMIC_NONE, NULL),
+	         GPU_dynamic_uniform(&wo->atmo_mie_g, GPU_DYNAMIC_NONE, NULL),
+	         GPU_dynamic_uniform(&wo->atmo_altitude, GPU_DYNAMIC_NONE, NULL),
+	         rlh, atmo);
 }
 
 /* Fase 5 (nos de material Game x Cycles): no caminho Shading Nodes, aplica
@@ -4061,8 +4065,8 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 								zen = GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma);
 								nad = GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL);
 							}
-							GPU_link(mat, "env_sky", hor, zen, nad, GPU_uniform(&world->ground),
-								shi->roughness_bsdf, GPU_uniform(&world->turbidity), sunDir, sunCol, sunEnergy, sunSize,
+							GPU_link(mat, "env_sky", hor, zen, nad, GPU_dynamic_uniform(&world->ground, GPU_DYNAMIC_NONE, NULL),
+								shi->roughness_bsdf, GPU_dynamic_uniform(&world->turbidity, GPU_DYNAMIC_NONE, NULL), sunDir, sunCol, sunEnergy, sunSize,
 								wv, wn, wr, &mirror, &radiosity, &transmit);
 						}
 					}
@@ -4208,7 +4212,7 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 			&mistfac);
 
 		if (world && GPUWorld.mistype == 3 && (world->skytype & WO_SKYATMOSPHERIC)) {
-			GPU_link(mat, "shade_mix_mist_atmospheric", mistfac, GPU_uniform(&world->misthi), shr->combined,
+			GPU_link(mat, "shade_mix_mist_atmospheric", mistfac, GPU_dynamic_uniform(&world->misthi, GPU_DYNAMIC_NONE, NULL), shr->combined,
 				GPU_select_uniform(GPUWorld.mistcol, GPU_DYNAMIC_MIST_COLOR, NULL, ma),
 				GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma),
 				GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL), sunDir, sunSize, &shr->combined);
@@ -4605,7 +4609,7 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 
 				} else {
 					GPU_link(mat, "do_sky_simple", shi.view, sunDir, sunCol, sunEnergy, sunSize,
-						GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(env_sky), &shi.rgb);
+						GPU_dynamic_uniform(&wo->turbidity, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&wo->ground, GPU_DYNAMIC_NONE, NULL), moonEnabled, moonSize, moonBrightness, blend, hor, zen, nad, GPU_uniform(env_sky), &shi.rgb);
 				}
 
 				if (moonSurface) {
@@ -4618,14 +4622,14 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 
 				if (GPUWorld.mistype == 3) { // use Height Fog
 					GPU_link(mat, "shade_mist_factor", ray, shi.view,
-						GPU_builtin(GPU_INVERSE_VIEW_MATRIX), GPU_uniform(&GPUWorld.mistenabled),
-						GPU_uniform(&GPUWorld.miststart), GPU_uniform(&GPUWorld.mistdistance),
-						GPU_uniform(&GPUWorld.mistheight), GPU_uniform(&GPUWorld.mistdensity),
-						GPU_uniform(&GPUWorld.mistype), GPU_uniform(&GPUWorld.mistintensity), &blend);
+						GPU_builtin(GPU_INVERSE_VIEW_MATRIX), GPU_dynamic_uniform(&GPUWorld.mistenabled, GPU_DYNAMIC_NONE, NULL),
+						GPU_dynamic_uniform(&GPUWorld.miststart, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&GPUWorld.mistdistance, GPU_DYNAMIC_NONE, NULL),
+						GPU_dynamic_uniform(&GPUWorld.mistheight, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&GPUWorld.mistdensity, GPU_DYNAMIC_NONE, NULL),
+						GPU_uniform(&GPUWorld.mistype), GPU_dynamic_uniform(&GPUWorld.mistintensity, GPU_DYNAMIC_NONE, NULL), &blend);
 				}
 
 				if (wo->skytype & WO_SKYATMOSPHERIC) {
-					GPU_link(mat, "shade_mix_mist_atmospheric", blend, GPU_uniform(&wo->misthi),
+					GPU_link(mat, "shade_mix_mist_atmospheric", blend, GPU_dynamic_uniform(&wo->misthi, GPU_DYNAMIC_NONE, NULL),
 						shi.rgb, hor, zen, nad, sunDir, sunSize, &shi.rgb);
 				}
 				else {
@@ -4646,7 +4650,7 @@ static void gpu_material_old_world(struct GPUMaterial *mat, struct World *wo, st
 			if (wo->skytype & WO_SKYREAL) {
 				/* if not skyblend but skyreal use old real sky without ground color */
 				GPU_link(mat, "background_transform_to_world", GPU_material_builtin(mat, GPU_VIEW_POSITION), &ray);
-				GPU_link(mat, "world_blend_real", ray, GPU_uniform(&wo->turbidity), GPU_uniform(&wo->ground), &blend);
+				GPU_link(mat, "world_blend_real", ray, GPU_dynamic_uniform(&wo->turbidity, GPU_DYNAMIC_NONE, NULL), GPU_dynamic_uniform(&wo->ground, GPU_DYNAMIC_NONE, NULL), &blend);
 				GPU_link(mat, "mix_rgb3", blend, hor, zen, &shi.rgb);
 			} else
 				GPU_link(mat, "set_rgb", hor, &shi.rgb);
@@ -4811,8 +4815,8 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 			GPUNodeLink *hor = GPU_select_uniform(GPUWorld.horicol, GPU_DYNAMIC_HORIZON_COLOR, NULL, ma);
 			GPUNodeLink *zen = GPU_select_uniform(GPUWorld.zencol, GPU_DYNAMIC_ZENITH_COLOR, NULL, ma);
 			GPUNodeLink *nad = GPU_dynamic_uniform(&world->nadr, GPU_DYNAMIC_NADIR_COLOR, NULL);
-			GPU_link(mat, "env_sky", hor, zen, nad, GPU_uniform(&world->ground),
-			         rough, GPU_uniform(&world->turbidity), sunDir, sunCol, sunEnergy, sunSize,
+			GPU_link(mat, "env_sky", hor, zen, nad, GPU_dynamic_uniform(&world->ground, GPU_DYNAMIC_NONE, NULL),
+			         rough, GPU_dynamic_uniform(&world->turbidity, GPU_DYNAMIC_NONE, NULL), sunDir, sunCol, sunEnergy, sunSize,
 			         wv, wn, wr, &mirror, &diffibl, &transmit);
 		}
 	}
