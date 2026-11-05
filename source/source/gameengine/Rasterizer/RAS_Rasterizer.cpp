@@ -53,6 +53,9 @@
 #include "GPU_shader.h"
 
 #include <algorithm>
+#include <cstdlib>
+#include <cstring>
+#include <cmath>
 #include "GPU_texture.h"
 
 #include "BLI_math_vector.h"
@@ -435,7 +438,80 @@ void RAS_Rasterizer::DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen
 	SetDepthFunc(RAS_ALWAYS);
 
 	RAS_OffScreen::RestoreScreen();
-	DrawOffScreen(offScreen, nullptr, true);
+	/* Reduced render (dynamic resolution): FSR 1 instead of the plain stretch. Only without
+	 * VR lens distortion, which has its own resampling. RANGE_UPSCALE=fsr turns it on for now:
+	 * EASU upscales into a full size target, then RCAS sharpens it onto the screen.
+	 * RANGE_UPSCALE=easu skips RCAS. RANGE_FSR_SHARP sets the RCAS stops (0 = strongest, default 0.2). */
+	static const int fsrMode = []() {
+		const char *mode = getenv("RANGE_UPSCALE");
+		if (!mode) {
+			return 0;
+		}
+		return (strcmp(mode, "fsr") == 0) ? 2 : (strcmp(mode, "easu") == 0) ? 1 : 0;
+	}();
+	static const float fsrSharp = []() {
+		const char *stops = getenv("RANGE_FSR_SHARP");
+		return exp2f(-((stops && stops[0]) ? std::max(0.0f, (float)atof(stops)) : 0.2f));
+	}();
+	GPUShader *easuShader = nullptr;
+	if (fsrMode > 0 && m_vrLensK <= 0.0f && m_vrVignette <= 0.0f &&
+	    ((int)offScreen->GetWidth() < viewport[2] || (int)offScreen->GetHeight() < viewport[3]))
+	{
+		easuShader = GPU_shader_get_builtin_shader(GPU_SHADER_FSR_EASU);
+	}
+	GPUShader *rcasShader = nullptr;
+	if (easuShader && fsrMode == 2) {
+		rcasShader = GPU_shader_get_builtin_shader(GPU_SHADER_FSR_RCAS);
+		if (rcasShader && (!m_fsrOffScreen || (int)m_fsrOffScreen->GetWidth() != viewport[2] ||
+		                   (int)m_fsrOffScreen->GetHeight() != viewport[3]))
+		{
+			m_fsrOffScreen.reset(new RAS_OffScreen(viewport[2], viewport[3], 0, {{1, RAS_HDR_NONE}},
+			                                       RAS_OffScreen::RAS_OFFSCREEN_CUSTOM));
+			if (!m_fsrOffScreen->GetValid()) {
+				m_fsrOffScreen.reset();
+			}
+		}
+		if (!m_fsrOffScreen) {
+			rcasShader = nullptr;
+		}
+	}
+	if (easuShader) {
+		float vp[4] = {(float)viewport[0], (float)viewport[1], (float)viewport[2], (float)viewport[3]};
+		if (rcasShader) {
+			// EASU into the full size target, starting at its origin.
+			m_fsrOffScreen->Bind();
+			SetViewport(0, 0, viewport[2], viewport[3]);
+			SetScissor(0, 0, viewport[2], viewport[3]);
+			vp[0] = vp[1] = 0.0f;
+		}
+		offScreen->BindColorTexture(0, 0);
+		GPU_shader_bind(easuShader);
+		OverrideShaderFsrEasuInterface *interface = (OverrideShaderFsrEasuInterface *)GPU_shader_get_interface(easuShader);
+		GPU_shader_uniform_int(easuShader, interface->colorTexLoc, 0);
+		GPU_shader_uniform_vector(easuShader, interface->viewportLoc, 4, 1, vp);
+		DrawOverlayPlane();
+		GPU_shader_unbind();
+		offScreen->UnbindColorTexture(0);
+
+		if (rcasShader) {
+			RAS_OffScreen::RestoreScreen();
+			SetViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+			SetScissor(viewport[0], viewport[1], viewport[2], viewport[3]);
+			m_fsrOffScreen->BindColorTexture(0, 0);
+			GPU_shader_bind(rcasShader);
+			OverrideShaderFsrRcasInterface *rcas = (OverrideShaderFsrRcasInterface *)GPU_shader_get_interface(rcasShader);
+			GPU_shader_uniform_int(rcasShader, rcas->colorTexLoc, 0);
+			const float svp[4] = {(float)viewport[0], (float)viewport[1], (float)viewport[2], (float)viewport[3]};
+			GPU_shader_uniform_vector(rcasShader, rcas->viewportLoc, 4, 1, svp);
+			GPU_shader_uniform_float(rcasShader, rcas->sharpLoc, fsrSharp);
+			DrawOverlayPlane();
+			GPU_shader_unbind();
+			m_fsrOffScreen->UnbindColorTexture(0);
+		}
+	}
+	else {
+		DrawOffScreen(offScreen, nullptr, true);
+	}
 	SetDepthFunc(RAS_LEQUAL);
 }
 
@@ -1110,6 +1186,33 @@ void RAS_Rasterizer::InitOverrideShadersInterface()
 			interface->aspectLoc = GPU_shader_get_uniform(shader, "lensaspect");
 			interface->vignetteLoc = GPU_shader_get_uniform(shader, "vignette");
 			interface->chromaLoc = GPU_shader_get_uniform(shader, "lensca");
+
+			GPU_shader_set_interface(shader, interface);
+		}
+	}
+
+	// FSR 1 EASU upscale shader (dynamic resolution present).
+	{
+		GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_FSR_EASU);
+		if (shader && !GPU_shader_get_interface(shader)) {
+			OverrideShaderFsrEasuInterface *interface = (OverrideShaderFsrEasuInterface *)MEM_mallocN(sizeof(OverrideShaderFsrEasuInterface), "OverrideShaderFsrEasuInterface");
+
+			interface->colorTexLoc = GPU_shader_get_uniform(shader, "colortex");
+			interface->viewportLoc = GPU_shader_get_uniform(shader, "fsrviewport");
+
+			GPU_shader_set_interface(shader, interface);
+		}
+	}
+
+	// FSR 1 RCAS sharpening shader (second pass of the dynamic resolution present).
+	{
+		GPUShader *shader = GPU_shader_get_builtin_shader(GPU_SHADER_FSR_RCAS);
+		if (shader && !GPU_shader_get_interface(shader)) {
+			OverrideShaderFsrRcasInterface *interface = (OverrideShaderFsrRcasInterface *)MEM_mallocN(sizeof(OverrideShaderFsrRcasInterface), "OverrideShaderFsrRcasInterface");
+
+			interface->colorTexLoc = GPU_shader_get_uniform(shader, "colortex");
+			interface->viewportLoc = GPU_shader_get_uniform(shader, "fsrviewport");
+			interface->sharpLoc = GPU_shader_get_uniform(shader, "fsrsharp");
 
 			GPU_shader_set_interface(shader, interface);
 		}

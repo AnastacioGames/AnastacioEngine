@@ -234,6 +234,19 @@ private:
 		int colorTexLoc;
 	};
 
+	struct OverrideShaderFsrEasuInterface
+	{
+		int colorTexLoc;
+		int viewportLoc;
+	};
+
+	struct OverrideShaderFsrRcasInterface
+	{
+		int colorTexLoc;
+		int viewportLoc;
+		int sharpLoc;
+	};
+
 	struct OverrideShaderVRLensInterface
 	{
 		int colorTexLoc;
@@ -281,6 +294,8 @@ private:
 	float m_vrVignette;
 	/// Chromatic aberration correction of the lens pass (red/blue scale offset), 0 = off.
 	float m_vrChroma;
+	/// Full size target between the FSR 1 EASU and RCAS passes (dynamic resolution present).
+	std::unique_ptr<RAS_OffScreen> m_fsrOffScreen;
 	StereoEye m_curreye;
 	float m_eyeseparation;
 	float m_focallength;

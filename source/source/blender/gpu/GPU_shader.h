@@ -180,6 +180,10 @@ typedef enum GPUBuiltinShader {
 	 * mesh VAO also fills (BL_BlenderShader::GetAttribs), so the shadow follows the pose. */
 	GPU_SHADER_BLACK_SKINNING       = 17,
 	GPU_SHADER_VSM_STORE_SKINNING   = 18,
+	/* Frame buffer draw with FSR 1 EASU upscale, for the dynamic resolution present. */
+	GPU_SHADER_FSR_EASU             = 19,
+	/* FSR 1 RCAS sharpening, second pass after EASU. */
+	GPU_SHADER_FSR_RCAS             = 20,
 } GPUBuiltinShader;
 
 #define GPU_SKINNING_OVERRIDE_BONE_INDEX_LOC 14

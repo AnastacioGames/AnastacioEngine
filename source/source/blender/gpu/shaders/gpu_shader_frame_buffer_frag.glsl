@@ -65,6 +65,151 @@ vec4 lens_color(vec2 co)
 }
 #endif
 
+#if defined(FSR_RCAS) && __VERSION__ >= 130
+/* AMD FidelityFX Super Resolution 1, RCAS (robust contrast adaptive sharpening), MIT license.
+ * Runs on the full size EASU output. */
+uniform vec4 fsrviewport; /* output x, y, width, height in pixels */
+uniform float fsrsharp; /* exp2(-stops), 1.0 = strongest */
+
+vec4 rcas_color(void)
+{
+	ivec2 size = textureSize(colortex, 0);
+	ivec2 p = ivec2(gl_FragCoord.xy - fsrviewport.xy);
+	vec3 b = texelFetch(colortex, clamp(p + ivec2(0, 1), ivec2(0), size - 1), 0).rgb;
+	vec3 d = texelFetch(colortex, clamp(p + ivec2(-1, 0), ivec2(0), size - 1), 0).rgb;
+	vec4 e4 = texelFetch(colortex, clamp(p, ivec2(0), size - 1), 0);
+	vec3 e = e4.rgb;
+	vec3 f = texelFetch(colortex, clamp(p + ivec2(1, 0), ivec2(0), size - 1), 0).rgb;
+	vec3 h = texelFetch(colortex, clamp(p + ivec2(0, -1), ivec2(0), size - 1), 0).rgb;
+
+	vec3 mn4 = min(min(b, d), min(f, h));
+	vec3 mx4 = max(max(b, d), max(f, h));
+	vec3 hitMin = min(mn4, e) / (4.0 * mx4 + 1e-5);
+	vec3 hitMax = (1.0 - max(mx4, e)) / (4.0 * mn4 - 4.0 - 1e-5);
+	vec3 lobeRGB = max(-hitMin, hitMax);
+	float lobe = max(-0.1875, min(max(lobeRGB.r, max(lobeRGB.g, lobeRGB.b)), 0.0)) * fsrsharp;
+	vec3 c = (lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0);
+	return vec4(clamp(c, 0.0, 1.0), e4.a);
+}
+#endif
+
+#if defined(FSR_EASU) && __VERSION__ >= 130
+/* AMD FidelityFX Super Resolution 1, EASU (edge adaptive upscale), MIT license, ported to plain
+ * texelFetch (12 taps, no textureGather) so it also runs on GLSL ES 3.00 (Web). */
+uniform vec4 fsrviewport; /* output x, y, width, height in pixels */
+
+vec3 easu_fetch(ivec2 p, ivec2 size)
+{
+	return texelFetch(colortex, clamp(p, ivec2(0), size - 1), 0).rgb;
+}
+
+float easu_luma(vec3 c)
+{
+	return c.b * 0.5 + (c.r * 0.5 + c.g);
+}
+
+void easu_set(inout vec2 dir, inout float len, float w, float lA, float lB, float lC, float lD, float lE)
+{
+	float dc = lD - lC;
+	float cb = lC - lB;
+	float lenX = max(abs(dc), abs(cb));
+	lenX = (lenX > 0.0) ? 1.0 / lenX : 0.0;
+	float dirX = lD - lB;
+	dir.x += dirX * w;
+	lenX = clamp(abs(dirX) * lenX, 0.0, 1.0);
+	len += lenX * lenX * w;
+
+	float ec = lE - lC;
+	float ca = lC - lA;
+	float lenY = max(abs(ec), abs(ca));
+	lenY = (lenY > 0.0) ? 1.0 / lenY : 0.0;
+	float dirY = lE - lA;
+	dir.y += dirY * w;
+	lenY = clamp(abs(dirY) * lenY, 0.0, 1.0);
+	len += lenY * lenY * w;
+}
+
+void easu_tap(inout vec3 aC, inout float aW, vec2 off, vec2 dir, vec2 len2, float lob, float clp, vec3 c)
+{
+	vec2 v = vec2(off.x * dir.x + off.y * dir.y, off.x * (-dir.y) + off.y * dir.x) * len2;
+	float d2 = min(v.x * v.x + v.y * v.y, clp);
+	float wB = 2.0 / 5.0 * d2 - 1.0;
+	float wA = lob * d2 - 1.0;
+	wB *= wB;
+	wA *= wA;
+	wB = 25.0 / 16.0 * wB - (25.0 / 16.0 - 1.0);
+	float w = wB * wA;
+	aC += c * w;
+	aW += w;
+}
+
+vec4 easu_color(void)
+{
+	ivec2 size = textureSize(colortex, 0);
+	vec2 scale = vec2(size) / fsrviewport.zw;
+	vec2 pp = (gl_FragCoord.xy - fsrviewport.xy) * scale - 0.5;
+	vec2 fp = floor(pp);
+	pp -= fp;
+	ivec2 p = ivec2(fp);
+
+	vec3 b = easu_fetch(p + ivec2(0, -1), size);
+	vec3 c = easu_fetch(p + ivec2(1, -1), size);
+	vec3 e = easu_fetch(p + ivec2(-1, 0), size);
+	vec3 f = easu_fetch(p, size);
+	vec3 g = easu_fetch(p + ivec2(1, 0), size);
+	vec3 h = easu_fetch(p + ivec2(2, 0), size);
+	vec3 i = easu_fetch(p + ivec2(-1, 1), size);
+	vec3 j = easu_fetch(p + ivec2(0, 1), size);
+	vec3 k = easu_fetch(p + ivec2(1, 1), size);
+	vec3 l = easu_fetch(p + ivec2(2, 1), size);
+	vec3 n = easu_fetch(p + ivec2(0, 2), size);
+	vec3 o = easu_fetch(p + ivec2(1, 2), size);
+
+	float bL = easu_luma(b), cL = easu_luma(c), eL = easu_luma(e), fL = easu_luma(f);
+	float gL = easu_luma(g), hL = easu_luma(h), iL = easu_luma(i), jL = easu_luma(j);
+	float kL = easu_luma(k), lL = easu_luma(l), nL = easu_luma(n), oL = easu_luma(o);
+
+	vec2 dir = vec2(0.0);
+	float len = 0.0;
+	easu_set(dir, len, (1.0 - pp.x) * (1.0 - pp.y), bL, eL, fL, gL, jL);
+	easu_set(dir, len, pp.x * (1.0 - pp.y), cL, fL, gL, hL, kL);
+	easu_set(dir, len, (1.0 - pp.x) * pp.y, fL, iL, jL, kL, nL);
+	easu_set(dir, len, pp.x * pp.y, gL, jL, kL, lL, oL);
+
+	float dirR = dot(dir, dir);
+	bool zro = dirR < 1.0 / 32768.0;
+	dirR = zro ? 1.0 : inversesqrt(dirR);
+	dir.x = zro ? 1.0 : dir.x;
+	dir *= dirR;
+	len = len * 0.5;
+	len *= len;
+	float stretch = dot(dir, dir) / max(abs(dir.x), abs(dir.y));
+	vec2 len2 = vec2(1.0 + (stretch - 1.0) * len, 1.0 - 0.5 * len);
+	float lob = 0.5 + ((1.0 / 4.0 - 0.04) - 0.5) * len;
+	float clp = 1.0 / lob;
+
+	vec3 mn = min(min(f, g), min(j, k));
+	vec3 mx = max(max(f, g), max(j, k));
+
+	vec3 aC = vec3(0.0);
+	float aW = 0.0;
+	easu_tap(aC, aW, vec2(0.0, -1.0) - pp, dir, len2, lob, clp, b);
+	easu_tap(aC, aW, vec2(1.0, -1.0) - pp, dir, len2, lob, clp, c);
+	easu_tap(aC, aW, vec2(-1.0, 1.0) - pp, dir, len2, lob, clp, i);
+	easu_tap(aC, aW, vec2(0.0, 1.0) - pp, dir, len2, lob, clp, j);
+	easu_tap(aC, aW, vec2(0.0, 0.0) - pp, dir, len2, lob, clp, f);
+	easu_tap(aC, aW, vec2(-1.0, 0.0) - pp, dir, len2, lob, clp, e);
+	easu_tap(aC, aW, vec2(1.0, 1.0) - pp, dir, len2, lob, clp, k);
+	easu_tap(aC, aW, vec2(2.0, 1.0) - pp, dir, len2, lob, clp, l);
+	easu_tap(aC, aW, vec2(2.0, 0.0) - pp, dir, len2, lob, clp, h);
+	easu_tap(aC, aW, vec2(1.0, 0.0) - pp, dir, len2, lob, clp, g);
+	easu_tap(aC, aW, vec2(1.0, 2.0) - pp, dir, len2, lob, clp, o);
+	easu_tap(aC, aW, vec2(0.0, 2.0) - pp, dir, len2, lob, clp, n);
+
+	return vec4(min(mx, max(mn, aC / aW)), 1.0);
+}
+#endif
+
 #ifdef STIPPLE
 #define STIPPLE_COLUMN 0
 #define STIPPLE_ROW 1
@@ -99,6 +244,10 @@ void main(void)
 			fragColor = texture(righteyetex, co);
 		}
 	}
+#elif defined(FSR_EASU)
+	fragColor = easu_color();
+#elif defined(FSR_RCAS)
+	fragColor = rcas_color();
 #elif defined(LENS_DISTORT)
 	fragColor = lens_color(co);
 #elif defined(ANAGLYPH)

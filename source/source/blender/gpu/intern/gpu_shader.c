@@ -133,6 +133,8 @@ static struct GPUShadersGlobal {
 		GPUShader *vsm_store_skinning;
 		GPUShader *draw_frame_buffer;
 		GPUShader *vr_lens;
+		GPUShader *fsr_easu;
+		GPUShader *fsr_rcas;
 		GPUShader *stereo_stipple;
 		GPUShader *stereo_anaglyph;
 		GPUShader *frustum_line;
@@ -1578,6 +1580,20 @@ GPUShader *GPU_shader_get_builtin_shader(GPUBuiltinShader shader)
 					NULL, NULL, "#define LENS_DISTORT;\n", 0, 0, 0);
 			retval = GG.shaders.vr_lens;
 			break;
+		case GPU_SHADER_FSR_EASU:
+			if (!GG.shaders.fsr_easu)
+				GG.shaders.fsr_easu = GPU_shader_create(
+					datatoc_gpu_shader_frame_buffer_vert_glsl, datatoc_gpu_shader_frame_buffer_frag_glsl,
+					NULL, NULL, "#define FSR_EASU;\n", 0, 0, 0);
+			retval = GG.shaders.fsr_easu;
+			break;
+		case GPU_SHADER_FSR_RCAS:
+			if (!GG.shaders.fsr_rcas)
+				GG.shaders.fsr_rcas = GPU_shader_create(
+					datatoc_gpu_shader_frame_buffer_vert_glsl, datatoc_gpu_shader_frame_buffer_frag_glsl,
+					NULL, NULL, "#define FSR_RCAS;\n", 0, 0, 0);
+			retval = GG.shaders.fsr_rcas;
+			break;
 		case GPU_SHADER_STEREO_STIPPLE:
 			if (!GG.shaders.stereo_stipple)
 				GG.shaders.stereo_stipple = GPU_shader_create(
@@ -1818,6 +1834,15 @@ void GPU_shader_free_builtin_shaders(void)
 	if (GG.shaders.vr_lens) {
 		GPU_shader_free(GG.shaders.vr_lens);
 		GG.shaders.vr_lens = NULL;
+	}
+
+	if (GG.shaders.fsr_easu) {
+		GPU_shader_free(GG.shaders.fsr_easu);
+		GG.shaders.fsr_easu = NULL;
+	}
+	if (GG.shaders.fsr_rcas) {
+		GPU_shader_free(GG.shaders.fsr_rcas);
+		GG.shaders.fsr_rcas = NULL;
 	}
 
 	if (GG.shaders.stereo_stipple) {
