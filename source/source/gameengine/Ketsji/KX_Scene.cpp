@@ -2187,7 +2187,7 @@ void KX_Scene::EndShadowCulling()
 	m_shadowCullCache.clear();
 }
 
-/// Range Trace "usage": one event the first time each object passes the culling of a camera or a shadow.
+/// Game Trace "usage": one event the first time each object passes the culling of a camera or a shadow.
 static void trace_visible(KX_Scene *scene, const std::vector<KX_GameObject *>& objects, bool shadow)
 {
 	static std::mutex mutex;

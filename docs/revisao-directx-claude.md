@@ -152,7 +152,7 @@ Sem alterar código:
    cada cascata enxergue um conjunto diferente. Sol com CSM em 3 cascatas; rodadas extras com 2 cascatas e com
    uma luz pontual (6 faces).
 2. Rodar ~10 s no runtime em background e registrar por quadro: `CM_WORK_INSTANCING_UPLOADS`, número de
-   conjuntos visíveis distintos por bucket, e ms de CPU em `RunInstancingNode`/`Update` (Range Trace ou
+   conjuntos visíveis distintos por bucket, e ms de CPU em `RunInstancingNode`/`Update` (Game Trace ou
    `RANGE_PROFILE`). Medir só com instrumentação existente; se faltar a contagem de conjuntos, ela é o único acréscimo.
 3. Leitura: uploads/quadro ≈ número de passes, mesmo parado, confirma o mecanismo; a decisão de corrigir depende
    dos ms. Sem sombras, deve dar ≈ 0. Se der ≈ 0 com sombras, A1 cai.

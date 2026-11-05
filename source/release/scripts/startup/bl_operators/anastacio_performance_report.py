@@ -76,8 +76,8 @@ class GAME_OT_performance_report(Operator):
             self._tempfile = game
 
         env = dict(os.environ,
-                   RANGE_TRACE=self._folder,
-                   RANGE_TRACE_MODULES="load,usage,frames,work,scripts,runtime",
+                   GAME_TRACE=self._folder,
+                   GAME_TRACE_MODULES="load,usage,frames,work,scripts,runtime",
                    RANGE_SHADER_LOG=os.path.join(self._folder, "shaders.txt"),
                    # GPU time per render step (KX_EngineProfiler), for the report's GPU section.
                    RANGE_PROFILE=os.path.join(self._folder, "profile.txt"))

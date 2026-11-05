@@ -55,7 +55,7 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 - **Carregamento:** cache e biblioteca GLSL enxuta, LibLoad assíncrono com progresso, arquivo `.cooked`
   (hull, shaders, malhas, tangentes, BVH), Load Mode por objeto, texturas DDS, preparar áudio, aquecimento de shaders.
 - **Performance:** Static Batch (empate com a ThunderPlayer), auditoria de trabalho repetido por frame (~100 itens),
-  caches de luz/probe/camada, resolução dinâmica, Range Trace e Performance Report, Scene Doctor.
+  caches de luz/probe/camada, resolução dinâmica, Game Trace e Performance Report, Scene Doctor.
 - **Lógica:** Logic Bricks → Python completo (F1–F12), Logic Bricks 2.0, Highlight Active, Logic Tree (F1–F6),
   Smart Components e Smart Wizard, Smart 2D Filter, UI Tree (menus 2D).
 - **Estabilidade de objetos:** autoatribuição segura de LOD, retomada da lógica ao desligar culling,

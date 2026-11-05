@@ -169,8 +169,8 @@ __PERF_SCRIPT__
   var CARDBOARD = __CARDBOARD__;  // --cardboard: botao VR sempre visivel, sem controle de toque
   var el = function (id) { return document.getElementById(id); };
   var debug = /[?&]debug=1/.test(location.search);
-  // ?report=1: grava o Performance Report (RANGE_TRACE) e manda ao serve.py do PC, que gera o report.html.
-  var report = /[?&]report=1/.test(location.search), REPORT_DIR = "/range_trace";
+  // ?report=1: grava o Performance Report (GAME_TRACE) e manda ao serve.py do PC, que gera o report.html.
+  var report = /[?&]report=1/.test(location.search), REPORT_DIR = "/game_trace";
   function sendReport() {
     if (!report || !Module.FS) return;
     var files = {};
@@ -847,8 +847,8 @@ __PERF_SCRIPT__
     preRun: [function () {
       if (report && window.ENV) {
         try { Module.FS.mkdirTree(REPORT_DIR); } catch (e) {}
-        ENV.RANGE_TRACE = REPORT_DIR;
-        ENV.RANGE_TRACE_MODULES = "load,usage,frames,work,scripts,runtime";
+        ENV.GAME_TRACE = REPORT_DIR;
+        ENV.GAME_TRACE_MODULES = "load,usage,frames,work,scripts,runtime";
         ENV.RANGE_SHADER_LOG = REPORT_DIR + "/shaders.txt";
       }
       Module.addRunDependency("game-files");

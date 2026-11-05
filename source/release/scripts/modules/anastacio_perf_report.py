@@ -7,7 +7,7 @@
 #
 # ##### END GPL LICENSE BLOCK #####
 
-"""Performance Report: reads the trace of one game run (RANGE_TRACE folder: trace.jsonl and, when
+"""Performance Report: reads the trace of one game run (GAME_TRACE folder: trace.jsonl and, when
 present, shaders.txt / objects.txt) and writes report.html next to it.
 
 Generic for any game. Usable without Blender: python anastacio_perf_report.py <folder>.

@@ -1,4 +1,4 @@
-"""Resume a CPU de uma rodada do Range Trace com os modulos frames e threads.
+"""Resume a CPU de uma rodada do Game Trace com os modulos frames e threads.
 
     python tools/debug/medir_cpu.py <pasta-do-trace> [<pasta-base> para comparar]
 

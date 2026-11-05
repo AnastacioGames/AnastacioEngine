@@ -142,7 +142,7 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 		}
 		if (!scene->IsSuspended()) {
 
-			// Range Trace sector rail: after physics and logic, so it wins over gameplay cameras.
+			// Game Trace sector rail: after physics and logic, so it wins over gameplay cameras.
 			scene->UpdateTraceRail();
 
 			// Publish one shared player/camera reference after physics. Distance-based

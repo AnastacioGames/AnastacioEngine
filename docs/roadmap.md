@@ -492,15 +492,18 @@ existem no `_prepareData` mas não são usados e a pasta `Track/` está vazia.
 
 ## Performance
 
-- **Range Trace ([range-trace.md](range-trace.md))** — fases 1 a 4 feitas (scripts/runtime no relatório e no
+- **Game Trace ([game-trace.md](game-trace.md))** — fases 1 a 4 feitas (scripts/runtime no relatório e no
   launcher em 2026-10-24); culpado provável por frame lento no relatório (2026-11-01, falta conferir num trace real). Falta usar num jogo real com som (o `--server` não toca).
+- **Trace Doctor ([plano](plano-trace-doctor.md))** — etapa 1 (seção "Como corrigir" no relatório) feita em
+  2026-11-05, falta validar em traces reais. Etapa 2: `sugestoes.json` aplicável e reversível pelo Scene
+  Doctor (Static Batch, Load Mode), mais os campos de C++ que a regra de Static Batch precisa.
 - **Static Batch:** Auto Static Batch medido em 2026-10-30 no benchmark da Thunder: igual ao manual e empatado
   com a Thunder ([batching estático e culling](batching-estatico-e-culling.md)). Ligado por padrão em cena nova desde 2026-10-30; aceito com janela em 2026-10-30.
 - **Travadas do RolimaRacer (2026-10-10):** `Speed_FX` com Preload/Keep falta aplicar no `.range` do jogo. Abertos:
-  picos longos no swap sem causa identificada; conferir de novo com 10 pilotos pelo menu (Range Trace, módulos
+  picos longos no swap sem causa identificada; conferir de novo com 10 pilotos pelo menu (Game Trace, módulos
   `frames`, `shaders` e `profile`).
 - **Trabalho repetido por frame:** contadores, detector (`61d35afc`) e `tools/check_trabalho_repetido.py` feitos.
-  Falta rodar o detector nos jogos reais, parado e em movimento, com o usuário jogando (Range Trace, módulo `work`).
+  Falta rodar o detector nos jogos reais, parado e em movimento, com o usuário jogando (Game Trace, módulo `work`).
   Plano em [auditoria-trabalho-repetido.md](auditoria-trabalho-repetido.md); suspeitos e decisões em
   [auditoria-suspeitos.md](auditoria-suspeitos.md). Correções do nível 0 só compiladas, falta conferir em jogo.
 - **Itens da auditoria ainda sem medição no jogo real** (detalhes em [auditoria-suspeitos.md](auditoria-suspeitos.md)

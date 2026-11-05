@@ -21,11 +21,11 @@
 /** \file CM_Trace.h
  *  \ingroup common
  *
- * Range Trace: opt-in session log of what the game loads and what it actually uses.
- * RANGE_TRACE=<folder> turns it on and writes <folder>/trace.jsonl, one JSON event per line;
- * RANGE_TRACE_MODULES=load,usage,... picks the modules ("all" or unset = every module).
+ * Game Trace: opt-in session log of what the game loads and what it actually uses.
+ * GAME_TRACE=<folder> turns it on and writes <folder>/trace.jsonl, one JSON event per line;
+ * GAME_TRACE_MODULES=load,usage,... picks the modules ("all" or unset = every module).
  * tools/debug/relatorio_trace.py turns the folder into a report. Off, each hook costs one branch.
- * See docs/range-trace.md.
+ * See docs/game-trace.md.
  */
 
 #ifndef __CM_TRACE_H__
@@ -40,7 +40,7 @@ enum CM_TraceModule {
 	CM_TRACE_USAGE = 1 << 1,
 	/// One line per frame with its time by profiler category (spikes and sector costs).
 	CM_TRACE_FRAMES = 1 << 2,
-	/// Camera on a curve at constant speed, set by RANGE_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;auto|none|object[;KEY+seconds]]].
+	/// Camera on a curve at constant speed, set by GAME_TRACE_RAIL=scene;curve;camera;seconds[;reverse|forward[;auto|none|object[;KEY+seconds]]].
 	CM_TRACE_SECTOR = 1 << 3,
 	/// Update work counters of each frame (CM_WorkCounters.h) and draw calls; RANGE_AUDIT_TRANSFORMS adds per object.
 	CM_TRACE_WORK = 1 << 4,
@@ -52,7 +52,10 @@ enum CM_TraceModule {
 	CM_TRACE_THREADS = 1 << 7,
 };
 
-/// Bit mask of the modules on; 0 when RANGE_TRACE is unset.
+/// Environment variable `name`, or `oldName` (the RANGE_TRACE* names before the rename) when unset or empty.
+const char *CM_TraceGetEnv(const char *name, const char *oldName);
+
+/// Bit mask of the modules on; 0 when GAME_TRACE is unset.
 int CM_TraceModules();
 
 inline bool CM_TraceOn(CM_TraceModule module)
