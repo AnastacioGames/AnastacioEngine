@@ -483,6 +483,7 @@ def regra_on_demand(a, eventos, sug):
         _sugestao(sug, 'on_demand', e['name'],
                   'Load Mode "With Scene", ou chamar scene.convertObject() antes deste trecho (na tela de loading)',
                   e['ms'], 'convertido na cena %s, %d objeto(s)' % (e['scene'], e.get('objects', 1)))
+        sug[('on_demand', e['name'])]['aplicar'] = dict(cena=e['scene'], objeto=e['name'])
 
 
 def regra_cenas(a, eventos, sug):
@@ -528,8 +529,8 @@ def regra_scripts(a, eventos, sug):
 
 
 def regra_static_batch(a, eventos, sug):
-    # O evento object grava so a marca manual. Sem saber se a cena usa o Auto Static Batch (padrao desde
-    # 2026-10-30) e o tipo de fisica, a regra apontaria objetos ja no lote: so dispara com esses campos.
+    # Com o Auto Static Batch ligado (padrao desde 2026-10-30) os estaticos sem logica nem pai ja vao para o
+    # lote; a regra so olha cenas com ele desligado. Traces antigos nao gravam o campo: a regra fica calada.
     sem_auto = {c['scene'] for c in a['cenas'] if c.get('auto_static_batch') is False}
     if not sem_auto:
         return
@@ -537,19 +538,23 @@ def regra_static_batch(a, eventos, sug):
     for o in a['com_malha'].values():
         if o['scene'] not in sem_auto or o.get('static_batch') or not o['active_layer'] or o.get('visible') is False:
             continue
-        if o.get('physics') not in ('static', 'no_collision'):
+        # Logica ou pai podem mover o objeto: o Scene Doctor tambem os deixa de fora.
+        if o.get('physics') not in ('static', 'no_collision') or o.get('parent') or o.get('logic'):
             continue
         if a['tris'](o) > SUG_SB_TRIS:
             continue
         mats = {m for nome in o['meshes'] for m in a['malhas'].get(nome, {}).get('materials', [])}
         if len(mats) == 1:
-            grupos[mats.pop()].append(o['name'])
-    for mat, nomes in grupos.items():
+            grupos[mats.pop()].append((o['scene'], o['name']))
+    for mat, itens in grupos.items():
+        nomes = [n for _c, n in itens]
+        mat = mat[2:] if mat.startswith('MA') else mat  # nome do RAS_IMaterial vem com o prefixo do ID
         if len(nomes) >= SUG_SB_MIN_OBJ:
             sug[('static_batch', mat)] = dict(
                 regra='static_batch', alvo=mat, vezes=len(nomes), ganho=len(nomes) - 1, lentos=0,
                 texto='ligar Static Batch nestes %d objetos estaticos (ou o Auto Static Batch da cena)' % len(nomes),
-                detalhe=', '.join(sorted(nomes)[:6]) + (' ...' if len(nomes) > 6 else ''))
+                detalhe=', '.join(sorted(nomes)[:6]) + (' ...' if len(nomes) > 6 else ''),
+                aplicar=dict(cena=itens[0][0], objetos=sorted(nomes)))
 
 
 REGRAS_FN = (regra_imagens, regra_on_demand, regra_cenas, regra_shaders, regra_scripts, regra_static_batch)
@@ -590,8 +595,22 @@ def gerar_sugestoes(a, eventos):
     if 'shaders' not in a['extras']:
         faltam.append('shader no jogo (opcao shaders do launcher)')
     if not any(c.get('auto_static_batch') is False for c in a['cenas']):
-        faltam.append('Static Batch (o trace ainda nao grava o Auto Static Batch da cena nem a fisica do objeto)')
+        faltam.append('Static Batch (so com o Auto Static Batch da cena desligado, em trace gravado desde 2026-11-05)')
     a['sugestoes'] = dict(lista=lista, faltam=faltam)
+
+
+# Regras com correcao segura e reversivel no editor (Scene Doctor > Game Trace Suggestions).
+REGRAS_APLICAVEIS = ('static_batch', 'on_demand')
+
+
+def sugestoes_json(a, jogo=''):
+    """sugestoes.json: so as correcoes que o Scene Doctor sabe aplicar e desfazer."""
+    itens = []
+    for s in a.get('sugestoes', {}).get('lista', []):
+        if s['regra'] in REGRAS_APLICAVEIS and s.get('aplicar'):
+            itens.append(dict(regra=s['regra'], alvo=s['alvo'], texto=s['texto'], ganho=texto_ganho(s),
+                              lentos=s['lentos'], **s['aplicar']))
+    return dict(versao=1, jogo=jogo, sugestoes=itens)
 
 
 def texto_ganho(s):
@@ -1640,8 +1659,11 @@ def main():
     md = resumo_md(a)
     with open(os.path.join(pasta, 'resumo.md'), 'w', encoding='utf-8') as f:
         f.write(md)
+    meta = ler_meta(pasta)
     with open(os.path.join(pasta, 'relatorio.html'), 'w', encoding='utf-8') as f:
-        f.write(relatorio_html(a, ler_meta(pasta), pasta))
+        f.write(relatorio_html(a, meta, pasta))
+    with open(os.path.join(pasta, 'sugestoes.json'), 'w', encoding='utf-8') as f:
+        json.dump(sugestoes_json(a, (meta or {}).get('jogo', '')), f, ensure_ascii=False, indent=1)
     if '--resumo' in sys.argv:
         print(md)
     print('relatorio: %s' % os.path.join(pasta, 'relatorio.html'))

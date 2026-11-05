@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - Game Trace: sugestões aplicáveis no Scene Doctor (Trace Doctor, etapa 2)
+
+- O trace grava `physics`, `parent` e `logic` em cada `object` e `auto_static_batch` em cada `scene_load`
+  (`BL_Converter.cpp`). Com isso a regra de Static Batch do relatório passa a disparar (só em cena com o Auto
+  Static Batch desligado; objetos estáticos sem lógica nem pai).
+- O relatório grava `sugestoes.json` com as correções seguras: Static Batch e Load Mode "With Scene" de objeto
+  On Demand convertido no jogo. O Scene Doctor ganhou **Game Trace...**: abre o arquivo e mostra cada sugestão
+  com Fix e Revert, conferida de novo no `.range` aberto.
+- Teste em background com `tools/debug/cenas/criar_cena_trace_doctor.py`: sugestões certas, Fix salvo no arquivo,
+  Revert volta. Falta aceite com janela num jogo real.
+
+
 ## 2026-11-05 - Range Trace passa a se chamar Game Trace
 
 - A ferramenta é do fork, não da Range Engine. Variáveis `GAME_TRACE`, `GAME_TRACE_MODULES` e `GAME_TRACE_RAIL`;
