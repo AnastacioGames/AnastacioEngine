@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-03 (`HEAD` `2373d1b6`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-05 (`HEAD` `934d2d1c`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -13,7 +13,7 @@ Caminhos abaixo relativos a `source/source/gameengine/`.
 
 ---
 
-## `Ketsji/KX_Scene.cpp` (4.800 linhas)
+## `Ketsji/KX_Scene.cpp` (4.802 linhas)
 
 Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings Python. Cutscene e Trace Rail ficam em
 `Ketsji/KX_SceneCutscene.cpp` (mesma classe `KX_Scene`). O header é
@@ -41,8 +41,8 @@ Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings
 | Iluminação (flag) | `Get/SetUseLightScatter` 2582–2587 |
 | Cutscene e Trace Rail (em `Ketsji/KX_SceneCutscene.cpp`, 901 linhas) | `SetCutsceneManager` 153, `StopCutscene` 164, `RestartCutscene` 174, `UpdateCutscene` 185, `StartTraceRail` 241, `StartTraceRailOrigin` 295, `UpdateTraceRail` 361, `UpdateCutscenePaths` 467, `TakePendingCutsceneEvents` 518, `DispatchCutsceneEvents` 574 (~300 linhas), `ClearCutsceneSpawnedObjects` 877, `GetCutsceneManager` 893 |
 | Busca e texto (`static`, em `KX_SceneCutscene.cpp`) | `FindObjectWithComponent` 526, `FindGameObject` 548, `GetLocalizedText` 566 |
-| Callbacks de Python | `RunDrawingCallbacks` 3775, `RunOnRemoveCallbacks` 3791 |
-| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 4744 |
+| Callbacks de Python | `RunDrawingCallbacks` 3777, `RunOnRemoveCallbacks` 3793 |
+| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 4746 |
 
 Observações: `DispatchCutsceneEvents` e `AddReplicaObject` são as funções mais longas; a remoção de objetos tem
 cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`, `NewRemoveObject`,
@@ -134,7 +134,7 @@ Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdP
 
 ---
 
-## `Converter/BL_BlenderDataConversion.cpp` (4.057 linhas)
+## `Converter/BL_BlenderDataConversion.cpp` (4.137 linhas)
 
 Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConversion.h` (100 linhas).
 
@@ -151,7 +151,7 @@ Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConve
 | Componentes e cutscene | `BL_ConvertComponentsObject` 2507, `BL_ConvertCutscene` 2730 |
 | Conversão de objeto único | `bl_ConvertBlenderObject_Single` 2592 |
 | **Passagem principal** | `BL_ConvertBlenderObjects` 2799–3498 (**uma função de ~700 linhas** que converte os objetos da cena) |
-| Pós-conversão e cursor | `BL_PostConvertBlenderObjects` 3841, `BL_ConvertCustomMouseCursor` 4036 |
+| Pós-conversão e cursor | `BL_PostConvertBlenderObjects` 3855, `BL_ConvertCustomMouseCursor` 4116 |
 
 Observação: `BL_ConvertBlenderObjects` concentra a conversão numa só função; mudanças aqui exigem ler o
 trecho inteiro, não só um método.
@@ -171,14 +171,14 @@ Laço do jogo: tempo, frames lógicos/físicos, cenas. O desenho em si fica em `
 | Cenas | `AddScene` 1277, `ConvertAndAddScene` 1379, `PreloadScene` 1384, `RemoveScene` 1389, `ReplaceScene` 1404, `SuspendScene` 1409, `ResumeScene` 1414 |
 | Taxas e flags | `SetTicRate` 1440, `SetUseFixedTimestep` 1533, `SetShadowCulling` 1560, `SetDynamicResolution` 1565 |
 
-## `Ketsji/KX_RenderPipeline.cpp` (1.266 linhas)
+## `Ketsji/KX_RenderPipeline.cpp` (1.275 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
 | Névoa volumétrica | `KX_FillVolumetricFog` 125 |
-| Frame | **`Render`** 375 (sombras, câmeras, filtros), `RenderCollisionDepthBuffer` 558 |
-| Câmeras e visibilidade | `GetCameraRenderData` 601, `GetRenderData` 647, `GetVisibleMeshes` 745, `RenderCamera` 790 |
-| Pós-render | `PostRenderScene` 970 (2D filters, offscreen final) |
+| Frame | **`Render`** 375 (sombras, câmeras, filtros), `RenderCollisionDepthBuffer` 567 |
+| Câmeras e visibilidade | `GetCameraRenderData` 610, `GetRenderData` 656, `GetVisibleMeshes` 754, `RenderCamera` 799 |
+| Pós-render | `PostRenderScene` 979 (2D filters, offscreen final) |
 
 ## `Converter/BL_Converter.cpp` (1.979 linhas)
 
