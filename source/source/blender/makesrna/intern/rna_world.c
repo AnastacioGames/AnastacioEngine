@@ -286,6 +286,18 @@ static void rna_World_sky_color_update(Main *bmain, Scene *scene, PointerRNA *pt
 		rna_World_draw_update(bmain, scene, ptr);
 }
 
+/* Exposure/Range are live uniforms; the materials only add that code once they leave
+ * the defaults, so rebuild just when they are back at (or leaving) 0 / 1. */
+static void rna_World_exposure_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	World *wo = ptr->id.data;
+
+	if (wo->exp == 0.0f || wo->range == 1.0f)
+		rna_World_shader_draw_update(bmain, scene, ptr);
+	else
+		rna_World_draw_update(bmain, scene, ptr);
+}
+
 /* Ripples/Splash > Only in Puddles need the puddles: turning one on turns them on too. */
 static void rna_World_ripple_puddle_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
@@ -1780,13 +1792,13 @@ void RNA_def_world(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "exp");
 	RNA_def_property_range(prop, 0.0, 1.0);
 	RNA_def_property_ui_text(prop, "Exposure", "Amount of exponential color correction for light");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_exposure_update");
 
 	prop = RNA_def_property(srna, "color_range", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "range");
 	RNA_def_property_range(prop, 0.2, 5.0);
 	RNA_def_property_ui_text(prop, "Range", "The color range that will be mapped to 0-1");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_exposure_update");
 
 	/* sun_size, turbidity, ground */
 	prop = RNA_def_property(srna, "sun_size", PROP_FLOAT, PROP_FACTOR);
@@ -1798,7 +1810,7 @@ void RNA_def_world(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_sky_moon", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_funcs(prop, "rna_World_use_sky_moon_get", "rna_World_use_sky_moon_set");
 	RNA_def_property_ui_text(prop, "Moon", "Render a visual moon opposite the World Sun without lighting the scene");
-	RNA_def_property_update(prop, 0, "rna_World_update");
+	RNA_def_property_update(prop, 0, "rna_World_draw_update");
 
 	prop = RNA_def_property(srna, "use_moon_precomputed", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "skytype", WO_SKY_MOON_PRECOMPUTED);
