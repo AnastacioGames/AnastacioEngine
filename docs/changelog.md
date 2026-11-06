@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Distance Culling em box e exemplos de KX_LightObject
+
+- Cull Distance e Glow Scale da luz agora ficam em um box. O plano de brilho já existia: com Glow Scale 1 ele sai pequeno demais de longe; com valor alto, aparece no jogo (conferido com janela).
+- `KX_LightObject` no `.rst`: explicação da Lamp e dos tipos, mais exemplos comentados. Os exemplos não foram rodados no jogo.
+
 ## 2026-11-06 - Tamanho da sombra com presets
 
 - Campo Size da luz virou menu Low/Medium/High/Very High (512 a 4096) e Custom, inclusive nas cascatas Near, Medium e Low.

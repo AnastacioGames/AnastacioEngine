@@ -5,7 +5,33 @@ base class --- :class:`KX_GameObject`
 
 .. class:: KX_LightObject(KX_GameObject)
 
-   A Light object.
+   A light in the game: the **Lamp** object of the editor (Add > Lamp). The type chosen in the Lamp panel is read in Python with :data:`type`:
+
+   - **Point**: ``NORMAL``, shines in all directions from one point, like a light bulb.
+   - **Sun**: ``SUN``, parallel light from far away, for daylight.
+   - **Spot**: ``SPOT``, a cone of light, like a flashlight.
+   - **Hemi**: ``HEMI``, soft light from a half sphere, without shadows.
+   - **Area**: has no type of its own in the game and reads as ``NORMAL``.
+
+   **Fake (GPU Particle)**, in the same Add > Lamp menu, is not a light: it is a mesh with one glowing particle, so it is not a :class:`KX_LightObject`.
+
+   .. code-block:: python
+
+      # Check the type of the lamp, or change it during the game.
+      import bge
+
+      light = bge.logic.getCurrentController().owner
+
+      if light.type == light.NORMAL:
+          print("Point lamp")
+      elif light.type == light.SUN:
+          print("Sun lamp")
+      elif light.type == light.SPOT:
+          print("Spot lamp")
+      elif light.type == light.HEMI:
+          print("Hemi lamp")
+
+      light.type = light.SPOT  # turn it into a Spot lamp
 
    .. code-block:: python
 
@@ -17,6 +43,53 @@ base class --- :class:`KX_GameObject`
 
       light.energy = 1.0
       light.color = [1.0, 0.0, 0.0]
+
+   .. code-block:: python
+
+      # Flicker like a torch. Run it every frame (Always sensor with True Pulse).
+      import random
+      import bge
+
+      light = bge.logic.getCurrentController().owner
+      light.energy = random.uniform(0.8, 1.2)
+
+   .. code-block:: python
+
+      # Turn the light on or off. An invisible light does not update its shadow.
+      import bge
+
+      light = bge.logic.getCurrentController().owner
+      light.visible = not light.visible
+
+   .. code-block:: python
+
+      # Shadow quality option. Bigger sizes look sharper but use more video memory.
+      # Point lamps keep the Size set in the editor.
+      import bge
+
+      light = bge.logic.getCurrentController().owner
+      light.shadowMapSize = 1024  # for example 512, 1024, 2048 or 4096
+
+   .. code-block:: python
+
+      # Stop redrawing the shadow every frame when the scene rarely changes.
+      import bge
+
+      light = bge.logic.getCurrentController().owner
+      light.staticShadow = True
+
+      # Later, after moving something that casts a shadow, redraw it once.
+      light.updateShadow()
+
+   .. code-block:: python
+
+      # Narrow the cone of a spot light and soften its edge.
+      import bge
+
+      light = bge.logic.getCurrentController().owner
+      if light.type == light.SPOT:
+          light.spotsize = 45.0  # cone angle in degrees
+          light.spotblend = 0.3  # edge softness, from 0 to 1
 
    .. data:: SPOT
 

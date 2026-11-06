@@ -331,8 +331,6 @@ class DATA_PT_light_culling_game(DataButtonsPanel, Panel):
 
         layout.active = lamp.use_cull_distance
 
-        row = layout.row()
-        row.prop(lamp, "cull_distance", text="Cull Distance")
-
-        row = layout.row()
-        row.prop(lamp, "glow_scale", text="Glow Scale")
+        box = layout.box()
+        box.prop(lamp, "cull_distance", text="Cull Distance")
+        box.prop(lamp, "glow_scale", text="Glow Scale")
