@@ -251,6 +251,9 @@ const char *ProfilerTip(int tip)
 }
 }  // namespace
 
+static const float RECORD_FONT_SIZE = 20.0f;
+static const float RECORD_COUNTDOWN_FONT_SIZE = 128.0f;
+
 void KX_DebugMode::RenderRecordOverlay()
 {
   const ImGuiViewport *viewport = ImGui::GetMainViewport();
@@ -265,17 +268,23 @@ void KX_DebugMode::RenderRecordOverlay()
                                  ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoDocking;
   if (ImGui::Begin("RecPlayOverlay", nullptr, flags)) {
     if (countdown > 0.0) {
-      ImGui::SetWindowFontScale(8.0f);
-      ImGui::Text("%d", (int)std::ceil(countdown));
-      ImGui::SetWindowFontScale(1.5f);
-      ImGui::Text("Esc cancels");
+      /* Built at the size it is drawn: a scaled small font comes out blurred. */
+      {
+        DebugFontScope numberFont(RECORD_COUNTDOWN_FONT_SIZE);
+        const std::string number = std::to_string((int)std::ceil(countdown));
+        const float width = ImGui::GetContentRegionAvail().x;
+        ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (width - ImGui::CalcTextSize(number.c_str()).x) * 0.5f));
+        ImGui::TextUnformatted(number.c_str());
+      }
+      DebugFontScope hintFont(RECORD_FONT_SIZE);
+      ImGui::TextUnformatted("Esc cancels");
       ImGui::End();
       return;
     }
     const double time = BKE_motion_record_time();
     const int seconds = (int)time;
     const int limit = (int)std::ceil(BKE_motion_record_max_seconds());
-    ImGui::SetWindowFontScale(1.5f);
+    DebugFontScope textFont(RECORD_FONT_SIZE);
     /* Blinks once per second. */
     ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, (time - seconds < 0.5) ? 1.0f : 0.25f), "REC");
     ImGui::SameLine();
