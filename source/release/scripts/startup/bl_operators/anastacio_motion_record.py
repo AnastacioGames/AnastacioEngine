@@ -5,6 +5,9 @@
 import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
 
+# Only properties here; bl_operators.register() reads this list from every module.
+classes = ()
+
 
 def register_props():
     S = bpy.types.Scene
