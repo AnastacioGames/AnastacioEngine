@@ -89,6 +89,19 @@ Numa pista, em vez de uma caixa gigante (o espaçamento cresce e a luz fica borr
 - Padrão: Medium, 6 m, 4 m acima da pista, limite total 15.000. Uma pista de 1,9 km dá ~120 caixas e
   ~14 mil sondas. Acima do limite, o Generate recusa e sugere o espaçamento que cabe.
 
+## Luz guardada (pistas)
+
+Com vários volumes, a captura ao vivo usa no máximo uma sonda por quadro e os volumes a até 120 m da câmera vão primeiro. Numa GPU
+integrada, uma cena com vários volumes não captura ao vivo: usa só a luz guardada.
+
+Para guardar a luz, abra o editor com `RANGE_PROBE_VOLUME_BAKE=1` e jogue normalmente. A cada 10 s, os volumes prontos vão para
+`<cena>.probes`, ao lado do jogo. Cada volume recebe uma passada, e a rodada seguinte continua de onde parou. Sem a variável, os
+volumes presentes no arquivo não capturam e ignoram World, sol e objetos movidos; os que faltam capturam ao vivo.
+
+- Mudou a caixa: aquele volume volta a capturar, com aviso. Mudou só o cenário: apague o arquivo e capture de novo.
+- A luz é fixa: não acompanha clima nem horário.
+- O arquivo ainda não entra no pacote exportado.
+
 ## Depuração
 
 Vários volumes dividem um orçamento de faces por quadro: o mais perto da câmera captura primeiro, e a cada 4 quadros

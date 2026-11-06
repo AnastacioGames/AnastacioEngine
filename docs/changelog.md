@@ -15,6 +15,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Caixa `KTX2 HQ` por imagem no Prepare Textures, guardada na propriedade `range_ktx2_high_quality`, que entra na chave do cache.
   Sem ela o arquivo sai idêntico; normal map ignora a opção.
 
+## 2026-11-05 - Light Probe Volumes: corrida real na Pista_4 e luz guardada
+
+- Checagem de objetos movidos em uma passada para todos os volumes (era uma por volume, ~140 ms por segundo com 119). Peças presas
+  a objeto dinâmico ficam fora da captura.
+- Com vários volumes: uma sonda por quadro, e volumes a até 120 m da câmera primeiro. Pista_4 foi de 39 para 60 fps (RX 6800M).
+- `RANGE_PROBE_VOLUME_BAKE`: corridas normais acumulam os volumes prontos em `<cena>.probes`; a rodada seguinte lê o arquivo e
+  captura só o resto. Testado com 10 volumes lidos e 23 de 119 salvos. GPU integrada não captura ao vivo (ainda sem teste).
+
 ## 2026-11-05 - Web: Static Batch deslocado pela posição do objeto de referência
 
 - Na Web a matriz do objeto vai ao shader por uniform, e o lote mandava a do objeto de referência sobre vértices já em coordenadas

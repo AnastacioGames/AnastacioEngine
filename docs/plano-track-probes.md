@@ -1,6 +1,6 @@
 # Plano: Light Probe Volumes gerados pelo Track Tool
 
-Status: P1, P2 e P3 feitas (2026-11-05: prévia, Generate/Clear, testes headless e orçamento global medido); P4 aberta. Base: [plano-track-tool.md](plano-track-tool.md),
+Status: P1, P2 e P3 feitas (2026-11-05); teste na Pista_4 em andamento: 60 fps, luz guardada com 23 de 119 volumes; P4 aberta. Base: [plano-track-tool.md](plano-track-tool.md),
 [probe-volume-gi.md](probe-volume-gi.md), [plano-probe-volume-gi.md](plano-probe-volume-gi.md).
 
 ## Objetivo
@@ -112,6 +112,26 @@ Custo: a luz completa demora mais. Sem o orçamento compartilhado, os 20 volumes
 seguem capturando 24 faces por quadro depois dos 10 s. O timer de GPU de `render.probes` não serviu nesta GPU: dá 6-10 ms com
 1 volume e não acompanha as faces (clock baixo com pouca carga é a hipótese). `RANGE_PROBE_VOLUME_LOG` com 20 volumes
 causa um pico de ~25 ms por segundo; não usar o log ao medir tempo de quadro.
+
+## Teste na Pista_4 (2026-11-05)
+
+Corrida real com janela, 119 volumes, RX 6800M, pelo Performance Report. As rodadas não são idênticas, a comparação é aproximada.
+
+| Rodada | Quadro típico | Captura | Picos |
+|---|---|---|---|
+| Orçamento compartilhado (24 faces) | 25,6 ms | 13,1 ms | 114 |
+| + checagem de objetos em uma passada | 21,6 ms | 8,5 ms | 8 |
+| + limite de 6 faces e raio de 120 m | 15,0 ms | 2,6 ms | 10 |
+| + luz guardada, 10 volumes prontos no início | 9,75 ms | 1,6 ms | 16 |
+
+- A medição da cena de 20 volumes não mostrou dois custos: a checagem de objetos por volume (~140 ms a cada segundo com 119) e o
+  aquecimento, que dura a corrida inteira (~83 mil faces por passada). A estimativa de 1 minuto por ciclo estava baixa.
+- Captura ao vivo não serve para PC fraco: o relatório estima 46 ms numa GPU 16x mais lenta. Por isso a luz guardada.
+- Luz guardada: `RANGE_PROBE_VOLUME_BAKE=1` no editor e corridas normais pelo menu; ~4 a 5 volumes por minuto. Começar direto
+  na Pista_4 não funciona para este jogo. Uma sessão única e lenta também foi descartada.
+
+Pendente: encher os outros 96 volumes, correr sem captura, testar `RANGE_WEAK_GPU` (GPU integrada não captura ao vivo; ainda sem
+teste), aceite do degrau de luz, incluir o `.probes` no pacote exportado e decidir o clima (a luz guardada é fixa; começar pelo dia claro).
 
 ## Riscos
 
