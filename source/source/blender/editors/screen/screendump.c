@@ -303,7 +303,7 @@ static int screencast_quality_crf(int quality)
 
 /* In the chosen folder, else next to the saved .blend, else in the user's default folder;
  * time stamped so recordings never overwrite each other. */
-static void screencast_default_filepath(char *filepath, size_t maxlen, const char *directory)
+void ED_screen_screencast_default_filepath(char *filepath, size_t maxlen, const char *directory)
 {
 	char stamp[32], name[FILE_MAXFILE];
 	const time_t now = time(NULL);
@@ -442,7 +442,7 @@ static int screencast_exec(bContext *C, wmOperator *op)
 	RNA_string_get(op->ptr, "filepath", filepath);
 	if (filepath[0] == '\0') {
 		RNA_string_get(op->ptr, "directory", directory);
-		screencast_default_filepath(filepath, sizeof(filepath), directory);
+		ED_screen_screencast_default_filepath(filepath, sizeof(filepath), directory);
 	}
 	else {
 		BLI_path_abs(filepath, BKE_main_blendfile_path_from_global());

@@ -267,6 +267,7 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
             col.operator("scene.rec_take_remove", icon='ZOOMOUT', text="")
             row = box.row(align=True)
             row.operator("view3d.game_record", text="Watch", icon='PLAY').watch = True
+            row.operator("view3d.game_record", text="Movie", icon='RENDER_ANIMATION').movie = True
             row.operator("view3d.game_record", text="Rerecord", icon='REC').rerecord = True
             row = box.row(align=True)
             row.operator("scene.rec_take_use", icon='ACTION')

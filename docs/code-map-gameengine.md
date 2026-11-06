@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-06 (`HEAD` `84fdd868`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-06 (`HEAD` `f6ccd7fc`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -158,18 +158,18 @@ trecho inteiro, não só um método.
 
 ---
 
-## `Ketsji/KX_KetsjiEngine.cpp` (1.792 linhas)
+## `Ketsji/KX_KetsjiEngine.cpp` (1.793 linhas)
 
 Laço do jogo: tempo, frames lógicos/físicos, cenas. O desenho em si fica em `KX_RenderPipeline.cpp` (abaixo).
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
-| Construção e serviços | `KX_KetsjiEngine` 194, `SetCanvas` 334, `SetRasterizer` 340, `SetConverter` 428, `StartEngine` 460, `StopEngine` 1264 |
-| Frame | `BeginFrame` 501, `EndFrame` 528, `UpdateDynamicResolution` 616, **`NextFrame`** 706 (lógica, física, animação), `Render` 1099 |
-| Tempo e espera | `ServerSleep` 933, `SleepUnderRate` 921, `UpdateSleepTime` 1004, `ClockTiming` 1310, `FrameTiming` 1346, `AdvanceStepTime` 1359 |
-| Animação e sombra | `UpdateAnimations` 1250, `IsStaticShadowSettled` 1259 |
-| Cenas | `AddScene` 1304, `ConvertAndAddScene` 1406, `PreloadScene` 1411, `RemoveScene` 1416, `ReplaceScene` 1431, `SuspendScene` 1436, `ResumeScene` 1441 |
-| Taxas e flags | `SetTicRate` 1467, `SetUseFixedTimestep` 1560, `SetShadowCulling` 1587, `SetDynamicResolution` 1592 |
+| Construção e serviços | `KX_KetsjiEngine` 194, `SetCanvas` 334, `SetRasterizer` 340, `SetConverter` 428, `StartEngine` 460, `StopEngine` 1265 |
+| Frame | `BeginFrame` 501, `EndFrame` 528, `UpdateDynamicResolution` 617, **`NextFrame`** 707 (lógica, física, animação), `Render` 1100 |
+| Tempo e espera | `ServerSleep` 934, `SleepUnderRate` 921, `UpdateSleepTime` 1005, `ClockTiming` 1311, `FrameTiming` 1347, `AdvanceStepTime` 1360 |
+| Animação e sombra | `UpdateAnimations` 1251, `IsStaticShadowSettled` 1260 |
+| Cenas | `AddScene` 1305, `ConvertAndAddScene` 1407, `PreloadScene` 1412, `RemoveScene` 1417, `ReplaceScene` 1432, `SuspendScene` 1437, `ResumeScene` 1442 |
+| Taxas e flags | `SetTicRate` 1468, `SetUseFixedTimestep` 1561, `SetShadowCulling` 1588, `SetDynamicResolution` 1593 |
 
 ## `Ketsji/KX_RenderPipeline.cpp` (1.303 linhas)
 

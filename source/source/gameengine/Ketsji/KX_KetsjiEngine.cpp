@@ -568,7 +568,8 @@ void KX_KetsjiEngine::EndFrame()
 			if ((m_flags & SHOW_DEBUG_MODE)) {
 				m_debugMode->RenderImguiDebugMode();
 			}
-			if (BKE_motion_record_is_active()) {
+			/* Watching shows the clean picture, it may be going into a movie. */
+			if (BKE_motion_record_is_active() && !BKE_motion_record_is_watch()) {
 				m_debugMode->RenderRecordOverlay();
 			}
 			// Fase L: automatic GPU particle debug overlay, one ImGui window per object with

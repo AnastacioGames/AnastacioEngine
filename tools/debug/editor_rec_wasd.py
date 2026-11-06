@@ -91,10 +91,15 @@ def run(scene):
         jogo('Regravar')
         report('watch: %s' % bpy.ops.view3d.game_record(override, watch=True))
         jogo('Watch 2')
+        report('movie: %s' % bpy.ops.view3d.game_record(override, movie=True))
+        video = bpy.context.window_manager.screencast_filepath
+        report('video: %s %d bytes' % (video, os.path.getsize(video)))
+        jogo('Movie')
     except Exception:
         report('ERRO\n' + traceback.format_exc())
     report('FIM')
-    bpy.ops.wm.quit_blender()
+    # quit_blender pararia na caixa de salvar alteracoes.
+    os._exit(0)
 
 
 bpy.app.handlers.scene_update_post.append(run)

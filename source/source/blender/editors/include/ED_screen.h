@@ -128,6 +128,7 @@ void    ED_screen_restore_temp_type(struct bContext *C, ScrArea *sa);
 ScrArea *ED_screen_full_newspace(struct bContext *C, ScrArea *sa, int type);
 void    ED_screen_full_prevspace(struct bContext *C, ScrArea *sa);
 void    ED_screen_full_restore(struct bContext *C, ScrArea *sa);
+void    ED_screen_screencast_default_filepath(char *filepath, size_t filepath_size, const char *directory);
 struct ScrArea *ED_screen_state_toggle(struct bContext *C, struct wmWindow *win, struct ScrArea *sa, const short state);
 void    ED_screens_header_tools_menu_create(struct bContext *C, struct uiLayout *layout, void *arg);
 bool    ED_screen_stereo3d_required(struct bScreen *screen);

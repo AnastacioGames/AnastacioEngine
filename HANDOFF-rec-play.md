@@ -12,7 +12,8 @@ Regras de build: [AGENTS.md](AGENTS.md).
 - Fase 3 (filhos e armature por NLA): feita, sem teste com personagem real.
 - Fase 4 (WASD, contagem, REC piscando): feita, testada com teclas reais, sem aceite visual da contagem.
 - Fase 5 (camadas, Watch, Rerecord): feita, testada com teclas reais, sem clique real nos botões.
-- Próxima: Fase 6.
+- Fase 6 (Movie pelo Screencast): feita, vídeo gerado e conferido por ffprobe, imagem ainda não vista.
+- Próxima: Fase 7 (DNA versionado: pede `ninja -t clean` e rebuild completo).
 
 ## Como testar
 

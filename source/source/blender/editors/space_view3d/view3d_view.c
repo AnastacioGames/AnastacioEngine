@@ -53,6 +53,7 @@
 #include "WM_api.h"
 #include "WM_types.h"
 
+#include "BLI_path_util.h"
 #include "ED_screen.h"
 #include "ED_undo.h"
 
@@ -1445,7 +1446,8 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 			BKE_report(op->reports, RPT_ERROR, "Rec Play does not work in a multiplayer session");
 			return OPERATOR_CANCELLED;
 		}
-		if (!view3d_motion_record_begin(startscene, op->reports, RNA_boolean_get(op->ptr, "watch"),
+		if (!view3d_motion_record_begin(startscene, op->reports,
+		                                RNA_boolean_get(op->ptr, "watch") || RNA_boolean_get(op->ptr, "movie"),
 		                                RNA_boolean_get(op->ptr, "rerecord")))
 		{
 			return OPERATOR_CANCELLED;
@@ -1497,6 +1499,15 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	}
 
 
+	/* Rec Play Movie: only the game area, on the swap every embedded frame passes through. */
+	const bool movie = rec_play && RNA_boolean_get(op->ptr, "movie") && !WM_screencast_is_running();
+	if (movie) {
+		char filepath[FILE_MAX];
+		ED_screen_screencast_default_filepath(filepath, sizeof(filepath), "");
+		const int fps = (int)(startscene->r.frs_sec / startscene->r.frs_sec_base + 0.5f);
+		WM_screencast_start(C, prevwin, &cam_frame, fps, 18, false, true, filepath, op->reports);
+	}
+
 	game_engine_save_state(C, prevwin);
 
 	StartKetsjiShell(C, ar, &cam_frame, 1);
@@ -1518,6 +1529,10 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	}
 
 	game_engine_restore_state(C, prevwin);
+
+	if (movie) {
+		WM_screencast_stop(op->reports);
+	}
 
 	//XXX restore_all_scene_cfra(scene_cfra_store);
 	BKE_scene_set_background(CTX_data_main(C), startscene);
@@ -1564,6 +1579,7 @@ void VIEW3D_OT_game_record(wmOperatorType *ot)
 	ot->poll = game_engine_poll;
 
 	RNA_def_boolean(ot->srna, "watch", false, "Watch", "Play the takes in the game without recording");
+	RNA_def_boolean(ot->srna, "movie", false, "Movie", "Play the takes and save the game area as a video");
 	RNA_def_boolean(ot->srna, "rerecord", false, "Rerecord", "Record the actors of the selected take again, replacing it");
 }
 

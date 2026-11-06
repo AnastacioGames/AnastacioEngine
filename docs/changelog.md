@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 6 (filme)
+
+- Botão **Movie** toca os Takes como o Watch e salva a área do jogo em vídeo, com som, pelo Screencast, na pasta do arquivo. O Watch não mostra contador, para a imagem sair limpa.
+
 ## 2026-11-06 - Rec Play: Fase 5 (camadas, Watch e Rerecord)
 
 - Ao gravar, quem não está marcado repete o Take mais recente dele, com a lógica desligada e sem colidir por padrão (`Play Other Takes`, `Collide on Replay`).
