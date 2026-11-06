@@ -250,7 +250,7 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
                 box.label(text="Empty = the character's own game controls")
 
         box = layout.box()
-        box.label(text="3. Press Rec Play and move it!", icon='REC')
+        box.label(text="3. Press Rec Play and move it! F10 stops", icon='REC')
         row = box.row()
         row.scale_y = 1.6
         row.operator("view3d.game_record", text="Rec Play", icon='REC_PLAY')

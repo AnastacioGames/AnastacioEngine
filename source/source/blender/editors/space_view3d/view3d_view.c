@@ -51,6 +51,7 @@
 #include "WM_types.h"
 
 #include "ED_screen.h"
+#include "ED_undo.h"
 
 #ifdef WITH_GAMEENGINE
 #  include "BLI_listbase.h"
@@ -1434,6 +1435,18 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	if (!ED_view3d_context_activate(C))
 		return OPERATOR_CANCELLED;
 
+	const bool rec_play = STREQ(op->type->idname, "VIEW3D_OT_game_record");
+	if (rec_play) {
+		/* Each peer would record its own version of the session. */
+		if (startscene->gm.network.mode != NET_MODE_OFFLINE) {
+			BKE_report(op->reports, RPT_ERROR, "Rec Play does not work in a multiplayer session");
+			return OPERATOR_CANCELLED;
+		}
+		if (!view3d_motion_record_begin(startscene, op->reports)) {
+			return OPERATOR_CANCELLED;
+		}
+	}
+
 	/* redraw to hide any menus/popups, we don't go back to
 	 * the window manager until after this operator exits */
 	WM_redraw_windows(C);
@@ -1457,7 +1470,7 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 
 	game_set_commmandline_options(&startscene->gm);
 	/* Written on every start, so Rec Play never leaks into the next plain Play. */
-	SYS_WriteCommandLineInt(SYS_GetSystem(), "rec_play", STREQ(op->type->idname, "VIEW3D_OT_game_record"));
+	SYS_WriteCommandLineInt(SYS_GetSystem(), "rec_play", rec_play);
 
 	if ((rv3d->persp == RV3D_CAMOB) &&
 	    (startscene->gm.framing.type == SCE_GAMEFRAMING_BARS))
@@ -1506,6 +1519,11 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	//XXX BKE_scene_update_for_newframe(bmain->eval_ctx, bmain, scene, scene->lay);
 
 	BLI_callback_exec(bmain, &startscene->id, BLI_CB_EVT_GAME_POST);
+
+	/* After the game, whatever way it ended: the buffer outlives the game scenes. */
+	if (rec_play && view3d_motion_record_finish(C, startscene, op->reports)) {
+		ED_undo_push(C, "Rec Play");
+	}
 
 	return OPERATOR_FINISHED;
 #else

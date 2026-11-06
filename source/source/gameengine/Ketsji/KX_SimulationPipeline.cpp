@@ -33,6 +33,8 @@
 #include "EXP_ListValue.h"
 #include "PHY_IPhysicsEnvironment.h"
 
+#include "BKE_motion_record.h"
+
 KX_SimulationPipeline::KX_SimulationPipeline(KX_KetsjiEngine *engine)
 	:m_engine(engine)
 {
@@ -47,6 +49,9 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 	if (network && network->IsActive()) {
 		network->BeginTick();
 	}
+
+	const bool recording = BKE_motion_record_is_active();
+	bool recordClockRuns = false;
 
 	// for each scene, call the proceed functions
 	for (KX_Scene *scene : m_engine->GetScenes()) {
@@ -159,6 +164,12 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_scenegraph_physics);
 			scene->UpdateParents();
 
+			// Rec Play: final transforms of this step.
+			if (recording) {
+				scene->UpdateMotionRecord();
+				recordClockRuns = true;
+			}
+
 			// Focus sensor, focus tracking and shake of the active camera, on final transforms.
 			KX_Camera *activeCamera = scene->GetActiveCamera();
 			if (activeCamera) {
@@ -177,6 +188,11 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 				light->UpdateFlicker(m_engine->GetFrameTime());
 			}
 		}
+	}
+
+	// Once per step, so every actor of every scene shares one clock.
+	if (recordClockRuns) {
+		BKE_motion_record_advance(m_engine->GetFrameStep());
 	}
 
 	// What follows the scenes is not the last scene's particle update.

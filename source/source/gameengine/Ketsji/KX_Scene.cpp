@@ -108,6 +108,7 @@ extern "C" {
 }
 #include "DNA_object_types.h"
 #include "DNA_node_types.h"
+#include "BKE_motion_record.h"
 #include "BKE_scene.h" // SETLOOPER
 #include "BKE_node.h" // SH_NODE_WORLD_BLOOM_FX, SH_NODE_WORLD_SSR_FX
 extern "C" {
@@ -1796,6 +1797,7 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	// Deferred deformation must never outlive the object, including between catch-up steps.
 	m_pendingAnimationDeformers.erase(gameobj);
 	m_animNeedsUpdateCache.erase(gameobj);
+	CM_ListRemoveIfFound(m_motionRecordActors, gameobj);
 	// Multiplayer: the replication layer forgets the object before it is destroyed.
 	if (gameobj->GetNetId() != 0) {
 		KX_NetworkManager *network = KX_GetActiveEngine()->GetNetworkManager();
@@ -1969,6 +1971,45 @@ KX_Camera *KX_Scene::GetActiveCamera()
 const mt::vec3& KX_Scene::GetOptimizationReferencePosition() const
 {
 	return m_optimizationReferencePosition;
+}
+
+static void motion_record_world_matrix(KX_GameObject *gameobj, float mat[4][4])
+{
+	const mt::mat3& orientation = gameobj->NodeGetWorldOrientation();
+	const mt::vec3& scale = gameobj->NodeGetWorldScaling();
+	const mt::vec3& position = gameobj->NodeGetWorldPosition();
+	memset(mat, 0, sizeof(float[4][4]));
+	for (unsigned short col = 0; col < 3; ++col) {
+		for (unsigned short row = 0; row < 3; ++row) {
+			mat[col][row] = orientation(row, col) * scale[col];
+		}
+		mat[3][col] = position[col];
+	}
+	mat[3][3] = 1.0f;
+}
+
+void KX_Scene::UpdateMotionRecord()
+{
+	if (!m_motionRecordActorsFound) {
+		m_motionRecordActorsFound = true;
+		for (KX_GameObject *gameobj : *m_objectlist) {
+			if (gameobj->GetBlenderObject() && BKE_motion_record_is_actor(gameobj->GetBlenderObject())) {
+				m_motionRecordActors.push_back(gameobj);
+			}
+		}
+	}
+	if (!BKE_motion_record_sample_due()) {
+		return;
+	}
+	for (KX_GameObject *gameobj : m_motionRecordActors) {
+		float mat[4][4], parentMat[4][4];
+		motion_record_world_matrix(gameobj, mat);
+		KX_GameObject *parent = gameobj->GetParent();
+		if (parent) {
+			motion_record_world_matrix(parent, parentMat);
+		}
+		BKE_motion_record_sample(gameobj->GetBlenderObject(), mat, parent ? parentMat : nullptr);
+	}
 }
 
 void KX_Scene::UpdateCharacterPostureProperties()

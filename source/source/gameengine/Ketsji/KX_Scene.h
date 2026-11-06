@@ -230,6 +230,9 @@ private:
 	std::unordered_map<std::string, KX_GameObject *> m_inactiveNameIndex;
 	/// All animated objects, no need of EXP_ListValue because the list isn't exposed in python.
 	std::vector<KX_GameObject *> m_animatedlist;
+	/// Rec Play actors in this scene, found on the first sample.
+	std::vector<KX_GameObject *> m_motionRecordActors;
+	bool m_motionRecordActorsFound = false;
 
 	/// The list of cameras for this scene.
 	EXP_ListValue<KX_Camera> *m_cameralist;
@@ -564,6 +567,8 @@ public:
 	}
 	/// Copy each character posture to its Posture Property, after physics.
 	void UpdateCharacterPostureProperties();
+	/// Rec Play: samples the actors of this scene.
+	void UpdateMotionRecord();
 
 	/// Object counters from the last main-camera (non-shadow) culling pass. See m_lastCullingTotalObjects.
 	int GetLastCullingTotalObjects() const;

@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 2 (captura e Action)
+
+- Rec Play grava os atores marcados (ou o objeto ativo) e, ao sair do jogo, cria uma Action `Rec_<objeto>` por ator, com chaves lineares simplificadas e Ctrl+Z.
+- O buffer fica em `BKE_motion_record` porque as cenas do jogo são destruídas ao sair. A captura roda em `KX_SimulationPipeline::Update`, com relógio único que para em cena suspensa.
+- F10 encerra a gravação mesmo com sensor na tecla de saída; qualquer saída salva. Rec Play recusa cena com multiplayer.
+- Filho de objeto móvel: cada amostra guarda também a matriz do pai no jogo, porque o pai do editor fica parado na conversão.
+- Teste com janela (`tools/debug/editor_rec_play.py`, cena `tools/debug/cenas/criar_cena_rec_play.py`): 300 passos, Action tocada no editor contra a matriz real do jogo, erro máximo de 2,4 mm em Cubo físico, Girador em ZXY e Filho; duas gravações convivem e Ctrl+Z desfaz a segunda. F10 e Esc não entraram nesse teste automático.
+
 ## 2026-11-06 - Distance Culling em box e exemplos de KX_LightObject
 
 - Cull Distance e Glow Scale da luz agora ficam em um box. O plano de brilho já existia: com Glow Scale 1 ele sai pequeno demais de longe; com valor alto, aparece no jogo (conferido com janela).

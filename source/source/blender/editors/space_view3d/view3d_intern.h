@@ -261,6 +261,10 @@ void VIEW3D_OT_localview(struct wmOperatorType *ot);
 void VIEW3D_OT_game_start(struct wmOperatorType *ot);
 void VIEW3D_OT_game_record(struct wmOperatorType *ot);
 
+/* view3d_motion_record.c */
+bool view3d_motion_record_begin(struct Scene *scene, struct ReportList *reports);
+bool view3d_motion_record_finish(struct bContext *C, struct Scene *scene, struct ReportList *reports);
+
 
 bool ED_view3d_boundbox_clip_ex(const RegionView3D *rv3d, const struct BoundBox *bb, float obmat[4][4]);
 bool ED_view3d_boundbox_clip(RegionView3D *rv3d, const struct BoundBox *bb);

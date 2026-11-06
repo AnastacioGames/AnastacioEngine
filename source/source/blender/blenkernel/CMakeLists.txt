@@ -169,6 +169,7 @@ set(SRC
 	intern/rigidbody.c
 	intern/sca.c
 	intern/scene.c
+	intern/motion_record.c
 	intern/screencast.c
 	intern/screencast_audio.cc
 	intern/screen.c
@@ -292,6 +293,7 @@ set(SRC
 	BKE_rigidbody.h
 	BKE_sca.h
 	BKE_scene.h
+	BKE_motion_record.h
 	BKE_screencast.h
 	intern/screencast_audio.h
 	BKE_screen.h

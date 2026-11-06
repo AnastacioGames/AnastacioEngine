@@ -1,53 +1,26 @@
-# Handoff — Rec Play, Fase 1 (botão, ícone e operador)
+# Handoff — Rec Play
 
-Para continuar no PC (Windows), com Claude ou Codex. Branch: `main`.
-Plano completo: [docs/gravacao-de-movimento-plan.md](docs/gravacao-de-movimento-plan.md).
-Regras de build: [AGENTS.md](AGENTS.md) (sempre `vcvars64.bat` + `set VSLANG=1033&&`).
+Branch: `main`. Plano: [docs/gravacao-de-movimento-plan.md](docs/gravacao-de-movimento-plan.md).
+Regras de build: [AGENTS.md](AGENTS.md).
 
-## O que já está pronto (só Python, ainda não visto no editor)
+## Estado
 
-- Painel **Motion Recording** em Properties > Render > System, depois de Player:
-  `RENDER_PT_game_motion_record` em `source/release/scripts/startup/bl_ui/properties_game_render.py`,
-  registrado em `bl_ui/properties_game.py`.
-- Propriedades `Scene.ae_rec_*`, `Object.ae_rec_actor`, `Object.ae_rec_action` em
-  `source/release/scripts/startup/bl_operators/anastacio_motion_record.py` (na lista `_modules` de
-  `bl_operators/__init__.py`).
+- Fase 1 (botão, ícone, operador `VIEW3D_OT_game_record`): enviada.
+- Fase 2 (captura e Action `Rec_<objeto>`): feita, ver `docs/changelog.md`.
+- Próxima: Fase 3. Antes de começar, ouvir as observações do usuário sobre o teste da Fase 2.
 
-**Primeiro passo no PC:** `git pull`, copiar `source/release/scripts/` para `build/bin/2.79/scripts/`, abrir o
-editor e conferir o painel (três passos, Advanced fechado). Só depois começar o C++.
+## Como testar
 
-## Fase 1 — o que fazer
+```
+set REC_LOG=caminho\log.json
+set REC_RES=caminho\res.txt
+AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_rec_play.py -- cena.range
+AnastacioEngine.exe cena.range --python tools/debug/editor_rec_play.py
+```
 
-Objetivo: botão **Rec Play** que inicia o Play embutido igual ao Play, mas com uma flag de "gravando". Ainda
-não grava nada (isso é a Fase 2). Teste de aceite: o botão aparece com ícone próprio no cabeçalho e na barra
-flutuante, o jogo inicia, Esc volta ao editor, e o console mostra uma linha confirmando que a flag chegou ao
-runtime.
+O script usa a 3D View em tela cheia e desfaz por timer: contexto forçado no redesenho e `ed.undo` dentro de
+`scene_update_post` derrubam o editor, mas isso é do script, não do Rec Play.
 
-1. **Ícone `REC_PLAY`** (mesmo caminho do `COOK`, ver changelog "Ícone novo `COOK`"):
-   - trocar um `DEF_ICON_BLANK(n)` livre por `DEF_ICON(REC_PLAY)` em
-     `source/source/blender/editors/include/UI_icons.h` (não renumerar; usar um BLANK);
-   - criar `release/datafiles/blender_icons16/icon16_rec_play.dat` e `blender_icons32/icon32_rec_play.dat`
-     (copiar o formato de `icon16_cook.dat`/`icon32_cook.dat`) e PNGs em `icons_blender5` e `icons_upbge`;
-   - acrescentar `rec_play` na lista de ícones de `source/source/blender/editors/datafiles/CMakeLists.txt`
-     (ao lado de `cook`);
-   - desenho original: bola vermelha + seta de play/filme. Não copiar arte do 3D Movie Maker.
-   - `python tools/check_ui_icons.py` tem de continuar sem erro novo.
-2. **Operador `VIEW3D_OT_game_record`** em `source/source/blender/editors/space_view3d/view3d_view.c`, ao lado de
-   `VIEW3D_OT_game_start`: mesmo `game_engine_exec`/`game_engine_poll`; liga a flag antes e desliga depois.
-   Declarar em `view3d_intern.h` e registrar em `view3d_ops.c` (perto de `WM_operatortype_append(VIEW3D_OT_game_start)`).
-   - Flag: chave `rec_play` por `SYS_WriteCommandLineInt`, escrita em toda execução (0 no Play comum), lida em
-     `LA_Launcher`. **Não** criar campo DNA nesta fase.
-   - Incluir `VIEW3D_OT_game_record` em `game_live_blocked_ops` (`wm_event_system.c`) e desligar o Live UI na
-     gravação. Bloqueio em sessão multiplayer fica para a Fase 2, quando houver captura.
-3. **Botões**: depois de "Play" em `uiTemplateHeader3D_game_controls` (`view3d_header.c`) e na barra flutuante
-   (`view3d_draw.c`, bloco `view3d_floating_game_controls`): `uiItemO(row, "Rec Play", ICON_REC_PLAY, "VIEW3D_OT_game_record")`.
-4. **Painel**: trocar a linha "Rec Play button: coming in phase 1" do passo 3 por
-   `row.operator("view3d.game_record", text="Rec Play", icon='REC_PLAY')` com `row.scale_y = 1.6`.
-5. **Docs**: entrada no topo de `docs/changelog.md`, atualizar "Gravação de movimento" em `docs/roadmap.md`,
-   `python tools/check_docs.py`.
+## Falta conferir à mão
 
-## Cuidados
-
-- `UI_icons.h` é header: depois de editar, se aparecer crash estranho, `ninja -t clean` (AGENTS.md).
-- Alvo para testar: `RangeEngine` (editor). Não marcar como feito sem build e teste na janela.
-- Parar para o usuário testar antes da Fase 2.
+F10 e Esc durante a gravação; personagem físico; objeto parentado a osso (usa o caminho sem a matriz do pai).

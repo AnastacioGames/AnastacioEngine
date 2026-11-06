@@ -31,6 +31,8 @@
 #include "LA_Launcher.h"
 #include "LA_SystemCommandLine.h"
 
+#include "BKE_motion_record.h"
+
 #include "RAS_ICanvas.h"
 
 #include "GPG_Canvas.h"
@@ -751,7 +753,12 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 	m_inputDevice->PollVirtualKeys();
 
 	SCA_IInputDevice::SCA_EnumInputs exitKey = m_ketsjiEngine->GetExitKey();
-	if (m_inputDevice->GetInput(exitKey).Find(SCA_InputEvent::ACTIVE) &&
+	/* Rec Play: a key of its own, since a sensor on the exit key blocks it and loses the way out. */
+	if (BKE_motion_record_is_active() && m_inputDevice->GetInput(SCA_IInputDevice::F10KEY).Find(SCA_InputEvent::ACTIVE)) {
+		m_inputDevice->ConvertEvent(SCA_IInputDevice::F10KEY, 0, 0);
+		exitInfo.m_code = KX_ExitInfo::BLENDER_ESC;
+	}
+	else if (m_inputDevice->GetInput(exitKey).Find(SCA_InputEvent::ACTIVE) &&
 	    !m_inputDevice->GetHookExitKey() && !(m_ketsjiEngine->GetFlags() & KX_KetsjiEngine::IGNORE_EXIT_KEY)) {
 		m_inputDevice->ConvertEvent(exitKey, 0, 0);
 		exitInfo.m_code = KX_ExitInfo::BLENDER_ESC;

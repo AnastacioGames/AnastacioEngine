@@ -176,7 +176,7 @@ void LA_BlenderLauncher::InitEngine()
 	// Rec Play: the recording must see the game untouched, so no live editing while it runs.
 	const bool recPlay = (SYS_GetCommandLineInt(SYS_GetSystem(), "rec_play", 0) != 0);
 	if (recPlay) {
-		CM_Message("Rec Play: recording flag on");
+		CM_Message("Rec Play: recording flag on (F10 stops)");
 	}
 	m_liveUI = (m_startScene->gm.flag & GAME_LIVE_UI) && !recPlay && (m_maggie == CTX_data_main(m_context));
 	if (m_liveUI) {

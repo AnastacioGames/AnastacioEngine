@@ -1,0 +1,63 @@
+/*
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software Foundation,
+ * Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
+ */
+
+#ifndef __BKE_MOTION_RECORD_H__
+#define __BKE_MOTION_RECORD_H__
+
+/** \file BKE_motion_record.h
+ *  \ingroup bke
+ *
+ * Rec Play buffer, shared by the game engine (writes samples) and the editor (turns them into
+ * Actions). It lives outside the game scenes because StopEngine destroys them before the editor
+ * gets control back. See docs/gravacao-de-movimento-plan.md.
+ */
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+struct Object;
+
+typedef struct MotionSample {
+	float t;  /* Seconds of game time since the recording started. */
+	float mat[4][4];  /* World matrix. */
+	float parent_mat[4][4];  /* World matrix of the parent in the game, it moves with the actor. */
+	bool has_parent;
+} MotionSample;
+
+/* fixed_rate: samples per second, 0 = every logic step. */
+void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate);
+/* Stops accepting samples and keeps them, until BKE_motion_record_free. */
+void BKE_motion_record_stop(void);
+void BKE_motion_record_free(void);
+
+bool BKE_motion_record_is_active(void);
+bool BKE_motion_record_is_actor(const struct Object *ob);
+/* Whether the samples of the current step are to be kept (false between fixed rate samples). */
+bool BKE_motion_record_sample_due(void);
+/* parent_mat: NULL when the actor has no parent in the game. */
+void BKE_motion_record_sample(const struct Object *ob, const float mat[4][4], const float parent_mat[4][4]);
+/* The one clock of the recording: call once per step that was not suspended. */
+void BKE_motion_record_advance(double step);
+
+int BKE_motion_record_actors_num(void);
+struct Object *BKE_motion_record_actor(int index, const MotionSample **r_samples, int *r_samples_num);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  /* __BKE_MOTION_RECORD_H__ */
