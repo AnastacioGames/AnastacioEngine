@@ -36,7 +36,6 @@
 #include "KX_LightObject.h"
 #include "KX_WorldInfo.h"
 #include "KX_Globals.h"
-#include "KX_KetsjiEngine.h"
 
 #include "RAS_Rasterizer.h"
 #include "RAS_OffScreen.h"
@@ -47,6 +46,7 @@
 #include "DNA_texture_types.h"
 #include "DNA_object_types.h"
 
+#include "GPU_extensions.h"
 #include "GPU_material.h"
 
 #ifdef __EMSCRIPTEN__
@@ -498,7 +498,10 @@ static const char bakedMagic[4] = {'R', 'P', 'V', '1'};
 
 std::string KX_TextureRendererManager::BakedPath() const
 {
-	return KX_GetMainPath() + "." + m_scene->GetName() + ".probes";
+	// By scene, next to the game: the Performance Report runs a temporary copy of the file.
+	const std::string& main = KX_GetMainPath();
+	const size_t slash = main.find_last_of("/\\");
+	return (slash == std::string::npos ? std::string() : main.substr(0, slash + 1)) + m_scene->GetName() + ".probes";
 }
 
 void KX_TextureRendererManager::ReadBakedLight()
@@ -547,34 +550,37 @@ void KX_TextureRendererManager::ReadBakedLight()
 	CM_Message("probe volume: saved light read for " << read << " of " << m_volumes.size() << " volumes");
 }
 
-void KX_TextureRendererManager::CheckBakeDone(double now)
+void KX_TextureRendererManager::SaveBakedLight(double now)
 {
-	if (m_bakeStart < 0.0) {
-		m_bakeStart = now;
+	// Every 10 s: quitting the game at any moment loses little, the next run goes on from the file.
+	if (m_bakeSaved < 0.0) {
+		m_bakeSaved = now;
 	}
-	bool complete = true, idle = true;
-	for (KX_ProbeVolume *volume : m_volumes) {
-		if (volume->GetViewpointObject()) {
-			complete &= volume->IsComplete();
-			idle &= volume->IsIdle();
-		}
-	}
-	// A grid that never settles (something keeps moving) doesn't hold the file back forever.
-	if (!complete || (!idle && now - m_bakeStart < 300.0)) {
+	if (now - m_bakeSaved < 10.0 || m_bakeDone) {
 		return;
 	}
-	m_bakeDone = true;
+	m_bakeSaved = now;
+	int ready = 0, total = 0;
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (volume->GetViewpointObject()) {
+			total++;
+			ready += volume->IsComplete() ? 1 : 0;
+		}
+	}
+	if (ready == m_bakeReady) {
+		return;
+	}
+	m_bakeReady = ready;
 	const std::string path = BakedPath();
 	const std::string temp = path + ".tmp";
 	FILE *file = fopen(temp.c_str(), "wb");
 	if (!file) {
 		CM_Error("probe volume: can't write " << temp);
-		KX_GetActiveEngine()->RequestExit(KX_ExitInfo::QUIT_GAME);
 		return;
 	}
 	fwrite(bakedMagic, 1, 4, file);
 	for (KX_ProbeVolume *volume : m_volumes) {
-		if (volume->GetViewpointObject()) {
+		if (volume->GetViewpointObject() && volume->IsComplete()) {
 			const std::string name = volume->GetViewpointObject()->GetName();
 			const int length = (int)name.size();
 			fwrite(&length, sizeof(int), 1, file);
@@ -585,14 +591,15 @@ void KX_TextureRendererManager::CheckBakeDone(double now)
 	const bool ok = !ferror(file);
 	fclose(file);
 	remove(path.c_str());
-	if (ok && rename(temp.c_str(), path.c_str()) == 0) {
-		CM_Message("probe volume: light saved to " << path << " after " << now - m_bakeStart << " s" <<
-		           (idle ? "" : " (not all settled)"));
-	}
-	else {
+	if (!ok || rename(temp.c_str(), path.c_str()) != 0) {
 		CM_Error("probe volume: can't write " << path);
+		return;
 	}
-	KX_GetActiveEngine()->RequestExit(KX_ExitInfo::QUIT_GAME);
+	CM_Message("probe volume: saved light of " << ready << " of " << total << " volumes in " << path);
+	m_bakeDone = ready == total;
+	if (m_bakeDone) {
+		CM_Message("probe volume: all the light is saved, nothing left to capture");
+	}
 }
 
 void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera,
@@ -610,9 +617,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 	static const bool bake = getenv("RANGE_PROBE_VOLUME_BAKE") != nullptr;
 	if (!m_bakedRead) {
 		m_bakedRead = true;
-		if (!bake) {
-			ReadBakedLight();
-		}
+		ReadBakedLight();
 	}
 
 	{
@@ -622,8 +627,14 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		 * about the same as one. BeginFrame runs on every grid, it lands the finished readbacks. */
 		std::vector<std::pair<float, KX_ProbeVolume *> > awake;
 		int total = 0;
+		/* A track on a weak GPU: live capture costs more than the frame, only saved light is used. */
+		const bool noCapture = !bake && m_volumes.size() > 1 && GPU_device_is_integrated();
 		for (KX_ProbeVolume *volume : m_volumes) {
-			if (volume->GetViewpointObject() && volume->BeginFrame(cameraPos, now)) {
+			if (!noCapture && volume->GetViewpointObject() && volume->BeginFrame(cameraPos, now)) {
+				// Saving the light: one pass per grid, the budget moves on along the track.
+				if (bake && volume->IsComplete()) {
+					continue;
+				}
 				awake.emplace_back(volume->BoxDistance(cameraPos), volume);
 				total = std::max(total, volume->GetFaceBudget());
 			}
@@ -640,10 +651,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		/* Several grids (a track): one probe per frame at most, during play the warm up budget would
 		 * cost more than the rest of the frame. The boxes near the camera go first; the far ones only
 		 * take the budget once the near ones are settled. */
-		if (bake) {
-			total = 96;
-		}
-		else if (awake.size() > 1 && !ownBudgets) {
+		if (awake.size() > 1 && !ownBudgets) {
 			total = std::min(total, 6);
 			if (awake.front().first <= 120.0f) {
 				awake.erase(std::find_if(awake.begin(), awake.end(), [](const std::pair<float, KX_ProbeVolume *>& item) {
@@ -675,8 +683,8 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		}
 	}
 
-	if (bake && !m_bakeDone && !m_volumes.empty()) {
-		CheckBakeDone(now);
+	if (bake && !m_volumes.empty()) {
+		SaveBakedLight(now);
 	}
 
 	// The per pixel atlas takes the SH9 read this frame.

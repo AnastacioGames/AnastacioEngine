@@ -1675,14 +1675,6 @@ int main(int argc,
 #endif // WIN32
 						Main *maggie = bfd->main;
 						Scene *scene = bfd->curscene;
-						// Tools only (saving the light of one scene): start in another scene of the file.
-						if (const char *startScene = getenv("RANGE_START_SCENE")) {
-							for (Scene *named = (Scene *)bfd->main->scene.first; named; named = (Scene *)named->id.next) {
-								if (strcmp(named->id.name + 2, startScene) == 0) {
-									scene = named;
-								}
-							}
-						}
 						G.main = maggie;
 
 						if (firstTimeRunning) {

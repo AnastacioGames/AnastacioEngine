@@ -93,15 +93,16 @@ private:
 	int m_moveCheckCount = 0;
 	bool m_bakedRead = false;
 	bool m_bakeDone = false;
-	double m_bakeStart = -1.0;
+	double m_bakeSaved = -1.0;
+	int m_bakeReady = -1;
 	/// Counts the frames of the far grid turn in the shared capture budget.
 	unsigned int m_volumeTurn = 0;
 
-	/// Saved light of the volumes: <game file>.<scene>.probes.
+	/// Saved light of the volumes: <scene>.probes next to the game.
 	std::string BakedPath() const;
 	void ReadBakedLight();
-	/// RANGE_PROBE_VOLUME_BAKE: writes the file and quits once all the grids are settled.
-	void CheckBakeDone(double now);
+	/// RANGE_PROBE_VOLUME_BAKE: a normal run of the game adds the finished grids to the file.
+	void SaveBakedLight(double now);
 
 	/// Run the probe volume schedulers: one budget of cube faces per frame shared by the grids.
 	void RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area);
