@@ -225,47 +225,60 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
         self.layout.label(text="", icon='REC')
 
     def draw(self, context):
+        # Kept as simple as a children's movie maker: three numbered steps, the rest under Advanced.
         layout = self.layout
         scene = context.scene
         ob = context.active_object
 
         box = layout.box()
-        box.label(text="Actors:", icon='POSE_HLT')
-        actors = [o for o in scene.objects if getattr(o, "ae_rec_actor", False)]
-        if ob is not None:
-            box.prop(ob, "ae_rec_actor", text="Record \"%s\"" % ob.name)
-        if actors:
-            col = box.column(align=True)
-            for o in actors:
-                col.label(text=o.name, icon='OBJECT_DATA')
+        box.label(text="1. Choose the character", icon='POSE_HLT')
+        if ob is None:
+            box.label(text="Click a character in the 3D View", icon='INFO')
         else:
-            box.label(text="None marked: the active object is recorded", icon='INFO')
-        box.prop(scene, "ae_rec_record_camera")
+            row = box.row()
+            row.scale_y = 1.3
+            row.prop(ob, "ae_rec_actor", text="Record \"%s\"" % ob.name, toggle=True,
+                     icon='REC' if ob.ae_rec_actor else 'BLANK1')
+        actors = [o for o in scene.objects if getattr(o, "ae_rec_actor", False)]
+        if actors:
+            box.label(text="Recording: " + ", ".join(o.name for o in actors))
+
+        box = layout.box()
+        box.label(text="2. Choose what it does", icon='ACTION')
+        if ob is None:
+            box.label(text="(choose a character first)")
+        else:
+            box.prop_search(ob, "ae_rec_action", bpy.data, "actions", text="", icon='ACTION')
+            if not ob.ae_rec_action:
+                box.label(text="Empty = the character's own game controls")
+
+        box = layout.box()
+        box.label(text="3. Press Rec Play and move it!", icon='REC')
+        box.label(text="Rec Play button: coming in phase 1", icon='INFO')
+
+        layout.prop(scene, "ae_rec_show_advanced",
+                    icon='TRIA_DOWN' if scene.ae_rec_show_advanced else 'TRIA_RIGHT', emboss=False)
+        if not scene.ae_rec_show_advanced:
+            return
 
         col = layout.column()
+        col.prop(scene, "ae_rec_record_camera")
         col.prop(scene, "ae_rec_countdown")
         row = col.row(align=True)
         row.prop(scene, "ae_rec_sample_rate", expand=True)
         sub = col.row()
         sub.active = scene.ae_rec_sample_rate == 'FIXED'
         sub.prop(scene, "ae_rec_fixed_rate")
-
-        box = layout.box()
-        box.label(text="Output:", icon='ACTION')
-        box.prop(scene, "ae_rec_make_keyframes")
-        sub = box.row()
+        col.separator()
+        col.prop(scene, "ae_rec_make_keyframes")
+        sub = col.row()
         sub.active = scene.ae_rec_make_keyframes
         sub.prop(scene, "ae_rec_keyframe_tolerance")
-        box.label(text="The take is always kept in the .range", icon='FILE_TICK')
-
-        box = layout.box()
-        box.label(text="Layers:", icon='RENDERLAYERS')
-        box.prop(scene, "ae_rec_playback_layers")
-        sub = box.row()
+        col.separator()
+        col.prop(scene, "ae_rec_playback_layers")
+        sub = col.row()
         sub.active = scene.ae_rec_playback_layers
         sub.prop(scene, "ae_rec_playback_collision")
-
-        layout.label(text="Rec Play button: coming in phase 1", icon='INFO')
 
 
 class RENDER_PT_embedded(RenderButtonsPanel, Panel):

@@ -3,7 +3,7 @@
 # capture come in later phases; the runtime will read these by name.
 
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
 
 
 def register_props():
@@ -27,12 +27,17 @@ def register_props():
         description="Actors not being recorded replay their active take, so takes stack in layers")
     S.ae_rec_playback_collision = BoolProperty(name="Collide on Replay", default=False,
         description="Replaying actors keep colliding with the scene (off = kinematic)")
+    S.ae_rec_show_advanced = BoolProperty(name="Advanced", default=False,
+        description="Show the detailed recording options")
+    bpy.types.Object.ae_rec_action = StringProperty(name="Action",
+        description="Animation played while you move the character (empty = its own game controls)")
     bpy.types.Object.ae_rec_actor = BoolProperty(name="Record Actor", default=False,
         description="Record this object when Rec Play is used (none marked = the active object)")
 
 
 def unregister_props():
     for name in ('countdown', 'sample_rate', 'fixed_rate', 'make_keyframes', 'keyframe_tolerance',
-                 'record_camera', 'playback_layers', 'playback_collision'):
+                 'record_camera', 'playback_layers', 'playback_collision', 'show_advanced'):
         delattr(bpy.types.Scene, 'ae_rec_' + name)
     del bpy.types.Object.ae_rec_actor
+    del bpy.types.Object.ae_rec_action

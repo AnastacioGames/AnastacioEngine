@@ -14,6 +14,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Player: atores (`Object.ae_rec_actor`), câmera, contagem, amostragem, keyframes/simplificação e camadas.
 - Propriedades `Scene.ae_rec_*` em `bl_operators/anastacio_motion_record.py`, salvas no `.blend`. Ainda só configuração:
   o botão Rec Play e a captura em C++ são as próximas fases ([plano](gravacao-de-movimento-plan.md)).
+- Painel simplificado em três passos (personagem, ação `Object.ae_rec_action`, Rec Play); opções técnicas em
+  Advanced, fechado por padrão.
 - Só sintaxe e ícones conferidos aqui (Linux, sem build); falta abrir o painel no editor.
 
 ## 2026-11-05 - KTX2 HQ: cor em UASTC por imagem

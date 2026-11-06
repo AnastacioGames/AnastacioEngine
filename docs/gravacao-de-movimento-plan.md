@@ -20,6 +20,21 @@ mas a arquitetura não encaixa e as marcas não são licenciadas).
 - **Saída nos dois formatos**: keyframes editáveis (Action do Blender) e um
   formato próprio de gravação ("take") para reprodução exata.
 
+## Regra principal: fácil como brinquedo
+
+O usuário usou o 3D Movie Maker quando criança; o recurso tem de ser usável
+por quem nunca abriu o editor:
+
+- Painel em três passos numerados: **1. escolher o personagem**, **2. escolher
+  o que ele faz** (uma Action da lista, ou vazio = controles do próprio jogo),
+  **3. Rec Play e mexer**. Tudo o mais fica fechado em **Advanced**.
+- Padrões que funcionam sem mexer em nada; nenhum termo técnico nos três passos.
+- Na gravação: contagem grande na tela, aviso "REC" piscando, e parar com Esc
+  já salva. Sem diálogo de confirmação.
+- Depois de gravar, botão "Assistir" e "Regravar" no mesmo painel.
+- Controle rápido (Fase 6) sobe de prioridade: personagem sem lógica deve
+  andar com setas/WASD e tocar a Action escolhida, sem montar Logic Bricks.
+
 ## Peças
 
 ### 1. Botão, ícone e painel
