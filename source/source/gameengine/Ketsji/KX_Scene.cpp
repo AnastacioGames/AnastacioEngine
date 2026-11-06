@@ -2014,6 +2014,9 @@ void KX_Scene::UpdateMotionRecord()
 				}
 			}
 		}
+		if (BKE_motion_record_layers()) {
+			PlayMotionTakeLayers();
+		}
 	}
 	if (!BKE_motion_record_sample_due()) {
 		return;

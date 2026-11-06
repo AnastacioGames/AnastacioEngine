@@ -1,5 +1,5 @@
-# Teste do Rec Play com teclas de verdade: Esc na contagem cancela; depois grava com WASD e F10.
-# REC_RES = relatorio; REC_PY = python do sistema, que roda tools/debug/teclas_rec.py.
+# Teste do Rec Play com teclas de verdade: Esc na contagem, WASD, camadas, Assistir e Regravar.
+# REC_RES = relatorio; REC_LOG = posicoes no jogo; REC_PY = python do sistema, roda teclas_rec.py.
 #   AnastacioEngine.exe cena.range --python tools/debug/editor_rec_wasd.py
 import bpy
 import os
@@ -8,8 +8,6 @@ import traceback
 
 state = {'updates': 0, 'done': False}
 TECLAS = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'teclas_rec.py')
-if not os.path.exists(TECLAS):
-    TECLAS = os.environ['REC_TECLAS']
 
 
 def report(texto):
@@ -21,18 +19,26 @@ def apertar(*passos):
     subprocess.Popen([os.environ['REC_PY'], TECLAS, str(os.getpid()), os.environ['REC_RES']] + list(passos))
 
 
-def resumo(scene, nome):
-    ob = bpy.data.objects[nome]
-    if not ob.animation_data or not ob.animation_data.action:
-        report('%s: sem Action' % nome)
+def marcar(scene, *nomes):
+    for ob in scene.objects:
+        ob.ae_rec_actor = ob.name in nomes
+
+
+def jogo(titulo):
+    """Primeira e ultima posicao de Andador e Personagem no jogo; so conta o Cubo vivo (com logica)."""
+    log = os.environ['REC_LOG']
+    if not os.path.exists(log):
+        report('%s: sem log do jogo (logica do Cubo parada?)' % titulo)
         return
-    curvas = ob.animation_data.action.fcurves
-    fim = max(k.co[0] for c in curvas for k in c.keyframe_points)
-    pontos = []
-    for frame in (scene.frame_start, fim):
-        scene.frame_set(int(frame))
-        pontos.append(tuple(round(v, 2) for v in ob.matrix_world.translation))
-    report('%s: inicio %s fim %s frames ate %.0f rot_z=%.2f' % (nome, pontos[0], pontos[1], fim, ob.rotation_euler.z))
+    with open(log) as f:
+        linhas = f.read().split('\n')[:-1]
+    os.remove(log)
+    report('%s: %d passos, inicio %s fim %s' % (titulo, len(linhas), linhas[0], linhas[-1]))
+
+
+def takes(scene):
+    report('takes: %s' % [(t.name, round(t.duration, 2), [a.object_name for a in t.actors], [a.action_name for a in t.actors])
+                          for t in scene.ae_rec_takes])
 
 
 def run(scene):
@@ -56,22 +62,35 @@ def run(scene):
     bpy.app.handlers.scene_update_post.remove(run)
     try:
         override = context()
-        scene.ae_rec_countdown = 3
-        apertar('espera:2', 'ESC:0.2')
-        report('rec cancelado: %s' % bpy.ops.view3d.game_record(override))
-        report('takes depois do Esc: %d' % len(scene.ae_rec_takes))
+        scene.ae_rec_countdown = 1
+        scene.ae_rec_max_duration = 8.0
 
-        scene.ae_rec_countdown = 2
-        apertar('espera:3', 'W:1', 'A:0.6', 'W:1', 'espera:0.5', 'F10:0.2')
-        report('rec wasd: %s' % bpy.ops.view3d.game_record(override))
-        report('takes: %s' % [(t.name, round(t.duration, 2), [a.object_name for a in t.actors])
-                              for t in scene.ae_rec_takes])
-        for nome in ('Andador', 'Personagem', 'Cubo'):
-            resumo(scene, nome)
-        boneco = bpy.data.objects['Boneco']
-        for track in boneco.animation_data.nla_tracks if boneco.animation_data else ():
-            report('NLA %s: %s' % (track.name, [(s.action.name, round(s.frame_start, 1), round(s.frame_end, 1))
-                                                for s in track.strips][:6]))
+        marcar(scene, 'Andador')
+        apertar('espera:1.8', 'W:1', 'espera:0.3', 'F10:0.2')
+        report('rec A: %s' % bpy.ops.view3d.game_record(override))
+        takes(scene)
+        jogo('A')
+
+        # Andador repete sem responder ao W; Personagem anda.
+        marcar(scene, 'Personagem')
+        apertar('espera:1.8', 'W:2', 'espera:0.3', 'F10:0.2')
+        report('rec B sobre A: %s' % bpy.ops.view3d.game_record(override))
+        takes(scene)
+        jogo('B sobre A')
+
+        report('watch: %s' % bpy.ops.view3d.game_record(override, watch=True))
+        takes(scene)
+        jogo('Watch')
+
+        # Regrava o Take 2 mais curto, com nada marcado: os atores vem do Take.
+        marcar(scene)
+        scene.ae_rec_take_index = 1
+        apertar('espera:1.8', 'W:0.5', 'espera:0.3', 'F10:0.2')
+        report('rerecord: %s' % bpy.ops.view3d.game_record(override, rerecord=True))
+        takes(scene)
+        jogo('Regravar')
+        report('watch: %s' % bpy.ops.view3d.game_record(override, watch=True))
+        jogo('Watch 2')
     except Exception:
         report('ERRO\n' + traceback.format_exc())
     report('FIM')

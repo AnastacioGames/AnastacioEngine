@@ -77,7 +77,13 @@ corpo.matrix_parent_inverse = boneco.matrix_world.inverted()
 corpo.modifiers.new('Armature', 'ARMATURE').object = boneco
 
 texto = bpy.data.texts.new('rec_wasd.py')
-texto.write('def tick(cont):\n    pass\n')
+texto.write('''import os
+def tick(cont):
+    # REC_LOG: posicao real de cada ator durante o jogo, uma linha por passo.
+    cena = cont.owner.scene
+    with open(os.environ['REC_LOG'], 'a') as f:
+        f.write(' '.join('%.3f,%.3f' % tuple(cena.objects[n].worldPosition)[:2] for n in ('Andador', 'Personagem')) + chr(10))
+''')
 bpy.ops.logic.sensor_add(type='ALWAYS', object=queda.name)
 bpy.ops.logic.controller_add(type='PYTHON', object=queda.name)
 sensor, controlador = queda.game.sensors[-1], queda.game.controllers[-1]

@@ -108,6 +108,7 @@
 #include "BKE_node.h" // SH_NODE_WORLD_BLOOM_FX, SH_NODE_WORLD_SSR_FX
 extern "C" {
 #include "BKE_idprop.h"
+#include "BKE_motion_record.h"
 }
 #include "GPU_material.h"
 
@@ -708,6 +709,70 @@ static void PlayMotionTakeTracks(KX_GameObject *gameobj, const char *prefix, flo
 /* Away from the layers a character uses for its own animation. */
 static const short MOTION_TAKE_LAYER = 7;
 
+/* The frame a take ends on, from the start of the scene. */
+static float MotionTakeEnd(Scene *scene, IDProperty *duration)
+{
+	const float seconds = (duration->type == IDP_FLOAT) ? IDP_Float(duration) : (float)IDP_Double(duration);
+	return (float)scene->r.sfra + seconds * ((float)scene->r.frs_sec / scene->r.frs_sec_base);
+}
+
+/* ghost: the actor stops touching the world. A Character has no dynamics to hold, it always leaves. */
+static void PlayMotionTakeActor(KX_GameObject *gameobj, IDProperty *actor, float start, float end, bool ghost)
+{
+	IDProperty *actionName = IDP_GetPropertyFromGroup(actor, "action_name");
+	IDProperty *trackPrefix = IDP_GetPropertyFromGroup(actor, "track_prefix");
+	/* Otherwise physics pulls a rigid body away from the recorded path. */
+	if (gameobj->GetPhysicsController()) {
+		if (ghost || gameobj->GetScene()->GetPhysicsEnvironment()->GetCharacterController(gameobj)) {
+			gameobj->SuspendPhysics(false);
+		}
+		else {
+			gameobj->GetPhysicsController()->SuspendDynamics(false);
+		}
+	}
+	if (actionName && IDP_String(actionName)[0]) {
+		/* A take that ends as this one starts may still hold the layer. */
+		gameobj->StopAction(MOTION_TAKE_LAYER);
+		gameobj->PlayAction(IDP_String(actionName), start, end, MOTION_TAKE_LAYER);
+	}
+	if (trackPrefix && IDP_String(trackPrefix)[0]) {
+		PlayMotionTakeTracks(gameobj, IDP_String(trackPrefix), start);
+	}
+}
+
+void KX_Scene::PlayMotionTakeLayers()
+{
+	Scene *scene = GetBlenderScene();
+	IDProperty *takes = scene->id.properties ? IDP_GetPropertyFromGroup(scene->id.properties, "ae_rec_takes") : nullptr;
+	if (!takes || takes->type != IDP_IDPARRAY) {
+		return;
+	}
+	const bool ghost = !BKE_motion_record_layers_collide();
+	std::vector<KX_GameObject *> taken = m_motionRecordActors;
+	for (int i = takes->len - 1; i >= 0; --i) {
+		if (i == BKE_motion_record_replaced_take()) {
+			continue;
+		}
+		IDProperty *take = &IDP_IDPArray(takes)[i];
+		IDProperty *duration = IDP_GetPropertyFromGroup(take, "duration");
+		IDProperty *actors = IDP_GetPropertyFromGroup(take, "actors");
+		if (!duration || !actors) {
+			continue;
+		}
+		for (int a = 0; a < actors->len; ++a) {
+			IDProperty *actor = &IDP_IDPArray(actors)[a];
+			IDProperty *objectName = IDP_GetPropertyFromGroup(actor, "object_name");
+			KX_GameObject *gameobj = objectName ? FindGameObject(m_objectlist, IDP_String(objectName)) : nullptr;
+			if (!gameobj || std::find(taken.begin(), taken.end(), gameobj) != taken.end()) {
+				continue;
+			}
+			taken.push_back(gameobj);
+			gameobj->SetMotionReplay();
+			PlayMotionTakeActor(gameobj, actor, (float)scene->r.sfra, MotionTakeEnd(scene, duration), ghost);
+		}
+	}
+}
+
 void KX_Scene::PlayMotionTake(const std::string& name)
 {
 	/* Takes are ID properties of the scene, written by Rec Play in the editor. */
@@ -722,31 +787,17 @@ void KX_Scene::PlayMotionTake(const std::string& name)
 			if (!takeName || !duration || !actors || name != IDP_String(takeName)) {
 				continue;
 			}
-			const float seconds = (duration->type == IDP_FLOAT) ? IDP_Float(duration) : (float)IDP_Double(duration);
 			const float start = (float)scene->r.sfra;
-			const float end = start + seconds * ((float)scene->r.frs_sec / scene->r.frs_sec_base);
+			const float end = MotionTakeEnd(scene, duration);
 			for (int a = 0; a < actors->len; ++a) {
 				IDProperty *actor = &IDP_IDPArray(actors)[a];
 				IDProperty *objectName = IDP_GetPropertyFromGroup(actor, "object_name");
-				IDProperty *actionName = IDP_GetPropertyFromGroup(actor, "action_name");
-				IDProperty *trackPrefix = IDP_GetPropertyFromGroup(actor, "track_prefix");
 				KX_GameObject *gameobj = objectName ? FindGameObject(m_objectlist, IDP_String(objectName)) : nullptr;
 				if (!gameobj) {
 					CM_Error("Play Take '" << name << "': an actor is missing from the scene");
 					continue;
 				}
-				/* Otherwise physics pulls a rigid body away from the recorded path. */
-				if (gameobj->GetPhysicsController()) {
-					gameobj->GetPhysicsController()->SuspendDynamics(false);
-				}
-				if (actionName && IDP_String(actionName)[0]) {
-					/* A take that ends as this one starts may still hold the layer. */
-					gameobj->StopAction(MOTION_TAKE_LAYER);
-					gameobj->PlayAction(IDP_String(actionName), start, end, MOTION_TAKE_LAYER);
-				}
-				if (trackPrefix && IDP_String(trackPrefix)[0]) {
-					PlayMotionTakeTracks(gameobj, IDP_String(trackPrefix), start);
-				}
+				PlayMotionTakeActor(gameobj, actor, start, end, false);
 			}
 			return;
 		}

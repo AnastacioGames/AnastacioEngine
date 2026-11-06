@@ -252,6 +252,7 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
 
         box = layout.box()
         box.label(text="3. Press Rec Play and move it! F10 stops", icon='REC')
+        box.label(text="Who is not marked repeats its take")
         box.prop(scene, "ae_rec_max_duration")
         row = box.row()
         row.scale_y = 1.6
@@ -265,7 +266,10 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
             col = row.column(align=True)
             col.operator("scene.rec_take_remove", icon='ZOOMOUT', text="")
             row = box.row(align=True)
-            row.operator("scene.rec_take_use", icon='PLAY')
+            row.operator("view3d.game_record", text="Watch", icon='PLAY').watch = True
+            row.operator("view3d.game_record", text="Rerecord", icon='REC').rerecord = True
+            row = box.row(align=True)
+            row.operator("scene.rec_take_use", icon='ACTION')
             row.operator("scene.rec_take_to_cutscene", icon='SEQUENCE')
             box.prop(scene, "ae_rec_replace_take")
         else:

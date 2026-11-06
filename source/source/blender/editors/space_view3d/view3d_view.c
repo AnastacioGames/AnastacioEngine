@@ -47,6 +47,9 @@
 
 #include "GPU_select.h"
 
+#include "RNA_access.h"
+#include "RNA_define.h"
+
 #include "WM_api.h"
 #include "WM_types.h"
 
@@ -1442,7 +1445,9 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 			BKE_report(op->reports, RPT_ERROR, "Rec Play does not work in a multiplayer session");
 			return OPERATOR_CANCELLED;
 		}
-		if (!view3d_motion_record_begin(startscene, op->reports)) {
+		if (!view3d_motion_record_begin(startscene, op->reports, RNA_boolean_get(op->ptr, "watch"),
+		                                RNA_boolean_get(op->ptr, "rerecord")))
+		{
 			return OPERATOR_CANCELLED;
 		}
 	}
@@ -1557,6 +1562,9 @@ void VIEW3D_OT_game_record(wmOperatorType *ot)
 	ot->exec = game_engine_exec;
 
 	ot->poll = game_engine_poll;
+
+	RNA_def_boolean(ot->srna, "watch", false, "Watch", "Play the takes in the game without recording");
+	RNA_def_boolean(ot->srna, "rerecord", false, "Rerecord", "Record the actors of the selected take again, replacing it");
 }
 
 /** \} */

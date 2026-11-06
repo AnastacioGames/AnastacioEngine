@@ -162,6 +162,7 @@ protected:
 	// culled = while rendering, depending on camera
 	bool       							m_bVisible; 
 	bool       							m_bRender;
+	bool								m_motionReplay = false;
 	bool       							m_bVisibleLOD;
 	bool								m_bOccluder;
 	KX_Camera							*m_hiddenFromCamera = nullptr;
@@ -959,6 +960,8 @@ public:
 	 * \param distance Squared nearest distance to the cameras of this object.
 	 */
 	void UpdateActivity(float distance);
+	/// Rec Play: the object follows a take, so its logic stays off and activity culling leaves it alone.
+	void SetMotionReplay();
 
 	const std::vector<KX_Mesh *>& GetMeshList() const;
 

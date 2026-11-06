@@ -44,6 +44,8 @@
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
 #include "BKE_fcurve.h"
+#include "BKE_global.h"
+#include "BKE_scene.h"
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_motion_record.h"
@@ -62,24 +64,99 @@
 
 #define MOTION_CHANNELS 9
 
-bool view3d_motion_record_begin(Scene *scene, ReportList *reports)
+static bool motion_take_active(PointerRNA *scene_ptr, PointerRNA *r_take)
+{
+	return RNA_property_collection_lookup_int(
+	        scene_ptr, RNA_struct_find_property(scene_ptr, "ae_rec_takes"),
+	        RNA_int_get(scene_ptr, "ae_rec_take_index"), r_take);
+}
+
+/* Takes run from the first frame, so what was recorded on top of them has to start there too. */
+static void motion_scene_rewind(Scene *scene)
+{
+	scene->r.cfra = scene->r.sfra;
+	scene->r.subframe = 0.0f;
+	BKE_scene_update_for_newframe(G.main->eval_ctx, G.main, scene, scene->lay);
+}
+
+static bool motion_watch_begin(Scene *scene, PointerRNA *scene_ptr, ReportList *reports)
+{
+	float seconds = 0.0f;
+	RNA_BEGIN(scene_ptr, take, "ae_rec_takes")
+	{
+		seconds = max_ff(seconds, RNA_float_get(&take, "duration"));
+	}
+	RNA_END;
+	if (seconds <= 0.0f) {
+		BKE_report(reports, RPT_ERROR, "Rec Play: record a take first");
+		return false;
+	}
+	motion_scene_rewind(scene);
+	BKE_motion_record_begin(NULL, 0, 0.0f, seconds, 0.0f, 0.0f);
+	BKE_motion_record_set_layers(true, RNA_boolean_get(scene_ptr, "ae_rec_playback_collision"), -1, true);
+	return true;
+}
+
+/* The actors of the take, without what they carry: children join by themselves. */
+static int motion_take_actors(PointerRNA *take, Object **actors, int capacity)
+{
+	int num = 0;
+	RNA_BEGIN(take, actor, "actors")
+	{
+		char name[MAX_ID_NAME - 2];
+		RNA_string_get(&actor, "object_name", name);
+		Object *ob = (Object *)BKE_libblock_find_name(G.main, ID_OB, name);
+		if (ob && num < capacity) {
+			actors[num++] = ob;
+		}
+	}
+	RNA_END;
+	int kept = 0;
+	for (int i = 0; i < num; i++) {
+		bool carried = false;
+		for (Object *parent = actors[i]->parent; parent && !carried; parent = parent->parent) {
+			for (int j = 0; j < num; j++) {
+				carried |= (actors[j] == parent);
+			}
+		}
+		if (!carried) {
+			actors[kept++] = actors[i];
+		}
+	}
+	return kept;
+}
+
+bool view3d_motion_record_begin(Scene *scene, ReportList *reports, bool watch, bool rerecord)
 {
 	PointerRNA scene_ptr;
 	RNA_id_pointer_create(&scene->id, &scene_ptr);
 
+	if (watch) {
+		return motion_watch_begin(scene, &scene_ptr, reports);
+	}
+
 	const int capacity = BLI_listbase_count(&scene->base) + 2;
 	Object **actors = MEM_mallocN(sizeof(*actors) * capacity, __func__);
 	int num = 0;
+	PointerRNA take;
+	const bool has_take = motion_take_active(&scene_ptr, &take);
 
-	for (Base *base = scene->base.first; base; base = base->next) {
-		PointerRNA ob_ptr;
-		RNA_id_pointer_create(&base->object->id, &ob_ptr);
-		if (RNA_boolean_get(&ob_ptr, "ae_rec_actor")) {
-			actors[num++] = base->object;
+	if (rerecord) {
+		if (has_take) {
+			num = motion_take_actors(&take, actors, capacity - 1);
+		}
+	}
+	else {
+		for (Base *base = scene->base.first; base; base = base->next) {
+			PointerRNA ob_ptr;
+			RNA_id_pointer_create(&base->object->id, &ob_ptr);
+			if (RNA_boolean_get(&ob_ptr, "ae_rec_actor")) {
+				actors[num++] = base->object;
+			}
 		}
 	}
 	/* None marked: the active object, as the panel says. */
-	if (num == 0 && scene->basact) {
+	if (num == 0 && !rerecord && scene->basact) {
 		actors[num++] = scene->basact->object;
 	}
 	if (RNA_boolean_get(&scene_ptr, "ae_rec_record_camera") && scene->camera) {
@@ -98,12 +175,20 @@ bool view3d_motion_record_begin(Scene *scene, ReportList *reports)
 		return false;
 	}
 
+	if (RNA_collection_length(&scene_ptr, "ae_rec_takes") > 0) {
+		motion_scene_rewind(scene);
+	}
+
 	const bool fixed = RNA_enum_get(&scene_ptr, "ae_rec_sample_rate") == 1;
 	BKE_motion_record_begin(
 	        actors, num, fixed ? (float)RNA_int_get(&scene_ptr, "ae_rec_fixed_rate") : 0.0f,
 	        RNA_float_get(&scene_ptr, "ae_rec_max_duration"), (float)RNA_int_get(&scene_ptr, "ae_rec_countdown"),
 	        RNA_float_get(&scene_ptr, "ae_rec_walk_speed") * (RNA_boolean_get(&scene_ptr, "ae_rec_walk_negative_y") ? -1.0f : 1.0f));
 	MEM_freeN(actors);
+	const bool replace = has_take && (rerecord || RNA_boolean_get(&scene_ptr, "ae_rec_replace_take"));
+	BKE_motion_record_set_layers(
+	        RNA_boolean_get(&scene_ptr, "ae_rec_playback_layers"), RNA_boolean_get(&scene_ptr, "ae_rec_playback_collision"),
+	        replace ? RNA_int_get(&scene_ptr, "ae_rec_take_index") : -1, false);
 	return true;
 }
 
@@ -352,6 +437,11 @@ bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
 	RNA_id_pointer_create(&scene->id, &scene_ptr);
 	int created = 0;
 
+	if (BKE_motion_record_is_watch()) {
+		BKE_motion_record_free();
+		return false;
+	}
+
 	/* Left before the countdown ended: nothing was recorded. */
 	if (BKE_motion_record_countdown() > 0.0) {
 		BKE_motion_record_free();
@@ -363,9 +453,7 @@ bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
 
 	if (RNA_boolean_get(&scene_ptr, "ae_rec_make_keyframes")) {
 		const float tolerance = RNA_float_get(&scene_ptr, "ae_rec_keyframe_tolerance");
-		const int active_take = RNA_int_get(&scene_ptr, "ae_rec_take_index");
-		const int replaced = (RNA_boolean_get(&scene_ptr, "ae_rec_replace_take") &&
-		                      active_take < RNA_collection_length(&scene_ptr, "ae_rec_takes")) ? active_take : -1;
+		const int replaced = BKE_motion_record_replaced_take();
 		float duration = 0.0f;
 		PointerRNA take;
 		/* Never reused, not even by a take that replaces another: old tracks are found by this name. */

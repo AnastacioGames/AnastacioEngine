@@ -51,6 +51,13 @@ typedef struct MotionClip {
  * walk_speed: quick control, meters per second along +Y of the actor, negative for -Y. */
 void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate, float max_seconds,
                              float countdown, float walk_speed);
+/* After begin. layers: actors with a take repeat it. replaced_take: left out of that, -1 = none.
+ * collide: repeating actors stay solid. watch: nothing is recorded, the takes only play. */
+void BKE_motion_record_set_layers(bool layers, bool collide, int replaced_take, bool watch);
+bool BKE_motion_record_layers(void);
+bool BKE_motion_record_layers_collide(void);
+int BKE_motion_record_replaced_take(void);
+bool BKE_motion_record_is_watch(void);
 /* Stops accepting samples and keeps them, until BKE_motion_record_free. */
 void BKE_motion_record_stop(void);
 void BKE_motion_record_free(void);

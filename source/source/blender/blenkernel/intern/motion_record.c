@@ -50,6 +50,8 @@ static struct {
 	float max_seconds;
 	double countdown;
 	float walk_speed;
+	bool layers, layers_collide, watch;
+	int replaced_take;
 } rec = {NULL};
 
 void BKE_motion_record_free(void)
@@ -66,7 +68,8 @@ void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed
                              float countdown, float walk_speed)
 {
 	BKE_motion_record_free();
-	rec.tracks = MEM_callocN(sizeof(MotionTrack) * actors_num, __func__);
+	/* Watching has no actors. */
+	rec.tracks = MEM_callocN(sizeof(MotionTrack) * max_ii(actors_num, 1), __func__);
 	rec.tracks_num = actors_num;
 	for (int i = 0; i < actors_num; i++) {
 		rec.tracks[i].ob = actors[i];
@@ -75,7 +78,36 @@ void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed
 	rec.max_seconds = max_seconds;
 	rec.countdown = countdown;
 	rec.walk_speed = walk_speed;
+	rec.replaced_take = -1;
 	rec.active = true;
+}
+
+void BKE_motion_record_set_layers(bool layers, bool collide, int replaced_take, bool watch)
+{
+	rec.layers = layers;
+	rec.layers_collide = collide;
+	rec.replaced_take = replaced_take;
+	rec.watch = watch;
+}
+
+bool BKE_motion_record_layers(void)
+{
+	return rec.layers;
+}
+
+bool BKE_motion_record_layers_collide(void)
+{
+	return rec.layers_collide;
+}
+
+int BKE_motion_record_replaced_take(void)
+{
+	return rec.replaced_take;
+}
+
+bool BKE_motion_record_is_watch(void)
+{
+	return rec.watch;
 }
 
 void BKE_motion_record_stop(void)

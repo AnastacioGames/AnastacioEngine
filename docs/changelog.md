@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 5 (camadas, Watch e Rerecord)
+
+- Ao gravar, quem não está marcado repete o Take mais recente dele, com a lógica desligada e sem colidir por padrão (`Play Other Takes`, `Collide on Replay`).
+- **Watch** toca todos os Takes no jogo sem gravar e fecha no fim do mais longo. **Rerecord** grava de novo os atores do Take selecionado e o substitui, sem depender das marcas.
+- Com Takes na cena, gravar e assistir voltam ao primeiro frame antes de começar.
+- Character repetindo sai da física (`SuspendPhysics`), também no evento Play Take. `UpdateActivity` respeita a marca de repetição.
+
 ## 2026-11-06 - Rec Play: Fase 4 (controle rápido e contagem)
 
 - Contagem (`Countdown`, padrão 3 s) com o mundo congelado: o Take começa da primeira pose. Sair durante a contagem, por Esc ou F10, cancela sem criar Take.

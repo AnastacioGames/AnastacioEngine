@@ -262,7 +262,7 @@ void VIEW3D_OT_game_start(struct wmOperatorType *ot);
 void VIEW3D_OT_game_record(struct wmOperatorType *ot);
 
 /* view3d_motion_record.c */
-bool view3d_motion_record_begin(struct Scene *scene, struct ReportList *reports);
+bool view3d_motion_record_begin(struct Scene *scene, struct ReportList *reports, bool watch, bool rerecord);
 bool view3d_motion_record_finish(struct bContext *C, struct Scene *scene, struct ReportList *reports);
 
 

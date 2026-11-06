@@ -793,6 +793,8 @@ public:
 	bool RestartCutscene();
 	/// Rec Play: plays the Actions of a take on its actors, keeping them where it ends.
 	void PlayMotionTake(const std::string& name);
+	/// Rec Play: each actor that is not being recorded repeats its newest take.
+	void PlayMotionTakeLayers();
 	/** Advance the scene-owned Cutscene clock and retain crossed events. */
 	void UpdateCutscene(double deltaTime);
 	/** Transfer events accumulated by UpdateCutscene() to the native dispatcher. */

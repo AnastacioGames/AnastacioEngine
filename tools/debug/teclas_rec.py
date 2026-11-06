@@ -24,6 +24,10 @@ def main():
             if nome == 'espera':
                 time.sleep(float(segundos))
                 continue
+            for _ in range(40):
+                if em_foco(pid):
+                    break
+                time.sleep(0.1)
             if not em_foco(pid):
                 f.write('sem foco, parei em %s\n' % passo)
                 return

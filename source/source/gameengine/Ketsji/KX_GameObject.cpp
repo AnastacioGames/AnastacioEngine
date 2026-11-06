@@ -1731,8 +1731,18 @@ void KX_GameObject::ReParentLogic()
 	}
 }
 
+void KX_GameObject::SetMotionReplay()
+{
+	m_motionReplay = true;
+	SuspendLogic();
+}
+
 void KX_GameObject::UpdateActivity(float distance)
 {
+	if (m_motionReplay) {
+		return;
+	}
+
 	// Manage logic/physics culling.
 	KX_Scene *scene = GetScene();
 	m_distance = distance;

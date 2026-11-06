@@ -286,7 +286,12 @@ void KX_DebugMode::RenderRecordOverlay()
     const int limit = (int)std::ceil(BKE_motion_record_max_seconds());
     DebugFontScope textFont(RECORD_FONT_SIZE);
     /* Blinks once per second. */
-    ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, (time - seconds < 0.5) ? 1.0f : 0.25f), "REC");
+    if (BKE_motion_record_is_watch()) {
+      ImGui::TextColored(ImVec4(0.3f, 1.0f, 0.4f, 1.0f), "WATCH");
+    }
+    else {
+      ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, (time - seconds < 0.5) ? 1.0f : 0.25f), "REC");
+    }
     ImGui::SameLine();
     if (limit > 0) {
       ImGui::Text("%02d:%02d / %02d:%02d   F10 stops", seconds / 60, seconds % 60, limit / 60, limit % 60);

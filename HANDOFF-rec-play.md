@@ -11,7 +11,8 @@ Regras de build: [AGENTS.md](AGENTS.md).
 - Fase 2.6 (evento Play Take e Add to Cutscene): feita, sem aceite visual.
 - Fase 3 (filhos e armature por NLA): feita, sem teste com personagem real.
 - Fase 4 (WASD, contagem, REC piscando): feita, testada com teclas reais, sem aceite visual da contagem.
-- Próxima: Fase 5.
+- Fase 5 (camadas, Watch, Rerecord): feita, testada com teclas reais, sem clique real nos botões.
+- Próxima: Fase 6.
 
 ## Como testar
 
@@ -27,7 +28,7 @@ AnastacioEngine.exe cena.range --python tools/debug/editor_rec_play.py
 O script usa a 3D View em tela cheia e desfaz por timer: contexto forçado no redesenho e `ed.undo` dentro de
 `scene_update_post` derrubam o editor, mas isso é do script, não do Rec Play.
 
-Teclas reais: defina `REC_RES` e `REC_PY` (python do sistema), gere `criar_cena_rec_wasd.py` e abra com
+Teclas reais: defina `REC_RES`, `REC_LOG` e `REC_PY` (python do sistema), gere `criar_cena_rec_wasd.py` e abra com
 `--python tools/debug/editor_rec_wasd.py`. Só aperta com a janela do editor em foco.
 
 ## Falta conferir à mão
