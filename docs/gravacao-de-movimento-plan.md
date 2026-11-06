@@ -186,8 +186,8 @@ Regras técnicas que saíram da revisão:
 - **Reprodução exata** só vem com o take. Gravar actions é leve e editável, mas não
   cobre IK e scripts; reservar no formato um bloco para pose por osso.
 - **Regravar parcial** pula os atores para `t`, mas o mundo volta ao início.
-- **Rec Studio** não usa `WM_window_open_temp` (uma só janela temporária). Provar antes
-  o Play embutido em segunda janela.
+- **Rec Studio** não usa `WM_window_open_temp` (uma só janela temporária). O Play embutido em
+  segunda janela foi provado em 2026-11-06 com `tools/debug/editor_rec_janela2.py`.
 
 A testar: ordem do Euler no jogo, Ctrl+Z após gravar, travada ao tocar take longo,
 `PointerProperty` com `prop_search` para `ae_rec_action`.
