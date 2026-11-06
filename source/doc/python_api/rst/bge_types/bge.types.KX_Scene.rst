@@ -41,6 +41,59 @@ base class --- :class:`EXP_PyObjectPlus`
 
    @bug: All attributes are read only at the moment.
 
+   .. code-block:: python
+
+      # Add a bullet at the gun. It disappears after 120 frames.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      gun = bge.logic.getCurrentController().owner
+
+      bullet = scene.addObject("Bullet", gun, 120)
+      bullet.worldLinearVelocity = gun.getAxisVect((0, 30, 0))
+
+   .. code-block:: python
+
+      # Switch to another camera.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      scene.active_camera = scene.cameras["CameraBack"]
+
+   .. code-block:: python
+
+      # Pause or resume another scene, like the level behind a pause menu.
+      import bge
+
+      level = bge.logic.getSceneList()["Level"]
+
+      if level.suspended:
+          level.resume()
+      else:
+          level.suspend()
+
+   .. code-block:: python
+
+      # Find objects by property and go to the next level.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      coins = [obj for obj in scene.objects if "coin" in obj]
+
+      if not coins:
+          scene.replace("Level2")
+
+   .. code-block:: python
+
+      # Run a function right before each frame is drawn.
+      import bge
+
+      def before_draw():
+          print("Drawing")
+
+      scene = bge.logic.getCurrentScene()
+      scene.pre_draw.append(before_draw)
+
    .. attribute:: name
 
       The scene's name, (read-only).

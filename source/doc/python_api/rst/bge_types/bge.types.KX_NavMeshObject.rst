@@ -11,6 +11,57 @@ base class --- :class:`KX_GameObject`
    game starts, so obstacles can carve it at runtime. Objects with "Create Obstacle" carve it automatically;
    :meth:`addObstacle` adds any other object. Paths may differ slightly from the static navigation mesh.
 
+   .. code-block:: python
+
+      # Find a path from the object to the player.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      owner = bge.logic.getCurrentController().owner
+
+      navmesh = scene.objects["Navmesh"]
+      player = scene.objects["Player"]
+
+      path = navmesh.findPath(owner.worldPosition, player.worldPosition)
+      print(len(path), "points")
+
+   .. code-block:: python
+
+      # Check for a wall on the way to the player: a factor below 1.0 means the ray stopped early.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      owner = bge.logic.getCurrentController().owner
+
+      navmesh = scene.objects["Navmesh"]
+      player = scene.objects["Player"]
+
+      if navmesh.raycast(owner.worldPosition, player.worldPosition) < 1.0:
+          print("Something is in the way")
+
+   .. code-block:: python
+
+      # Draw the navigation mesh to debug it. Run it every frame (Always sensor with True Pulse).
+      import bge
+
+      navmesh = bge.logic.getCurrentScene().objects["Navmesh"]
+      navmesh.draw(bge.logic.RM_TRIS)
+
+   .. code-block:: python
+
+      # Dynamic navigation mesh: a crate blocks the way, then frees it.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      navmesh = scene.objects["Navmesh"]
+      crate = scene.objects["Crate"]
+
+      if navmesh.dynamic:
+          navmesh.addObstacle(crate, 1.5)
+
+      # Later, when the crate is gone:
+      navmesh.removeObstacle(crate)
+
    .. attribute:: dynamic
 
       True when the navigation mesh was built in tiles and obstacles can carve it (read-only).

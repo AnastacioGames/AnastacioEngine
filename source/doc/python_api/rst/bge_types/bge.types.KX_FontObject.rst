@@ -22,6 +22,43 @@ base class --- :class:`KX_GameObject`
 
       font.text = "Press key '%s' to quit the game." % exit_key
 
+   .. code-block:: python
+
+      # Show the score stored in a game property.
+      import bge
+
+      font = bge.logic.getCurrentController().owner
+      font.text = "Score: %d" % font["score"]
+
+   .. code-block:: python
+
+      # Center the text on the X axis, using its current width.
+      import bge
+
+      font = bge.logic.getCurrentController().owner
+      font.text = "Game Over"
+      font.localPosition.x = -font.dimensions.x / 2
+
+   .. code-block:: python
+
+      # Reveal the text one letter at a time. Run it every frame (Always sensor with True Pulse).
+      import bge
+
+      font = bge.logic.getCurrentController().owner
+
+      if font.visibleCharacters < font.characterCount:
+          font.visibleCharacters += 1
+
+   .. code-block:: python
+
+      # Add a dark shadow behind the text.
+      import bge
+
+      font = bge.logic.getCurrentController().owner
+      font.useShadows = True
+      font.shadowColor = [0.0, 0.0, 0.0, 0.8]
+      font.shadowOffset = [0.02, -0.02]
+
    .. attribute:: text
 
       The text displayed by this Font object.

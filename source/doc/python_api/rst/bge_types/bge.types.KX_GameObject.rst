@@ -60,6 +60,81 @@ base class --- :class:`SCA_IObject`
    should be used - e.g. inherit from :class:`BL_ArmatureObject` when the object
    to mutate is an armature.
 
+   .. code-block:: python
+
+      # Move and turn the object with W and A. Run it every frame (Always sensor with True Pulse).
+      import bge
+
+      obj = bge.logic.getCurrentController().owner
+      keys = bge.logic.keyboard.events
+
+      if keys[bge.events.WKEY]:
+          obj.applyMovement((0, 0.1, 0), True)
+      if keys[bge.events.AKEY]:
+          obj.applyRotation((0, 0, 0.05), True)
+
+   .. code-block:: python
+
+      # Read and change game properties.
+      import bge
+
+      obj = bge.logic.getCurrentController().owner
+
+      obj["health"] = obj.get("health", 100) - 10
+
+      if obj["health"] <= 0:
+          obj.endObject()
+
+   .. code-block:: python
+
+      # Look for the ground under the object.
+      import bge
+
+      obj = bge.logic.getCurrentController().owner
+      below = obj.worldPosition - obj.getAxisVect((0, 0, 1))
+
+      hit, point, normal = obj.rayCast(below, obj, 10.0)
+
+      if hit is not None:
+          print(hit.name, point)
+
+   .. code-block:: python
+
+      # Chase the player when it comes close.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      obj = bge.logic.getCurrentController().owner
+      player = scene.objects["Player"]
+
+      if obj.getDistanceTo(player) < 15.0:
+          distance, direction, local = obj.getVectTo(player)
+          obj.alignAxisToVect(direction, 1, 0.1)
+          obj.applyMovement((0, 0.05, 0), True)
+
+   .. code-block:: python
+
+      # Play the frames 1 to 30 of an action.
+      import bge
+
+      obj = bge.logic.getCurrentController().owner
+
+      if not obj.isPlayingAction():
+          obj.playAction("Walk", 1, 30)
+
+   .. code-block:: python
+
+      # Attach the object to a hand, and release it later.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      obj = bge.logic.getCurrentController().owner
+
+      obj.setParent(scene.objects["Hand"])
+
+      # Later:
+      obj.removeParent()
+
    .. attribute:: name
 
       The object's name.

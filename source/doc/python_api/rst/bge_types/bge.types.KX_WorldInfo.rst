@@ -16,6 +16,34 @@ base class --- :class:`EXP_PyObjectPlus`
 
       sce.world.mistColor = [1.0, 0.0, 0.0]
 
+   .. code-block:: python
+
+      # Turn the mist on and bring it closer to the camera.
+      import bge
+
+      world = bge.logic.getCurrentScene().world
+      world.mistEnable = True
+      world.mistStart = 5.0
+      world.mistDistance = 40.0
+
+   .. code-block:: python
+
+      # Start the rain, and read the current value back.
+      import bge
+
+      world = bge.logic.getCurrentScene().world
+      world.setWeather("rain", True)
+      print(world.getWeather("rain"))
+
+   .. code-block:: python
+
+      # Evening light: warm horizon and a weaker ambient light.
+      import bge
+
+      world = bge.logic.getCurrentScene().world
+      world.horizonColor = [1.0, 0.5, 0.2]
+      world.ambientColor = [0.2, 0.15, 0.1]
+
    .. data:: KX_MIST_QUADRATIC
 
       Type of quadratic attenuation used to fade mist.

@@ -24,6 +24,19 @@ base class --- :class:`EXP_PyObjectPlus`
       
       print(box)
 
+   .. code-block:: python
+
+      # Read the size of the box of the object.
+      import bge
+
+      box = bge.logic.getCurrentController().owner.cullingBox
+
+      size = box.max - box.min
+      print("Size:", size)
+      print("Center:", box.center)
+      print("Radius:", box.radius)
+      print("Volume:", box.volume)
+
    .. attribute:: min
 
       The minimal point in x, y and z axis of the bounding box.

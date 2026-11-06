@@ -17,6 +17,31 @@ base class --- :class:`EXP_PyObjectPlus`
 
       bge.logic.LibLoad('myblend.blend', 'Scene', asynchronous=True).onFinish = finished_cb
 
+   .. code-block:: python
+
+      # Loading screen: show the progress. Run update every frame (Always sensor with True Pulse).
+      import bge
+
+      status = bge.logic.LibLoad("//level2.range", "Scene", asynchronous=True)
+
+      def update(cont):
+          cont.owner.text = "Loading %d%%" % (status.progress * 100)
+
+          if status.finished:
+              cont.owner.text = "Ready"
+
+   .. code-block:: python
+
+      # Add an object as soon as its file finishes loading.
+      import bge
+
+      def finished(status):
+          print(status.libraryName, status.timeTaken)
+          bge.logic.getCurrentScene().addObject("Enemy")
+
+      status = bge.logic.LibLoad("//enemies.range", "Scene", asynchronous=True)
+      status.onFinish = finished
+
    .. attribute:: onFinish
 
       A callback that gets called when the lib load is done.

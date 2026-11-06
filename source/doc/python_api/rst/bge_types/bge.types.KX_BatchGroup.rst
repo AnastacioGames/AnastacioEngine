@@ -17,12 +17,43 @@ base class --- :class:`EXP_Value`
 
       scene = bge.logic.getCurrentScene()
 
-      batchGroup = types.KX_BatchGroup([scene.objects["Cube"], scene.objects["Plane"]])
+      batchGroup = bge.types.KX_BatchGroup([scene.objects["Cube"], scene.objects["Plane"]])
 
    .. warning::
 
       Rendering settings unique to objects such as :data:`KX_GameObject.layer` and :data:`KX_GameObject.color` are shared when using batch groups.
       These settings are taken from object :attr:`referenceObject`.
+
+   .. code-block:: python
+
+      # Merge every object with the rock property to draw them in fewer calls.
+      import bge
+
+      scene = bge.logic.getCurrentScene()
+      rocks = [obj for obj in scene.objects if "rock" in obj]
+
+      group = bge.types.KX_BatchGroup(rocks)
+      print(len(group.objects))
+
+   .. code-block:: python
+
+      # Take one object out of its group before changing it alone.
+      import bge
+
+      obj = bge.logic.getCurrentController().owner
+
+      if obj.batchGroup is not None:
+          obj.batchGroup.split([obj])
+
+   .. code-block:: python
+
+      # Undo the group and give every object its original mesh back.
+      import bge
+
+      obj = bge.logic.getCurrentController().owner
+
+      if obj.batchGroup is not None:
+          obj.batchGroup.destruct()
 
    .. attribute:: objects
 
