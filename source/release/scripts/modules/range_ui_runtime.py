@@ -206,7 +206,7 @@ class UIRuntime:
     def show(self, name):
         """Troca a tela ativa; "" esconde o menu."""
         if name and name not in self.screens:
-            print("[UI] tela não encontrada: %r" % name)
+            print("[UI] screen not found: %r" % name)
             name = ""
         old = self.screen
         if old is not None:
@@ -515,7 +515,7 @@ class UIRuntime:
             try:
                 value = type(current)(float(text))
             except ValueError:
-                print("[UI] valor inválido para %s: %r" % (name, text))
+                print("[UI] invalid value for %s: %r" % (name, text))
                 return
         else:
             value = text
@@ -525,7 +525,7 @@ class UIRuntime:
         try:
             delta = float(text)
         except ValueError:
-            print("[UI] valor inválido para %s: %r" % (name, text))
+            print("[UI] invalid value for %s: %r" % (name, text))
             return
         current = self.owner.get(name, 0)
         self.owner[name] = type(current)(current + delta) if isinstance(current, int) else current + delta
@@ -536,7 +536,7 @@ class UIRuntime:
         try:
             func = getattr(importlib.import_module(module_name), func_name)
         except (ImportError, AttributeError, ValueError) as exc:
-            print("[UI] Run Python: %r não encontrado (%s)" % (path, exc))
+            print("[UI] Run Python: %r not found (%s)" % (path, exc))
             return
         func(self)
 
@@ -568,7 +568,7 @@ class UIRuntime:
             try:
                 sound = aud.Sound.file(logic.expandPath(path))
             except Exception as exc:
-                print("[UI] som não carregou: %r (%s)" % (path, exc))
+                print("[UI] sound did not load: %r (%s)" % (path, exc))
                 return
             # Guarda decodificado: cliques seguidos não releem o arquivo.
             sound = self.sounds[path] = sound.cache()
@@ -626,7 +626,7 @@ class UIRuntime:
                              bgl.GL_RGBA, bgl.GL_UNSIGNED_BYTE, pixels)
             bgl.glBindTexture(bgl.GL_TEXTURE_2D, 0)
         except Exception as exc:
-            print("[UI] imagem não carregou: %r (%s)" % (path, exc))
+            print("[UI] image did not load: %r (%s)" % (path, exc))
         self.textures[path] = bindcode
         return bindcode
 
@@ -826,7 +826,7 @@ def main(cont):
         try:
             import ui_tree_data
         except ImportError:
-            print("[UI] texto ui_tree_data.py não encontrado; use Bake UI no editor")
+            print("[UI] text ui_tree_data.py not found; use Bake UI in the editor")
             owner["_ui_tree"] = False
             return
         ui = owner["_ui_tree"] = UIRuntime(ui_tree_data.DATA, owner)
