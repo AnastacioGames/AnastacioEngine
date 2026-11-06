@@ -1865,6 +1865,11 @@ void wm_window_lower(wmWindow *win)
 	GHOST_SetWindowOrder(win->ghostwin, GHOST_kWindowOrderBottom);
 }
 
+void WM_window_raise(wmWindow *win)
+{
+	wm_window_raise(win);
+}
+
 void wm_window_raise(wmWindow *win)
 {
 	GHOST_SetWindowOrder(win->ghostwin, GHOST_kWindowOrderTop);

@@ -354,7 +354,8 @@ void ED_fileselect_browse_mode_params_ensure(SpaceFile *sfile)
 		params->flag |= FILE_FILTER | FILE_HIDE_DOT;
 		params->flag &= ~FILE_DIRSEL_ONLY;
 		params->filter = FILE_TYPE_FOLDER | FILE_TYPE_BLENDER | FILE_TYPE_BLENDERLIB;
-		params->filter_id &= FILE_ASSET_FILTER_ID;
+		/* Actions are off by default: only the Rec Studio tab asks for them. */
+		params->filter_id &= FILE_ASSET_FILTER_ID | FILTER_ID_AC;
 		if (params->filter_id == 0) {
 			params->filter_id = FILE_ASSET_FILTER_ID;
 		}

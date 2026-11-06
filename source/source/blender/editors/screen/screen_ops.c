@@ -4351,6 +4351,126 @@ static void SCREEN_OT_asset_browser_show(struct wmOperatorType *ot)
 /** \} */
 
 /* -------------------------------------------------------------------- */
+/** \name Show Rec Studio Operator
+ * \{ */
+
+static void rec_studio_region_show(bContext *C, ScrArea *sa, int regiontype, bool show)
+{
+	ARegion *ar = BKE_area_find_region_type(sa, regiontype);
+	if (ar) {
+		SET_FLAG_FROM_TEST(ar->flag, !show, RGN_FLAG_HIDDEN);
+		CTX_wm_area_set(C, sa);
+		ED_region_visibility_change_update(C, ar);
+	}
+}
+
+static void rec_studio_camera_view(ScrArea *sa, Scene *scene)
+{
+	View3D *v3d = sa->spacedata.first;
+	ARegion *ar = BKE_area_find_region_type(sa, RGN_TYPE_WINDOW);
+	if (scene->camera && ar && ar->regiondata) {
+		RegionView3D *rv3d = ar->regiondata;
+		v3d->camera = scene->camera;
+		rv3d->persp = RV3D_CAMOB;
+		rv3d->view = RV3D_VIEW_USER;
+	}
+}
+
+/* Not a temporary screen: those are limited to one, and Preferences would take this window. */
+static int rec_studio_show_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	Main *bmain = CTX_data_main(C);
+	wmWindowManager *wm = CTX_wm_manager(C);
+	wmWindow *win = CTX_wm_window(C);
+	Scene *scene = CTX_data_scene(C);
+
+	for (wmWindow *w = wm->windows.first; w; w = w->next) {
+		if (ED_screen_is_rec_studio(w->screen)) {
+			WM_window_raise(w);
+			return OPERATOR_FINISHED;
+		}
+	}
+
+	rcti rect;
+	rect.xmin = win->posx + 40;
+	rect.ymin = win->posy + 40;
+	rect.xmax = rect.xmin + 1200 * UI_DPI_FAC;
+	rect.ymax = rect.ymin + 760 * UI_DPI_FAC;
+	wmWindow *newwin = WM_window_open(C, &rect);
+	if (newwin == NULL) {
+		BKE_report(op->reports, RPT_ERROR, "Failed to open window!");
+		return OPERATOR_CANCELLED;
+	}
+	*newwin->stereo3d_format = *win->stereo3d_format;
+
+	/* No window shows it here, so a Rec Studio left by a closed window is free. */
+	bScreen *sc;
+	for (sc = bmain->screen.first; sc; sc = sc->id.next) {
+		if (ED_screen_is_rec_studio(sc)) {
+			break;
+		}
+	}
+	if (sc) {
+		sc->scene = scene;
+		sc->winid = newwin->winid;
+		sc->do_refresh = true;
+		sc->do_draw = true;
+		newwin->screen = sc;
+		BLI_strncpy(newwin->screenname, sc->id.name + 2, sizeof(newwin->screenname));
+		rec_studio_camera_view(sc->areabase.first, scene);
+		WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);
+		return OPERATOR_FINISHED;
+	}
+
+	sc = ED_screen_add(bmain, newwin, scene, "Rec Studio");
+	newwin->screen = sc;
+	BLI_strncpy(newwin->screenname, sc->id.name + 2, sizeof(newwin->screenname));
+
+	ScrArea *sa_view = sc->areabase.first;
+	ScrArea *sa_assets = area_split(sc, sa_view, 'h', 0.3f, 0);
+
+	/* changes context! */
+	CTX_wm_window_set(C, newwin);
+	CTX_wm_area_set(C, sa_view);
+	ED_area_newspace(C, sa_view, SPACE_VIEW3D, false);
+	CTX_wm_area_set(C, sa_assets);
+	ED_area_newspace(C, sa_assets, SPACE_FILE, false);
+	ED_screen_refresh(wm, newwin);
+
+	ED_fileselect_set_browse_mode(C, sa_assets, FILE_BROWSE_MODE_ASSETS);
+	rec_studio_region_show(C, sa_assets, RGN_TYPE_TOOLS, false);
+	rec_studio_region_show(C, sa_assets, RGN_TYPE_UI, false);
+
+	rec_studio_camera_view(sa_view, scene);
+	ARegion *ar_side = BKE_area_find_region_type(sa_view, RGN_TYPE_UI);
+	if (ar_side) {
+		ar_side->sizex = 300;
+	}
+	rec_studio_region_show(C, sa_view, RGN_TYPE_UI, true);
+	rec_studio_region_show(C, sa_view, RGN_TYPE_HEADER, false);
+	sc->do_refresh = true;
+	sc->do_draw = true;
+	ED_area_tag_redraw(sa_view);
+	ED_area_tag_redraw(sa_assets);
+	WM_event_add_notifier(C, NC_SCREEN | NA_EDITED, NULL);
+	return OPERATOR_FINISHED;
+}
+
+static void SCREEN_OT_rec_studio_show(struct wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Rec Studio";
+	ot->description = "Open the Rec Studio: camera view, big record buttons and the asset thumbnails";
+	ot->idname = "SCREEN_OT_rec_studio_show";
+
+	/* api callbacks */
+	ot->invoke = rec_studio_show_invoke;
+	ot->poll = ED_operator_screenactive;
+}
+
+/** \} */
+
+/* -------------------------------------------------------------------- */
 /** \name Show Drivers Editor Operator
  * \{ */
 
@@ -4856,6 +4976,7 @@ void ED_operatortypes_screen(void)
 	WM_operatortype_append(SCREEN_OT_settings_show);
 	WM_operatortype_append(SCREEN_OT_drivers_editor_show);
 	WM_operatortype_append(SCREEN_OT_asset_browser_show);
+	WM_operatortype_append(SCREEN_OT_rec_studio_show);
 	WM_operatortype_append(SCREEN_OT_region_blend);
 	WM_operatortype_append(SCREEN_OT_space_context_cycle);
 

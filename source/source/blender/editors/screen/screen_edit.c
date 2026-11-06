@@ -465,6 +465,11 @@ ScrArea *area_split(bScreen *sc, ScrArea *sa, char dir, float fac, int merge)
 
 /* empty screen, with 1 dummy area without spacedata */
 /* uses window size */
+bool ED_screen_is_rec_studio(const bScreen *sc)
+{
+	return sc && STREQLEN(sc->id.name + 2, "Rec Studio", 10);
+}
+
 bScreen *ED_screen_add(Main *bmain, wmWindow *win, Scene *scene, const char *name)
 {
 	const int winsize_x = WM_window_pixels_x(win);

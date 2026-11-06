@@ -4,7 +4,7 @@
 
 import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
-from bpy.types import Operator, UIList
+from bpy.types import Operator, Panel, UIList
 
 
 def _take_tracks(actor):
@@ -114,9 +114,61 @@ class SCENE_OT_rec_take_to_cutscene(Operator):
         return {'FINISHED'}
 
 
+class VIEW3D_PT_rec_studio(Panel):
+    # bl_context keeps it out of every other 3D View and the others out of Rec Studio.
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_context = "rec_studio"
+    bl_label = "Rec Studio"
+    bl_options = {'HIDE_HEADER'}
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        ob = context.active_object
+
+        if ob is None:
+            layout.label(text="Click a character", icon='INFO')
+        else:
+            row = layout.row()
+            row.scale_y = 1.4
+            row.prop(ob, "ae_rec_actor", text=ob.name, toggle=True, icon='REC' if ob.ae_rec_actor else 'BLANK1')
+            layout.prop_search(ob, "ae_rec_action", bpy.data, "actions", text="", icon='ACTION')
+
+        col = layout.column()
+        col.scale_y = 1.7
+        col.operator("view3d.game_record", text="Record", icon='REC_PLAY')
+        sub = col.column()
+        sub.enabled = len(scene.ae_rec_takes) > 0
+        sub.operator("view3d.game_record", text="Watch", icon='PLAY').watch = True
+        sub.operator("view3d.game_record", text="Rerecord", icon='REC').rerecord = True
+        col.operator("ed.undo", text="Undo", icon='LOOP_BACK')
+        # The editor sleeps while the game runs, so a Stop button here could never be clicked.
+        layout.label(text="F10 stops the recording", icon='INFO')
+        layout.prop(scene, "ae_rec_max_duration")
+
+        if not scene.ae_rec_takes:
+            return
+        layout.template_list("SCENE_UL_rec_takes", "", scene, "ae_rec_takes", scene, "ae_rec_take_index", rows=2)
+
+        # One lane per character: its latest take, as long as the take is.
+        lanes = {}
+        for take in scene.ae_rec_takes:
+            for actor in take.actors:
+                lanes[actor.object_name] = take
+        longest = max(take.duration for take in scene.ae_rec_takes) or 1.0
+        layout.label(text="Characters", icon='TIME')
+        for name, take in sorted(lanes.items()):
+            layout.label(text=name)
+            size = min(0.98, max(0.1, take.duration / longest))
+            lane = layout.split(factor=size)
+            lane.box().label(text="%s  %.1f s" % (take.name, take.duration))
+            lane.label(text="")
+
+
 # bl_operators.register() reads this list from every module.
 classes = (SCENE_UL_rec_takes, SCENE_OT_rec_take_remove, SCENE_OT_rec_take_use,
-           SCENE_OT_rec_take_to_cutscene)
+           SCENE_OT_rec_take_to_cutscene, VIEW3D_PT_rec_studio)
 
 
 def register_props():

@@ -549,6 +549,7 @@ class INFO_MT_window(Menu):
         layout.separator(factor=1)
 
         layout.operator("screen.asset_browser_show", text="Asset Browser", icon='ASSET_MANAGER')
+        layout.operator("screen.rec_studio_show", text="Rec Studio", icon='REC_PLAY')
 
         layout.separator(factor=1)
 

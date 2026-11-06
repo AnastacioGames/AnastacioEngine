@@ -117,6 +117,7 @@ void    ED_screen_do_listen(struct bContext *C, struct wmNotifier *note);
 bScreen *ED_screen_duplicate(struct Main *bmain, struct wmWindow *win, struct bScreen *sc);
 bScreen *ED_screen_add(struct Main *bmain, struct wmWindow *win, struct Scene *scene, const char *name);
 bool    ED_screen_set(struct bContext *C, struct bScreen *sc);
+bool    ED_screen_is_rec_studio(const struct bScreen *sc);
 bool    ED_screen_delete(struct bContext *C, struct bScreen *sc);
 void    ED_screen_set_scene(struct bContext *C, struct bScreen *screen, struct Scene *scene);
 bool    ED_screen_delete_scene(struct bContext *C, struct Scene *scene);

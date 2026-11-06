@@ -257,6 +257,7 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
         row = box.row()
         row.scale_y = 1.6
         row.operator("view3d.game_record", text="Rec Play", icon='REC_PLAY')
+        box.operator("screen.rec_studio_show", text="Open Rec Studio", icon='FULLSCREEN_ENTER')
 
         box = layout.box()
         box.label(text="Takes", icon='ACTION')

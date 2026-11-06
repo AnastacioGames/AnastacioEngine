@@ -688,6 +688,7 @@ void WM_tooltip_timer_init(
         struct bContext *C, struct wmWindow *win, struct ARegion *ar,
         wmTooltipInitFn init) RET_NONE
 int			WM_userdef_event_type_from_keymap_type(int kmitype) RET_ZERO
+void WM_window_raise(struct wmWindow *win) RET_NONE
 struct wmWindow	*WM_window_open(struct bContext *C, const struct rcti *rect) RET_NULL
 struct wmWindow *WM_window_open_temp(struct bContext *C, int x, int y, int sizex, int sizey, int type) RET_NULL
 int			WM_window_pixels_x		(struct wmWindow *win) RET_ZERO

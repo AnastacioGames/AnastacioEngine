@@ -2161,6 +2161,10 @@ void ED_region_panels_layout_ex(
 		if (contexts && pt->context[0] && !streq_array_any(pt->context, contexts)) {
 			continue;
 		}
+		/* The Rec Studio side bar has no technical panels. */
+		if (contexts && !pt->context[0] && STREQ(contexts[0], "rec_studio")) {
+			continue;
+		}
 
 		/* draw panel */
 		if (pt->draw && (!pt->poll || pt->poll(C, pt))) {

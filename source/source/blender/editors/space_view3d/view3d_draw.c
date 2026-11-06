@@ -4556,6 +4556,11 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 	rcti rect;
 	int x, y;
 
+	/* The Rec Studio has its own big buttons. */
+	if (ED_screen_is_rec_studio(screen)) {
+		return;
+	}
+
 	/* Start at the visible part of the region, so the side panels (T/N)
 	 * with region overlap don't cover the buttons. */
 	ED_region_visible_rect(ar, &rect);

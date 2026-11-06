@@ -1245,7 +1245,12 @@ static void view3d_buttons_region_init(wmWindowManager *wm, ARegion *ar)
 
 static void view3d_buttons_region_draw(const bContext *C, ARegion *ar)
 {
-	ED_region_panels(C, ar);
+	if (ED_screen_is_rec_studio(CTX_wm_screen(C))) {
+		ED_region_panels_ex(C, ar, (const char * []){"rec_studio", NULL}, -1, true);
+	}
+	else {
+		ED_region_panels(C, ar);
+	}
 }
 
 static void view3d_buttons_region_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *ar, wmNotifier *wmn)

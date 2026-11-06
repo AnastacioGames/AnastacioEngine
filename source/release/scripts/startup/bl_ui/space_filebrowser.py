@@ -103,6 +103,17 @@ class FILEBROWSER_HT_header(Header):
         st = context.space_data
         params = st.params
 
+        if context.screen.name.startswith("Rec Studio"):
+            # Plain tabs, no technical menus.
+            if params:
+                row = layout.row(align=True)
+                row.scale_x = 1.5
+                row.prop_enum(params, "filter_id", 'GROUP', text="Scenery")
+                row.prop_enum(params, "filter_id", 'OBJECT', text="Characters")
+                row.prop_enum(params, "filter_id", 'ACTION', text="Actions")
+                layout.prop(params, "filter_search", text="", icon='VIEWZOOM')
+            return
+
         layout.menu("FILEBROWSER_MT_asset_view")
 
         row = layout.row(align=True)

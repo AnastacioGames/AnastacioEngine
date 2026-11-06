@@ -101,6 +101,7 @@ enum {
 	// WM_WINDOW_FILESEL // UNUSED
 };
 
+void		WM_window_raise(struct wmWindow *win);
 struct wmWindow	*WM_window_open(struct bContext *C, const struct rcti *rect);
 struct wmWindow *WM_window_open_temp(struct bContext *C, int x, int y, int sizex, int sizey, int type);
 void             WM_window_set_dpi(wmWindow *win);

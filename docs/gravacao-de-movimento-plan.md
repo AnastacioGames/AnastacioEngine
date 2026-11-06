@@ -121,6 +121,14 @@ mesmo caminho da janela flutuante do Asset Browser
 
 O editor normal não muda; o painel Motion Recording continua para detalhes.
 
+Feito em 2026-11-06 (`SCREEN_OT_rec_studio_show`, painel `VIEW3D_PT_rec_studio`). Diferenças do desenho:
+
+- Não há botão Parar: o editor fica parado durante o jogo, então F10 para.
+- A linha do tempo está no painel lateral: uma faixa por personagem, com o último Take dele.
+- A aba Actions já filtra, mas as bibliotecas só ganham conteúdo na Fase 9. A barra de caminho continua visível.
+- Teste: `tools/debug/editor_rec_studio.py` abre por tecla e clica de verdade. Abrir por script com contexto
+  falso cria as sub-regiões na janela errada e a área de baixo não desenha.
+
 ### 8. Asset Browser (miniaturas)
 
 Base: [Asset Browser](asset-browser.md). Falta:
