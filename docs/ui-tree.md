@@ -53,6 +53,9 @@ Jogar esconde o menu e liga o HUD; Som e Volume mandam no volume geral do jogo.
 
 - Propriedade `ui_screen` do dono do script: nome da tela; `""` esconde o menu.
 - Propriedade `ui_hud` (bool): mostra/esconde o HUD.
+- Propriedade `ui_nav` (bool, padrão True): False desliga a navegação por setas/controle
+  (menu só de mouse, aberto enquanto se dirige). `ui_back` (bool, padrão True): False
+  desliga o Esc/Voltar que abre a primeira tela.
 - Python: `range_ui_runtime.show("Menu")`, `hide()`, `set_hud(True)`, `get()`.
 - Teclado/controle: setas ou analógico mudam o foco, Enter/Espaço/A apertam,
   esquerda/direita mexem o Slider.

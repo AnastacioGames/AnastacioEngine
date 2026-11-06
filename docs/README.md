@@ -21,6 +21,12 @@ Para quem abre o projeto pela primeira vez, ou numa máquina nova, nesta ordem:
 
 ## Estado atual
 
+- [Estudo de modernização do processamento](estudo-modernizacao-processamento.md): referências de CPU,
+  tarefas, física, animação, SIMD e cooking; candidatos pequenos e migrações a adiar.
+
+- [Análise do DirectX: clusters e PTLAS](analise-directx-clusters-ptlas.md): comparação dos exemplos
+  públicos com o renderizador atual; candidatos de instancing parcial, queries sem espera e cache de comandos.
+
 - [Preparar texturas DDS](plano-texturas-dds.md): derivados BC1/BC3, sele??o no editor, cache e export desktop preservando originais.
 
 - [Ragdoll: análise e plano](ragdoll-modernization-plan.md): fonte do addon, auditoria dos scripts

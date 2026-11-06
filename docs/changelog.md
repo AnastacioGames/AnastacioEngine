@@ -173,6 +173,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   5000 com sol CSM ~122 → 1,37 ms; iGPU com 400: 9,0 ms antes. RA4 original: uploads só nos quadros
   com mudança, 1 desenho. Detalhes em [revisao-directx-claude.md](revisao-directx-claude.md).
 
+## 2026-11-04 - Pesquisa de referências para processamento moderno
+
+- [Estudo](estudo-modernizacao-processamento.md) de enkiTS, oneTBB, ozz-animation, Jolt, Flecs,
+  ISPC e meshoptimizer, com revisões fixadas e cópias em `artifacts/modernization-study/`.
+- Comparação com o código atual: animação em blocos e snapshot de sombras já existem; candidatos
+  de medição incluem filtragem da sincronização Bullet, preparação compacta de tarefas, SIMD
+  sobre o snapshot e otimização dos índices de desenho no cooking. Sem migração, fonte alterado
+  ou ganho medido. Trocas globais de física/ECS/agendador não recomendadas sem prova específica.
+
+## 2026-11-04 - Análise dos exemplos novos do DirectX
+
+- [Estudo](analise-directx-clusters-ptlas.md) dos exemplos públicos de Clustered Geometry/PTLAS e da
+  especificação, com revisões fixadas. Comparação com instancing, batching, buffers e queries OpenGL.
+- Candidatos: envio parcial de instancing e leitura adiada das queries do painel; cache de metadados
+  do batch condicionado a perfil. Confirmado que batching já faz culling por membro e instancing já
+  evita uploads em repouso. Sem alteração C++, build ou benchmark; ganhos ainda não demonstrados.
+
 ## 2026-11-04 - Range.track: project(pos, near)
 
 - `Track.project(pos, near=None)`: com `near` (o `s` do quadro anterior) a amostra mais próxima é

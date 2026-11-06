@@ -22,6 +22,10 @@ Enter/Espaço (ou botão A) apertam, esquerda/direita mexem o Slider em foco.
 Voltar: Esc (se não for a tecla de sair do jogo) ou Pause, que é o que o botão
 Voltar do Android manda, abrem a primeira tela e escondem o HUD; numa outra
 tela, voltam para a primeira.
+
+Propriedades opcionais do dono: "ui_nav" = False desliga a navegação por
+teclado/controle (menu só de mouse, ex.: painel de ajuste aberto enquanto se
+dirige com as setas); "ui_back" = False desliga o Voltar acima.
 """
 
 import math
@@ -235,7 +239,8 @@ class UIRuntime:
         wanted = self.owner.get("ui_screen", "")
         if wanted != (self.active or ""):
             self.show(wanted)
-        if self.first and self.back_pressed() and self.active != self.first:
+        if (self.first and self.owner.get("ui_back", True) and self.back_pressed()
+                and self.active != self.first):
             if self.active is None:
                 self.owner["ui_hud"] = False
             self.show(self.first)
@@ -415,6 +420,8 @@ class UIRuntime:
 
     def navigate(self, screen):
         """Teclado e controle: move o foco e devolve (apertou, soltou)."""
+        if not self.owner.get("ui_nav", True):
+            return False, False  # menu só de mouse: setas/controle ficam para o jogo
         keyboard = logic.keyboard.inputs
         step = 0
         side = 0
