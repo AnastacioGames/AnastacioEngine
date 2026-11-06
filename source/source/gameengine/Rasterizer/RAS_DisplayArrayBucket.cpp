@@ -417,6 +417,19 @@ void RAS_DisplayArrayBucket::RunBatchingNode(const RAS_DisplayArrayNodeTuple& tu
 	rasty->SetClientObject(referenceMeshUser->GetClientObject());
 	// Use batch group reference mesh user for layer and object color.
 	material->ActivateMeshUser(referenceMeshUser, rasty, managerData->m_trans);
+#if defined(__EMSCRIPTEN__) || defined(WITH_GL_PROFILE_CORE)
+	/* The merged vertices are already in world space. Core profile (Web) takes the object matrix from a
+	 * uniform, which now holds the reference object: it would move the whole batch by that object. */
+	{
+		static const float identity[16] = {1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f, 0.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+		if (managerData->m_shaderOverride) {
+			rasty->UpdateOverrideShaderObjectMatrix(identity);
+		}
+		else {
+			material->UpdateObjectMatrix(referenceMeshUser, rasty, identity);
+		}
+	}
+#endif
 
 	RAS_AttributeArrayStorage *attribStorage = m_nodeData.m_attribStorage;
 	attribStorage->BindPrimitives();

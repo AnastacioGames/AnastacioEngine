@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - Web: Static Batch deslocado pela posição do objeto de referência
+
+- Na Web a matriz do objeto vai ao shader por uniform, e o lote mandava a do objeto de referência sobre vértices já em coordenadas
+  do mundo: tudo andava a posição dele. `RAS_DisplayArrayBucket::RunBatchingNode` agora manda identidade na Web e no perfil core.
+  O PC (compat) não muda.
+- Visto no celular com dois planos em x = ±1,1 (`criar_cena_ktx2_gpu.py`); referência perto da origem escondia o erro.
+- KTX2 (marca de normal map e orientação) aceito com janela no PC e no celular (Adreno 660). Resta a opção de qualidade: ETC1S
+  marca blocos em degradês suaves.
+
 ## 2026-11-05 - i18n: textos novos desde 01/11 em pt_BR, es e ru
 
 - Nova tabela `translations_features.py` (349 textos): Wet Surfaces, Track Tool, Light Probe Volume, regras novas do Scene Doctor,
