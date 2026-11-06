@@ -146,6 +146,10 @@ def register_props():
     S.ae_rec_countdown = IntProperty(name="Countdown", default=3, min=0, max=10,
         description="Seconds counted on screen before recording starts (0 = start at once)")
     # Enum numbers will be read by C++ from the IDProperty: keep 0/1.
+    S.ae_rec_walk_speed = FloatProperty(name="Walk Speed", default=3.0, min=0.1, max=50.0,
+                                        description="Meters per second of WASD on an actor with no logic")
+    S.ae_rec_walk_negative_y = BoolProperty(name="Faces -Y", default=False,
+                                            description="The character looks along -Y, so W walks that way")
     S.ae_rec_sample_rate = EnumProperty(name="Sampling", default='FRAME', items=(
         ('FRAME', "Every Frame", "One sample per logic frame", 0),
         ('FIXED', "Fixed Rate", "Samples at the rate below, independent of the frame rate", 1),

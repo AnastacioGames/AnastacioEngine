@@ -758,6 +758,10 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 		m_inputDevice->ConvertEvent(SCA_IInputDevice::F10KEY, 0, 0);
 		exitInfo.m_code = KX_ExitInfo::BLENDER_ESC;
 	}
+	else if (BKE_motion_record_countdown() > 0.0 && m_inputDevice->GetInput(SCA_IInputDevice::ESCKEY).Find(SCA_InputEvent::ACTIVE)) {
+		m_inputDevice->ConvertEvent(SCA_IInputDevice::ESCKEY, 0, 0);
+		exitInfo.m_code = KX_ExitInfo::BLENDER_ESC;
+	}
 	else if (BKE_motion_record_time_up()) {
 		exitInfo.m_code = KX_ExitInfo::BLENDER_ESC;
 	}

@@ -48,6 +48,8 @@ static struct {
 	bool active;
 	double time, next_sample, interval;
 	float max_seconds;
+	double countdown;
+	float walk_speed;
 } rec = {NULL};
 
 void BKE_motion_record_free(void)
@@ -60,7 +62,8 @@ void BKE_motion_record_free(void)
 	memset(&rec, 0, sizeof(rec));
 }
 
-void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate, float max_seconds)
+void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate, float max_seconds,
+                             float countdown, float walk_speed)
 {
 	BKE_motion_record_free();
 	rec.tracks = MEM_callocN(sizeof(MotionTrack) * actors_num, __func__);
@@ -70,6 +73,8 @@ void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed
 	}
 	rec.interval = (fixed_rate > 0.0f) ? 1.0 / fixed_rate : 0.0;
 	rec.max_seconds = max_seconds;
+	rec.countdown = countdown;
+	rec.walk_speed = walk_speed;
 	rec.active = true;
 }
 
@@ -96,6 +101,21 @@ float BKE_motion_record_max_seconds(void)
 bool BKE_motion_record_time_up(void)
 {
 	return rec.active && rec.max_seconds > 0.0f && rec.time >= rec.max_seconds;
+}
+
+double BKE_motion_record_countdown(void)
+{
+	return rec.countdown;
+}
+
+void BKE_motion_record_countdown_advance(double step)
+{
+	rec.countdown = (rec.countdown > step) ? rec.countdown - step : 0.0;
+}
+
+float BKE_motion_record_walk_speed(void)
+{
+	return rec.walk_speed;
 }
 
 static MotionTrack *motion_track_find(const struct Object *ob)

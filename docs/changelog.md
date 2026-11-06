@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 4 (controle rápido e contagem)
+
+- Contagem (`Countdown`, padrão 3 s) com o mundo congelado: o Take começa da primeira pose. Sair durante a contagem, por Esc ou F10, cancela sem criar Take.
+- Ator marcado sem sensores, controladores nem componentes anda com WASD ou setas: W/S andam e A/D giram. Vale para objeto simples, corpo rígido e Character. Câmera fica de fora.
+- A Action escolhida no painel toca em loop na armature do ator enquanto ele se move e vira faixas de NLA. `Walk Speed` e `Faces -Y` ficam em Advanced.
+- Aviso REC pisca. Teste com teclas reais: `tools/debug/editor_rec_wasd.py`.
+
 ## 2026-11-06 - Rec Play: Fase 3 (personagem completo)
 
 - Ator agora inclui os filhos. Filho parado em relação ao pai não gera Action.

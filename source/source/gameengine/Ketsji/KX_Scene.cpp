@@ -48,6 +48,8 @@
 #include "KX_AnimationEvent.h"
 #include "KX_AnimationEventManager.h"
 #include "KX_Globals.h"
+#include "BL_Action.h"
+#include "BL_ActionData.h"
 #include "BLI_utildefines.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_BlenderMaterial.h"
@@ -108,6 +110,7 @@ extern "C" {
 }
 #include "DNA_object_types.h"
 #include "DNA_node_types.h"
+#include "BKE_action.h"
 #include "BKE_motion_record.h"
 #include "BKE_scene.h" // SETLOOPER
 #include "BKE_node.h" // SH_NODE_WORLD_BLOOM_FX, SH_NODE_WORLD_SSR_FX
@@ -1995,6 +1998,11 @@ void KX_Scene::UpdateMotionRecord()
 		for (KX_GameObject *gameobj : *m_objectlist) {
 			if (gameobj->GetBlenderObject() && BKE_motion_record_is_actor(gameobj->GetBlenderObject())) {
 				m_motionRecordActors.push_back(gameobj);
+				if (gameobj->GetGameObjectType() != SCA_IObject::OBJ_CAMERA && gameobj->GetSensors().empty() &&
+				    gameobj->GetControllers().empty() && (!gameobj->GetComponents() || gameobj->GetComponents()->GetCount() == 0))
+				{
+					m_motionRecordWalkers.push_back(gameobj);
+				}
 			}
 		}
 		/* An actor is the object and all it carries, such as a capsule with its armature. */
@@ -2022,6 +2030,70 @@ void KX_Scene::UpdateMotionRecord()
 			for (short layer : gameobj->GetPlayingActionLayers()) {
 				BKE_motion_record_clip(gameobj->GetBlenderObject(), layer,
 				                       gameobj->GetActionName(layer).c_str(), gameobj->GetActionFrame(layer));
+			}
+		}
+	}
+}
+
+/* Away from the layers a character uses for its own animation, and from Play Take. */
+static const short MOTION_WALK_LAYER = 6;
+static const float MOTION_TURN_SPEED = 2.5f;  // Radians per second.
+
+void KX_Scene::UpdateMotionQuickControl(double step)
+{
+	if (m_motionRecordWalkers.empty()) {
+		return;
+	}
+	SCA_IInputDevice *input = KX_GetActiveEngine()->GetInputDevice();
+	const auto pressed = [input](SCA_IInputDevice::SCA_EnumInputs a, SCA_IInputDevice::SCA_EnumInputs b) {
+		return (input->GetInput(a).Find(SCA_InputEvent::ACTIVE) || input->GetInput(b).Find(SCA_InputEvent::ACTIVE)) ? 1.0f : 0.0f;
+	};
+	const float walk = pressed(SCA_IInputDevice::WKEY, SCA_IInputDevice::UPARROWKEY) -
+	                   pressed(SCA_IInputDevice::SKEY, SCA_IInputDevice::DOWNARROWKEY);
+	const float turn = pressed(SCA_IInputDevice::AKEY, SCA_IInputDevice::LEFTARROWKEY) -
+	                   pressed(SCA_IInputDevice::DKEY, SCA_IInputDevice::RIGHTARROWKEY);
+	const mt::vec3 move(0.0f, walk * BKE_motion_record_walk_speed() * (float)step, 0.0f);
+
+	for (KX_GameObject *gameobj : m_motionRecordWalkers) {
+		if (turn != 0.0f) {
+			gameobj->ApplyRotation(mt::vec3(0.0f, 0.0f, turn * MOTION_TURN_SPEED * (float)step), true);
+		}
+		PHY_ICharacter *character = m_physicsEnvironment->GetCharacterController(gameobj);
+		if (character) {
+			/* Set even when stopped: a character keeps its last walk direction. */
+			character->SetWalkDirection(gameobj->NodeGetWorldOrientation() * move / m_physicsEnvironment->GetNumTimeSubSteps());
+		}
+		else if (walk != 0.0f) {
+			gameobj->ApplyMovement(move, true);
+		}
+
+		/* The chosen Action plays on the armature while the actor moves. */
+		Object *blenderobj = gameobj->GetBlenderObject();
+		IDProperty *action = blenderobj->id.properties ? IDP_GetPropertyFromGroup(blenderobj->id.properties, "ae_rec_action") : nullptr;
+		if (!action || action->type != IDP_STRING || !IDP_String(action)[0]) {
+			continue;
+		}
+		KX_GameObject *armature = (gameobj->GetGameObjectType() == SCA_IObject::OBJ_ARMATURE) ? gameobj : nullptr;
+		if (!armature) {
+			for (KX_GameObject *child : gameobj->GetChildrenRecursive()) {
+				if (child->GetGameObjectType() == SCA_IObject::OBJ_ARMATURE) {
+					armature = child;
+					break;
+				}
+			}
+		}
+		if (!armature) {
+			continue;
+		}
+		if (walk == 0.0f && turn == 0.0f) {
+			armature->StopAction(MOTION_WALK_LAYER);
+		}
+		else if (armature->IsActionDone(MOTION_WALK_LAYER)) {
+			BL_ActionData *data = static_cast<BL_ActionData *>(GetLogicManager()->GetActionByName(IDP_String(action)));
+			if (data) {
+				float start, end;
+				calc_action_range(data->GetAction(), &start, &end, 0);
+				armature->PlayAction(IDP_String(action), start, end, MOTION_WALK_LAYER, 0, 0.0f, BL_Action::ACT_MODE_LOOP);
 			}
 		}
 	}

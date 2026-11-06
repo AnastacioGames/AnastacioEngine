@@ -247,7 +247,8 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
         else:
             box.prop_search(ob, "ae_rec_action", bpy.data, "actions", text="", icon='ACTION')
             if not ob.ae_rec_action:
-                box.label(text="Empty = the character's own game controls")
+                box.label(text="Empty = just walk, or the character's own game controls")
+            box.label(text="No logic on it? WASD or the arrows walk it")
 
         box = layout.box()
         box.label(text="3. Press Rec Play and move it! F10 stops", icon='REC')
@@ -279,6 +280,9 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
         col = box.column()
         col.prop(scene, "ae_rec_record_camera")
         col.prop(scene, "ae_rec_countdown")
+        row = col.row(align=True)
+        row.prop(scene, "ae_rec_walk_speed")
+        row.prop(scene, "ae_rec_walk_negative_y", toggle=True)
         row = col.row(align=True)
         row.prop(scene, "ae_rec_sample_rate", expand=True)
         sub = col.row()

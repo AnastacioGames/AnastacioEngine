@@ -101,7 +101,8 @@ bool view3d_motion_record_begin(Scene *scene, ReportList *reports)
 	const bool fixed = RNA_enum_get(&scene_ptr, "ae_rec_sample_rate") == 1;
 	BKE_motion_record_begin(
 	        actors, num, fixed ? (float)RNA_int_get(&scene_ptr, "ae_rec_fixed_rate") : 0.0f,
-	        RNA_float_get(&scene_ptr, "ae_rec_max_duration"));
+	        RNA_float_get(&scene_ptr, "ae_rec_max_duration"), (float)RNA_int_get(&scene_ptr, "ae_rec_countdown"),
+	        RNA_float_get(&scene_ptr, "ae_rec_walk_speed") * (RNA_boolean_get(&scene_ptr, "ae_rec_walk_negative_y") ? -1.0f : 1.0f));
 	MEM_freeN(actors);
 	return true;
 }
@@ -350,6 +351,13 @@ bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
 	PointerRNA scene_ptr;
 	RNA_id_pointer_create(&scene->id, &scene_ptr);
 	int created = 0;
+
+	/* Left before the countdown ended: nothing was recorded. */
+	if (BKE_motion_record_countdown() > 0.0) {
+		BKE_motion_record_free();
+		BKE_report(reports, RPT_INFO, "Rec Play: cancelled");
+		return false;
+	}
 
 	BKE_motion_record_stop();
 

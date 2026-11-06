@@ -254,7 +254,9 @@ const char *ProfilerTip(int tip)
 void KX_DebugMode::RenderRecordOverlay()
 {
   const ImGuiViewport *viewport = ImGui::GetMainViewport();
-  ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + 12.0f),
+  const double countdown = BKE_motion_record_countdown();
+  const float top = (countdown > 0.0) ? viewport->WorkSize.y * 0.35f : 12.0f;
+  ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + top),
                           ImGuiCond_Always, ImVec2(0.5f, 0.0f));
   ImGui::SetNextWindowViewport(viewport->ID);
   ImGui::SetNextWindowBgAlpha(0.6f);
@@ -262,10 +264,20 @@ void KX_DebugMode::RenderRecordOverlay()
                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                  ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoDocking;
   if (ImGui::Begin("RecPlayOverlay", nullptr, flags)) {
-    const int seconds = (int)BKE_motion_record_time();
+    if (countdown > 0.0) {
+      ImGui::SetWindowFontScale(8.0f);
+      ImGui::Text("%d", (int)std::ceil(countdown));
+      ImGui::SetWindowFontScale(1.5f);
+      ImGui::Text("Esc cancels");
+      ImGui::End();
+      return;
+    }
+    const double time = BKE_motion_record_time();
+    const int seconds = (int)time;
     const int limit = (int)std::ceil(BKE_motion_record_max_seconds());
     ImGui::SetWindowFontScale(1.5f);
-    ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "REC");
+    /* Blinks once per second. */
+    ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, (time - seconds < 0.5) ? 1.0f : 0.25f), "REC");
     ImGui::SameLine();
     if (limit > 0) {
       ImGui::Text("%02d:%02d / %02d:%02d   F10 stops", seconds / 60, seconds % 60, limit / 60, limit % 60);

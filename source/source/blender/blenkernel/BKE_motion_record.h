@@ -46,8 +46,11 @@ typedef struct MotionClip {
 	float frame_start, frame_end;
 } MotionClip;
 
-/* fixed_rate: samples per second, 0 = every logic step. max_seconds: 0 = until stopped. */
-void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate, float max_seconds);
+/* fixed_rate: samples per second, 0 = every logic step. max_seconds: 0 = until stopped.
+ * countdown: seconds the game waits frozen before recording.
+ * walk_speed: quick control, meters per second along +Y of the actor, negative for -Y. */
+void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate, float max_seconds,
+                             float countdown, float walk_speed);
 /* Stops accepting samples and keeps them, until BKE_motion_record_free. */
 void BKE_motion_record_stop(void);
 void BKE_motion_record_free(void);
@@ -57,6 +60,10 @@ bool BKE_motion_record_is_active(void);
 double BKE_motion_record_time(void);
 float BKE_motion_record_max_seconds(void);
 bool BKE_motion_record_time_up(void);
+/* Seconds left before recording starts, 0 once it started. */
+double BKE_motion_record_countdown(void);
+void BKE_motion_record_countdown_advance(double step);
+float BKE_motion_record_walk_speed(void);
 bool BKE_motion_record_is_actor(const struct Object *ob);
 /* Whether the samples of the current step are to be kept (false between fixed rate samples). */
 bool BKE_motion_record_sample_due(void);

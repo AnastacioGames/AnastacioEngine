@@ -50,6 +50,20 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 		network->BeginTick();
 	}
 
+	/* Rec Play: the world waits for the countdown, so the take starts from the first pose. */
+	if (BKE_motion_record_countdown() > 0.0) {
+		BKE_motion_record_countdown_advance(m_engine->GetFrameStep());
+		const bool waiting = BKE_motion_record_countdown() > 0.0;
+		for (KX_Scene *scene : m_engine->GetScenes()) {
+			if (waiting) {
+				scene->Suspend();
+			}
+			else {
+				scene->Resume();
+			}
+		}
+	}
+
 	const bool recording = BKE_motion_record_is_active();
 	bool recordClockRuns = false;
 
@@ -132,6 +146,10 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 		}
 
 		if (!scene->IsSuspended()) {
+			if (recording) {
+				scene->UpdateMotionQuickControl(m_engine->GetFrameStep());
+			}
+
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_physics);
 			// Before physics so the shaken gravity is what this frame's solve uses.
 			scene->UpdateEarthquake(m_engine->GetFrameTime());
