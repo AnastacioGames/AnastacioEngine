@@ -97,15 +97,46 @@ por quem nunca abriu o editor:
 - Controle rápido opcional estilo 3DMM (andar com o mouse/WASD e escolher a
   ação numa lista) para quem não tem lógica de personagem pronta.
 
+### 7. Janela Rec Studio (decidido 2026-11-06)
+
+Janela flutuante própria, como no 3D Movie Maker, aberta por
+**Window > Rec Studio** ou pelo Rec Play. Montada com peças existentes, pelo
+mesmo caminho da janela flutuante do Asset Browser
+(`SCREEN_OT_asset_browser_show`, `WM_WINDOW_ASSETS` em `screen_ops.c` e
+`wm_window.c`):
+
+- em cima, 3D View grande pela câmera;
+- embaixo, miniaturas em abas Cenários / Personagens / Ações (o Asset Browser
+  sem menus técnicos);
+- na lateral, botões grandes: Gravar, Parar, Assistir, Regravar, Desfazer;
+- linha do tempo simples com uma faixa por personagem (camadas).
+
+O editor normal não muda; o painel Motion Recording continua para detalhes.
+
+### 8. Asset Browser (miniaturas)
+
+Base: [Asset Browser](asset-browser.md). Falta:
+
+- incluir Actions no filtro do modo Assets (hoje só OB, GR, MA);
+- miniatura de Action (personagem renderizado numa pose do meio);
+- soltar uma Action sobre um personagem na 3D View
+  (`VIEW3D_OT_asset_drop`, como o material): define `ae_rec_action`;
+- soltar um personagem já o marca como `ae_rec_actor`;
+- kit inicial de conteúdo (personagens e ações), podendo usar o
+  Personagem automático (Fuse → armature).
+
 ## Fases
 
 1. Botão + ícone + operador que só inicia o Play com flag de gravação.
+   Instruções em [`HANDOFF-rec-play.md`](../HANDOFF-rec-play.md).
 2. Captura de transformação em memória + conversão em Action ao parar
    (primeiro resultado visível).
 3. Estado de animação (actions/NLA) na captura.
-4. Take em DNA + reprodução no runtime + camadas.
-5. Painel de takes, contagem, câmera, standalone.
-6. Cutscene, API Python e controle rápido.
+4. Janela Rec Studio (3D View, botões, painel).
+5. Asset Browser na janela: Actions, miniaturas, soltar ação/personagem.
+6. Take em DNA + reprodução no runtime + camadas + linha do tempo.
+7. Contagem, câmera, standalone, controle rápido (WASD sem Logic Bricks).
+8. Cutscene, API Python e kit de conteúdo.
 
 Uma fase por vez, com build no Windows e teste do usuário antes da próxima.
 
