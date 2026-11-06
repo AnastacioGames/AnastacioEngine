@@ -3983,6 +3983,7 @@ PyMethodDef KX_Scene::Methods[] = {
 	EXP_PYMETHODTABLE(KX_Scene, suspend),
 	EXP_PYMETHODTABLE(KX_Scene, resume),
 	EXP_PYMETHODTABLE(KX_Scene, play_cutscene),
+	EXP_PYMETHODTABLE(KX_Scene, play_take),
 	EXP_PYMETHODTABLE(KX_Scene, stop_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, skip_cutscene),
 	EXP_PYMETHODTABLE(KX_Scene, restart_cutscene),
@@ -4232,6 +4233,18 @@ PyObject *KX_Scene::pyattr_get_cameras(EXP_PyObjectPlus *self_v, const EXP_PYATT
 	return self->GetCameraList()->GetProxy();
 }
 
+PyObject *KX_Scene::pyattr_get_takes(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
+{
+	KX_Scene *self = static_cast<KX_Scene *>(self_v);
+	PyObject *list = PyList_New(0);
+	for (const MotionTake *take = (MotionTake *)self->GetBlenderScene()->motion_takes.first; take; take = take->next) {
+		PyObject *name = PyUnicode_FromString(take->name);
+		PyList_Append(list, name);
+		Py_DECREF(name);
+	}
+	return list;
+}
+
 PyObject *KX_Scene::pyattr_get_active_camera(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_Scene *self = static_cast<KX_Scene *>(self_v);
@@ -4403,6 +4416,7 @@ PyAttributeDef KX_Scene::Attributes[] = {
 	EXP_PYATTRIBUTE_RO_FUNCTION("texts", KX_Scene, pyattr_get_texts),
     EXP_PYATTRIBUTE_RO_FUNCTION("speakers", KX_Scene, pyattr_get_speakers),
 	EXP_PYATTRIBUTE_RO_FUNCTION("cameras", KX_Scene, pyattr_get_cameras),
+	EXP_PYATTRIBUTE_RO_FUNCTION("takes", KX_Scene, pyattr_get_takes),
 	EXP_PYATTRIBUTE_RO_FUNCTION("filterManager", KX_Scene, pyattr_get_filter_manager),
 	EXP_PYATTRIBUTE_RO_FUNCTION("world", KX_Scene, pyattr_get_world),
 	EXP_PYATTRIBUTE_RO_FUNCTION("worldSun", KX_Scene, pyattr_get_world_sun),
@@ -4706,6 +4720,17 @@ EXP_PYMETHODDEF_DOC(KX_Scene, resume,
 	Resume();
 
 	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC(KX_Scene, play_take,
+                    "play_take(name)\n"
+                    "Plays a Rec Play take on all its actors. Returns True when the take exists.\n")
+{
+	const char *name;
+	if (!PyArg_ParseTuple(args, "s:play_take", &name)) {
+		return nullptr;
+	}
+	return PyBool_FromLong(PlayMotionTake(name));
 }
 
 EXP_PYMETHODDEF_DOC(KX_Scene, play_cutscene,

@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fases 9 e 10 (kit de conteúdo e API Python)
+
+- Asset Browser: Actions agora têm miniatura (`bAction.preview`, campo novo no DNA, exige rebuild limpo) renderizada numa pose do meio.
+- Soltar uma Action define `ae_rec_action` no ator sob o cursor. Se o cursor pegar algo que não é ator, como o chão, vale o ator ativo. Soltar um personagem no Rec Studio já o marca como ator e o ativa.
+- As abas Scenery, Characters e Actions são exclusivas (`file.rec_studio_tab`): `filter_id` é conjunto e seus botões somavam filtros.
+- Kit em `release/datafiles/rec_kit`, gerado por `tools/criar_rec_kit.py`: 3 personagens, 6 ações e 4 cenários. O Rec Studio abre nele quando o usuário não tem biblioteca.
+- API: `scene.takes`, `scene.play_take(nome)`, `obj.play_take(nome)`, `obj.stop_take()`, `obj.is_playing_take()`. Referência em [rec-play-api.md](rec-play-api.md).
+- Lógica e física do ator voltam quando o Take acaba ou é interrompido.
+- Testado com mouse real e no Runtime. Pendente: aceite visual do usuário.
+
 ## 2026-11-06 - Rec Play: Fase 7 (Take em DNA, reprodução exata)
 
 - O Take virou DNA da cena (`MotionTake`, com versão), em `scene.ae_rec_takes`. Guarda a pose amostrada de cada ator e os trechos de Action como eventos; o vínculo com o objeto é por ponteiro, então renomear não quebra.

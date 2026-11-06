@@ -51,6 +51,7 @@
 #include "BKE_depsgraph.h"
 #include "BKE_fcurve.h"
 #include "BKE_global.h"
+#include "BKE_icons.h"
 #include "BKE_idprop.h"
 #include "BKE_library.h"
 #include "BKE_library_query.h"
@@ -109,6 +110,8 @@ void BKE_action_free(bAction *act)
 
 	/* Free pose-references (aka local markers) */
 	BLI_freelistN(&act->markers);
+
+	BKE_previewimg_free(&act->preview);
 }
 
 /* .................................. */
@@ -121,7 +124,7 @@ void BKE_action_free(bAction *act)
  *
  * \param flag: Copying options (see BKE_library.h's LIB_ID_COPY_... flags for more).
  */
-void BKE_action_copy_data(Main *UNUSED(bmain), bAction *act_dst, const bAction *act_src, const int UNUSED(flag))
+void BKE_action_copy_data(Main *UNUSED(bmain), bAction *act_dst, const bAction *act_src, const int flag)
 {
 	bActionGroup *grp_dst, *grp_src;
 	FCurve *fcu_dst, *fcu_src;
@@ -155,6 +158,13 @@ void BKE_action_copy_data(Main *UNUSED(bmain), bAction *act_dst, const bAction *
 				break;
 			}
 		}
+	}
+
+	if ((flag & LIB_ID_COPY_NO_PREVIEW) == 0) {
+		BKE_previewimg_id_copy(&act_dst->id, &act_src->id);
+	}
+	else {
+		act_dst->preview = NULL;
 	}
 }
 

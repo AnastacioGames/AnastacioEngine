@@ -35,6 +35,14 @@ em arquivos `.blend` de uma pasta de biblioteca.
 - Ao soltar, os scripts (Texts) do arquivo de origem são copiados para o projeto automaticamente; um nome que já existe no projeto não é copiado nem sobrescrito.
 - Não é possível arrastar assets do próprio arquivo aberto.
 
+### Rec Studio
+
+No Rec Studio, as abas Scenery, Characters e Actions mostram um tipo por vez. Sem biblioteca do usuário, a janela abre no kit `datafiles/rec_kit`.
+
+- Soltar um personagem o marca como ator do Rec Play e o torna ativo.
+- Soltar uma Action a escolhe para o ator sob o cursor. Fora de um ator, ela vai para o ator ativo. A Action é sempre copiada para o arquivo, nunca vinculada.
+- Cada cenário solto traz uma cópia nova do Group (`Park`, `Park.001`).
+
 ### Miniaturas
 
 O botão **Generate Previews**, no painel Asset Libraries, gera as miniaturas de todos os `.blend` da pasta:

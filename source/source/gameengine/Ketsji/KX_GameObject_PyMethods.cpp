@@ -1723,6 +1723,32 @@ EXP_PYMETHODDEF_DOC(KX_GameObject, isPlayingAction,
 	return PyBool_FromLong(!IsActionDone(layer));
 }
 
+EXP_PYMETHODDEF_DOC(KX_GameObject, play_take,
+                    "play_take(name)\n"
+                    "Plays what a Rec Play take recorded of this object. Returns False if it recorded nothing of it.\n")
+{
+	const char *name;
+	if (!PyArg_ParseTuple(args, "s:play_take", &name)) {
+		return nullptr;
+	}
+	return PyBool_FromLong(GetScene()->PlayMotionTakeObject(this, name));
+}
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, stop_take,
+                           "stop_take()\n"
+                           "Stops the take of this object and gives it back to its logic and physics.\n")
+{
+	GetScene()->StopMotionTake(this);
+	Py_RETURN_NONE;
+}
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, is_playing_take,
+                           "is_playing_take()\n"
+                           "Returns True while a Rec Play take moves this object.\n")
+{
+	return PyBool_FromLong(GetScene()->IsMotionTakePlaying(this));
+}
+
 EXP_PYMETHODDEF_DOC(KX_GameObject, playNLA,
                     "playNLA(speed=1.0, loop=True)\n"
                     "Plays the NLA tracks of the armature under its action layers. Returns True when it started.\n"

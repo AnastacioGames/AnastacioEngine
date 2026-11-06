@@ -542,6 +542,8 @@ typedef struct bAction {
 
 	int idroot;         /* type of ID-blocks that action can be assigned to (if 0, will be set to whatever ID first evaluates it) */
 	int pad;
+
+	struct PreviewImage *preview;  /* Thumbnail of the Asset Browser. */
 } bAction;
 
 

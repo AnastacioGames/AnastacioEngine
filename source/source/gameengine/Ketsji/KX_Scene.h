@@ -803,7 +803,12 @@ public:
 	bool SkipCutscene();
 	bool RestartCutscene();
 	/// Rec Play: plays the Actions of a take on its actors, keeping them where it ends.
-	void PlayMotionTake(const std::string& name);
+	bool PlayMotionTake(const std::string& name);
+	/// Rec Play: plays only what the take recorded of this object. False if it has nothing.
+	bool PlayMotionTakeObject(KX_GameObject *gameobj, const std::string& name);
+	/// Rec Play: gives the object back to its logic and physics, where it stands.
+	void StopMotionTake(KX_GameObject *gameobj);
+	bool IsMotionTakePlaying(KX_GameObject *gameobj) const;
 	/// Rec Play: each actor that is not being recorded repeats its newest take.
 	void PlayMotionTakeLayers();
 	void PlayMotionTakeActor(KX_GameObject *gameobj, const struct MotionTakeActor *actor, float start, float end, bool ghost);
@@ -870,6 +875,7 @@ public:
 	EXP_PYMETHOD_DOC(KX_Scene, suspend);
 	EXP_PYMETHOD_DOC(KX_Scene, resume);
 	EXP_PYMETHOD_DOC(KX_Scene, play_cutscene);
+	EXP_PYMETHOD_DOC(KX_Scene, play_take);
 	EXP_PYMETHOD_DOC(KX_Scene, release_cutscene_trigger);
 	EXP_PYMETHOD_DOC(KX_Scene, stop_cutscene);
 	EXP_PYMETHOD_DOC(KX_Scene, skip_cutscene);
@@ -887,6 +893,7 @@ public:
 	static PyObject *pyattr_get_texts(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_speakers(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_cameras(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
+	static PyObject *pyattr_get_takes(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_filter_manager(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_world(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static PyObject *pyattr_get_world_sun(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

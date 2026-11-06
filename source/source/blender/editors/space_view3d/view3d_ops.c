@@ -241,7 +241,7 @@ bool view3d_asset_drop_path_parse(const char *path, char *r_libpath, short *r_id
 	}
 
 	idcode = BKE_idcode_from_name(group);
-	if (!ELEM(idcode, ID_OB, ID_GR, ID_MA)) {
+	if (!ELEM(idcode, ID_OB, ID_GR, ID_MA, ID_AC)) {
 		return false;
 	}
 
@@ -377,12 +377,12 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 	GSet *existing;
 	ID *id;
 	short idcode;
-	bool link, has_mouse;
+	bool link, has_mouse, rec_actor;
 	int result;
 
 	RNA_string_get(op->ptr, "filepath", path);
 	if (!view3d_asset_drop_path_parse(path, libpath, &idcode, name)) {
-		BKE_reportf(op->reports, RPT_ERROR, "'%s' is not an object, group or material inside a .blend or .range", path);
+		BKE_reportf(op->reports, RPT_ERROR, "'%s' is not an object, group, material or action inside a .blend or .range", path);
 		return OPERATOR_CANCELLED;
 	}
 	if (BLI_path_cmp(BKE_main_blendfile_path(bmain), libpath) == 0) {
@@ -420,6 +420,32 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 		}
 	}
 
+	if (idcode == ID_AC) {
+		/* The character keeps only the name of its Action, so a linked one would not survive saving. */
+		link = false;
+		target = has_mouse ? ED_view3d_give_base_under_cursor(C, mval) : NULL;
+		if (target) {
+			/* A drop that just misses the character lands on the floor: it means the active one. */
+			Object *root = target->object;
+			PointerRNA root_ptr;
+
+			while (root->parent) {
+				root = root->parent;
+			}
+			RNA_id_pointer_create(&root->id, &root_ptr);
+			if (!RNA_boolean_get(&root_ptr, "ae_rec_actor")) {
+				target = NULL;
+			}
+		}
+		if (target == NULL) {
+			target = BASACT;
+		}
+		if (target == NULL) {
+			BKE_report(op->reports, RPT_ERROR, "Drop the action on a character");
+			return OPERATOR_CANCELLED;
+		}
+	}
+
 	append_ot = WM_operatortype_find(link ? "WM_OT_link" : "WM_OT_append", false);
 	if (append_ot == NULL) {
 		return OPERATOR_CANCELLED;
@@ -445,7 +471,7 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 	WM_operator_properties_create_ptr(&props, append_ot);
 	RNA_string_set(&props, "directory", directory);
 	RNA_string_set(&props, "filename", name);
-	RNA_boolean_set(&props, "autoselect", idcode != ID_MA);
+	RNA_boolean_set(&props, "autoselect", !ELEM(idcode, ID_MA, ID_AC));
 	RNA_boolean_set(&props, "active_layer", true);
 	RNA_boolean_set(&props, "instance_groups", idcode == ID_GR);
 	result = WM_operator_name_call_ptr(C, append_ot, WM_OP_EXEC_DEFAULT, &props);
@@ -469,6 +495,19 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 		DAG_id_tag_update(&target->object->id, OB_RECALC_OB);
 		WM_event_add_notifier(C, NC_OBJECT | ND_OB_SHADING, target->object);
 		WM_event_add_notifier(C, NC_MATERIAL | ND_SHADING_LINKS, id);
+	}
+	else if (idcode == ID_AC) {
+		/* The quick control reads it from the actor: the top of the hierarchy. */
+		Object *actor = target->object;
+		PointerRNA actor_ptr;
+
+		while (actor->parent) {
+			actor = actor->parent;
+		}
+		id_fake_user_set(id);
+		RNA_id_pointer_create(&actor->id, &actor_ptr);
+		RNA_string_set(&actor_ptr, "ae_rec_action", id->name + 2);
+		WM_event_add_notifier(C, NC_OBJECT | ND_DRAW, actor);
 	}
 	else {
 		/* Append/link selected exactly what arrived: for a Group that is the
@@ -514,6 +553,20 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 			ref = ref->parent;
 		}
 
+		/* A character dropped in the Rec Studio is ready to record. */
+		rec_actor = idcode == ID_OB && !link && ED_screen_is_rec_studio(CTX_wm_screen(C));
+		if (rec_actor) {
+			PointerRNA actor_ptr;
+			RNA_id_pointer_create(&ref->id, &actor_ptr);
+			RNA_boolean_set(&actor_ptr, "ae_rec_actor", true);
+			/* The dot only hides it from the Asset Browser. */
+			if (ref->id.name[2] == '.') {
+				char actor_name[MAX_ID_NAME - 2];
+				BLI_strncpy(actor_name, ref->id.name + 3, sizeof(actor_name));
+				BKE_libblock_rename(bmain, &ref->id, actor_name);
+			}
+		}
+
 		ED_object_location_from_view(C, loc);
 		if (has_mouse) {
 			ED_view3d_cursor3d_position(C, mval, loc);
@@ -531,7 +584,7 @@ static int view3d_asset_drop_exec(bContext *C, wmOperator *op)
 		}
 
 		DAG_relations_tag_update(bmain);
-		base = BKE_scene_base_find(scene, (idcode == ID_GR) ? ref : (Object *)id);
+		base = BKE_scene_base_find(scene, (idcode == ID_GR || rec_actor) ? ref : (Object *)id);
 		if (base) {
 			ED_base_object_activate(C, base);
 		}
@@ -560,7 +613,8 @@ static void VIEW3D_OT_asset_drop(wmOperatorType *ot)
 	ot->name = "Drop Asset";
 	ot->idname = "VIEW3D_OT_asset_drop";
 	ot->description = "Append (or link with Ctrl) an object, group or material dragged from a .blend "
-	                  "and place it where it was dropped; a linked object comes as a Group instance";
+	                  "and place it where it was dropped; a linked object comes as a Group instance. "
+	                  "An action becomes the Rec Play action of the character it lands on";
 	ot->exec = view3d_asset_drop_exec;
 	ot->poll = ED_operator_objectmode;
 

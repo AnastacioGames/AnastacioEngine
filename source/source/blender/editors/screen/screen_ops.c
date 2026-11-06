@@ -48,6 +48,7 @@
 #include "DNA_space_types.h"
 #include "DNA_view3d_types.h"
 
+#include "BKE_appdir.h"
 #include "BKE_context.h"
 #include "BKE_customdata.h"
 #include "BKE_fcurve.h"
@@ -4438,6 +4439,16 @@ static int rec_studio_show_invoke(bContext *C, wmOperator *op, const wmEvent *UN
 	ED_screen_refresh(wm, newwin);
 
 	ED_fileselect_set_browse_mode(C, sa_assets, FILE_BROWSE_MODE_ASSETS);
+	{
+		/* Start on one tab; without a library of the user, the kit that comes with the engine. */
+		FileSelectParams *params = ED_fileselect_get_params(sa_assets->spacedata.first);
+		const char *kit = BKE_appdir_folder_id(BLENDER_DATAFILES, "rec_kit");
+
+		params->filter_id = FILTER_ID_GR;
+		if (kit && ED_fileselect_asset_library_active_index(params->dir) == -1) {
+			BLI_strncpy(params->dir, kit, sizeof(params->dir));
+		}
+	}
 	rec_studio_region_show(C, sa_assets, RGN_TYPE_TOOLS, false);
 	rec_studio_region_show(C, sa_assets, RGN_TYPE_UI, false);
 

@@ -844,6 +844,8 @@ static void write_action(WriteData *wd, bAction *act)
 		for (TimeMarker *marker = act->markers.first; marker; marker = marker->next) {
 			writestruct(wd, DATA, TimeMarker, 1, marker);
 		}
+
+		write_previews(wd, act->preview);
 	}
 }
 

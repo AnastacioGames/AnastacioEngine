@@ -18,13 +18,30 @@
 
 # <pep8 compliant>
 import bpy
-from bpy.types import Header, Panel, Menu, UIList
+from bpy.props import EnumProperty
+from bpy.types import Header, Operator, Panel, Menu, UIList
 
 
 def _is_asset_browser(space):
     # A file selector opened from the Asset Browser reuses its area, so it is a
     # regular file selector (drives, bookmarks...) while an operator is active.
     return space.browse_mode == 'ASSETS' and space.active_operator is None
+
+
+class FILEBROWSER_OT_rec_studio_tab(Operator):
+    """Show only this kind of item in the Rec Studio library"""
+    bl_idname = "file.rec_studio_tab"
+    bl_label = "Rec Studio Tab"
+    bl_options = {'INTERNAL'}
+
+    tab = EnumProperty(items=(('GROUP', "Scenery", ""),
+                              ('OBJECT', "Characters", ""),
+                              ('ACTION', "Actions", "")))
+
+    def execute(self, context):
+        # filter_id is a set: its buttons toggle, but a tab must replace the others.
+        context.space_data.params.filter_id = {self.tab}
+        return {'FINISHED'}
 
 
 class FILEBROWSER_HT_header(Header):
@@ -108,9 +125,11 @@ class FILEBROWSER_HT_header(Header):
             if params:
                 row = layout.row(align=True)
                 row.scale_x = 1.5
-                row.prop_enum(params, "filter_id", 'GROUP', text="Scenery")
-                row.prop_enum(params, "filter_id", 'OBJECT', text="Characters")
-                row.prop_enum(params, "filter_id", 'ACTION', text="Actions")
+                for tab, text, icon in (('GROUP', "Scenery", 'GROUP'),
+                                        ('OBJECT', "Characters", 'OBJECT_DATA'),
+                                        ('ACTION', "Actions", 'ACTION')):
+                    row.operator("file.rec_studio_tab", text=text, icon=icon,
+                                 depress=params.filter_id == {tab}).tab = tab
                 layout.prop(params, "filter_search", text="", icon='VIEWZOOM')
             return
 
@@ -389,6 +408,7 @@ class FILEBROWSER_MT_view(Menu):
 
 
 classes = (
+    FILEBROWSER_OT_rec_studio_tab,
     FILEBROWSER_HT_header,
     FILEBROWSER_UL_dir,
     FILEBROWSER_PT_bookmarks_volumes,

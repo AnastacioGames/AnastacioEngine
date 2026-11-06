@@ -18,6 +18,16 @@ def fim_do_jogo(scene):
            [(t.name, round(t.duration, 2), [a.object_name for a in t.actors]) for t in scene.ae_rec_takes]))
 
 
+def vigia(scene):
+    # Relata cada mudanca de atores, acoes e takes feita pelos arrastes e botoes reais.
+    atual = ([(o.name, o.ae_rec_action) for o in scene.objects
+              if getattr(o, 'ae_rec_actor', False)], sorted(g.name for g in bpy.data.groups), sorted(o.name for o in scene.objects),
+             [t.name for t in scene.ae_rec_takes])
+    if atual != state.get('visto'):
+        state['visto'] = atual
+        report('estado: atores %s grupos %s objetos %s takes %s' % atual)
+
+
 def run(scene):
     state['updates'] += 1
     if state['done'] or state['updates'] < 3:
@@ -29,6 +39,7 @@ def run(scene):
     bpy.app.handlers.game_post.append(fim_do_jogo)
     keymap = bpy.context.window_manager.keyconfigs.active.keymaps['Window']
     keymap.keymap_items.new('screen.rec_studio_show', 'F9', 'PRESS')
+    bpy.app.handlers.scene_update_post.append(vigia)
     report('PRONTO')
 
 

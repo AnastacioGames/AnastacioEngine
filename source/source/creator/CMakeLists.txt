@@ -539,6 +539,12 @@ install(
 	DESTINATION ${TARGETDIR_VER}/datafiles
 )
 
+# Starter kit of the Rec Studio (characters, actions and scenery, see tools/criar_rec_kit.py)
+install(
+	DIRECTORY ${CMAKE_SOURCE_DIR}/release/datafiles/rec_kit
+	DESTINATION ${TARGETDIR_VER}/datafiles
+)
+
 # game controller data base
 if(WITH_GAMEENGINE AND WITH_SDL)
 	install(

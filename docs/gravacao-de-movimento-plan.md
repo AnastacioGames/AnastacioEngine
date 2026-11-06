@@ -125,7 +125,7 @@ Feito em 2026-11-06 (`SCREEN_OT_rec_studio_show`, painel `VIEW3D_PT_rec_studio`)
 
 - Não há botão Parar: o editor fica parado durante o jogo, então F10 para.
 - A linha do tempo está no painel lateral: uma faixa por personagem, com o último Take dele.
-- A aba Actions já filtra, mas as bibliotecas só ganham conteúdo na Fase 9. A barra de caminho continua visível.
+- A barra de caminho continua visível. O conteúdo inicial vem do kit `rec_kit` (Fase 9).
 - Teste: `tools/debug/editor_rec_studio.py` abre por tecla e clica de verdade. Abrir por script com contexto
   falso cria as sub-regiões na janela errada e a área de baixo não desenha.
 
@@ -217,8 +217,8 @@ A Fase 7 trouxe o DNA do Take (`MotionTake`). O recurso fica marcado como Experi
 6. Filme pelo Screencast, ligado no Assistir.
 7. Take em DNA versionado, com eventos e reprodução exata.
 8. Janela Rec Studio.
-9. Asset Browser: Actions, miniaturas, soltar ação/personagem, kit de conteúdo.
-10. API Python.
+9. Asset Browser: Actions, miniaturas, soltar ação/personagem, kit de conteúdo. Feito em 2026-11-06, falta aceite visual.
+10. API Python. Feito em 2026-11-06, ver [rec-play-api.md](rec-play-api.md).
 
 Uma fase por vez, com build no Windows e teste do usuário antes da próxima.
 

@@ -694,7 +694,7 @@ static void view3d_obj_drop_copy(wmDrag *drag, wmDropBox *drop)
 	RNA_string_set(drop->ptr, "filepath", drag->path);
 }
 
-/* Object, Group or Material dragged from inside a .blend in the File Browser. */
+/* Object, Group, Material or Action dragged from inside a .blend in the File Browser. */
 static bool view3d_asset_drop_poll(bContext *C, wmDrag *drag, const wmEvent *UNUSED(event))
 {
 	return drag->type == WM_DRAG_PATH && ED_operator_objectmode(C) &&

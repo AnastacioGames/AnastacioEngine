@@ -1275,6 +1275,9 @@ public:
 	EXP_PYMETHOD_DOC(KX_GameObject, setActionFrame);
 	EXP_PYMETHOD_DOC(KX_GameObject, isPlayingAction);
 	EXP_PYMETHOD_DOC(KX_GameObject, playNLA);
+	EXP_PYMETHOD_DOC(KX_GameObject, play_take);
+	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, stop_take);
+	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, is_playing_take);
 	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, stopNLA);
 	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, isPlayingNLA);
 	EXP_PYMETHOD_DOC_NOARGS(KX_GameObject, getNLAFrame);

@@ -717,6 +717,21 @@ static float MotionTakeEnd(Scene *scene, const MotionTake *take)
 	return (float)scene->r.sfra + take->duration * ((float)scene->r.frs_sec / scene->r.frs_sec_base);
 }
 
+/* Hands the object back to its own logic and physics, the opposite of PlayMotionTakeActor. */
+static void EndMotionHold(KX_GameObject *gameobj, PHY_IPhysicsEnvironment *environment)
+{
+	gameobj->EndMotionReplay();
+	if (!gameobj->GetPhysicsController()) {
+		return;
+	}
+	if (environment->GetCharacterController(gameobj)) {
+		gameobj->RestorePhysics();
+	}
+	else {
+		gameobj->GetPhysicsController()->RestoreDynamics();
+	}
+}
+
 /* Sets the pose of the replay's time and starts the clips it reached. */
 static void ApplyMotionReplay(KX_Scene::MotionReplay& replay)
 {
@@ -751,7 +766,7 @@ void KX_Scene::UpdateMotionReplays(double step)
 		const MotionTakeActor *actor = replay.m_actor;
 		if (replay.m_time >= actor->samples[(actor->samples_num - 1) * MOTION_TAKE_SAMPLE_FLOATS]) {
 			if (replay.m_endsLogicHold) {
-				replay.m_object->EndMotionReplay();
+				EndMotionHold(replay.m_object, m_physicsEnvironment);
 			}
 			m_motionReplays.erase(m_motionReplays.begin() + i);
 		}
@@ -825,7 +840,7 @@ void KX_Scene::PlayMotionTakeLayers()
 	}
 }
 
-void KX_Scene::PlayMotionTake(const std::string& name)
+bool KX_Scene::PlayMotionTake(const std::string& name)
 {
 	Scene *scene = GetBlenderScene();
 	for (const MotionTake *take = (MotionTake *)scene->motion_takes.first; take; take = take->next) {
@@ -842,9 +857,46 @@ void KX_Scene::PlayMotionTake(const std::string& name)
 			}
 			PlayMotionTakeActor(gameobj, actor, start, end, false);
 		}
-		return;
+		return true;
 	}
 	CM_Error("Play Take: no take named '" << name << "'");
+	return false;
+}
+
+bool KX_Scene::PlayMotionTakeObject(KX_GameObject *gameobj, const std::string& name)
+{
+	Scene *scene = GetBlenderScene();
+	for (const MotionTake *take = (MotionTake *)scene->motion_takes.first; take; take = take->next) {
+		if (name != take->name) {
+			continue;
+		}
+		for (const MotionTakeActor *actor = (MotionTakeActor *)take->actors.first; actor; actor = actor->next) {
+			if (actor->ob == gameobj->GetBlenderObject()) {
+				PlayMotionTakeActor(gameobj, actor, (float)scene->r.sfra, MotionTakeEnd(scene, take), false);
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
+void KX_Scene::StopMotionTake(KX_GameObject *gameobj)
+{
+	for (const MotionReplay& replay : m_motionReplays) {
+		if (replay.m_object == gameobj) {
+			if (replay.m_endsLogicHold) {
+				EndMotionHold(gameobj, m_physicsEnvironment);
+			}
+			break;
+		}
+	}
+	RemoveMotionReplay(gameobj);
+}
+
+bool KX_Scene::IsMotionTakePlaying(KX_GameObject *gameobj) const
+{
+	return std::any_of(m_motionReplays.begin(), m_motionReplays.end(),
+	                   [gameobj](const MotionReplay& replay) { return replay.m_object == gameobj; });
 }
 
 void KX_Scene::DispatchCutsceneEvents()

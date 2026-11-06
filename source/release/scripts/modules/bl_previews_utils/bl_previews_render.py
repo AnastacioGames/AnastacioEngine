@@ -429,6 +429,53 @@ def do_previews(do_objects, do_groups, do_scenes, do_data_intern):
             scene = bpy.data.scenes[render_context.scene, None]
             scene.objects.unlink(bpy.data.objects[grp_obname, None])
 
+    if do_objects:
+        # The character that can play the Action, in the pose of its middle frame.
+        for act in ids_nolib(bpy.data.actions):
+            bones = {fc.data_path.split('"')[1] for fc in act.fcurves if fc.data_path.startswith('pose.bones[')}
+            rig = None
+            for ob in ids_nolib(bpy.data.objects):
+                if bones and ob.type == 'ARMATURE' and bones <= set(ob.data.bones.keys()):
+                    rig = ob
+                    break
+            parts = [ob for ob in rig.children if ob.type in OBJECT_TYPES_RENDER] if rig else ()
+            if not parts:
+                continue
+            objects = tuple((ob.name, None) for ob in parts)
+
+            render_engine = objects_render_engine_guess(objects)
+            render_context = render_contexts.get(render_engine, None)
+            if render_context is None:
+                render_context = render_context_create(render_engine, objects_ignored)
+                render_contexts[render_engine] = render_context
+
+            scene = bpy.data.scenes[render_context.scene, None]
+            bpy.context.screen.scene = scene
+            linked = [ob for ob in [rig] + list(parts) if ob.name not in scene.objects]
+            for ob in linked:
+                scene.objects.link(ob)
+            shown = {ob.name: ob.hide_render for ob in parts}
+            for ob in parts:
+                ob.hide_render = False
+            had_animation = rig.animation_data is not None
+            old_action = rig.animation_data.action if had_animation else None
+            old_frame = scene.frame_current
+            rig.animation_data_create().action = act
+            scene.frame_set(int(sum(act.frame_range) / 2))
+
+            preview_render_do(render_context, 'actions', act.name, objects)
+
+            scene = bpy.data.scenes[render_context.scene, None]
+            scene.frame_set(old_frame)
+            if had_animation:
+                rig.animation_data.action = old_action
+            else:
+                rig.animation_data_clear()
+            for ob in parts:
+                ob.hide_render = shown[ob.name]
+            for ob in linked:
+                scene.objects.unlink(ob)
+
     bpy.context.screen.scene = bpy.data.scenes[prev_scenename, None]
     for render_context in render_contexts.values():
         if not render_context_delete(render_context):
@@ -472,6 +519,8 @@ def do_clear_previews(do_objects, do_groups, do_scenes, do_data_intern):
     if do_objects:
         for ob in ids_nolib(bpy.data.objects):
             ob.preview.image_size = (0, 0)
+        for act in ids_nolib(bpy.data.actions):
+            act.preview.image_size = (0, 0)
 
     if do_groups:
         for grp in ids_nolib(bpy.data.groups):
