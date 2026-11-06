@@ -179,6 +179,8 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 			// the scenegraph pass below publishes the light transform for rendering.
 			scene->UpdateAutoWorldSun();
 
+			scene->UpdateMotionReplays(m_engine->GetFrameStep());
+
 			m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_scenegraph_physics);
 			scene->UpdateParents();
 

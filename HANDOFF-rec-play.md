@@ -13,7 +13,8 @@ Regras de build: [AGENTS.md](AGENTS.md).
 - Fase 4 (WASD, contagem, REC piscando): feita, testada com teclas reais, sem aceite visual da contagem.
 - Fase 5 (camadas, Watch, Rerecord): feita, testada com teclas reais, sem clique real nos botões.
 - Fase 6 (Movie pelo Screencast): feita, vídeo gerado e conferido por ffprobe, imagem ainda não vista.
-- Próxima: Fase 7 (DNA versionado: pede `ninja -t clean` e rebuild completo).
+- Fase 7 (Take em DNA, reprodução exata): feita e medida com `editor_rec_exato.py`. Pose por osso só reservada no formato (`bones`, `bone_names`); falta capturar.
+- Próxima: Fase 8 (Rec Studio).
 
 ## Como testar
 
@@ -31,6 +32,9 @@ O script usa a 3D View em tela cheia e desfaz por timer: contexto forçado no re
 
 Teclas reais: defina `REC_RES`, `REC_LOG` e `REC_PY` (python do sistema), gere `criar_cena_rec_wasd.py` e abra com
 `--python tools/debug/editor_rec_wasd.py`. Só aperta com a janela do editor em foco.
+
+Exatidão: gere `criar_cena_rec_exato.py` e abra com `--python tools/debug/editor_rec_exato.py` (`REC_RES`, `REC_LOG`). Arquivo e
+migração: `-b salvo.range --python tools/debug/editor_rec_take_arquivo.py -- relatorio.txt antigo.range`.
 
 ## Falta conferir à mão
 

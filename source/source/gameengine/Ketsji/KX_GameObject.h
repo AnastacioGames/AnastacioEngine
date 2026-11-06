@@ -962,6 +962,8 @@ public:
 	void UpdateActivity(float distance);
 	/// Rec Play: the object follows a take, so its logic stays off and activity culling leaves it alone.
 	void SetMotionReplay();
+	void EndMotionReplay();
+	bool IsMotionReplay() const { return m_motionReplay; }
 
 	const std::vector<KX_Mesh *>& GetMeshList() const;
 

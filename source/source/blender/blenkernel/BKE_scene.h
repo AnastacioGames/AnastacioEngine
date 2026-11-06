@@ -124,6 +124,13 @@ struct CutsceneSettings *BKE_cutscene_settings_new(void);
 struct CutsceneSettings *BKE_cutscene_settings_copy(const struct CutsceneSettings *settings);
 void BKE_cutscene_settings_free(struct CutsceneSettings *settings);
 
+void BKE_motion_take_free(struct MotionTake *take);
+void BKE_motion_takes_free(struct ListBase *takes);
+void BKE_motion_takes_copy(struct ListBase *dst, const struct ListBase *src);
+/* Pose at a time. index: where the search starts, kept between calls since time moves forward. */
+void BKE_motion_take_pose(const struct MotionTakeActor *actor, float t, int *index,
+                          float r_loc[3], float r_quat[4], float r_scale[3]);
+
 void BKE_scene_copy_data(struct Main *bmain, struct Scene *sce_dst, const struct Scene *sce_src, const int flag);
 struct Scene *BKE_scene_copy(struct Main *bmain, struct Scene *sce, int type);
 void BKE_scene_groups_relink(struct Scene *sce);

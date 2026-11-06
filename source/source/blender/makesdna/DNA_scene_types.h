@@ -1879,6 +1879,40 @@ typedef struct DisplaySafeAreas {
 } DisplaySafeAreas;
 
 /* *************************************************************** */
+/* Rec Play takes */
+
+#define MOTION_TAKE_VERSION 1
+#define MOTION_TAKE_SAMPLE_FLOATS 11  /* Time, location[3], quaternion[4], scale[3]. */
+
+/* A stretch of an Action seen playing on an armature. */
+typedef struct MotionTakeClip {
+	char action[64];
+	int layer;
+	float t_start, t_end;
+	float frame_start, frame_end;
+	int pad;
+} MotionTakeClip;
+
+typedef struct MotionTakeActor {
+	struct MotionTakeActor *next, *prev;
+	struct Object *ob;
+	float *samples;  /* samples_num * MOTION_TAKE_SAMPLE_FLOATS, in the space of the parent if there is one. */
+	struct MotionTakeClip *clips;
+	float *bones;  /* Reserved for the pose per bone: samples_num * bones_num * 10 floats. */
+	char *bone_names;  /* Reserved: bones_num * 64 chars. */
+	char action_name[64];
+	char track_prefix[32];
+	int samples_num, clips_num, bones_num, flag;
+} MotionTakeActor;
+
+typedef struct MotionTake {
+	struct MotionTake *next, *prev;
+	ListBase actors;
+	char name[64];
+	float duration;
+	int version;
+} MotionTake;
+
 /* Cutscene */
 
 typedef enum CutsceneEventType {
@@ -2054,6 +2088,8 @@ typedef struct Scene {
 
 	/* User names for the 20 scene layers (empty = unnamed). */
 	char layer_names[20][64];
+
+	ListBase motion_takes;  /* Rec Play recordings, MotionTake. */
 } Scene;
 
 /* **************** RENDERDATA ********************* */

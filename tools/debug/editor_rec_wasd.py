@@ -95,6 +95,25 @@ def run(scene):
         video = bpy.context.window_manager.screencast_filepath
         report('video: %s %d bytes' % (video, os.path.getsize(video)))
         jogo('Movie')
+
+        # Fase 7: o Take guarda as amostras, segue o objeto renomeado e vive sem keyframes.
+        report('amostras: %s' % [(t.name, t.version, [(a.object_name, a.samples_num, a.clips_num) for a in t.actors])
+                                 for t in scene.ae_rec_takes])
+        bpy.data.objects['Andador'].name = 'AndadorX'
+        takes(scene)
+        report('watch renomeado: %s' % bpy.ops.view3d.game_record(override, watch=True))
+        jogo('Watch renomeado')
+        bpy.data.objects['AndadorX'].name = 'Andador'
+        scene.ae_rec_make_keyframes = False
+        marcar(scene, 'Personagem')
+        apertar('espera:1.8', 'W:0.5', 'espera:0.3', 'F10:0.2')
+        report('rec sem keyframes: %s' % bpy.ops.view3d.game_record(override))
+        takes(scene)
+        jogo('Sem keyframes')
+        report('watch sem keyframes: %s' % bpy.ops.view3d.game_record(override, watch=True))
+        jogo('Watch sem keyframes')
+        if os.environ.get('REC_SAVE'):
+            bpy.ops.wm.save_as_mainfile(override, filepath=os.environ['REC_SAVE'], copy=True)
     except Exception:
         report('ERRO\n' + traceback.format_exc())
     report('FIM')

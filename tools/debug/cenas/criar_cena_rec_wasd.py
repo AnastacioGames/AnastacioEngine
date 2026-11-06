@@ -82,7 +82,7 @@ def tick(cont):
     # REC_LOG: posicao real de cada ator durante o jogo, uma linha por passo.
     cena = cont.owner.scene
     with open(os.environ['REC_LOG'], 'a') as f:
-        f.write(' '.join('%.3f,%.3f' % tuple(cena.objects[n].worldPosition)[:2] for n in ('Andador', 'Personagem')) + chr(10))
+        f.write(' '.join('%.3f,%.3f' % tuple((cena.objects.get(n) or cena.objects[n + 'X']).worldPosition)[:2] for n in ('Andador', 'Personagem')) + chr(10))
 ''')
 bpy.ops.logic.sensor_add(type='ALWAYS', object=queda.name)
 bpy.ops.logic.controller_add(type='PYTHON', object=queda.name)

@@ -2682,6 +2682,24 @@ static void write_scene(WriteData *wd, Scene *sce)
 			writelist(wd, DATA, CutsceneEvent, &sequence->events);
 		}
 	}
+	writelist(wd, DATA, MotionTake, &sce->motion_takes);
+	for (MotionTake *take = sce->motion_takes.first; take; take = take->next) {
+		writelist(wd, DATA, MotionTakeActor, &take->actors);
+		for (MotionTakeActor *actor = take->actors.first; actor; actor = actor->next) {
+			if (actor->samples) {
+				writedata(wd, DATA, sizeof(float) * MOTION_TAKE_SAMPLE_FLOATS * actor->samples_num, actor->samples);
+			}
+			if (actor->clips) {
+				writestruct(wd, DATA, MotionTakeClip, actor->clips_num, actor->clips);
+			}
+			if (actor->bones) {
+				writedata(wd, DATA, sizeof(float) * 10 * actor->samples_num * actor->bones_num, actor->bones);
+			}
+			if (actor->bone_names) {
+				writedata(wd, DATA, 64 * actor->bones_num, actor->bone_names);
+			}
+		}
+	}
 	if (tos->vpaint) {
 		writestruct(wd, DATA, VPaint, 1, tos->vpaint);
 		write_paint(wd, &tos->vpaint->paint);

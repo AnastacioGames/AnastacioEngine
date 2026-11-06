@@ -622,6 +622,29 @@ static void rna_SpaceImageEditor_uv_sculpt_update(Main *bmain, Scene *scene, Poi
 	ED_space_image_uv_sculpt_update(bmain, bmain->wm.first, scene);
 }
 
+static void rna_MotionTakeActor_object_name_get(PointerRNA *ptr, char *value)
+{
+	const MotionTakeActor *actor = ptr->data;
+	strcpy(value, actor->ob ? actor->ob->id.name + 2 : "");
+}
+
+static int rna_MotionTakeActor_object_name_length(PointerRNA *ptr)
+{
+	const MotionTakeActor *actor = ptr->data;
+	return actor->ob ? strlen(actor->ob->id.name + 2) : 0;
+}
+
+static void rna_Scene_motion_take_remove(Scene *scene, ReportList *reports, int index)
+{
+	MotionTake *take = BLI_findlink(&scene->motion_takes, index);
+	if (!take) {
+		BKE_report(reports, RPT_ERROR, "No take at this index");
+		return;
+	}
+	BLI_remlink(&scene->motion_takes, take);
+	BKE_motion_take_free(take);
+}
+
 static int rna_Scene_object_bases_lookup_string(PointerRNA *ptr, const char *key, PointerRNA *r_ptr)
 {
 	Scene *scene = (Scene *)ptr->data;
@@ -8179,6 +8202,84 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 }
 
+static void rna_def_motion_take_actor(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "MotionTakeActor", NULL);
+	RNA_def_struct_ui_text(srna, "Take Actor", "What one object did in a Rec Play take");
+
+	prop = RNA_def_property(srna, "object", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "Object");
+	RNA_def_property_pointer_sdna(prop, NULL, "ob");
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Object", "");
+
+	prop = RNA_def_property(srna, "object_name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, "rna_MotionTakeActor_object_name_get",
+	                              "rna_MotionTakeActor_object_name_length", NULL);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Object Name", "");
+
+	prop = RNA_def_property(srna, "action_name", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Action", "Editable copy of the movement, when keyframes were generated");
+
+	prop = RNA_def_property(srna, "track_prefix", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "NLA Tracks", "Start of the names of its NLA tracks, on armatures");
+
+	prop = RNA_def_property(srna, "samples_num", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Samples", "Recorded poses, played back exactly");
+
+	prop = RNA_def_property(srna, "clips_num", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Clips", "Stretches of Actions seen playing");
+}
+
+static void rna_def_motion_take(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "MotionTake", NULL);
+	RNA_def_struct_ui_text(srna, "Take", "One Rec Play recording");
+
+	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Name", "");
+	RNA_def_struct_name_property(srna, prop);
+
+	prop = RNA_def_property(srna, "duration", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Duration", "Seconds");
+
+	prop = RNA_def_property(srna, "version", PROP_INT, PROP_UNSIGNED);
+	RNA_def_property_clear_flag(prop, PROP_EDITABLE);
+	RNA_def_property_ui_text(prop, "Version", "Format of the recording");
+
+	prop = RNA_def_property(srna, "actors", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_struct_type(prop, "MotionTakeActor");
+	RNA_def_property_ui_text(prop, "Actors", "");
+}
+
+static void rna_def_motion_takes(BlenderRNA *brna, PropertyRNA *cprop)
+{
+	StructRNA *srna;
+	FunctionRNA *func;
+	PropertyRNA *parm;
+
+	RNA_def_property_srna(cprop, "MotionTakes");
+	srna = RNA_def_struct(brna, "MotionTakes", NULL);
+	RNA_def_struct_sdna(srna, "Scene");
+	RNA_def_struct_ui_text(srna, "Takes", "Rec Play recordings of the scene");
+
+	func = RNA_def_function(srna, "remove", "rna_Scene_motion_take_remove");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	RNA_def_function_ui_description(func, "Delete a take, the Actions it made stay");
+	parm = RNA_def_int(func, "index", 0, 0, INT_MAX, "Index", "", 0, INT_MAX);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+}
+
 static void rna_def_cutscene_settings(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -8606,6 +8707,12 @@ void RNA_def_scene(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "CutsceneSettings");
 	RNA_def_property_ui_text(prop, "Cutscene Settings", "Cutscene data stored in this scene");
 
+	prop = RNA_def_property(srna, "ae_rec_takes", PROP_COLLECTION, PROP_NONE);
+	RNA_def_property_collection_sdna(prop, NULL, "motion_takes", NULL);
+	RNA_def_property_struct_type(prop, "MotionTake");
+	RNA_def_property_ui_text(prop, "Takes", "Rec Play recordings of this scene");
+	rna_def_motion_takes(brna, prop);
+
 	/* Unit Settings */
 	prop = RNA_def_property(srna, "unit_settings", PROP_POINTER, PROP_NONE);
 	RNA_def_property_flag(prop, PROP_NEVER_NULL);
@@ -8772,6 +8879,8 @@ void RNA_def_scene(BlenderRNA *brna)
 	/* *** Non-Animated *** */
 	RNA_define_animate_sdna(false);
 	rna_def_tool_settings(brna);
+	rna_def_motion_take_actor(brna);
+	rna_def_motion_take(brna);
 	rna_def_cutscene_settings(brna);
 	rna_def_cutscene_sequence(brna);
 	rna_def_cutscene_event(brna);

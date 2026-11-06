@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 7 (Take em DNA, reprodução exata)
+
+- O Take virou DNA da cena (`MotionTake`, com versão), em `scene.ae_rec_takes`. Guarda a pose amostrada de cada ator e os trechos de Action como eventos; o vínculo com o objeto é por ponteiro, então renomear não quebra.
+- Repetição e Play Take seguem as amostras: distância até a trajetória gravada de 0,00001 m, incluindo filho. As amostras ficam no espaço do nó de `parentinv` que o conversor cria.
+- Generate Keyframes desligado agora cria Take, sem Action. Takes antigos (propriedades da cena) migram ao abrir e repetem pela Action.
+- No Play Take o ator fica sem lógica enquanto repete e a recupera no fim. Pose por osso: formato reservado, captura ainda não feita, então IK e scripts em ossos não são gravados.
+
 ## 2026-11-06 - Rec Play: Fase 6 (filme)
 
 - Botão **Movie** toca os Takes como o Watch e salva a área do jogo em vídeo, com som, pelo Screencast, na pasta do arquivo. O Watch não mostra contador, para a imagem sair limpa.

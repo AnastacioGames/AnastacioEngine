@@ -6067,6 +6067,12 @@ static void lib_link_scene(FileData *fd, Main *main)
 				}
 			}
 
+			for (MotionTake *take = sce->motion_takes.first; take; take = take->next) {
+				for (MotionTakeActor *actor = take->actors.first; actor; actor = actor->next) {
+					actor->ob = newlibadr(fd, sce->id.lib, actor->ob);
+				}
+			}
+
 			link_paint(fd, sce, &sce->toolsettings->sculpt->paint);
 			link_paint(fd, sce, &sce->toolsettings->vpaint->paint);
 			link_paint(fd, sce, &sce->toolsettings->wpaint->paint);
@@ -6372,6 +6378,25 @@ static void direct_link_scene(FileData *fd, Scene *sce)
 		sce->toolsettings->gp_interpolate.custom_ipo = newdataadr(fd, sce->toolsettings->gp_interpolate.custom_ipo);
 		if (sce->toolsettings->gp_interpolate.custom_ipo) {
 			direct_link_curvemapping(fd, sce->toolsettings->gp_interpolate.custom_ipo);
+		}
+	}
+
+	link_list(fd, &sce->motion_takes);
+	for (MotionTake *take = sce->motion_takes.first; take; take = take->next) {
+		link_list(fd, &take->actors);
+		for (MotionTakeActor *actor = take->actors.first; actor; actor = actor->next) {
+			actor->samples = newdataadr(fd, actor->samples);
+			actor->clips = newdataadr(fd, actor->clips);
+			actor->bones = newdataadr(fd, actor->bones);
+			actor->bone_names = newdataadr(fd, actor->bone_names);
+			if (fd->flags & FD_FLAGS_SWITCH_ENDIAN) {
+				if (actor->samples) {
+					BLI_endian_switch_float_array(actor->samples, MOTION_TAKE_SAMPLE_FLOATS * actor->samples_num);
+				}
+				if (actor->bones) {
+					BLI_endian_switch_float_array(actor->bones, 10 * actor->samples_num * actor->bones_num);
+				}
+			}
 		}
 	}
 

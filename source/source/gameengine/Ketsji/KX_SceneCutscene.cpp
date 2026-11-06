@@ -97,6 +97,8 @@
 #include "SG_Node.h"
 #include "DNA_group_types.h"
 #include "DNA_scene_types.h"
+#include "BLI_listbase.h"
+#include "BL_Action.h"
 #include "DNA_property_types.h"
 #include "DNA_python_component_types.h"
 #include "BLI_listbase.h"
@@ -710,97 +712,137 @@ static void PlayMotionTakeTracks(KX_GameObject *gameobj, const char *prefix, flo
 static const short MOTION_TAKE_LAYER = 7;
 
 /* The frame a take ends on, from the start of the scene. */
-static float MotionTakeEnd(Scene *scene, IDProperty *duration)
+static float MotionTakeEnd(Scene *scene, const MotionTake *take)
 {
-	const float seconds = (duration->type == IDP_FLOAT) ? IDP_Float(duration) : (float)IDP_Double(duration);
-	return (float)scene->r.sfra + seconds * ((float)scene->r.frs_sec / scene->r.frs_sec_base);
+	return (float)scene->r.sfra + take->duration * ((float)scene->r.frs_sec / scene->r.frs_sec_base);
+}
+
+/* Sets the pose of the replay's time and starts the clips it reached. */
+static void ApplyMotionReplay(KX_Scene::MotionReplay& replay)
+{
+	const MotionTakeActor *actor = replay.m_actor;
+	KX_GameObject *gameobj = replay.m_object;
+	float loc[3], quat[4], scale[3];
+	BKE_motion_take_pose(actor, (float)replay.m_time, &replay.m_sample, loc, quat, scale);
+	gameobj->NodeSetLocalPosition(mt::vec3(loc[0], loc[1], loc[2]));
+	gameobj->NodeSetLocalOrientation(mt::quat(quat[0], quat[1], quat[2], quat[3]).ToMatrix());
+	gameobj->NodeSetLocalScale(mt::vec3(scale[0], scale[1], scale[2]));
+
+	/* The NLA tracks already play them when there are keyframes. */
+	while (!actor->track_prefix[0] && replay.m_clip < actor->clips_num &&
+	       actor->clips[replay.m_clip].t_start <= replay.m_time)
+	{
+		const MotionTakeClip& clip = actor->clips[replay.m_clip++];
+		const float seconds = clip.t_end - clip.t_start;
+		if (seconds > 0.0f) {
+			const float frames = std::abs(clip.frame_end - clip.frame_start);
+			gameobj->PlayAction(clip.action, clip.frame_start, clip.frame_end, clip.layer, 0, 0.0f, BL_Action::ACT_MODE_PLAY,
+			                    0.0f, 0, frames / seconds / (float)KX_GetActiveEngine()->GetAnimFrameRate());
+		}
+	}
+}
+
+void KX_Scene::UpdateMotionReplays(double step)
+{
+	for (unsigned int i = 0; i < m_motionReplays.size();) {
+		MotionReplay& replay = m_motionReplays[i];
+		replay.m_time += step;
+		ApplyMotionReplay(replay);
+		const MotionTakeActor *actor = replay.m_actor;
+		if (replay.m_time >= actor->samples[(actor->samples_num - 1) * MOTION_TAKE_SAMPLE_FLOATS]) {
+			if (replay.m_endsLogicHold) {
+				replay.m_object->EndMotionReplay();
+			}
+			m_motionReplays.erase(m_motionReplays.begin() + i);
+		}
+		else {
+			++i;
+		}
+	}
+}
+
+void KX_Scene::RemoveMotionReplay(KX_GameObject *gameobj)
+{
+	m_motionReplays.erase(std::remove_if(m_motionReplays.begin(), m_motionReplays.end(),
+	                                     [gameobj](const MotionReplay& replay) { return replay.m_object == gameobj; }),
+	                      m_motionReplays.end());
 }
 
 /* ghost: the actor stops touching the world. A Character has no dynamics to hold, it always leaves. */
-static void PlayMotionTakeActor(KX_GameObject *gameobj, IDProperty *actor, float start, float end, bool ghost)
+void KX_Scene::PlayMotionTakeActor(KX_GameObject *gameobj, const MotionTakeActor *actor, float start, float end, bool ghost)
 {
-	IDProperty *actionName = IDP_GetPropertyFromGroup(actor, "action_name");
-	IDProperty *trackPrefix = IDP_GetPropertyFromGroup(actor, "track_prefix");
 	/* Otherwise physics pulls a rigid body away from the recorded path. */
 	if (gameobj->GetPhysicsController()) {
-		if (ghost || gameobj->GetScene()->GetPhysicsEnvironment()->GetCharacterController(gameobj)) {
+		if (ghost || m_physicsEnvironment->GetCharacterController(gameobj)) {
 			gameobj->SuspendPhysics(false);
 		}
 		else {
 			gameobj->GetPhysicsController()->SuspendDynamics(false);
 		}
 	}
-	if (actionName && IDP_String(actionName)[0]) {
-		/* A take that ends as this one starts may still hold the layer. */
-		gameobj->StopAction(MOTION_TAKE_LAYER);
-		gameobj->PlayAction(IDP_String(actionName), start, end, MOTION_TAKE_LAYER);
+	/* Takes layered under a recording hold their actors until the game ends. */
+	bool hold = !gameobj->IsMotionReplay();
+	for (const MotionReplay& replay : m_motionReplays) {
+		hold |= (replay.m_object == gameobj && replay.m_endsLogicHold);
 	}
-	if (trackPrefix && IDP_String(trackPrefix)[0]) {
-		PlayMotionTakeTracks(gameobj, IDP_String(trackPrefix), start);
+	/* A take that ends as this one starts may still hold the object. */
+	RemoveMotionReplay(gameobj);
+	if (actor->samples_num >= 2) {
+		gameobj->SetMotionReplay();
+		m_motionReplays.push_back({gameobj, actor, 0.0, 0, 0, hold});
+		ApplyMotionReplay(m_motionReplays.back());
+	}
+	else if (actor->action_name[0]) {
+		/* A take from before the samples existed. */
+		gameobj->StopAction(MOTION_TAKE_LAYER);
+		gameobj->PlayAction(actor->action_name, start, end, MOTION_TAKE_LAYER);
+	}
+	if (actor->track_prefix[0]) {
+		PlayMotionTakeTracks(gameobj, actor->track_prefix, start);
 	}
 }
 
 void KX_Scene::PlayMotionTakeLayers()
 {
 	Scene *scene = GetBlenderScene();
-	IDProperty *takes = scene->id.properties ? IDP_GetPropertyFromGroup(scene->id.properties, "ae_rec_takes") : nullptr;
-	if (!takes || takes->type != IDP_IDPARRAY) {
-		return;
-	}
 	const bool ghost = !BKE_motion_record_layers_collide();
 	std::vector<KX_GameObject *> taken = m_motionRecordActors;
-	for (int i = takes->len - 1; i >= 0; --i) {
-		if (i == BKE_motion_record_replaced_take()) {
+	int index = BLI_listbase_count(&scene->motion_takes);
+	for (const MotionTake *take = (MotionTake *)scene->motion_takes.last; take; take = take->prev) {
+		if (--index == BKE_motion_record_replaced_take()) {
 			continue;
 		}
-		IDProperty *take = &IDP_IDPArray(takes)[i];
-		IDProperty *duration = IDP_GetPropertyFromGroup(take, "duration");
-		IDProperty *actors = IDP_GetPropertyFromGroup(take, "actors");
-		if (!duration || !actors) {
-			continue;
-		}
-		for (int a = 0; a < actors->len; ++a) {
-			IDProperty *actor = &IDP_IDPArray(actors)[a];
-			IDProperty *objectName = IDP_GetPropertyFromGroup(actor, "object_name");
-			KX_GameObject *gameobj = objectName ? FindGameObject(m_objectlist, IDP_String(objectName)) : nullptr;
+		for (const MotionTakeActor *actor = (MotionTakeActor *)take->actors.first; actor; actor = actor->next) {
+			KX_GameObject *gameobj = actor->ob ? FindGameObject(m_objectlist, actor->ob->id.name + 2) : nullptr;
 			if (!gameobj || std::find(taken.begin(), taken.end(), gameobj) != taken.end()) {
 				continue;
 			}
 			taken.push_back(gameobj);
+			/* Set first, so the replay knows the logic does not come back. */
 			gameobj->SetMotionReplay();
-			PlayMotionTakeActor(gameobj, actor, (float)scene->r.sfra, MotionTakeEnd(scene, duration), ghost);
+			PlayMotionTakeActor(gameobj, actor, (float)scene->r.sfra, MotionTakeEnd(scene, take), ghost);
 		}
 	}
 }
 
 void KX_Scene::PlayMotionTake(const std::string& name)
 {
-	/* Takes are ID properties of the scene, written by Rec Play in the editor. */
 	Scene *scene = GetBlenderScene();
-	IDProperty *takes = scene->id.properties ? IDP_GetPropertyFromGroup(scene->id.properties, "ae_rec_takes") : nullptr;
-	if (takes && takes->type == IDP_IDPARRAY) {
-		for (int i = 0; i < takes->len; ++i) {
-			IDProperty *take = &IDP_IDPArray(takes)[i];
-			IDProperty *takeName = IDP_GetPropertyFromGroup(take, "name");
-			IDProperty *duration = IDP_GetPropertyFromGroup(take, "duration");
-			IDProperty *actors = IDP_GetPropertyFromGroup(take, "actors");
-			if (!takeName || !duration || !actors || name != IDP_String(takeName)) {
+	for (const MotionTake *take = (MotionTake *)scene->motion_takes.first; take; take = take->next) {
+		if (name != take->name) {
+			continue;
+		}
+		const float start = (float)scene->r.sfra;
+		const float end = MotionTakeEnd(scene, take);
+		for (const MotionTakeActor *actor = (MotionTakeActor *)take->actors.first; actor; actor = actor->next) {
+			KX_GameObject *gameobj = actor->ob ? FindGameObject(m_objectlist, actor->ob->id.name + 2) : nullptr;
+			if (!gameobj) {
+				CM_Error("Play Take '" << name << "': an actor is missing from the scene");
 				continue;
 			}
-			const float start = (float)scene->r.sfra;
-			const float end = MotionTakeEnd(scene, duration);
-			for (int a = 0; a < actors->len; ++a) {
-				IDProperty *actor = &IDP_IDPArray(actors)[a];
-				IDProperty *objectName = IDP_GetPropertyFromGroup(actor, "object_name");
-				KX_GameObject *gameobj = objectName ? FindGameObject(m_objectlist, IDP_String(objectName)) : nullptr;
-				if (!gameobj) {
-					CM_Error("Play Take '" << name << "': an actor is missing from the scene");
-					continue;
-				}
-				PlayMotionTakeActor(gameobj, actor, start, end, false);
-			}
-			return;
+			PlayMotionTakeActor(gameobj, actor, start, end, false);
 		}
+		return;
 	}
 	CM_Error("Play Take: no take named '" << name << "'");
 }

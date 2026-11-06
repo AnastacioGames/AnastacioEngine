@@ -3,22 +3,8 @@
 # capture come in later phases; the runtime will read these by name.
 
 import bpy
-from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty,
-                       StringProperty)
-from bpy.types import Operator, PropertyGroup, UIList
-
-
-class RecTakeActor(PropertyGroup):
-    object_name = StringProperty(name="Object")
-    action_name = StringProperty(name="Action")
-    # Start of the names of its NLA tracks, on armatures.
-    track_prefix = StringProperty(name="NLA Tracks")
-
-
-class RecTake(PropertyGroup):
-    # Written by view3d_motion_record.c. A take groups the Actions of one recording.
-    duration = FloatProperty(name="Duration")
-    actors = CollectionProperty(type=RecTakeActor)
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
+from bpy.types import Operator, UIList
 
 
 def _take_tracks(actor):
@@ -129,13 +115,12 @@ class SCENE_OT_rec_take_to_cutscene(Operator):
 
 
 # bl_operators.register() reads this list from every module.
-classes = (RecTakeActor, RecTake, SCENE_UL_rec_takes, SCENE_OT_rec_take_remove, SCENE_OT_rec_take_use,
+classes = (SCENE_UL_rec_takes, SCENE_OT_rec_take_remove, SCENE_OT_rec_take_use,
            SCENE_OT_rec_take_to_cutscene)
 
 
 def register_props():
     S = bpy.types.Scene
-    S.ae_rec_takes = CollectionProperty(type=RecTake)
     S.ae_rec_take_index = IntProperty(name="Active Take", default=0, min=0)
     S.ae_rec_take_counter = IntProperty(default=0, options={'HIDDEN'})
     S.ae_rec_track_counter = IntProperty(default=0, options={'HIDDEN'})
@@ -157,7 +142,7 @@ def register_props():
     S.ae_rec_fixed_rate = IntProperty(name="Rate", default=30, min=1, max=240,
         description="Samples per second when Sampling is Fixed Rate")
     S.ae_rec_make_keyframes = BoolProperty(name="Generate Keyframes", default=True,
-        description="When recording stops, convert the take into an editable Action per actor")
+        description="When recording stops, also make an editable Action per actor; the take keeps the exact movement")
     S.ae_rec_keyframe_tolerance = FloatProperty(name="Simplify", default=0.001, min=0.0, max=1.0,
         precision=4, description="Keyframes that change less than this are removed (0 = keep every sample)")
     S.ae_rec_record_camera = BoolProperty(name="Record Active Camera", default=False,
@@ -177,7 +162,7 @@ def register_props():
 def unregister_props():
     for name in ('countdown', 'sample_rate', 'fixed_rate', 'make_keyframes', 'keyframe_tolerance',
                  'record_camera', 'playback_layers', 'playback_collision', 'show_advanced',
-                 'takes', 'take_index', 'take_counter', 'track_counter', 'replace_take', 'max_duration'):
+                 'take_index', 'take_counter', 'track_counter', 'replace_take', 'max_duration'):
         delattr(bpy.types.Scene, 'ae_rec_' + name)
     del bpy.types.Object.ae_rec_actor
     del bpy.types.Object.ae_rec_action

@@ -480,6 +480,12 @@ void BKE_library_foreach_ID_link(Main *bmain, ID *id, LibraryIDLinkCallback call
 					}
 				}
 
+				for (MotionTake *take = scene->motion_takes.first; take; take = take->next) {
+					for (MotionTakeActor *actor = take->actors.first; actor; actor = actor->next) {
+						CALLBACK_INVOKE(actor->ob, IDWALK_CB_NOP);
+					}
+				}
+
 				if (toolsett) {
 					CALLBACK_INVOKE(toolsett->skgen_template, IDWALK_CB_NOP);
 

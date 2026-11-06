@@ -1801,6 +1801,8 @@ bool KX_Scene::NewRemoveObject(KX_GameObject *gameobj)
 	m_pendingAnimationDeformers.erase(gameobj);
 	m_animNeedsUpdateCache.erase(gameobj);
 	CM_ListRemoveIfFound(m_motionRecordActors, gameobj);
+	CM_ListRemoveIfFound(m_motionRecordWalkers, gameobj);
+	RemoveMotionReplay(gameobj);
 	// Multiplayer: the replication layer forgets the object before it is destroyed.
 	if (gameobj->GetNetId() != 0) {
 		KX_NetworkManager *network = KX_GetActiveEngine()->GetNetworkManager();

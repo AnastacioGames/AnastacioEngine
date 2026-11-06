@@ -194,8 +194,7 @@ A testar: ordem do Euler no jogo, Ctrl+Z após gravar, travada ao tocar take lon
 
 ## Fases
 
-Até a Fase 7 não há DNA novo: uma versão pode sair sem risco de formato. O recurso
-fica marcado como Experimental.
+A Fase 7 trouxe o DNA do Take (`MotionTake`). O recurso fica marcado como Experimental.
 
 1. Botão, ícone, operador e flag. Instruções em [`HANDOFF-rec-play.md`](../HANDOFF-rec-play.md).
 2. Captura de transformação, relógio, parada segura e Action com undo. Teste: cubo

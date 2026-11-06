@@ -38,6 +38,10 @@
 
 #include "DNA_camera_types.h"
 #include "DNA_genfile.h"
+#include "DNA_ID.h"
+#include "BKE_idprop.h"
+#include "MEM_guardedalloc.h"
+#include "BLI_string.h"
 #include "DNA_material_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_object_force_types.h"
@@ -753,8 +757,55 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
   }
 }
 
+/* Takes used to be ID properties of the scene, holding only names: they keep working through
+ * their Actions, there are no samples to bring. */
+static void do_versions_motion_takes(Main *main)
+{
+  LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+    IDProperty *takes = scene->id.properties ? IDP_GetPropertyFromGroup(scene->id.properties, "ae_rec_takes") : NULL;
+    if (!takes) {
+      continue;
+    }
+    for (int i = 0; takes->type == IDP_IDPARRAY && i < takes->len; i++) {
+      IDProperty *group = &IDP_IDPArray(takes)[i];
+      IDProperty *name = IDP_GetPropertyFromGroup(group, "name");
+      IDProperty *duration = IDP_GetPropertyFromGroup(group, "duration");
+      IDProperty *actors = IDP_GetPropertyFromGroup(group, "actors");
+      MotionTake *take = MEM_callocN(sizeof(*take), __func__);
+      take->version = MOTION_TAKE_VERSION;
+      if (name && name->type == IDP_STRING) {
+        BLI_strncpy(take->name, IDP_String(name), sizeof(take->name));
+      }
+      if (duration) {
+        take->duration = (duration->type == IDP_FLOAT) ? IDP_Float(duration) : (float)IDP_Double(duration);
+      }
+      BLI_addtail(&scene->motion_takes, take);
+      for (int a = 0; actors && actors->type == IDP_IDPARRAY && a < actors->len; a++) {
+        IDProperty *old = &IDP_IDPArray(actors)[a];
+        IDProperty *object_name = IDP_GetPropertyFromGroup(old, "object_name");
+        IDProperty *action_name = IDP_GetPropertyFromGroup(old, "action_name");
+        IDProperty *track_prefix = IDP_GetPropertyFromGroup(old, "track_prefix");
+        MotionTakeActor *actor = MEM_callocN(sizeof(*actor), __func__);
+        if (object_name && object_name->type == IDP_STRING) {
+          actor->ob = BLI_findstring(&main->object, IDP_String(object_name), offsetof(ID, name) + 2);
+        }
+        if (action_name && action_name->type == IDP_STRING) {
+          BLI_strncpy(actor->action_name, IDP_String(action_name), sizeof(actor->action_name));
+        }
+        if (track_prefix && track_prefix->type == IDP_STRING) {
+          BLI_strncpy(actor->track_prefix, IDP_String(track_prefix), sizeof(actor->track_prefix));
+        }
+        BLI_addtail(&take->actors, actor);
+      }
+    }
+    IDP_FreeFromGroup(scene->id.properties, takes);
+  }
+}
+
 void do_versions_after_linking_range(Main *main)
 {
+  do_versions_motion_takes(main);
+
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 118)) {
     /* The game lamp panel now has one "Use Shadow" checkbox for both the traditional and the
      * PBR (Shading Nodes) path. PBR used to ignore that flag and cast shadows unconditionally,

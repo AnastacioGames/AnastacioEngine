@@ -1737,6 +1737,12 @@ void KX_GameObject::SetMotionReplay()
 	SuspendLogic();
 }
 
+void KX_GameObject::EndMotionReplay()
+{
+	m_motionReplay = false;
+	ResumeLogic();
+}
+
 void KX_GameObject::UpdateActivity(float distance)
 {
 	if (m_motionReplay) {

@@ -110,6 +110,16 @@ struct KX_NavMeshObstacle
 class KX_Scene: public EXP_Value, public SCA_IScene
 {
 public:
+	/// An actor following the samples of a take.
+	struct MotionReplay {
+		KX_GameObject *m_object;
+		const struct MotionTakeActor *m_actor;
+		double m_time;
+		int m_sample;
+		int m_clip;
+		bool m_endsLogicHold;  // The game goes on after it: the actor gets its logic back.
+	};
+
 	enum DrawingCallbackType {
 		PRE_DRAW = 0,
 		POST_DRAW,
@@ -235,6 +245,7 @@ private:
 	bool m_motionRecordActorsFound = false;
 	/// The actors moved by the quick control.
 	std::vector<KX_GameObject *> m_motionRecordWalkers;
+	std::vector<MotionReplay> m_motionReplays;
 
 	/// The list of cameras for this scene.
 	EXP_ListValue<KX_Camera> *m_cameralist;
@@ -795,6 +806,10 @@ public:
 	void PlayMotionTake(const std::string& name);
 	/// Rec Play: each actor that is not being recorded repeats its newest take.
 	void PlayMotionTakeLayers();
+	void PlayMotionTakeActor(KX_GameObject *gameobj, const struct MotionTakeActor *actor, float start, float end, bool ghost);
+	void RemoveMotionReplay(KX_GameObject *gameobj);
+	/* Moves the actors replaying a take, after physics and before the parents update. */
+	void UpdateMotionReplays(double step);
 	/** Advance the scene-owned Cutscene clock and retain crossed events. */
 	void UpdateCutscene(double deltaTime);
 	/** Transfer events accumulated by UpdateCutscene() to the native dispatcher. */

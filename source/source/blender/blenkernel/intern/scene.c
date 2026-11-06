@@ -417,6 +417,61 @@ void BKE_toolsettings_free(ToolSettings *toolsettings)
 	MEM_freeN(toolsettings);
 }
 
+void BKE_motion_take_free(MotionTake *take)
+{
+	for (MotionTakeActor *actor = take->actors.first; actor; actor = actor->next) {
+		MEM_SAFE_FREE(actor->samples);
+		MEM_SAFE_FREE(actor->clips);
+		MEM_SAFE_FREE(actor->bones);
+		MEM_SAFE_FREE(actor->bone_names);
+	}
+	BLI_freelistN(&take->actors);
+	MEM_freeN(take);
+}
+
+void BKE_motion_takes_free(ListBase *takes)
+{
+	MotionTake *next;
+	for (MotionTake *take = takes->first; take; take = next) {
+		next = take->next;
+		BKE_motion_take_free(take);
+	}
+	BLI_listbase_clear(takes);
+}
+
+void BKE_motion_takes_copy(ListBase *dst, const ListBase *src)
+{
+	BLI_listbase_clear(dst);
+	for (const MotionTake *take = src->first; take; take = take->next) {
+		MotionTake *take_dst = MEM_dupallocN(take);
+		BLI_addtail(dst, take_dst);
+		BLI_duplicatelist(&take_dst->actors, &take->actors);
+		for (MotionTakeActor *actor = take_dst->actors.first; actor; actor = actor->next) {
+			actor->samples = MEM_dupallocN(actor->samples);
+			actor->clips = MEM_dupallocN(actor->clips);
+			actor->bones = MEM_dupallocN(actor->bones);
+			actor->bone_names = MEM_dupallocN(actor->bone_names);
+		}
+	}
+}
+
+void BKE_motion_take_pose(const MotionTakeActor *actor, float t, int *index,
+                          float r_loc[3], float r_quat[4], float r_scale[3])
+{
+	const int stride = MOTION_TAKE_SAMPLE_FLOATS;
+	int i = *index;
+	while (i + 2 < actor->samples_num && actor->samples[(i + 1) * stride] <= t) {
+		i++;
+	}
+	*index = i;
+	const float *a = &actor->samples[i * stride];
+	const float *b = (i + 1 < actor->samples_num) ? a + stride : a;
+	const float factor = (b[0] > a[0]) ? clamp_f((t - a[0]) / (b[0] - a[0]), 0.0f, 1.0f) : 0.0f;
+	interp_v3_v3v3(r_loc, a + 1, b + 1, factor);
+	interp_qt_qtqt(r_quat, a + 4, b + 4, factor);
+	interp_v3_v3v3(r_scale, a + 8, b + 8, factor);
+}
+
 CutsceneSettings *BKE_cutscene_settings_new(void)
 {
 	return MEM_callocN(sizeof(CutsceneSettings), "Cutscene Settings");
@@ -530,6 +585,7 @@ void BKE_scene_copy_data(Main *bmain, Scene *sce_dst, const Scene *sce_src, cons
 	/* tool settings */
 	sce_dst->toolsettings = BKE_toolsettings_copy(sce_dst->toolsettings, flag_subdata);
 	sce_dst->cutscene_settings = BKE_cutscene_settings_copy(sce_dst->cutscene_settings);
+	BKE_motion_takes_copy(&sce_dst->motion_takes, &sce_src->motion_takes);
 
 	/* make a private copy of the avicodecdata */
 	if (sce_src->r.avicodecdata) {
@@ -757,6 +813,7 @@ void BKE_scene_free(Scene *sce)
 	sce->toolsettings = NULL;
 	BKE_cutscene_settings_free(sce->cutscene_settings);
 	sce->cutscene_settings = NULL;
+	BKE_motion_takes_free(&sce->motion_takes);
 
 	DAG_scene_free(sce);
 	if (sce->depsgraph)
