@@ -137,6 +137,45 @@ def _shadow_section_header(box, lamp, open_prop, title):
     return is_open
 
 
+SHADOW_SIZE_PRESETS = (512, 1024, 2048, 4096)
+SHADOW_SIZE_CUSTOM = len(SHADOW_SIZE_PRESETS)
+SHADOW_SIZE_ITEMS = (
+    ('LOW', "Low (512)", "512 x 512 pixels, about 1 MB per shadow map"),
+    ('MEDIUM', "Medium (1024)", "1024 x 1024 pixels, about 4 MB per shadow map"),
+    ('HIGH', "High (2048)", "2048 x 2048 pixels, about 16 MB per shadow map"),
+    ('VERY_HIGH', "Very High (4096)", "4096 x 4096 pixels, about 64 MB per shadow map"),
+    ('CUSTOM', "Custom", "Type any size"),
+)
+
+
+def _shadow_size_preset(size_prop, description):
+    # The size property stays the only real value; this menu just writes to it. The custom flag
+    # keeps the field open when the typed value happens to match a preset.
+    custom_key = size_prop + "_custom"
+
+    def get_preset(lamp):
+        size = getattr(lamp, size_prop)
+        if lamp.get(custom_key) or size not in SHADOW_SIZE_PRESETS:
+            return SHADOW_SIZE_CUSTOM
+        return SHADOW_SIZE_PRESETS.index(size)
+
+    def set_preset(lamp, value):
+        lamp[custom_key] = value == SHADOW_SIZE_CUSTOM
+        if value != SHADOW_SIZE_CUSTOM:
+            setattr(lamp, size_prop, SHADOW_SIZE_PRESETS[value])
+
+    return EnumProperty(name="Shadow Size", description=description, items=SHADOW_SIZE_ITEMS,
+                        get=get_preset, set=set_preset)
+
+
+bpy.types.Lamp.shadow_size_preset = _shadow_size_preset(
+    "shadow_buffer_size", "Resolution of the shadow buffer")
+bpy.types.Lamp.shadow_csm_two_size_preset = _shadow_size_preset(
+    "shadow_csm_two_buffer_size", "Resolution of the Medium cascade")
+bpy.types.Lamp.shadow_csm_three_size_preset = _shadow_size_preset(
+    "shadow_csm_three_buffer_size", "Resolution of the Low cascade")
+
+
 def _shadow_flags(lamp):
     """Shared state of the Use Shadow panel sections."""
     is_point = lamp.type == 'POINT'
@@ -179,7 +218,9 @@ def _draw_shadow_buffer(layout, lamp):
             layout.label("PCF filters are not used with cascades", icon='INFO')
     else:
         col = layout.column(align=True)
-        col.prop(lamp, "shadow_buffer_size", text="Size")
+        col.prop(lamp, "shadow_size_preset", text="Size")
+        if lamp.shadow_size_preset == 'CUSTOM':
+            col.prop(lamp, "shadow_buffer_size", text="Custom Size")
         if is_point:
             # The atlas is Size*3 x Size*2 texels, so the engine caps Size at 2048.
             col.label("Size above 2048 is clamped (cube atlas)", icon='INFO')
@@ -239,10 +280,11 @@ def _draw_shadow_csm(layout, lamp):
                  icon='INFO')
 
     # One row per cascade: buffer size, plus its bias when Auto Bias is off.
-    rows = [("Near", "shadow_buffer_size", "shadow_buffer_bias"),
-            ("Medium", "shadow_csm_two_buffer_size", "shadow_buffer_bias_two")]
+    rows = [("Near", "shadow_size_preset", "shadow_buffer_size", "shadow_buffer_bias"),
+            ("Medium", "shadow_csm_two_size_preset", "shadow_csm_two_buffer_size", "shadow_buffer_bias_two")]
     if not two_cascades:
-        rows.append(("Low", "shadow_csm_three_buffer_size", "shadow_buffer_bias_three"))
+        rows.append(("Low", "shadow_csm_three_size_preset", "shadow_csm_three_buffer_size",
+                     "shadow_buffer_bias_three"))
     show_bias = not auto_bias
     col = layout.column(align=True)
     split = col.split(factor=0.3)
@@ -251,11 +293,13 @@ def _draw_shadow_csm(layout, lamp):
     sub.label("Size")
     if show_bias:
         sub.label("Bias")
-    for name, size_prop, bias_prop in rows:
+    for name, preset_prop, size_prop, bias_prop in rows:
         split = col.split(factor=0.3)
         split.label(name)
         sub = split.row(align=True)
-        sub.prop(lamp, size_prop, text="")
+        sub.prop(lamp, preset_prop, text="")
+        if getattr(lamp, preset_prop) == 'CUSTOM':
+            sub.prop(lamp, size_prop, text="")
         if show_bias:
             sub.prop(lamp, bias_prop, text="")
 

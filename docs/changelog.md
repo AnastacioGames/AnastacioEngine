@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Tamanho da sombra com presets
+
+- Campo Size da luz virou menu Low/Medium/High/Very High (512 a 4096) e Custom, inclusive nas cascatas Near, Medium e Low.
+  O menu só grava em `shadow_buffer_size` e nos tamanhos das cascatas; valor fora da lista aparece como Custom.
+- `light.shadowMapSize` continua sem arredondar para múltiplos de 16: não há ganho, e a leitura mudaria o valor pedido.
+- Teste em segundo plano dos valores OK; falta conferir o painel com janela.
+
 ## 2026-11-06 - Motion Recording: painel na aba Render
 
 - Painel **Motion Recording** (`RENDER_PT_game_motion_record`) em Properties > Render, categoria System, logo depois de
