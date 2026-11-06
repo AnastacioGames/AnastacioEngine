@@ -256,6 +256,12 @@ static const float RECORD_COUNTDOWN_FONT_SIZE = 128.0f;
 
 void KX_DebugMode::RenderRecordOverlay()
 {
+  /* Fonts arrive a frame after the request: a box measured without them cuts the text. */
+  if (KX_Imgui::RequestDefaultFont(RECORD_FONT_SIZE) < 0 ||
+      KX_Imgui::RequestDefaultFont(RECORD_COUNTDOWN_FONT_SIZE) < 0)
+  {
+    return;
+  }
   const ImGuiViewport *viewport = ImGui::GetMainViewport();
   const double countdown = BKE_motion_record_countdown();
   const float top = (countdown > 0.0) ? viewport->WorkSize.y * 0.35f : 12.0f;
@@ -266,7 +272,8 @@ void KX_DebugMode::RenderRecordOverlay()
   const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
                                  ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
                                  ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoDocking;
-  if (ImGui::Begin("RecPlayOverlay", nullptr, flags)) {
+  /* One window each: the box keeps the size of the last frame it was drawn. */
+  if (ImGui::Begin((countdown > 0.0) ? "RecPlayCountdown" : "RecPlayOverlay", nullptr, flags)) {
     if (countdown > 0.0) {
       /* Built at the size it is drawn: a scaled small font comes out blurred. */
       {
