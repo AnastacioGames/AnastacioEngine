@@ -302,6 +302,7 @@ def prepared_path(image, colors=None, normals=None):
 KTX2_VERSION = 'basisu-073eb6a0-etc1s-uastc-v2'
 KTX2_QUALITY = 75
 KTX2_ID = b'\xabKTX 20\xbb\r\n\x1a\n'
+KTX2_HIGH_QUALITY = 'range_ktx2_high_quality'  # image property: colour in UASTC
 
 
 def ktx2_path(image, colors=None, normals=None):
@@ -314,7 +315,10 @@ def ktx2_path(image, colors=None, normals=None):
     record = _record(image)
     fmt = record['options'].get('format')
     max_size = record['options'].get('max_size', 2048)
+    high_quality = bool(image.get(KTX2_HIGH_QUALITY)) and fmt != 'BC5'
     options = {'container': KTX2_VERSION, 'max_size': max_size, 'quality': KTX2_QUALITY, 'format': fmt}
+    if high_quality:
+        options['high_quality'] = True
     fingerprint = _source_hash(image, options)
     folder = os.path.join(os.path.dirname(bpy.data.filepath), 'textures_ktx2')
     name = bpy.path.clean_name(image.name)[:40] or 'image'
@@ -326,7 +330,7 @@ def ktx2_path(image, colors=None, normals=None):
     if not valid:
         def write(source_image, temporary):
             source_image.save_ktx2(filepath=temporary, normal=fmt == 'BC5', max_size=max_size,
-                                   quality=KTX2_QUALITY, srgb=fmt != 'BC5')
+                                   quality=KTX2_QUALITY, srgb=fmt != 'BC5', high_quality=high_quality)
             with open(temporary, 'rb') as stream:
                 if stream.read(12) != KTX2_ID:
                     raise ValueError('KTX2 encoder produced an invalid file')
@@ -390,6 +394,9 @@ class AnastacioTextureEntry(PropertyGroup):
     width: IntProperty()
     height: IntProperty()
     format: StringProperty()
+    high_quality: BoolProperty(name='KTX2 HQ', default=False,
+                               description='Web and Android: smoother gradients in a larger file, same GPU cost. '
+                                           'For UI, sky and skin')
 
 
 class ANASTACIO_UL_prepared_textures(UIList):
@@ -412,6 +419,8 @@ class ANASTACIO_UL_prepared_textures(UIList):
                 mw, mh = max(1, mw // 2), max(1, mh // 2)
             row.label(text='%d x %d | %.1f -> %.2f MiB | %s %s' % (
                 w, h, old, size / 1048576, item.format, item.status))
+            if item.format != 'BC5':
+                row.prop(item, 'high_quality')
         else:
             row.label(text=item.status)
 
@@ -446,6 +455,7 @@ class GAME_OT_prepare_textures(Operator):
                 entry.format = ('BC5' if image.name in normals else
                                 'DXT5' if image.depth == 32 and image.use_alpha else 'DXT1')
                 entry.status = '(Prepared)' if KEY in image else ''
+                entry.high_quality = bool(image.get(KTX2_HIGH_QUALITY))
         return context.window_manager.invoke_props_dialog(self, width=820)
 
     def draw(self, context):
@@ -466,6 +476,13 @@ class GAME_OT_prepare_textures(Operator):
     active_index: IntProperty(default=0)
 
     def execute(self, context):
+        for entry in self.entries:
+            image = bpy.data.images.get(entry.image_name)
+            if image and entry.eligible:
+                if entry.high_quality:
+                    image[KTX2_HIGH_QUALITY] = True
+                elif KTX2_HIGH_QUALITY in image:
+                    del image[KTX2_HIGH_QUALITY]
         self._pending = [entry.image_name for entry in self.entries if entry.selected and entry.eligible]
         self._done = 0
         self._total = len(self._pending)

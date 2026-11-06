@@ -400,9 +400,9 @@ short IMB_saveiff(struct ImBuf *ibuf, const char *filepath, int flags);
 bool IMB_dds_write_dxt(const struct ImBuf *ibuf, const char *path, int format,
                        int max_size, int quality, bool srgb);
 /* Export a copy as KTX2 (Basis Universal): ETC1S colour, or UASTC tangent-space normal map.
- * quality 0-100. Needs an encoder build (desktop); POT byte images only. */
+ * high_quality makes colour UASTC too: same GPU cost, larger file, no ETC1S blocks. quality 0-100. Needs an encoder build (desktop); POT byte images only. */
 bool IMB_ktx2_write(const struct ImBuf *ibuf, const char *path, bool normal,
-                    int max_size, int quality, bool srgb);
+                    int max_size, int quality, bool srgb, bool high_quality);
 /* Compressed formats the GPU takes, set once GL is up: KTX2 files transcode to the best one. */
 #define IMB_KTX2_GPU_BC   (1 << 0) /* BC1/BC3 (S3TC) */
 #define IMB_KTX2_GPU_BC5  (1 << 1) /* RGTC2 */

@@ -524,6 +524,12 @@ TABLE = (
     ('Run Python', 'Rodar Python', 'Ejecutar Python', 'Выполнить Python'),
     ('Module: range_ui_runtime.main', 'Módulo: range_ui_runtime.main', 'Módulo: range_ui_runtime.main', 'Модуль: range_ui_runtime.main'),
 
+    ('KTX2 HQ', 'KTX2 alta', 'KTX2 alta', 'KTX2 HQ'),
+    ('Web and Android: smoother gradients in a larger file, same GPU cost. For UI, sky and skin',
+     'Web e Android: degradês mais suaves com arquivo maior, mesmo custo na GPU. Para UI, céu e pele',
+     'Web y Android: degradados más suaves con archivo mayor, mismo coste en GPU. Para UI, cielo y piel',
+     'Web и Android: более плавные градиенты при большем файле, та же нагрузка на GPU. Для UI, неба и кожи'),
+
     # Brazilian buildings
     ('Brazilian House', 'Casa brasileira', 'Casa brasileña', 'Бразильский дом'),
     ('Brazilian Street Block', 'Quarteirão brasileiro', 'Manzana brasileña', 'Бразильский квартал'),

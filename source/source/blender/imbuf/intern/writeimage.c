@@ -54,12 +54,12 @@ bool IMB_dds_write_dxt(const ImBuf *ibuf, const char *path, int format,
 }
 
 bool IMB_ktx2_write(const ImBuf *ibuf, const char *path, bool normal,
-                    int max_size, int quality, bool srgb)
+                    int max_size, int quality, bool srgb, bool high_quality)
 {
 #ifdef WITH_DDS
-	return imb_ktx2_write(ibuf, path, normal, max_size, quality, srgb);
+	return imb_ktx2_write(ibuf, path, normal, max_size, quality, srgb, high_quality);
 #else
-	(void)ibuf; (void)path; (void)normal; (void)max_size; (void)quality; (void)srgb;
+	(void)ibuf; (void)path; (void)normal; (void)max_size; (void)quality; (void)srgb; (void)high_quality;
 	return false;
 #endif
 }

@@ -39,7 +39,7 @@ int imb_is_a_ktx2(const unsigned char *mem); /* first 12 bytes */
 struct ImBuf *imb_load_ktx2(const unsigned char *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE]);
 bool imb_ktx2_decode_rect(struct ImBuf *ibuf);
 bool imb_ktx2_write(const struct ImBuf *ibuf, const char *path, bool normal,
-                    int max_size, int quality, bool srgb);
+                    int max_size, int quality, bool srgb, bool high_quality);
 struct ImBuf *imb_load_dds(const unsigned char *mem, size_t size, int flags, char colorspace[IM_MAX_SPACE]);
 
 #ifdef __cplusplus

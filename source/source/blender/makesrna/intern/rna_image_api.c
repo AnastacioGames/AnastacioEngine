@@ -125,14 +125,15 @@ static void rna_Image_save_dds(Image *image, Main *bmain, ReportList *reports,
 }
 
 static void rna_Image_save_ktx2(Image *image, Main *bmain, ReportList *reports,
-                               const char *filepath, bool normal, int max_size, int quality, bool srgb)
+                               const char *filepath, bool normal, int max_size, int quality, bool srgb,
+                               bool high_quality)
 {
 	char path[FILE_MAX];
 	BLI_strncpy(path, filepath, sizeof(path));
 	BLI_path_abs(path, ID_BLEND_PATH(bmain, &image->id));
 	void *lock;
 	ImBuf *ibuf = BKE_image_acquire_ibuf(image, NULL, &lock);
-	if (!IMB_ktx2_write(ibuf, path, normal, max_size, quality, srgb)) {
+	if (!IMB_ktx2_write(ibuf, path, normal, max_size, quality, srgb, high_quality)) {
 		BKE_report(reports, RPT_ERROR, "KTX2 export failed: requires a byte, power-of-two image, "
 				   "a writable destination and a desktop build with the Basis Universal encoder");
 	}
@@ -371,6 +372,8 @@ void RNA_api_image(StructRNA *srna)
 	RNA_def_int(func, "max_size", 2048, 0, 16384, "Maximum Size", "Zero keeps original dimensions", 0, 16384);
 	RNA_def_int(func, "quality", 75, 0, 100, "Quality", "Higher is better and larger", 0, 100);
 	RNA_def_boolean(func, "srgb", true, "sRGB", "Filter color in linear light; disable for data maps");
+	RNA_def_boolean(func, "high_quality", false, "High Quality",
+	                "Color in UASTC instead of ETC1S: larger file, same GPU cost, no blocks in smooth gradients");
 
 	func = RNA_def_function(srna, "save", "rna_Image_save");
 	RNA_def_function_ui_description(func, "Save image to its source path");

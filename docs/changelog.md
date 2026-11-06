@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-05 - KTX2 HQ: cor em UASTC por imagem
+
+- `Image.save_ktx2(high_quality=True)` grava cor em UASTC: mesmo formato na GPU, sem os blocos do ETC1S em degradês. Em 64x64 de
+  degradê, erro médio de 0,0118 para 0,0012 e arquivo 55% maior.
+- Caixa `KTX2 HQ` por imagem no Prepare Textures, guardada na propriedade `range_ktx2_high_quality`, que entra na chave do cache.
+  Sem ela o arquivo sai idêntico; normal map ignora a opção.
+
 ## 2026-11-05 - Web: Static Batch deslocado pela posição do objeto de referência
 
 - Na Web a matriz do objeto vai ao shader por uniform, e o lote mandava a do objeto de referência sobre vértices já em coordenadas
