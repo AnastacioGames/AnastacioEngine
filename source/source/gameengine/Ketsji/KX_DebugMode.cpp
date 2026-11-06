@@ -48,6 +48,7 @@
 #include "SCA_IController.h"
 #include "SCA_IActuator.h"
 
+#include "BKE_motion_record.h"
 #include "DNA_object_types.h"
 
 #include "EXP_ListValue.h"
@@ -249,6 +250,32 @@ const char *ProfilerTip(int tip)
 	return profilerTips[tip][col];
 }
 }  // namespace
+
+void KX_DebugMode::RenderRecordOverlay()
+{
+  const ImGuiViewport *viewport = ImGui::GetMainViewport();
+  ImGui::SetNextWindowPos(ImVec2(viewport->WorkPos.x + viewport->WorkSize.x * 0.5f, viewport->WorkPos.y + 12.0f),
+                          ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+  ImGui::SetNextWindowViewport(viewport->ID);
+  ImGui::SetNextWindowBgAlpha(0.6f);
+  const ImGuiWindowFlags flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize |
+                                 ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing |
+                                 ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoInputs | ImGuiWindowFlags_NoDocking;
+  if (ImGui::Begin("RecPlayOverlay", nullptr, flags)) {
+    const int seconds = (int)BKE_motion_record_time();
+    const int limit = (int)std::ceil(BKE_motion_record_max_seconds());
+    ImGui::SetWindowFontScale(1.5f);
+    ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "REC");
+    ImGui::SameLine();
+    if (limit > 0) {
+      ImGui::Text("%02d:%02d / %02d:%02d   F10 stops", seconds / 60, seconds % 60, limit / 60, limit % 60);
+    }
+    else {
+      ImGui::Text("%02d:%02d   F10 stops", seconds / 60, seconds % 60);
+    }
+  }
+  ImGui::End();
+}
 
 void KX_DebugMode::RenderDebugProperties()
 {

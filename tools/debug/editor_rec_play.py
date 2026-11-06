@@ -18,6 +18,10 @@ def report(text):
         f.write(text + '\n')
 
 
+def takes(scene):
+    return [(t.name, round(t.duration, 2), len(t.actors)) for t in scene.ae_rec_takes]
+
+
 def actions():
     return sorted((a.name, a.users, a.use_fake_user) for a in bpy.data.actions)
 
@@ -61,6 +65,10 @@ class RecFim(bpy.types.Operator):
         try:
             bpy.ops.ed.undo()
             report('depois do undo: %s' % actions())
+            report('takes: %s' % takes(bpy.context.scene))
+            bpy.context.scene.ae_rec_take_index = 0
+            report('use take 1: %s' % bpy.ops.scene.rec_take_use())
+            report('frame_end=%d' % bpy.context.scene.frame_end)
             report('Cubo usa: %s' % bpy.data.objects['Cubo'].animation_data.action.name)
             bpy.context.scene.frame_set(bpy.context.scene.frame_start)
             bpy.ops.screen.animation_play()
@@ -97,7 +105,14 @@ def run(scene):
         report('rec 1: %s' % bpy.ops.view3d.game_record(override))
         report('actions: %s' % actions())
         compare(scene)
-        report('rec 2: %s' % bpy.ops.view3d.game_record(override))
+        report('takes: %s' % takes(scene))
+        scene.ae_rec_max_duration = 2.0
+        report('rec 2 (limite 2 s): %s' % bpy.ops.view3d.game_record(override))
+        report('takes: %s' % takes(scene))
+        scene.ae_rec_max_duration = 1.0
+        scene.ae_rec_replace_take = True
+        report('rec 3 (substitui, limite 1 s): %s' % bpy.ops.view3d.game_record(override))
+        report('takes: %s' % takes(scene))
         report('actions: %s' % actions())
         bpy.utils.register_class(RecFim)
         bpy.ops.wm.rec_fim('INVOKE_DEFAULT')

@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 2.5 (Takes e duração)
+
+- Take agrupa as Actions de uma gravação: lista no painel (`Scene.ae_rec_takes`, sem DNA novo), Use Take, apagar e Replace Selected Take.
+- Max Duration encerra a gravação sozinha; contador REC no topo da tela pelo ImGui (`KX_DebugMode::RenderRecordOverlay`).
+- Teste com janela por dados: limite de 2 s e 1 s, substituição, Ctrl+Z e Use Take OK. Aparência do painel e do contador sem aceite visual do usuário.
+
 ## 2026-11-06 - Rec Play: Fase 2 (captura e Action)
 
 - Rec Play grava os atores marcados (ou o objeto ativo) e, ao sair do jogo, cria uma Action `Rec_<objeto>` por ator, com chaves lineares simplificadas e Ctrl+Z.

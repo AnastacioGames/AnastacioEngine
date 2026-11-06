@@ -251,9 +251,22 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
 
         box = layout.box()
         box.label(text="3. Press Rec Play and move it! F10 stops", icon='REC')
+        box.prop(scene, "ae_rec_max_duration")
         row = box.row()
         row.scale_y = 1.6
         row.operator("view3d.game_record", text="Rec Play", icon='REC_PLAY')
+
+        box = layout.box()
+        box.label(text="Takes", icon='ACTION')
+        if scene.ae_rec_takes:
+            row = box.row()
+            row.template_list("SCENE_UL_rec_takes", "", scene, "ae_rec_takes", scene, "ae_rec_take_index", rows=3)
+            col = row.column(align=True)
+            col.operator("scene.rec_take_remove", icon='ZOOMOUT', text="")
+            box.operator("scene.rec_take_use", icon='PLAY')
+            box.prop(scene, "ae_rec_replace_take")
+        else:
+            box.label(text="Each recording appears here")
 
         box = layout.box()
         box.prop(scene, "ae_rec_show_advanced",

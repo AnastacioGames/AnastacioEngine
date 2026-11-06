@@ -38,13 +38,17 @@ typedef struct MotionSample {
 	bool has_parent;
 } MotionSample;
 
-/* fixed_rate: samples per second, 0 = every logic step. */
-void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate);
+/* fixed_rate: samples per second, 0 = every logic step. max_seconds: 0 = until stopped. */
+void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate, float max_seconds);
 /* Stops accepting samples and keeps them, until BKE_motion_record_free. */
 void BKE_motion_record_stop(void);
 void BKE_motion_record_free(void);
 
 bool BKE_motion_record_is_active(void);
+/* Seconds recorded so far and the limit (0 = none). */
+double BKE_motion_record_time(void);
+float BKE_motion_record_max_seconds(void);
+bool BKE_motion_record_time_up(void);
 bool BKE_motion_record_is_actor(const struct Object *ob);
 /* Whether the samples of the current step are to be kept (false between fixed rate samples). */
 bool BKE_motion_record_sample_due(void);

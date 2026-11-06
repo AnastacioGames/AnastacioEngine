@@ -60,6 +60,8 @@ extern "C" {
 
 #include "KX_DebugMode.h"
 #include "KX_KetsjiEngine.h"
+
+#include "BKE_motion_record.h"
 #include "KX_EngineProfiler.h"
 
 #include "EXP_ListValue.h"
@@ -565,6 +567,9 @@ void KX_KetsjiEngine::EndFrame()
 			}
 			if ((m_flags & SHOW_DEBUG_MODE)) {
 				m_debugMode->RenderImguiDebugMode();
+			}
+			if (BKE_motion_record_is_active()) {
+				m_debugMode->RenderRecordOverlay();
 			}
 			// Fase L: automatic GPU particle debug overlay, one ImGui window per object with
 			// gpu_particles.use_debug_ui checked -- see KX_ParticleDebugUI.

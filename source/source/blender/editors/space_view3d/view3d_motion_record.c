@@ -98,7 +98,9 @@ bool view3d_motion_record_begin(Scene *scene, ReportList *reports)
 	}
 
 	const bool fixed = RNA_enum_get(&scene_ptr, "ae_rec_sample_rate") == 1;
-	BKE_motion_record_begin(actors, num, fixed ? (float)RNA_int_get(&scene_ptr, "ae_rec_fixed_rate") : 0.0f);
+	BKE_motion_record_begin(
+	        actors, num, fixed ? (float)RNA_int_get(&scene_ptr, "ae_rec_fixed_rate") : 0.0f,
+	        RNA_float_get(&scene_ptr, "ae_rec_max_duration"));
 	MEM_freeN(actors);
 	return true;
 }
@@ -157,7 +159,7 @@ static void motion_fcurve_add(
 	calchandles_fcurve(fcu);
 }
 
-static void motion_action_create(
+static bAction *motion_action_create(
         Main *bmain, Scene *scene, Object *ob, const MotionSample *samples, int num, float tolerance)
 {
 	static const struct { const char *path; int index; } channels[MOTION_CHANNELS] = {
@@ -227,6 +229,41 @@ static void motion_action_create(
 	MEM_freeN(values);
 	MEM_freeN(keep);
 	MEM_freeN(stack);
+	return act;
+}
+
+/* A take is the one name that groups the Actions of a recording. */
+static void motion_take_add(PointerRNA *scene_ptr, PointerRNA *r_take, int replaced)
+{
+	const int takes_num = RNA_collection_length(scene_ptr, "ae_rec_takes");
+	char name[64];
+	if (replaced >= 0) {
+		PointerRNA old;
+		RNA_property_collection_lookup_int(
+		        scene_ptr, RNA_struct_find_property(scene_ptr, "ae_rec_takes"), replaced, &old);
+		RNA_string_get(&old, "name", name);
+	}
+	else {
+		const int counter = RNA_int_get(scene_ptr, "ae_rec_take_counter") + 1;
+		RNA_int_set(scene_ptr, "ae_rec_take_counter", counter);
+		BLI_snprintf(name, sizeof(name), "Take %d", counter);
+	}
+	RNA_collection_add(scene_ptr, "ae_rec_takes", r_take);
+	RNA_string_set(r_take, "name", name);
+	RNA_int_set(scene_ptr, "ae_rec_take_index", takes_num);
+}
+
+/* The old take goes only after the new one exists, so a failed recording loses nothing. */
+static void motion_take_remove(bContext *C, int index)
+{
+	wmOperatorType *ot = WM_operatortype_find("SCENE_OT_rec_take_remove", false);
+	if (ot) {
+		PointerRNA props;
+		WM_operator_properties_create_ptr(&props, ot);
+		RNA_int_set(&props, "index", index);
+		WM_operator_name_call_ptr(C, ot, WM_OP_EXEC_DEFAULT, &props);
+		WM_operator_properties_free(&props);
+	}
 }
 
 bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
@@ -240,21 +277,37 @@ bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
 
 	if (RNA_boolean_get(&scene_ptr, "ae_rec_make_keyframes")) {
 		const float tolerance = RNA_float_get(&scene_ptr, "ae_rec_keyframe_tolerance");
+		const int active_take = RNA_int_get(&scene_ptr, "ae_rec_take_index");
+		const int replaced = (RNA_boolean_get(&scene_ptr, "ae_rec_replace_take") &&
+		                      active_take < RNA_collection_length(&scene_ptr, "ae_rec_takes")) ? active_take : -1;
+		float duration = 0.0f;
+		PointerRNA take;
 		for (int i = 0; i < BKE_motion_record_actors_num(); i++) {
 			const MotionSample *samples;
 			int num;
 			Object *ob = BKE_motion_record_actor(i, &samples, &num);
 			/* A single sample is an actor that never ran (e.g. removed on the first frame). */
 			if (num >= 2 && !ID_IS_LINKED(ob)) {
-				motion_action_create(bmain, scene, ob, samples, num, tolerance);
-				created++;
+				bAction *act = motion_action_create(bmain, scene, ob, samples, num, tolerance);
+				if (created++ == 0) {
+					motion_take_add(&scene_ptr, &take, replaced);
+				}
+				PointerRNA actor;
+				RNA_collection_add(&take, "actors", &actor);
+				RNA_string_set(&actor, "object_name", ob->id.name + 2);
+				RNA_string_set(&actor, "action_name", act->id.name + 2);
+				duration = max_ff(duration, samples[num - 1].t);
+				RNA_float_set(&take, "duration", duration);
 			}
+		}
+		if (created && replaced >= 0) {
+			motion_take_remove(C, replaced);
 		}
 	}
 	BKE_motion_record_free();
 
 	if (created) {
-		BKE_reportf(reports, RPT_INFO, "Rec Play: %d Action(s) created", created);
+		BKE_reportf(reports, RPT_INFO, "Rec Play: take saved with %d actor(s)", created);
 		WM_event_add_notifier(C, NC_ANIMATION | ND_KEYFRAME | NA_ADDED, NULL);
 	}
 	else {

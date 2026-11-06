@@ -200,6 +200,10 @@ fica marcado como Experimental.
 1. Botão, ícone, operador e flag. Instruções em [`HANDOFF-rec-play.md`](../HANDOFF-rec-play.md).
 2. Captura de transformação, relógio, parada segura e Action com undo. Teste: cubo
    e personagem físico. Bom ponto para a versão Experimental.
+2.5. Organização (decidido 2026-11-06): Take agrupa as Actions de uma gravação, lista no painel, Max
+   Duration, contador REC na tela, substituir o Take selecionado. Fluxo: gravar primeiro e depois mandar
+   para o Cutscene.
+2.6. Evento Play Take no Cutscene e botão Add to Cutscene no Take.
 3. Personagem completo: filhos, actions e NLA.
 4. Controle rápido (WASD sem Logic Bricks), contagem e aviso REC.
 5. Camadas pela Action: repetir A enquanto grava B, Assistir e Regravar.
@@ -207,7 +211,7 @@ fica marcado como Experimental.
 7. Take em DNA versionado, com eventos e reprodução exata.
 8. Janela Rec Studio.
 9. Asset Browser: Actions, miniaturas, soltar ação/personagem, kit de conteúdo.
-10. Cutscene e API Python.
+10. API Python.
 
 Uma fase por vez, com build no Windows e teste do usuário antes da próxima.
 

@@ -3,14 +3,93 @@
 # capture come in later phases; the runtime will read these by name.
 
 import bpy
-from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
+from bpy.props import (BoolProperty, CollectionProperty, EnumProperty, FloatProperty, IntProperty,
+                       StringProperty)
+from bpy.types import Operator, PropertyGroup, UIList
 
-# Only properties here; bl_operators.register() reads this list from every module.
-classes = ()
+
+class RecTakeActor(PropertyGroup):
+    object_name = StringProperty(name="Object")
+    action_name = StringProperty(name="Action")
+
+
+class RecTake(PropertyGroup):
+    # Written by view3d_motion_record.c. A take groups the Actions of one recording.
+    duration = FloatProperty(name="Duration")
+    actors = CollectionProperty(type=RecTakeActor)
+
+
+class SCENE_UL_rec_takes(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        row = layout.row(align=True)
+        row.prop(item, "name", text="", emboss=False, icon='REC')
+        row.label(text="%.1f s, %d actor(s)" % (item.duration, len(item.actors)))
+
+
+class SCENE_OT_rec_take_remove(Operator):
+    """Delete this take and its Actions"""
+    bl_idname = "scene.rec_take_remove"
+    bl_label = "Delete Take"
+
+    index = IntProperty(default=-1, options={'HIDDEN'})
+
+    def execute(self, context):
+        scene = context.scene
+        index = self.index if self.index >= 0 else scene.ae_rec_take_index
+        if not 0 <= index < len(scene.ae_rec_takes):
+            return {'CANCELLED'}
+        for actor in scene.ae_rec_takes[index].actors:
+            action = bpy.data.actions.get(actor.action_name)
+            if action:
+                bpy.data.actions.remove(action, do_unlink=True)
+        scene.ae_rec_takes.remove(index)
+        scene.ae_rec_take_index = max(0, len(scene.ae_rec_takes) - 1)
+        return {'FINISHED'}
+
+    def invoke(self, context, event):
+        # Rec Play calls execute inside its own undo step; only the button adds one.
+        result = self.execute(context)
+        bpy.ops.ed.undo_push(message=self.bl_label)
+        return result
+
+
+class SCENE_OT_rec_take_use(Operator):
+    """Put this take on its actors and set the scene range to its length"""
+    bl_idname = "scene.rec_take_use"
+    bl_label = "Use Take"
+    bl_options = {'UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+        index = scene.ae_rec_take_index
+        if not 0 <= index < len(scene.ae_rec_takes):
+            return {'CANCELLED'}
+        take = scene.ae_rec_takes[index]
+        for actor in take.actors:
+            ob = bpy.data.objects.get(actor.object_name)
+            action = bpy.data.actions.get(actor.action_name)
+            if ob and action:
+                if not ob.animation_data:
+                    ob.animation_data_create()
+                ob.animation_data.action = action
+        scene.frame_end = scene.frame_start + int(take.duration * scene.render.fps + 0.5)
+        scene.frame_set(scene.frame_start)
+        return {'FINISHED'}
+
+
+# bl_operators.register() reads this list from every module.
+classes = (RecTakeActor, RecTake, SCENE_UL_rec_takes, SCENE_OT_rec_take_remove, SCENE_OT_rec_take_use)
 
 
 def register_props():
     S = bpy.types.Scene
+    S.ae_rec_takes = CollectionProperty(type=RecTake)
+    S.ae_rec_take_index = IntProperty(name="Active Take", default=0, min=0)
+    S.ae_rec_take_counter = IntProperty(default=0, options={'HIDDEN'})
+    S.ae_rec_replace_take = BoolProperty(name="Replace Selected Take", default=False,
+        description="The new recording takes the place of the selected take instead of adding one")
+    S.ae_rec_max_duration = FloatProperty(name="Max Duration (s)", default=0.0, min=0.0, max=3600.0,
+        description="Recording stops by itself after this many seconds (0 = until F10)")
     S.ae_rec_countdown = IntProperty(name="Countdown", default=3, min=0, max=10,
         description="Seconds counted on screen before recording starts (0 = start at once)")
     # Enum numbers will be read by C++ from the IDProperty: keep 0/1.
@@ -40,7 +119,8 @@ def register_props():
 
 def unregister_props():
     for name in ('countdown', 'sample_rate', 'fixed_rate', 'make_keyframes', 'keyframe_tolerance',
-                 'record_camera', 'playback_layers', 'playback_collision', 'show_advanced'):
+                 'record_camera', 'playback_layers', 'playback_collision', 'show_advanced',
+                 'takes', 'take_index', 'take_counter', 'replace_take', 'max_duration'):
         delattr(bpy.types.Scene, 'ae_rec_' + name)
     del bpy.types.Object.ae_rec_actor
     del bpy.types.Object.ae_rec_action

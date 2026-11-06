@@ -249,6 +249,8 @@ class KX_DebugMode
 
   /// Panels
   void RenderDebugProperties();
+  /// Rec Play: REC and the time at the top of the screen.
+  void RenderRecordOverlay();
   void RenderScenePanel();
   void RenderOptionsPanel();
   void RenderProfiling();
