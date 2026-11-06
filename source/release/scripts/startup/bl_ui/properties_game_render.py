@@ -211,6 +211,63 @@ class RENDER_PT_game_cook(RenderButtonsPanel, Panel):
             layout.label(text="Not cooked: shapes and shaders are computed while loading", icon='INFO')
 
 
+class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
+    # Rec Play: record actors controlled live (plan: docs/gravacao-de-movimento-plan.md).
+    bl_label = "Motion Recording"
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+    ae_category = 'SYSTEM'
+
+    @classmethod
+    def poll(cls, context):
+        return super().poll(context) and hasattr(context.scene, "ae_rec_countdown")
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon='REC')
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        ob = context.active_object
+
+        box = layout.box()
+        box.label(text="Actors:", icon='POSE_HLT')
+        actors = [o for o in scene.objects if getattr(o, "ae_rec_actor", False)]
+        if ob is not None:
+            box.prop(ob, "ae_rec_actor", text="Record \"%s\"" % ob.name)
+        if actors:
+            col = box.column(align=True)
+            for o in actors:
+                col.label(text=o.name, icon='OBJECT_DATA')
+        else:
+            box.label(text="None marked: the active object is recorded", icon='INFO')
+        box.prop(scene, "ae_rec_record_camera")
+
+        col = layout.column()
+        col.prop(scene, "ae_rec_countdown")
+        row = col.row(align=True)
+        row.prop(scene, "ae_rec_sample_rate", expand=True)
+        sub = col.row()
+        sub.active = scene.ae_rec_sample_rate == 'FIXED'
+        sub.prop(scene, "ae_rec_fixed_rate")
+
+        box = layout.box()
+        box.label(text="Output:", icon='ACTION')
+        box.prop(scene, "ae_rec_make_keyframes")
+        sub = box.row()
+        sub.active = scene.ae_rec_make_keyframes
+        sub.prop(scene, "ae_rec_keyframe_tolerance")
+        box.label(text="The take is always kept in the .range", icon='FILE_TICK')
+
+        box = layout.box()
+        box.label(text="Layers:", icon='RENDERLAYERS')
+        box.prop(scene, "ae_rec_playback_layers")
+        sub = box.row()
+        sub.active = scene.ae_rec_playback_layers
+        sub.prop(scene, "ae_rec_playback_collision")
+
+        layout.label(text="Rec Play button: coming in phase 1", icon='INFO')
+
+
 class RENDER_PT_embedded(RenderButtonsPanel, Panel):
     # Embedded and Standalone players side by side, one column each.
     bl_label = "Player"

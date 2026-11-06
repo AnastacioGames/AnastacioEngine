@@ -22,7 +22,11 @@ mas a arquitetura não encaixa e as marcas não são licenciadas).
 
 ## Peças
 
-### 1. Botão e ícone
+### 1. Botão, ícone e painel
+
+- Painel **Motion Recording** em Properties > Render (System), depois de
+  Player, com as configurações (`Scene.ae_rec_*`, `Object.ae_rec_actor`).
+  Feito em 2026-11-06.
 
 - Ícone novo `REC_PLAY` num espaço `DEF_ICON_BLANK` livre de `UI_icons.h`,
   mesmo caminho do ícone `COOK`: `.dat` 16/32 do atlas embutido e PNGs de

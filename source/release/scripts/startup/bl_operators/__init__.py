@@ -35,6 +35,7 @@ _modules = [
     "file",
     "image",
     "anastacio_cook",
+    "anastacio_motion_record",
     "anastacio_prepare_textures",
     "anastacio_performance_report",
     "anastacio_prepare_audio",

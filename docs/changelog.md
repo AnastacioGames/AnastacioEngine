@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Motion Recording: painel na aba Render
+
+- Painel **Motion Recording** (`RENDER_PT_game_motion_record`) em Properties > Render, categoria System, logo depois de
+  Player: atores (`Object.ae_rec_actor`), câmera, contagem, amostragem, keyframes/simplificação e camadas.
+- Propriedades `Scene.ae_rec_*` em `bl_operators/anastacio_motion_record.py`, salvas no `.blend`. Ainda só configuração:
+  o botão Rec Play e a captura em C++ são as próximas fases ([plano](gravacao-de-movimento-plan.md)).
+- Só sintaxe e ícones conferidos aqui (Linux, sem build); falta abrir o painel no editor.
+
 ## 2026-11-05 - KTX2 HQ: cor em UASTC por imagem
 
 - `Image.save_ktx2(high_quality=True)` grava cor em UASTC: mesmo formato na GPU, sem os blocos do ETC1S em degradês. Em 64x64 de

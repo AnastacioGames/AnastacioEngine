@@ -318,8 +318,8 @@ Letterbox também feitos em 2026-11-01, aguardando teste no Windows.
 ### Gravação de movimento (Rec Play)
 
 Plano escrito em 2026-11-06: botão próprio com ícone de gravação, captura ao vivo do personagem, saída em
-keyframes e em take próprio, gravação em camadas. Nada implementado ainda; próxima peça é a Fase 1 (botão,
-ícone e operador). Ver [plano](gravacao-de-movimento-plan.md).
+keyframes e em take próprio, gravação em camadas. Painel Motion Recording (só configuração) na aba Render em
+2026-11-06; falta conferir no editor. Próxima peça: Fase 1 (botão, ícone e operador). Ver [plano](gravacao-de-movimento-plan.md).
 
 ### World Status
 
