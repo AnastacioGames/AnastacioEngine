@@ -29,7 +29,9 @@
 
 #include "mathfu.h"
 
+#include <string>
 #include <vector>
+#include <unordered_map>
 
 class KX_GameObject;
 class KX_Camera;
@@ -80,8 +82,26 @@ private:
 	float m_ssgiScale = 1.0f;
 	/// Frames until the next moved objects check of the volumes.
 	int m_moveCheck = 0;
+	struct MovedObject {
+		mt::vec3 pos;
+		int layer;
+		/// Number of the last check that saw the object.
+		int check;
+	};
+	/// One record for all the volumes: the cost of a check doesn't grow with the boxes.
+	std::unordered_map<KX_GameObject *, MovedObject> m_movedObjects;
+	int m_moveCheckCount = 0;
+	bool m_bakedRead = false;
+	bool m_bakeDone = false;
+	double m_bakeStart = -1.0;
 	/// Counts the frames of the far grid turn in the shared capture budget.
 	unsigned int m_volumeTurn = 0;
+
+	/// Saved light of the volumes: <game file>.<scene>.probes.
+	std::string BakedPath() const;
+	void ReadBakedLight();
+	/// RANGE_PROBE_VOLUME_BAKE: writes the file and quits once all the grids are settled.
+	void CheckBakeDone(double now);
 
 	/// Run the probe volume schedulers: one budget of cube faces per frame shared by the grids.
 	void RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera, const RAS_Rect& viewport, const RAS_Rect& area);

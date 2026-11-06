@@ -35,6 +35,8 @@
 #include "KX_GameObject.h"
 #include "KX_LightObject.h"
 #include "KX_WorldInfo.h"
+#include "KX_Globals.h"
+#include "KX_KetsjiEngine.h"
 
 #include "RAS_Rasterizer.h"
 #include "RAS_OffScreen.h"
@@ -492,6 +494,107 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 	return true;
 }
 
+static const char bakedMagic[4] = {'R', 'P', 'V', '1'};
+
+std::string KX_TextureRendererManager::BakedPath() const
+{
+	return KX_GetMainPath() + "." + m_scene->GetName() + ".probes";
+}
+
+void KX_TextureRendererManager::ReadBakedLight()
+{
+	const std::string path = BakedPath();
+	FILE *file = fopen(path.c_str(), "rb");
+	if (!file) {
+		return;
+	}
+	char magic[4];
+	bool ok = fread(magic, 1, 4, file) == 4 && memcmp(magic, bakedMagic, 4) == 0;
+	int read = 0;
+	while (ok) {
+		int length;
+		if (fread(&length, sizeof(int), 1, file) != 1) {
+			break;
+		}
+		ok = length > 0 && length < 1024;
+		if (!ok) {
+			break;
+		}
+		std::string name(length, '\0');
+		ok = fread(&name[0], 1, length, file) == (size_t)length;
+		KX_ProbeVolume *found = nullptr;
+		for (KX_ProbeVolume *volume : m_volumes) {
+			if (volume->GetViewpointObject() && volume->GetViewpointObject()->GetName() == name) {
+				found = volume;
+			}
+		}
+		if (ok && !found) {
+			// Box removed from the scene: skip its record.
+			int dims[3], count;
+			float box[6];
+			ok = fread(dims, sizeof(int), 3, file) == 3 && fread(box, sizeof(float), 6, file) == 6 &&
+			     fread(&count, sizeof(int), 1, file) == 1 && count >= 0 &&
+			     fseek(file, (long)count * (long)(sizeof(float) * 30 + sizeof(int) * 2), SEEK_CUR) == 0;
+			continue;
+		}
+		ok = ok && found->ReadBaked(file);
+		read += ok ? 1 : 0;
+	}
+	fclose(file);
+	if (!ok) {
+		CM_Warning("probe volume: broken saved light file " << path);
+	}
+	CM_Message("probe volume: saved light read for " << read << " of " << m_volumes.size() << " volumes");
+}
+
+void KX_TextureRendererManager::CheckBakeDone(double now)
+{
+	if (m_bakeStart < 0.0) {
+		m_bakeStart = now;
+	}
+	bool complete = true, idle = true;
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (volume->GetViewpointObject()) {
+			complete &= volume->IsComplete();
+			idle &= volume->IsIdle();
+		}
+	}
+	// A grid that never settles (something keeps moving) doesn't hold the file back forever.
+	if (!complete || (!idle && now - m_bakeStart < 300.0)) {
+		return;
+	}
+	m_bakeDone = true;
+	const std::string path = BakedPath();
+	const std::string temp = path + ".tmp";
+	FILE *file = fopen(temp.c_str(), "wb");
+	if (!file) {
+		CM_Error("probe volume: can't write " << temp);
+		KX_GetActiveEngine()->RequestExit(KX_ExitInfo::QUIT_GAME);
+		return;
+	}
+	fwrite(bakedMagic, 1, 4, file);
+	for (KX_ProbeVolume *volume : m_volumes) {
+		if (volume->GetViewpointObject()) {
+			const std::string name = volume->GetViewpointObject()->GetName();
+			const int length = (int)name.size();
+			fwrite(&length, sizeof(int), 1, file);
+			fwrite(name.data(), 1, length, file);
+			volume->WriteBaked(file);
+		}
+	}
+	const bool ok = !ferror(file);
+	fclose(file);
+	remove(path.c_str());
+	if (ok && rename(temp.c_str(), path.c_str()) == 0) {
+		CM_Message("probe volume: light saved to " << path << " after " << now - m_bakeStart << " s" <<
+		           (idle ? "" : " (not all settled)"));
+	}
+	else {
+		CM_Error("probe volume: can't write " << path);
+	}
+	KX_GetActiveEngine()->RequestExit(KX_ExitInfo::QUIT_GAME);
+}
+
 void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *sceneCamera,
                                               const RAS_Rect& viewport, const RAS_Rect& area)
 {
@@ -503,6 +606,14 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 	const double now = std::chrono::duration<double>(start.time_since_epoch()).count();
 	KX_Camera *activeCam = m_scene->GetActiveCamera();
 	const mt::vec3 cameraPos = activeCam ? activeCam->NodeGetWorldPosition() : mt::zero3;
+
+	static const bool bake = getenv("RANGE_PROBE_VOLUME_BAKE") != nullptr;
+	if (!m_bakedRead) {
+		m_bakedRead = true;
+		if (!bake) {
+			ReadBakedLight();
+		}
+	}
 
 	{
 		// The grid stores linear light: the materials skip the display transform while it captures.
@@ -526,6 +637,20 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		                 [](const std::pair<float, KX_ProbeVolume *>& a, const std::pair<float, KX_ProbeVolume *>& b) {
 			return a.first < b.first;
 		});
+		/* Several grids (a track): one probe per frame at most, during play the warm up budget would
+		 * cost more than the rest of the frame. The boxes near the camera go first; the far ones only
+		 * take the budget once the near ones are settled. */
+		if (bake) {
+			total = 96;
+		}
+		else if (awake.size() > 1 && !ownBudgets) {
+			total = std::min(total, 6);
+			if (awake.front().first <= 120.0f) {
+				awake.erase(std::find_if(awake.begin(), awake.end(), [](const std::pair<float, KX_ProbeVolume *>& item) {
+					return item.first > 120.0f;
+				}), awake.end());
+			}
+		}
 		// Every 4th frame another grid goes first: a near one that never settles can't stall the far ones.
 		if (awake.size() > 1 && (++m_volumeTurn & 3) == 0) {
 			const size_t turn = (m_volumeTurn >> 2) % awake.size();
@@ -550,6 +675,10 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		}
 	}
 
+	if (bake && !m_bakeDone && !m_volumes.empty()) {
+		CheckBakeDone(now);
+	}
+
 	// The per pixel atlas takes the SH9 read this frame.
 	for (KX_ProbeVolume *volume : m_volumes) {
 		volume->UpdateAtlas();
@@ -559,19 +688,45 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 	 * moved go first. Same filter as the capture, without the camera culling. */
 	if (++m_moveCheck >= 30) {
 		m_moveCheck = 0;
-		for (KX_ProbeVolume *volume : m_volumes) {
-			if (!volume->GetViewpointObject()) {
+		const int check = ++m_moveCheckCount;
+		const auto markAll = [this](const mt::vec3& pos, int layer) {
+			for (KX_ProbeVolume *volume : m_volumes) {
+				if (volume->GetViewpointObject()) {
+					volume->MarkMoved(pos, layer);
+				}
+			}
+		};
+		for (KX_GameObject *gameobj : m_scene->GetObjectList()) {
+			if (gameobj->GetMeshList().empty() || !gameobj->GetVisible() || KX_ProbeVolume::SkipObject(gameobj)) {
 				continue;
 			}
-			std::vector<KX_GameObject *> objects;
-			for (KX_GameObject *gameobj : m_scene->GetObjectList()) {
-				if (gameobj->GetMeshList().empty() || !gameobj->GetVisible() ||
-				    (gameobj->GetLayer() & volume->GetIgnoreLayers()) || KX_ProbeVolume::SkipObject(gameobj)) {
-					continue;
+			const mt::vec3 pos = gameobj->NodeGetWorldPosition();
+			const int layer = gameobj->GetLayer();
+			auto it = m_movedObjects.find(gameobj);
+			if (it == m_movedObjects.end()) {
+				m_movedObjects.emplace(gameobj, MovedObject{pos, layer, check});
+				// Added after the start (Add Object, made visible): the probes that see it update.
+				if (check > 1) {
+					markAll(pos, layer);
 				}
-				objects.push_back(gameobj);
+				continue;
 			}
-			volume->CheckMovedObjects(objects);
+			it->second.check = check;
+			const mt::vec3 old = it->second.pos;
+			if ((pos - old).Length() > 0.25f) {
+				it->second.pos = pos;
+				markAll(pos, layer);
+				markAll(old, layer);
+			}
+		}
+		// Gone (ended, hidden): the probes that saw it update.
+		for (auto it = m_movedObjects.begin(); it != m_movedObjects.end();) {
+			if (it->second.check == check) {
+				++it;
+				continue;
+			}
+			markAll(it->second.pos, it->second.layer);
+			it = m_movedObjects.erase(it);
 		}
 	}
 

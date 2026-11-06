@@ -30,6 +30,7 @@
 #include "KX_CubeMap.h"
 
 #include <unordered_map>
+#include <cstdio>
 #include <vector>
 
 struct GPUTexture;
@@ -96,14 +97,6 @@ private:
 	bool m_atlasDirty;
 	std::vector<float> m_atlasData;
 
-	/// Position of each captured object at its last check: moving it past 0.25 m marks the probes near it.
-	struct ObjectPos {
-		mt::vec3 pos;
-		/// Number of the last CheckMovedObjects that saw the object.
-		int check;
-	};
-	std::unordered_map<KX_GameObject *, ObjectPos> m_objectPos;
-	int m_moveCheck = 0;
 	/// Cube shared by every probe of the grid, reused as soon as its readback is requested.
 	GPUTexture *m_cube;
 	Reader m_readers[NUM_READERS];
@@ -120,6 +113,8 @@ private:
 	/** Idle: the light stopped changing (2 cycles in a row) and nothing moved, so no capture runs
 	 * until Wake() or a moved object marks a probe. */
 	bool m_idle = false;
+	/// Light read from the saved file: no capture, the moved objects and the World don't wake it.
+	bool m_baked = false;
 	/// Largest relative change of a probe's light in the current cycle.
 	float m_cycleDelta = 0.0f;
 	int m_stableCycles = 0;
@@ -194,7 +189,14 @@ public:
 	GPUTexture *GetAtlas() const;
 	/** Moved objects: compares the objects the grid captures with their last position and puts the
 	 * probes within clip end of one that moved more than 0.25 m first in the queue. */
-	void CheckMovedObjects(const std::vector<KX_GameObject *>& objects);
+	void MarkMoved(const mt::vec3& pos, int layer);
+
+	/// True once every probe has light or is disabled.
+	bool IsComplete() const;
+	/// Saved light (RANGE_PROBE_VOLUME_BAKE): the grid and its light, read back without any capture.
+	void WriteBaked(FILE *file) const;
+	/// Reads one record. False only when the file is broken; a record of an older box is skipped.
+	bool ReadBaked(FILE *file);
 
 	/// True for objects the grid must not capture (moving physics, deformed mesh, probe_volume_skip).
 	static bool SkipObject(KX_GameObject *gameobj);

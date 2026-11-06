@@ -203,6 +203,9 @@ bool KX_ProbeVolume::IsIdle() const
 
 void KX_ProbeVolume::Wake()
 {
+	if (m_baked) {
+		return;
+	}
 	if (m_idle) {
 		CM_Message("probe volume \"" << GetViewpointObject()->GetName() << "\": light changed, capturing again");
 	}
@@ -421,6 +424,9 @@ void KX_ProbeVolume::ClassifyProbes()
 
 bool KX_ProbeVolume::BeginFrame(const mt::vec3& cameraPos, double now)
 {
+	if (m_baked) {
+		return false;
+	}
 	if (!m_classified) {
 		ClassifyProbes();
 	}
@@ -783,58 +789,110 @@ GPUTexture *KX_ProbeVolume::UpdateAtlas()
 	return m_atlas;
 }
 
-void KX_ProbeVolume::CheckMovedObjects(const std::vector<KX_GameObject *>& objects)
+void KX_ProbeVolume::MarkMoved(const mt::vec3& pos, int layer)
 {
-	// Updated in place: each entry keeps the check number that last saw its object.
-	const int check = ++m_moveCheck;
-	for (KX_GameObject *gameobj : objects) {
-		const mt::vec3 pos = gameobj->NodeGetWorldPosition();
-		auto it = m_objectPos.find(gameobj);
-		if (it == m_objectPos.end()) {
-			m_objectPos.emplace(gameobj, ObjectPos{pos, check});
-			// Added after the start (Add Object, made visible): the probes that see it update.
-			if (check > 1) {
-				for (Probe& probe : m_probes) {
-					if ((probe.position - pos).Length() <= m_clipEnd) {
-						probe.dirty = true;
-					}
-				}
-			}
-			continue;
-		}
-		it->second.check = check;
-		const mt::vec3 old = it->second.pos;
-		if ((pos - old).Length() <= 0.25f) {
-			continue;
-		}
-		it->second.pos = pos;
-		/* The probes that see it (old or new place) are recaptured first; frozen grids stay as
-		 * they are. */
-		for (Probe& probe : m_probes) {
-			if ((probe.position - pos).Length() <= m_clipEnd || (probe.position - old).Length() <= m_clipEnd) {
-				probe.dirty = true;
-			}
+	if (m_baked || (layer & GetIgnoreLayers()) || BoxDistance(pos) > m_clipEnd) {
+		return;
+	}
+	// The probes that see it are recaptured first; frozen grids stay as they are.
+	for (Probe& probe : m_probes) {
+		if ((probe.position - pos).Length() <= m_clipEnd) {
+			probe.dirty = true;
 		}
 	}
-	// Objects gone (or out of reach) drop out; a new object at a reused address only marks too much.
-	for (auto it = m_objectPos.begin(); it != m_objectPos.end();) {
-		if (it->second.check == check) {
-			++it;
-			continue;
+}
+
+bool KX_ProbeVolume::IsComplete() const
+{
+	for (const Probe& probe : m_probes) {
+		if (!probe.valid && !probe.disabled) {
+			return false;
 		}
-		// Gone (ended, hidden): the probes that saw it update.
-		for (Probe& probe : m_probes) {
-			if ((probe.position - it->second.pos).Length() <= m_clipEnd) {
-				probe.dirty = true;
-			}
-		}
-		it = m_objectPos.erase(it);
 	}
+	return true;
+}
+
+namespace {
+struct BakedProbe {
+	float position[3];
+	float sh[9][3];
+	int valid;
+	int disabled;
+};
+}
+
+void KX_ProbeVolume::WriteBaked(FILE *file) const
+{
+	const int count = (int)m_probes.size();
+	const float box[6] = {m_min[0], m_min[1], m_min[2], m_max[0], m_max[1], m_max[2]};
+	fwrite(m_dims, sizeof(int), 3, file);
+	fwrite(box, sizeof(float), 6, file);
+	fwrite(&count, sizeof(int), 1, file);
+	for (const Probe& probe : m_probes) {
+		BakedProbe baked;
+		for (int i = 0; i < 3; i++) {
+			baked.position[i] = probe.position[i];
+		}
+		memcpy(baked.sh, probe.sh, sizeof(baked.sh));
+		baked.valid = probe.valid;
+		baked.disabled = probe.disabled;
+		fwrite(&baked, sizeof(baked), 1, file);
+	}
+}
+
+bool KX_ProbeVolume::ReadBaked(FILE *file)
+{
+	int dims[3], count;
+	float box[6];
+	if (fread(dims, sizeof(int), 3, file) != 3 || fread(box, sizeof(float), 6, file) != 6 ||
+	    fread(&count, sizeof(int), 1, file) != 1 || count < 0 || count > (1 << 20)) {
+		return false;
+	}
+	std::vector<BakedProbe> baked(count);
+	if (count && fread(baked.data(), sizeof(BakedProbe), count, file) != (size_t)count) {
+		return false;
+	}
+	bool same = count == (int)m_probes.size();
+	for (int i = 0; i < 3; i++) {
+		same = same && dims[i] == m_dims[i] && fabsf(box[i] - m_min[i]) < 1e-3f && fabsf(box[i + 3] - m_max[i]) < 1e-3f;
+	}
+	if (!same) {
+		CM_Warning("probe volume \"" << GetViewpointObject()->GetName() << "\": saved light is from another box, capturing");
+		return true;
+	}
+	int active = 0;
+	for (int i = 0; i < count; i++) {
+		Probe& probe = m_probes[i];
+		for (int k = 0; k < 3; k++) {
+			probe.position[k] = baked[i].position[k];
+		}
+		memcpy(probe.sh, baked[i].sh, sizeof(probe.sh));
+		probe.valid = baked[i].valid != 0;
+		probe.disabled = baked[i].disabled != 0;
+		probe.dirty = false;
+		active += probe.disabled ? 0 : 1;
+	}
+	m_activeProbes = active;
+	m_classified = true;
+	m_warmup = false;
+	m_idle = true;
+	m_baked = true;
+	m_atlasDirty = true;
+	return true;
 }
 
 bool KX_ProbeVolume::SkipObject(KX_GameObject *gameobj)
 {
-	return gameobj->IsDynamic() || gameobj->GetDeformer() || gameobj->GetProperty("probe_volume_skip");
+	if (gameobj->IsDynamic() || gameobj->GetDeformer() || gameobj->GetProperty("probe_volume_skip")) {
+		return true;
+	}
+	// Parts riding a dynamic object (a car's body and wheels) move with it all the time.
+	for (KX_GameObject *parent = gameobj->GetParent(); parent; parent = parent->GetParent()) {
+		if (parent->IsDynamic()) {
+			return true;
+		}
+	}
+	return false;
 }
 
 bool KX_ProbeVolume::SetupCamera(KX_Camera *sceneCamera, KX_Camera *camera)
