@@ -263,7 +263,9 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
             row.template_list("SCENE_UL_rec_takes", "", scene, "ae_rec_takes", scene, "ae_rec_take_index", rows=3)
             col = row.column(align=True)
             col.operator("scene.rec_take_remove", icon='ZOOMOUT', text="")
-            box.operator("scene.rec_take_use", icon='PLAY')
+            row = box.row(align=True)
+            row.operator("scene.rec_take_use", icon='PLAY')
+            row.operator("scene.rec_take_to_cutscene", icon='SEQUENCE')
             box.prop(scene, "ae_rec_replace_take")
         else:
             box.label(text="Each recording appears here")

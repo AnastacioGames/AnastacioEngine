@@ -681,6 +681,49 @@ static const std::string &GetLocalizedText(const KX_CutsceneManager::Event *even
 	return event->m_textEn; /* Default to English */
 }
 
+/* Away from the layers a character uses for its own animation. */
+static const short MOTION_TAKE_LAYER = 7;
+
+void KX_Scene::PlayMotionTake(const std::string& name)
+{
+	/* Takes are ID properties of the scene, written by Rec Play in the editor. */
+	Scene *scene = GetBlenderScene();
+	IDProperty *takes = scene->id.properties ? IDP_GetPropertyFromGroup(scene->id.properties, "ae_rec_takes") : nullptr;
+	if (takes && takes->type == IDP_IDPARRAY) {
+		for (int i = 0; i < takes->len; ++i) {
+			IDProperty *take = &IDP_IDPArray(takes)[i];
+			IDProperty *takeName = IDP_GetPropertyFromGroup(take, "name");
+			IDProperty *duration = IDP_GetPropertyFromGroup(take, "duration");
+			IDProperty *actors = IDP_GetPropertyFromGroup(take, "actors");
+			if (!takeName || !duration || !actors || name != IDP_String(takeName)) {
+				continue;
+			}
+			const float seconds = (duration->type == IDP_FLOAT) ? IDP_Float(duration) : (float)IDP_Double(duration);
+			const float start = (float)scene->r.sfra;
+			const float end = start + seconds * ((float)scene->r.frs_sec / scene->r.frs_sec_base);
+			for (int a = 0; a < actors->len; ++a) {
+				IDProperty *actor = &IDP_IDPArray(actors)[a];
+				IDProperty *objectName = IDP_GetPropertyFromGroup(actor, "object_name");
+				IDProperty *actionName = IDP_GetPropertyFromGroup(actor, "action_name");
+				KX_GameObject *gameobj = objectName ? FindGameObject(m_objectlist, IDP_String(objectName)) : nullptr;
+				if (!gameobj || !actionName) {
+					CM_Error("Play Take '" << name << "': an actor is missing from the scene");
+					continue;
+				}
+				/* Otherwise physics pulls a rigid body away from the recorded path. */
+				if (gameobj->GetPhysicsController()) {
+					gameobj->GetPhysicsController()->SuspendDynamics(false);
+				}
+				/* A take that ends as this one starts may still hold the layer. */
+				gameobj->StopAction(MOTION_TAKE_LAYER);
+				gameobj->PlayAction(IDP_String(actionName), start, end, MOTION_TAKE_LAYER);
+			}
+			return;
+		}
+	}
+	CM_Error("Play Take: no take named '" << name << "'");
+}
+
 void KX_Scene::DispatchCutsceneEvents()
 {
 	const KX_CutsceneManager::DispatchedEvents dispatchedEvents = TakePendingCutsceneEvents();
@@ -696,6 +739,7 @@ void KX_Scene::DispatchCutsceneEvents()
 				case CUTSCENE_EVENT_FADE:
 				case CUTSCENE_EVENT_LETTERBOX:
 				case CUTSCENE_EVENT_PLAYER_ANIM:
+				case CUTSCENE_EVENT_PLAY_TAKE:
 					continue;
 				default:
 					break;
@@ -1093,6 +1137,10 @@ void KX_Scene::DispatchCutsceneEvents()
 				CallCutsceneRuntime("fade", args);
 				m_cutsceneOverlayActive = true;
 			}
+			break;
+
+		case CUTSCENE_EVENT_PLAY_TAKE:
+			PlayMotionTake(event->m_paramStrA);
 			break;
 
 		case CUTSCENE_EVENT_LETTERBOX:

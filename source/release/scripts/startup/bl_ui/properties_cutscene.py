@@ -251,6 +251,11 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
         elif event.type == 'UNLOCK_PLAYER':
             layout.box().label("Unlocks player input. No parameters.")
 
+        elif event.type == 'PLAY_TAKE':
+            box = layout.box()
+            box.label("Play Take")
+            box.prop_search(event, "take_name", context.scene, "ae_rec_takes", text="Take")
+
         elif event.type == 'PLAYER_ANIM':
             box = layout.box()
             box.label("Player Anim")

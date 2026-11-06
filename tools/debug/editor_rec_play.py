@@ -48,6 +48,25 @@ def compare(scene):
             report('  log+%d passo: erro max posicao=%.4f matriz=%.4f' % (atraso, pos, rot))
 
 
+REPLAY = '''import bge, json, os
+def tick(cont):
+    own = cont.owner
+    n = own.get('n', 0)
+    own['n'] = n + 1
+    if n == 0:
+        own.scene.play_cutscene(0)
+    log = own.get('log')
+    if log is None:
+        log = own['log'] = []
+    log.append({o.name: [list(r) for r in o.worldTransform] for o in own.scene.objects
+                if o.name in ('Cubo', 'Girador', 'Filho')})
+    if n >= 330:
+        with open(os.environ['REC_REPLAY'], 'w') as f:
+            json.dump(log, f)
+        bge.logic.endGame()
+'''
+
+
 class RecFim(bpy.types.Operator):
     """Desfaz pelo laco de eventos, como Ctrl+Z: dentro do handler a cena em uso seria liberada."""
     bl_idname = 'wm.rec_fim'
@@ -69,6 +88,16 @@ class RecFim(bpy.types.Operator):
             bpy.context.scene.ae_rec_take_index = 0
             report('use take 1: %s' % bpy.ops.scene.rec_take_use())
             report('frame_end=%d' % bpy.context.scene.frame_end)
+            report('cutscene: %s' % bpy.ops.scene.rec_take_to_cutscene())
+            bpy.context.scene.ae_rec_take_index = 1
+            bpy.ops.scene.rec_take_to_cutscene()
+            sequence = bpy.context.scene.cutscene_settings.sequences[0]
+            report('eventos: %s' % [(e.type, e.take_name, round(e.time, 2)) for e in sequence.events])
+            # Copia em que o script so toca a cutscene: o Take 1 tem de repetir o registro do jogo.
+            texto = bpy.data.texts['rec_teste.py']
+            texto.clear()
+            texto.write(REPLAY)
+            bpy.ops.wm.save_as_mainfile(filepath=os.environ['REC_CUT'], copy=True)
             report('Cubo usa: %s' % bpy.data.objects['Cubo'].animation_data.action.name)
             bpy.context.scene.frame_set(bpy.context.scene.frame_start)
             bpy.ops.screen.animation_play()

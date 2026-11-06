@@ -1902,6 +1902,7 @@ typedef enum CutsceneEventType {
 	CUTSCENE_EVENT_CAMERA_PATH = 17,
 	CUTSCENE_EVENT_FADE = 18,
 	CUTSCENE_EVENT_LETTERBOX = 19,
+	CUTSCENE_EVENT_PLAY_TAKE = 20,
 } CutsceneEventType;
 
 typedef struct CutsceneEvent {

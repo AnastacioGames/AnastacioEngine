@@ -77,8 +77,43 @@ class SCENE_OT_rec_take_use(Operator):
         return {'FINISHED'}
 
 
+class SCENE_OT_rec_take_to_cutscene(Operator):
+    """Add a Play Take event to the active cutscene sequence, after the takes already there"""
+    bl_idname = "scene.rec_take_to_cutscene"
+    bl_label = "Add to Cutscene"
+    bl_options = {'UNDO'}
+
+    def execute(self, context):
+        scene = context.scene
+        index = scene.ae_rec_take_index
+        if not 0 <= index < len(scene.ae_rec_takes):
+            return {'CANCELLED'}
+        take = scene.ae_rec_takes[index]
+        settings = scene.cutscene_settings
+        if not settings.sequences:
+            bpy.ops.cutscene.sequence_add()
+        sequence_index = min(settings.active_sequence_index, len(settings.sequences) - 1)
+        sequence = settings.sequences[sequence_index]
+        start = 0.0
+        for event in sequence.events:
+            length = 0.0
+            if event.type == 'PLAY_TAKE':
+                other = scene.ae_rec_takes.get(event.take_name)
+                length = other.duration if other else 0.0
+            start = max(start, event.time + length)
+        bpy.ops.cutscene.event_add(sequence_index=sequence_index)
+        event = sequence.events[-1]
+        event.type = 'PLAY_TAKE'
+        event.name = take.name
+        event.take_name = take.name
+        event.time = start
+        self.report({'INFO'}, "%s added to %s at %.1f s" % (take.name, sequence.name, start))
+        return {'FINISHED'}
+
+
 # bl_operators.register() reads this list from every module.
-classes = (RecTakeActor, RecTake, SCENE_UL_rec_takes, SCENE_OT_rec_take_remove, SCENE_OT_rec_take_use)
+classes = (RecTakeActor, RecTake, SCENE_UL_rec_takes, SCENE_OT_rec_take_remove, SCENE_OT_rec_take_use,
+           SCENE_OT_rec_take_to_cutscene)
 
 
 def register_props():

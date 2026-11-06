@@ -167,10 +167,8 @@ static bAction *motion_action_create(
 		{"rotation_euler", 0}, {"rotation_euler", 1}, {"rotation_euler", 2},
 		{"scale", 0}, {"scale", 1}, {"scale", 2},
 	};
-	/* Quaternion curves do not play in the game. */
-	if (ob->rotmode <= 0) {
-		ob->rotmode = ROT_MODE_EUL;
-	}
+	/* The game reads object rotation curves as XYZ Euler, whatever the mode of the object. */
+	ob->rotmode = ROT_MODE_EUL;
 
 	float *times = MEM_mallocN(sizeof(float) * num, __func__);
 	float *values = MEM_mallocN(sizeof(float) * num * MOTION_CHANNELS, __func__);

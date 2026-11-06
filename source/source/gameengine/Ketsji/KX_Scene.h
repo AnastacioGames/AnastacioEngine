@@ -787,6 +787,8 @@ public:
 	/** Jump to the end of the playing Cutscene, keeping its end state (camera, player, scene change). */
 	bool SkipCutscene();
 	bool RestartCutscene();
+	/// Rec Play: plays the Actions of a take on its actors, keeping them where it ends.
+	void PlayMotionTake(const std::string& name);
 	/** Advance the scene-owned Cutscene clock and retain crossed events. */
 	void UpdateCutscene(double deltaTime);
 	/** Transfer events accumulated by UpdateCutscene() to the native dispatcher. */

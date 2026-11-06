@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 2.6 (Play Take no Cutscene)
+
+- Evento `PLAY_TAKE` no Cutscene e botão Add to Cutscene no Take, que cria a sequência se preciso e coloca o evento depois dos Takes já presentes.
+- No jogo, `KX_Scene::PlayMotionTake` lê o Take das propriedades da cena, suspende a física dos atores e toca as Actions na camada 7. A física não volta sozinha no fim do Take.
+- O jogo lê a rotação de objeto como Euler XYZ, então a gravação passa o ator para XYZ. Antes, ZXY tocava certo no editor e errado no jogo.
+- Teste: gravar, Add to Cutscene e tocar no runtime contra o registro do jogo, erro máximo de 2,2 mm em posição e 0,001 na matriz, com Cubo físico, Girador e Filho.
+
 ## 2026-11-06 - Rec Play: Fase 2.5 (Takes e duração)
 
 - Take agrupa as Actions de uma gravação: lista no painel (`Scene.ae_rec_takes`, sem DNA novo), Use Take, apagar e Replace Selected Take.

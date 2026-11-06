@@ -7956,6 +7956,7 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 		{CUTSCENE_EVENT_WAIT_CAMERA_END, "WAIT_CAMERA_END", ICON_TIME, "Wait Camera End", "Pause the timeline until the current camera shot finishes"},
 		{CUTSCENE_EVENT_CAMERA_PATH, "CAMERA_PATH", ICON_CURVE_PATH, "Camera Path", "Move an object (usually a camera) along a curve"},
 		{CUTSCENE_EVENT_FADE, "FADE", ICON_IMAGE_ALPHA, "Fade", "Fade the screen to or from black"},
+		{CUTSCENE_EVENT_PLAY_TAKE, "PLAY_TAKE", ICON_ACTION, "Play Take", "Play a Rec Play take on its actors"},
 		{CUTSCENE_EVENT_LETTERBOX, "LETTERBOX", ICON_FULLSCREEN_EXIT, "Letterbox", "Show or hide black cinema bars at the top and bottom"},
 		{0, NULL, 0, NULL, NULL}
 	};
@@ -8139,6 +8140,12 @@ static void rna_def_cutscene_event(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "path_set_camera", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "param_int", 1);
 	RNA_def_property_ui_text(prop, "Make Active Camera", "Make the object the active scene camera while it moves");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
+	/* Rec Play */
+	prop = RNA_def_property(srna, "take_name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "param_str_a");
+	RNA_def_property_ui_text(prop, "Take", "Name of the Rec Play take to play");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
 	/* Player */
