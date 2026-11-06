@@ -315,6 +315,12 @@ Diálogo na tela (Text Object, Speaker, Wait for Advance), voz e corte nativo de
 transição suave entre câmeras (hoje só corte seco) e animação de NPC por evento. Pular (Tab/Start), Fade e
 Letterbox também feitos em 2026-11-01, aguardando teste no Windows.
 
+### Gravação de movimento (Rec Play)
+
+Plano escrito em 2026-11-06: botão próprio com ícone de gravação, captura ao vivo do personagem, saída em
+keyframes e em take próprio, gravação em camadas. Nada implementado ainda; próxima peça é a Fase 1 (botão,
+ícone e operador). Ver [plano](gravacao-de-movimento-plan.md).
+
 ### World Status
 
 Causa raiz achada e corrigida em 2026-09-20 (o World do `startup.blend` não passava por `BKE_world_init`); as oito
