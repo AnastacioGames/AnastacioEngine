@@ -102,6 +102,7 @@
 #include "BLI_listbase.h"
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
+#include "DNA_anim_types.h"
 #include "DNA_node_types.h"
 #include "BKE_scene.h" // SETLOOPER
 #include "BKE_node.h" // SH_NODE_WORLD_BLOOM_FX, SH_NODE_WORLD_SSR_FX
@@ -681,6 +682,29 @@ static const std::string &GetLocalizedText(const KX_CutsceneManager::Event *even
 	return event->m_textEn; /* Default to English */
 }
 
+/* The NLA player takes every track that is not muted, so the tracks of other takes are muted. */
+static void PlayMotionTakeTracks(KX_GameObject *gameobj, const char *prefix, float start)
+{
+	Object *object = gameobj->GetBlenderObject();
+	if (!object || !object->adt) {
+		return;
+	}
+	for (NlaTrack *track = (NlaTrack *)object->adt->nla_tracks.first; track; track = track->next) {
+		if (strncmp(track->name, "Rec_", 4) == 0) {
+			if (strncmp(track->name, prefix, strlen(prefix)) == 0) {
+				track->flag &= ~NLATRACK_MUTED;
+			}
+			else {
+				track->flag |= NLATRACK_MUTED;
+			}
+		}
+	}
+	gameobj->StopNla();
+	if (gameobj->PlayNla(1.0f, false)) {
+		gameobj->SetNlaFrame(start);
+	}
+}
+
 /* Away from the layers a character uses for its own animation. */
 static const short MOTION_TAKE_LAYER = 7;
 
@@ -705,8 +729,9 @@ void KX_Scene::PlayMotionTake(const std::string& name)
 				IDProperty *actor = &IDP_IDPArray(actors)[a];
 				IDProperty *objectName = IDP_GetPropertyFromGroup(actor, "object_name");
 				IDProperty *actionName = IDP_GetPropertyFromGroup(actor, "action_name");
+				IDProperty *trackPrefix = IDP_GetPropertyFromGroup(actor, "track_prefix");
 				KX_GameObject *gameobj = objectName ? FindGameObject(m_objectlist, IDP_String(objectName)) : nullptr;
-				if (!gameobj || !actionName) {
+				if (!gameobj) {
 					CM_Error("Play Take '" << name << "': an actor is missing from the scene");
 					continue;
 				}
@@ -714,9 +739,14 @@ void KX_Scene::PlayMotionTake(const std::string& name)
 				if (gameobj->GetPhysicsController()) {
 					gameobj->GetPhysicsController()->SuspendDynamics(false);
 				}
-				/* A take that ends as this one starts may still hold the layer. */
-				gameobj->StopAction(MOTION_TAKE_LAYER);
-				gameobj->PlayAction(IDP_String(actionName), start, end, MOTION_TAKE_LAYER);
+				if (actionName && IDP_String(actionName)[0]) {
+					/* A take that ends as this one starts may still hold the layer. */
+					gameobj->StopAction(MOTION_TAKE_LAYER);
+					gameobj->PlayAction(IDP_String(actionName), start, end, MOTION_TAKE_LAYER);
+				}
+				if (trackPrefix && IDP_String(trackPrefix)[0]) {
+					PlayMotionTakeTracks(gameobj, IDP_String(trackPrefix), start);
+				}
 			}
 			return;
 		}

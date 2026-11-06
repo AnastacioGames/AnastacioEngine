@@ -372,6 +372,9 @@ public:
 	 */
 	const std::string GetActionName(short layer);
 
+	/// Layers with an action that is still playing.
+	std::vector<short> GetPlayingActionLayers();
+
 	/**
 	 * Sets the layerweight in an action
 	 */

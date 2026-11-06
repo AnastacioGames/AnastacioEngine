@@ -1997,6 +1997,15 @@ void KX_Scene::UpdateMotionRecord()
 				m_motionRecordActors.push_back(gameobj);
 			}
 		}
+		/* An actor is the object and all it carries, such as a capsule with its armature. */
+		for (unsigned int i = 0, marked = m_motionRecordActors.size(); i < marked; ++i) {
+			for (KX_GameObject *child : m_motionRecordActors[i]->GetChildrenRecursive()) {
+				if (child->GetBlenderObject() && !BKE_motion_record_is_actor(child->GetBlenderObject())) {
+					BKE_motion_record_add_child(child->GetBlenderObject());
+					m_motionRecordActors.push_back(child);
+				}
+			}
+		}
 	}
 	if (!BKE_motion_record_sample_due()) {
 		return;
@@ -2009,6 +2018,12 @@ void KX_Scene::UpdateMotionRecord()
 			motion_record_world_matrix(parent, parentMat);
 		}
 		BKE_motion_record_sample(gameobj->GetBlenderObject(), mat, parent ? parentMat : nullptr);
+		if (gameobj->GetGameObjectType() == SCA_IObject::OBJ_ARMATURE) {
+			for (short layer : gameobj->GetPlayingActionLayers()) {
+				BKE_motion_record_clip(gameobj->GetBlenderObject(), layer,
+				                       gameobj->GetActionName(layer).c_str(), gameobj->GetActionFrame(layer));
+			}
+		}
 	}
 }
 

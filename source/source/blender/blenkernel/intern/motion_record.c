@@ -25,6 +25,7 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
+#include "BLI_string.h"
 #include "BLI_utildefines.h"
 
 #include "BKE_motion_record.h"
@@ -33,7 +34,13 @@ typedef struct MotionTrack {
 	struct Object *ob;
 	MotionSample *samples;
 	int num, capacity;
+	MotionClip *clips;
+	int clips_num, clips_capacity;
+	bool is_child;
 } MotionTrack;
+
+/* Longer than this without seeing an Action means it stopped and started again. */
+#define MOTION_CLIP_MAX_GAP 0.5f
 
 static struct {
 	MotionTrack *tracks;
@@ -47,6 +54,7 @@ void BKE_motion_record_free(void)
 {
 	for (int i = 0; i < rec.tracks_num; i++) {
 		MEM_SAFE_FREE(rec.tracks[i].samples);
+		MEM_SAFE_FREE(rec.tracks[i].clips);
 	}
 	MEM_SAFE_FREE(rec.tracks);
 	memset(&rec, 0, sizeof(rec));
@@ -136,6 +144,52 @@ void BKE_motion_record_sample(const struct Object *ob, const float mat[4][4], co
 	}
 }
 
+void BKE_motion_record_add_child(struct Object *ob)
+{
+	if (!rec.active || motion_track_find(ob)) {
+		return;
+	}
+	rec.tracks = MEM_reallocN(rec.tracks, sizeof(MotionTrack) * (rec.tracks_num + 1));
+	MotionTrack *track = &rec.tracks[rec.tracks_num++];
+	memset(track, 0, sizeof(*track));
+	track->ob = ob;
+	track->is_child = true;
+}
+
+void BKE_motion_record_clip(const struct Object *ob, int layer, const char *action, float frame)
+{
+	MotionTrack *track = motion_track_find(ob);
+	if (!rec.active || !track) {
+		return;
+	}
+	const float t = (float)rec.time;
+	MotionClip *last = NULL;
+	for (int i = track->clips_num - 1; i >= 0 && !last; i--) {
+		if (track->clips[i].layer == layer) {
+			last = &track->clips[i];
+		}
+	}
+	if (last && STREQ(last->action, action) && t - last->t_end < MOTION_CLIP_MAX_GAP) {
+		/* Same direction: a loop that jumps back to the start is a new clip. */
+		if ((frame - last->frame_end) * (last->frame_end - last->frame_start) >= 0.0f) {
+			last->t_end = t;
+			last->frame_end = frame;
+			return;
+		}
+	}
+	if (track->clips_num == track->clips_capacity) {
+		track->clips_capacity = max_ii(16, track->clips_capacity * 2);
+		track->clips = track->clips ?
+		        MEM_reallocN(track->clips, sizeof(MotionClip) * track->clips_capacity) :
+		        MEM_mallocN(sizeof(MotionClip) * track->clips_capacity, __func__);
+	}
+	MotionClip *clip = &track->clips[track->clips_num++];
+	BLI_strncpy(clip->action, action, sizeof(clip->action));
+	clip->layer = layer;
+	clip->t_start = clip->t_end = t;
+	clip->frame_start = clip->frame_end = frame;
+}
+
 void BKE_motion_record_advance(double step)
 {
 	if (!rec.active) {
@@ -150,6 +204,17 @@ void BKE_motion_record_advance(double step)
 int BKE_motion_record_actors_num(void)
 {
 	return rec.tracks_num;
+}
+
+const MotionClip *BKE_motion_record_actor_clips(int index, int *r_clips_num)
+{
+	*r_clips_num = rec.tracks[index].clips_num;
+	return rec.tracks[index].clips;
+}
+
+bool BKE_motion_record_actor_is_child(int index)
+{
+	return rec.tracks[index].is_child;
 }
 
 struct Object *BKE_motion_record_actor(int index, const MotionSample **r_samples, int *r_samples_num)

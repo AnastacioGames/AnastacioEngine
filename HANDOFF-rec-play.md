@@ -9,7 +9,8 @@ Regras de build: [AGENTS.md](AGENTS.md).
 - Fase 2 (captura e Action `Rec_<objeto>`): feita, ver `docs/changelog.md`.
 - Fase 2.5 (Takes, Max Duration, contador): feita, sem aceite visual do painel e do contador.
 - Fase 2.6 (evento Play Take e Add to Cutscene): feita, sem aceite visual.
-- Próxima: Fase 3.
+- Fase 3 (filhos e armature por NLA): feita, sem teste com personagem real.
+- Próxima: Fase 4.
 
 ## Como testar
 

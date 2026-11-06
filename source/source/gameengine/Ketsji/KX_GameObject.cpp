@@ -812,6 +812,11 @@ const std::string KX_GameObject::GetActionName(short layer)
 	return GetActionManager()->GetActionName(layer);
 }
 
+std::vector<short> KX_GameObject::GetPlayingActionLayers()
+{
+	return GetActionManager()->GetPlayingLayers();
+}
+
 void KX_GameObject::SetActionLayerWeight(short layer, float layer_weight)
 {
 	GetActionManager()->SetActionLayerWeight(layer, layer_weight);

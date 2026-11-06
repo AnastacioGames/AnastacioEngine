@@ -60,6 +60,9 @@ def tick(cont):
         log = own['log'] = []
     log.append({o.name: [list(r) for r in o.worldTransform] for o in own.scene.objects
                 if o.name in ('Cubo', 'Girador', 'Filho')})
+    boneco = own.scene.objects['Boneco']
+    boneco.update()
+    log[-1]['osso'] = [v for linha in boneco.channels[0].pose_matrix for v in linha]
     if n >= 330:
         with open(os.environ['REC_REPLAY'], 'w') as f:
             json.dump(log, f)
@@ -135,6 +138,12 @@ def run(scene):
         report('actions: %s' % actions())
         compare(scene)
         report('takes: %s' % takes(scene))
+        report('atores: %s' % [(a.object_name, a.action_name, a.track_prefix) for a in scene.ae_rec_takes[0].actors])
+        boneco = bpy.data.objects['Boneco']
+        for track in boneco.animation_data.nla_tracks:
+            faixas = [(s.action.name, round(s.frame_start, 1), round(s.frame_end, 1)) for s in track.strips]
+            report('NLA %s: %d faixas, primeiras %s' % (track.name, len(faixas), faixas[:3]))
+        scene.frame_set(scene.frame_start)
         scene.ae_rec_max_duration = 2.0
         report('rec 2 (limite 2 s): %s' % bpy.ops.view3d.game_record(override))
         report('takes: %s' % takes(scene))

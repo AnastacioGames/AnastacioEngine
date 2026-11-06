@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-06 (`HEAD` `6590f82b`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-06 (`HEAD` `19939bb0`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -13,7 +13,7 @@ Caminhos abaixo relativos a `source/source/gameengine/`.
 
 ---
 
-## `Ketsji/KX_Scene.cpp` (4.856 linhas)
+## `Ketsji/KX_Scene.cpp` (4.871 linhas)
 
 Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings Python. Cutscene e Trace Rail ficam em
 `Ketsji/KX_SceneCutscene.cpp` (mesma classe `KX_Scene`). O header é
@@ -27,22 +27,22 @@ Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings
 | Suspensão e culling (config) | `Suspend`/`Resume`/`IsSuspended` 1113–1128, `SetActivityCulling` 1108, `Set/GetDbvtCulling` e oclusão 719–734 |
 | Objetos: criação/réplica/grupos | `AddNodeReplicaObject` 1166, `ReplicateLogic` 1368, `DupliGroupRecurse` 1454, `IsObjectInGroup` 1596, `FindInactiveObjectAcrossScenes` 1601, `AddReplicaObject` 1648 |
 | Objetos: remoção | `RemoveNodeDestructObject` 1156, `RemoveObject` 1746, `RemoveDupliGroup` 1759, `DelayedRemoveObject` 1768, `RemoveEuthanasyObjects` 1775, `NewRemoveObject` 1795 |
-| Câmera e estatísticas de culling | `Get/SetActiveCamera` 1450–1468, contadores `GetLast*` 1474–1504, `Get/SetOverrideCullingCamera` 1511–1516, `SetCameraOnTop` 2103 |
-| Culling e listas visíveis | `PhysicsCullingCallback` 2124, `CalculateVisibleMeshes` 2143–2166, `UpdateObjectActivity` 3442 |
-| Debug (desenho e ImGui) | `GetDebugDraw` 2345, `DrawDebug` 2350, `RenderDebugProperties` 2387, `RenderDebugPropertiesImGui` 2440, `FlushDebugDraw` 2586, `AddObjectDebugProperties` 1138 |
-| Frame lógico | `LogicBeginFrame` 2591, `LogicUpdateFrame` 2916, `LogicEndFrame` 2942, `UpdateParents` 2965 |
-| Animação | `AddAnimatedObject` 2608, `UpdateAnimPoseTask` 2696, `UpdateAnimDeformTask` 2726, `UpdateAnimations` 2796, `UpdateAnimationDeformers` 2907 |
-| Render | `RenderBuckets` 2988, `RenderTextureRenderers` 3003, `Get2DFilterManager` 3753, `Render2DFilters` 3758 |
-| LOD | `UpdateObjectLods` 3009, hysteresis 2185–2200 |
-| Partículas GPU | `UpdateGpuParticleEmitters` 3130, listas de emissores/colisores 2219–2250 |
+| Câmera e estatísticas de culling | `Get/SetActiveCamera` 1450–1468, contadores `GetLast*` 1474–1504, `Get/SetOverrideCullingCamera` 1511–1516, `SetCameraOnTop` 2118 |
+| Culling e listas visíveis | `PhysicsCullingCallback` 2139, `CalculateVisibleMeshes` 2158–2181, `UpdateObjectActivity` 3457 |
+| Debug (desenho e ImGui) | `GetDebugDraw` 2360, `DrawDebug` 2365, `RenderDebugProperties` 2402, `RenderDebugPropertiesImGui` 2455, `FlushDebugDraw` 2601, `AddObjectDebugProperties` 1138 |
+| Frame lógico | `LogicBeginFrame` 2606, `LogicUpdateFrame` 2931, `LogicEndFrame` 2957, `UpdateParents` 2980 |
+| Animação | `AddAnimatedObject` 2623, `UpdateAnimPoseTask` 2711, `UpdateAnimDeformTask` 2741, `UpdateAnimations` 2811, `UpdateAnimationDeformers` 2922 |
+| Render | `RenderBuckets` 3003, `RenderTextureRenderers` 3018, `Get2DFilterManager` 3768, `Render2DFilters` 3773 |
+| LOD | `UpdateObjectLods` 3024, hysteresis 2185–2200 |
+| Partículas GPU | `UpdateGpuParticleEmitters` 3145, listas de emissores/colisores 2219–2250 |
 | Sombras (listas) | casters estáticos/dinâmicos e flag "dirty" 2255–2298 |
 | Física e rede | `Get/SetPhysicsEnvironment` 2339–2344, gravidade 2353–2358, `Get/SetNetworkMessageScene` 2329–2334, `Get/SetSuspendedDelta` 2363–2368 |
-| Merge de cenas | `MergeScene_LogicBrick` 3517, `MergeScene_GameObject` 3540, `MergeScene` 3615 |
+| Merge de cenas | `MergeScene_LogicBrick` 3532, `MergeScene_GameObject` 3555, `MergeScene` 3630 |
 | Iluminação (flag) | `Get/SetUseLightScatter` 2582–2587 |
 | Cutscene e Trace Rail (em `Ketsji/KX_SceneCutscene.cpp`, 901 linhas) | `SetCutsceneManager` 153, `StopCutscene` 164, `RestartCutscene` 174, `UpdateCutscene` 185, `StartTraceRail` 241, `StartTraceRailOrigin` 295, `UpdateTraceRail` 361, `UpdateCutscenePaths` 467, `TakePendingCutsceneEvents` 518, `DispatchCutsceneEvents` 574 (~300 linhas), `ClearCutsceneSpawnedObjects` 877, `GetCutsceneManager` 893 |
 | Busca e texto (`static`, em `KX_SceneCutscene.cpp`) | `FindObjectWithComponent` 526, `FindGameObject` 548, `GetLocalizedText` 566 |
-| Callbacks de Python | `RunDrawingCallbacks` 3831, `RunOnRemoveCallbacks` 3847 |
-| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 4800 |
+| Callbacks de Python | `RunDrawingCallbacks` 3846, `RunOnRemoveCallbacks` 3862 |
+| Bindings Python (3014–fim) | `Type` 3043, `Methods[]` 3068, `Attributes[]` 3441, `Map_*`/`Seq_Contains` (`static`) 3085–3186, `pyattr_*` 3225–3428, métodos (`addObject` 3466, `end`, `restart`, `replace`, `suspend`, `resume`, `play_cutscene`, `get`…) 3466–3692, `ConvertPythonToScene` 4815 |
 
 Observações: `DispatchCutsceneEvents` e `AddReplicaObject` são as funções mais longas; a remoção de objetos tem
 cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`, `NewRemoveObject`,

@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: Fase 3 (personagem completo)
+
+- Ator agora inclui os filhos. Filho parado em relação ao pai não gera Action.
+- Armature grava as Actions que tocaram: cada trecho vira uma faixa no NLA, em track `Rec_<n>_<camada>`. Takes diferentes ficam em tracks diferentes, e Use Take e Play Take silenciam os outros.
+- Play Take toca as faixas com `playNLA`, ainda muda o mute das tracks nos dados carregados.
+- Teste no runtime com armature com malha: erro mediano 0,0000 na pose do osso, com loop e troca de Action; o osso entra um passo depois dos objetos. Armature sem malha não atualiza a pose no jogo.
+- Não gravado: Action de forma (shape key), IK e pose por script.
+
 ## 2026-11-06 - Rec Play: Fase 2.6 (Play Take no Cutscene)
 
 - Evento `PLAY_TAKE` no Cutscene e botão Add to Cutscene no Take, que cria a sequência se preciso e coloca o evento depois dos Takes já presentes.

@@ -52,6 +52,48 @@ filho.parent = girador
 filho.matrix_parent_inverse = girador.matrix_world.inverted()
 filho.ae_rec_actor = True
 
+# Enfeite: filho parado do Cubo, nao deve gerar Action.
+bpy.ops.mesh.primitive_cube_add(radius=0.15, location=(-3, 0, 6.9))
+enfeite = scene.objects.active
+enfeite.name = 'Enfeite'
+material(enfeite, 'verde', (0.1, 0.8, 0.2))
+enfeite.game.physics_type = 'NO_COLLISION'
+enfeite.parent = cubo
+enfeite.matrix_parent_inverse = cubo.matrix_world.inverted()
+
+# Boneco: armature filha do Girador, nao marcada, com duas animacoes de um osso.
+bpy.ops.object.armature_add(location=(3, 0, 3))
+boneco = scene.objects.active
+boneco.name = 'Boneco'
+boneco.parent = girador
+boneco.matrix_parent_inverse = girador.matrix_world.inverted()
+boneco.animation_data_create()
+osso = boneco.pose.bones[0]
+osso.rotation_mode = 'XYZ'
+for nome, passos, angulo in (('AnimA', 30, 1.5), ('AnimB', 20, -1.0)):
+    acao = bpy.data.actions.new(nome)
+    acao.use_fake_user = True
+    boneco.animation_data.action = acao
+    for frame, valor in ((1, 0.0), (passos, angulo)):
+        osso.rotation_euler = (valor, 0, 0)
+        osso.keyframe_insert('rotation_euler', frame=frame)
+boneco.animation_data.action = None
+osso.rotation_euler = (0, 0, 0)
+
+# Sem malha ligada a armature nao e atualizada no jogo.
+bpy.ops.object.mode_set(mode='OBJECT')
+bpy.ops.mesh.primitive_cube_add(radius=0.3, location=(3, 0, 3.5))
+corpo = scene.objects.active
+corpo.name = 'Corpo'
+material(corpo, 'roxo', (0.6, 0.2, 0.8))
+corpo.game.physics_type = 'NO_COLLISION'
+grupo = corpo.vertex_groups.new('Bone')
+grupo.add([v.index for v in corpo.data.vertices], 1.0, 'REPLACE')
+corpo.parent = boneco
+corpo.parent_type = 'ARMATURE'
+corpo.matrix_parent_inverse = boneco.matrix_world.inverted()
+corpo.modifiers.new('Armature', 'ARMATURE').object = boneco
+
 texto = bpy.data.texts.new('rec_teste.py')
 texto.write('''import bge, json, math, os
 PASSOS = 300
@@ -64,11 +106,18 @@ def tick(cont):
     own.applyRotation((0.03, 0.05, 0.07), True)
     filho = own.scene.objects['Filho']
     filho.applyRotation((0, 0, 0.1), True)
+    boneco = own.scene.objects['Boneco']
+    if n == 0:
+        boneco.playAction('AnimA', 1, 30, play_mode=bge.logic.KX_ACTION_MODE_LOOP)
+    elif n == 120:
+        boneco.playAction('AnimB', 1, 20, play_mode=bge.logic.KX_ACTION_MODE_LOOP)
     log = own.get('log')
     if log is None:
         log = own['log'] = []
     log.append({o.name: [list(r) for r in o.worldTransform] for o in own.scene.objects
                 if o.name in ('Cubo', 'Girador', 'Filho')})
+    boneco.update()
+    log[-1]['osso'] = [v for linha in boneco.channels[0].pose_matrix for v in linha]
     if n + 1 >= PASSOS:
         with open(os.environ['REC_LOG'], 'w') as f:
             json.dump(log, f)

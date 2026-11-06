@@ -47,6 +47,7 @@
 #include "BKE_library.h"
 #include "BKE_main.h"
 #include "BKE_motion_record.h"
+#include "BKE_nla.h"
 #include "BKE_object.h"
 #include "BKE_report.h"
 
@@ -230,6 +231,85 @@ static bAction *motion_action_create(
 	return act;
 }
 
+/* Whether a child that joined by itself moves apart from its parent, and so needs an Action. */
+static bool motion_child_moves(const MotionSample *samples, int num, float tolerance)
+{
+	const float limit = max_ff(tolerance, 1e-4f);
+	float first[4][4];
+	for (int i = 0; i < num; i++) {
+		float parent[4][4], mat[4][4], inverse[4][4], local[4][4];
+		memcpy(mat, samples[i].mat, sizeof(mat));
+		if (samples[i].has_parent) {
+			memcpy(parent, samples[i].parent_mat, sizeof(parent));
+			invert_m4_m4(inverse, parent);
+			mul_m4_m4m4(local, inverse, mat);
+		}
+		else {
+			copy_m4_m4(local, mat);
+		}
+		if (i == 0) {
+			copy_m4_m4(first, local);
+		}
+		else if (!compare_m4m4(first, local, limit)) {
+			return true;
+		}
+	}
+	return false;
+}
+
+/* One NLA track per action layer, named after the take so a take can be chosen by muting the others. */
+static void motion_nla_create(
+        Main *bmain, Scene *scene, Object *ob, const MotionClip *clips, int num, const char *prefix)
+{
+	AnimData *adt = BKE_animdata_add_id(&ob->id);
+	const float fps = (float)FPS;
+
+	for (NlaTrack *nlt = adt->nla_tracks.first; nlt; nlt = nlt->next) {
+		if (STRPREFIX(nlt->name, "Rec_")) {
+			nlt->flag |= NLATRACK_MUTED;
+		}
+	}
+	for (int i = 0; i < num; i++) {
+		bool seen = false;
+		for (int j = 0; j < i; j++) {
+			seen |= (clips[j].layer == clips[i].layer);
+		}
+		if (seen) {
+			continue;
+		}
+		NlaTrack *nlt = BKE_nlatrack_add(adt, NULL);
+		BLI_snprintf(nlt->name, sizeof(nlt->name), "%s%d", prefix, clips[i].layer);
+		for (int j = i; j < num; j++) {
+			const MotionClip *clip = &clips[j];
+			bAction *act = BLI_findstring(&bmain->action, clip->action, offsetof(ID, name) + 2);
+			if (clip->layer != clips[i].layer || !act) {
+				continue;
+			}
+			NlaStrip *strip = BKE_nlastrip_new(act);
+			if (!strip) {
+				continue;
+			}
+			strip->start = (float)scene->r.sfra + clip->t_start * fps;
+			strip->end = max_ff((float)scene->r.sfra + clip->t_end * fps, strip->start + 1.0f);
+			strip->actstart = min_ff(clip->frame_start, clip->frame_end);
+			strip->actend = max_ff(max_ff(clip->frame_start, clip->frame_end), strip->actstart + 0.01f);
+			strip->scale = (strip->end - strip->start) / (strip->actend - strip->actstart);
+			strip->repeat = 1.0f;
+			strip->extendmode = NLASTRIP_EXTEND_HOLD_FORWARD;
+			if (clip->frame_end < clip->frame_start) {
+				strip->flag |= NLASTRIP_FLAG_REVERSE;
+			}
+			if (BKE_nlatrack_add_strip(nlt, strip)) {
+				BKE_nlastrip_validate_name(adt, strip);
+			}
+			else {
+				BKE_nlastrip_free(NULL, strip);
+			}
+		}
+	}
+	DAG_id_tag_update(&ob->id, OB_RECALC_OB | OB_RECALC_DATA | OB_RECALC_TIME);
+}
+
 /* A take is the one name that groups the Actions of a recording. */
 static void motion_take_add(PointerRNA *scene_ptr, PointerRNA *r_take, int replaced)
 {
@@ -280,20 +360,38 @@ bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
 		                      active_take < RNA_collection_length(&scene_ptr, "ae_rec_takes")) ? active_take : -1;
 		float duration = 0.0f;
 		PointerRNA take;
+		/* Never reused, not even by a take that replaces another: old tracks are found by this name. */
+		const int track_counter = RNA_int_get(&scene_ptr, "ae_rec_track_counter") + 1;
+		char track_prefix[32];
+		BLI_snprintf(track_prefix, sizeof(track_prefix), "Rec_%d_", track_counter);
+		RNA_int_set(&scene_ptr, "ae_rec_track_counter", track_counter);
 		for (int i = 0; i < BKE_motion_record_actors_num(); i++) {
 			const MotionSample *samples;
 			int num;
 			Object *ob = BKE_motion_record_actor(i, &samples, &num);
 			/* A single sample is an actor that never ran (e.g. removed on the first frame). */
 			if (num >= 2 && !ID_IS_LINKED(ob)) {
-				bAction *act = motion_action_create(bmain, scene, ob, samples, num, tolerance);
+				int clips_num;
+				const MotionClip *clips = BKE_motion_record_actor_clips(i, &clips_num);
+				const bool make_action = !BKE_motion_record_actor_is_child(i) ||
+				                         motion_child_moves(samples, num, tolerance);
+				if (!make_action && clips_num == 0) {
+					continue;
+				}
 				if (created++ == 0) {
 					motion_take_add(&scene_ptr, &take, replaced);
 				}
 				PointerRNA actor;
 				RNA_collection_add(&take, "actors", &actor);
 				RNA_string_set(&actor, "object_name", ob->id.name + 2);
-				RNA_string_set(&actor, "action_name", act->id.name + 2);
+				if (make_action) {
+					bAction *act = motion_action_create(bmain, scene, ob, samples, num, tolerance);
+					RNA_string_set(&actor, "action_name", act->id.name + 2);
+				}
+				if (clips_num) {
+					motion_nla_create(bmain, scene, ob, clips, clips_num, track_prefix);
+					RNA_string_set(&actor, "track_prefix", track_prefix);
+				}
 				duration = max_ff(duration, samples[num - 1].t);
 				RNA_float_set(&take, "duration", duration);
 			}

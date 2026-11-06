@@ -46,6 +46,17 @@ BL_ActionManager::~BL_ActionManager()
 	m_layers.clear();
 }
 
+std::vector<short> BL_ActionManager::GetPlayingLayers()
+{
+	std::vector<short> layers;
+	for (const auto& entry : m_layers) {
+		if (!entry.second->IsDone()) {
+			layers.push_back(entry.first);
+		}
+	}
+	return layers;
+}
+
 BL_Action *BL_ActionManager::GetAction(short layer) const
 {
 	BL_ActionMap::const_iterator it = m_layers.find(layer);

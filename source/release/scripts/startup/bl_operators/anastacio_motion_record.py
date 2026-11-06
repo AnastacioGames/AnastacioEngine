@@ -11,12 +11,21 @@ from bpy.types import Operator, PropertyGroup, UIList
 class RecTakeActor(PropertyGroup):
     object_name = StringProperty(name="Object")
     action_name = StringProperty(name="Action")
+    # Start of the names of its NLA tracks, on armatures.
+    track_prefix = StringProperty(name="NLA Tracks")
 
 
 class RecTake(PropertyGroup):
     # Written by view3d_motion_record.c. A take groups the Actions of one recording.
     duration = FloatProperty(name="Duration")
     actors = CollectionProperty(type=RecTakeActor)
+
+
+def _take_tracks(actor):
+    ob = bpy.data.objects.get(actor.object_name)
+    if not ob or not ob.animation_data:
+        return ob, ()
+    return ob, [t for t in ob.animation_data.nla_tracks if t.name.startswith("Rec_")]
 
 
 class SCENE_UL_rec_takes(UIList):
@@ -42,6 +51,11 @@ class SCENE_OT_rec_take_remove(Operator):
             action = bpy.data.actions.get(actor.action_name)
             if action:
                 bpy.data.actions.remove(action, do_unlink=True)
+            if actor.track_prefix:
+                ob, tracks = _take_tracks(actor)
+                for track in tracks:
+                    if track.name.startswith(actor.track_prefix):
+                        ob.animation_data.nla_tracks.remove(track)
         scene.ae_rec_takes.remove(index)
         scene.ae_rec_take_index = max(0, len(scene.ae_rec_takes) - 1)
         return {'FINISHED'}
@@ -72,6 +86,9 @@ class SCENE_OT_rec_take_use(Operator):
                 if not ob.animation_data:
                     ob.animation_data_create()
                 ob.animation_data.action = action
+            if actor.track_prefix:
+                for track in _take_tracks(actor)[1]:
+                    track.mute = not track.name.startswith(actor.track_prefix)
         scene.frame_end = scene.frame_start + int(take.duration * scene.render.fps + 0.5)
         scene.frame_set(scene.frame_start)
         return {'FINISHED'}
@@ -121,6 +138,7 @@ def register_props():
     S.ae_rec_takes = CollectionProperty(type=RecTake)
     S.ae_rec_take_index = IntProperty(name="Active Take", default=0, min=0)
     S.ae_rec_take_counter = IntProperty(default=0, options={'HIDDEN'})
+    S.ae_rec_track_counter = IntProperty(default=0, options={'HIDDEN'})
     S.ae_rec_replace_take = BoolProperty(name="Replace Selected Take", default=False,
         description="The new recording takes the place of the selected take instead of adding one")
     S.ae_rec_max_duration = FloatProperty(name="Max Duration (s)", default=0.0, min=0.0, max=3600.0,
@@ -155,7 +173,7 @@ def register_props():
 def unregister_props():
     for name in ('countdown', 'sample_rate', 'fixed_rate', 'make_keyframes', 'keyframe_tolerance',
                  'record_camera', 'playback_layers', 'playback_collision', 'show_advanced',
-                 'takes', 'take_index', 'take_counter', 'replace_take', 'max_duration'):
+                 'takes', 'take_index', 'take_counter', 'track_counter', 'replace_take', 'max_duration'):
         delattr(bpy.types.Scene, 'ae_rec_' + name)
     del bpy.types.Object.ae_rec_actor
     del bpy.types.Object.ae_rec_action

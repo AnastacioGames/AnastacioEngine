@@ -38,6 +38,14 @@ typedef struct MotionSample {
 	bool has_parent;
 } MotionSample;
 
+/* A stretch of an Action seen playing on an armature: becomes an NLA strip. */
+typedef struct MotionClip {
+	char action[64];
+	int layer;
+	float t_start, t_end;
+	float frame_start, frame_end;
+} MotionClip;
+
 /* fixed_rate: samples per second, 0 = every logic step. max_seconds: 0 = until stopped. */
 void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed_rate, float max_seconds);
 /* Stops accepting samples and keeps them, until BKE_motion_record_free. */
@@ -54,11 +62,16 @@ bool BKE_motion_record_is_actor(const struct Object *ob);
 bool BKE_motion_record_sample_due(void);
 /* parent_mat: NULL when the actor has no parent in the game. */
 void BKE_motion_record_sample(const struct Object *ob, const float mat[4][4], const float parent_mat[4][4]);
+/* Children of the marked actors join when the game starts. */
+void BKE_motion_record_add_child(struct Object *ob);
+void BKE_motion_record_clip(const struct Object *ob, int layer, const char *action, float frame);
 /* The one clock of the recording: call once per step that was not suspended. */
 void BKE_motion_record_advance(double step);
 
 int BKE_motion_record_actors_num(void);
 struct Object *BKE_motion_record_actor(int index, const MotionSample **r_samples, int *r_samples_num);
+const MotionClip *BKE_motion_record_actor_clips(int index, int *r_clips_num);
+bool BKE_motion_record_actor_is_child(int index);
 
 #ifdef __cplusplus
 }

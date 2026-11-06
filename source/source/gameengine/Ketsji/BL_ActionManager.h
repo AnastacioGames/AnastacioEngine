@@ -29,6 +29,7 @@
 
 #include <map>
 #include <memory>
+#include <vector>
 
 // Currently, we use the max value of a short.
 // We should switch to unsigned short; doesn't make sense to support negative layers.
@@ -105,6 +106,9 @@ public:
 	 * Gets the currently running action on the given layer
 	 */
 	std::string GetCurrentActionName(short layer) const;
+
+	/// Layers with an action that is still playing.
+	std::vector<short> GetPlayingLayers();
 	/// Data of the action playing on the layer, nullptr when none or finished.
 	BL_ActionData *GetCurrentActionData(short layer) const;
 
