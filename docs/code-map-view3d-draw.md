@@ -3,7 +3,7 @@
 Índice de `view3d_draw.c` e dos arquivos separados dele (`view3d_draw_shadows.c`, `view3d_draw_warmup.c`): grade, cursor, bordas de câmera, profundidade e seleção, sombras na viewport,
 offscreen, overlays e o aquecimento de shaders. Não descreve arquitetura.
 
-**Linhas conferidas em 2026-10-29 (`HEAD` `2976bd78`).** Os números envelhecem a cada edição: confirme com
+**Linhas conferidas em 2026-11-05 (`HEAD` `6cb8d768`).** Os números envelhecem a cada edição: confirme com
 `grep -n "nome" arquivo`. `python tools/check_docs.py --fix` corrige os números deste mapa.
 
 Regra da casa: não mudar o shading dos meshes na viewport; ajustes visuais vão nos overlays.
@@ -28,11 +28,11 @@ Regra da casa: não mudar o shading dos meshes na viewport; ajustes visuais vão
 | Região principal | `view3d_main_region_draw_objects` 4139, `draw_paint_hints` 4385 (dicas de pintura), `view3d_main_region_draw_info` 4452, `view3d_draw_floating_controls` 4543, **`view3d_main_region_draw`** 4700 (entrada) |
 | Debug draw | `bl_debug_draw_quad_add` 4766, `bl_debug_draw` 4794 |
 
-## `source/source/blender/editors/space_view3d/view3d_draw_shadows.c` (438 linhas)
+## `source/source/blender/editors/space_view3d/view3d_draw_shadows.c` (442 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
-| Lâmpadas e sombras (CSM) | `gpu_render_lamp_update` 123, `view3d_compute_cascade_shadow_matrix` 162, `gpu_update_lamps_shadows_world` 243 |
+| Lâmpadas e sombras (CSM) | `gpu_render_lamp_update` 123, `view3d_compute_cascade_shadow_matrix` 166, `gpu_update_lamps_shadows_world` 247 |
 
 ## `source/source/blender/editors/space_view3d/view3d_draw_warmup.c` (369 linhas)
 
