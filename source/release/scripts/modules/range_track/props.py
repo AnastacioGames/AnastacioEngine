@@ -77,7 +77,7 @@ class RangeTrackPoint(bpy.types.PropertyGroup):
                                description="Asphalt half width on the left (0 = profile)")
     width_right = FloatProperty(name="Width Right", default=0.0, min=0.0, unit='LENGTH',
                                 description="Asphalt half width on the right (0 = profile)")
-    bank_mode = EnumProperty(name="Bank", items=BANK_MODES, default='AUTO')
+    bank_mode = EnumProperty(name="Track Bank", items=BANK_MODES, default='AUTO')
     bank_deg = FloatProperty(name="Bank Angle", default=0.0, min=-45.0, max=45.0,
                              description="Degrees, + = falls to the left")
     surface = StringProperty(name="Surface", default="",

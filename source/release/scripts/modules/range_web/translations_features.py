@@ -249,6 +249,7 @@ TABLE = (
     ('Width Right', 'Largura à direita', 'Ancho derecho', 'Ширина справа'),
     ('Asphalt half width on the right (0 = profile)', 'Meia largura do asfalto à direita (0 = perfil)',
      'Medio ancho del asfalto a la derecha (0 = perfil)', 'Половина ширины асфальта справа (0 = профиль)'),
+    ('Track Bank', 'Inclinação da pista', 'Peralte', 'Крен'),
     ('Bank Angle', 'Ângulo de inclinação', 'Ángulo de peralte', 'Угол крена'),
     ('Degrees, + = falls to the left', 'Graus, + = cai para a esquerda', 'Grados, + = cae a la izquierda', 'Градусы, + = наклон влево'),
     ('Surface from this point on (empty = keeps the previous one)', 'Piso a partir deste ponto (vazio = mantém o anterior)',
