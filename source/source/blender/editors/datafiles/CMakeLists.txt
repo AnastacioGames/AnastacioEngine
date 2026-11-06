@@ -119,6 +119,7 @@ set(ICON_NAMES
 	edit
 	game
 	cook
+	rec_play
 	network
 	web
 	android

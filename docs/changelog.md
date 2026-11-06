@@ -20,6 +20,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - `light.shadowMapSize` continua sem arredondar para múltiplos de 16: não há ganho, e a leitura mudaria o valor pedido.
 - Teste em segundo plano dos valores OK; falta conferir o painel com janela.
 
+## 2026-11-06 - Rec Play: Fase 1 (botão, ícone e flag)
+
+- Botão **Rec Play** com ícone próprio `REC_PLAY` no cabeçalho, na barra flutuante e no painel Motion Recording
+  (Experimental). `VIEW3D_OT_game_record` inicia o jogo como o Play e liga a chave `rec_play`, sem DNA; ainda não grava.
+- Com a chave ligada o Live UI fica desligado, e o operador entra na lista de bloqueio do jogo ao vivo.
+- Plano revisado contra o código: nova ordem das fases e regras técnicas em [gravação de movimento](gravacao-de-movimento-plan.md).
+- Painel "Player" renomeado para "Play Game".
+
 ## 2026-11-06 - Motion Recording: painel na aba Render
 
 - Painel **Motion Recording** (`RENDER_PT_game_motion_record`) em Properties > Render, categoria System, logo depois de

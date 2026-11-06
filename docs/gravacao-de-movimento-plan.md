@@ -20,6 +20,14 @@ mas a arquitetura não encaixa e as marcas não são licenciadas).
 - **Saída nos dois formatos**: keyframes editáveis (Action do Blender) e um
   formato próprio de gravação ("take") para reprodução exata.
 
+- **Público**: primeiro o próprio usuário, mas feito para outras pessoas se
+  divertirem criando os jogos delas.
+- **Destino**: principal é usar dentro do jogo; filme exportado também é desejado.
+- **Teste de aceite**: começar por algo simples e ir completando.
+- **Experimental**: marcado como "(Experimental)" na engine até ficar bom, porque
+  sairá uma versão antes de o recurso estar completo.
+- **Liberdade**: o 3D Movie Maker é o conceito; usar o que a engine tem e fazer melhor.
+
 ## Regra principal: fácil como brinquedo
 
 O usuário usou o 3D Movie Maker quando criança; o recurso tem de ser usável
@@ -32,7 +40,7 @@ por quem nunca abriu o editor:
 - Na gravação: contagem grande na tela, aviso "REC" piscando, e parar com Esc
   já salva. Sem diálogo de confirmação.
 - Depois de gravar, botão "Assistir" e "Regravar" no mesmo painel.
-- Controle rápido (Fase 6) sobe de prioridade: personagem sem lógica deve
+- Controle rápido (Fase 4) sobe de prioridade: personagem sem lógica deve
   andar com setas/WASD e tocar a Action escolhida, sem montar Logic Bricks.
 
 ## Peças
@@ -125,24 +133,88 @@ Base: [Asset Browser](asset-browser.md). Falta:
 - kit inicial de conteúdo (personagens e ações), podendo usar o
   Personagem automático (Fuse → armature).
 
+## Ideias vistas no 3DMMEx (2026-11-06)
+
+Leitura de `src/engine/actor.cpp` e `movie.cpp` do [3DMMEx](https://github.com/benstone/3dmmex).
+Só ideias de comportamento, para reimplementar do nosso jeito; nenhum código entra.
+
+- **Gravação começa ao mexer**: o botão arma a gravação, mas ela só inicia quando o
+  ator anda um pouco ou passa um tempo curto (~0,75 s). Evita take com início parado.
+  Pode substituir a contagem quando ela estiver em 0.
+- **Regravar a partir daqui**: regravar apaga só o que vem depois do frame atual e
+  emenda no trecho anterior, em vez de refazer o take inteiro.
+- **Trechos dentro do take**: cada gravação é um trecho que pode ser movido, adiantado
+  ou atrasado no tempo, sem regravar.
+- **Eventos além da posição**: troca de ação guardada como evento na linha do tempo, não
+  por amostra. Combina com a Fase 3: só gravar quando a action muda.
+- **Congelar andando**: tecla que desliza o ator sem avançar a animação (Shift no 3DMM).
+- **Suavizar a entrada**: média simples do movimento antes de gravar, útil no mouse.
+- **Falha restaura**: guardar o estado anterior antes de gravar e voltar a ele se der erro.
+- **Não copiar**: o caminho por distância ("onde", não "quando") do 3DMM. O próprio
+  código admite que complicou muito; nosso take continua por tempo.
+
+## Decisões da revisão (2026-11-06)
+
+Plano revisado contra o código; o usuário aceitou as sugestões abaixo.
+
+- **Ator** = objeto marcado mais todos os filhos (cápsula com armature filha).
+- **Quem controla o ator gravado**: a lógica do jogo, se houver; se não, controle
+  rápido com WASD.
+- **O resto do jogo** roda normalmente durante a gravação.
+- **Ator repetindo** não colide por padrão (`Collide on Replay`).
+- **Só Play embutido**: Standalone fora do escopo por enquanto.
+
+Regras técnicas que saíram da revisão:
+
+- **Flag**: chave `rec_play` por `SYS_WriteCommandLineInt`, escrita em toda execução
+  de `game_engine_exec` (0 no Play comum). Sem DNA.
+- **Buffer fora da cena**: `StopEngine` destrói as cenas. A gravação fica em C na
+  blenkernel, como `BKE_screencast.h`, e vira Action no editor, depois de
+  `StartKetsjiShell`. Só gravar quando o Main do jogo é o do editor.
+- **Relógio único**: `t` soma o passo do jogo só em passo não suspenso; todos os
+  atores usam o mesmo `t`. Sincronia por `t`, não por índice de amostra.
+- **Captura** dentro de `KX_SimulationPipeline::Update`, depois de `UpdateParents`,
+  com lista própria de atores (sem varrer todos os objetos por frame).
+- **Repetição**: marca própria no objeto, respeitada por `UpdateActivity`.
+  `SuspendDynamics` não vale para Character: política por tipo de física.
+- **Action**: Euler (quaternion não funciona no jogo), curvas lineares, não sobrescrever
+  a gravação anterior, `ED_undo_push`, tolerância por canal.
+- **Parada**: tecla própria em gravação, porque um sensor na tecla de saída bloqueia o
+  Esc. Qualquer saída salva; Esc na contagem cancela.
+- **Câmera**: sem câmera real o jogo usa `__default__cam__`, que não tem objeto. Gravar
+  câmera exige uma câmera real.
+- **Reprodução exata** só vem com o take. Gravar actions é leve e editável, mas não
+  cobre IK e scripts; reservar no formato um bloco para pose por osso.
+- **Regravar parcial** pula os atores para `t`, mas o mundo volta ao início.
+- **Rec Studio** não usa `WM_window_open_temp` (uma só janela temporária). Provar antes
+  o Play embutido em segunda janela.
+
+A testar: ordem do Euler no jogo, Ctrl+Z após gravar, travada ao tocar take longo,
+`PointerProperty` com `prop_search` para `ae_rec_action`.
+
 ## Fases
 
-1. Botão + ícone + operador que só inicia o Play com flag de gravação.
-   Instruções em [`HANDOFF-rec-play.md`](../HANDOFF-rec-play.md).
-2. Captura de transformação em memória + conversão em Action ao parar
-   (primeiro resultado visível).
-3. Estado de animação (actions/NLA) na captura.
-4. Janela Rec Studio (3D View, botões, painel).
-5. Asset Browser na janela: Actions, miniaturas, soltar ação/personagem.
-6. Take em DNA + reprodução no runtime + camadas + linha do tempo.
-7. Contagem, câmera, standalone, controle rápido (WASD sem Logic Bricks).
-8. Cutscene, API Python e kit de conteúdo.
+Até a Fase 7 não há DNA novo: uma versão pode sair sem risco de formato. O recurso
+fica marcado como Experimental.
+
+1. Botão, ícone, operador e flag. Instruções em [`HANDOFF-rec-play.md`](../HANDOFF-rec-play.md).
+2. Captura de transformação, relógio, parada segura e Action com undo. Teste: cubo
+   e personagem físico. Bom ponto para a versão Experimental.
+3. Personagem completo: filhos, actions e NLA.
+4. Controle rápido (WASD sem Logic Bricks), contagem e aviso REC.
+5. Camadas pela Action: repetir A enquanto grava B, Assistir e Regravar.
+6. Filme pelo Screencast, ligado no Assistir.
+7. Take em DNA versionado, com eventos e reprodução exata.
+8. Janela Rec Studio.
+9. Asset Browser: Actions, miniaturas, soltar ação/personagem, kit de conteúdo.
+10. Cutscene e API Python.
 
 Uma fase por vez, com build no Windows e teste do usuário antes da próxima.
 
 ## Em aberto
 
-- Gravar também no player standalone (precisa devolver o take ao editor por
-  arquivo) ou só no Play embutido.
-- Frequência de amostragem: todo frame lógico ou taxa fixa (ex. 30 Hz).
-- Física de atores em reprodução: viram cinemáticos ou mantêm colisão.
+- Frequência de amostragem padrão: todo passo lógico ou taxa fixa.
+- Repetição no jogo: no lugar gravado ou relativa ao objeto (NPC).
+- Sons do jogo na repetição e narração por microfone.
+- Gravação ao trocar de cena: hoje a ideia é fechar o take.
+- Quantas gravações guardar.

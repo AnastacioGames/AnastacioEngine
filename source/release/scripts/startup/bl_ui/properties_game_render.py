@@ -213,16 +213,13 @@ class RENDER_PT_game_cook(RenderButtonsPanel, Panel):
 
 class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
     # Rec Play: record actors controlled live (plan: docs/gravacao-de-movimento-plan.md).
-    bl_label = "Motion Recording"
+    bl_label = "Motion Recording (Experimental)"
     COMPAT_ENGINES = {'BLENDER_GAME'}
     ae_category = 'SYSTEM'
 
     @classmethod
     def poll(cls, context):
         return super().poll(context) and hasattr(context.scene, "ae_rec_countdown")
-
-    def draw_header(self, context):
-        self.layout.label(text="", icon='REC')
 
     def draw(self, context):
         # Kept as simple as a children's movie maker: three numbered steps, the rest under Advanced.
@@ -254,14 +251,17 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
 
         box = layout.box()
         box.label(text="3. Press Rec Play and move it!", icon='REC')
-        box.label(text="Rec Play button: coming in phase 1", icon='INFO')
+        row = box.row()
+        row.scale_y = 1.6
+        row.operator("view3d.game_record", text="Rec Play", icon='REC_PLAY')
 
-        layout.prop(scene, "ae_rec_show_advanced",
-                    icon='TRIA_DOWN' if scene.ae_rec_show_advanced else 'TRIA_RIGHT', emboss=False)
+        box = layout.box()
+        box.prop(scene, "ae_rec_show_advanced",
+                 icon='TRIA_DOWN' if scene.ae_rec_show_advanced else 'TRIA_RIGHT', emboss=False)
         if not scene.ae_rec_show_advanced:
             return
 
-        col = layout.column()
+        col = box.column()
         col.prop(scene, "ae_rec_record_camera")
         col.prop(scene, "ae_rec_countdown")
         row = col.row(align=True)
@@ -283,7 +283,7 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
 
 class RENDER_PT_embedded(RenderButtonsPanel, Panel):
     # Embedded and Standalone players side by side, one column each.
-    bl_label = "Player"
+    bl_label = "Play Game"
     COMPAT_ENGINES = {'BLENDER_GAME'}
     ae_category = 'SYSTEM'
 

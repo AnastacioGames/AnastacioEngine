@@ -28,6 +28,9 @@
 
 #include "KX_BlenderCanvas.h"
 
+#include "CM_Message.h"
+#include "LA_SystemCommandLine.h"
+
 #include "KX_PythonInit.h"
 #include "KX_KetsjiEngine.h"
 #include "KX_Scene.h"
@@ -170,7 +173,12 @@ void LA_BlenderLauncher::InitEngine()
 	LA_Launcher::InitEngine();
 
 	// Outro .blend carregado pelo jogo (Game Actuator) não é o que o editor mostra: sem UI ao vivo.
-	m_liveUI = (m_startScene->gm.flag & GAME_LIVE_UI) && (m_maggie == CTX_data_main(m_context));
+	// Rec Play: the recording must see the game untouched, so no live editing while it runs.
+	const bool recPlay = (SYS_GetCommandLineInt(SYS_GetSystem(), "rec_play", 0) != 0);
+	if (recPlay) {
+		CM_Message("Rec Play: recording flag on");
+	}
+	m_liveUI = (m_startScene->gm.flag & GAME_LIVE_UI) && !recPlay && (m_maggie == CTX_data_main(m_context));
 	if (m_liveUI) {
 		for (Object *ob = (Object *)m_maggie->object.first; ob; ob = (Object *)ob->id.next) {
 			LiveSnapshotTake(ob, m_liveSnapshots[ob]);

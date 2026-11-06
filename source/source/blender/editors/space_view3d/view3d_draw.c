@@ -4587,6 +4587,7 @@ static void view3d_draw_floating_controls(const bContext *C, ARegion *ar, View3D
 		/* Cook (convert everything once into the .cooked file) right before Play; Clear Cooked lives in the Cook panel. */
 		uiItemO(row, "Cook", ICON_COOK, "GAME_OT_cook");
 		uiItemO(row, "Play", ICON_PLAY, "VIEW3D_OT_game_start");
+		uiItemO(row, "Rec Play", ICON_REC_PLAY, "VIEW3D_OT_game_record");
 		uiItemO(row, "Standalone", ICON_GHOST_ENABLED, "wm.blenderplayer_start");
 		uiItemR(row, &gameptr, "use_live_ui", UI_ITEM_R_TOGGLE, "",
 		        (scene->gm.flag & GAME_LIVE_UI) ? ICON_UNLOCKED : ICON_LOCKED);

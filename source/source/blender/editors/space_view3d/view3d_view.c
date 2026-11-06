@@ -1429,7 +1429,6 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	RegionView3D *rv3d;
 	rcti cam_frame;
 
-	UNUSED_VARS(op);
 
 	/* bad context switch .. */
 	if (!ED_view3d_context_activate(C))
@@ -1457,6 +1456,8 @@ static int game_engine_exec(bContext *C, wmOperator *op)
 	view3d_operator_needs_opengl(C);
 
 	game_set_commmandline_options(&startscene->gm);
+	/* Written on every start, so Rec Play never leaks into the next plain Play. */
+	SYS_WriteCommandLineInt(SYS_GetSystem(), "rec_play", STREQ(op->type->idname, "VIEW3D_OT_game_record"));
 
 	if ((rv3d->persp == RV3D_CAMOB) &&
 	    (startscene->gm.framing.type == SCE_GAMEFRAMING_BARS))
@@ -1520,6 +1521,19 @@ void VIEW3D_OT_game_start(wmOperatorType *ot)
 	ot->name = "Start Game Engine";
 	ot->description = "Start game engine";
 	ot->idname = "VIEW3D_OT_game_start";
+
+	/* api callbacks */
+	ot->exec = game_engine_exec;
+
+	ot->poll = game_engine_poll;
+}
+
+void VIEW3D_OT_game_record(wmOperatorType *ot)
+{
+	/* identifiers */
+	ot->name = "Rec Play";
+	ot->description = "Start the game and record the chosen characters (experimental)";
+	ot->idname = "VIEW3D_OT_game_record";
 
 	/* api callbacks */
 	ot->exec = game_engine_exec;

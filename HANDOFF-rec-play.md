@@ -1,6 +1,6 @@
 # Handoff — Rec Play, Fase 1 (botão, ícone e operador)
 
-Para continuar no PC (Windows), com Claude ou Codex. Branch: `ccr-f8a165aa-ikjsis`.
+Para continuar no PC (Windows), com Claude ou Codex. Branch: `main`.
 Plano completo: [docs/gravacao-de-movimento-plan.md](docs/gravacao-de-movimento-plan.md).
 Regras de build: [AGENTS.md](AGENTS.md) (sempre `vcvars64.bat` + `set VSLANG=1033&&`).
 
@@ -35,8 +35,10 @@ runtime.
 2. **Operador `VIEW3D_OT_game_record`** em `source/source/blender/editors/space_view3d/view3d_view.c`, ao lado de
    `VIEW3D_OT_game_start`: mesmo `game_engine_exec`/`game_engine_poll`; liga a flag antes e desliga depois.
    Declarar em `view3d_intern.h` e registrar em `view3d_ops.c` (perto de `WM_operatortype_append(VIEW3D_OT_game_start)`).
-   - Flag: um campo de runtime que o Ketsji consiga ler (ex. global/argumento passado ao iniciar o jogo
-     embutido). **Não** criar campo DNA nesta fase.
+   - Flag: chave `rec_play` por `SYS_WriteCommandLineInt`, escrita em toda execução (0 no Play comum), lida em
+     `LA_Launcher`. **Não** criar campo DNA nesta fase.
+   - Incluir `VIEW3D_OT_game_record` em `game_live_blocked_ops` (`wm_event_system.c`) e desligar o Live UI na
+     gravação. Bloqueio em sessão multiplayer fica para a Fase 2, quando houver captura.
 3. **Botões**: depois de "Play" em `uiTemplateHeader3D_game_controls` (`view3d_header.c`) e na barra flutuante
    (`view3d_draw.c`, bloco `view3d_floating_game_controls`): `uiItemO(row, "Rec Play", ICON_REC_PLAY, "VIEW3D_OT_game_record")`.
 4. **Painel**: trocar a linha "Rec Play button: coming in phase 1" do passo 3 por
