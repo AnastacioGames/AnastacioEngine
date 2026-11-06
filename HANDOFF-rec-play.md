@@ -16,6 +16,8 @@ Regras de build: [AGENTS.md](AGENTS.md).
 ```
 set REC_LOG=caminho\log.json
 set REC_RES=caminho\res.txt
+set REC_CUT=caminho/copia_cutscene.range
+set REC_REPLAY=caminho/replay.json
 AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_rec_play.py -- cena.range
 AnastacioEngine.exe cena.range --python tools/debug/editor_rec_play.py
 ```
