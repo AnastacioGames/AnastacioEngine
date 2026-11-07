@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Rec Play: botões não herdam o modo do clique anterior
+
+- Watch, Movie e Rerecord ficavam memorizados no operador: depois de um Watch, Record e Rerecord só assistiam, e depois de um Rerecord, Record substituía o Take. As três opções agora valem só para o clique delas.
+- Conferido com arrastes e cliques reais no Rec Studio: Park, Hero, Run, Record, Watch, Rerecord, Undo e Record depois de Watch.
+
 ## 2026-11-07 - Rec Play: evento acompanha o nome do Take
 
 - Renomear um Take agora renomeia também o evento PLAY_TAKE que tinha o nome antigo. Nome digitado à mão no evento é mantido.

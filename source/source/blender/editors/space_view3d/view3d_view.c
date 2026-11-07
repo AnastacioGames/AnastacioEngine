@@ -1578,9 +1578,13 @@ void VIEW3D_OT_game_record(wmOperatorType *ot)
 
 	ot->poll = game_engine_poll;
 
-	RNA_def_boolean(ot->srna, "watch", false, "Watch", "Play the takes in the game without recording");
-	RNA_def_boolean(ot->srna, "movie", false, "Movie", "Play the takes and save the game area as a video");
-	RNA_def_boolean(ot->srna, "rerecord", false, "Rerecord", "Record the actors of the selected take again, replacing it");
+	/* Each button sets only its own mode: remembered values would turn Record into the last Watch. */
+	PropertyRNA *prop = RNA_def_boolean(ot->srna, "watch", false, "Watch", "Play the takes in the game without recording");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_boolean(ot->srna, "movie", false, "Movie", "Play the takes and save the game area as a video");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+	prop = RNA_def_boolean(ot->srna, "rerecord", false, "Rerecord", "Record the actors of the selected take again, replacing it");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
 /** \} */
