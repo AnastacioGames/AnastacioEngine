@@ -1718,6 +1718,10 @@ static void rna_MotionTake_name_set(PointerRNA *ptr, const char *value)
 			for (CutsceneEvent *event = seq->events.first; event; event = event->next) {
 				if (event->type == CUTSCENE_EVENT_PLAY_TAKE && STREQ(event->param_str_a, oldname)) {
 					BLI_strncpy(event->param_str_a, take->name, sizeof(event->param_str_a));
+					/* A name the user typed stays. */
+					if (STREQ(event->name, oldname)) {
+						BLI_strncpy(event->name, take->name, sizeof(event->name));
+					}
 				}
 			}
 		}

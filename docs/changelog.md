@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Rec Play: evento acompanha o nome do Take
+
+- Renomear um Take agora renomeia também o evento PLAY_TAKE que tinha o nome antigo. Nome digitado à mão no evento é mantido.
+
 ## 2026-11-07 - Minimap: Show on Minimap com cor por objeto
 
 - Painel Minimap na aba Object: liga o marcador do objeto sem digitar propriedade e dá cor própria (`minimap_color`, `#rrggbb`, que um script pode trocar no jogo). Sem cor própria vale Markers do nó.
