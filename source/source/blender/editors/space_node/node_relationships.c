@@ -1275,6 +1275,10 @@ static int node_attach_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent
 {
 	ARegion *ar = CTX_wm_region(C);
 	SpaceNode *snode = CTX_wm_space_node(C);
+	/* Passo de macro (G): a área pode ter deixado de ser Node Editor durante o translate. */
+	if (snode == NULL || snode->edittree == NULL || ar == NULL) {
+		return OPERATOR_CANCELLED;
+	}
 	bNodeTree *ntree = snode->edittree;
 	bNode *frame = node_find_frame_to_attach(ar, ntree, event->mval);
 
@@ -1366,6 +1370,9 @@ static void node_detach_recursive(bNode *node)
 static int node_detach_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	SpaceNode *snode = CTX_wm_space_node(C);
+	if (snode == NULL || snode->edittree == NULL) {
+		return OPERATOR_CANCELLED;
+	}
 	bNodeTree *ntree = snode->edittree;
 	bNode *node;
 
@@ -1827,6 +1834,9 @@ static int node_insert_offset_modal(bContext *C, wmOperator *UNUSED(op), const w
 static int node_insert_offset_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	const SpaceNode *snode = CTX_wm_space_node(C);
+	if (snode == NULL) {
+		return OPERATOR_CANCELLED;
+	}
 	NodeInsertOfsData *iofsd = snode->iofsd;
 
 	if (!iofsd || !iofsd->insert)
