@@ -118,6 +118,8 @@ public:
 		int m_sample;
 		int m_clip;
 		bool m_endsLogicHold;  // The game goes on after it: the actor gets its logic back.
+		double m_end;  // Seconds. Also holds actors with clips or tracks and no samples.
+		bool m_fromCutscene;  // Skip, Stop and Restart of the cutscene end it.
 	};
 
 	enum DrawingCallbackType {
@@ -803,7 +805,7 @@ public:
 	bool SkipCutscene();
 	bool RestartCutscene();
 	/// Rec Play: plays the Actions of a take on its actors, keeping them where it ends.
-	bool PlayMotionTake(const std::string& name);
+	bool PlayMotionTake(const std::string& name, bool cutscene = false);
 	/// Rec Play: plays only what the take recorded of this object. False if it has nothing.
 	bool PlayMotionTakeObject(KX_GameObject *gameobj, const std::string& name);
 	/// Rec Play: gives the object back to its logic and physics, where it stands.
@@ -811,8 +813,10 @@ public:
 	bool IsMotionTakePlaying(KX_GameObject *gameobj) const;
 	/// Rec Play: each actor that is not being recorded repeats its newest take.
 	void PlayMotionTakeLayers();
-	void PlayMotionTakeActor(KX_GameObject *gameobj, const struct MotionTakeActor *actor, float start, float end, bool ghost);
+	void PlayMotionTakeActor(KX_GameObject *gameobj, const struct MotionTakeActor *actor, float start, float end, bool ghost, bool cutscene = false);
 	void RemoveMotionReplay(KX_GameObject *gameobj);
+	/// Ends the takes a cutscene started, on their last pose when finish is set.
+	void EndCutsceneTakes(bool finish);
 	/* Moves the actors replaying a take, after physics and before the parents update. */
 	void UpdateMotionReplays(double step);
 	/** Advance the scene-owned Cutscene clock and retain crossed events. */

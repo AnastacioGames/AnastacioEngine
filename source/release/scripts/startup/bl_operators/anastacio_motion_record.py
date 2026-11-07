@@ -115,12 +115,17 @@ class SCENE_OT_rec_take_to_cutscene(Operator):
 
 
 class VIEW3D_PT_rec_studio(Panel):
-    # bl_context keeps it out of every other 3D View and the others out of Rec Studio.
+    # bl_context keeps the other panels out of Rec Studio; poll keeps this one out of other 3D Views.
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_context = "rec_studio"
     bl_label = "Rec Studio"
     bl_options = {'HIDE_HEADER'}
+
+    @classmethod
+    def poll(cls, context):
+        # Same test as ED_screen_is_rec_studio.
+        return context.screen.name.startswith("Rec Studio")
 
     def draw(self, context):
         layout = self.layout

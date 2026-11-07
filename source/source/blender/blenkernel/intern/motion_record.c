@@ -39,7 +39,7 @@ typedef struct MotionTrack {
 	bool is_child;
 } MotionTrack;
 
-/* Longer than this without seeing an Action means it stopped and started again. */
+/* Longer than this, or two sample intervals, without seeing an Action means it stopped and started again. */
 #define MOTION_CLIP_MAX_GAP 0.5f
 
 static struct {
@@ -221,7 +221,7 @@ void BKE_motion_record_clip(const struct Object *ob, int layer, const char *acti
 			last = &track->clips[i];
 		}
 	}
-	if (last && STREQ(last->action, action) && t - last->t_end < MOTION_CLIP_MAX_GAP) {
+	if (last && STREQ(last->action, action) && t - last->t_end < max_ff(MOTION_CLIP_MAX_GAP, 2.0f * (float)rec.interval)) {
 		/* Same direction: a loop that jumps back to the start is a new clip. */
 		if ((frame - last->frame_end) * (last->frame_end - last->frame_start) >= 0.0f) {
 			last->t_end = t;

@@ -207,6 +207,7 @@ void KX_Scene::SetCutsceneManager(std::unique_ptr<KX_CutsceneManager> cutsceneMa
 
 void KX_Scene::StopCutscene()
 {
+	EndCutsceneTakes(false);
 	ClearCutsceneSpawnedObjects();
 	if (m_cutsceneManager) {
 		m_cutsceneManager->Stop();
@@ -220,14 +221,22 @@ void KX_Scene::StopCutscene()
 
 bool KX_Scene::SkipCutscene()
 {
-	if (!m_cutsceneManager || !m_cutsceneManager->IsInProgress()) {
+	if (!m_cutsceneManager) {
 		return false;
+	}
+	if (!m_cutsceneManager->IsInProgress()) {
+		/* The sequence ends at its last event, the take it started may still be playing. */
+		const bool playing = std::any_of(m_motionReplays.begin(), m_motionReplays.end(),
+		                                 [](const MotionReplay& replay) { return replay.m_fromCutscene; });
+		EndCutsceneTakes(true);
+		return playing;
 	}
 	const KX_CutsceneManager::DispatchedEvents remaining = m_cutsceneManager->Skip();
 	m_pendingCutsceneEvents.insert(m_pendingCutsceneEvents.end(), remaining.begin(), remaining.end());
 	m_cutsceneSkipping = true;
 	DispatchCutsceneEvents();
 	m_cutsceneSkipping = false;
+	EndCutsceneTakes(true);
 	m_cutscenePaths.clear();
 	/* Drop the dialog and any fade/bars: the game continues in its normal view. */
 	CallCutsceneRuntime("skip_cleanup", PyTuple_New(0));
@@ -240,6 +249,7 @@ bool KX_Scene::RestartCutscene()
 	if (!m_cutsceneManager) {
 		return false;
 	}
+	EndCutsceneTakes(false);
 	ClearCutsceneSpawnedObjects();
 	m_pendingCutsceneEvents.clear();
 	m_cutscenePaths.clear();
@@ -737,11 +747,13 @@ static void ApplyMotionReplay(KX_Scene::MotionReplay& replay)
 {
 	const MotionTakeActor *actor = replay.m_actor;
 	KX_GameObject *gameobj = replay.m_object;
-	float loc[3], quat[4], scale[3];
-	BKE_motion_take_pose(actor, (float)replay.m_time, &replay.m_sample, loc, quat, scale);
-	gameobj->NodeSetLocalPosition(mt::vec3(loc[0], loc[1], loc[2]));
-	gameobj->NodeSetLocalOrientation(mt::quat(quat[0], quat[1], quat[2], quat[3]).ToMatrix());
-	gameobj->NodeSetLocalScale(mt::vec3(scale[0], scale[1], scale[2]));
+	if (actor->samples_num >= 2) {
+		float loc[3], quat[4], scale[3];
+		BKE_motion_take_pose(actor, (float)replay.m_time, &replay.m_sample, loc, quat, scale);
+		gameobj->NodeSetLocalPosition(mt::vec3(loc[0], loc[1], loc[2]));
+		gameobj->NodeSetLocalOrientation(mt::quat(quat[0], quat[1], quat[2], quat[3]).ToMatrix());
+		gameobj->NodeSetLocalScale(mt::vec3(scale[0], scale[1], scale[2]));
+	}
 
 	/* The NLA tracks already play them when there are keyframes. */
 	while (!actor->track_prefix[0] && replay.m_clip < actor->clips_num &&
@@ -763,8 +775,7 @@ void KX_Scene::UpdateMotionReplays(double step)
 		MotionReplay& replay = m_motionReplays[i];
 		replay.m_time += step;
 		ApplyMotionReplay(replay);
-		const MotionTakeActor *actor = replay.m_actor;
-		if (replay.m_time >= actor->samples[(actor->samples_num - 1) * MOTION_TAKE_SAMPLE_FLOATS]) {
+		if (replay.m_time >= replay.m_end) {
 			if (replay.m_endsLogicHold) {
 				EndMotionHold(replay.m_object, m_physicsEnvironment);
 			}
@@ -776,6 +787,30 @@ void KX_Scene::UpdateMotionReplays(double step)
 	}
 }
 
+void KX_Scene::EndCutsceneTakes(bool finish)
+{
+	for (unsigned int i = 0; i < m_motionReplays.size();) {
+		MotionReplay& replay = m_motionReplays[i];
+		if (!replay.m_fromCutscene) {
+			++i;
+			continue;
+		}
+		if (finish) {
+			/* Only the pose: the clips left would all start at once. */
+			replay.m_clip = replay.m_actor->clips_num;
+			replay.m_time = replay.m_end;
+			ApplyMotionReplay(replay);
+			/* The body turns dynamic below, before the scene graph would place it. */
+			replay.m_object->NodeUpdate();
+			replay.m_object->SynchronizeTransform();
+		}
+		if (replay.m_endsLogicHold) {
+			EndMotionHold(replay.m_object, m_physicsEnvironment);
+		}
+		m_motionReplays.erase(m_motionReplays.begin() + i);
+	}
+}
+
 void KX_Scene::RemoveMotionReplay(KX_GameObject *gameobj)
 {
 	m_motionReplays.erase(std::remove_if(m_motionReplays.begin(), m_motionReplays.end(),
@@ -784,8 +819,19 @@ void KX_Scene::RemoveMotionReplay(KX_GameObject *gameobj)
 }
 
 /* ghost: the actor stops touching the world. A Character has no dynamics to hold, it always leaves. */
-void KX_Scene::PlayMotionTakeActor(KX_GameObject *gameobj, const MotionTakeActor *actor, float start, float end, bool ghost)
+void KX_Scene::PlayMotionTakeActor(KX_GameObject *gameobj, const MotionTakeActor *actor, float start, float end, bool ghost, bool cutscene)
 {
+	/* Nothing to play: the object must not be held by a replay that never ends it. */
+	if (actor->samples_num < 2 && actor->clips_num == 0 && !actor->action_name[0] && !actor->track_prefix[0]) {
+		return;
+	}
+	/* Takes layered under a recording hold their actors until the game ends. */
+	bool hold = !gameobj->IsMotionReplay();
+	for (const MotionReplay& replay : m_motionReplays) {
+		hold |= (replay.m_object == gameobj && replay.m_endsLogicHold);
+	}
+	/* Before the physics below: it may bring a culled object back. */
+	gameobj->SetMotionReplay();
 	/* Otherwise physics pulls a rigid body away from the recorded path. */
 	if (gameobj->GetPhysicsController()) {
 		if (ghost || m_physicsEnvironment->GetCharacterController(gameobj)) {
@@ -795,19 +841,14 @@ void KX_Scene::PlayMotionTakeActor(KX_GameObject *gameobj, const MotionTakeActor
 			gameobj->GetPhysicsController()->SuspendDynamics(false);
 		}
 	}
-	/* Takes layered under a recording hold their actors until the game ends. */
-	bool hold = !gameobj->IsMotionReplay();
-	for (const MotionReplay& replay : m_motionReplays) {
-		hold |= (replay.m_object == gameobj && replay.m_endsLogicHold);
-	}
 	/* A take that ends as this one starts may still hold the object. */
 	RemoveMotionReplay(gameobj);
-	if (actor->samples_num >= 2) {
-		gameobj->SetMotionReplay();
-		m_motionReplays.push_back({gameobj, actor, 0.0, 0, 0, hold});
-		ApplyMotionReplay(m_motionReplays.back());
-	}
-	else if (actor->action_name[0]) {
+	Scene *scene = GetBlenderScene();
+	const double seconds = actor->samples_num >= 2 ? actor->samples[(actor->samples_num - 1) * MOTION_TAKE_SAMPLE_FLOATS] :
+	                       (end - start) * scene->r.frs_sec_base / scene->r.frs_sec;
+	m_motionReplays.push_back({gameobj, actor, 0.0, 0, 0, hold, seconds, cutscene});
+	ApplyMotionReplay(m_motionReplays.back());
+	if (actor->samples_num < 2 && actor->action_name[0]) {
 		/* A take from before the samples existed. */
 		gameobj->StopAction(MOTION_TAKE_LAYER);
 		gameobj->PlayAction(actor->action_name, start, end, MOTION_TAKE_LAYER);
@@ -840,7 +881,7 @@ void KX_Scene::PlayMotionTakeLayers()
 	}
 }
 
-bool KX_Scene::PlayMotionTake(const std::string& name)
+bool KX_Scene::PlayMotionTake(const std::string& name, bool cutscene)
 {
 	Scene *scene = GetBlenderScene();
 	for (const MotionTake *take = (MotionTake *)scene->motion_takes.first; take; take = take->next) {
@@ -855,7 +896,7 @@ bool KX_Scene::PlayMotionTake(const std::string& name)
 				CM_Error("Play Take '" << name << "': an actor is missing from the scene");
 				continue;
 			}
-			PlayMotionTakeActor(gameobj, actor, start, end, false);
+			PlayMotionTakeActor(gameobj, actor, start, end, false, cutscene);
 		}
 		return true;
 	}
@@ -914,7 +955,6 @@ void KX_Scene::DispatchCutsceneEvents()
 				case CUTSCENE_EVENT_FADE:
 				case CUTSCENE_EVENT_LETTERBOX:
 				case CUTSCENE_EVENT_PLAYER_ANIM:
-				case CUTSCENE_EVENT_PLAY_TAKE:
 					continue;
 				default:
 					break;
@@ -1315,7 +1355,8 @@ void KX_Scene::DispatchCutsceneEvents()
 			break;
 
 		case CUTSCENE_EVENT_PLAY_TAKE:
-			PlayMotionTake(event->m_paramStrA);
+			/* Also on a skip: SkipCutscene jumps it to its last pose. */
+			PlayMotionTake(event->m_paramStrA, true);
 			break;
 
 		case CUTSCENE_EVENT_LETTERBOX:

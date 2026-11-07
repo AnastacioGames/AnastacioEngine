@@ -409,24 +409,27 @@ static MotionTake *motion_take_add(Scene *scene, PointerRNA *scene_ptr, int repl
  * inverse between an object and its parent, so that is the space they are relative to. */
 static void motion_take_store(MotionTakeActor *actor, const Object *ob, const MotionSample *samples, int num)
 {
-	float parentinv_inverse[4][4];
+	/* The take replays under the parent of the editor, whatever the game did to the hierarchy. */
+	float parentinv_inverse[4][4], parent[4][4];
 	if (ob->parent) {
 		invert_m4_m4(parentinv_inverse, (float (*)[4])ob->parentinv);
+		copy_m4_m4(parent, ob->parent->obmat);
 	}
 	actor->samples = MEM_mallocN(sizeof(float) * MOTION_TAKE_SAMPLE_FLOATS * num, __func__);
 	actor->samples_num = num;
 	for (int i = 0; i < num; i++) {
 		float *out = &actor->samples[i * MOTION_TAKE_SAMPLE_FLOATS];
-		float mat[4][4], parent[4][4], inverse[4][4], local[4][4];
+		float mat[4][4], inverse[4][4], local[4][4];
 		memcpy(mat, samples[i].mat, sizeof(mat));
-		if (samples[i].has_parent) {
-			memcpy(parent, samples[i].parent_mat, sizeof(parent));
+		if (ob->parent) {
+			/* After removeParent the last place the parent was seen stands in for it. */
+			if (samples[i].has_parent) {
+				memcpy(parent, samples[i].parent_mat, sizeof(parent));
+			}
 			invert_m4_m4(inverse, parent);
 			mul_m4_m4m4(local, inverse, mat);
-			if (ob->parent) {
-				mul_m4_m4m4(inverse, parentinv_inverse, local);
-				copy_m4_m4(local, inverse);
-			}
+			mul_m4_m4m4(inverse, parentinv_inverse, local);
+			copy_m4_m4(local, inverse);
 		}
 		else {
 			copy_m4_m4(local, mat);
@@ -516,14 +519,16 @@ bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
 			actor->ob = ob;
 			BLI_addtail(&take->actors, actor);
 			/* The space of a bone is not the one of the parent object: that child rides along. */
-			if (moves && (!ob->parent || ob->partype == PAROBJECT)) {
+			const bool own_space = !ob->parent || ob->partype == PAROBJECT;
+			/* Clips start from the replay, so a child that only animates needs samples too. */
+			if ((moves || clips_num) && own_space) {
 				motion_take_store(actor, ob, samples, num);
 			}
 			if (clips_num) {
 				motion_take_store_clips(actor, clips, clips_num);
 			}
 			if (keyframes) {
-				if (moves) {
+				if (moves && own_space) {
 					bAction *act = motion_action_create(bmain, scene, ob, samples, num, tolerance);
 					BLI_strncpy(actor->action_name, act->id.name + 2, sizeof(actor->action_name));
 				}

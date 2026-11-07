@@ -529,7 +529,7 @@ static const char *game_live_blocked_ops[] = {
 	"ED_OT_undo*", "ED_OT_redo", "SCREEN_OT_repeat_*", "SCREEN_OT_redo_last",
 	"WM_OT_open_mainfile", "WM_OT_read_*", "WM_OT_revert_mainfile", "WM_OT_recover_*",
 	"WM_OT_link", "WM_OT_append", "WM_OT_window_*",
-	"VIEW3D_OT_game_start", "VIEW3D_OT_game_record",
+	"VIEW3D_OT_game_start", "VIEW3D_OT_game_record", "SCENE_OT_rec_take_remove",
 	"OBJECT_OT_delete", "OBJECT_OT_add*", "OBJECT_OT_*_add", "OBJECT_OT_duplicate*", "OBJECT_OT_join*",
 	"OBJECT_OT_convert", "OBJECT_OT_editmode_toggle", "OBJECT_OT_mode_set", "OBJECT_OT_*paint_toggle",
 	"MESH_OT_primitive_*", "OUTLINER_OT_*delete*", "OUTLINER_OT_*operation",

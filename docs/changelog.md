@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Rec Play: correções da revisão
+
+- Take sem amostras não prende mais o ator: quem tem clipes, Action ou tracks segue em reprodução até o fim e devolve física e lógica; quem não tem nada não é tocado.
+- Filho que só anima guarda amostras, então a animação toca no Watch com Generate Keyframes desligado. Objeto preso a osso não ganha mais Action.
+- Skip de cutscene leva os Takes dela à pose final, inclusive os pendentes e os que continuam depois de a sequência acabar; Stop e Restart os encerram. Takes de `play_take` por script não são afetados.
+- Ator escondido por Activity Culling volta a aparecer durante o Take.
+- Remover Take fica bloqueado na UI ao vivo; o painel Rec Studio só aparece na tela Rec Studio; renomear Take atualiza as cutscenes e mantém o nome único.
+- Amostras seguem o pai do editor mesmo com `setParent`/`removeParent` em jogo, e o limite entre clipes acompanha o Fixed Rate.
+
 ## 2026-11-06 - Textura de fundo no tema
 
 - Tema > User Interface ganhou **Background Texture**: imagem seamless repetida nos painéis e headers, com Strength, Scale e Tint, e menu Presets com Clouds, Marble, Wood, Voronoi e Stucci.

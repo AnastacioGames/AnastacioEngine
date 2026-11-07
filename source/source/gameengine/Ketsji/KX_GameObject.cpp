@@ -1733,6 +1733,10 @@ void KX_GameObject::ReParentLogic()
 
 void KX_GameObject::SetMotionReplay()
 {
+	/* UpdateActivity stops during a replay: a culled actor would stay hidden. */
+	if (!m_bRender) {
+		RestoreActivityCulled();
+	}
 	m_motionReplay = true;
 	SuspendLogic();
 }
@@ -1741,6 +1745,24 @@ void KX_GameObject::EndMotionReplay()
 {
 	m_motionReplay = false;
 	ResumeLogic();
+}
+
+void KX_GameObject::RestoreActivityCulled()
+{
+	const bool hasLogic = (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_LOGIC) != 0;
+	const bool hasPhysics = (m_activityCullingInfo.m_flags & ActivityCullingInfo::ACTIVITY_PHYSICS) != 0;
+
+	ResumeLogic();
+	if (hasLogic && m_actionManager) {
+		m_actionManager->Resume();
+	}
+	if (hasPhysics) {
+		RestorePhysics();
+	}
+	m_bRender = true;
+	if (m_bVisible) {
+		GetScene()->GetRenderList()->Add(CM_AddRef(this));
+	}
 }
 
 void KX_GameObject::UpdateActivity(float distance)
@@ -1789,17 +1811,7 @@ void KX_GameObject::UpdateActivity(float distance)
 		if (m_bRender) {
 			return;
 		}
-		ResumeLogic();
-		if (hasLogic && m_actionManager) {
-			m_actionManager->Resume();
-		}
-		if (hasPhysics) {
-			RestorePhysics();
-		}
-		m_bRender = true;
-		if (m_bVisible) {
-			scene->GetRenderList()->Add(CM_AddRef(this));
-		}
+		RestoreActivityCulled();
 	}
 }
 

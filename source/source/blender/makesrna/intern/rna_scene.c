@@ -1704,6 +1704,26 @@ static void rna_SceneRenderView_name_set(PointerRNA *ptr, const char *value)
 	BLI_uniquename(&scene->r.views, rv, DATA_("RenderView"), '.', offsetof(SceneRenderView, name), sizeof(rv->name));
 }
 
+/* Cutscene events find a take by name, so they follow the rename. */
+static void rna_MotionTake_name_set(PointerRNA *ptr, const char *value)
+{
+	Scene *scene = (Scene *)ptr->id.data;
+	MotionTake *take = (MotionTake *)ptr->data;
+	char oldname[sizeof(take->name)];
+	BLI_strncpy(oldname, take->name, sizeof(oldname));
+	BLI_strncpy_utf8(take->name, value, sizeof(take->name));
+	BLI_uniquename(&scene->motion_takes, take, DATA_("Take"), '.', offsetof(MotionTake, name), sizeof(take->name));
+	if (scene->cutscene_settings) {
+		for (CutsceneSequence *seq = scene->cutscene_settings->sequences.first; seq; seq = seq->next) {
+			for (CutsceneEvent *event = seq->events.first; event; event = event->next) {
+				if (event->type == CUTSCENE_EVENT_PLAY_TAKE && STREQ(event->param_str_a, oldname)) {
+					BLI_strncpy(event->param_str_a, take->name, sizeof(event->param_str_a));
+				}
+			}
+		}
+	}
+}
+
 static char *rna_SceneRenderView_path(PointerRNA *ptr)
 {
 	SceneRenderView *srv = (SceneRenderView *)ptr->data;
@@ -8246,6 +8266,7 @@ static void rna_def_motion_take(BlenderRNA *brna)
 	RNA_def_struct_ui_text(srna, "Take", "One Rec Play recording");
 
 	prop = RNA_def_property(srna, "name", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_funcs(prop, NULL, NULL, "rna_MotionTake_name_set");
 	RNA_def_property_ui_text(prop, "Name", "");
 	RNA_def_struct_name_property(srna, prop);
 
