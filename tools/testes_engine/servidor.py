@@ -162,56 +162,70 @@ def atender(linha):
         return {'ok': False, 'erro': str(erro), 'traceback': traceback.format_exc()}
 
 
+# Estado fora do operador: abrir/reverter arquivo libera os modais, e o servidor
+# precisa sobreviver (responde o pedido e se religa pelo load_post).
+ESTADO = {'escuta': None, 'conexao': None, 'buffer': b''}
+
+
+def escuta():
+    if ESTADO['escuta'] is None:
+        s = socket.socket()
+        s.bind(('127.0.0.1', 0))
+        s.listen(4)
+        s.setblocking(False)
+        ESTADO['escuta'] = s
+        with open(ARQUIVO_SESSAO + '.tmp', 'w') as f:
+            json.dump({'porta': s.getsockname()[1], 'token': TOKEN, 'pid': os.getpid()}, f)
+        os.replace(ARQUIVO_SESSAO + '.tmp', ARQUIVO_SESSAO)
+    return ESTADO['escuta']
+
+
+def tique():
+    """Um pedido por tique: o editor segue desenhando e tratando eventos entre eles."""
+    e = ESTADO
+    if e['conexao'] is None:
+        try:
+            e['conexao'], _ = escuta().accept()
+            e['conexao'].setblocking(False)
+            e['buffer'] = b''
+        except BlockingIOError:
+            return
+    try:
+        dados = e['conexao'].recv(1 << 20)
+        if not dados:
+            e['conexao'].close()
+            e['conexao'] = None
+            return
+        e['buffer'] += dados
+    except BlockingIOError:
+        pass
+    except OSError:
+        e['conexao'] = None
+        return
+    if b'\n' in e['buffer']:
+        linha, resto = e['buffer'].split(b'\n', 1)
+        resposta = atender(linha.decode('utf-8'))
+        if resposta is not None and e['conexao'] is not None:
+            e['buffer'] = resto
+            e['conexao'].setblocking(True)
+            e['conexao'].sendall((json.dumps(resposta) + '\n').encode('utf-8'))
+            e['conexao'].setblocking(False)
+
+
 class ANASTACIO_OT_servidor_controle(bpy.types.Operator):
     bl_idname = 'wm.anastacio_servidor_controle'
     bl_label = 'Servidor de controle'
 
     def invoke(self, context, _event):
-        self.conexao = None
-        self.buffer = b''
-        self.escuta = socket.socket()
-        self.escuta.bind(('127.0.0.1', 0))
-        self.escuta.listen(4)
-        self.escuta.setblocking(False)
+        escuta()
         wm = context.window_manager
-        self.relogio = wm.event_timer_add(0.02, context.window)
+        wm.event_timer_add(0.02, context.window)
         wm.modal_handler_add(self)
-        with open(ARQUIVO_SESSAO + '.tmp', 'w') as f:
-            json.dump({'porta': self.escuta.getsockname()[1], 'token': TOKEN, 'pid': os.getpid()}, f)
-        os.replace(ARQUIVO_SESSAO + '.tmp', ARQUIVO_SESSAO)
         return {'RUNNING_MODAL'}
 
     def modal(self, _context, evento):
-        """Um pedido por tique: o editor segue desenhando e tratando eventos entre eles."""
-        if evento.type != 'TIMER':
-            return {'PASS_THROUGH'}
-        if self.conexao is None:
-            try:
-                self.conexao, _ = self.escuta.accept()
-                self.conexao.setblocking(False)
-                self.buffer = b''
-            except BlockingIOError:
-                return {'PASS_THROUGH'}
-        try:
-            dados = self.conexao.recv(1 << 20)
-            if not dados:
-                self.conexao.close()
-                self.conexao = None
-                return {'PASS_THROUGH'}
-            self.buffer += dados
-        except BlockingIOError:
-            pass
-        except OSError:
-            self.conexao = None
-            return {'PASS_THROUGH'}
-        if b'\n' in self.buffer:
-            linha, resto = self.buffer.split(b'\n', 1)
-            resposta = atender(linha.decode('utf-8'))
-            if resposta is not None:
-                self.buffer = resto
-                self.conexao.setblocking(True)
-                self.conexao.sendall((json.dumps(resposta) + '\n').encode('utf-8'))
-                self.conexao.setblocking(False)
+        if evento.type == 'TIMER':
+            tique()
         return {'PASS_THROUGH'}
 
 
@@ -228,4 +242,12 @@ def iniciar(_cena):
     bpy.ops.wm.anastacio_servidor_controle(ctx, 'INVOKE_DEFAULT')
 
 
+@bpy.app.handlers.persistent
+def religar(_arquivo):
+    quadros[0] = 0
+    if iniciar not in bpy.app.handlers.scene_update_post:
+        bpy.app.handlers.scene_update_post.append(iniciar)
+
+
 bpy.app.handlers.scene_update_post.append(iniciar)
+bpy.app.handlers.load_post.append(religar)
