@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Estudo de código aberto: OIDN com normal e PVS descartados
+
+- OIDN guiado por normal (albedo branco) no Baked Lighting: sem ganho medido (RMSE 0,103 x 0,104); não aplicado.
+  Só reavaliar com OIDN >= 1.3 (filtro RTLightmap).
+- PVS/portais (ideia do Quake/Doom 3): medido com `tools/debug/cenas/medir_visibilidade.py` num prédio de 36 salas;
+  o Occluder herdado desenha 50 objetos contra 239 de um PVS ideal por sala. Plano descartado, registro em
+  `docs/plano-visibilidade-portais.md`; segue o Occluder automático.
+
 ## 2026-11-07 - Referência velha de logic brick no Python
 
 - Trocar `actuator.type`/`sensor.type`/`controller.type` realoca o data; a variável Python antiga mantinha o subtipo velho e gravava em memória de tamanho errado (crash, herdado do upstream). `pyrna_struct_validity_check` agora compara com o subtipo atual e lança `ReferenceError` pedindo para pegar de novo do objeto.
