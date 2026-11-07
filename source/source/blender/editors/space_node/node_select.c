@@ -291,6 +291,10 @@ static int node_select_grouped_exec(bContext *C, wmOperator *op)
 	const bool extend = RNA_boolean_get(op->ptr, "extend");
 	const int type = RNA_enum_get(op->ptr, "type");
 
+	if (node_act == NULL) {
+		return OPERATOR_CANCELLED;
+	}
+
 	if (!extend) {
 		for (node = snode->edittree->nodes.first; node; node = node->next) {
 			nodeSetSelected(node, false);

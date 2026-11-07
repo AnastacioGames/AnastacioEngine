@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Crashes achados pela varredura de operadores
+
+- `outliner.parent_drop` sem pai ou filho válido, `node.select_grouped` sem nó ativo e `object.skin_armature_create` sem malha ativa usavam ponteiro inválido; agora cancelam.
+- Conferido por repetição no editor: os dois primeiros cancelam com erro tratado e a varredura `object.` passa pelo terceiro sem crash.
+
 ## 2026-11-07 - Rec Play: botões não herdam o modo do clique anterior
 
 - Watch, Movie e Rerecord ficavam memorizados no operador: depois de um Watch, Record e Rerecord só assistiam, e depois de um Rerecord, Record substituía o Take. As três opções agora valem só para o clique delas.

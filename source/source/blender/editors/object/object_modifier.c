@@ -1765,9 +1765,15 @@ static int skin_armature_create_exec(bContext *C, wmOperator *op)
 	Main *bmain = CTX_data_main(C);
 	Scene *scene = CTX_data_scene(C);
 	Object *ob = CTX_data_active_object(C), *arm_ob;
-	Mesh *me = ob->data;
+	Mesh *me;
 	ModifierData *skin_md;
 	ArmatureModifierData *arm_md;
+
+	if (ob == NULL || ob->type != OB_MESH) {
+		BKE_report(op->reports, RPT_WARNING, "Active object must be a mesh");
+		return OPERATOR_CANCELLED;
+	}
+	me = ob->data;
 
 	if (!CustomData_has_layer(&me->vdata, CD_MVERT_SKIN)) {
 		BKE_reportf(op->reports, RPT_WARNING, "Mesh '%s' has no skin vertex data", me->id.name + 2);

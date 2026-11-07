@@ -2027,6 +2027,11 @@ static int parent_drop_exec(bContext *C, wmOperator *op)
 	RNA_string_get(op->ptr, "child", childname);
 	ob = (Object *)BKE_libblock_find_name(bmain, ID_OB, childname);
 
+	if (ob == NULL || par == NULL) {
+		BKE_report(op->reports, RPT_ERROR, "Parent or child object not found");
+		return OPERATOR_CANCELLED;
+	}
+
 	if (ID_IS_LINKED(ob)) {
 		BKE_report(op->reports, RPT_INFO, "Can't edit library linked object");
 		return OPERATOR_CANCELLED;
