@@ -201,8 +201,16 @@ typedef struct ThemeUI {
 	float bg_tile_strength;
 	float bg_tile_scale;  /* 0 only in prefs older than this field, see versioning */
 	char bg_tile_tint[4];
-	int bg_tile_pad;
+	int bg_tile_flag;
 } ThemeUI;
+
+/* ThemeUI.bg_tile_flag: extra places that show the background texture. */
+enum {
+	UI_BG_TILE_MENUS   = (1 << 0),
+	UI_BG_TILE_PANELS  = (1 << 1),
+	UI_BG_TILE_BUTTONS = (1 << 2),
+	UI_BG_TILE_EDITORS = (1 << 3),
+};
 
 /* try to put them all in one, if needed a special struct can be created as well
  * for example later on, when we introduce wire colors for ob types or so...

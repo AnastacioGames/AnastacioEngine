@@ -1214,6 +1214,26 @@ static void rna_def_userdef_theme_ui(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Tint", "Color multiplied with the texture, white keeps the original colors");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	prop = RNA_def_property(srna, "background_tile_menus", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "bg_tile_flag", UI_BG_TILE_MENUS);
+	RNA_def_property_ui_text(prop, "Menus", "Show the texture on menus and popups");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "background_tile_panels", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "bg_tile_flag", UI_BG_TILE_PANELS);
+	RNA_def_property_ui_text(prop, "Panels", "Show the texture on panel backgrounds and titles");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "background_tile_buttons", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "bg_tile_flag", UI_BG_TILE_BUTTONS);
+	RNA_def_property_ui_text(prop, "Buttons", "Show the texture on buttons and boxes");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "background_tile_editors", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "bg_tile_flag", UI_BG_TILE_EDITORS);
+	RNA_def_property_ui_text(prop, "Editors", "Show the texture on the Logic Bricks and Outliner areas");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	prop = RNA_def_property(srna, "widget_emboss", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "widget_emboss");
 	RNA_def_property_array(prop, 4);

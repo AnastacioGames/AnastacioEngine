@@ -782,6 +782,11 @@ class USERPREF_PT_theme(Panel):
         row.prop(ui, "background_tile_strength")
         row.prop(ui, "background_tile_scale")
         row.prop(ui, "background_tile_tint", text="")
+        row = col.row()
+        row.prop(ui, "background_tile_menus")
+        row.prop(ui, "background_tile_panels")
+        row.prop(ui, "background_tile_buttons")
+        row.prop(ui, "background_tile_editors")
 
         col = outer.box()
         col.label(text="Axis Colors:")

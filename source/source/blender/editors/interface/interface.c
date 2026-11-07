@@ -1606,6 +1606,8 @@ void UI_block_draw(const bContext *C, uiBlock *block)
 
 	wmOrtho2_region_pixelspace(ar);
 
+	ui_widget_tile_region_set(ar);
+
 	/* back */
 	if (block->flag & UI_BLOCK_RADIAL)
 		ui_draw_pie_center(block);
@@ -1627,6 +1629,8 @@ void UI_block_draw(const bContext *C, uiBlock *block)
 				ui_draw_but(C, ar, &style, but, &rect);
 		}
 	}
+
+	ui_widget_tile_region_set(NULL);
 
 	/* restore matrix */
 	glMatrixMode(GL_PROJECTION);

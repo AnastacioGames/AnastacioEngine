@@ -249,6 +249,7 @@ static void logic_main_region_draw(const bContext *C, ARegion *ar)
 	/* clear and setup matrix */
 	UI_ThemeClearColor(TH_BACK);
 	glClear(GL_COLOR_BUFFER_BIT);
+	UI_ThemeBackgroundTileDrawEditor(ar);
 
 	UI_view2d_view_ortho(v2d);
 

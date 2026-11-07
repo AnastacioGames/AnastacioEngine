@@ -475,6 +475,7 @@ static void outliner_main_region_draw(const bContext *C, ARegion *ar)
 	/* clear */
 	UI_ThemeClearColor(TH_BACK);
 	glClear(GL_COLOR_BUFFER_BIT);
+	UI_ThemeBackgroundTileDrawEditor(ar);
 
 	draw_outliner(C);
 

@@ -379,6 +379,7 @@ struct ARegion;
 bool    UI_ThemeBackgroundTileBegin(const struct ARegion *ar);
 void    UI_ThemeBackgroundTileEnd(void);
 void    UI_ThemeBackgroundTileDrawRect(const struct ARegion *ar);
+void    UI_ThemeBackgroundTileDrawEditor(const struct ARegion *ar);
 
 // clear the openGL ClearColor using the input colorid using optional transparency
 void    UI_ThemeClearColorAlpha(int colorid, float alpha);

@@ -1760,6 +1760,13 @@ void UI_ThemeBackgroundTileDrawRect(const ARegion *ar)
 	}
 }
 
+void UI_ThemeBackgroundTileDrawEditor(const ARegion *ar)
+{
+	if (UI_GetTheme()->tui.bg_tile_flag & UI_BG_TILE_EDITORS) {
+		UI_ThemeBackgroundTileDrawRect(ar);
+	}
+}
+
 void UI_ThemeClearColorAlpha(int colorid, float alpha)
 {
 	float col[3];

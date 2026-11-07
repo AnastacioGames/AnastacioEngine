@@ -680,6 +680,11 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 			UI_ThemeColor4(TH_PANEL_HEADER);
 			UI_draw_roundbox_corner_set(is_closed_y ? UI_CNR_ALL : (UI_CNR_TOP_LEFT | UI_CNR_TOP_RIGHT));
 			UI_draw_roundbox(minx, headrect.ymin + 1, maxx, y, PNL_ROUND_RADIUS / block->aspect);
+			if (ui_widget_tile_begin(UI_BG_TILE_PANELS)) {
+				UI_draw_roundbox_gl_mode(GL_POLYGON, minx, headrect.ymin + 1, maxx, y, PNL_ROUND_RADIUS / block->aspect);
+				UI_ThemeBackgroundTileEnd();
+				glEnable(GL_BLEND);
+			}
 		}
 		else if (!(panel->runtime_flag & PNL_FIRST)) {
 			/* draw embossed separator */
@@ -760,12 +765,23 @@ void ui_draw_aligned_panel(uiStyle *style, uiBlock *block, const rcti *rect, con
 			glEnable(GL_BLEND);
 			UI_ThemeColor4(TH_PANEL_SUB_BACK);
 			glRecti(rect->xmin, rect->ymin, rect->xmax, rect->ymax);
+			if (ui_widget_tile_begin(UI_BG_TILE_PANELS)) {
+				glRecti(rect->xmin, rect->ymin, rect->xmax, rect->ymax);
+				UI_ThemeBackgroundTileEnd();
+				glEnable(GL_BLEND);
+			}
 		}
 		else if (UI_GetThemeValue(TH_PANEL_SHOW_BACK)) {
 			glEnable(GL_BLEND);
 			UI_ThemeColor4(TH_PANEL_BACK);
 			UI_draw_roundbox_corner_set(UI_CNR_BOTTOM_LEFT | UI_CNR_BOTTOM_RIGHT);
 			UI_draw_roundbox(rect->xmin, rect->ymin, rect->xmax, rect->ymax + 1, PNL_ROUND_RADIUS / block->aspect);
+			if (ui_widget_tile_begin(UI_BG_TILE_PANELS)) {
+				UI_draw_roundbox_gl_mode(
+				        GL_POLYGON, rect->xmin, rect->ymin, rect->xmax, rect->ymax + 1, PNL_ROUND_RADIUS / block->aspect);
+				UI_ThemeBackgroundTileEnd();
+				glEnable(GL_BLEND);
+			}
 		}
 
 		if (panel->control & UI_PNL_SCALE)

@@ -717,6 +717,22 @@ static void widgetbase_outline(uiWidgetBase *wtb)
 	glDisableClientState(GL_VERTEX_ARRAY);
 }
 
+/* Region of the block being drawn and the theme texture part of the current widget. */
+static const ARegion *widget_tile_region = NULL;
+static int widget_tile_part = 0;
+
+void ui_widget_tile_region_set(const ARegion *ar)
+{
+	widget_tile_region = ar;
+	widget_tile_part = 0;
+}
+
+bool ui_widget_tile_begin(int part)
+{
+	return widget_tile_region && (UI_GetTheme()->tui.bg_tile_flag & part) &&
+	       UI_ThemeBackgroundTileBegin(widget_tile_region);
+}
+
 static void widgetbase_draw_ex(
         uiWidgetBase *wtb, const uiWidgetColors *wcol,
         const bool show_alpha_checkers)
@@ -802,6 +818,15 @@ static void widgetbase_draw_ex(
 			glDrawArrays(GL_POLYGON, 0, wtb->totvert);
 			glDisableClientState(GL_VERTEX_ARRAY);
 			glDisableClientState(GL_COLOR_ARRAY);
+		}
+
+		if (widget_tile_part && ui_widget_tile_begin(widget_tile_part)) {
+			glEnableClientState(GL_VERTEX_ARRAY);
+			glVertexPointer(2, GL_FLOAT, 0, wtb->inner_v);
+			glDrawArrays(GL_POLYGON, 0, wtb->totvert);
+			glDisableClientState(GL_VERTEX_ARRAY);
+			UI_ThemeBackgroundTileEnd();
+			glEnable(GL_BLEND);
 		}
 	}
 
@@ -4076,6 +4101,11 @@ void ui_draw_but(const bContext *C, ARegion *ar, uiStyle *style, uiBut *but, rct
 
 	const rcti rect_orig = *rect;
 
+	/* Only plain buttons: a texture would falsify colors and values shown by other types. */
+	widget_tile_part = (but->dt == UI_EMBOSS &&
+	                    ELEM(but->type, UI_BTYPE_BUT, UI_BTYPE_MENU, UI_BTYPE_BLOCK, UI_BTYPE_ROUNDBOX)) ?
+	                   UI_BG_TILE_BUTTONS : 0;
+
 	/* handle menus separately */
 	if (but->dt == UI_EMBOSS_PULLDOWN) {
 		switch (but->type) {
@@ -4431,10 +4461,12 @@ void ui_draw_menu_back(uiStyle *UNUSED(style), uiBlock *block, rcti *rect)
 	uiWidgetType *wt = widget_type(UI_WTYPE_MENU_BACK);
 
 	wt->state(wt, 0, 0);
+	widget_tile_part = UI_BG_TILE_MENUS;
 	if (block)
 		wt->draw(&wt->wcol, rect, block->flag, block->direction);
 	else
 		wt->draw(&wt->wcol, rect, 0, 0);
+	widget_tile_part = 0;
 
 	ui_draw_clip_tri(block, rect, wt);
 }
@@ -4498,7 +4530,9 @@ void ui_draw_popover_back(ARegion *ar, uiStyle *UNUSED(style), uiBlock *block, r
 	if (block) {
 		float mval_origin[2] = {block->mx, block->my};
 		ui_window_to_block_fl(ar, block, &mval_origin[0], &mval_origin[1]);
+		widget_tile_part = UI_BG_TILE_MENUS;
 		ui_draw_popover_back_impl(&wcol_menu_back, rect, block->direction, mval_origin);
+		widget_tile_part = 0;
 	}
 	else {
 		wt->state(wt, 0, 0);

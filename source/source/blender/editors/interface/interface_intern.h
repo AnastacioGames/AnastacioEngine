@@ -795,6 +795,8 @@ int ui_id_icon_get(const struct bContext *C, struct ID *id, const bool big);
 void init_userdef_do_versions(void);
 void ui_theme_init_default(void);
 void ui_style_init_default(void);
+void ui_widget_tile_region_set(const struct ARegion *ar);
+bool ui_widget_tile_begin(int part);
 void ui_resources_init(void);
 void ui_resources_free(void);
 
