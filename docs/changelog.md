@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Referência velha de logic brick no Python
+
+- Trocar `actuator.type`/`sensor.type`/`controller.type` realoca o data; a variável Python antiga mantinha o subtipo velho e gravava em memória de tamanho errado (crash, herdado do upstream). `pyrna_struct_validity_check` agora compara com o subtipo atual e lança `ReferenceError` pedindo para pegar de novo do objeto.
+
 ## 2026-11-07 - Lote 5: Dope Sheet Cache File e cutscene
 
 - Dope Sheet no modo Cache File filtrava o `bDopeSheet` como canal (`ANIMCONT_CHANNEL`), lendo memória do tipo errado; agora usa `ANIMCONT_DOPESHEET`.

@@ -105,6 +105,24 @@ static PyObject *pyrna_unregister_class(PyObject *self, PyObject *py_class);
 int pyrna_struct_validity_check(BPy_StructRNA *pysrna)
 {
 	if (pysrna->ptr.type) {
+		/* Logic bricks: trocar .type realoca o data; a referência antiga com o subtipo velho
+		 * leria/gravaria memória do tamanho errado. Compara com o subtipo atual. */
+		StructRNA *type = pysrna->ptr.type;
+		if (RNA_struct_base(type) && pysrna->ptr.data) {
+			StructRNA *base = RNA_struct_is_a(type, &RNA_Actuator) ? &RNA_Actuator :
+			                  RNA_struct_is_a(type, &RNA_Sensor) ? &RNA_Sensor :
+			                  RNA_struct_is_a(type, &RNA_Controller) ? &RNA_Controller : NULL;
+			if (base && base != type) {
+				PointerRNA tmp;
+				RNA_pointer_create(pysrna->ptr.id.data, base, pysrna->ptr.data, &tmp);
+				if (tmp.type != type) {
+					PyErr_Format(PyExc_ReferenceError,
+					             "%.200s changed type to %.200s, get it again from the object",
+					             RNA_struct_identifier(type), RNA_struct_identifier(tmp.type));
+					return -1;
+				}
+			}
+		}
 		return 0;
 	}
 	PyErr_Format(PyExc_ReferenceError,
