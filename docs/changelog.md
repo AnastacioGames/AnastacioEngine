@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Lote 5: Dope Sheet Cache File e cutscene
+
+- Dope Sheet no modo Cache File filtrava o `bDopeSheet` como canal (`ANIMCONT_CHANNEL`), lendo memória do tipo errado; agora usa `ANIMCONT_DOPESHEET`.
+- Cutscene: remover a última sequência ou evento deixava o índice ativo em -1; agora fica em 0.
+
 ## 2026-11-07 - Lote 4: curve.draw, UV Follow Active Quads e painéis
 
 - Crash: `curve.draw` chamado por script sem traço lia fora do buffer no fitting; agora cancela.

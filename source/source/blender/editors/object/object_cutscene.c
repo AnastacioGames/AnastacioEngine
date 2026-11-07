@@ -12,6 +12,7 @@
 #include "DNA_scene_types.h"
 
 #include "BLI_listbase.h"
+#include "BLI_math_base.h"
 #include "BLI_string.h"
 
 #include "BKE_context.h"
@@ -150,7 +151,7 @@ static int cutscene_sequence_remove_exec(bContext *C, wmOperator *op)
 	BLI_remlink(&settings->sequences, sequence);
 	cutscene_sequence_free(sequence);
 
-	settings->active_sequence = MIN2(index, BLI_listbase_count(&settings->sequences) - 1);
+	settings->active_sequence = max_ii(0, MIN2(index, BLI_listbase_count(&settings->sequences) - 1));
 	settings->active_event = 0;
 
 	WM_event_add_notifier(C, NC_SCENE | NA_EDITED, scene);
@@ -183,7 +184,7 @@ static int cutscene_sequence_duplicate_exec(bContext *C, wmOperator *op)
 	sequence_copy = cutscene_sequence_duplicate(sequence);
 	BLI_insertlinkafter(&settings->sequences, sequence, sequence_copy);
 	settings->active_sequence = index + 1;
-	settings->active_event = MIN2(settings->active_event, BLI_listbase_count(&sequence_copy->events) - 1);
+	settings->active_event = max_ii(0, MIN2(settings->active_event, BLI_listbase_count(&sequence_copy->events) - 1));
 
 	WM_event_add_notifier(C, NC_SCENE | NA_EDITED, scene);
 	return OPERATOR_FINISHED;
@@ -288,7 +289,7 @@ static int cutscene_event_remove_exec(bContext *C, wmOperator *op)
 	cutscene_event_free(event);
 
 	settings->active_sequence = sequence_index;
-	settings->active_event = MIN2(event_index, BLI_listbase_count(&sequence->events) - 1);
+	settings->active_event = max_ii(0, MIN2(event_index, BLI_listbase_count(&sequence->events) - 1));
 
 	WM_event_add_notifier(C, NC_SCENE | NA_EDITED, scene);
 	return OPERATOR_FINISHED;

@@ -199,7 +199,7 @@ static bool actedit_get_context(bAnimContext *ac, SpaceAction *saction)
 			/* update scene-pointer (no need to check for pinning yet, as not implemented) */
 			saction->ads.source = (ID *)ac->scene;
 
-			ac->datatype = ANIMCONT_CHANNEL;
+			ac->datatype = ANIMCONT_DOPESHEET; /* CHANNEL lia o bDopeSheet como bAnimListElem */
 			ac->data = &saction->ads;
 
 			ac->mode = saction->mode;
