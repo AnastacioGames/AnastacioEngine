@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Minimap: Show on Minimap com cor por objeto
+
+- Painel Minimap na aba Object: liga o marcador do objeto sem digitar propriedade e dá cor própria (`minimap_color`, `#rrggbb`, que um script pode trocar no jogo). Sem cor própria vale Markers do nó.
+
 ## 2026-11-07 - Rec Play: animação do Take em sincronia com o corpo
 
 - Com Generate Keyframes, ator que ficou parado antes de animar tocava o NLA adiantado (28 quadros no teste) e a animação acabava antes do corpo. O relógio do NLA agora começa junto com o Take, mesmo antes da primeira faixa. `playNLA` por script não muda.

@@ -288,7 +288,7 @@ def minimap_view(data, player, w, h):
 
 
 def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
-    """markers = [(mundo x, mundo y, yaw, é_jogador)].  A imagem cobre
+    """markers = [(mundo x, mundo y, yaw, é_jogador[, cor])].  A imagem cobre
     World Min..Max; fora dela vale a borda da textura (clamp)."""
     _blend(bgl)
     if data["shape"] in ("CIRCLE", "SQUARE"):
@@ -384,7 +384,8 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
     side = min(w, h)
     round_shape = data["shape"] in _ROUND_SHAPES
     # Jogador por último, por cima dos outros.
-    for mx, my, yaw, is_player in sorted(markers, key=lambda m: m[3]):
+    for marker in sorted(markers, key=lambda m: m[3]):
+        mx, my, yaw, is_player = marker[:4]
         projected = to_screen(mx, my)
         if projected is None:
             continue
@@ -418,7 +419,7 @@ def draw_minimap(bgl, data, bindcode, markers, x, y, w, h):
                 bgl.glVertex2f(px + math.cos(a + da) * size * r, py + math.sin(a + da) * size * r)
             bgl.glEnd()
         else:
-            _color(bgl, data["marker_color"])
+            _color(bgl, marker[4] if len(marker) > 4 and marker[4] else data["marker_color"])
             bgl.glBegin(bgl.GL_TRIANGLE_FAN)
             for i in range(12):
                 a = i * math.pi / 6

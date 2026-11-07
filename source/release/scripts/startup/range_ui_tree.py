@@ -1251,6 +1251,89 @@ def _draw_add_minimap(self, context):
                                        text="Minimap", icon="WORLD")
 
 
+MINIMAP_COLOR_PROP = "minimap_color"
+
+
+def _minimap_prop_name():
+    """A propriedade que os nós Minimap procuram; `minimap` é o padrão."""
+    for tree in bpy.data.node_groups:
+        if tree.bl_idname == UITree.bl_idname:
+            for node in tree.nodes:
+                if isinstance(node, UIMinimapNode) and node.marker_prop:
+                    return node.marker_prop
+    return "minimap"
+
+
+def _set_game_prop(ob, name, typ, value):
+    """Cria, troca ou (value None) apaga uma propriedade de jogo de `ob`."""
+    props = ob.game.properties
+    scene = bpy.context.scene
+    active = scene.objects.active
+    scene.objects.active = ob
+    if value is None:
+        if name in props:
+            bpy.ops.object.game_property_remove(index=props.find(name))
+    else:
+        if name not in props:
+            bpy.ops.object.game_property_new(type=typ, name=name)
+        props[name].value = value
+    scene.objects.active = active
+
+
+def _minimap_show_get(self):
+    return _minimap_prop_name() in self.game.properties
+
+
+def _minimap_show_set(self, value):
+    _set_game_prop(self, _minimap_prop_name(), "BOOL", True if value else None)
+
+
+def _minimap_use_color_get(self):
+    return MINIMAP_COLOR_PROP in self.game.properties
+
+
+def _minimap_use_color_set(self, value):
+    _set_game_prop(self, MINIMAP_COLOR_PROP, "STRING", "#ffffff" if value else None)
+
+
+def _minimap_color_get(self):
+    prop = self.game.properties.get(MINIMAP_COLOR_PROP)
+    try:
+        value = prop.value.lstrip("#")
+        return tuple(int(value[i:i + 2], 16) / 255.0 for i in (0, 2, 4))
+    except (AttributeError, ValueError):
+        return (1.0, 1.0, 1.0)
+
+
+def _minimap_color_set(self, value):
+    text = "#%02x%02x%02x" % tuple(int(round(c * 255.0)) for c in value)
+    _set_game_prop(self, MINIMAP_COLOR_PROP, "STRING", text)
+
+
+class OBJECT_PT_range_minimap(Panel):
+    bl_label = "Minimap"
+    bl_space_type = "PROPERTIES"
+    bl_region_type = "WINDOW"
+    bl_context = "object"
+    bl_options = {"DEFAULT_CLOSED"}
+
+    @classmethod
+    def poll(cls, context):
+        return (context.object is not None and context.scene.render.engine == "BLENDER_GAME" and
+                context.window_manager.ae_object_panel_category == "GAME")
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
+        layout.prop(ob, "range_minimap_show")
+        row = layout.row(align=True)
+        row.active = ob.range_minimap_show
+        row.prop(ob, "range_minimap_use_color")
+        sub = row.row(align=True)
+        sub.active = ob.range_minimap_use_color
+        sub.prop(ob, "range_minimap_color", text="")
+
+
 class RANGE_OT_ui_tree_capture(Operator):
     """Render the scene camera and use it as the active Frame's backdrop"""
     bl_idname = "node.range_ui_tree_capture"
@@ -1644,7 +1727,7 @@ CATEGORIES = [
 
 CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
     RANGE_OT_ui_tree_bake, RANGE_OT_ui_tree_image_aspect, RANGE_OT_ui_tree_minimap_fit,
-    RANGE_OT_ui_tree_minimap_bake_image, RANGE_OT_add_minimap,
+    RANGE_OT_ui_tree_minimap_bake_image, RANGE_OT_add_minimap, OBJECT_PT_range_minimap,
     RANGE_OT_ui_tree_capture,
     RANGE_OT_ui_tree_template, RANGE_OT_ui_tree_setup_logic,
     NODE_PT_range_ui_tree,
@@ -1679,6 +1762,16 @@ def register():
     bpy.types.NodeFrame.ui_click_sound = StringProperty(
         name="Click Sound", subtype="FILE_PATH",
         description="Default sound for clicking any button on this screen")
+    bpy.types.Object.range_minimap_show = BoolProperty(
+        name="Show on Minimap", get=_minimap_show_get, set=_minimap_show_set,
+        description="This object gets a marker on the minimap")
+    bpy.types.Object.range_minimap_use_color = BoolProperty(
+        name="Own Color", get=_minimap_use_color_get, set=_minimap_use_color_set,
+        description="Use a marker color for this object instead of the node's Markers color")
+    bpy.types.Object.range_minimap_color = FloatVectorProperty(
+        name="Marker Color", subtype="COLOR", size=3, min=0.0, max=1.0,
+        get=_minimap_color_get, set=_minimap_color_set,
+        description="Marker color of this object (game property minimap_color, #rrggbb)")
     nodeitems_utils.register_node_categories("RANGE_UI_TREE", CATEGORIES)
     bpy.types.INFO_MT_add.append(_draw_add_minimap)
     space = bpy.types.SpaceNodeEditor
@@ -1694,6 +1787,9 @@ def unregister():
             handlers.remove(_auto_bake)
     while _draw_handles:
         bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handles.pop(), "WINDOW")
+    del bpy.types.Object.range_minimap_show
+    del bpy.types.Object.range_minimap_use_color
+    del bpy.types.Object.range_minimap_color
     del bpy.types.NodeFrame.ui_backdrop
     del bpy.types.NodeFrame.ui_screen
     del bpy.types.NodeFrame.ui_hud

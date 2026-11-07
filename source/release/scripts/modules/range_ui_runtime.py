@@ -138,6 +138,21 @@ class Dialogue:
 
 # Fundo primeiro: Panel e Image ficam atrás do resto.
 _DRAW_ORDER = {"PANEL": 0, "IMAGE": 1, "MINIMAP": 1}
+_hex_colors = {}
+
+
+def _hex_color(text):
+    """'#rrggbb' -> (r, g, b, 1); None se vazio ou inválido (usa a cor do nó)."""
+    if not isinstance(text, str):
+        return None
+    if text not in _hex_colors:
+        value = text.lstrip("#")
+        try:
+            color = tuple(int(value[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + (1.0,)
+        except ValueError:
+            color = None
+        _hex_colors[text] = color if len(value) == 6 else None
+    return _hex_colors[text]
 
 
 class Screen:
@@ -638,8 +653,8 @@ class UIRuntime:
         return bindcode
 
     def minimap_markers(self, data):
-        """[(x, y, yaw, é_jogador)]: o Object do nó é o jogador; os outros
-        vêm da propriedade/prefixo.  A busca na cena só se refaz quando o
+        """[(x, y, yaw, é_jogador, cor ou None)]: o Object do nó é o jogador;
+        os outros vêm da propriedade/prefixo e podem ter `minimap_color`.  A busca na cena só se refaz quando o
         número de objetos muda ou algum da lista some (respawn no mesmo
         frame mantém a contagem)."""
         player = self.scene.objects.get(data["object"]) if data["object"] else None
@@ -655,12 +670,12 @@ class UIRuntime:
             if obj is player:
                 continue
             p = obj.worldPosition
-            markers.append((p.x, p.y, 0.0, False))
+            markers.append((p.x, p.y, 0.0, False, _hex_color(obj.get("minimap_color"))))
         if player is not None and not player.invalid:
             p = player.worldPosition
             # Pela frente (Y local) e não pelo Euler: carro inclinado não distorce.
             fx, fy = player.worldOrientation.col[1].xy
-            markers.append((p.x, p.y, math.atan2(fy, fx) - math.pi * 0.5, True))
+            markers.append((p.x, p.y, math.atan2(fy, fx) - math.pi * 0.5, True, None))
         return markers
 
     def hud_area(self, screen):

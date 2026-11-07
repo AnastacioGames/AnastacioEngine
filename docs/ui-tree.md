@@ -38,6 +38,9 @@ Jogar esconde o menu e liga o HUD; Som e Volume mandam no volume geral do jogo.
   (ou usa a existente), HUD Screen, nó Minimap seguindo o objeto, foto do mapa e lógica da
   UI com o HUD ligado. Estilos: Radar (círculo que gira), Whole Map (quadrado parado) e
   GPS 3D (retângulo inclinado). Rivais/itens: propriedade de jogo `minimap`.
+- **Show on Minimap** (aba Object, painel Minimap): liga o marcador do objeto ativo, sem digitar
+  propriedade. **Own Color** dá a cor dele, guardada em `minimap_color` como `#rrggbb`; um script
+  pode trocar esse valor durante o jogo. Sem ela vale a cor Markers do nó. O jogador usa a cor Player.
 - **Bake Map Image** (painel do nó): foto ortográfica de cima das malhas visíveis, sem o
   jogador e os marcadores, fundo transparente, salva como `<arquivo>_minimap.png` ao lado do
   .range; acerta World Min/Max. Salve o .range antes (senão vai para pasta temporária).
