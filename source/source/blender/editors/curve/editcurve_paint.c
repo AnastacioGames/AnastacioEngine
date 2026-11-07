@@ -765,6 +765,12 @@ static int curve_draw_exec(bContext *C, wmOperator *op)
 		stroke_len = BLI_mempool_len(cdd->stroke_elem_pool);
 	}
 
+	/* Sem traço (script chamando sem "stroke"): o fitting leria fora do buffer. */
+	if (stroke_len == 0) {
+		curve_draw_exit(op);
+		return OPERATOR_CANCELLED;
+	}
+
 	ED_curve_deselect_all(cu->editnurb);
 
 	const float radius_min = cps->radius_min;

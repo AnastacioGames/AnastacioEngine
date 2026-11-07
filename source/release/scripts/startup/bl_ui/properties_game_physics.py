@@ -168,9 +168,9 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             col.prop(game, "use_sleep")
             sub = col.column()
             sub.active = not game.use_sleep
-            sub.prop(game, "use_start_asleep")
+            sub.prop(ob, "use_start_asleep")
 
-            if game.use_start_asleep:
+            if ob.use_start_asleep:
                 box = layout.box()
                 box.label(text="Start Asleep: stays still until an awake body touches it", icon="INFO")
                 box.label(text="Keep pieces touching without overlap, or they jump when they wake")

@@ -341,7 +341,7 @@ class CUSTOM_PT_game_world(CustomWorldButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return (scene.world and scene.render.engine in cls.COMPAT_ENGINES and _world_tab_is(context, 'SKY'))
+        return (getattr(context, "world", None) and scene.render.engine in cls.COMPAT_ENGINES and _world_tab_is(context, 'SKY'))
 
     def draw(self, context):
         layout = self.layout
@@ -410,10 +410,10 @@ class CUSTOM_PT_game_world_sun(CustomWorldButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return (scene.world and not _world_nodes_active(context) and
+        return (getattr(context, "world", None) and not _world_nodes_active(context) and
                 scene.render.engine in cls.COMPAT_ENGINES and
                 _world_tab_is(context, 'SKY') and
-                scene.world.sky_type in {'PROCEDURAL', 'ATMOSPHERIC'})
+                getattr(context, "world", None).sky_type in {'PROCEDURAL', 'ATMOSPHERIC'})
 
     def draw(self, context):
         scene = context.scene
@@ -447,10 +447,10 @@ class CUSTOM_PT_game_world_night(CustomWorldButtonsPanel, Panel):
     @classmethod
     def poll(cls, context):
         scene = context.scene
-        return (scene.world and not _world_nodes_active(context) and
+        return (getattr(context, "world", None) and not _world_nodes_active(context) and
                 scene.render.engine in cls.COMPAT_ENGINES and
                 _world_tab_is(context, 'SKY') and
-                scene.world.sky_type in {'PROCEDURAL', 'ATMOSPHERIC'})
+                getattr(context, "world", None).sky_type in {'PROCEDURAL', 'ATMOSPHERIC'})
 
     def draw(self, context):
         world = context.world

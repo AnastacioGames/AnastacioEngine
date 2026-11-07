@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Lote 4: curve.draw, UV Follow Active Quads e painéis
+
+- Crash: `curve.draw` chamado por script sem traço lia fora do buffer no fitting; agora cancela.
+- `uv.follow_active_quads` só aparece em Edit Mode (dava ValueError em Object Mode).
+- Painéis Sky/Sun/Night do World: poll e draw usam o mesmo mundo; `properties_game_physics.py` lê `use_start_asleep` do objeto.
+- Conferido no editor invisível; varreduras de render, menus/painéis e física sem outros crashes.
+
 ## 2026-11-07 - Lote 3: Logic Tree, UI Tree, receitas de material e World
 
 - Logic Tree: cadeia de "Then" sem gatilho é cortada até o fim (antes sobravam regras da cadeia); erro no meio do compile grava o registro, para os bricks não ficarem órfãos; Convert to Nodes grava o nome do estado e copia todos os valores dos bricks (antes perdia os iguais ao padrão do nó).
