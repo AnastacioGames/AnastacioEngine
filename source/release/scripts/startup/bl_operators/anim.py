@@ -268,17 +268,22 @@ class BakeAction(Operator):
             [(obj, None) for obj in objects]
         )
 
-        actions = anim_utils.bake_action_objects(
-            object_action_pairs,
-            frames=range(self.frame_start, self.frame_end + 1, self.step),
-            only_selected=self.only_selected,
-            do_pose='POSE' in self.bake_types,
-            do_object='OBJECT' in self.bake_types,
-            do_visual_keying=self.visual_keying,
-            do_constraint_clear=self.clear_constraints,
-            do_parents_clear=self.clear_parents,
-            do_clean=True,
-        )
+        try:
+            actions = anim_utils.bake_action_objects(
+                object_action_pairs,
+                frames=range(self.frame_start, self.frame_end + 1, self.step),
+                only_selected=self.only_selected,
+                do_pose='POSE' in self.bake_types,
+                do_object='OBJECT' in self.bake_types,
+                do_visual_keying=self.visual_keying,
+                do_constraint_clear=self.clear_constraints,
+                do_parents_clear=self.clear_parents,
+                do_clean=True,
+            )
+        except Exception as ex:
+            # Ex.: só POSE pedido num objeto que não é armature (exec sem o invoke).
+            self.report({'ERROR'}, str(ex))
+            return {'CANCELLED'}
 
         if not any(actions):
             self.report({'INFO'}, "Nothing to bake")
