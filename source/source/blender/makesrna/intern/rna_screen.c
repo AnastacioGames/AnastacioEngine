@@ -94,6 +94,12 @@ static void rna_Screen_scene_update(bContext *C, PointerRNA *ptr)
 	}
 }
 
+static void rna_Area_header_menus_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
+{
+	ED_area_tag_redraw((ScrArea *)ptr->data);
+	WM_main_add_notifier(NC_SCREEN | NA_EDITED, NULL);
+}
+
 static void rna_Screen_redraw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
 	bScreen *screen = (bScreen *)ptr->data;
@@ -245,6 +251,19 @@ static void rna_def_area(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "show_header_menus", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", HEADER_HIDE_MENUS);
 	RNA_def_property_ui_text(prop, "Header Menus", "Show the editor menus in the header");
+
+	/* Mesmas flags, no sentido das caixas do menu do cabeçalho e com redesenho imediato. */
+	prop = RNA_def_property(srna, "use_collapse_header_menus", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", HEADER_NO_PULLDOWN);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Collapse Menus", "Expand or collapse the header pulldown menus");
+	RNA_def_property_update(prop, 0, "rna_Area_header_menus_update");
+
+	prop = RNA_def_property(srna, "use_hide_header_menus", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", HEADER_HIDE_MENUS);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop, "Hide Menus", "Show or hide the header pulldown menus");
+	RNA_def_property_update(prop, 0, "rna_Area_header_menus_update");
 
 	prop = RNA_def_property(srna, "type", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "spacetype");

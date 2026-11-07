@@ -4020,6 +4020,22 @@ class VIEW3D_PT_gizmo(Panel):
         sub.prop(prefs, "mini_axis_size", text="Size")
         layout.prop(view, "show_game_controls_in_header", text="Game Buttons in Header")
         layout.prop(view, "show_tool_controls_in_header", text="Tool Buttons in Header")
+        if view.show_game_controls_in_header or view.show_tool_controls_in_header:
+            layout.prop(view, "use_header_controls_center", text="Center Controls in Header")
+        layout.prop(view, "show_floating_debug_controls", text="Floating Debug Controls")
+        layout.prop(prefs, "show_paint_hints", text="Paint Shortcut Hints")
+
+        # Demais opções do menu do botão direito no cabeçalho.
+        area = context.area
+        layout.separator()
+        layout.prop(area, "use_collapse_header_menus", text="Collapse Menus")
+        layout.prop(area, "use_hide_header_menus", text="Hide Menus")
+        layout.separator()
+        # O padrão do popover é a região da janela; estes agem no cabeçalho.
+        layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator("screen.region_flip", text="Flip Header")
+        layout.operator("screen.screen_full_area",
+                        text="Tile Area" if context.screen.show_fullscreen else "Maximize Area")
 
 
 class VIEW3D_PT_pivot_point(Panel):

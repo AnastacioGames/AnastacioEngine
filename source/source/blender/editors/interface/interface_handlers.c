@@ -7654,7 +7654,11 @@ static void button_activate_exit(
 	/* if this button is in a menu, this will set the button return
 	 * value to the button value and the menu return value to ok, the
 	 * menu return value will be picked up and the menu will close */
-	if (block->handle && !(block->flag & UI_BLOCK_KEEP_OPEN)) {
+	/* Popovers ficam abertos, mas estes operadores trocam a área ou a região do popover. */
+	const bool close_popover = (block->flag & UI_BLOCK_POPOVER) && but->optype &&
+	                           (STREQ(but->optype->idname, "SCREEN_OT_region_flip") ||
+	                            STREQ(but->optype->idname, "SCREEN_OT_screen_full_area"));
+	if (block->handle && (!(block->flag & UI_BLOCK_KEEP_OPEN) || close_popover)) {
 		if (!data->cancel || data->escapecancel) {
 			uiPopupBlockHandle *menu;
 
