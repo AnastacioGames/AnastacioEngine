@@ -866,7 +866,8 @@ static void draw_view_axis(RegionView3D *rv3d, rcti *rect)
 {
 	/* Proportions of Blender 5's navigation gizmo: 80px wide, axis discs of 0.2 radius placed
 	 * at 0.8 of the radius, 2px lines that end at the disc edge. */
-	const float radius = 40.0f * U.pixelsize;
+	/* Size 25 (default) keeps the 80px gizmo. */
+	const float radius = 40.0f * ((float)U.rvisize / 25.0f) * U.pixelsize;
 	const float disc_radius = radius * 0.20f;
 	const float axis_length = radius - disc_radius;
 	const float startx = rect->xmax - (radius + 0.5f * UI_UNIT_X);
