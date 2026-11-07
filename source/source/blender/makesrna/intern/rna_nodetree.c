@@ -714,8 +714,20 @@ static void rna_NodeTree_update(Main *bmain, Scene *UNUSED(scene), PointerRNA *p
 	ED_node_tag_update_nodetree(bmain, ntree, node);
 }
 
+/* A prévia de material copia a árvore numa thread; editar por script no meio corrompe a cópia. */
+static void rna_NodeTree_kill_preview(Main *bmain)
+{
+	wmWindowManager *wm = bmain ? bmain->wm.first : NULL;
+	if (wm) {
+		ED_preview_kill_jobs(wm, bmain);
+		/* Ícones de material também localizam a árvore (job próprio, fora do kill acima). */
+		WM_jobs_kill_type(wm, NULL, WM_JOB_TYPE_RENDER_PREVIEW);
+	}
+}
+
 static bNode *rna_NodeTree_node_new(bNodeTree *ntree, bContext *C, ReportList *reports, const char *type)
 {
+	rna_NodeTree_kill_preview(CTX_data_main(C));
 	bNodeType *ntype;
 	bNode *node;
 
@@ -749,6 +761,7 @@ static bNode *rna_NodeTree_node_new(bNodeTree *ntree, bContext *C, ReportList *r
 
 static void rna_NodeTree_node_remove(bNodeTree *ntree, Main *bmain, ReportList *reports, PointerRNA *node_ptr)
 {
+	rna_NodeTree_kill_preview(bmain);
 	bNode *node = node_ptr->data;
 
 	if (!rna_NodeTree_check(ntree, reports))
@@ -769,6 +782,7 @@ static void rna_NodeTree_node_remove(bNodeTree *ntree, Main *bmain, ReportList *
 
 static void rna_NodeTree_node_clear(bNodeTree *ntree, Main *bmain, ReportList *reports)
 {
+	rna_NodeTree_kill_preview(bmain);
 	bNode *node = ntree->nodes.first;
 
 	if (!rna_NodeTree_check(ntree, reports))
@@ -812,6 +826,7 @@ static bNodeLink *rna_NodeTree_link_new(bNodeTree *ntree, Main *bmain, ReportLis
                                         bNodeSocket *fromsock, bNodeSocket *tosock,
                                         bool verify_limits)
 {
+	rna_NodeTree_kill_preview(bmain);
 	bNodeLink *ret;
 	bNode *fromnode = NULL, *tonode = NULL;
 
@@ -826,7 +841,7 @@ static bNodeLink *rna_NodeTree_link_new(bNodeTree *ntree, Main *bmain, ReportLis
 	if (!fromnode || !tonode)
 		return NULL;
 
-	if (&fromsock->in_out == &tosock->in_out) {
+	if (fromsock->in_out == tosock->in_out) {
 		BKE_report(reports, RPT_ERROR, "Same input/output direction of sockets");
 		return NULL;
 	}
@@ -852,7 +867,11 @@ static bNodeLink *rna_NodeTree_link_new(bNodeTree *ntree, Main *bmain, ReportLis
 
 		ntreeUpdateTree(bmain, ntree);
 
-		ED_node_tag_update_nodetree(bmain, ntree, ret->tonode);
+		/* O update de algum nó pode remover o link recém-criado: não ler ret depois disso. */
+		ED_node_tag_update_nodetree(bmain, ntree, tonode);
+		if (BLI_findindex(&ntree->links, ret) == -1) {
+			ret = NULL;
+		}
 		WM_main_add_notifier(NC_NODE | NA_EDITED, ntree);
 	}
 	return ret;
@@ -860,6 +879,7 @@ static bNodeLink *rna_NodeTree_link_new(bNodeTree *ntree, Main *bmain, ReportLis
 
 static void rna_NodeTree_link_remove(bNodeTree *ntree, Main *bmain, ReportList *reports, PointerRNA *link_ptr)
 {
+	rna_NodeTree_kill_preview(bmain);
 	bNodeLink *link = link_ptr->data;
 
 	if (!rna_NodeTree_check(ntree, reports))
@@ -879,6 +899,7 @@ static void rna_NodeTree_link_remove(bNodeTree *ntree, Main *bmain, ReportList *
 
 static void rna_NodeTree_link_clear(bNodeTree *ntree, Main *bmain, ReportList *reports)
 {
+	rna_NodeTree_kill_preview(bmain);
 	bNodeLink *link = ntree->links.first;
 
 	if (!rna_NodeTree_check(ntree, reports))
