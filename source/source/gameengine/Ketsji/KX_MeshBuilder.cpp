@@ -62,7 +62,7 @@ KX_MeshBuilderSlot::KX_MeshBuilderSlot(RAS_MeshMaterial *meshmat, const RAS_Disp
 
 KX_MeshBuilderSlot::~KX_MeshBuilderSlot()
 {
-	m_array->Clear();
+	delete m_array;
 }
 
 std::string KX_MeshBuilderSlot::GetName()
@@ -667,7 +667,8 @@ PyObject *KX_MeshBuilder::PyFinish()
 		KX_MeshBuilderSlot *slot = m_slots.GetValue(i);
 		bool created;
 		RAS_MaterialBucket *bucket = bucketManager->FindBucket(slot->GetMaterial(), created);
-		mesh->AddMaterial(bucket, i, slot->GetDisplayArray());
+		// The mesh owns its array: the slot array dies with the builder.
+		mesh->AddMaterial(bucket, i, new RAS_DisplayArray(*slot->GetDisplayArray()));
 	}
 
 	mesh->EndConversion(m_scene->GetBoundingBoxManager());
