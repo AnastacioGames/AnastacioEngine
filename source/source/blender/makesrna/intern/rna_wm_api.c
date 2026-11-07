@@ -63,6 +63,10 @@ const EnumPropertyItem rna_enum_window_cursor_items[] = {
 
 #include "UI_interface.h"
 #include "BKE_context.h"
+#include "BKE_report.h"
+#include "BLI_string.h"
+#include <stdlib.h>
+#include <string.h>
 
 static wmKeyMap *rna_keymap_active(wmKeyMap *km, bContext *C)
 {
@@ -371,6 +375,46 @@ static void rna_PieMenuEnd(bContext *C, PointerRNA *handle)
 	UI_pie_menu_end(C, handle->data);
 }
 
+/* Evento na fila real da janela, para testes automáticos. Só com ANASTACIO_EVENT_SIMULATE no ambiente. */
+static void rna_Window_event_simulate(
+        wmWindow *win, ReportList *reports, int type, int value, int x, int y,
+        bool shift, bool ctrl, bool alt, const char *text)
+{
+	wmEvent event;
+
+	if (getenv("ANASTACIO_EVENT_SIMULATE") == NULL) {
+		BKE_report(reports, RPT_ERROR, "Requires ANASTACIO_EVENT_SIMULATE in the environment");
+		return;
+	}
+
+	event = *win->eventstate;
+	event.next = event.prev = NULL;
+	event.type = (short)type;
+	event.val = (short)value;
+	event.x = x;
+	event.y = y;
+	event.shift = shift;
+	event.ctrl = ctrl;
+	event.alt = alt;
+	event.ascii = text[0];
+	memset(event.utf8_buf, 0, sizeof(event.utf8_buf));
+	BLI_strncpy(event.utf8_buf, text, sizeof(event.utf8_buf));
+
+	win->eventstate->x = x;
+	win->eventstate->y = y;
+	win->eventstate->shift = shift;
+	win->eventstate->ctrl = ctrl;
+	win->eventstate->alt = alt;
+	if (type != MOUSEMOVE) {
+		win->eventstate->prevtype = win->eventstate->type;
+		win->eventstate->prevval = win->eventstate->val;
+		win->eventstate->type = (short)type;
+		win->eventstate->val = (short)value;
+	}
+
+	wm_event_add(win, &event);
+}
+
 #else
 
 #define WM_GEN_INVOKE_EVENT (1 << 0)
@@ -427,6 +471,22 @@ void RNA_api_window(StructRNA *srna)
 
 	RNA_def_function(srna, "cursor_modal_restore", "WM_cursor_modal_restore");
 	RNA_def_function_ui_description(func, "Restore the previous cursor after calling ``cursor_modal_set``");
+
+	func = RNA_def_function(srna, "event_simulate", "rna_Window_event_simulate");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	RNA_def_function_ui_description(func, "Add an event to the window queue (automated tests only)");
+	parm = RNA_def_enum(func, "type", rna_enum_event_type_items, 0, "Type", "");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_enum(func, "value", rna_enum_event_value_items, 0, "Value", "");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_int(func, "x", 0, INT_MIN, INT_MAX, "", "", INT_MIN, INT_MAX);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_int(func, "y", 0, INT_MIN, INT_MAX, "", "", INT_MIN, INT_MAX);
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_boolean(func, "shift", false, "Shift", "");
+	RNA_def_boolean(func, "ctrl", false, "Ctrl", "");
+	RNA_def_boolean(func, "alt", false, "Alt", "");
+	RNA_def_string(func, "text", NULL, 6, "Text", "Typed character");
 }
 
 void RNA_api_wm(StructRNA *srna)

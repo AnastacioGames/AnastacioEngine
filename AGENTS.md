@@ -99,6 +99,7 @@ antes de começar:
 - CI no GitHub (`.github/workflows/`): `checks.yml` roda `check_docs`, `check_ui_icons` e o selftest do detector em todo push; `linux-build.yml` compila editor e player no Ubuntu 22.04 e roda `ctest` quando muda `source/`. Depois do push, confira com `gh run list`; não dê a tarefa por concluída com CI vermelho sem avisar o usuário.
 - Antes de publicar release no Windows, rode `tools\pre_release.bat` (compila, instala, checks, smoke `--server` do player e `ctest`; para no primeiro erro).
 - Onde pôr arquivos novos: cenas de teste em `tools/debug/cenas/`, evidências (prints, logs) em `artifacts/` (ignorado pelo git), documentação em `docs/`.
+- Para testar o editor de verdade, a IA usa `tools/testes_engine/controle.py` (abrir, listar, descrever, op, ler, definir, py, tela, clicar, mover, tecla, fechar): roda invisível, com config própria, e não abre nada na tela do usuário. É ferramenta exclusiva dos agentes; o usuário não a opera.
 
 Antes de propor "vamos implementar X", confira o roadmap e o relatório; consulte no changelog apenas o
 histórico relevante. Depois de implementar, atualize o estado vigente e acrescente o registro histórico sem
