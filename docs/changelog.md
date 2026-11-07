@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-06 - Textura de fundo no tema
+
+- Tema > User Interface ganhou **Background Texture**: imagem seamless repetida nos painéis e headers, com Strength, Scale e Tint, e menu Presets com Clouds, Marble, Wood, Voronoi e Stucci.
+- As texturas prontas ficam em `datafiles/ui_textures` e são geradas por `tools/criar_texturas_ui.py` com as fórmulas de textura da engine. O tema guarda `ui_textures/<nome>.png`, relativo à instalação.
+- As coordenadas seguem a posição na janela, para não haver emenda entre regiões. Engines sem os campos ignoram os atributos do XML; preferências antigas recebem os padrões sem textura ligada.
+- A área principal dos editores (Logic Bricks, 3D View, Outliner) continua sem textura. Aceite visual com janela em 2026-11-06.
+
 ## 2026-11-06 - Rec Play: Fases 9 e 10 (kit de conteúdo e API Python)
 
 - Asset Browser: Actions agora têm miniatura (`bAction.preview`, campo novo no DNA, exige rebuild limpo) renderizada numa pose do meio.

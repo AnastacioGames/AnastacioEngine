@@ -1294,6 +1294,18 @@ void BLO_version_defaults_userpref_blend(UserDef *userdef)
     }
   }
 
+  /* Scale is never 0 once set, so it marks prefs saved before the background texture. */
+  for (bTheme *btheme = userdef->themes.first; btheme; btheme = btheme->next) {
+    ThemeUI *uis[2] = {&btheme->tui, &btheme->tglobal_ui};
+    for (int i = 0; i < 2; i++) {
+      if (uis[i]->bg_tile_scale == 0.0f) {
+        uis[i]->bg_tile_scale = 1.0f;
+        uis[i]->bg_tile_strength = 0.25f;
+        rgba_char_args_set(uis[i]->bg_tile_tint, 255, 255, 255, 255);
+      }
+    }
+  }
+
   // we default to the first audio device
   userdef->audiodevice = 0;
 

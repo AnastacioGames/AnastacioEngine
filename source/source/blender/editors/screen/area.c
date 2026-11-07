@@ -2351,6 +2351,11 @@ void ED_region_panels_draw(const bContext *C, ARegion *ar)
 			UI_draw_roundbox_corner_set(content_ymin > 0 ? cnr_bottom | cnr_top : cnr_top);
 			UI_draw_roundbox((float)xmin, (float)content_ymin, (float)xmax, (float)(ar->winy + 1), radius);
 			glDisable(GL_BLEND);
+			if (UI_ThemeBackgroundTileBegin(ar)) {
+				UI_draw_roundbox_gl_mode(
+				        GL_POLYGON, (float)xmin, (float)content_ymin, (float)xmax, (float)(ar->winy + 1), radius);
+				UI_ThemeBackgroundTileEnd();
+			}
 		}
 	}
 	else if (ar->overlap) {
@@ -2360,10 +2365,13 @@ void ED_region_panels_draw(const bContext *C, ARegion *ar)
 		UI_ThemeColor4((ar->type->regionid == RGN_TYPE_PREVIEW) ? TH_PREVIEW_BACK : TH_BACK);
 		glRecti(0, 0, BLI_rcti_size_x(&ar->winrct), BLI_rcti_size_y(&ar->winrct) + 1);
 		glDisable(GL_BLEND);
+		UI_ThemeBackgroundTileDrawRect(ar);
 	}
 	else {
 		UI_ThemeClearColor((ar->type->regionid == RGN_TYPE_PREVIEW) ? TH_PREVIEW_BACK : TH_BACK);
 		glClear(GL_COLOR_BUFFER_BIT);
+		UI_view2d_view_restore(C);
+		UI_ThemeBackgroundTileDrawRect(ar);
 	}
 
 	/* reset line width for drawing tabs */
@@ -2449,6 +2457,7 @@ void ED_region_header(const bContext *C, ARegion *ar)
 	/* clear */
 	UI_ThemeClearColor((ED_screen_area_active(C)) ? TH_HEADER : TH_HEADERDESEL);
 	glClear(GL_COLOR_BUFFER_BIT);
+	UI_ThemeBackgroundTileDrawRect(ar);
 
 	/* set view2d view matrix for scrolling (without scrollers) */
 	UI_view2d_view_ortho(&ar->v2d);

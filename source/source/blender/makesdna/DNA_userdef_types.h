@@ -195,6 +195,13 @@ typedef struct ThemeUI {
 	char icon_modifier[4];
 	/* Shading related items */
 	char icon_shading[4];     
+
+	/* Seamless image tiled over region backgrounds (empty path: disabled). */
+	char bg_tile_image[1024];
+	float bg_tile_strength;
+	float bg_tile_scale;  /* 0 only in prefs older than this field, see versioning */
+	char bg_tile_tint[4];
+	int bg_tile_pad;
 } ThemeUI;
 
 /* try to put them all in one, if needed a special struct can be created as well

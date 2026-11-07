@@ -539,6 +539,12 @@ install(
 	DESTINATION ${TARGETDIR_VER}/datafiles
 )
 
+# Seamless textures offered by the theme (see tools/criar_texturas_ui.py)
+install(
+	DIRECTORY ${CMAKE_SOURCE_DIR}/release/datafiles/ui_textures
+	DESTINATION ${TARGETDIR_VER}/datafiles
+)
+
 # Starter kit of the Rec Studio (characters, actions and scenery, see tools/criar_rec_kit.py)
 install(
 	DIRECTORY ${CMAKE_SOURCE_DIR}/release/datafiles/rec_kit

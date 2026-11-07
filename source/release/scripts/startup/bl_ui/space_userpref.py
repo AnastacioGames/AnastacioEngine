@@ -558,6 +558,25 @@ class USERPREF_MT_interface_theme_presets(Menu):
         bpy.ops.ui.reset_default_theme()
 
 
+class USERPREF_MT_theme_background_textures(Menu):
+    bl_label = "Background Textures"
+
+    def draw(self, context):
+        layout = self.layout
+        data_path = "user_preferences.themes[0].user_interface.background_tile_image"
+        for label, value in (
+                ("None", ""),
+                ("Clouds", "ui_textures/clouds.png"),
+                ("Marble", "ui_textures/marble.png"),
+                ("Wood", "ui_textures/wood.png"),
+                ("Voronoi", "ui_textures/voronoi.png"),
+                ("Stucci", "ui_textures/stucci.png"),
+        ):
+            props = layout.operator("wm.context_set_string", text=label)
+            props.data_path = data_path
+            props.value = value
+
+
 class USERPREF_PT_theme(Panel):
     bl_space_type = 'USER_PREFERENCES'
     bl_label = "Themes"
@@ -753,6 +772,16 @@ class USERPREF_PT_theme(Panel):
         left.prop(ui, "menu_shadow_width")
         left.prop(ui, "icon_alpha")
         right.prop(ui, "widget_emboss")
+
+        col = outer.box()
+        col.label(text="Background Texture:")
+        row = col.row(align=True)
+        row.menu("USERPREF_MT_theme_background_textures", text="Presets")
+        row.prop(ui, "background_tile_image", text="")
+        row = col.row()
+        row.prop(ui, "background_tile_strength")
+        row.prop(ui, "background_tile_scale")
+        row.prop(ui, "background_tile_tint", text="")
 
         col = outer.box()
         col.label(text="Axis Colors:")
@@ -1578,6 +1607,7 @@ classes = (
     USERPREF_PT_edit,
     USERPREF_PT_system_general,
     USERPREF_MT_interface_theme_presets,
+    USERPREF_MT_theme_background_textures,
     USERPREF_PT_theme,
     USERPREF_PT_file,
     USERPREF_MT_ndof_settings,

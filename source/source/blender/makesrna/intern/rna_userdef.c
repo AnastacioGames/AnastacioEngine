@@ -1190,6 +1190,30 @@ static void rna_def_userdef_theme_ui(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Icon Alpha", "Transparency of icons in the interface, to reduce contrast");
 	RNA_def_property_update(prop, 0, "rna_userdef_update");
 
+	prop = RNA_def_property(srna, "background_tile_image", PROP_STRING, PROP_FILEPATH);
+	RNA_def_property_string_sdna(prop, NULL, "bg_tile_image");
+	RNA_def_property_ui_text(prop, "Background Texture",
+	                         "Seamless image repeated over panel and header backgrounds");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "background_tile_strength", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "bg_tile_strength");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Strength", "How strongly the texture shows over the background color");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "background_tile_scale", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_float_sdna(prop, NULL, "bg_tile_scale");
+	RNA_def_property_range(prop, 0.1f, 8.0f);
+	RNA_def_property_ui_text(prop, "Scale", "Size of the repeated texture");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
+	prop = RNA_def_property(srna, "background_tile_tint", PROP_FLOAT, PROP_COLOR_GAMMA);
+	RNA_def_property_float_sdna(prop, NULL, "bg_tile_tint");
+	RNA_def_property_array(prop, 3);
+	RNA_def_property_ui_text(prop, "Tint", "Color multiplied with the texture, white keeps the original colors");
+	RNA_def_property_update(prop, 0, "rna_userdef_update");
+
 	prop = RNA_def_property(srna, "widget_emboss", PROP_FLOAT, PROP_COLOR_GAMMA);
 	RNA_def_property_float_sdna(prop, NULL, "widget_emboss");
 	RNA_def_property_array(prop, 4);

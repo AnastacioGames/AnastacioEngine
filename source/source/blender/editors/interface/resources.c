@@ -38,10 +38,14 @@
 #include "BKE_addon.h"
 #include "BKE_appdir.h"
 #include "BKE_DerivedMesh.h"
+#include "BKE_global.h"
 #include "BKE_main.h"
 
 #include "BIF_gl.h"
 #include "BLO_readfile.h"  /* for UserDef version patching. */
+
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "UI_interface.h"
 #include "UI_interface_icons.h"
@@ -62,6 +66,8 @@ static struct bThemeState g_theme_state = {
 #define theme_spacetype g_theme_state.spacetype
 #define theme_regionid g_theme_state.regionid
 
+static void ui_bg_tile_free(void);
+
 void ui_resources_init(void)
 {
 	UI_icons_init(BIFICONID_LAST);
@@ -69,6 +75,7 @@ void ui_resources_init(void)
 
 void ui_resources_free(void)
 {
+	ui_bg_tile_free();
 	UI_icons_free();
 }
 
@@ -874,6 +881,10 @@ void ui_theme_init_default(void)
 	ui_widget_color_init(&btheme->tui);
 
 	btheme->tui.iconfile[0] = 0;
+	btheme->tui.bg_tile_image[0] = 0;
+	btheme->tui.bg_tile_strength = 0.25f;
+	btheme->tui.bg_tile_scale = 1.0f;
+	rgba_char_args_set(btheme->tui.bg_tile_tint, 255, 255, 255, 255);
 	rgba_char_args_set(btheme->tui.wcol_tooltip.text, 255, 255, 255, 255);
 	rgba_char_args_set_fl(btheme->tui.widget_emboss, 1.0f, 1.0f, 1.0f, 0.02f);
 
@@ -1635,6 +1646,118 @@ void UI_ThemeClearColor(int colorid)
 
 	UI_GetThemeColor3fv(colorid, col);
 	glClearColor(col[0], col[1], col[2], 0.0f);
+}
+
+/* Theme background texture: uploaded once, kept until the path changes. */
+static struct {
+	char path[1024];
+	unsigned int texture;
+	int size[2];
+} ui_bg_tile = {{0}};
+
+static void ui_bg_tile_free(void)
+{
+	if (ui_bg_tile.texture) {
+		glDeleteTextures(1, &ui_bg_tile.texture);
+		ui_bg_tile.texture = 0;
+	}
+	ui_bg_tile.path[0] = '\0';
+}
+
+static bool ui_bg_tile_ensure(const char *path)
+{
+	if (STREQ(ui_bg_tile.path, path)) {
+		return ui_bg_tile.texture != 0;
+	}
+
+	ui_bg_tile_free();
+	/* Remember failures too, a bad path must not hit the disk on every redraw. */
+	BLI_strncpy(ui_bg_tile.path, path, sizeof(ui_bg_tile.path));
+
+	/* Textures shipped with the engine are stored relative to datafiles, so themes stay portable. */
+	char abspath[1024];
+	const char *datafiles = STRPREFIX(path, "ui_textures/") ? BKE_appdir_folder_id(BLENDER_DATAFILES, "ui_textures") : NULL;
+	if (datafiles) {
+		BLI_join_dirfile(abspath, sizeof(abspath), datafiles, path + strlen("ui_textures/"));
+	}
+	else {
+		BLI_strncpy(abspath, path, sizeof(abspath));
+		BLI_path_abs(abspath, G.main->name);
+	}
+
+	ImBuf *ibuf = IMB_loadiffname(abspath, IB_rect, NULL);
+	if (ibuf == NULL) {
+		printf("Theme background texture: could not load '%s'\n", abspath);
+		return false;
+	}
+
+	glGenTextures(1, &ui_bg_tile.texture);
+	glBindTexture(GL_TEXTURE_2D, ui_bg_tile.texture);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, ibuf->x, ibuf->y, 0, GL_RGBA, GL_UNSIGNED_BYTE, ibuf->rect);
+	glBindTexture(GL_TEXTURE_2D, 0);
+
+	ui_bg_tile.size[0] = ibuf->x;
+	ui_bg_tile.size[1] = ibuf->y;
+	IMB_freeImBuf(ibuf);
+	return true;
+}
+
+/* Region must be in pixel space. Any shape drawn until the End call gets the texture;
+ * texture coordinates follow window position so regions line up without a seam. */
+bool UI_ThemeBackgroundTileBegin(const ARegion *ar)
+{
+	const ThemeUI *tui = &UI_GetTheme()->tui;
+
+	if (tui->bg_tile_image[0] == '\0' || tui->bg_tile_strength <= 0.0f ||
+	    !ui_bg_tile_ensure(tui->bg_tile_image))
+	{
+		return false;
+	}
+
+	const float scale = max_ff(tui->bg_tile_scale, 0.1f) * UI_DPI_FAC;
+	const float width = ui_bg_tile.size[0] * scale;
+	const float height = ui_bg_tile.size[1] * scale;
+	const float plane_s[4] = {1.0f / width, 0.0f, 0.0f, ar->winrct.xmin / width};
+	const float plane_t[4] = {0.0f, 1.0f / height, 0.0f, ar->winrct.ymin / height};
+
+	glBindTexture(GL_TEXTURE_2D, ui_bg_tile.texture);
+	glEnable(GL_TEXTURE_2D);
+	glTexGeni(GL_S, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGeni(GL_T, GL_TEXTURE_GEN_MODE, GL_OBJECT_LINEAR);
+	glTexGenfv(GL_S, GL_OBJECT_PLANE, plane_s);
+	glTexGenfv(GL_T, GL_OBJECT_PLANE, plane_t);
+	glEnable(GL_TEXTURE_GEN_S);
+	glEnable(GL_TEXTURE_GEN_T);
+	glTexEnvi(GL_TEXTURE_ENV, GL_TEXTURE_ENV_MODE, GL_MODULATE);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glColor4f(tui->bg_tile_tint[0] / 255.0f,
+	          tui->bg_tile_tint[1] / 255.0f,
+	          tui->bg_tile_tint[2] / 255.0f,
+	          tui->bg_tile_strength);
+	return true;
+}
+
+void UI_ThemeBackgroundTileEnd(void)
+{
+	glDisable(GL_BLEND);
+	glDisable(GL_TEXTURE_GEN_S);
+	glDisable(GL_TEXTURE_GEN_T);
+	glDisable(GL_TEXTURE_2D);
+	glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+void UI_ThemeBackgroundTileDrawRect(const ARegion *ar)
+{
+	if (UI_ThemeBackgroundTileBegin(ar)) {
+		glRecti(0, 0, BLI_rcti_size_x(&ar->winrct) + 1, BLI_rcti_size_y(&ar->winrct) + 1);
+		UI_ThemeBackgroundTileEnd();
+	}
 }
 
 void UI_ThemeClearColorAlpha(int colorid, float alpha)
