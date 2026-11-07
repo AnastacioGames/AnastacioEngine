@@ -371,13 +371,19 @@ class SMARTWIZ_OT_create(Operator):
             self.report({'ERROR'}, errors[0])
             return {'CANCELLED'}
 
+        if s.save_to == 'TEXT':
+            # Nome ocupado (ex.: depois de um undo): usa o próximo livre.
+            base, n = module, 1
+            while module + ".py" in bpy.data.texts:
+                module = "%s_%d" % (base, n)
+                n += 1
+            if module != base:
+                s.module = module
+                cls = s.class_name.strip()  # o update do módulo pode renomear a classe
         code = _code(s)
         filename = module + ".py"
 
         if s.save_to == 'TEXT':
-            if filename in bpy.data.texts:
-                self.report({'ERROR'}, "There is already a text %s: pick another file name" % filename)
-                return {'CANCELLED'}
             text = bpy.data.texts.new(filename)
             text.write(code)
         else:

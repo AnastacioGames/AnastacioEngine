@@ -850,6 +850,9 @@ class GAME_OT_scene_doctor_trace(Operator):
 
     def execute(self, context):
         global _trace_path
+        if not self.filepath:
+            self.report({'ERROR'}, tip_("Pick the sugestoes.json of a Game Trace run"))
+            return {'CANCELLED'}
         try:
             with open(self.filepath, encoding="utf-8") as f:
                 ok = "sugestoes" in json.load(f)
