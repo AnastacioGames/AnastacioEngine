@@ -38,6 +38,7 @@
 #  pragma warning (disable:4355)
 #endif 
 
+#include <cfloat>
 #include <stddef.h>
 #include <vector>
 
@@ -416,7 +417,7 @@ public:
 	bool HasActiveActions();
 
 	/// Play the NLA tracks of an armature under its action layers.
-	bool PlayNla(float speed, bool loop);
+	bool PlayNla(float speed, bool loop, float earliest = FLT_MAX);
 	void StopNla();
 	bool IsNlaPlaying();
 	float GetNlaFrame();

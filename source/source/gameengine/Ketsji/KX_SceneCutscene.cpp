@@ -713,7 +713,8 @@ static void PlayMotionTakeTracks(KX_GameObject *gameobj, const char *prefix, flo
 		}
 	}
 	gameobj->StopNla();
-	if (gameobj->PlayNla(1.0f, false)) {
+	/* The actor may stand still before its first strip: the clock starts with the take. */
+	if (gameobj->PlayNla(1.0f, false, start)) {
 		gameobj->SetNlaFrame(start);
 	}
 }

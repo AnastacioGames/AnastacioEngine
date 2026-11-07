@@ -757,9 +757,9 @@ bool KX_GameObject::HasActiveActions()
 	return m_actionManager && m_actionManager->HasActiveActions();
 }
 
-bool KX_GameObject::PlayNla(float speed, bool loop)
+bool KX_GameObject::PlayNla(float speed, bool loop, float earliest)
 {
-	if (!GetActionManager()->PlayNla(speed, loop)) {
+	if (!GetActionManager()->PlayNla(speed, loop, earliest)) {
 		return false;
 	}
 	GetScene()->AddAnimatedObject(this);

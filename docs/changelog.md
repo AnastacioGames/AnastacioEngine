@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Rec Play: animação do Take em sincronia com o corpo
+
+- Com Generate Keyframes, ator que ficou parado antes de animar tocava o NLA adiantado (28 quadros no teste) e a animação acabava antes do corpo. O relógio do NLA agora começa junto com o Take, mesmo antes da primeira faixa. `playNLA` por script não muda.
+
 ## 2026-11-07 - Minimap: Bake pede .range salvo
 
 - Add > Minimap e Bake Map Image recusam cena nunca salva, com mensagem clara. Antes o PNG ia para a pasta temporária e o mapa ficava branco no jogo. Add > Minimap sem Bake continua permitido.

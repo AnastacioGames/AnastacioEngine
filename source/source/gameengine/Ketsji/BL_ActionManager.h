@@ -27,6 +27,7 @@
 #ifndef __BL_ACTIONMANAGER_H__
 #define __BL_ACTIONMANAGER_H__
 
+#include <cfloat>
 #include <map>
 #include <memory>
 #include <vector>
@@ -135,7 +136,7 @@ public:
 	bool HasActiveActions();
 
 	/// NLA playback: the tracks are evaluated before the action layers, which blend on top.
-	bool PlayNla(float speed, bool loop);
+	bool PlayNla(float speed, bool loop, float earliest = FLT_MAX);
 	void StopNla();
 	bool IsNlaPlaying() const;
 	float GetNlaFrame() const;

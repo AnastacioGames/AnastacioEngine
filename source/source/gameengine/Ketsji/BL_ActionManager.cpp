@@ -183,12 +183,12 @@ bool BL_ActionManager::IsActionDone(short layer)
 	return action ? action->IsDone() : true;
 }
 
-bool BL_ActionManager::PlayNla(float speed, bool loop)
+bool BL_ActionManager::PlayNla(float speed, bool loop, float earliest)
 {
 	if (!m_nla) {
 		m_nla.reset(new BL_NlaPlayer(m_obj));
 	}
-	return m_nla->Play(speed, loop);
+	return m_nla->Play(speed, loop, earliest);
 }
 
 void BL_ActionManager::StopNla()

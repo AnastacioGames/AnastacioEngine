@@ -28,6 +28,7 @@
 #ifndef __BL_NLAPLAYER_H__
 #define __BL_NLAPLAYER_H__
 
+#include <cfloat>
 #include <map>
 #include <set>
 #include <string>
@@ -77,7 +78,8 @@ public:
 	~BL_NlaPlayer();
 
 	/// Start the NLA from its first frame. Returns false when the object has no usable strip.
-	bool Play(float speed, bool loop);
+	/// earliest: the clock may start before the first strip (FLT_MAX: at the first strip).
+	bool Play(float speed, bool loop, float earliest = FLT_MAX);
 	void Stop();
 	bool IsPlaying() const;
 	/// Playing, or finished while culled with the last pose not applied yet.

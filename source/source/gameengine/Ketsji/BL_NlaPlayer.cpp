@@ -203,7 +203,7 @@ void BL_NlaPlayer::FreeActions()
 	m_chanPose = nullptr;
 }
 
-bool BL_NlaPlayer::Play(float speed, bool loop)
+bool BL_NlaPlayer::Play(float speed, bool loop, float earliest)
 {
 	Object *blenderobj = m_obj->GetBlenderObject();
 	AnimData *adt = blenderobj ? blenderobj->adt : nullptr;
@@ -267,6 +267,7 @@ bool BL_NlaPlayer::Play(float speed, bool loop)
 		return false;
 	}
 
+	m_startFrame = std::min(m_startFrame, earliest);
 	m_speed = speed;
 	m_loop = loop;
 	// Playing backwards starts at the end.
