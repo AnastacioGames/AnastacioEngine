@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Lote 2 de bugs achados pelos agentes de teste
+
+- Crashes: Shift+]/[ (Activate Same Type) no Node Editor sem nó ativo; redo de passo Sculpt com objeto ativo que não é malha; `vertex_group_fix`/`vertex_group_lock` usavam o objeto ativo em vez do objeto do contexto que o poll valida.
+- Remover um Animation Event ajusta o índice dos sensores Animation Event que apontavam para eventos seguintes (antes o sensor ficava mudo).
+- Import de texto com erro de sintaxe vira ImportError em vez de SystemError.
+- Clip Editor "Copy as Default" (TypeError float→int) e ícones inválidos do Track Tool (`check_ui_icons` voltou a 0).
+- Conferido no editor invisível: cada caso reproduzido cancela ou segue sem crash; varredura `object.` sem crash.
+
 ## 2026-11-07 - Crashes achados pela varredura de operadores
 
 - `outliner.parent_drop` sem pai ou filho válido, `node.select_grouped` sem nó ativo e `object.skin_armature_create` sem malha ativa usavam ponteiro inválido; agora cancelam.

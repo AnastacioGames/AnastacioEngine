@@ -1084,7 +1084,7 @@ class RANGE_TRACK_OT_probes_generate(_TrackOp, Operator):
 
     def draw(self, context):
         col = self.layout.column()
-        col.label(getattr(self, "_text", ""), icon='LIGHT')
+        col.label(getattr(self, "_text", ""), icon='LAMP')
         for w in getattr(self, "_warnings", ()):
             col.label(w, icon='ERROR')
         col.label(tip_("Old volumes made by this track are replaced; hand-made ones stay."))
@@ -1781,7 +1781,7 @@ class VIEW3D_PT_range_track_decor(_TrackPanel, Panel):
         track = _active_track(context)
         st = settings_of(track)
         owner, attr = list_index_owner(track, None, 'RULES')
-        layout.operator_menu_enum("range_track.rules_default", "theme", text=tip_("Default Rules"), icon='PRESET')
+        layout.operator_menu_enum("range_track.rules_default", "theme", text=tip_("Default Rules"), icon='SETTINGS')
         row = layout.row()
         row.template_list("RANGE_TRACK_UL_rules", "", st, "rules", owner, attr, rows=4)
         _list_buttons(row, 'RULES')
@@ -1831,7 +1831,7 @@ class VIEW3D_PT_range_track_probes(_TrackPanel, Panel):
             box = layout.box()
             if not current:
                 box.label(tip_("The track changed: press Preview again"), icon='INFO')
-            box.label(result.text(), icon='ERROR' if result.over_limit or result.warnings else 'LIGHT')
+            box.label(result.text(), icon='ERROR' if result.over_limit or result.warnings else 'LAMP')
             for w in result.warnings:
                 box.label(w)
             if getattr(result, "suggested", None):

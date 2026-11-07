@@ -1041,9 +1041,17 @@ static bool sculpt_undosys_step_encode(struct bContext *UNUSED(C), UndoStep *us_
 
 static void sculpt_undosys_step_decode(struct bContext *C, UndoStep *us_p, int UNUSED(dir))
 {
+	Object *ob = CTX_data_active_object(C);
+
+	/* Sem malha ativa (ativo trocado por script) não há o que restaurar; seguir derrubava o editor. */
+	if (ob == NULL || ob->type != OB_MESH) {
+		return;
+	}
 	/* TODO(campbell): undo_system: use low-level API to set mode. */
 	ED_object_mode_set(C, OB_MODE_SCULPT);
-	BLI_assert(sculpt_undosys_poll(C));
+	if (ob->sculpt == NULL || (ob->mode & OB_MODE_SCULPT) == 0) {
+		return;
+	}
 
 	SculptUndoStep *us = (SculptUndoStep *)us_p;
 	sculpt_undo_restore_list(C, &us->data.nodes);

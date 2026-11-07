@@ -51,6 +51,7 @@
 #include "DNA_view3d_types.h"
 #include "DNA_world_types.h"
 #include "DNA_object_types.h"
+#include "DNA_sensor_types.h"
 #include "DNA_property_types.h"
 #include "DNA_rigidbody_types.h"
 
@@ -1005,6 +1006,16 @@ bool BKE_object_animation_event_remove(Object *ob, int index)
 	}
 	BLI_freelistN(&rem->triggers);
 	MEM_freeN(rem);
+
+	/* Sensores Animation Event guardam o índice: os de depois do removido descem um. */
+	for (bSensor *sens = ob->sensors.first; sens; sens = sens->next) {
+		if (sens->type == SENS_ANIMATIONEVENT && sens->data) {
+			bAnimationEventSensor *aes = sens->data;
+			if (aes->index > index) {
+				aes->index--;
+			}
+		}
+	}
 
 	/* If there are no user defined events, remove the base event as well */
 	if (BLI_listbase_is_single(&ob->animevents)) {

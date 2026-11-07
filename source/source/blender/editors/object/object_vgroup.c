@@ -3004,13 +3004,18 @@ void OBJECT_OT_vertex_group_normalize_all(wmOperatorType *ot)
 
 static int vertex_group_fix_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = CTX_data_active_object(C);
+	Object *ob = ED_object_context(C);
 	Scene *scene = CTX_data_scene(C);
 
 	float distToBe = RNA_float_get(op->ptr, "dist");
 	float strength = RNA_float_get(op->ptr, "strength");
 	float cp = RNA_float_get(op->ptr, "accuracy");
-	ModifierData *md = ob->modifiers.first;
+	ModifierData *md;
+
+	if (ob == NULL || ob->type != OB_MESH) {
+		return OPERATOR_CANCELLED;
+	}
+	md = ob->modifiers.first;
 
 	while (md) {
 		if (md->type == eModifierType_Mirror && (md->mode & eModifierMode_Realtime)) {
@@ -3056,7 +3061,7 @@ void OBJECT_OT_vertex_group_fix(wmOperatorType *ot)
 
 static int vertex_group_lock_exec(bContext *C, wmOperator *op)
 {
-	Object *ob = CTX_data_active_object(C);
+	Object *ob = ED_object_context(C);
 
 	int action = RNA_enum_get(op->ptr, "action");
 

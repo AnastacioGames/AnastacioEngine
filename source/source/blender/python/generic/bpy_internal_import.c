@@ -312,6 +312,10 @@ static PyObject *blender_import(PyObject *UNUSED(self), PyObject *args, PyObject
 		Py_XDECREF(exception);
 		Py_XDECREF(err);
 		Py_XDECREF(tb);
+		if (!PyErr_Occurred()) {
+			/* bpy_text_import já imprimiu e limpou o SyntaxError; sem isto o import vira SystemError. */
+			PyErr_Format(PyExc_ImportError, "text module '%s' failed to compile", name);
+		}
 		return NULL;
 	}
 	else {

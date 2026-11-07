@@ -884,6 +884,10 @@ static int node_select_same_type_step_exec(bContext *C, wmOperator *op)
 	const bool revert = RNA_boolean_get(op->ptr, "prev");
 	const bool same_type = 1;
 
+	if (active == NULL) {
+		return OPERATOR_CANCELLED;
+	}
+
 	ntreeGetDependencyList(snode->edittree, &node_array, &totnodes);
 
 	if (totnodes > 1) {
