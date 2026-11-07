@@ -36,7 +36,7 @@ Os métodos de um mesmo domínio **não são contíguos**: por exemplo, animaç�
 | Malhas e renderização | `UpdateBlenderObjectMatrix` 1403, `AddMeshUser` 1414, `UpdateBuckets` 1466, `ReplaceMesh` 1489, `RemoveMeshes` 1519, `GetMeshList` 1536, `Renderable` 1546, cor 1686–1691, `Get/SetPassIndex` 1654–1659, `Get/SetLayer` 1644–1649 |
 | LOD | `Set/GetLodManager` 1291–1313, `UpdateLod` 1598, `GetVisibleLOD`/`UpdateVisibleLOD` 1873–1878 |
 | Visibilidade e depuração | `GetVisible`/`SetVisible` 1910/1563, `SetOccluder` 1938, `SetUseDebugProperties` 1973, helpers `static` `setVisible_recursive` 1893, `setOccluder_recursive` 1922, `setDebug_recursive` 1950 |
-| Atividade e culling | `UpdateActivity` 1746, `Get/SetActivityCullingInfo` 2092–2097, `SetActivityCulling` 2460, `UpdateBounds` 2398, `Get/SetBoundsAabb` 2070–2081, `GetCullingNode` 2445 |
+| Atividade e culling | `UpdateActivity` 1768, `Get/SetActivityCullingInfo` 2092–2097, `SetActivityCulling` 2460, `UpdateBounds` 2398, `Get/SetBoundsAabb` 2070–2081, `GetCullingNode` 2445 |
 | SceneGraph e transformação | `UpdateTransform`/`SynchronizeTransform` 1828–1857, `AlignAxisToVect` 2043, `NodeSet*`/`NodeGet*` 1878–2015, `SetNode` 2393 |
 | Componentes Python | `SetComponents` 2716, `UpdateComponents` 2721 (runtime; ficam no núcleo apesar do `#ifdef WITH_PYTHON`) |
 | Helpers `static` do núcleo | `setGraphicController_recursive` 1026, `walk_children`/`walk_parent` 2675–2697 (servem a `GetChildren*`) |
