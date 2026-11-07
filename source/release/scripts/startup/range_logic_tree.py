@@ -580,15 +580,21 @@ def plan(tree):
         if isinstance(node, TriggerNode) and node.error():
             errors.append("%s: %s" % (_label(node), node.error()))
     # Then de uma ação que nunca roda não dispara nada
-    acting = {a for r in rules.values() for a in r[1]}
-    out = []
-    for r in rules.values():
-        dead = [n for n in _leaves(r[0]) if isinstance(n, ActionNode) and n not in acting]
-        if dead:
-            errors.append("%s: Then de \"%s\", que não tem gatilho" % (
-                _label(r[1][0]), _label(dead[0])))
-            continue
-        out.append(r)
+    # (repete até estabilizar: cortar uma regra pode deixar a seguinte da cadeia sem gatilho)
+    out = list(rules.values())
+    while True:
+        acting = {a for r in out for a in r[1]}
+        keep = []
+        for r in out:
+            dead = [n for n in _leaves(r[0]) if isinstance(n, ActionNode) and n not in acting]
+            if dead:
+                errors.append("%s: Then de \"%s\", que não tem gatilho" % (
+                    _label(r[1][0]), _label(dead[0])))
+                continue
+            keep.append(r)
+        if len(keep) == len(out):
+            break
+        out = keep
     names = [_label(f) for f in state_frames(tree)]
     for n in set(x for x in names if names.count(x) > 1):
         errors.append("Frames de Estado com o mesmo nome: %s" % n)
@@ -683,6 +689,18 @@ def _assign_states(ob, tree, rec):
 
 def compile_object(ob, scene=None):
     """Gera os bricks da árvore do objeto.  Devolve a lista de erros."""
+    holder = {}
+    try:
+        return _compile_object(ob, scene, holder)
+    except Exception:
+        # Erro no meio: grava o que já foi criado, senão o próximo clear() não
+        # acha esses bricks e eles ficam órfãos se acumulando.
+        if "rec" in holder:
+            ob.logic_tree_record = json.dumps(holder["rec"])
+        raise
+
+
+def _compile_object(ob, scene, holder):
     if ob.library is not None:
         return ["%s: objeto de biblioteca, não compilado" % ob.name]
     clear(ob)
@@ -697,7 +715,7 @@ def compile_object(ob, scene=None):
     group = "Tree: " + tree.name
     if group not in game.brick_groups:
         group = game.brick_groups.new(group).name
-    rec = {"group": group, "sensors": [], "controllers": [], "actuators": [],
+    rec = holder["rec"] = {"group": group, "sensors": [], "controllers": [], "actuators": [],
            "names": [], "init_on": [], "init_off": [], "nodes": {}}
     frame_state = _assign_states(ob, tree, rec)
     tree_bits = set(frame_state.values())
@@ -1439,6 +1457,8 @@ def import_bricks(ob, tree=None, remove=True):
             f = tree.nodes.new("NodeFrame")
             f.range_logic_state = True
             f.label = game.state_names[st - 1].name or "State %d" % st
+            # Grava o nome para o compile achar o mesmo número de estado.
+            game.state_names[st - 1].name = f.label
             f.range_logic_initial = game.states_initial[st - 1]
             f.location = (i * 1100.0, 0.0)
             frames[st] = f
@@ -1449,9 +1469,8 @@ def import_bricks(ob, tree=None, remove=True):
         node.mute = not brick.active  # brick desligado no checkbox vira nó desligado
         for f in node.fields():
             try:
-                v = getattr(brick, f)
-                if not _same(v, getattr(node, f)):
-                    setattr(node, f, v)
+                # Sempre copia: o padrão do nó difere do brick (ex.: Near).
+                setattr(node, f, getattr(brick, f))
             except (AttributeError, TypeError, ValueError):
                 pass
         return node

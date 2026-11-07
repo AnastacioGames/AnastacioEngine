@@ -847,6 +847,10 @@ def _actions_for(socket):
     actions = []
     for link in socket.links:
         target = link.to_node
+        if target.bl_idname == "NodeReroute":
+            # Reroute só repassa: segue para os nós ligados depois dele.
+            actions.extend(_actions_for(target.outputs[0]))
+            continue
         if getattr(target, "action", None):
             actions.append((target.action, target.payload()))
     return actions
@@ -875,6 +879,9 @@ def bake_tree(tree, scene):
         widgets = []
         for node in tree.nodes:
             if node.parent != frame:
+                continue
+            # Nó de ação, Reroute ou Frame dentro da Screen não é widget nem botão.
+            if not isinstance(node, UIHudNode) and node.bl_idname != UIButtonNode.bl_idname:
                 continue
             nx, ny = _abs_location(node)
             # Retângulo normalizado na tela: x da esquerda, y do topo.
@@ -1485,30 +1492,32 @@ def setup_game_logic(obj, tree=None):
     """Always (pulso) + Python Module range_ui_runtime.main no objeto, e as
     propriedades que o template usa.  Não repete o que já existe."""
     game = obj.game
-    if not any(c.type == "PYTHON" and c.mode == "MODULE" and c.module == "range_ui_runtime.main"
-               for c in game.controllers):
-        bpy.ops.logic.sensor_add(type="ALWAYS", name="UI Tree", object=obj.name)
-        bpy.ops.logic.controller_add(type="PYTHON", name="UI Tree", object=obj.name)
-        sensor, controller = game.sensors[-1], game.controllers[-1]
-        sensor.use_pulse_true_level = True
-        controller.mode = "MODULE"
-        controller.module = "range_ui_runtime.main"
-        sensor.link(controller)
     scene = bpy.context.scene
     active = scene.objects.active
-    scene.objects.active = obj  # game_property_new age no objeto ativo
-    for name, kind, value in GAME_PROPS:
-        if name not in game.properties:
-            bpy.ops.object.game_property_new(type=kind, name=name)
-            game.properties[name].value = value
-    # Só HUD, sem menu: nenhum botão vai ligar o HUD nem abrir a tela
-    # "Menu" dos valores padrão, então ele começa visível.
-    tree = tree or _baked_tree()
-    if tree is not None and not any(_is_screen(n) and not n.ui_hud for n in tree.nodes):
-        game.properties["ui_hud"].value = True
-        game.properties["ui_screen"].value = ""
-    scene.objects.active = active
-
+    # sensor_add/game_property_new pedem objeto ativo; sem ele o poll falha.
+    scene.objects.active = obj
+    try:
+        if not any(c.type == "PYTHON" and c.mode == "MODULE" and c.module == "range_ui_runtime.main"
+                   for c in game.controllers):
+            bpy.ops.logic.sensor_add(type="ALWAYS", name="UI Tree", object=obj.name)
+            bpy.ops.logic.controller_add(type="PYTHON", name="UI Tree", object=obj.name)
+            sensor, controller = game.sensors[-1], game.controllers[-1]
+            sensor.use_pulse_true_level = True
+            controller.mode = "MODULE"
+            controller.module = "range_ui_runtime.main"
+            sensor.link(controller)
+        for name, kind, value in GAME_PROPS:
+            if name not in game.properties:
+                bpy.ops.object.game_property_new(type=kind, name=name)
+                game.properties[name].value = value
+        # Só HUD, sem menu: nenhum botão vai ligar o HUD nem abrir a tela
+        # "Menu" dos valores padrão, então ele começa visível.
+        tree = tree or _baked_tree()
+        if tree is not None and not any(_is_screen(n) and not n.ui_hud for n in tree.nodes):
+            game.properties["ui_hud"].value = True
+            game.properties["ui_screen"].value = ""
+    finally:
+        scene.objects.active = active
 
 class RANGE_OT_ui_tree_template(Operator):
     """Add ready-made screens to the UI Tree (menu with options or HUD)"""

@@ -61,12 +61,19 @@ def resolve_pbr(context, mode):
     return want, switched
 
 
+# Pedaços do nome que não dizem o mapa: resolução ("4k", "2048") e variante do normal.
+NOISE = re.compile(r"^(\d+k|\d+|gl|dx|opengl|directx)$")
+
+
 def classify(filename):
     """Diz que mapa (color, normal, ...) o arquivo é, pelo nome; None se não reconhecer."""
     stem = os.path.splitext(filename)[0].lower()
     tokens = [t for t in re.split(r"[_\-. ]+", stem) if t]
-    for kind, words in MAP_WORDS:
-        for t in reversed(tokens):
+    # O último pedaço que é nome de mapa vence ("metal_plate_diff_4k" é color).
+    for t in reversed(tokens):
+        if NOISE.match(t):
+            continue
+        for kind, words in MAP_WORDS:
             if t in words:
                 return kind
     # Nomes colados ("brickAlbedo"): procura a palavra no fim do nome.
@@ -78,12 +85,20 @@ def classify(filename):
 
 
 def set_stem(filename):
-    """Nome do conjunto sem o sufixo do mapa ("bricks_rough.png" -> "bricks")."""
+    """Nome do conjunto sem o sufixo do mapa ("bricks_rough_4k.png" -> "bricks")."""
     stem = os.path.splitext(filename)[0]
-    tokens = re.split(r"([_\-. ]+)", stem)
-    if len(tokens) > 2 and classify(tokens[-1] + ".png"):
-        return "".join(tokens[:-2])
-    return stem
+    parts = re.split(r"([_\-. ]+)", stem)
+    mapped = False
+    while len(parts) > 2:
+        last = parts[-1].lower()
+        if NOISE.match(last):
+            parts = parts[:-2]
+        elif not mapped and classify(last + ".png"):
+            parts = parts[:-2]
+            mapped = True
+        else:
+            break
+    return "".join(parts) if mapped else stem
 
 
 def find_texture_set(filepath):
@@ -98,7 +113,9 @@ def find_texture_set(filepath):
     for n in names:
         if os.path.splitext(n)[1].lower() not in IMAGE_EXTS:
             continue
-        if not n.lower().startswith(stem):
+        low = n.lower()
+        # "bricks" não pode pegar "bricks2_diff": depois do prefixo vem separador.
+        if not low.startswith(stem) or low[len(stem):len(stem) + 1] not in ("_", "-", ".", " "):
             continue
         kind = classify(n)
         if kind and kind not in found:
@@ -808,8 +825,8 @@ class MATERIAL_OT_recipe_preset(Operator):
         _id, label, color, metal, rough, alpha, emit = next(p for p in PRESETS if p[0] == self.preset)
         mat = target_material(context, label)
         mat[RECIPE_KEY] = "preset"
-        if alpha < 1.0:
-            mat.game_settings.alpha_blend = 'ALPHA'
+        # Reaplicar num material que já era vidro não pode deixar o Alpha ligado.
+        mat.game_settings.alpha_blend = 'ALPHA' if alpha < 1.0 else 'OPAQUE'
         if use_pbr(context):
             b = TreeBuilder(mat)
             bsdf = b.pbr_output(0, 0)

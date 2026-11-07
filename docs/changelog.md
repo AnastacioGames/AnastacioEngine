@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Lote 3: Logic Tree, UI Tree, receitas de material e World
+
+- Logic Tree: cadeia de "Then" sem gatilho é cortada até o fim (antes sobravam regras da cadeia); erro no meio do compile grava o registro, para os bricks não ficarem órfãos; Convert to Nodes grava o nome do estado e copia todos os valores dos bricks (antes perdia os iguais ao padrão do nó).
+- UI Tree: Bake ignora nó de ação/Reroute/Frame dentro da Screen (quebrava); evento ligado por Reroute chega à ação; Setup Game Logic funciona sem objeto ativo.
+- Material from Texture Set: reconhece nomes com resolução/variante (`metal_plate_diff_4k`), o último nome de mapa vence ("metal" no nome não vira Metallic) e o prefixo não pega conjunto vizinho; preset opaco desliga o Alpha herdado.
+- `world.atmosphere_reset`, `flare_sun_set` e `game_header_add/edit` usam o mundo da cena fora do Properties (davam traceback no F3).
+- Conferido no editor invisível.
+
 ## 2026-11-07 - Lote 2 de bugs achados pelos agentes de teste
 
 - Crashes: Shift+]/[ (Activate Same Type) no Node Editor sem nó ativo; redo de passo Sculpt com objeto ativo que não é malha; `vertex_group_fix`/`vertex_group_lock` usavam o objeto ativo em vez do objeto do contexto que o poll valida.

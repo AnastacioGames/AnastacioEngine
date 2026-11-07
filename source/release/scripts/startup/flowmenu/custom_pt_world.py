@@ -102,11 +102,11 @@ class WORLD_OT_atmosphere_reset(bpy.types.Operator):
 
     @classmethod
     def poll(cls, context):
-        return context.world is not None
+        return _op_world(context) is not None
 
     def execute(self, context):
         for name, value in ATMOSPHERE_EARTH.items():
-            setattr(context.world, name, value)
+            setattr(_op_world(context), name, value)
         return {'FINISHED'}
 
 
@@ -267,6 +267,11 @@ class WORLD_OT_cloud_quality_preset(Operator):
         return {'FINISHED'}
 
 
+def _op_world(context):
+    # context.world só existe no editor Properties; F3 e scripts usam o mundo da cena.
+    return getattr(context, "world", None) or context.scene.world
+
+
 class WORLD_OT_flare_sun_set(Operator):
     """Use this Lamp as the lens flare's sun"""
     bl_idname = "world.flare_sun_set"
@@ -276,7 +281,10 @@ class WORLD_OT_flare_sun_set(Operator):
     name: StringProperty()
 
     def execute(self, context):
-        context.world.weather_settings.sun_object_name = self.name
+        world = _op_world(context)
+        if world is None:
+            return {'CANCELLED'}
+        world.weather_settings.sun_object_name = self.name
         return {'FINISHED'}
 
 
@@ -904,7 +912,7 @@ class WORLD_OT_game_header_add(Operator):
         layout.prop(self, "expanded")
 
     def execute(self, context):
-        world = context.world
+        world = _op_world(context)
         if not world:
             return {'CANCELLED'}
         title = self.title.replace("/", " ").strip() or "Header"
@@ -936,7 +944,7 @@ class WORLD_OT_game_header_edit(Operator):
         layout.prop(self, "icon")
 
     def execute(self, context):
-        world = context.world
+        world = _op_world(context)
         if not world or not (0 <= self.index < len(world.properties)):
             return {'CANCELLED'}
         title = self.title.replace("/", " ").strip() or "Header"
