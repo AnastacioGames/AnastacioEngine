@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - UI Tree: primeiro menu depois do Minimap
+
+- O template Menu agora abre ao iniciar quando entra depois de Add > Minimap: o primeiro menu da árvore preenche `ui_screen` vazio e desliga `ui_hud`. Com menu anterior, a escolha do projeto é mantida.
+
 ## 2026-11-06 - Rec Play: correções da revisão
 
 - Take sem amostras não prende mais o ator: quem tem clipes, Action ou tracks segue em reprodução até o fim e devolve física e lógica; quem não tem nada não é tocado.

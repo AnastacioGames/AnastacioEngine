@@ -1445,8 +1445,18 @@ class RANGE_OT_ui_tree_template(Operator):
         origin = (0.0, bottom - 150.0 if tree.nodes else 0.0)
         for node in tree.nodes:
             node.select = False
+        had_menu = any(_is_screen(n) and not n.ui_hud for n in tree.nodes)
         frames = add_template(tree, self.kind, origin)
         tree.nodes.active = frames[0]
+        # Add > Minimap numa árvore só com HUD deixa ui_screen vazio; sem isto o
+        # primeiro menu nunca abriria.  Com menu anterior, a escolha é do usuário.
+        camera = context.scene.camera
+        if self.kind == "MENU" and not had_menu and camera is not None:
+            props = camera.game.properties
+            if "ui_screen" in props and not props["ui_screen"].value:
+                props["ui_screen"].value = frames[0].name
+                if "ui_hud" in props:
+                    props["ui_hud"].value = False
         self.report({'INFO'}, "UI: %d tela(s) adicionada(s)" % len(frames))
         return {'FINISHED'}
 
