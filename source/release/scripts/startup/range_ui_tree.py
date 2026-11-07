@@ -1029,12 +1029,19 @@ def _bounds(objects, margin=0.0):
     return (min(xs) - mx, min(ys) - my), (max(xs) + mx, max(ys) + my)
 
 
+# O jogo lê o PNG do disco: sem .range salvo ele iria para a pasta temporária,
+# que some ao fechar o editor, e o mapa ficaria branco.
+UNSAVED_MAP_ERROR = "Salve o .range antes: a imagem do mapa fica ao lado dele"
+
+
 def bake_minimap_image(scene, node, size=1024):
     """Foto ortográfica de cima das malhas do mapa (sem jogador nem
     marcadores), com fundo transparente.  Salva o PNG ao lado do .range,
     liga a imagem ao nó e acerta World Min/Max para a área exata da foto.
     Devolve o caminho salvo ou levanta RuntimeError."""
     import os
+    if not bpy.data.filepath:
+        raise RuntimeError(UNSAVED_MAP_ERROR)
     objects = _map_objects(scene, node)
     # Sem margem: a borda da foto é o chão, e o clamp da textura o estende
     # para fora em vez de mostrar uma faixa transparente.
@@ -1045,11 +1052,8 @@ def bake_minimap_image(scene, node, size=1024):
     sx, sy = max(x1 - x0, 1e-3), max(y1 - y0, 1e-3)
     top = max((o.matrix_world * Vector(c)).z for o in objects for c in o.bound_box)
 
-    if bpy.data.filepath:
-        folder = os.path.dirname(bpy.path.abspath(bpy.data.filepath))
-        base = os.path.splitext(os.path.basename(bpy.data.filepath))[0]
-    else:
-        folder, base = bpy.app.tempdir, "untitled"
+    folder = os.path.dirname(bpy.path.abspath(bpy.data.filepath))
+    base = os.path.splitext(os.path.basename(bpy.data.filepath))[0]
     filename = "%s_minimap.png" % bpy.path.clean_name(base)
     path = os.path.join(folder, filename)
 
@@ -1115,8 +1119,7 @@ def bake_minimap_image(scene, node, size=1024):
         image = bpy.data.images.load(path)
     else:
         image.reload()
-    if bpy.data.filepath:
-        image.filepath = "//" + filename  # o jogo lê do arquivo, relativo ao .range
+    image.filepath = "//" + filename  # o jogo lê do arquivo, relativo ao .range
     image.use_fake_user = True  # o nó guarda só o nome: sem usuário a imagem some ao salvar
     node.image_name = image.name
     node.world_min, node.world_max = (x0, y0), (x1, y1)
@@ -1137,10 +1140,7 @@ class RANGE_OT_ui_tree_minimap_bake_image(Operator):
         except RuntimeError as exc:
             self.report({'ERROR'}, str(exc))
             return {'CANCELLED'}
-        if not bpy.data.filepath:
-            self.report({'WARNING'}, bpy.app.translations.pgettext_tip("Save the .range and generate again: the image is in a temporary folder"))
-        else:
-            self.report({'INFO'}, "Mapa salvo em %s" % path)
+        self.report({'INFO'}, "Mapa salvo em %s" % path)
         return {'FINISHED'}
 
 
@@ -1232,6 +1232,9 @@ class RANGE_OT_add_minimap(Operator):
         return context.active_object is not None and context.mode == "OBJECT"
 
     def execute(self, context):
+        if self.bake_image and not bpy.data.filepath:
+            self.report({'ERROR'}, UNSAVED_MAP_ERROR)
+            return {'CANCELLED'}
         try:
             node = add_minimap(context, context.active_object, self.style, self.bake_image)
         except RuntimeError as exc:
