@@ -186,16 +186,10 @@ void Exception::setXptDesc(void)
 			}
 		}
 		// add result code
-		// length of result code
-		const size_t rsltSize = 11;
-		// delimit description
-		//const char delimRslt[] = ": ";
-		// set text of description
-		char rsltTxt[rsltSize];
 		std::ostringstream os;
-		os << std::hex << m_hRslt << ": " << '\0';
+		os << std::hex << m_hRslt << ": ";
 		// copy result to description
-		m_desc.insert(0, rsltTxt);
+		m_desc.insert(0, os.str());
 		// copy exception description to last exception string
 		m_lastError = m_desc;
 	}

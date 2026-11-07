@@ -950,8 +950,9 @@ EXP_PYMETHODDEF_DOC(BL_Shader, setUniformDef, "setUniformDef(name, enum)")
 			uni->m_type = nloc;
 			uni->m_flag = 0;
 			m_preDef.push_back(uni);
-			Py_RETURN_NONE;
 		}
+		// A missing uniform was already reported by GetUniformLocation().
+		Py_RETURN_NONE;
 	}
 	return nullptr;
 }
