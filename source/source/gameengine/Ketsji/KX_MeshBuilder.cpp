@@ -207,13 +207,13 @@ int KX_MeshBuilderSlot::pyattr_set_material(EXP_PyObjectPlus *self_v, const EXP_
 PyObject *KX_MeshBuilderSlot::pyattr_get_uvCount(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_MeshBuilderSlot *self = static_cast<KX_MeshBuilderSlot *>(self_v);
-	return PyBool_FromLong(self->GetDisplayArray()->GetFormat().uvSize);
+	return PyLong_FromLong(self->GetDisplayArray()->GetFormat().uvSize);
 }
 
 PyObject *KX_MeshBuilderSlot::pyattr_get_colorCount(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
 {
 	KX_MeshBuilderSlot *self = static_cast<KX_MeshBuilderSlot *>(self_v);
-	return PyBool_FromLong(self->GetDisplayArray()->GetFormat().colorSize);
+	return PyLong_FromLong(self->GetDisplayArray()->GetFormat().colorSize);
 }
 
 PyObject *KX_MeshBuilderSlot::pyattr_get_primitive(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef)
