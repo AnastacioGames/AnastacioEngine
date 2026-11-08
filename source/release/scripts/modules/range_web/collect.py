@@ -55,7 +55,8 @@ class Snapshot:
     def available(self):
         if self.stdlib is None:
             return None
-        tops = set(self.stdlib) | self.project_tops
+        # O runtime registra Range e os apelidos bge/range (KX_PythonInit), na Web tambem.
+        tops = set(self.stdlib) | self.project_tops | {"Range", "bge", "range"}
         for name in self.texts:
             tops.add(name[:-3] if name.endswith(".py") else name)
         return tops

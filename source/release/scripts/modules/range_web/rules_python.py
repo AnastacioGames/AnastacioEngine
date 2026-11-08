@@ -302,7 +302,7 @@ class _Analyzer(ast.NodeVisitor):
         if top in EDITOR_MODULES:
             self._emit("WEB-PY-007", node, Msg("Import of %s (editor-only API).", top),
                        "Separate the authoring tool from the game logic.")
-        elif top == "bge" and (self.available is None or top not in self.available):
+        elif top == "bge" and self.available is not None and top not in self.available:
             self._emit("WEB-PY-001", node, Msg("Unresolved import: %s (the engine exposes the API as Range).", name),
                        "Replace `import bge` with `import Range` (bge.logic -> Range.logic, bge.types -> Range.types).")
         elif self.available is not None and top not in self.available:

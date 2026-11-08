@@ -205,7 +205,26 @@ def collect_extra_files(scenes=None, stdlib=None):
     paths = set(seen) | {p for _kind, p, _origin in assets if os.path.isfile(p)}
     if root:
         paths |= set(input_map_files(root))
+        paths |= set(_library_files(root))
     return sorted(p for p in paths if p.startswith(prefix))
+
+
+def _library_files(root):
+    """.range/.blend do projeto que o jogo pode abrir por LibLoad (o caminho costuma ser montado
+    no script, então a análise estática não acha todos). O arquivo principal já vai no pacote."""
+    main = os.path.realpath(bpy.data.filepath) if bpy.data.filepath else ""
+    out = []
+    for folder, dirs, files in os.walk(root):
+        dirs[:] = [d for d in dirs if not d.startswith(".") and d != "__pycache__"]
+        if folder != root and ("index.html" in files or any(f.lower().endswith(".exe") for f in files)):
+            dirs[:] = []  # pacote já exportado (Web ou desktop) dentro do projeto
+            continue
+        for name in files:
+            if os.path.splitext(name)[1].lower() in (".range", ".blend", ".rasec"):
+                path = os.path.join(folder, name)
+                if os.path.realpath(path) != main:
+                    out.append(path)
+    return out
 
 
 def collect_report(scenes=None, stdlib=None, touch_layout=None):
