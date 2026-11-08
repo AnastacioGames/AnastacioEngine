@@ -1013,7 +1013,13 @@ static PyObject *gLibLoad(PyObject *, PyObject *args, PyObject *kwds)
 
 		// check if the current file link exists, if not, try rasec.
 		if (!(BLI_access(abs_path, R_OK) == 0) && BLI_path_extension_check(abs_path, ".range")) {
-			BLI_path_extension_replace(abs_path, FILE_MAX, ".rasec");
+			/* Só troca para .rasec se ele existir: o erro cita o nome pedido. */
+			char rasec_path[FILE_MAX];
+			BLI_strncpy(rasec_path, abs_path, sizeof(rasec_path));
+			BLI_path_extension_replace(rasec_path, FILE_MAX, ".rasec");
+			if (BLI_access(rasec_path, R_OK) == 0) {
+				BLI_strncpy(abs_path, rasec_path, sizeof(abs_path));
+			}
 		}
 		else {
 			G.usePtrFile = false;

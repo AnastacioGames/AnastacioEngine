@@ -122,7 +122,10 @@ static void ProfileNoteScene(const std::string& name, double start)
 void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous)
 {
 	// only add scene when it doesn't exist!
-	if (FindScene(scenename) || IsPending(scenename)) {
+	/* Uma cena com end() neste frame sai antes do add: aceitar a nova. */
+	const bool removing = std::find(m_removingScenes.begin(), m_removingScenes.end(), scenename) != m_removingScenes.end() &&
+	                      std::find(m_removingKeep.begin(), m_removingKeep.end(), scenename) == m_removingKeep.end();
+	if ((FindScene(scenename) && !removing) || IsPending(scenename)) {
 		CM_Warning("scene " << scenename << " already exists, not added!");
 	}
 	else {

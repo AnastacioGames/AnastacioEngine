@@ -78,6 +78,10 @@ public:
 	void AddProgress(float progress);
 
 #ifdef WITH_PYTHON
+	virtual PyObject *py_repr();
+#endif
+
+#ifdef WITH_PYTHON
 	static PyObject *pyattr_get_onfinish(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);
 	static int pyattr_set_onfinish(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef, PyObject *value);
 	static PyObject *pyattr_get_onprogress(EXP_PyObjectPlus *self_v, const EXP_PYATTRIBUTE_DEF *attrdef);

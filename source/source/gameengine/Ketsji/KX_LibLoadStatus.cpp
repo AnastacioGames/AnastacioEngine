@@ -138,6 +138,11 @@ PyAttributeDef KX_LibLoadStatus::Attributes[] = {
 	EXP_PYATTRIBUTE_NULL // Sentinel
 };
 
+PyObject *KX_LibLoadStatus::py_repr()
+{
+	return PyUnicode_FromFormat("KX_LibLoadStatus(\"%s\", progress=%d%%)", m_libname.c_str(), (int)(m_progress * 100.0f));
+}
+
 PyTypeObject KX_LibLoadStatus::Type = {
 	PyVarObject_HEAD_INIT(nullptr, 0)
 	"KX_LibLoadStatus",
