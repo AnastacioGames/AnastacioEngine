@@ -512,3 +512,11 @@ class SEQUENCER_OT_bake_sound_strip(Operator):
         self.report({'INFO'}, "Novo strip %s (o original ficou mudo)" % new.name)
         return {'FINISHED'}
 
+
+
+classes = (
+    SOUND_OT_record_microphone,
+    SOUND_OT_preview_fx,
+    SOUND_OT_adjust,
+    SEQUENCER_OT_bake_sound_strip,
+)
