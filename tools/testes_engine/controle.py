@@ -64,15 +64,15 @@ def iniciar_invisivel(args, log, env):
     return pi.dwProcessId
 
 
-def abrir(cena=None, visivel=False, espera=60):
+def abrir(cena=None, visivel=False, espera=60, args_extra=()):
     PASTA.mkdir(parents=True, exist_ok=True)
     SESSAO.unlink(missing_ok=True)
     config = Path(tempfile.mkdtemp(prefix='config_', dir=PASTA))
     env = dict(os.environ, ANASTACIO_EVENT_SIMULATE='1', BLENDER_USER_CONFIG=str(config), BLENDER_USER_SCRIPTS=str(config / 'scripts'),
                BLENDER_USER_DATAFILES=str(config / 'datafiles'))
-    args = [str(EDITOR), '--factory-startup', '--window-geometry', '0', '0', '1904', '1000'] + ([cena] if cena else [])
+    args = [str(EDITOR), '--factory-startup', '--window-geometry', '0', '0', '1904', '1000'] + list(args_extra) + ([cena] if cena else [])
     args += ['--python-exit-code', '1', '--python', str(AQUI / 'servidor.py'), '--', str(SESSAO)]
-    log = PASTA / 'editor.log'
+    log = PASTA / ('editor_%d.log' % int(time.time() * 1000))
     if visivel:
         subprocess.Popen(args, env=env, cwd=RAIZ, stdout=log.open('w'), stderr=subprocess.STDOUT)
     else:
