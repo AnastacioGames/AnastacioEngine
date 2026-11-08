@@ -584,6 +584,43 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!DNA_struct_elem_find(fd->filesdna, "Lamp", "float", "shadow_cascade_proportion_near")) {
+    /* Arquivos de antes do CSM: mesmos padroes de BKE_lamp_init (proporcao 0 quebra as cascatas). */
+    LISTBASE_FOREACH (Lamp *, la, &main->lamp) {
+      la->shadow_cascade_proportion_near = 0.4f;
+      la->shadow_cascade_proportion_middle = 0.35f;
+      la->csm_bufsize[0] = 512;
+      la->csm_bufsize[1] = 128;
+      la->csm_soft[0] = 5.0f;
+      la->csm_soft[1] = 8.0f;
+      la->csm_bias[0] = 0.4f;
+      la->csm_bias[1] = 0.7f;
+    }
+  }
+
+  /* Arquivos salvos ja com os campos de CSM zerados (aberto sem versioning): proporcao 0
+   * nunca e valida, entao volta aos padroes. */
+  LISTBASE_FOREACH (Lamp *, la, &main->lamp) {
+    if (la->shadow_cascade_proportion_near == 0.0f && la->shadow_cascade_proportion_middle == 0.0f &&
+        la->csm_bufsize[0] == 0 && la->csm_bufsize[1] == 0) {
+      la->shadow_cascade_proportion_near = 0.4f;
+      la->shadow_cascade_proportion_middle = 0.35f;
+      la->csm_bufsize[0] = 512;
+      la->csm_bufsize[1] = 128;
+      la->csm_soft[0] = 5.0f;
+      la->csm_soft[1] = 8.0f;
+      la->csm_bias[0] = 0.4f;
+      la->csm_bias[1] = 0.7f;
+    }
+  }
+
+  if (!DNA_struct_elem_find(fd->filesdna, "Lamp", "float", "glow_scale")) {
+    LISTBASE_FOREACH (Lamp *, la, &main->lamp) {
+      la->cull_distance = 100.0f;
+      la->glow_scale = 1.0f;
+    }
+  }
+
   if (!DNA_struct_elem_find(fd->filesdna, "World", "float", "rain_lightning_intensity")) {
     /* Raios da chuva desligados por padrao (WO_WEATHER_RAIN_LIGHTNING nunca estava ligado). */
     LISTBASE_FOREACH (World *, wo, &main->world) {

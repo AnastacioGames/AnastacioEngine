@@ -154,8 +154,8 @@ def _shadow_size_preset(size_prop, description):
     custom_key = size_prop + "_custom"
 
     def get_preset(lamp):
-        size = getattr(lamp, size_prop)
-        if lamp.get(custom_key) or size not in SHADOW_SIZE_PRESETS:
+        size = getattr(lamp, size_prop, None)
+        if size is None or lamp.get(custom_key) or size not in SHADOW_SIZE_PRESETS:
             return SHADOW_SIZE_CUSTOM
         return SHADOW_SIZE_PRESETS.index(size)
 
