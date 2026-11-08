@@ -1749,6 +1749,87 @@ EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, is_playing_take,
 	return PyBool_FromLong(GetScene()->IsMotionTakePlaying(this));
 }
 
+/* Caixa local (a do cullingBox) e seus 8 cantos: bit 0 = X, bit 1 = Y, bit 2 = Z (0 = min, 1 = max). */
+static void bound_box_local_corners(KX_GameObject *gameobj, mt::vec3 corners[8])
+{
+	gameobj->UpdateBounds(false);
+	const SG_BBox& box = gameobj->GetCullingNode().GetAabb();
+	const mt::vec3& lo = box.GetMin();
+	const mt::vec3& hi = box.GetMax();
+	for (int i = 0; i < 8; ++i) {
+		corners[i] = mt::vec3((i & 1) ? hi.x : lo.x, (i & 2) ? hi.y : lo.y, (i & 4) ? hi.z : lo.z);
+	}
+}
+
+/* Canto local levado ao mundo sem a posição: rotação e escala do objeto. */
+static mt::vec3 bound_box_offset(KX_GameObject *gameobj, const mt::vec3& local)
+{
+	return gameobj->NodeGetWorldOrientation() * (gameobj->NodeGetWorldScaling() * local);
+}
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, getBoundBoxSize,
+                           "getBoundBoxSize()\n"
+                           "Returns the size of the bounding box along the object's own axes, with its world scale.\n")
+{
+	mt::vec3 corners[8];
+	bound_box_local_corners(this, corners);
+	const mt::vec3& scale = NodeGetWorldScaling();
+	const mt::vec3 size = corners[7] - corners[0];
+	return PyObjectFrom(mt::vec3(std::fabs(size.x * scale.x), std::fabs(size.y * scale.y), std::fabs(size.z * scale.z)));
+}
+
+EXP_PYMETHODDEF_DOC_NOARGS(KX_GameObject, getBoundBoxVolume,
+                           "getBoundBoxVolume()\n"
+                           "Range compatibility: returns [volume, corner1, ..., corner8]. The volume uses the world\n"
+                           "scale; each corner is an offset from worldPosition (rotation and scale applied), so\n"
+                           "obj.worldPosition + box[i] is the corner in the world.\n")
+{
+	mt::vec3 corners[8];
+	bound_box_local_corners(this, corners);
+	const mt::vec3& scale = NodeGetWorldScaling();
+	const mt::vec3 size = corners[7] - corners[0];
+	const float volume = std::fabs(size.x * scale.x * size.y * scale.y * size.z * scale.z);
+
+	PyObject *list = PyList_New(9);
+	PyList_SET_ITEM(list, 0, PyFloat_FromDouble(volume));
+	for (int i = 0; i < 8; ++i) {
+		PyList_SET_ITEM(list, i + 1, PyObjectFrom(bound_box_offset(this, corners[i])));
+	}
+	return list;
+}
+
+EXP_PYMETHODDEF_DOC(KX_GameObject, getBoundBoxCorners,
+                    "getBoundBoxCorners(space='WORLD')\n"
+                    "Returns the 8 corners of the bounding box. space: 'WORLD' (positions in the world),\n"
+                    "'OFFSET' (from worldPosition, like getBoundBoxVolume) or 'LOCAL' (object space, no scale).\n")
+{
+	const char *space = "WORLD";
+	if (!EXP_ParseTupleArgsAndKeywords(args, kwds, "|s:getBoundBoxCorners", {"space", 0}, &space)) {
+		return nullptr;
+	}
+	const bool world = STREQ(space, "WORLD");
+	const bool offset = STREQ(space, "OFFSET");
+	if (!world && !offset && !STREQ(space, "LOCAL")) {
+		PyErr_SetString(PyExc_ValueError, "getBoundBoxCorners(space): expected 'WORLD', 'OFFSET' or 'LOCAL'");
+		return nullptr;
+	}
+
+	mt::vec3 corners[8];
+	bound_box_local_corners(this, corners);
+	PyObject *list = PyList_New(8);
+	for (int i = 0; i < 8; ++i) {
+		mt::vec3 point = corners[i];
+		if (world || offset) {
+			point = bound_box_offset(this, point);
+			if (world) {
+				point += NodeGetWorldPosition();
+			}
+		}
+		PyList_SET_ITEM(list, i, PyObjectFrom(point));
+	}
+	return list;
+}
+
 EXP_PYMETHODDEF_DOC(KX_GameObject, playNLA,
                     "playNLA(speed=1.0, loop=True)\n"
                     "Plays the NLA tracks of the armature under its action layers. Returns True when it started.\n"

@@ -1210,6 +1210,31 @@ base class --- :class:`SCA_IObject`
       :return: All property names for this object.
       :rtype: list
 
+   .. method:: getBoundBoxSize()
+
+      Size of the bounding box (:data:`cullingBox`) along the object's own axes, with its world scale.
+
+      :return: width, depth and height.
+      :rtype: :class:`mathutils.Vector`
+
+   .. method:: getBoundBoxCorners(space='WORLD')
+
+      The 8 corners of the bounding box. Corner ``i`` uses the max X when bit 0 is set, max Y for bit 1
+      and max Z for bit 2, so ``[0]`` is the minimum corner and ``[7]`` the maximum one.
+
+      :arg space: ``'WORLD'`` (positions in the world), ``'OFFSET'`` (from :data:`worldPosition`, with
+         rotation and scale) or ``'LOCAL'`` (object space, without scale).
+      :type space: string
+      :rtype: list of :class:`mathutils.Vector`
+
+   .. method:: getBoundBoxVolume()
+
+      Compatibility with Range 1.x scripts: returns ``[volume, corner1, ..., corner8]``. The volume uses
+      the world scale and the corners are the ``'OFFSET'`` ones of :meth:`getBoundBoxCorners`, so
+      ``obj.worldPosition + box[i]`` is a corner in the world.
+
+      :rtype: list
+
    .. method:: getDistanceTo(other)
 
       :arg other: a point or another :class:`KX_GameObject` to measure the distance to.
