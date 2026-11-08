@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-08 (`HEAD` `fa834071`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-08 (`HEAD` `8c48a7d5`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -50,7 +50,7 @@ cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`,
 
 ---
 
-## `Ketsji/KX_PythonInit.cpp` (3.902 linhas)
+## `Ketsji/KX_PythonInit.cpp` (3.930 linhas)
 
 Bootstrap do Python embutido e módulos `Range`/`bge`. O registro dos **tipos** (`KX_GameObject`, `KX_Scene`…)
 não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específico de Web (`__EMSCRIPTEN__`) em 69,
@@ -61,22 +61,22 @@ não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específic
 | Utilitários do módulo `Range` (funções globais `gPy*`) | aleatório/gravidade/caminho 214–243, `gPyStartGame`/`EndGame`/`RestartGame` 261–289, `SaveGlobalDict`/`LoadGlobalDict` 300–318, `GetProfileInfo` 336, `SendMessage` 349, `GetSpectrum` 372 |
 | Taxas e relógio | tic rate, render rate, animation rate, exit key, max frames, clock/time scale 384–602 |
 | Lista de arquivos e cenas | `.blend`/`.range`/`.rasec` 607–660, `AddScene`/`GetCurrentScene`/`GetSceneList` 671–707 |
-| Informação de sistema | `pyPrintStats` 864, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 946 |
-| Bibliotecas externas | `gLibLoad` 965, `gLibNew` 1190, `gLibFree` 1244, `gLibList` 1260, `gPyNextFrame` 1286 |
+| Informação de sistema | `pyPrintStats` 891, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 973 |
+| Bibliotecas externas | `gLibLoad` 992, `gLibNew` 1217, `gLibFree` 1271, `gLibList` 1287, `gPyNextFrame` 1313 |
 | Tabela `game_methods[]` | 997 |
-| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1423–1617 |
-| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1928, janela/fullscreen 1507–1524 |
+| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1451–1645 |
+| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1956, janela/fullscreen 1507–1524 |
 | Áudio e debug na tela | `MasterVolume` 1585–1597, `ShowFramerate`/`ShowProfile`/`ShowProperties`/`AutoDebugList` 1606–1650, `GetDisplayDimensions` 1660 |
 | Tabela `rasterizer_methods[]` | 1679 |
-| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2297 (~430 linhas, constantes de tipos/estados) |
-| Ambiente `sys` e caminhos | `backupPySysObjects` 2727 … `restorePySysObjects` 2802, `appendPythonPath` 2830, `addImportMain`/`removeImportMain` 2841–2846 |
-| Módulo `Range` e compatibilidade | `addSubModule` 2863, `initRANGE` 2871, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2910, `installLegacyAudFactoryAlias` 2964 (alias `bge`/`aud`) |
-| Init/saída do Python | `initPlayerPython` 3012, `exitPlayerPython` 3052, console 2528–2595, `initGamePython` 3143, `exitGamePython` 3240 |
-| Console e joystick | `createPythonConsole` 3263, `getPythonJoystick` 3275, `updatePythonJoysticks` 3280 |
-| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3321 |
-| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3455 (~190 linhas de constantes) |
-| Módulo `Application` | `initApplicationPythonBinding` 3650 |
-| Config persistente do jogo | `saveGamePythonConfig` 3712, `loadGamePythonConfig` 3791, `pathGamePythonConfig` 3868 (contém código Web/IDBFS) |
+| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2325 (~430 linhas, constantes de tipos/estados) |
+| Ambiente `sys` e caminhos | `backupPySysObjects` 2755 … `restorePySysObjects` 2830, `appendPythonPath` 2858, `addImportMain`/`removeImportMain` 2869–2874 |
+| Módulo `Range` e compatibilidade | `addSubModule` 2891, `initRANGE` 2899, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2938, `installLegacyAudFactoryAlias` 2992 (alias `bge`/`aud`) |
+| Init/saída do Python | `initPlayerPython` 3040, `exitPlayerPython` 3080, console 2528–2595, `initGamePython` 3171, `exitGamePython` 3268 |
+| Console e joystick | `createPythonConsole` 3291, `getPythonJoystick` 3303, `updatePythonJoysticks` 3308 |
+| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3349 |
+| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3483 (~190 linhas de constantes) |
+| Módulo `Application` | `initApplicationPythonBinding` 3678 |
+| Config persistente do jogo | `saveGamePythonConfig` 3740, `loadGamePythonConfig` 3819, `pathGamePythonConfig` 3896 (contém código Web/IDBFS) |
 
 Observação: `initPlayerPython` (editor não usa) é o caminho do standalone; o editor entra por `BPY_python_start`.
 
@@ -158,18 +158,18 @@ trecho inteiro, não só um método.
 
 ---
 
-## `Ketsji/KX_KetsjiEngine.cpp` (1.793 linhas)
+## `Ketsji/KX_KetsjiEngine.cpp` (1.832 linhas)
 
 Laço do jogo: tempo, frames lógicos/físicos, cenas. O desenho em si fica em `KX_RenderPipeline.cpp` (abaixo).
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
-| Construção e serviços | `KX_KetsjiEngine` 194, `SetCanvas` 334, `SetRasterizer` 340, `SetConverter` 428, `StartEngine` 460, `StopEngine` 1265 |
-| Frame | `BeginFrame` 501, `EndFrame` 528, `UpdateDynamicResolution` 617, **`NextFrame`** 707 (lógica, física, animação), `Render` 1100 |
-| Tempo e espera | `ServerSleep` 934, `SleepUnderRate` 921, `UpdateSleepTime` 1005, `ClockTiming` 1311, `FrameTiming` 1347, `AdvanceStepTime` 1360 |
-| Animação e sombra | `UpdateAnimations` 1251, `IsStaticShadowSettled` 1260 |
-| Cenas | `AddScene` 1305, `ConvertAndAddScene` 1407, `PreloadScene` 1412, `RemoveScene` 1417, `ReplaceScene` 1432, `SuspendScene` 1437, `ResumeScene` 1442 |
-| Taxas e flags | `SetTicRate` 1468, `SetUseFixedTimestep` 1561, `SetShadowCulling` 1588, `SetDynamicResolution` 1593 |
+| Construção e serviços | `KX_KetsjiEngine` 194, `SetCanvas` 334, `SetRasterizer` 340, `SetConverter` 428, `StartEngine` 460, `StopEngine` 1304 |
+| Frame | `BeginFrame` 501, `EndFrame` 528, `UpdateDynamicResolution` 617, **`NextFrame`** 743 (lógica, física, animação), `Render` 1139 |
+| Tempo e espera | `ServerSleep` 973, `SleepUnderRate` 921, `UpdateSleepTime` 1044, `ClockTiming` 1350, `FrameTiming` 1386, `AdvanceStepTime` 1399 |
+| Animação e sombra | `UpdateAnimations` 1290, `IsStaticShadowSettled` 1299 |
+| Cenas | `AddScene` 1344, `ConvertAndAddScene` 1446, `PreloadScene` 1451, `RemoveScene` 1456, `ReplaceScene` 1471, `SuspendScene` 1476, `ResumeScene` 1481 |
+| Taxas e flags | `SetTicRate` 1507, `SetUseFixedTimestep` 1600, `SetShadowCulling` 1627, `SetDynamicResolution` 1632 |
 
 ## `Ketsji/KX_RenderPipeline.cpp` (1.303 linhas)
 
