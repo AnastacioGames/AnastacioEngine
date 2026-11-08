@@ -1,10 +1,12 @@
 """V0 do plano de visibilidade (docs/plano-visibilidade-portais.md): predio de salas para medir o ganho de PVS.
 
-  AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_visibilidade.py -- saida.range [occluder|auto] [nobatch] [open] [lado]
+  AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_visibilidade.py -- saida.range [occluder|auto] [nobatch] [open] [aceite] [lado]
 
 Grade lado x lado de salas 8x8 m (padrao 6x6) ligadas em serpentina: portas no eixo X em todas as salas e
 porta no eixo Y so na ponta da fileira. A camera fica na sala (0,0) olhando +X pelo corredor de portas:
 so a fileira 0 e a sala (lado-1, 1) aparecem. Cada sala tem moveis com malha propria (~1,3k tri cada).
+Com "aceite": cena para olhar com janela (Automatic Occluders ligado, contador de FPS, personagem invisivel com
+a camera: W/A/S/D anda, setas giram); sem o script de medicao.
 Com "occluder": paredes viram Occluder e o Occlusion Culling da cena liga.
 
 No jogo (script vis_test.py na camera), variaveis de ambiente:
@@ -24,6 +26,7 @@ if not argv:
     raise SystemExit('uso: ... -- saida.range [occluder] [lado]')
 out = argv[0]
 use_occluder = 'occluder' in argv[1:]
+aceite = 'aceite' in argv[1:]
 open_area = 'open' in argv[1:]  # sem paredes nem teto: a oclusao nao tem o que esconder
 SIDE = next((int(a) for a in argv[1:] if a.isdigit()), 6)
 ROOM = 8.0
@@ -47,7 +50,8 @@ scene.game_settings.use_auto_static_batch = 'nobatch' not in argv[1:]
 scene.game_settings.physics_engine = 'BULLET'
 scene.game_settings.use_occlusion_culling = True
 # auto: paredes STATIC (com colisao) viram occluder sozinhas no load (Automatic Occluders)
-scene.game_settings.use_auto_occlusion = 'auto' in argv[1:]
+scene.game_settings.use_auto_occlusion = 'auto' in argv[1:] or aceite
+scene.game_settings.show_fps_counter = aceite
 scene.world.horizon_color = (0.3, 0.3, 0.35)
 scene.world.mist_settings.use_mist = False
 
@@ -196,15 +200,54 @@ def tick(cont):
                 f.write(line + '\\n')
         bge.logic.endGame()
 ''' % SIDE
-text = bpy.data.texts.new('vis_test.py')
-text.write(GAME_SCRIPT)
-scene.objects.active = cam
-bpy.ops.logic.sensor_add(type='ALWAYS', name='tick', object=cam.name)
-bpy.ops.logic.controller_add(type='PYTHON', name='test', object=cam.name)
-cam.game.sensors['tick'].use_pulse_true_level = True
-controller = cam.game.controllers['test']
-controller.mode = 'MODULE'
-controller.module = 'vis_test.tick'
-controller.link(sensor=cam.game.sensors['tick'])
+if aceite:
+    bpy.ops.mesh.primitive_cube_add(location=(1.0, ROOM / 2, 1.0))
+    player = scene.objects.active
+    player.name = 'Jogador'
+    player.scale = (0.3, 0.3, 0.9)
+    bpy.ops.object.transform_apply(scale=True)
+    player.game.physics_type = 'CHARACTER'
+    player.game.use_collision_bounds = True
+    player.game.collision_bounds_type = 'CAPSULE'
+    player.hide_render = True
+    cam.parent = player
+    cam.location = (0.0, 0.0, 0.6)
+    cam.rotation_euler = (math.pi / 2, 0.0, -math.pi / 2)
+    text = bpy.data.texts.new('andar.py')
+    text.write('''import bge
+from bge import logic, events, constraints
+def andar(cont):
+    own = cont.owner
+    k = logic.keyboard.inputs
+    def on(key):
+        return k[key].active
+    frente = (on(events.WKEY) - on(events.SKEY)) * 0.08
+    lado = (on(events.DKEY) - on(events.AKEY)) * 0.08
+    giro = (on(events.LEFTARROWKEY) - on(events.RIGHTARROWKEY)) * 0.04
+    own.applyRotation((0, 0, giro), True)
+    # camera olha +X local do jogador
+    d = own.worldOrientation * __import__('mathutils').Vector((frente, -lado, 0.0))
+    constraints.getCharacter(own).walkDirection = d
+''')
+    scene.objects.active = player
+    bpy.ops.logic.sensor_add(type='ALWAYS', name='tick', object=player.name)
+    bpy.ops.logic.controller_add(type='PYTHON', name='andar', object=player.name)
+    player.game.sensors['tick'].use_pulse_true_level = True
+    ctl = player.game.controllers['andar']
+    ctl.mode = 'MODULE'
+    ctl.module = 'andar.andar'
+    ctl.link(sensor=player.game.sensors['tick'])
+    scene.game_settings.fps = 60
+else:
+    text = bpy.data.texts.new('vis_test.py')
+    text.write(GAME_SCRIPT)
+    scene.objects.active = cam
+    bpy.ops.logic.sensor_add(type='ALWAYS', name='tick', object=cam.name)
+    bpy.ops.logic.controller_add(type='PYTHON', name='test', object=cam.name)
+    cam.game.sensors['tick'].use_pulse_true_level = True
+    controller = cam.game.controllers['test']
+    controller.mode = 'MODULE'
+    controller.module = 'vis_test.tick'
+    controller.link(sensor=cam.game.sensors['tick'])
 print('VIS cena: %d salas, %d objetos, occluder=%s' % (SIDE * SIDE, len(scene.objects), use_occluder))
 bpy.ops.wm.save_as_mainfile(filepath=out, compress=False)

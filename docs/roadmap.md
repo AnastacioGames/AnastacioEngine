@@ -20,11 +20,6 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   (faces por quadro), só difuso; reflexo continua nas sondas manuais. Etapas F1a, F1b, F2-F4, nada implementado;
   revisado pelo Codex (C1-C7 aplicados), próximo passo F1a.
 
-## Occluder automático
-
-- Feito, com dica no Scene Doctor ([plano](plano-visibilidade-portais.md)); padrão desligado (decisão do usuário).
-  Falta aceite com janela num jogo de interior.
-
 ## Água realista (estudo do water 0.99)
 
 - Fases 1-5 em [plano-agua-realista.md](plano-agua-realista.md): gotas na lente (fase 1 no Rolimã),

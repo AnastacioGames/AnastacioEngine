@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Automatic Occluders aprovado com janela
+
+- Cena jogável `criar_cena_visibilidade.py -- saida.range aceite` (W/A/S/D, setas, contador de FPS): nada some
+  nem pisca ao andar e virar nas portas, paredes mantêm a colisão. Aprovado pelo usuário.
+
 ## 2026-11-07 - Use Frame Rate: descrição corrigida
 
 - O texto dizia que desligar renderiza o máximo de quadros possível; não é verdade desde a Range original: o
