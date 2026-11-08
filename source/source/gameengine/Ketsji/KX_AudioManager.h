@@ -32,6 +32,7 @@
 
 #include "EXP_Python.h"
 
+#include <map>
 #include <memory>
 #include <string>
 #include <unordered_set>
@@ -107,6 +108,53 @@ public:
 	/// \param covered The camera is under a rain_shelter: the rain is heard quieter.
 	void ReportRain(bool covered = false);
 
+	/* ---- Microfone (Range.audio.microphone*, sensor Microphone, atuador Voice) ----
+	 * Aberto sob demanda. StopAll() (troca de cena/música) não fecha: só MicrophoneStop()
+	 * sem usuários ou o fim do jogo. poll() roda em Update(). */
+
+	/// Liga o microfone (idempotente). 
+eturn false se não abriu (ver MicrophoneState()).
+	bool MicrophoneStart(const std::string& device = "");
+	/// Desliga se nenhum sensor/atuador estiver usando (MicrophoneAcquire).
+	void MicrophoneStop();
+	/// Contagem de uso dos bricks: Acquire liga, o último Release desliga (se o Python não ligou).
+	void MicrophoneAcquire();
+	void MicrophoneRelease();
+	/// "closed", "pending", "granted", "denied" ou "error".
+	std::string MicrophoneState() const;
+	std::string MicrophoneError() const;
+	float MicrophoneLevel() const;
+	float MicrophonePeak() const;
+	int MicrophoneDropped() const;
+	bool MicrophoneRecordStart();
+	/// Para a gravação e guarda em  slot (vazio = "last"). 
+eturn false se não gravava.
+	bool MicrophoneRecordStop(const std::string& slot);
+	bool MicrophoneIsRecording() const;
+	float MicrophoneRecordingSeconds() const;
+	/// AUD_Microphone* (nullptr antes do primeiro start), para o Python.
+	void *GetMicrophone() const;
+
+	/// Gravações por nome: AUD_Sound* do manager (não liberar). nullptr se não existe.
+	void *GetRecording(const std::string& slot) const;
+	/// Guarda uma cópia de  sound (AUD_Sound*) em  slot, substituindo a anterior.
+	void SetRecording(const std::string& slot, void *sound);
+	bool RemoveRecording(const std::string& slot);
+	std::vector<std::string> GetRecordingNames() const;
+	/// WAV PCM16. Caminho relativo: pasta do jogo (Web: /saves). 
+eturn false em erro.
+	bool SaveRecording(const std::string& slot, const std::string& path);
+
+	/** Toca um som (AUD_Sound*) com preset de voz, volume e, opcional, o reverb da área.
+	 * 
+eturn false se o preset não existe ou não pode tocar. */
+	bool PlaySound(void *sound, const std::string& preset, float amount, float volume, bool reverb);
+	bool PlayRecording(const std::string& slot, const std::string& preset, float amount, float volume, bool reverb);
+	/// Voz ao vivo com efeito (liga o microfone). Uma só: chamar de novo troca o efeito.
+	bool PlayLive(const std::string& preset, float amount, float volume, bool reverb);
+	void StopLive();
+	bool IsLive() const;
+
 private:
 	struct Sound;
 	struct Voice;
@@ -163,6 +211,21 @@ private:
 		float gain;
 	};
 	std::vector<DelayedEvent> m_delayedEvents;
+
+	/// AUD_Microphone*, criado no primeiro start.
+	void *m_microphone;
+	/// Python/microphoneStart ligou (os bricks não desligam enquanto true).
+	bool m_microphoneByScript;
+	int m_microphoneUsers;
+	/// Nome -> AUD_Sound*.
+	std::map<std::string, void *> m_recordings;
+	/// Vozes tocadas por PlaySound/PlayLive (Voice::wantReverb decide o reverb da área).
+	std::unique_ptr<Module> m_voiceModule;
+	/// Índice em m_voiceModule->voices da voz ao vivo, -1 sem.
+	int m_liveVoice;
+	void UpdateMicrophoneVoices();
+	void StopMicrophoneVoices();
+	void CloseMicrophone();
 };
 
 #ifdef WITH_PYTHON

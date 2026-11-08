@@ -378,6 +378,7 @@ if(WITH_C)
 		bindings/C/AUD_Sequence.cpp
 		bindings/C/AUD_Sound.cpp
 		bindings/C/AUD_Special.cpp
+		bindings/C/AUD_Microphone.cpp
 	)
 	set(C_HDR
 		bindings/C/GEEffects/AUD_OpenALEffect.h
@@ -390,6 +391,7 @@ if(WITH_C)
 		bindings/C/AUD_Sequence.h
 		bindings/C/AUD_Sound.h
 		bindings/C/AUD_Special.h
+		bindings/C/AUD_Microphone.h
 		bindings/C/AUD_Types.h
 	)
 

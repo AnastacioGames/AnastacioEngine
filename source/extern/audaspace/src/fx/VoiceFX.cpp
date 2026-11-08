@@ -25,6 +25,7 @@
 #include "fx/Reverse.h"
 #include "fx/Volume.h"
 #include "generator/Sine.h"
+#include "devices/Microphone.h"
 #include "sequence/Superpose.h"
 #include "IReader.h"
 #include "Exception.h"
@@ -173,6 +174,32 @@ SoundP VoiceFX::edit(SoundP s, float start, float end, float fade_in, float fade
 			out = vol(out, 0.95f / p);
 	}
 	return out;
+}
+
+void VoiceFX::saveWAV(SoundP s, const std::string& path, float max_seconds)
+{
+	if(!s)
+		AUD_THROW(StateException, "VoiceFX: no sound.");
+	auto reader = s->createReader();
+	const Specs specs = reader->getSpecs();
+	const int block = 4096;
+	const long long limit = (long long)(max_seconds * specs.rate);
+	std::vector<sample_t> data;
+	bool eos = false;
+	long long total = 0;
+
+	while(!eos && total < limit)
+	{
+		int length = int(std::min<long long>(block, limit - total));
+		const size_t offset = data.size();
+		data.resize(offset + size_t(length) * specs.channels);
+		reader->read(length, eos, data.data() + offset);
+		data.resize(offset + size_t(std::max(length, 0)) * specs.channels);
+		if(length <= 0)
+			break;
+		total += length;
+	}
+	Microphone::writeWAV(path, data.data(), int(total), specs);
 }
 
 AUD_NAMESPACE_END

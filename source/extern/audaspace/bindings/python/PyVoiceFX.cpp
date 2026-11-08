@@ -176,7 +176,37 @@ static PyObject* aud_voice_presets(PyObject*, PyObject* args, PyObject* kwds)
 	return list;
 }
 
+PyDoc_STRVAR(M_aud_save_wav_doc,
+			 ".. function:: save_wav(sound, path, max_seconds=600.0)
+
+"
+			 "   Writes the sound as 16-bit PCM WAV (works on the Web too, unlike Sound.write).");
+
+static PyObject* aud_save_wav(PyObject*, PyObject* args, PyObject* kwds)
+{
+	static const char* kwlist[] = {"sound", "path", "max_seconds", nullptr};
+	PyObject* object;
+	const char* path;
+	float max_seconds = 600.0f;
+	if(!PyArg_ParseTupleAndKeywords(args, kwds, "Os|f:save_wav", const_cast<char**>(kwlist), &object, &path, &max_seconds))
+		return nullptr;
+	std::shared_ptr<ISound> sound = soundOf(object);
+	if(!sound)
+		return nullptr;
+	try
+	{
+		VoiceFX::saveWAV(sound, path, max_seconds);
+	}
+	catch(Exception& e)
+	{
+		PyErr_SetString(AUDError, e.what());
+		return nullptr;
+	}
+	Py_RETURN_NONE;
+}
+
 static PyMethodDef voice_fx_methods[] = {
+	{"save_wav", (PyCFunction)aud_save_wav, METH_VARARGS | METH_KEYWORDS, M_aud_save_wav_doc},
 	{"voice_fx", (PyCFunction)aud_voice_fx, METH_VARARGS | METH_KEYWORDS, M_aud_voice_fx_doc},
 	{"edit", (PyCFunction)aud_edit, METH_VARARGS | METH_KEYWORDS, M_aud_edit_doc},
 	{"peak", (PyCFunction)aud_peak, METH_VARARGS | METH_KEYWORDS, M_aud_peak_doc},

@@ -158,7 +158,7 @@ exceção: `microphoneState()` explica e o nível fica 0.
 | Fase | Entrega | Depende de |
 |---|---|---|
 | U1 | `aud.voice_fx`, `aud.edit`, `aud.peak`, lista de presets; testes com o backend Test — **código feito 2026-11-08** (`fx/VoiceFX.{h,cpp}` em C++ para o jogo usar direto, `PyVoiceFX.cpp`; também `aud.duration` e `aud.voice_presets(live)`); libs compilam, falta link do exe + teste | fases 1–2 (feitas) |
-| U2 | `Range.audio` (fase 3 + `recordings`, `voiceFx`, `edit`, `play(reverb)`, `playLive`); cena de teste R/P/efeitos | U1 |
+| U2 | `Range.audio` (fase 3 + `recordings`, `voiceFx`, `edit`, `play(reverb)`, `playLive`); cena de teste R/P/efeitos — **código feito 2026-11-08 no branch feat/microfone, sem build** (API C `AUD_Microphone.h`; nomes finais: `recordings()`, `recording(slot)`, `setRecording`, `playVoice(som_ou_slot, effect, amount, volume, reverb)`, `playLive`, `stopLive`, `microphoneSave`; `MicrophoneAcquire/Release` para os bricks) | U1 |
 | U3 | Sensor Microphone + atuador Voice (DNA/RNA/conversão/UI/versioning/logic_to_python/presets) | U2 |
 | U4 | Nós Logic Tree + peças UI Tree | U3 |
 | U5 | Web (fase 4) + overlay + auto-marcar no export; Android (fase 5) | U2 (U3 p/ auto-marcar) |

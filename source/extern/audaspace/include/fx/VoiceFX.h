@@ -58,6 +58,9 @@ public:
 	 */
 	static std::shared_ptr<ISound> edit(std::shared_ptr<ISound> sound, float start = 0.0f, float end = -1.0f,
 	                                    float fade_in = 0.0f, float fade_out = 0.0f, bool normalize = false);
+
+	/// Grava o som em WAV PCM 16 bits (writer próprio, funciona na Web). Lança FileException.
+	static void saveWAV(std::shared_ptr<ISound> sound, const std::string& path, float max_seconds = 600.0f);
 };
 
 AUD_NAMESPACE_END
