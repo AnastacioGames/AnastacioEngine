@@ -688,8 +688,30 @@ class UISliderNode(UIControlNode, Node):
         return {self.prop_name: self.min_value + 0.5 * (self.max_value - self.min_value)}
 
 
+class UIMicMeterNode(UIProgressBarNode):
+    """Barra com o nível da voz no microfone (liga o microfone; na Web, depois de um clique)."""
+    bl_idname = "RangeUIMicMeter"
+    bl_label = "Microphone Meter"
+
+    def init(self, context):
+        UIProgressBarNode.init(self, context)
+        self.prop_name = "microphone"
+        self.min_value = 0.0
+        self.max_value = 1.0
+        self.use_low_color = False
+
+    def draw_buttons_ext(self, context, layout):
+        layout.label("Shows the voice level (0..1)", icon='REC')
+        UIProgressBarNode.draw_buttons_ext(self, context, layout)
+
+    def widget(self):
+        data = UIProgressBarNode.widget(self)
+        data["source"] = "MIC"
+        return data
+
+
 HUD_NODES = (UIProgressBarNode, UILabelNode, UIPanelNode, UIImageNode, UIMinimapNode, UIGaugeNode,
-             UIToggleNode, UISliderNode, UIDialogueNode)
+             UIToggleNode, UISliderNode, UIDialogueNode, UIMicMeterNode)
 
 
 class UIActionNode(UINode):
@@ -828,9 +850,16 @@ class UIRunPythonNode(UIActionNode, Node):
     param_label = "Function"
 
 
+class UIMicrophoneOnNode(UIActionNode, Node):
+    """Liga o microfone. Na Web o navegador só pede permissão depois de um clique/toque."""
+    bl_idname = "RangeUIMicrophoneOn"
+    bl_label = "Enable Microphone"
+    action = "MIC_ON"
+
+
 ACTION_NODES = (UIPrintNode, UIMessageNode, UIScreenNode, UISceneNode, UIQuitNode,
                 UISoundNode, UISetPropertyNode, UIAddPropertyNode, UITogglePropertyNode,
-                UIShowDialogueNode, UIRunPythonNode)
+                UIShowDialogueNode, UIRunPythonNode, UIMicrophoneOnNode)
 
 
 def _abs_location(node):
@@ -1734,6 +1763,7 @@ CATEGORIES = [
         NodeItem(UIGaugeNode.bl_idname),
         NodeItem(UIMinimapNode.bl_idname),
         NodeItem(UIDialogueNode.bl_idname),
+        NodeItem(UIMicMeterNode.bl_idname),
     ]),
     UICategory("RANGE_UI_ACTIONS", "Actions",
                items=[NodeItem(cls.bl_idname) for cls in ACTION_NODES]),

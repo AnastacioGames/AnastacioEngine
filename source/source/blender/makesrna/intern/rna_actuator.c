@@ -2416,6 +2416,7 @@ static void rna_def_voice_actuator(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "slot", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_default(prop, "voice");
 	RNA_def_property_ui_text(prop, "Recording",
 	                         "Name of the recording (the same names as Range.audio.recording())");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
@@ -2428,12 +2429,14 @@ static void rna_def_voice_actuator(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "amount", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_float_default(prop, 1.0f);
 	RNA_def_property_ui_text(prop, "Amount", "Strength of the effect");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "volume", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.0f, 4.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 10, 2);
+	RNA_def_property_float_default(prop, 1.0f);
 	RNA_def_property_ui_text(prop, "Volume", "");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 

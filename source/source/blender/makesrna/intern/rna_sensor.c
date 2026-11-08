@@ -1196,12 +1196,14 @@ static void rna_def_microphone_sensor(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "threshold", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_float_default(prop, 0.1f);
 	RNA_def_property_ui_text(prop, "Threshold", "Voice level (0..1) that counts as sound");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 
 	prop = RNA_def_property(srna, "hold", PROP_FLOAT, PROP_TIME);
 	RNA_def_property_range(prop, 0.0f, 60.0f);
 	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 2);
+	RNA_def_property_float_default(prop, 0.3f);
 	RNA_def_property_ui_text(prop, "Hold",
 	                         "Seconds: Talking stays on this long after the voice stops; Silence needs this long quiet");
 	RNA_def_property_update(prop, NC_LOGIC, NULL);

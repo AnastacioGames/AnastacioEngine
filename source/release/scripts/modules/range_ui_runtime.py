@@ -533,6 +533,9 @@ class UIRuntime:
                                 dialogue.reset()
             elif action == "PYTHON":
                 self.run_python(value)
+            elif action == "MIC_ON":
+                from Range import audio
+                audio.microphoneStart()
 
     def set_property(self, name, text):
         """Converte o texto para o tipo atual da propriedade (bool/int/float)."""
@@ -610,6 +613,13 @@ class UIRuntime:
     # -- desenho -------------------------------------------------------------
 
     def widget_values(self, data):
+        if data.get("source") == "MIC":
+            # Microphone Meter: o nível da voz no lugar da propriedade.
+            from Range import audio
+            if not getattr(self, "_mic_started", False):
+                self._mic_started = True
+                audio.microphoneStart()
+            return {data["property"]: audio.microphoneLevel()}
         obj = self.obj_for(data)
         if obj is None:
             return {}

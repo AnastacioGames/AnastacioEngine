@@ -238,6 +238,8 @@ TRIGGER_NODES = (
                 ("axis", "range", "property"), ("ray_type", "use_x_ray", "mask") + PULSE),
     _brick_node(TriggerNode, "RangeLogicNear", "Near", T.NearSensor, 'NEAR',
                 ("property", "distance", "reset_distance"), PULSE),
+    _brick_node(TriggerNode, "RangeLogicMicrophone", "When Talking", T.MicrophoneSensor, 'MICROPHONE',
+                ("mode", "threshold"), ("hold", "property") + PULSE),
 )
 
 ACTION_NODES = (
@@ -279,6 +281,9 @@ ACTION_NODES = (
                 required=("target",), then=True),
     _brick_node(ActionNode, "RangeLogicVideo", "Video", T.VideoActuator, 'VIDEO',
                 ("mode", "object"), ("seconds", "use_relative"), then=True),
+    # Microfone: grava, toca com efeito (Then no fim), ao vivo, salva WAV.
+    _brick_node(ActionNode, "RangeLogicVoice", "Voice", T.VoiceActuator, 'VOICE',
+                ("mode", "slot", "effect"), ("amount", "volume", "max_seconds", "use_reverb"), then=True),
 )
 
 
