@@ -2443,10 +2443,13 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 		static const unsigned int AUTO_OCCLUSION_PROBE = 30;
 		int occlusionRes = m_dbvtOcclusionRes;
 		const bool autoOcclusion = m_autoOcclusion && occlusionRes;
-		if (autoOcclusion) {
-			if (!m_autoOcclusionOn) {
-				occlusionRes = 0;
-			}
+		/* Only the active camera measures and decides: split screen viewports, mirrors and probe
+		 * captures would mix their counts and advance the probe counter several times per frame. */
+		const bool autoSample = autoOcclusion && cam == m_activeCamera;
+		if (autoOcclusion && !m_autoOcclusionOn) {
+			occlusionRes = 0;
+		}
+		if (autoSample) {
 			if (++m_autoOcclusionFrame % AUTO_OCCLUSION_PROBE == 0) {
 				CullingCount count{layer, is_shadowbuf, 0};
 				m_physicsEnvironment->CullingTest(CountCullingCallback, &count, planes,
@@ -2457,7 +2460,7 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 
 		dbvt_culling = m_physicsEnvironment->CullingTest(PhysicsCullingCallback, &info, planes, occlusionRes, viewport, matrix);
 
-		if (dbvt_culling && autoOcclusion) {
+		if (dbvt_culling && autoSample) {
 			const float visible = (float)objects.size();
 			float& average = occlusionRes ? m_autoVisibleWith : m_autoVisibleWithout;
 			average = (average < 0.0f) ? visible : average * 0.9f + visible * 0.1f;
