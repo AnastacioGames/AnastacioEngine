@@ -7,8 +7,8 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Microfone
 
-Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Falta aceite com microfone físico
-(desktop, navegador e APK) e conferir se o export Web/APK leva a pasta `sounds/`.
+Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Desktop aprovado com microfone físico; Web testada em Chrome com microfone simulado. Falta aceite no navegador
+real e no APK.
 
 ## Track Tool (pistas e vias)
 

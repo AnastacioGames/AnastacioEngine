@@ -3,6 +3,7 @@
 # Roda no thread principal do editor; nao chamar de draw() (plano, secao 7).
 
 import hashlib
+import glob
 import os
 
 import bpy
@@ -206,7 +207,22 @@ def collect_extra_files(scenes=None, stdlib=None):
     if root:
         paths |= set(input_map_files(root))
         paths |= set(_library_files(root))
+        paths |= set(_voice_files(root, scenes))
     return sorted(p for p in paths if p.startswith(prefix))
+
+
+def _voice_files(root, scenes):
+    """Falas da cutscene (evento Dialog, por caminho) e vozes dos Takes (sounds/take_*.wav)."""
+    files = glob.glob(os.path.join(root, "sounds", "take_*.wav"))
+    for scene in scenes:
+        for sequence in scene.cutscene_settings.sequences:
+            for event in sequence.events:
+                path = event.dialog_audio_path
+                if event.type == 'DIALOG' and path and not path.startswith("slot:"):
+                    full = _abs(path)
+                    if os.path.isfile(full):
+                        files.append(full)
+    return files
 
 
 def _library_files(root):
