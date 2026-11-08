@@ -59,7 +59,7 @@ from _bpy import (
     _utils_units as units,
     blend_paths,
     escape_identifier,
-    register_class as _register_class,
+    register_class,
     resource_path,
     script_paths as _bpy_script_paths,
     unregister_class,
@@ -677,30 +677,6 @@ def user_resource(resource_type, path="", create=False):
                 target_path = ""
 
     return target_path
-
-
-def _is_deferred_property(value):
-    return (isinstance(value, tuple) and len(value) == 2 and
-            callable(value[0]) and isinstance(value[1], dict))
-
-
-def _apply_annotation_properties(cls):
-    # Blender 2.8+ declares properties as ``name: BoolProperty()``.
-    for base in reversed(cls.__mro__):
-        if base is not cls and "bl_rna" in base.__dict__:
-            continue
-        for name, value in base.__dict__.get("__annotations__", {}).items():
-            if _is_deferred_property(value) and name not in cls.__dict__:
-                setattr(cls, name, value)
-
-
-def register_class(cls):
-    """
-    Register a subclass of a blender type.
-    Properties may be class attributes (2.7x) or annotations (2.8+).
-    """
-    _apply_annotation_properties(cls)
-    _register_class(cls)
 
 
 # Classes found by register_module, so unregister_module never has to inspect
