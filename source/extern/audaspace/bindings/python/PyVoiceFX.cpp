@@ -177,9 +177,7 @@ static PyObject* aud_voice_presets(PyObject*, PyObject* args, PyObject* kwds)
 }
 
 PyDoc_STRVAR(M_aud_save_wav_doc,
-			 ".. function:: save_wav(sound, path, max_seconds=600.0)
-
-"
+			 ".. function:: save_wav(sound, path, max_seconds=600.0)\n\n"
 			 "   Writes the sound as 16-bit PCM WAV (works on the Web too, unlike Sound.write).");
 
 static PyObject* aud_save_wav(PyObject*, PyObject* args, PyObject* kwds)

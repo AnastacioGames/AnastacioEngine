@@ -154,7 +154,10 @@ class BrickNode(LogicNode):
     def draw_buttons(self, context, layout):
         layout.prop(self, "range_logic_active")
         for f in self.main:
-            layout.prop(self, f)
+            if f == "sound":
+                self.draw_sound_row(layout)
+            else:
+                layout.prop(self, f)
         extra = [f for f in self.extra if f not in self.main]
         if extra:
             # as demais opções do brick, recolhidas por padrão para o nó ficar pequeno
@@ -168,6 +171,17 @@ class BrickNode(LogicNode):
         err = self.error()
         if err:
             layout.label(err, icon="ERROR")
+
+    def draw_sound_row(self, layout):
+        """Campo Sound com gravar do microfone e Ajustar Som (anastacio_sound_record.py)."""
+        row = layout.row(align=True)
+        row.prop(self, "sound")
+        op = row.operator("sound.record_microphone", text="", icon='REC')
+        op.target = 'NODE'
+        op.tree = self.id_data.name
+        op.node = self.name
+        if self.sound:
+            row.operator("sound.adjust", text="", icon='MODIFIER').sound = self.sound.name
 
     def draw_buttons_ext(self, context, layout):
         for f in self.fields():

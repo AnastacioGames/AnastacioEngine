@@ -162,7 +162,7 @@ exceção: `microphoneState()` explica e o nível fica 0.
 | U3 | Sensor Microphone + atuador Voice (DNA/RNA/conversão/UI/versioning/logic_to_python/presets) — **código feito 2026-11-08 no branch, sem build** (`KX_MicrophoneSensor` Talking/Shout-Clap/Silence + Level Property; `KX_VoiceActuator` Record/Play/Live/Stop/Save WAV com Concluído; preset como nome no DNA e lista no RNA; versioning não precisou: tipos novos; presets "Talk to Act" e "Voice Recorder"; `PlaySound` agora devolve id da voz) | U2 |
 | U4 | Nós Logic Tree + peças UI Tree — **código feito 2026-11-08 no branch, sem build** (nós `When Talking` e `Voice` com Then; UI Tree: `Microphone Meter` no HUD e ação `Enable Microphone`; padrões no RNA para os nós; ● e ▶ ficam para a U6) | U3 |
 | U5 | Web (fase 4) + overlay + auto-marcar no export; Android (fase 5) — **código feito 2026-11-08, sem build** (`plugins/webaudio/WebMicrophone.cpp`; opção Microphone Auto/On/Off no painel Web, `--microphone` no `package-web.py`, aviso na página, `RECORD_AUDIO` + `onPermissionRequest` no APK) | U2 (U3 p/ auto-marcar) |
-| U6 | Editor: `SOUND_OT_record`, painel "Ajustar Som" com prévia, `SOUND_OT_bake_strip` | U1 |
+| U6 | Editor: gravar, painel "Ajustar Som" com prévia, aplicar edição do strip — **código feito 2026-11-08, sem build** (`bl_operators/anastacio_sound_record.py`; botões no atuador Sound, nó Sound e Sequencer) | U1 |
 
 | U7 | Cutscene e Gravação de Movimento usam as gravações (ver §7.1) | U2 (U6 p/ gravar no editor) |
 

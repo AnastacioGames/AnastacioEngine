@@ -2593,9 +2593,26 @@ static void draw_actuator_scene(uiLayout *layout, PointerRNA *ptr)
 static void draw_actuator_sound(uiLayout *layout, PointerRNA *ptr, bContext *C)
 {
 	uiLayout *row, *col;
+	PointerRNA op_ptr;
+	Object *ob = (Object *)ptr->id.data;
+	bActuator *act = (bActuator *)ptr->data;
+	ID *sound_id = (ID *)RNA_pointer_get(ptr, "sound").data;
 
-	uiTemplateID(layout, C, ptr, "sound", NULL, "SOUND_OT_open", NULL, UI_TEMPLATE_ID_FILTER_ALL);
-	if (!RNA_pointer_get(ptr, "sound").data) {
+	/* Campo do som + gravar do microfone (sound.record_microphone, anastacio_sound_record.py)
+	 * e "Ajustar Som" (corte, fade, efeito). */
+	row = uiLayoutRow(layout, false);
+	uiTemplateID(row, C, ptr, "sound", NULL, "SOUND_OT_open", NULL, UI_TEMPLATE_ID_FILTER_ALL);
+	if (WM_operatortype_find("SOUND_OT_record_microphone", true)) {
+		uiItemFullO(row, "SOUND_OT_record_microphone", "", ICON_REC, NULL, WM_OP_INVOKE_DEFAULT, 0, &op_ptr);
+		RNA_enum_set_identifier(NULL, &op_ptr, "target", "ACTUATOR");
+		RNA_string_set(&op_ptr, "object", ob->id.name + 2);
+		RNA_string_set(&op_ptr, "brick", act->name);
+	}
+	if (sound_id && WM_operatortype_find("SOUND_OT_adjust", true)) {
+		uiItemFullO(row, "SOUND_OT_adjust", "", ICON_MODIFIER, NULL, WM_OP_INVOKE_DEFAULT, 0, &op_ptr);
+		RNA_string_set(&op_ptr, "sound", sound_id->name + 2);
+	}
+	if (!sound_id) {
 		uiItemL(layout, IFACE_("Select a sound from the list or load a new one"), ICON_NONE);
 		return;
 	}
