@@ -2,7 +2,7 @@
 
 AnastacioEngine -b --factory-startup --python tools/debug/cenas/criar_cena_microfone.py -- saida.range
 
-M microfone, R gravar/parar, P tocar, 1-7 efeitos, L ao vivo (use fones), S salvar //voz.wav.
+M microfone, R gravar/parar, P tocar, 1-7 efeitos, L ao vivo (use fones), S salvar //voz.wav, D trocar microfone.
 """
 import os
 import sys
@@ -11,9 +11,9 @@ import bpy
 
 # nome, rótulo, x, y, largura, altura
 BUTTONS = (
-    ("mic", "M  Microfone", -5.0, 1.0, 5.0, 1.1),
+    ("mic", "M  Microfone", -4.9, 1.0, 4.4, 1.1),
     ("rec", "R  Gravar", 0.0, 1.0, 4.4, 1.1),
-    ("play", "P  Tocar", 5.0, 1.0, 5.0, 1.1),
+    ("play", "P  Tocar", 4.9, 1.0, 4.4, 1.1),
     ("fx1", "1 Esquilo", -5.4, -0.7, 2.5, 1.0),
     ("fx2", "2 Gigante", -1.8, -0.7, 2.5, 1.0),
     ("fx3", "3 Robo", 1.8, -0.7, 2.5, 1.0),
@@ -21,19 +21,21 @@ BUTTONS = (
     ("fx5", "5 Eco", -3.6, -2.0, 2.5, 1.0),
     ("fx6", "6 Caverna", 0.0, -2.0, 2.5, 1.0),
     ("fx7", "7 Inverso", 3.6, -2.0, 2.5, 1.0),
-    ("live", "L  Ao vivo (fones)", -3.2, -3.4, 5.8, 1.0),
-    ("save", "S  Salvar voz.wav", 3.2, -3.4, 5.8, 1.0),
+    ("live", "L  Ao vivo (fones)", -4.9, -3.4, 4.4, 1.0),
+    ("save", "S  Salvar voz.wav", 0.0, -3.4, 4.4, 1.0),
+    ("dev", "D  Trocar microfone", 4.9, -3.4, 4.4, 1.0),
 )
 
 CODE = '''import time
 
+import aud
 import Range
 from Range import logic, events, render
 
 BUTTONS = %r
 FX = {"fx1": "CHIPMUNK", "fx2": "GIANT", "fx3": "ROBOT", "fx4": "RADIO",
       "fx5": "ECHO", "fx6": "CAVE", "fx7": "REVERSE"}
-KEYS = {events.MKEY: "mic", events.RKEY: "rec", events.PKEY: "play", events.LKEY: "live", events.SKEY: "save",
+KEYS = {events.MKEY: "mic", events.RKEY: "rec", events.PKEY: "play", events.LKEY: "live", events.SKEY: "save", events.DKEY: "dev",
         events.ONEKEY: "fx1", events.TWOKEY: "fx2", events.THREEKEY: "fx3", events.FOURKEY: "fx4",
         events.FIVEKEY: "fx5", events.SIXKEY: "fx6", events.SEVENKEY: "fx7"}
 ORTHO = 16.0
@@ -45,17 +47,43 @@ ON = (0.15, 0.55, 0.30, 1.0)
 RED = (0.80, 0.12, 0.12, 1.0)
 OFF = (0.12, 0.13, 0.16, 1.0)
 
-S = {"since": 0.0, "last": 0.0, "fx": "", "msg": "Clique em Microfone ou Gravar"}
+S = {"since": 0.0, "last": 0.0, "fx": "", "msg": "Clique em Microfone ou Gravar", "dev": 0}
 
 
 def has_voice(a):
     return "voz" in a.recordings()
 
 
+def devices():
+    try:
+        return [""] + list(aud.Microphone.devices())
+    except Exception:
+        return [""]
+
+
+def device():
+    names = devices()
+    return names[S["dev"] %% len(names)]
+
+
+def device_label():
+    return device().replace("OpenAL Soft on ", "") or "padrao"
+
+
 def act(a, name):
-    if name == "mic":
+    if name == "dev":
+        if a.microphoneIsRecording():
+            S["msg"] = "Pare a gravacao antes"
+            return
+        if a.isLive():
+            a.stopLive()
+        S["dev"] += 1
+        a.microphoneStop()
+        a.microphoneStart(device())
+        S["msg"] = "Usando: " + device_label()
+    elif name == "mic":
         if a.microphoneState() in ("closed", "error"):
-            a.microphoneStart()
+            a.microphoneStart(device())
         elif not a.microphoneIsRecording() and not a.isLive():
             a.microphoneStop()
     elif name == "rec":
@@ -64,7 +92,7 @@ def act(a, name):
             S["last"] = time.time() - S["since"]
             S["msg"] = "Gravado: %%.1f s" %% S["last"]
         else:
-            a.microphoneStart()
+            a.microphoneStart(device())
             if a.microphoneRecordStart():
                 S["since"] = time.time()
                 S["msg"] = "Gravando..."
@@ -74,6 +102,7 @@ def act(a, name):
         if a.isLive():
             a.stopLive()
         else:
+            a.microphoneStart(device())
             a.playLive()
     elif not has_voice(a):
         S["msg"] = "Grave algo primeiro"
@@ -141,6 +170,7 @@ def main(cont):
     names = {"closed": "desligado", "pending": "esperando permissao", "granted": "ligado",
              "denied": "bloqueado", "error": "erro"}
     set_text(objs["Status"], "Microfone: %%s" %% names.get(state, state))
+    set_text(objs["Disp"], device_label()[:44])
     set_text(objs["Msg"], S["msg"])
 
     level = min(a.microphoneLevel() * 3.0, 1.0)
@@ -206,6 +236,7 @@ def main():
     add_text(scene, mat, "Status", "Microfone: desligado", -7.0, 3.7, 0.42, 'LEFT')
     add_text(scene, mat, "Tempo", "00:00", 7.0, 3.5, 0.9, 'RIGHT')
     add_text(scene, mat, "Msg", "", -7.0, 3.05, 0.34, 'LEFT')
+    add_text(scene, mat, "Disp", "", 0.0, 3.05, 0.3, 'LEFT')
     add_rect(scene, mesh, "NivelFundo", 0, 2.2, 0, 12.0, 0.45, (0.12, 0.13, 0.16, 1))
     add_rect(scene, mesh, "Nivel", -6.0, 2.2, 0.1, 0.001, 0.45, (0.15, 0.55, 0.30, 1))
 
