@@ -698,6 +698,67 @@ def rule_probe_volume(scene, objects):
 
 
 
+# Mirror of BL_IsAutoOccluder (BL_BlenderDataConversion.cpp), standing meshes only: what the hint counts.
+AUTO_OCCLUDER_MAX_TRIANGLES = 2048
+AUTO_OCCLUDER_MIN_SIDE = 1.5
+AUTO_OCCLUDER_MIN_AREA = 6.0
+# Below this many visible meshes the occlusion raster costs more than it saves.
+AUTO_OCCLUSION_MIN_OBJECTS = 150
+AUTO_OCCLUSION_MIN_OCCLUDERS = 8
+
+
+def _auto_occluder_candidate(ob):
+    if ob.type != 'MESH' or ob.hide_render or ob.game.physics_type not in {'STATIC', 'NO_COLLISION'}:
+        return False
+    if any(m.type in {'ARMATURE', 'MESH_DEFORM'} for m in ob.modifiers):
+        return False
+    for slot in ob.material_slots:
+        ma = slot.material
+        if ma and ma.game_settings.alpha_blend != 'OPAQUE':
+            return False
+    if not 0 < _mesh_tris(ob.data) <= AUTO_OCCLUDER_MAX_TRIANGLES:
+        return False
+    from mathutils import Vector
+    corners = [ob.matrix_world * Vector(c) for c in ob.bound_box]
+    size = [max(c[i] for c in corners) - min(c[i] for c in corners) for i in range(3)]
+    side = sorted(size)
+    # Floors are picked too, but only something standing up (wall, building) hides objects from a
+    # camera walking on the ground: the hint counts only those, so an open field does not ask for it.
+    return (side[1] >= AUTO_OCCLUDER_MIN_SIDE and side[2] * side[1] >= AUTO_OCCLUDER_MIN_AREA and
+            size[2] >= AUTO_OCCLUDER_MIN_SIDE)
+
+
+def rule_auto_occlusion(scene, objects):
+    gs = scene.game_settings
+    if gs.use_auto_occlusion and gs.use_occlusion_culling:
+        return []
+    active = _active_objects(scene, objects)
+    if any(ob.game.physics_type == 'OCCLUDER' for ob in active):
+        return []  # occluders placed by hand: the scene already chose
+    meshes = [ob for ob in active if ob.type == 'MESH' and not ob.hide_render]
+    if len(meshes) < AUTO_OCCLUSION_MIN_OBJECTS:
+        return []
+    walls = [ob for ob in meshes if _auto_occluder_candidate(ob)]
+    if len(walls) < AUTO_OCCLUSION_MIN_OCCLUDERS:
+        return []
+
+    def fix(gs=gs):
+        old = (gs.use_auto_occlusion, gs.use_occlusion_culling)
+        gs.use_auto_occlusion = True
+        gs.use_occlusion_culling = True
+
+        def revert():
+            gs.use_auto_occlusion, gs.use_occlusion_culling = old
+        return revert
+    return [Issue(
+        "auto_occlusion", scene.name, 'LOW',
+        tip_("%d wall(s) or building(s) could hide what is behind them") % len(walls),
+        tip_("Automatic Occluders (Scene > Culling) uses large opaque static meshes to skip the objects behind "
+             "them, keeping their collision, and turns itself off where it hides little. It helps most indoors "
+             "and on weak GPUs. Fix turns it on."),
+        sorted(walls, key=lambda o: o.name), fix)]
+
+
 def _trace_suggestions():
     if not _trace_path:
         return []
@@ -763,6 +824,7 @@ RULES = (
     rule_sounds,
     rule_scripts_every_frame,
     rule_probe_volume,
+    rule_auto_occlusion,
     rule_game_trace,
 )
 
