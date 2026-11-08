@@ -25,6 +25,7 @@
 extern "C" {
 #include "DNA_texture_types.h"
 #include "DNA_image_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_meshdata_types.h"
 
 #include "BKE_customdata.h"
@@ -64,6 +65,11 @@ void ImagesExporter::export_UV_Image(Image *image, bool use_copies)
 
 		ImageFormatData imageFormat;
 		BKE_imbuf_to_image_format(&imageFormat, imbuf);
+		/* DDS/KTX2 só têm leitor; gravar a cópia em PNG. */
+		if (imageFormat.imtype == R_IMF_IMTYPE_DDS) {
+			imageFormat.imtype = R_IMF_IMTYPE_PNG;
+			imageFormat.planes = (imbuf->planes == 32) ? R_IMF_PLANES_RGBA : R_IMF_PLANES_RGB;
+		}
 
 		short image_source = image->source;
 		bool  is_generated = image_source == IMA_SRC_GENERATED;
@@ -98,6 +104,7 @@ void ImagesExporter::export_UV_Image(Image *image, bool use_copies)
 
 			if (BKE_imbuf_write_as(imbuf, export_path, &imageFormat, true) == 0) {
 				fprintf(stderr, "Collada export: Cannot export image to:\n%s\n", export_path);
+				BKE_image_release_ibuf(image, imbuf, NULL);
 				return;
 			}
 			BLI_strncpy(export_path, export_file, sizeof(export_path));
@@ -120,6 +127,7 @@ void ImagesExporter::export_UV_Image(Image *image, bool use_copies)
 				if (BLI_path_cmp(source_path, export_path) != 0) {
 					if (BLI_copy(source_path, export_path) != 0) {
 						fprintf(stderr, "Collada export: Cannot copy image:\n source:%s\ndest :%s\n", source_path, export_path);
+						BKE_image_release_ibuf(image, imbuf, NULL);
 						return;
 					}
 				}
