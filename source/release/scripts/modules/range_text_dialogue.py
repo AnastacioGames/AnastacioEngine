@@ -15,6 +15,8 @@ depois passam para a próxima.  Propriedades de jogo do objeto:
 
 Trocar o texto (propriedade "Text" do objeto, Property actuator ou o nó
 Show Dialogue da UI Tree) recomeça o diálogo e mostra o objeto de novo.
+Com td_end "HIDE", mostrar o objeto de novo (visible = True) recomeça a
+mesma fala.
 """
 
 from Range import events, logic
@@ -32,6 +34,7 @@ class _State:
         self.text = None
         self.shown = 0.0
         self.done = False
+        self.hidden = False
         self.time = logic.getFrameTime()
         self.joy_down = False
 
@@ -59,6 +62,7 @@ def _finish(owner, state):
     state.done = True
     if end == "HIDE":
         owner.visible = False
+        state.hidden = True
 
 
 def main(cont):
@@ -78,6 +82,13 @@ def main(cont):
         state.text = owner.text
         state.shown = 0.0
         state.done = False
+        state.hidden = False
+        owner.page = 0
+    elif state.hidden and owner.visible:
+        # Escondido no fim e mostrado de novo com a mesma fala: recomeça.
+        state.shown = 0.0
+        state.done = False
+        state.hidden = False
         owner.page = 0
     if state.done or not owner.visible:
         return

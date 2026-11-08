@@ -945,6 +945,11 @@ def _baked_tree():
 def _auto_bake(_scene):
     """Bake automático ao apertar P e ao salvar (o export salva o arquivo):
     o jogo nunca roda com um menu velho."""
+    # Uma UI Tree só é usada pelo Node Editor: sem fake user ela some ao salvar
+    # depois que o editor mostra outra árvore.
+    for ui_tree in bpy.data.node_groups:
+        if ui_tree.bl_idname == "RangeUITree" and not ui_tree.use_fake_user:
+            ui_tree.use_fake_user = True
     tree = _baked_tree()
     if tree is None:
         return

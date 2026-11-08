@@ -525,6 +525,12 @@ class UIRuntime:
                 obj = self.scene.objects.get(name) if name else self.owner
                 if obj is not None:
                     obj[prop] = text
+                    # Mesma fala de novo: o texto não muda, então a caixa que mostra
+                    # este objeto recomeça aqui.
+                    for screen in list(self.screens.values()) + list(self.huds):
+                        for dialogue in screen.dialogues:
+                            if self.obj_for(dialogue.data) is obj:
+                                dialogue.reset()
             elif action == "PYTHON":
                 self.run_python(value)
 
