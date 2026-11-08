@@ -66,6 +66,27 @@ def device():
     return names[S["dev"] %% len(names)]
 
 
+def device_file():
+    return logic.expandPath("//mic_device.txt")
+
+
+def save_device():
+    try:
+        with open(device_file(), "w", encoding="utf-8") as f:
+            f.write(device())
+    except OSError:
+        pass
+
+
+def load_device():
+    """Volta ao microfone escolhido da última vez."""
+    try:
+        with open(device_file(), encoding="utf-8") as f:
+            S["dev"] = devices().index(f.read())
+    except (OSError, ValueError):
+        pass
+
+
 def device_label():
     return device().replace("OpenAL Soft on ", "") or "padrao"
 
@@ -78,6 +99,7 @@ def act(a, name):
         if a.isLive():
             a.stopLive()
         S["dev"] += 1
+        save_device()
         a.microphoneStop()
         a.microphoneStart(device())
         S["msg"] = "Usando: " + device_label()
@@ -137,6 +159,9 @@ def main(cont):
     a = Range.audio
     objs = cont.owner.scene.objects
     logic.mouse.visible = True
+    if "loaded" not in S:
+        S["loaded"] = True
+        load_device()
 
     hover = under_mouse()
     if logic.mouse.inputs[events.LEFTMOUSE].activated and hover:
