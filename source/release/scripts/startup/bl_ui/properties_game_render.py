@@ -254,6 +254,7 @@ class RENDER_PT_game_motion_record(RenderButtonsPanel, Panel):
         box.label(text="3. Press Rec Play and move it! F10 stops", icon='REC')
         box.label(text="Who is not marked repeats its take")
         box.prop(scene, "ae_rec_max_duration")
+        box.prop(scene, "ae_rec_voice", icon='REC')
         row = box.row()
         row.scale_y = 1.6
         row.operator("view3d.game_record", text="Rec Play", icon='REC_PLAY')

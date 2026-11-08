@@ -54,6 +54,13 @@ void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed
 /* After begin. layers: actors with a take repeat it. replaced_take: left out of that, -1 = none.
  * collide: repeating actors stay solid. watch: nothing is recorded, the takes only play. */
 void BKE_motion_record_set_layers(bool layers, bool collide, int replaced_take, bool watch);
+/* Record Voice: the game records the microphone along with the take. */
+void BKE_motion_record_set_voice(bool voice);
+bool BKE_motion_record_voice(void);
+/* Where the game leaves the WAV until the take has a name. */
+void BKE_motion_record_voice_temp_path(char *r_path, int maxlen);
+/* The WAV of a take: //sounds/take_<name>.wav next to main_path. */
+void BKE_motion_record_voice_file(const char *take_name, const char *main_path, char *r_path, int maxlen);
 bool BKE_motion_record_layers(void);
 bool BKE_motion_record_layers_collide(void);
 int BKE_motion_record_replaced_take(void);

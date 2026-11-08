@@ -194,7 +194,16 @@ class CUTSCENE_PT_event(CutsceneButtonsPanel, Panel):
             box.prop(event, "dialog_text_pt")
             box.prop(event, "dialog_text_es")
             box.prop(event, "dialog_text_ru")
-            box.prop(event, "dialog_audio_path")
+            row = box.row(align=True)
+            row.prop(event, "dialog_audio_path")
+            op = row.operator("sound.record_microphone", text="", icon='REC')
+            op.target = 'DIALOG'
+            op.sequence_index = settings.active_sequence_index
+            op.event_index = settings.active_event_index
+            if event.dialog_audio_path:
+                op = row.operator("sound.adjust", text="", icon='MODIFIER')
+                op.sequence_index = settings.active_sequence_index
+                op.event_index = settings.active_event_index
             box.prop(event, "dialog_wait")
             if event.dialog_text_object is None:
                 box.prop(event, "dialog_live")

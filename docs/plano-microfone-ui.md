@@ -164,7 +164,7 @@ exceção: `microphoneState()` explica e o nível fica 0.
 | U5 | Web (fase 4) + overlay + auto-marcar no export; Android (fase 5) — **código feito 2026-11-08, sem build** (`plugins/webaudio/WebMicrophone.cpp`; opção Microphone Auto/On/Off no painel Web, `--microphone` no `package-web.py`, aviso na página, `RECORD_AUDIO` + `onPermissionRequest` no APK) | U2 (U3 p/ auto-marcar) |
 | U6 | Editor: gravar, painel "Ajustar Som" com prévia, aplicar edição do strip — **código feito 2026-11-08, sem build** (`bl_operators/anastacio_sound_record.py`; botões no atuador Sound, nó Sound e Sequencer) | U1 |
 
-| U7 | Cutscene e Gravação de Movimento usam as gravações (ver §7.1) | U2 (U6 p/ gravar no editor) |
+| U7 | Cutscene e Rec Play usam as gravações (ver §7.1) — **código feito 2026-11-08, sem build** (● e Ajustar no evento Dialog, `slot:nome` no caminho do áudio; "Record Voice" salva `//sounds/take_NOME.wav`) | U2 (U6 p/ gravar no editor) |
 
 ### 7.1 Cutscene e Gravação de Movimento (pedido 2026-11-08)
 

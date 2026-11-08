@@ -143,7 +143,12 @@ TARGETS = (
     ('ACTUATOR', "Actuator", "Coloca no atuador Sound (object + brick)"),
     ('NODE', "Node", "Coloca no nó Sound da Logic Tree (tree + node)"),
     ('REPLACE', "Replace", "Regravar: troca o arquivo do Sound (sound)"),
+    ('DIALOG', "Cutscene Dialog", "Áudio de um evento Dialog da cutscene"),
 )
+
+
+def _dialog_event(scene, op):
+    return scene.cutscene_settings.sequences[op.sequence_index].events[op.event_index]
 
 
 def _assign(context, op, snd):
@@ -166,6 +171,9 @@ def _assign(context, op, snd):
             s.select = False
         strip.select = True
         sed.active_strip = strip
+    elif t == 'DIALOG':
+        # A cutscene toca por caminho; arquivo salvo garantido no invoke.
+        _dialog_event(context.scene, op).dialog_audio_path = snd.filepath
     elif t == 'ACTUATOR':
         ob = bpy.data.objects.get(op.object)
         act = ob.game.actuators.get(op.brick) if ob else None
@@ -196,6 +204,8 @@ class SOUND_OT_record_microphone(Operator):
     tree = StringProperty(name="Node Tree", options={'SKIP_SAVE'})
     node = StringProperty(name="Node", options={'SKIP_SAVE'})
     sound = StringProperty(name="Sound", description="Sound a regravar (Replace)", options={'SKIP_SAVE'})
+    sequence_index = IntProperty(default=-1, options={'HIDDEN', 'SKIP_SAVE'})
+    event_index = IntProperty(default=-1, options={'HIDDEN', 'SKIP_SAVE'})
     device = EnumProperty(name="Device", items=_device_items)
     countdown = IntProperty(name="Countdown", description="Contagem antes de gravar (s)",
                             default=0, min=0, max=5)
@@ -217,6 +227,9 @@ class SOUND_OT_record_microphone(Operator):
             self._area.tag_redraw()
 
     def invoke(self, context, event):
+        if self.target == 'DIALOG' and not bpy.data.filepath:
+            self.report({'ERROR'}, "Salve o arquivo antes de gravar a fala da cutscene")
+            return {'CANCELLED'}
         device = None
         if self.device != 'DEFAULT':
             for ident, name, _d in _device_items(self, context):
@@ -366,11 +379,24 @@ class SOUND_OT_adjust(_FxProps, Operator):
     bl_label = "Adjust Sound"
     bl_options = {'REGISTER', 'UNDO'}
 
+    sequence_index = IntProperty(default=-1, options={'HIDDEN', 'SKIP_SAVE'})
+    event_index = IntProperty(default=-1, options={'HIDDEN', 'SKIP_SAVE'})
+
     @classmethod
     def poll(cls, context):
         return aud is not None and hasattr(aud, "voice_fx")
 
     def invoke(self, context, event):
+        if self.event_index >= 0:
+            if not bpy.data.filepath:
+                self.report({'ERROR'}, "Salve o arquivo antes de ajustar a fala")
+                return {'CANCELLED'}
+            path = _dialog_event(context.scene, self).dialog_audio_path
+            abspath = bpy.path.abspath(path)
+            if not os.path.exists(abspath):
+                self.report({'ERROR'}, "Arquivo do áudio não encontrado: %s" % path)
+                return {'CANCELLED'}
+            self.sound = bpy.data.sounds.load(path, check_existing=True).name
         if not self.sound:
             snd = getattr(getattr(context.scene.sequence_editor, "active_strip", None), "sound", None)
             if snd is None:
@@ -424,6 +450,8 @@ class SOUND_OT_adjust(_FxProps, Operator):
             return {'CANCELLED'}
         # O arquivo antigo fica no disco; só o Sound passa a apontar para o novo.
         _repoint(snd, path, saved)
+        if self.event_index >= 0:
+            _dialog_event(context.scene, self).dialog_audio_path = snd.filepath
         self.report({'INFO'}, "Som ajustado: %s" % os.path.basename(path))
         return {'FINISHED'}
 

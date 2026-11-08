@@ -128,6 +128,9 @@ extern "C" {
 
 #include "KX_Imgui.h"
 #include "KX_DebugMode.h"
+#include "KX_AudioManager.h"
+#include "KX_Globals.h"
+#include "KX_KetsjiEngine.h"
 
 #ifdef WITH_PYTHON
 #  include "EXP_PythonCallBack.h"
@@ -898,6 +901,12 @@ bool KX_Scene::PlayMotionTake(const std::string& name, bool cutscene)
 				continue;
 			}
 			PlayMotionTakeActor(gameobj, actor, start, end, false, cutscene);
+		}
+		/* Voz gravada junto (Record Voice): mesmo instante do inicio do Take. */
+		char voice[1024];
+		BKE_motion_record_voice_file(take->name, KX_GetMainPath().c_str(), voice, sizeof(voice));
+		if (BLI_exists(voice) && KX_GetActiveEngine()->GetAudioManager()) {
+			KX_GetActiveEngine()->GetAudioManager()->PlayFile(voice);
 		}
 		return true;
 	}

@@ -112,8 +112,7 @@ public:
 	 * Aberto sob demanda. StopAll() (troca de cena/música) não fecha: só MicrophoneStop()
 	 * sem usuários ou o fim do jogo. poll() roda em Update(). */
 
-	/// Liga o microfone (idempotente). 
-eturn false se não abriu (ver MicrophoneState()).
+	/// Liga o microfone (idempotente). Retorna false se não abriu (ver MicrophoneState()).
 	bool MicrophoneStart(const std::string& device = "");
 	/// Desliga se nenhum sensor/atuador estiver usando (MicrophoneAcquire).
 	void MicrophoneStop();
@@ -127,8 +126,7 @@ eturn false se não abriu (ver MicrophoneState()).
 	float MicrophonePeak() const;
 	int MicrophoneDropped() const;
 	bool MicrophoneRecordStart();
-	/// Para a gravação e guarda em  slot (vazio = "last"). 
-eturn false se não gravava.
+	/// Para a gravação e guarda em  slot (vazio = "last"). Retorna false se não gravava.
 	bool MicrophoneRecordStop(const std::string& slot);
 	bool MicrophoneIsRecording() const;
 	float MicrophoneRecordingSeconds() const;
@@ -141,18 +139,18 @@ eturn false se não gravava.
 	void SetRecording(const std::string& slot, void *sound);
 	bool RemoveRecording(const std::string& slot);
 	std::vector<std::string> GetRecordingNames() const;
-	/// WAV PCM16. Caminho relativo: pasta do jogo (Web: /saves). 
-eturn false em erro.
+	/// WAV PCM16. Caminho relativo: pasta do jogo (Web: /saves). Retorna false em erro.
 	bool SaveRecording(const std::string& slot, const std::string& path);
 
 	/** Toca um som (AUD_Sound*) com preset de voz, volume e, opcional, o reverb da área.
-	 * 
-eturn false se o preset não existe ou não pode tocar. */
+	 * Retorna false se o preset não existe ou não pode tocar. */
 	unsigned int PlaySound(void *sound, const std::string& preset, float amount, float volume, bool reverb);
 	unsigned int PlayRecording(const std::string& slot, const std::string& preset, float amount, float volume, bool reverb);
 	/// Voz ao vivo com efeito (liga o microfone). Uma só: chamar de novo troca o efeito.
 	bool PlayLive(const std::string& preset, float amount, float volume, bool reverb);
 	void StopLive();
+	/// Toca um WAV por caminho absoluto (voz de um Take do Rec Play); 0 = falhou.
+	unsigned int PlayFile(const std::string& path);
 	bool IsLive() const;
 	/// Para o atuador Voice: id devolvido por PlaySound/PlayRecording (0 = falhou).
 	bool IsVoicePlaying(unsigned int id) const;
@@ -227,6 +225,10 @@ private:
 	/// Índice em m_voiceModule->voices da voz ao vivo, -1 sem.
 	int m_liveVoice;
 	unsigned int m_nextVoiceId;
+	/// Rec Play com "Record Voice": gravando desde o fim da contagem.
+	bool m_recPlayVoice;
+	void UpdateRecPlayVoice();
+	void FinishRecPlayVoice();
 	void UpdateMicrophoneVoices();
 	void StopMicrophoneVoices();
 	void CloseMicrophone();

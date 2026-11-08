@@ -53,6 +53,7 @@ typedef float sample_t;
 #include "DNA_world_types.h"
 
 #include "BLI_blenlib.h"
+#include "BKE_motion_record.h"
 #include "PIL_time.h"
 
 #include "CM_Message.h"
@@ -184,6 +185,7 @@ KX_AudioManager::KX_AudioManager(bool enabled)
 
 KX_AudioManager::~KX_AudioManager()
 {
+	FinishRecPlayVoice();
 	StopAll();
 	CloseMicrophone();
 #ifdef WITH_AUDASPACE
@@ -535,6 +537,7 @@ void KX_AudioManager::Update()
 	const double now = PIL_check_seconds_timer();
 	const float dt = (m_lastUpdate > 0.0) ? (float)std::min(std::max(now - m_lastUpdate, 0.0), 0.1) : 0.0f;
 	m_lastUpdate = now;
+	UpdateRecPlayVoice();
 
 	// Events waiting for their time (thunder after the flash).
 	for (unsigned int i = 0; i < m_delayedEvents.size();) {
@@ -1019,6 +1022,49 @@ void KX_AudioManager::StopMicrophoneVoices()
 	}
 	m_voiceModule->voices.clear();
 	m_liveVoice = -1;
+}
+
+void KX_AudioManager::UpdateRecPlayVoice()
+{
+	if (m_recPlayVoice || !BKE_motion_record_voice() || !BKE_motion_record_is_active() ||
+	    BKE_motion_record_is_watch() || BKE_motion_record_countdown() > 0.0) {
+		return;
+	}
+	m_recPlayVoice = true;
+	if (!MicrophoneStart() || !MicrophoneRecordStart()) {
+		CM_Warning("Rec Play: microphone did not start, the take has no voice");
+		m_recPlayVoice = false;
+	}
+}
+
+void KX_AudioManager::FinishRecPlayVoice()
+{
+	if (!m_recPlayVoice) {
+		return;
+	}
+	m_recPlayVoice = false;
+	/* O editor leva o arquivo para //sounds quando o Take ganha nome. */
+	char path[1024];
+	BKE_motion_record_voice_temp_path(path, sizeof(path));
+	const std::string slot = "__recplay_voice";
+	if (MicrophoneRecordStop(slot)) {
+		SaveRecording(slot, path);
+	}
+}
+
+unsigned int KX_AudioManager::PlayFile(const std::string& path)
+{
+#ifdef WITH_AUDASPACE
+	AUD_Sound *sound = AUD_Sound_file(path.c_str());
+	if (!sound) {
+		return 0;
+	}
+	const unsigned int id = PlaySound(sound, "NONE", 1.0f, 1.0f, false);
+	AUD_Sound_free(sound);
+	return id;
+#else
+	return 0;
+#endif
 }
 
 void KX_AudioManager::CloseMicrophone()

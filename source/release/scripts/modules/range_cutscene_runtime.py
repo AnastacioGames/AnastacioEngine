@@ -122,6 +122,13 @@ def _play_voice(path):
     _stop_voice()
     if not path:
         return
+    if path.startswith("slot:"):  # gravação feita no jogo (Range.audio.recordings)
+        try:
+            import Range
+            Range.audio.playVoice(path[5:])
+        except Exception as exc:
+            print("[cutscene] voz não tocou (%s): %s" % (path, exc))
+        return
     try:
         import aud
         full = logic.expandPath(path)

@@ -34,6 +34,7 @@
 
 #include "MEM_guardedalloc.h"
 
+#include "BLI_fileops.h"
 #include "BLI_listbase.h"
 #include "BLI_math.h"
 #include "BLI_string.h"
@@ -179,6 +180,7 @@ bool view3d_motion_record_begin(Scene *scene, ReportList *reports, bool watch, b
 	BKE_motion_record_set_layers(
 	        RNA_boolean_get(&scene_ptr, "ae_rec_playback_layers"), RNA_boolean_get(&scene_ptr, "ae_rec_playback_collision"),
 	        replace ? RNA_int_get(&scene_ptr, "ae_rec_take_index") : -1, false);
+	BKE_motion_record_set_voice(RNA_boolean_get(&scene_ptr, "ae_rec_voice"));
 	return true;
 }
 
@@ -542,6 +544,28 @@ bool view3d_motion_record_finish(bContext *C, Scene *scene, ReportList *reports)
 	}
 	if (created && replaced >= 0) {
 		motion_take_remove(C, replaced);
+	}
+	{
+		/* Voz gravada junto: o jogo deixou no temporario, aqui o Take ja tem nome. */
+		char temp[FILE_MAX];
+		BKE_motion_record_voice_temp_path(temp, sizeof(temp));
+		if (BLI_exists(temp)) {
+			if (created && bmain->name[0]) {
+				char dest[FILE_MAX];
+				BKE_motion_record_voice_file(take->name, bmain->name, dest, sizeof(dest));
+				BLI_make_existing_file(dest);
+				if (BLI_exists(dest)) {
+					BLI_delete(dest, false, false);
+				}
+				if (BLI_copy(temp, dest) != 0) {
+					BKE_report(reports, RPT_WARNING, "Rec Play: could not save the voice file");
+				}
+			}
+			else if (created) {
+				BKE_report(reports, RPT_WARNING, "Rec Play: save the file first to keep the voice");
+			}
+			BLI_delete(temp, false, false);
+		}
 	}
 	BKE_motion_record_free();
 

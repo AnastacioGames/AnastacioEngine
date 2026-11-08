@@ -178,6 +178,8 @@ classes = (SCENE_UL_rec_takes, SCENE_OT_rec_take_remove, SCENE_OT_rec_take_use,
 
 def register_props():
     S = bpy.types.Scene
+    S.ae_rec_voice = BoolProperty(name="Record Voice", default=False,
+                                  description="Grava o microfone junto; o Take toca a voz (//sounds/take_NOME.wav)")
     S.ae_rec_take_index = IntProperty(name="Active Take", default=0, min=0)
     S.ae_rec_take_counter = IntProperty(default=0, options={'HIDDEN'})
     S.ae_rec_track_counter = IntProperty(default=0, options={'HIDDEN'})
