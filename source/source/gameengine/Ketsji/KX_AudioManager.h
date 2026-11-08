@@ -148,12 +148,15 @@ eturn false em erro.
 	/** Toca um som (AUD_Sound*) com preset de voz, volume e, opcional, o reverb da área.
 	 * 
 eturn false se o preset não existe ou não pode tocar. */
-	bool PlaySound(void *sound, const std::string& preset, float amount, float volume, bool reverb);
-	bool PlayRecording(const std::string& slot, const std::string& preset, float amount, float volume, bool reverb);
+	unsigned int PlaySound(void *sound, const std::string& preset, float amount, float volume, bool reverb);
+	unsigned int PlayRecording(const std::string& slot, const std::string& preset, float amount, float volume, bool reverb);
 	/// Voz ao vivo com efeito (liga o microfone). Uma só: chamar de novo troca o efeito.
 	bool PlayLive(const std::string& preset, float amount, float volume, bool reverb);
 	void StopLive();
 	bool IsLive() const;
+	/// Para o atuador Voice: id devolvido por PlaySound/PlayRecording (0 = falhou).
+	bool IsVoicePlaying(unsigned int id) const;
+	void StopVoiceById(unsigned int id);
 
 private:
 	struct Sound;
@@ -223,6 +226,7 @@ private:
 	std::unique_ptr<Module> m_voiceModule;
 	/// Índice em m_voiceModule->voices da voz ao vivo, -1 sem.
 	int m_liveVoice;
+	unsigned int m_nextVoiceId;
 	void UpdateMicrophoneVoices();
 	void StopMicrophoneVoices();
 	void CloseMicrophone();

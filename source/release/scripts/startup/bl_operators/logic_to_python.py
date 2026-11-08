@@ -329,6 +329,9 @@ def _sensor_expr(ob, sens, key=None):
                                                           A("Distance", sens.distance), A("Angle", sens.angle))
     elif t == 'VR_HEAD':
         expr = "self._vr_head(%r, %r, %s, %s)" % (key, sens.mode, A("Angle", sens.angle), A("Time", sens.time))
+    elif t == 'MICROPHONE':
+        expr = "self._microphone(%r, %r, %s, %s, %r, own=ob)" % (key, sens.mode, A("Threshold", sens.threshold),
+                                                              A("Hold", sens.hold), sens.property)
     elif t == 'RAY' and sens.axis == 'GAZE':
         mask = sum(1 << i for i, on in enumerate(sens.mask) if on)
         mat = sens.ray_type != 'PROPERTY' and bool(sens.material)
@@ -802,6 +805,8 @@ def _actuator_code(ob, act):
         return _wait_code(act)
     if t == 'VIDEO':
         return _video_code(act)
+    if t == 'VOICE':
+        return _voice_code(act)
     if t == 'VIBRATION':
         return ["self._vibrate(%s, %s, %s, %s, %s)" % (
             _act_arg("Joystick", act.joy_index), act.mode == 'PLAY', _act_arg("Strength Left", act.joy_strength_left),
@@ -811,7 +816,7 @@ def _actuator_code(ob, act):
 
 def _finishes(act):
     """Actuators cujo termino o conversor sabe reproduzir (sensor Actuator no modo Concluido)."""
-    return act.type in {'WAIT', 'VIDEO'}
+    return act.type in {'WAIT', 'VIDEO'} or (act.type == 'VOICE' and act.mode in {'PLAY', 'RECORD'})
 
 
 def _wait_code(act):
@@ -836,6 +841,22 @@ def _video_code(act):
     return ["self._video(%r, %s, %s, %s, %d, %s, %s, own=ob)" % (
         key, _FIRE, _LIVE, _act_arg("Object", act.object.name if act.object else ""), _VIDEO_MODES[act.mode],
         _act_arg("Seconds", act.seconds), _act_arg("Relative", act.use_relative))], False
+
+
+_VOICE_MODES = {'RECORD': 0, 'PLAY': 1, 'LIVE': 2, 'STOP': 3, 'SAVE': 4}
+
+
+def _voice_code(act):
+    # KX_VoiceActuator: grava/toca/ao vivo pelo Range.audio; Play e Record terminam (Concluido).
+    key = "voi:" + _ACT_LABEL[0]
+    _ACT_ALWAYS[0] = True
+    _ACT_STATE[0] = "%r in self._ticks" % key
+    _ACT_DONE[0] = "self._ticks.pop(%r, False)" % ("done:" + key)
+    A = _act_arg
+    return ["self._voice(%r, %s, %s, %d, %s, %s, %s, %s, %s, %s)" % (
+        key, _ON, _LIVE, _VOICE_MODES[act.mode], A("Recording", act.slot), A("Effect", act.effect),
+        A("Amount", act.amount), A("Volume", act.volume), A("Max Seconds", act.max_seconds),
+        A("Area Reverb", act.use_reverb))], False
 
 
 def _runtime_property_code(act):
@@ -2107,6 +2128,93 @@ _EXTRA["_hold"] = '''
         t = self._prev.get(key, 0.0) + 1.0 / max(logic.getLogicTicRate(), 1.0) if active else 0.0
         self._prev[key] = t
         return active and t + 1e-4 >= time
+'''
+_EXTRA["_microphone"] = '''
+    def _microphone(self, key, mode, threshold, hold, prop, own=None):
+        """Sensor Microphone (KX_MicrophoneSensor): falando, pico (palma/grito) ou silencio."""
+        from Range import audio
+        mics = self.__dict__.setdefault("_mic", {})
+        st = mics.get(key)
+        if st is None:
+            # Liga o microfone uma vez (na Web so depois de um clique/toque).
+            audio.microphoneStart()
+            st = mics[key] = {"quiet": 0.0, "armed": True, "on": False}
+        level, peak = audio.microphoneLevel(), audio.microphonePeak()
+        ob = own or self.object
+        if prop and prop in ob:
+            ob[prop] = level
+        if level > threshold:
+            st["quiet"] = 0.0
+        else:
+            st["quiet"] += 1.0 / max(logic.getLogicTicRate(), 1.0)
+        if mode == 'TALKING':
+            st["on"] = level > threshold or (st["on"] and st["quiet"] < hold)
+        elif mode == 'PEAK':
+            st["on"] = st["armed"] and peak > threshold
+            if st["on"]:
+                st["armed"] = False
+            elif peak < threshold * 0.7:
+                st["armed"] = True
+        else:
+            st["on"] = st["quiet"] >= hold
+        return st["on"]
+'''
+_EXTRA["_voice"] = '''
+    def _voice(self, key, on, live, mode, slot, effect, amount, volume, max_seconds, reverb):
+        """Voice actuator (KX_VoiceActuator): 0 grava, 1 toca, 2 ao vivo, 3 para, 4 salva WAV."""
+        from Range import audio
+        was = self._ticks.get("on:" + key, False)
+        self._ticks["on:" + key] = on
+        fire, off = on and not was, was and not on
+        st = self._ticks.get(key)
+        if st is not None and not live:
+            # Saiu do estado: a gravacao fica guardada, o ao vivo para.
+            if mode == 0:
+                audio.microphoneRecordStop(slot)
+            elif mode == 2:
+                audio.stopLive()
+            del self._ticks[key]
+            return
+        if mode == 0:
+            if fire and st is None and audio.microphoneRecordStart():
+                self._ticks[key] = st = True
+            if st is None:
+                return
+            sec = audio.microphoneRecordingSeconds()
+            if (max_seconds > 0.0 and sec >= max_seconds) or (max_seconds <= 0.0 and off)                     or not audio.microphoneIsRecording():
+                audio.microphoneRecordStop(slot)
+                del self._ticks[key]
+                self._ticks["done:" + key] = True
+        elif mode == 1:
+            if fire:
+                snd = audio.recording(slot)
+                st = None
+                if snd is not None:
+                    st = (audio.voiceFx(snd, effect, amount), logic.getRealTime())
+                    audio.playVoice(snd, effect, amount, volume, reverb)
+                self._ticks.pop(key, None)
+                if st is not None:
+                    self._ticks[key] = st
+            if st is None:
+                return
+            fx, t0 = st
+            import aud
+            length = aud.duration(fx) if fx is not None else 0.0
+            if length >= 0.0 and logic.getRealTime() - t0 >= length:
+                del self._ticks[key]
+                self._ticks["done:" + key] = True
+        elif mode == 2:
+            if fire and audio.playLive(effect, amount, volume, reverb):
+                self._ticks[key] = True
+            elif off and st is not None:
+                audio.stopLive()
+                del self._ticks[key]
+        elif mode == 3:
+            if fire:
+                audio.stopLive()
+        elif mode == 4:
+            if fire and not audio.microphoneSave(slot, slot + ".wav"):
+                print("Voice actuator: could not save the recording %r" % slot)
 '''
 _EXTRA["_vr_head"] = '''
     def _vr_head(self, key, mode, angle, time):

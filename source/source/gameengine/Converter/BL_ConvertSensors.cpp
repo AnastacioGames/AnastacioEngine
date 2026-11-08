@@ -78,6 +78,7 @@
 #include "KX_RaySensor.h"
 #include "KX_MovementSensor.h"
 #include "KX_VRHeadSensor.h"
+#include "KX_MicrophoneSensor.h"
 #include "SCA_EventManager.h"
 #include "SCA_LogicManager.h"
 #include "KX_Scene.h"
@@ -648,6 +649,15 @@ void BL_ConvertSensors(struct Object *blenderobject,
 					SCA_EventManager *eventmgr = logicmgr->FindEventManager(SCA_EventManager::BASIC_EVENTMGR);
 					if (bvrhead && eventmgr) {
 						gamesensor = new KX_VRHeadSensor(eventmgr, gameobj, kxscene, bvrhead->mode, bvrhead->angle, bvrhead->time);
+					}
+					break;
+				}
+				case SENS_MICROPHONE:
+				{
+					bMicrophoneSensor *bmic = (bMicrophoneSensor *)sens->data;
+					SCA_EventManager *eventmgr = logicmgr->FindEventManager(SCA_EventManager::BASIC_EVENTMGR);
+					if (bmic && eventmgr) {
+						gamesensor = new KX_MicrophoneSensor(eventmgr, gameobj, bmic->mode, bmic->threshold, bmic->hold, bmic->prop);
 					}
 					break;
 				}

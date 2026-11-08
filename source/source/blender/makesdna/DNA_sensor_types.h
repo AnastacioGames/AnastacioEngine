@@ -229,6 +229,21 @@ typedef struct bVRHeadSensor {
 	float pad2;
 } bVRHeadSensor;
 
+typedef struct bMicrophoneSensor {
+	short mode;       /* SENS_MIC_* */
+	short flag;       /* SENS_MIC_* flags */
+	float threshold;  /* 0..1 voice level */
+	float hold;       /* seconds: talking keeps positive / silence needed */
+	float pad;
+	char prop[64];    /* optional property that receives the level every tick */
+} bMicrophoneSensor;
+
+/* bMicrophoneSensor->mode */
+#define SENS_MIC_TALKING   0 /* level above threshold (with hold) */
+#define SENS_MIC_PEAK      1 /* one pulse when the peak passes threshold (clap, blow) */
+#define SENS_MIC_SILENCE   2 /* positive after hold seconds below threshold */
+#define SENS_MIC_KEYWORD   3 /* reserved */
+
 /* bVRHeadSensor->mode */
 #define SENS_VRHEAD_LOOK_UP     0
 #define SENS_VRHEAD_LOOK_DOWN   1
@@ -325,6 +340,7 @@ typedef struct bVRHeadSensor {
 #define SENS_MOVEMENT		 15
 #define SENS_ANIMATIONEVENT  16
 #define SENS_VR_HEAD         17
+#define SENS_MICROPHONE      18
 
 /* sensor->flag */
 #define SENS_SHOW		1

@@ -49,6 +49,7 @@ static const EnumPropertyItem sensor_type_items[] = {
 	{SENS_JOYSTICK, "JOYSTICK", ICON_NDOF_DOM, "Joystick", ""},
 	{SENS_KEYBOARD, "KEYBOARD", ICON_FONT_DATA, "Keyboard", ""},
 	{SENS_MESSAGE, "MESSAGE", ICON_TEXT, "Message", ""},
+	{SENS_MICROPHONE, "MICROPHONE", ICON_REC, "Microphone", ""},
 	{SENS_MOUSE, "MOUSE", ICON_RESTRICT_SELECT_OFF, "Mouse", ""},
 	{SENS_NEAR, "NEAR", ICON_PROP_ON, "Near", ""},
 	{SENS_PROPERTY, "PROPERTY", ICON_BUTS, "Property", ""},
@@ -174,6 +175,8 @@ static StructRNA *rna_Sensor_refine(struct PointerRNA *ptr)
 			return &RNA_DelaySensor;
 		case SENS_VR_HEAD:
 			return &RNA_VRHeadSensor;
+		case SENS_MICROPHONE:
+			return &RNA_MicrophoneSensor;
 		default:
 			return &RNA_Sensor;
 	}
@@ -238,6 +241,7 @@ const EnumPropertyItem *rna_Sensor_type_itemf(bContext *C, PointerRNA *ptr, Prop
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_JOYSTICK);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_KEYBOARD);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_MESSAGE);
+	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_MICROPHONE);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_MOUSE);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_MOVEMENT);
 	RNA_enum_items_add_value(&item, &totitem, sensor_type_items, SENS_NEAR);
@@ -1168,6 +1172,47 @@ static void rna_def_vr_head_sensor(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
+static void rna_def_microphone_sensor(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem mode_items[] = {
+		{SENS_MIC_TALKING, "TALKING", 0, "Talking", "Positive while the voice is above the threshold (stays on for Hold seconds)"},
+		{SENS_MIC_PEAK, "PEAK", 0, "Shout / Clap", "One pulse when a loud sound passes the threshold (clap, shout, blow)"},
+		{SENS_MIC_SILENCE, "SILENCE", 0, "Silence", "Positive after Hold seconds below the threshold"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "MicrophoneSensor", "Sensor");
+	RNA_def_struct_ui_text(srna, "Microphone Sensor",
+	                       "Sensor that listens to the microphone (turns it on by itself; on the Web after a click)");
+	RNA_def_struct_sdna_from(srna, "bMicrophoneSensor", "data");
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, mode_items);
+	RNA_def_property_ui_text(prop, "Mode", "What to listen for");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "threshold", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Threshold", "Voice level (0..1) that counts as sound");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "hold", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_range(prop, 0.0f, 60.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 10.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Hold",
+	                         "Seconds: Talking stays on this long after the voice stops; Silence needs this long quiet");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "property", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "prop");
+	RNA_def_property_ui_text(prop, "Level Property",
+	                         "Optional float property that receives the voice level (0..1) every frame");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+}
+
 static void rna_def_message_sensor(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -1328,6 +1373,7 @@ void RNA_def_sensor(BlenderRNA *brna)
 	rna_def_ray_sensor(brna);
 	rna_def_movement_sensor(brna);
 	rna_def_vr_head_sensor(brna);
+	rna_def_microphone_sensor(brna);
 	rna_def_message_sensor(brna);
 	rna_def_joystick_sensor(brna);
 }

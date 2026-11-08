@@ -1231,6 +1231,10 @@ bool ED_logic_actuator_reports_finish(const bActuator *act)
 		/* without Self Terminated it steers until a negative pulse */
 		return act->data && (((bSteeringActuator *)act->data)->flag & ACT_STEERING_SELFTERMINATED);
 	}
+	if (act->type == ACT_VOICE) {
+		/* Play finishes at the end of the recording; Record with Max Seconds when the time is up */
+		return act->data && ELEM(((bVoiceActuator *)act->data)->mode, ACT_VOICE_PLAY, ACT_VOICE_RECORD);
+	}
 	return ELEM(act->type, ACT_WAIT, ACT_ACTION, ACT_SOUND, ACT_VIDEO);
 }
 

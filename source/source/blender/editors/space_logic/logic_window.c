@@ -374,6 +374,8 @@ static const char *sensor_name(int type)
 		return N_("Joystick");
 	case SENS_VR_HEAD:
 		return N_("VR Head");
+	case SENS_MICROPHONE:
+		return N_("Microphone");
 	}
 	return N_("Unknown");
 }
@@ -452,6 +454,8 @@ static const char *actuator_name(int type)
 		return N_("Wait");
 	case ACT_VIDEO:
 		return N_("Video");
+	case ACT_VOICE:
+		return N_("Voice");
 	}
 	return N_("Unknown");
 }
@@ -1409,6 +1413,22 @@ static void draw_sensor_vr_head(uiLayout *layout, PointerRNA *ptr)
 	}
 }
 
+static void draw_sensor_microphone(uiLayout *layout, PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	PointerRNA settings_ptr;
+	uiLayout *row;
+
+	uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
+	row = uiLayoutRow(layout, false);
+	uiItemR(row, ptr, "threshold", 0, NULL, ICON_NONE);
+	if (RNA_enum_get(ptr, "mode") != SENS_MIC_PEAK) {
+		uiItemR(row, ptr, "hold", 0, NULL, ICON_NONE);
+	}
+	RNA_pointer_create((ID *)ob, &RNA_GameObjectSettings, ob, &settings_ptr);
+	uiItemPointerR(layout, ptr, "property", &settings_ptr, "properties", NULL, ICON_NONE);
+}
+
 static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 {
 	uiLayout *box;
@@ -1473,6 +1493,9 @@ static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 			break;
 		case SENS_VR_HEAD:
 			draw_sensor_vr_head(box, ptr);
+			break;
+		case SENS_MICROPHONE:
+			draw_sensor_microphone(box, ptr);
 			break;
 	}
 }
@@ -2666,6 +2689,29 @@ static void draw_actuator_video(uiLayout *layout, PointerRNA *ptr)
 	}
 }
 
+static void draw_actuator_voice(uiLayout *layout, PointerRNA *ptr)
+{
+	uiLayout *row;
+	const int mode = RNA_enum_get(ptr, "mode");
+
+	row = uiLayoutRow(layout, false);
+	uiItemR(row, ptr, "mode", 0, "", ICON_NONE);
+	if (mode != ACT_VOICE_LIVE && mode != ACT_VOICE_STOP) {
+		uiItemR(row, ptr, "slot", 0, "", ICON_NONE);
+	}
+	if (mode == ACT_VOICE_RECORD) {
+		uiItemR(layout, ptr, "max_seconds", 0, NULL, ICON_NONE);
+	}
+	else if (mode == ACT_VOICE_PLAY || mode == ACT_VOICE_LIVE) {
+		row = uiLayoutRow(layout, false);
+		uiItemR(row, ptr, "effect", 0, "", ICON_NONE);
+		uiItemR(row, ptr, "amount", 0, NULL, ICON_NONE);
+		row = uiLayoutRow(layout, false);
+		uiItemR(row, ptr, "volume", 0, NULL, ICON_NONE);
+		uiItemR(row, ptr, "use_reverb", 0, NULL, ICON_NONE);
+	}
+}
+
 static void draw_actuator_visibility(uiLayout *layout, PointerRNA *ptr)
 {
 	uiLayout *row;
@@ -2858,6 +2904,9 @@ static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
 			break;
 		case ACT_VIDEO:
 			draw_actuator_video(box, ptr);
+			break;
+		case ACT_VOICE:
+			draw_actuator_voice(box, ptr);
 			break;
 	}
 }

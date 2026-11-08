@@ -63,11 +63,36 @@ static const EnumPropertyItem actuator_type_items[] = {
 	{ACT_VIBRATION, "VIBRATION", ICON_FORCE_HARMONIC, "Vibration", ""},
 	{ACT_VISIBILITY, "VISIBILITY", ICON_RESTRICT_VIEW_OFF, "Visibility", ""},
 	{ACT_VIDEO, "VIDEO", ICON_FILE_MOVIE, "Video", ""},
+	{ACT_VOICE, "VOICE", ICON_REC, "Voice", ""},
 	{ACT_WAIT, "WAIT", ICON_TIME, "Wait", ""},
 	{0, NULL, 0, NULL, NULL}
 };
 
 #ifdef RNA_RUNTIME
+
+#include "BLI_string.h"
+
+/* Voice actuator: the preset is kept as a name (VoiceFX), shown as a list. */
+static const char *rna_voice_preset_names[] = {"NONE", "CHIPMUNK", "GIANT", "ROBOT", "RADIO", "ECHO", "CAVE", "REVERSE", NULL};
+
+static int rna_VoiceActuator_preset_get(PointerRNA *ptr)
+{
+	bVoiceActuator *va = (bVoiceActuator *)(((bActuator *)ptr->data)->data);
+	for (int i = 0; rna_voice_preset_names[i]; i++) {
+		if (STREQ(va->preset, rna_voice_preset_names[i])) {
+			return i;
+		}
+	}
+	return 0;
+}
+
+static void rna_VoiceActuator_preset_set(PointerRNA *ptr, int value)
+{
+	bVoiceActuator *va = (bVoiceActuator *)(((bActuator *)ptr->data)->data);
+	if (value >= 0 && value < (int)(ARRAY_SIZE(rna_voice_preset_names) - 1)) {
+		BLI_strncpy(va->preset, rna_voice_preset_names[value], sizeof(va->preset));
+	}
+}
 
 #include "BKE_sca.h"
 
@@ -115,6 +140,8 @@ static StructRNA *rna_Actuator_refine(struct PointerRNA *ptr)
 			return &RNA_WaitActuator;
 		case ACT_VIDEO:
 			return &RNA_VideoActuator;
+		case ACT_VOICE:
+			return &RNA_VoiceActuator;
 		case ACT_2DFILTER:
 			return &RNA_Filter2DActuator;
 		case ACT_PARENT:
@@ -537,6 +564,7 @@ const EnumPropertyItem *rna_Actuator_type_itemf(bContext *C, PointerRNA *ptr, Pr
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VIBRATION);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VIDEO);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VISIBILITY);
+	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_VOICE);
 	RNA_enum_items_add_value(&item, &totitem, actuator_type_items, ACT_WAIT);
 
 	rna_logic_type_items_icons(C, item, totitem);
@@ -2351,6 +2379,76 @@ static void rna_def_video_actuator(BlenderRNA *brna)
 	RNA_def_property_update(prop, NC_LOGIC, NULL);
 }
 
+static void rna_def_voice_actuator(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	static const EnumPropertyItem prop_mode_items[] = {
+		{ACT_VOICE_RECORD, "RECORD", 0, "Record", "Record the microphone while the sensor is on (or until Max Seconds)"},
+		{ACT_VOICE_PLAY, "PLAY", 0, "Play Recording", "Play the recording with the effect; finishes when it ends"},
+		{ACT_VOICE_LIVE, "LIVE", 0, "Live", "Hear the microphone with the effect while the sensor is on (use headphones)"},
+		{ACT_VOICE_STOP, "STOP", 0, "Stop", "Stop the live voice"},
+		{ACT_VOICE_SAVE, "SAVE", 0, "Save WAV", "Save the recording as <name>.wav in the game folder (Web: saves)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	/* Same order as rna_voice_preset_names. */
+	static const EnumPropertyItem prop_preset_items[] = {
+		{0, "NONE", 0, "None", "The voice as it is"},
+		{1, "CHIPMUNK", 0, "Chipmunk", "Higher, faster voice"},
+		{2, "GIANT", 0, "Giant", "Deep, slow voice"},
+		{3, "ROBOT", 0, "Robot", "Metallic voice"},
+		{4, "RADIO", 0, "Radio", "Thin voice, like a walkie-talkie"},
+		{5, "ECHO", 0, "Echo", "Repeats fading away"},
+		{6, "CAVE", 0, "Cave", "Many short echoes"},
+		{7, "REVERSE", 0, "Reverse", "Backwards (recordings only)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+
+	srna = RNA_def_struct(brna, "VoiceActuator", "Actuator");
+	RNA_def_struct_ui_text(srna, "Voice Actuator", "Record the microphone and play voices with effects");
+	RNA_def_struct_sdna_from(srna, "bVoiceActuator", "data");
+
+	prop = RNA_def_property(srna, "mode", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, prop_mode_items);
+	RNA_def_property_ui_text(prop, "Mode", "");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "slot", PROP_STRING, PROP_NONE);
+	RNA_def_property_ui_text(prop, "Recording",
+	                         "Name of the recording (the same names as Range.audio.recording())");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "effect", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_items(prop, prop_preset_items);
+	RNA_def_property_enum_funcs(prop, "rna_VoiceActuator_preset_get", "rna_VoiceActuator_preset_set", NULL);
+	RNA_def_property_ui_text(prop, "Effect", "Voice effect");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "amount", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Amount", "Strength of the effect");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "volume", PROP_FLOAT, PROP_NONE);
+	RNA_def_property_range(prop, 0.0f, 4.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 2.0f, 10, 2);
+	RNA_def_property_ui_text(prop, "Volume", "");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "max_seconds", PROP_FLOAT, PROP_TIME);
+	RNA_def_property_range(prop, 0.0f, 600.0f);
+	RNA_def_property_ui_range(prop, 0.0f, 60.0f, 10, 1);
+	RNA_def_property_ui_text(prop, "Max Seconds", "Record: stop by itself after this time (0: only when the sensor turns off)");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+
+	prop = RNA_def_property(srna, "use_reverb", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", ACT_VOICE_REVERB);
+	RNA_def_property_ui_text(prop, "Area Reverb", "Use the reverb of the area / World Sound");
+	RNA_def_property_update(prop, NC_LOGIC, NULL);
+}
+
 static void rna_def_twodfilter_actuator(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -2815,6 +2913,7 @@ void RNA_def_actuator(BlenderRNA *brna)
 	rna_def_visibility_actuator(brna);
 	rna_def_wait_actuator(brna);
 	rna_def_video_actuator(brna);
+	rna_def_voice_actuator(brna);
 	rna_def_twodfilter_actuator(brna);
 	rna_def_parent_actuator(brna);
 	rna_def_state_actuator(brna);

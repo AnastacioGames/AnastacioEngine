@@ -103,6 +103,8 @@ struct KX_AudioManager::Voice
 	float reverbInfluence;
 	/// Vozes do microfone/gravações: recebe o reverb da área (as dos módulos usam Module::useReverb).
 	bool wantReverb = false;
+	/// PlaySound: number given back to the caller (0 for the World Sound voices).
+	unsigned int id = 0;
 #ifdef WITH_AUDASPACE
 	AUD_Handle *handle;
 #endif
@@ -164,7 +166,8 @@ KX_AudioManager::KX_AudioManager(bool enabled)
 	m_microphoneByScript(false),
 	m_microphoneUsers(0),
 	m_voiceModule(new Module()),
-	m_liveVoice(-1)
+	m_liveVoice(-1),
+	m_nextVoiceId(1)
 {
 	m_voiceModule->name = "__voice";
 	m_voiceModule->type = 0;
@@ -1309,16 +1312,16 @@ bool KX_AudioManager::SaveRecording(const std::string& slot, const std::string& 
 #endif
 }
 
-bool KX_AudioManager::PlaySound(void *sound, const std::string& preset, float amount, float volume, bool reverb)
+unsigned int KX_AudioManager::PlaySound(void *sound, const std::string& preset, float amount, float volume, bool reverb)
 {
 #ifdef WITH_AUDASPACE
 	if (!m_enabled || !sound) {
-		return false;
+		return 0;
 	}
 	AUD_Sound *played = AUD_Sound_voiceFx(sound, preset.empty() ? "NONE" : preset.c_str(), amount);
 	if (!played) {
 		CM_Warning("Voice: unknown effect \"" << preset << "\"");
-		return false;
+		return 0;
 	}
 	AUD_Handle *handle = nullptr;
 	AUD_Device *device = AUD_Device_getCurrent();
@@ -1328,7 +1331,7 @@ bool KX_AudioManager::PlaySound(void *sound, const std::string& preset, float am
 	}
 	AUD_Sound_free(played);
 	if (!handle) {
-		return false;
+		return 0;
 	}
 	AUD_Handle_setVolume(handle, volume);
 
@@ -1345,27 +1348,64 @@ bool KX_AudioManager::PlaySound(void *sound, const std::string& preset, float am
 	voice.reverbInfluence = 0.0f;
 	voice.wantReverb = reverb;
 	voice.handle = handle;
+	voice.id = m_nextVoiceId++;
+	if (m_nextVoiceId == 0) {
+		m_nextVoiceId = 1;
+	}
 	m_voiceModule->voices.push_back(voice);
 	if (reverb) {
 		UpdateVoiceReverb(*m_voiceModule, m_voiceModule->voices.back());
 	}
-	return true;
+	return voice.id;
 #else
 	(void)sound;
 	(void)preset;
 	(void)amount;
 	(void)volume;
 	(void)reverb;
-	return false;
+	return 0;
 #endif
 }
 
-bool KX_AudioManager::PlayRecording(const std::string& slot, const std::string& preset, float amount, float volume, bool reverb)
+bool KX_AudioManager::IsVoicePlaying(unsigned int id) const
+{
+#ifdef WITH_AUDASPACE
+	for (const Voice& voice : m_voiceModule->voices) {
+		if (voice.id == id) {
+			return AUD_Handle_getStatus(voice.handle) == AUD_STATUS_PLAYING;
+		}
+	}
+#else
+	(void)id;
+#endif
+	return false;
+}
+
+void KX_AudioManager::StopVoiceById(unsigned int id)
+{
+	std::vector<Voice>& voices = m_voiceModule->voices;
+	for (unsigned int i = 0; i < voices.size(); ++i) {
+		if (voices[i].id != id) {
+			continue;
+		}
+		StopVoice(voices[i]);
+		voices.erase(voices.begin() + i);
+		if (m_liveVoice == (int)i) {
+			m_liveVoice = -1;
+		}
+		else if (m_liveVoice > (int)i) {
+			--m_liveVoice;
+		}
+		return;
+	}
+}
+
+unsigned int KX_AudioManager::PlayRecording(const std::string& slot, const std::string& preset, float amount, float volume, bool reverb)
 {
 	void *sound = GetRecording(slot);
 	if (!sound) {
 		CM_Warning("Voice: no recording \"" << slot << "\"");
-		return false;
+		return 0;
 	}
 	return PlaySound(sound, preset, amount, volume, reverb);
 }

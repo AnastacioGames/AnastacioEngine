@@ -1497,6 +1497,9 @@ static void write_sensors(WriteData *wd, ListBase *lb)
 			case SENS_VR_HEAD:
 				writestruct(wd, DATA, bVRHeadSensor, 1, sens->data);
 				break;
+			case SENS_MICROPHONE:
+				writestruct(wd, DATA, bMicrophoneSensor, 1, sens->data);
+				break;
 			case SENS_ANIMATIONEVENT:
 				writestruct(wd, DATA, bAnimationEventSensor, 1, sens->data);
 				break;
@@ -1613,6 +1616,9 @@ static void write_actuators(WriteData *wd, ListBase *lb)
 				break;
 			case ACT_VIDEO:
 				writestruct(wd, DATA, bVideoActuator, 1, act->data);
+				break;
+			case ACT_VOICE:
+				writestruct(wd, DATA, bVoiceActuator, 1, act->data);
 				break;
 			default:
 				; /* error: don't know how to write this file */

@@ -214,6 +214,15 @@ typedef struct bVideoActuator {
 	short mode, flag;	/* ACT_VIDEO_PLAY..., ACT_VIDEO_RELATIVE */
 } bVideoActuator;
 
+typedef struct bVoiceActuator {
+	short mode, flag;	/* ACT_VOICE_RECORD..., ACT_VOICE_REVERB */
+	float amount;		/* 0..1 strength of the effect */
+	float volume;
+	float max_seconds;	/* ACT_VOICE_RECORD: stop by itself (0 = only when released) */
+	char preset[32];	/* VoiceFX name: NONE, CHIPMUNK, GIANT, ROBOT... */
+	char slot[64];		/* recording name, shared with Range.audio.recording() */
+} bVoiceActuator;
+
 typedef struct bVisibilityActuator {
 	/** bit 0: Is this object visible?
 	 ** bit 1: Apply recursively
@@ -467,6 +476,7 @@ typedef struct bActuator {
 #define ACT_VIBRATION	26
 #define ACT_WAIT		27
 #define ACT_VIDEO		28
+#define ACT_VOICE		29
 
 /* actuator flag */
 #define ACT_SHOW		1
@@ -671,6 +681,15 @@ typedef struct bActuator {
 #define ACT_VIDEO_SEEK		5
 /* videoactuator->flag */
 #define ACT_VIDEO_RELATIVE	(1 << 0)	/* seek from the current time */
+
+/* voiceactuator->mode */
+#define ACT_VOICE_RECORD	0	/* records while positive (or until max_seconds) */
+#define ACT_VOICE_PLAY		1	/* plays slot with the effect; finishes when it ends */
+#define ACT_VOICE_LIVE		2	/* hear the microphone with the effect while positive */
+#define ACT_VOICE_STOP		3	/* stop live voice and playbacks of this actuator */
+#define ACT_VOICE_SAVE		4	/* slot -> //slot.wav (Web: /saves) */
+/* voiceactuator->flag */
+#define ACT_VOICE_REVERB	(1 << 0)	/* use the reverb of the area/World */
 
 #define ACT_VISIBILITY_INVISIBLE       (1 << 0)
 #define ACT_VISIBILITY_RECURSIVE       (1 << 1)

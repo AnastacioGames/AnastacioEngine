@@ -159,6 +159,13 @@ void init_sensor(bSensor *sens)
 		vrs->time = 1.0f;
 		break;
 	}
+	case SENS_MICROPHONE:
+	{
+		bMicrophoneSensor *ms = sens->data = MEM_callocN(sizeof(bMicrophoneSensor), "micsens");
+		ms->threshold = 0.1f;
+		ms->hold = 0.3f;
+		break;
+	}
 	case SENS_ANIMATIONEVENT:
 		sens->data = MEM_callocN(sizeof(bAnimationEventSensor), "animsens");
 		aes = sens->data;
@@ -507,6 +514,15 @@ void init_actuator(bActuator *act)
 	case ACT_VIDEO:
 		act->data = MEM_callocN(sizeof(bVideoActuator), "video act");
 		break;
+	case ACT_VOICE:
+	{
+		bVoiceActuator *voa = act->data = MEM_callocN(sizeof(bVoiceActuator), "voice act");
+		voa->amount = 1.0f;
+		voa->volume = 1.0f;
+		BLI_strncpy(voa->preset, "NONE", sizeof(voa->preset));
+		BLI_strncpy(voa->slot, "voice", sizeof(voa->slot));
+		break;
+	}
 	case ACT_2DFILTER:
 		act->data = MEM_callocN(sizeof( bTwoDFilterActuator ), "2d filter act");
 		break;
