@@ -34,6 +34,7 @@ __all__ = (
     "refresh_script_paths",
     "app_template_paths",
     "register_class",
+    "register_module",
     "register_manual_map",
     "unregister_manual_map",
     "register_classes_factory",
@@ -49,6 +50,7 @@ __all__ = (
     "smpte_from_seconds",
     "units",
     "unregister_class",
+    "unregister_module",
     "user_resource",
     "execfile",
 )
@@ -57,7 +59,7 @@ from _bpy import (
     _utils_units as units,
     blend_paths,
     escape_identifier,
-    register_class,
+    register_class as _register_class,
     resource_path,
     script_paths as _bpy_script_paths,
     unregister_class,
@@ -675,6 +677,89 @@ def user_resource(resource_type, path="", create=False):
                 target_path = ""
 
     return target_path
+
+
+def _is_deferred_property(value):
+    return (isinstance(value, tuple) and len(value) == 2 and
+            callable(value[0]) and isinstance(value[1], dict))
+
+
+def _apply_annotation_properties(cls):
+    # Blender 2.8+ declares properties as ``name: BoolProperty()``.
+    for base in reversed(cls.__mro__):
+        if base is not cls and "bl_rna" in base.__dict__:
+            continue
+        for name, value in base.__dict__.get("__annotations__", {}).items():
+            if _is_deferred_property(value) and name not in cls.__dict__:
+                setattr(cls, name, value)
+
+
+def register_class(cls):
+    """
+    Register a subclass of a blender type.
+    Properties may be class attributes (2.7x) or annotations (2.8+).
+    """
+    _apply_annotation_properties(cls)
+    _register_class(cls)
+
+
+# Classes found by register_module, so unregister_module never has to inspect
+# classes that the addon may already have unregistered by itself.
+_module_registered_classes = {}
+
+
+def _module_classes(module):
+    # Classes defined in ``module`` and its submodules, in definition order.
+    prefix = module + "."
+    result = []
+    for name, mod in tuple(_sys.modules.items()):
+        if mod is None or not (name == module or name.startswith(prefix)):
+            continue
+        for cls in vars(mod).values():
+            if (isinstance(cls, type) and cls.__module__ == name and
+                    hasattr(cls, "bl_rna") and cls not in result):
+                result.append(cls)
+    return result
+
+
+def register_module(module, verbose=False):
+    """
+    Register every class of a module and its submodules (Blender 2.7x API).
+    A class that fails is reported and does not stop the others.
+    """
+    classes = _module_classes(module)
+    if not classes:
+        raise Exception("register_module(%r): defines no classes" % module)
+    _module_registered_classes[module] = classes
+    for cls in classes:
+        if "bl_rna" in cls.__dict__:
+            continue
+        if verbose:
+            print("    %r" % cls)
+        try:
+            register_class(cls)
+        except Exception:
+            import traceback
+            print("bpy.utils.register_module(): failed to register %r" % cls)
+            traceback.print_exc()
+
+
+def unregister_module(module, verbose=False):
+    """
+    Unregister every class of the module that is still registered,
+    including those the addon registered by itself (same as Blender 2.7x).
+    """
+    for cls in reversed(_module_registered_classes.pop(module, ())):
+        if "bl_rna" not in cls.__dict__:
+            continue
+        if verbose:
+            print("    %r" % cls)
+        try:
+            unregister_class(cls)
+        except Exception:
+            import traceback
+            print("bpy.utils.unregister_module(): failed to unregister %r" % cls)
+            traceback.print_exc()
 
 
 def register_classes_factory(classes):

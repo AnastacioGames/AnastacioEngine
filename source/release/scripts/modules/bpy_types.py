@@ -33,6 +33,11 @@ bpy_types.BlendData.user_map = _bpy._rna_id_collection_user_map
 class Context(StructRNA):
     __slots__ = ()
 
+    @property
+    def preferences(self):
+        """Blender 2.8+ name of user_preferences"""
+        return self.user_preferences
+
     def copy(self):
         from types import BuiltinMethodType
         new_context = {}
@@ -109,6 +114,14 @@ class Group(bpy_types.ID):
 
 class Object(bpy_types.ID):
     __slots__ = ()
+
+    def select_get(self, view_layer=None):
+        """Blender 2.8+ accessor of Object.select"""
+        return self.select
+
+    def select_set(self, state, view_layer=None):
+        """Blender 2.8+ accessor of Object.select"""
+        self.select = state
 
     @property
     def children(self):

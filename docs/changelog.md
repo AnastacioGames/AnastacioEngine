@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-08 - Compatibilidade de addons 2.7x e 2.8+
+
+- `bpy.utils.register_module`/`unregister_module` restaurados (ja faltavam na Range 1.6 original); a lista e guardada no registro porque consultar classes ja desregistradas derruba o Python.
+- `register_class` aceita propriedades por anotacao; apelidos `context.preferences`, `Object.select_get`/`select_set`.
+- Sprytile 0.4.5 ativa, desativa e reativa sem alteracao. Addons que exigem `gpu_extras`, `gpu.types` ou `WorkSpaceTool` (Sprytile 0.5.25) seguem fora.
+
 ## 2026-11-08 - Microfone (jogo, editor, Web e Android)
 
 - Núcleo `aud.Microphone` com backends OpenAL, WebAudio e Test; `aud.voice_fx`, `aud.edit`, `aud.peak`, WAV próprio.
