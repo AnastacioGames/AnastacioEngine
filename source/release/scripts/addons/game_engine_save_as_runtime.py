@@ -144,6 +144,7 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         shutil.rmtree(tempdir)
 
     # Create a new file for the bundled runtime
+    os.makedirs(os.path.dirname(os.path.abspath(output_path)), exist_ok=True)
     output = open(output_path, 'wb')
 
     # Write the player and blend data to the new runtime
@@ -166,7 +167,7 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
     # Cooked conversion data recorded while playing the .blend ("<blend>.cooked"): the runtime reads
     # "<runtime>.cooked" next to itself.
     cooked_src = (os.path.splitext(bpy.data.filepath)[0] + ".cooked"
-                  if bpy.data.filepath and not assets.enabled() else "")
+                  if bpy.data.filepath else "")
     cooked_dst = os.path.splitext(output_path)[0] + ".cooked"
     if os.path.isfile(cooked_src):
         shutil.copy2(cooked_src, cooked_dst)
@@ -227,6 +228,22 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         shutil.copytree(src, dst, dirs_exist_ok=True, ignore=shutil.ignore_patterns('__pycache__'))
         print("done")
 
+    # Files the game loads from its folder (LibLoad .range/.blend, imported .py): the prepared-assets
+    # path already copies the whole project tree.
+    if not assets.enabled() and bpy.data.filepath:
+        copy_project_files(os.path.dirname(os.path.realpath(bpy.data.filepath)),
+                           os.path.realpath(runtime_dir), os.path.realpath(bpy.data.filepath))
+
+    # Modules the runtime imports by itself or game scripts use (no bpy): needed when Copy Scripts is off.
+    if not copy_scripts:
+        modules_src = os.path.join(blender_dir, bpy.app.version_string.split()[0], "scripts", "modules")
+        modules_dst = os.path.join(runtime_dir, bpy.app.version_string.split()[0], "scripts", "modules")
+        for name in RUNTIME_MODULES:
+            src = os.path.join(modules_src, name)
+            if os.path.isfile(src):
+                os.makedirs(modules_dst, exist_ok=True)
+                shutil.copy2(src, os.path.join(modules_dst, name))
+
     # Reusable multiplayer components must be available even when Copy Scripts is off.
     modules_dir = os.path.join(bpy.app.version_string.split()[0], "scripts", "modules")
     multiplayer_src = os.path.join(blender_dir, modules_dir, "anastacio_network")
@@ -253,6 +270,32 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         print("done")
 
     return True
+
+RUNTIME_MODULES = (
+    "range_args.py", "range_locale.py", "range_language.py", "range_ui_runtime.py", "range_ui_draw.py",
+    "range_text_dialogue.py", "range_cutscene_runtime.py", "range_component_wizard.py",
+    "anastacio_ragdoll_runtime.py",
+)
+PROJECT_EXTENSIONS = {".range", ".blend", ".rasec", ".py"}
+
+
+def copy_project_files(source_dir, runtime_dir, main_file):
+    """Copy the project's .range/.blend/.py files next to the runtime, keeping subfolders."""
+    for root, dirs, files in os.walk(source_dir):
+        real_root = os.path.realpath(root)
+        # Never descend into the export folder itself (exporting inside the project).
+        dirs[:] = [d for d in dirs if d != "__pycache__" and
+                   os.path.realpath(os.path.join(root, d)) != runtime_dir]
+        if real_root == runtime_dir:
+            continue
+        for name in files:
+            src = os.path.join(root, name)
+            if os.path.splitext(name)[1].lower() not in PROJECT_EXTENSIONS or os.path.realpath(src) == main_file:
+                continue
+            dst = os.path.join(runtime_dir, os.path.relpath(src, source_dir))
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            shutil.copy2(src, dst)
+
 
 from bpy.props import *
 
