@@ -46,6 +46,36 @@ def _runtime_candidates():
     return dirs
 
 
+_MIC_NODES = {"RangeLogicMicrophone", "RangeLogicVoice", "RangeUIMicMeter", "RangeUIMicrophoneOn"}
+_MIC_WORDS = ("microphoneStart", "playLive", "aud.Microphone")
+
+
+def scene_uses_microphone():
+    """True quando o jogo usa o microfone: bricks, nos da Logic/UI Tree ou scripts."""
+    for ob in bpy.data.objects:
+        game = getattr(ob, "game", None)
+        if game is None:
+            continue
+        if any(s.type == 'MICROPHONE' for s in game.sensors):
+            return True
+        if any(a.type == 'VOICE' for a in game.actuators):
+            return True
+    for tree in bpy.data.node_groups:
+        if any(n.bl_idname in _MIC_NODES for n in tree.nodes):
+            return True
+    for text in bpy.data.texts:
+        body = text.as_string()
+        if any(w in body for w in _MIC_WORDS):
+            return True
+    return False
+
+
+def web_microphone_enabled(web):
+    if web.microphone == 'AUTO':
+        return scene_uses_microphone()
+    return web.microphone == 'ON'
+
+
 def _packager_path():
     import os
     release = os.path.join(os.path.dirname(bpy.app.binary_path), _RELEASE_PACKAGER)
@@ -214,6 +244,18 @@ class RangeWebSettings(PropertyGroup):
         ),
         default='STICK',
     )
+    # Microfone (U5): no APK so pede RECORD_AUDIO quando ligado; Auto liga se a cena usar o microfone.
+    microphone: bpy.props.EnumProperty(
+        name="Microphone",
+        description="Let the game use the microphone (the browser asks the player; the Android app gets the "
+                    "RECORD_AUDIO permission)",
+        items=(
+            ('AUTO', "Auto", "On when a Microphone sensor, Voice actuator, microphone node or script uses it"),
+            ('ON', "On", "Always ask for the microphone"),
+            ('OFF', "Off", "Never ask for the microphone"),
+        ),
+        default='AUTO',
+    )
     touch_stick: bpy.props.EnumProperty(
         name="Stick mode",
         description="Where the on-screen stick appears",
@@ -257,6 +299,15 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
         row.enabled = web.touch_layout in {'STICK', 'TWIN', 'WASD', 'FPS', 'RACE'}
         row.prop(web, "touch_stick", expand=True)
         box.label(text="Shown only on touch screens; test on a PC with ?touch=1 in the address.", icon='INFO')
+
+        box = layout.box()
+        box.label(text="Microphone:", icon="REC")
+        box.prop(web, "microphone")
+        if web.microphone == 'AUTO':
+            used = scene_uses_microphone()
+            box.label(text=_("Used by this game: on") if used else _("Not used by this game: off"),
+                      icon='CHECKBOX_HLT' if used else 'CHECKBOX_DEHLT')
+        box.label(text="Starts after the first tap or click; needs https (or localhost).", icon='INFO')
 
         box = layout.box()
         box.label(text="Validation:", icon="VIEWZOOM")
@@ -412,6 +463,8 @@ class SCENE_OT_range_web_export(Operator):
                 cmd += ["--touch-layout", web.touch_layout.lower(), "--touch-stick", web.touch_stick.lower()]
                 if web.keep_debug_overlays:
                     cmd.append("--debug-overlays")
+                if web_microphone_enabled(web):
+                    cmd.append("--microphone")
                 for extra in extras:
                     cmd += ["--extra", extra]
                 result = subprocess.run(cmd, capture_output=True, text=True)

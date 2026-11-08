@@ -588,9 +588,9 @@ endif()
 
 # Saida AudioWorklet do runtime Web (substitui o ScriptProcessorNode do port SDL2; plugins/webaudio).
 if(EMSCRIPTEN)
-	list(APPEND SRC plugins/webaudio/WebAudioDevice.cpp)
-	list(APPEND HDR plugins/webaudio/WebAudioDevice.h)
-	list(APPEND STATIC_PLUGINS WebAudioDevice)
+	list(APPEND SRC plugins/webaudio/WebAudioDevice.cpp plugins/webaudio/WebMicrophone.cpp)
+	list(APPEND HDR plugins/webaudio/WebAudioDevice.h plugins/webaudio/WebMicrophone.h)
+	list(APPEND STATIC_PLUGINS WebAudioDevice WebMicrophone)
 endif()
 
 # OpenAL
