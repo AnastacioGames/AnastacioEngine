@@ -115,6 +115,12 @@ void KX_BatchGroup::MergeObjects(const std::vector<KX_GameObject *>& objects)
 			continue;
 		}
 
+		/* Objeto pego pelo Auto Static Batch: o pedido explícito do script vence. */
+		KX_BatchGroup *oldGroup = dynamic_cast<KX_BatchGroup *>(meshUser->GetBatchGroup());
+		if (oldGroup && oldGroup != this && oldGroup->IsAutomatic()) {
+			oldGroup->SplitObjects({gameobj});
+		}
+
 		if (meshUser->GetBatchGroup()) {
 			CM_Error("object \"" << gameobj->GetName() << "\" already used in a batch group");
 			continue;

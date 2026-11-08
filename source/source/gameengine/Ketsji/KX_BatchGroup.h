@@ -46,6 +46,8 @@ private:
 	EXP_ListValue<KX_GameObject> *m_objects;
 	/// Reference object used to retrieve layer and color.
 	KX_GameObject *m_referenceObject;
+	/// Criado pelo Auto Static Batch: um grupo de script pode tirar objetos dele.
+	bool m_automatic = false;
 
 public:
 	KX_BatchGroup();
@@ -56,6 +58,8 @@ public:
 	EXP_ListValue<KX_GameObject> *GetObjects() const;
 
 	KX_GameObject *GetReferenceObject() const;
+	void SetAutomatic(bool automatic) { m_automatic = automatic; }
+	bool IsAutomatic() const { return m_automatic; }
 	/// Set reference object with error checking. Return false on error.
 	bool SetReferenceObject(KX_GameObject *object);
 	/// Remove an object before its mesh user is destroyed.

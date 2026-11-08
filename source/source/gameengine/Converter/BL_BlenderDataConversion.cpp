@@ -3908,6 +3908,7 @@ static void BL_StaticBatchObjects(EXP_ListValue<KX_GameObject> *objectlist, bool
 	if (batchObjects.size() > 1) {
 		KX_BatchGroup *batchGroup = new KX_BatchGroup();
 		batchGroup->MergeObjects(batchObjects);
+		batchGroup->SetAutomatic(true);
 		if (batchGroup->GetObjects()->Empty()) {
 			delete batchGroup;
 		}
