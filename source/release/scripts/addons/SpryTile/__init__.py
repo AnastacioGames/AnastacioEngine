@@ -951,7 +951,8 @@ def unregister():
 
     # Unregister self from sys.path as well
     cmd_subfolder = os.path.realpath(os.path.abspath(os.path.split(inspect.getfile(inspect.currentframe()))[0]))
-    sys.path.remove(cmd_subfolder)
+    if cmd_subfolder in sys.path:  # only added on the first import, not when the add-on is re-enabled
+        sys.path.remove(cmd_subfolder)
 
 
 if __name__ == "__main__":

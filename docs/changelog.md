@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-08 - Versão 0.7.0 em preparo
+
+- Versão no executável, no About e nos scripts de release; notas em `docs/release-notes-0.7.0.md`.
+
 ## 2026-11-08 - Compatibilidade de addons 2.7x e 2.8+
 
 - `bpy.utils.register_module`/`unregister_module` restaurados (ja faltavam na Range 1.6 original); a lista e guardada no registro porque consultar classes ja desregistradas derruba o Python.

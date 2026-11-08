@@ -399,7 +399,10 @@ def register():
 def unregister():
     # remove keymap entry
     for km, kmi in addon_keymaps:
-        km.keymap_items.remove(kmi)
+        try:
+            km.keymap_items.remove(kmi)
+        except RuntimeError:  # the keymap item is already gone
+            pass
     addon_keymaps.clear()
 
     # remove operator and preferences

@@ -44,6 +44,7 @@ BLACKLIST = {
     os.path.join("Range_Particle_Emitter", "Range_Emitter"),
     os.path.join("anastacio_network", "component"),
     "range_language",
+    "range_cutscene_runtime",
     "anastacio_ragdoll_runtime",
     "anastacio_video",
     "range_ui_runtime",
@@ -153,6 +154,10 @@ def load_modules():
         for mod_dir in sys.path:
             if mod_dir.startswith(script_path):
                 if not mod_dir.startswith(BLACKLIST_DIRS):
+                    # An add-on may add its own package dir to `sys.path` (Sprytile, for `rx`):
+                    # its files use relative imports and only load as part of the package.
+                    if os.path.exists(os.path.join(mod_dir, "__init__.py")):
+                        continue
                     if mod_dir not in module_paths:
                         if os.path.exists(mod_dir):
                             module_paths.append(mod_dir)

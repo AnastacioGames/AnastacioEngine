@@ -27,6 +27,15 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
   zip Windows publicado da RangeArmor.
 - Abra janelas do jogo/editor só quando o usuário pedir; o resto valide em background.
 
+## 0.7.0
+
+Estado: **em preparo** (versão aplicada em 2026-11-08). Windows primeiro; falta decidir se o Linux sai junto.
+Destaque: microfone e gravação de voz no jogo, no editor, na Web e no Android.
+
+Texto da página do GitHub: [release-notes-0.7.0.md](release-notes-0.7.0.md).
+
+Pendências antes de publicar: splash novo, aceite do microfone físico no pacote final.
+
 ## 0.6.1
 
 Estado: **publicada completa em 2026-10-28** (tag `v0.6.1`). Pacotes Linux montados e
