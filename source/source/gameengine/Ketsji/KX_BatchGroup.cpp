@@ -127,9 +127,9 @@ void KX_BatchGroup::MergeObjects(const std::vector<KX_GameObject *>& objects)
 		}
 
 		RAS_Deformer *deformer = meshUser->GetDeformer();
-		if (deformer && deformer->IsGPUSkinned()) {
-			CM_Error("object \"" << gameobj->GetName() << "\" uses GPU skinning and cannot be static-batched "
-					"(each instance needs its own bone-matrix palette)");
+		if (deformer) {
+			CM_Error("object \"" << gameobj->GetName() << "\" is deformed (armature/shape keys) and cannot be "
+					"static-batched: the merged copy would stay frozen");
 			continue;
 		}
 

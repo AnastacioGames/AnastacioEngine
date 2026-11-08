@@ -260,7 +260,7 @@ static void GuardWarmUp()
 	const std::string marker = WarmUpMarker();
 	if (BLI_exists(marker.c_str())) {
 		warmUp = false;
-		CM_Warning("[Cooked] the last shader warm-up did not finish (GPU driver crash?): skipping it, shaders "
+		CM_Warning("[Cooked] the last shader warm-up did not finish (game closed during it, or GPU driver crash?): skipping it, shaders "
 		           "compile when first drawn");
 		return;
 	}

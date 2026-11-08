@@ -308,6 +308,8 @@ void BL_Action::SetFrame(float frame)
 
 	m_localframe = frame;
 	m_calc_localtime = false;
+	// Com speed 0 o Update só aplica a pose quando ela mudou.
+	m_appliedToObject = false;
 }
 
 void BL_Action::SetPlayMode(short play_mode)
@@ -371,7 +373,7 @@ void BL_Action::Update(float curtime, bool applyToObject)
 	/* Don't bother if we're done with the animation and if the animation was already applied to the object.
 	 * of if the animation made a double update for the same time and that it was applied to the object.
 	 */
-	if ((m_done || m_prevUpdate == curtime) && m_appliedToObject || m_speed == 0.0f) {
+	if ((m_done || m_prevUpdate == curtime || m_speed == 0.0f) && m_appliedToObject) {
 		return;
 	}
 	m_prevUpdate = curtime;
@@ -386,7 +388,11 @@ void BL_Action::Update(float curtime, bool applyToObject)
 	KX_Scene *scene = m_obj->GetScene();
 	curtime -= (float)scene->GetSuspendedDelta();
 
-	if (m_calc_localtime) {
+	if (m_speed == 0.0f) {
+		// Parada: o frame é o do setActionFrame (a conta do tempo dividiria por zero).
+		m_calc_localtime = false;
+	}
+	else if (m_calc_localtime) {
 		SetLocalTime(curtime);
 	}
 	else {

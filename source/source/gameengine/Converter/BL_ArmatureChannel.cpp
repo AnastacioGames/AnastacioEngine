@@ -100,6 +100,8 @@ PyAttributeDef BL_ArmatureChannel::Attributes[] = {
 	// Keep these attributes in order of BCA_ defines!!! used by py_attr_getattr and py_attr_setattr
 	EXP_PYATTRIBUTE_RO_FUNCTION("bone", BL_ArmatureChannel, py_attr_getattr),
 	EXP_PYATTRIBUTE_RO_FUNCTION("parent", BL_ArmatureChannel, py_attr_getattr),
+	/* Getter usa o BL_ArmatureChannel (m_posechannel), não o ponteiro do pchan. */
+	EXP_PYATTRIBUTE_RW_FUNCTION("joint_rotation", BL_ArmatureChannel, py_attr_get_joint_rotation, py_attr_set_joint_rotation),
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
 
@@ -136,7 +138,6 @@ PyAttributeDef BL_ArmatureChannel::AttributesPtr[] = {
 	EXP_PYATTRIBUTE_FLOAT_RO("ik_stretch", bPoseChannel, ikstretch),
 	EXP_PYATTRIBUTE_FLOAT_RW("ik_rot_weight", 0, 1.0f, bPoseChannel, ikrotweight),
 	EXP_PYATTRIBUTE_FLOAT_RW("ik_lin_weight", 0, 1.0f, bPoseChannel, iklinweight),
-	EXP_PYATTRIBUTE_RW_FUNCTION("joint_rotation", BL_ArmatureChannel, py_attr_get_joint_rotation, py_attr_set_joint_rotation),
 	EXP_PYATTRIBUTE_NULL //Sentinel
 };
 
