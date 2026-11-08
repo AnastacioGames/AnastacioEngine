@@ -64,7 +64,26 @@ def iniciar_invisivel(args, log, env):
     return pi.dwProcessId
 
 
+def rodando(pid):
+    saida = subprocess.run(['tasklist', '/FI', 'PID eq %d' % pid, '/NH'], capture_output=True, text=True, errors='replace').stdout
+    return str(pid) in saida
+
+
+def encerrar(pid, espera=0):
+    """Espera `pid` sair sozinho por `espera` segundos; se não sair, mata ele e os filhos."""
+    limite = time.time() + espera
+    while time.time() < limite:
+        if not rodando(pid):
+            return
+        time.sleep(0.2)
+    subprocess.run(['taskkill', '/T', '/F', '/PID', str(pid)], capture_output=True)
+
+
+ultimo_pid = None  # processo invisível aberto por último (o `cmd` que segura o programa)
+
+
 def abrir(cena=None, visivel=False, espera=60, args_extra=()):
+    global ultimo_pid
     PASTA.mkdir(parents=True, exist_ok=True)
     SESSAO.unlink(missing_ok=True)
     config = Path(tempfile.mkdtemp(prefix='config_', dir=PASTA))
@@ -76,17 +95,20 @@ def abrir(cena=None, visivel=False, espera=60, args_extra=()):
     if visivel:
         subprocess.Popen(args, env=env, cwd=RAIZ, stdout=log.open('w'), stderr=subprocess.STDOUT)
     else:
-        iniciar_invisivel(args, log, env)
+        ultimo_pid = iniciar_invisivel(args, log, env)
     limite = time.time() + espera
     while time.time() < limite:
         if SESSAO.exists():
             return json.loads(SESSAO.read_text())
         time.sleep(0.2)
+    if not visivel:
+        encerrar(ultimo_pid)
     raise TimeoutError('o editor não respondeu; veja ' + str(log))
 
 
 def abrir_jogo(arquivo, visivel=False, espera=90, largura=1280, altura=720, env_extra=None, exportado=False):
     """Roda o .range no AnastacioRuntime com o servidor_jogo.py; devolve um Jogo conectado."""
+    global ultimo_pid
     PASTA.mkdir(parents=True, exist_ok=True)
     SESSAO_JOGO.unlink(missing_ok=True)
     env = dict(os.environ, RANGE_CONTROL_SCRIPT=str(AQUI / 'servidor_jogo.py'), RANGE_CONTROL_SESSION=str(SESSAO_JOGO),
@@ -99,7 +121,7 @@ def abrir_jogo(arquivo, visivel=False, espera=90, largura=1280, altura=720, env_
         proc = subprocess.Popen(args, env=env, cwd=RAIZ, stdout=log.open('w'), stderr=subprocess.STDOUT)
     else:
         proc = None
-        iniciar_invisivel(args, log, env)
+        ultimo_pid = iniciar_invisivel(args, log, env)
     limite = time.time() + espera
     while time.time() < limite:
         if SESSAO_JOGO.exists():
@@ -107,6 +129,10 @@ def abrir_jogo(arquivo, visivel=False, espera=90, largura=1280, altura=720, env_
         if proc and proc.poll() is not None:
             break
         time.sleep(0.2)
+    if proc:
+        proc.kill()
+    else:
+        encerrar(ultimo_pid)  # senão o jogo preso fica rodando depois do teste
     raise TimeoutError('o jogo não respondeu; veja ' + str(log))
 
 

@@ -41,13 +41,13 @@ class Teste:
 
     def jogo(self, arquivo, **opcoes):
         j = controle.abrir_jogo(arquivo, **opcoes)
-        self.abertos.append(j.fechar)
+        self.abertos.append(_garantir(j.fechar, controle.ultimo_pid))
         return j
 
     def editor(self, cena=None):
         controle.abrir(str(cena) if cena else None)
         e = controle.Editor()
-        self.abertos.append(lambda: _fechar_editor(e))
+        self.abertos.append(_garantir(lambda: _fechar_editor(e), controle.ultimo_pid))
         return e
 
     def nota(self, texto):
@@ -60,6 +60,16 @@ class Teste:
             except Exception:
                 pass
         self.abertos.clear()
+
+
+def _garantir(fechar, pid):
+    """Pede para fechar e, se o processo não sair em 15 s, mata: nada aberto passa para o próximo caso."""
+    def executar():
+        try:
+            fechar()
+        finally:
+            controle.encerrar(pid, espera=15)
+    return executar
 
 
 def _fechar_editor(e):
@@ -84,7 +94,9 @@ def carregar(arquivo):
 
 def main():
     filtro = sys.argv[1] if len(sys.argv) > 1 else ''
-    arquivos = sorted(a for a in CASOS.glob('*.py') if not a.name.startswith('_') and filtro in a.stem)
+    # a exportação vai por último: depois dela os jogos seguintes abriram até 20x mais devagar
+    arquivos = sorted((a for a in CASOS.glob('*.py') if not a.name.startswith('_') and filtro in a.stem),
+                      key=lambda a: (a.stem == 'jogo_exportado', a.stem))
     resultados = []
     for arquivo in arquivos:
         t = Teste(arquivo.stem)
