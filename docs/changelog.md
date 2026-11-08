@@ -12,6 +12,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 - `bpy.utils.register_module`/`unregister_module` restaurados (ja faltavam na Range 1.6 original); a lista e guardada no registro porque consultar classes ja desregistradas derruba o Python.
 - Propriedades por anotacao ja eram aceitas pelo `register_class` em C (`bpy_rna.c`). Apelidos `context.preferences`, `Object.select_get`/`select_set`.
+- Sprytile 0.4.6 (Jeiel Aranal, com ajustes de Anastacio Games) incluido em `addons/SpryTile`, desativado por padrao: previa com contorno, escolha do grid pelo material do objeto, modulos sem carga dupla, correcoes de raycast e de Python 3.11, updater removido.
 - Sprytile 0.4.5 ativa, desativa e reativa sem alteracao. Addons que exigem `gpu_extras`, `gpu.types` ou `WorkSpaceTool` (Sprytile 0.5.25) seguem fora.
 
 ## 2026-11-08 - Microfone (jogo, editor, Web e Android)
