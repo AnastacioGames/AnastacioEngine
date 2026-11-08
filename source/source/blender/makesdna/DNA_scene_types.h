@@ -1209,6 +1209,9 @@ enum {
 /* Small FPS + draw calls counter in the game (without the full profile). Lives here because
  * GameData.flag has no free bit left. */
 #define SCE_SHOW_FPS_COUNTER	(1 << 2)
+/* Large opaque static meshes become occluders at conversion (keeping their physics) and the game turns
+ * occlusion on/off by measuring how many objects it hides (KX_Scene::UpdateAutoOcclusion). */
+#define SCE_AUTO_OCCLUSION		(1 << 3)
 
 /* GameData.hdr */
 #define GAME_HDR_NONE		0

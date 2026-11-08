@@ -1,6 +1,6 @@
 """V0 do plano de visibilidade (docs/plano-visibilidade-portais.md): predio de salas para medir o ganho de PVS.
 
-  AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_visibilidade.py -- saida.range [occluder] [nobatch] [lado]
+  AnastacioEngine.exe -b --factory-startup --python tools/debug/cenas/criar_cena_visibilidade.py -- saida.range [occluder|auto] [nobatch] [open] [lado]
 
 Grade lado x lado de salas 8x8 m (padrao 6x6) ligadas em serpentina: portas no eixo X em todas as salas e
 porta no eixo Y so na ponta da fileira. A camera fica na sala (0,0) olhando +X pelo corredor de portas:
@@ -24,6 +24,7 @@ if not argv:
     raise SystemExit('uso: ... -- saida.range [occluder] [lado]')
 out = argv[0]
 use_occluder = 'occluder' in argv[1:]
+open_area = 'open' in argv[1:]  # sem paredes nem teto: a oclusao nao tem o que esconder
 SIDE = next((int(a) for a in argv[1:] if a.isdigit()), 6)
 ROOM = 8.0
 HEIGHT = 3.0
@@ -44,7 +45,9 @@ scene.game_settings.use_frame_rate = False
 scene.game_settings.fps = 1000
 scene.game_settings.use_auto_static_batch = 'nobatch' not in argv[1:]
 scene.game_settings.physics_engine = 'BULLET'
-scene.game_settings.use_occlusion_culling = use_occluder
+scene.game_settings.use_occlusion_culling = True
+# auto: paredes STATIC (com colisao) viram occluder sozinhas no load (Automatic Occluders)
+scene.game_settings.use_auto_occlusion = 'auto' in argv[1:]
 scene.world.horizon_color = (0.3, 0.3, 0.35)
 scene.world.mist_settings.use_mist = False
 
@@ -71,6 +74,8 @@ def box(name, center, size, mat, room, physics='STATIC'):
 
 def wall_x(name, x0, x1, y, door, room):
     """Parede ao longo de X em y, de x0 a x1, com porta no meio se door."""
+    if open_area:
+        return
     phys = 'OCCLUDER' if use_occluder else 'STATIC'
     if not door:
         box(name, ((x0 + x1) / 2, y, HEIGHT / 2), (x1 - x0, THICK, HEIGHT), wall_mat, room, phys)
@@ -83,6 +88,8 @@ def wall_x(name, x0, x1, y, door, room):
 
 
 def wall_y(name, y0, y1, x, door, room):
+    if open_area:
+        return
     phys = 'OCCLUDER' if use_occluder else 'STATIC'
     if not door:
         box(name, (x, (y0 + y1) / 2, HEIGHT / 2), (THICK, y1 - y0, HEIGHT), wall_mat, room, phys)
@@ -105,7 +112,8 @@ for gy in range(SIDE):
         room = '%d_%d' % (gx, gy)
         x0, y0 = gx * ROOM, gy * ROOM
         box('Piso_' + room, (x0 + ROOM / 2, y0 + ROOM / 2, -0.1), (ROOM, ROOM, 0.2), wall_mat, room)
-        box('Teto_' + room, (x0 + ROOM / 2, y0 + ROOM / 2, HEIGHT + 0.1), (ROOM, ROOM, 0.2), wall_mat, room)
+        if not open_area:
+            box('Teto_' + room, (x0 + ROOM / 2, y0 + ROOM / 2, HEIGHT + 0.1), (ROOM, ROOM, 0.2), wall_mat, room)
         # parede oeste (X = x0): porta se nao for a primeira coluna
         wall_y('ParedeO_' + room, y0, y0 + ROOM, x0, gx > 0, room)
         if gx == SIDE - 1:

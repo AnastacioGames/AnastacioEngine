@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Automatic Occluders
+
+- Nova opção em Scene > Culling: malhas estáticas grandes, opacas e simples viram occluders no load sem perder
+  a colisão; no jogo a oclusão liga/desliga sozinha contando, a cada 30 quadros, quantos objetos ela esconde.
+  Prédio de salas com GPU 8x: 5,1 → 3,75 ms; cena aberta desliga sozinha. Detalhes em
+  `docs/plano-visibilidade-portais.md`.
+
 ## 2026-11-07 - Estudo de código aberto: OIDN com normal e PVS descartados
 
 - OIDN guiado por normal (albedo branco) no Baked Lighting: sem ganho medido (RMSE 0,103 x 0,104); não aplicado.

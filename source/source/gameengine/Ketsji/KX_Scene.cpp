@@ -428,6 +428,11 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	m_activityCulling(false),
 	m_dbvtCulling(false),
 	m_dbvtOcclusionRes(0),
+	m_autoOcclusion(false),
+	m_autoOcclusionOn(true),
+	m_autoOcclusionFrame(0),
+	m_autoVisibleWith(-1.0f),
+	m_autoVisibleWithout(-1.0f),
 	m_blenderScene(scene),
 	m_previousAnimTime(0.0f),
 	m_isActivedHysteresis(false),
@@ -1136,6 +1141,21 @@ void KX_Scene::SetDbvtOcclusionRes(int i)
 int KX_Scene::GetDbvtOcclusionRes() const
 {
 	return m_dbvtOcclusionRes;
+}
+
+void KX_Scene::SetAutoOcclusion(bool autoOcclusion)
+{
+	m_autoOcclusion = autoOcclusion;
+}
+
+bool KX_Scene::GetAutoOcclusion() const
+{
+	return m_autoOcclusion;
+}
+
+bool KX_Scene::GetAutoOcclusionActive() const
+{
+	return !m_autoOcclusion || m_autoOcclusionOn;
 }
 
 void KX_Scene::AddObjectDebugProperties(KX_GameObject *gameobj)
@@ -2213,6 +2233,22 @@ static void CullInvisibleLods(std::vector<KX_GameObject *>& objects, KX_Camera *
 	}), objects.end());
 }
 
+/* Counting-only pass of the automatic occlusion: same filter as PhysicsCullingCallback, no side effect. */
+struct CullingCount {
+	int m_layer;
+	bool m_is_shadowbuf;
+	int m_visible;
+};
+
+static void CountCullingCallback(KX_ClientObjectInfo *objectInfo, void *data)
+{
+	CullingCount *count = static_cast<CullingCount *>(data);
+	KX_GameObject *gameobj = objectInfo->m_gameobject;
+	if (gameobj->Renderable(count->m_layer) && (count->m_is_shadowbuf || gameobj->GetVisibleLOD())) {
+		count->m_visible++;
+	}
+}
+
 void KX_Scene::PhysicsCullingCallback(KX_ClientObjectInfo *objectInfo, void *cullingInfo)
 {
 	CullingInfo *info = static_cast<CullingInfo *>(cullingInfo);
@@ -2400,7 +2436,45 @@ std::vector<KX_GameObject *> KX_Scene::CalculateVisibleMeshes(KX_Camera *cam, co
 		const int *viewport = KX_GetActiveEngine()->GetCanvas()->GetViewPort();
 		CullingInfo info(layer, objects, cam, is_shadowbuf);
 
-		dbvt_culling = m_physicsEnvironment->CullingTest(PhysicsCullingCallback, &info, planes, m_dbvtOcclusionRes, viewport, matrix);
+		/* Automatic occluders: the occlusion raster costs CPU every frame (~0.25 ms measured in
+		 * tools/debug/cenas/medir_visibilidade.py), so it runs only while it hides enough objects. Every
+		 * AUTO_OCCLUSION_PROBE frames the other mode is run once only to count its visible objects (no
+		 * side effect, nothing else is drawn), so switching never causes a heavier frame. */
+		static const unsigned int AUTO_OCCLUSION_PROBE = 30;
+		int occlusionRes = m_dbvtOcclusionRes;
+		const bool autoOcclusion = m_autoOcclusion && occlusionRes;
+		if (autoOcclusion) {
+			if (!m_autoOcclusionOn) {
+				occlusionRes = 0;
+			}
+			if (++m_autoOcclusionFrame % AUTO_OCCLUSION_PROBE == 0) {
+				CullingCount count{layer, is_shadowbuf, 0};
+				m_physicsEnvironment->CullingTest(CountCullingCallback, &count, planes,
+				                                  occlusionRes ? 0 : m_dbvtOcclusionRes, viewport, matrix);
+				(occlusionRes ? m_autoVisibleWithout : m_autoVisibleWith) = (float)count.m_visible;
+			}
+		}
+
+		dbvt_culling = m_physicsEnvironment->CullingTest(PhysicsCullingCallback, &info, planes, occlusionRes, viewport, matrix);
+
+		if (dbvt_culling && autoOcclusion) {
+			const float visible = (float)objects.size();
+			float& average = occlusionRes ? m_autoVisibleWith : m_autoVisibleWithout;
+			average = (average < 0.0f) ? visible : average * 0.9f + visible * 0.1f;
+			if (m_autoOcclusionFrame % AUTO_OCCLUSION_PROBE == 0 && m_autoVisibleWith >= 0.0f &&
+			    m_autoVisibleWithout >= 0.0f)
+			{
+				// Worth it when it hides at least 15% of what the frustum keeps (and at least 8 objects).
+				const float hidden = m_autoVisibleWithout - m_autoVisibleWith;
+				const bool worth = hidden >= std::max(8.0f, 0.15f * m_autoVisibleWithout);
+				if (worth != m_autoOcclusionOn) {
+					m_autoOcclusionOn = worth;
+					CM_Message("auto occlusion " << (worth ? "on" : "off") << " in scene " << GetName()
+					           << ": visible " << (int)m_autoVisibleWith << " with, "
+					           << (int)m_autoVisibleWithout << " without");
+				}
+			}
+		}
 	}
 
 	int testedCount;

@@ -22,9 +22,9 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Occluder automático
 
-- [Plano](plano-visibilidade-portais.md) (seção final): escolha automática de Occluders + ligar/desligar o
-  Occlusion Culling no jogo conforme o ganho medido. Achado pendente: `use_frame_rate = False` não solta o FPS
-  no runtime (espera segue a taxa de lógica).
+- Feito ([plano](plano-visibilidade-portais.md)); falta aceite com janela num jogo de interior, dica no Scene
+  Doctor e decidir se vem ligado em cenas novas. Achado pendente: `use_frame_rate = False` não solta o FPS no
+  runtime (espera segue a taxa de lógica).
 
 ## Água realista (estudo do water 0.99)
 

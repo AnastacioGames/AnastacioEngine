@@ -106,6 +106,7 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
                 col.prop(gs, "use_occlusion_culling", text="Occlusion Culling")
                 sub = col.column()
                 sub.active = gs.use_occlusion_culling
+                sub.prop(gs, "use_auto_occlusion", text="Automatic Occluders")
                 sub.prop(gs, "occlusion_culling_resolution", text="Resolution")
 
                 col = split.column()

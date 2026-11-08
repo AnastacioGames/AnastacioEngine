@@ -5584,6 +5584,13 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	                         "together (one draw per material), as if Static Batch was marked on each one");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "use_auto_occlusion", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "lodflag", SCE_AUTO_OCCLUSION);
+	RNA_def_property_ui_text(prop, "Automatic Occluders",
+	                         "Large opaque static meshes (walls, floors, buildings) hide what is behind them, "
+	                         "keeping their physics; the game turns occlusion off where it hides little");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "show_fps_counter", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "lodflag", SCE_SHOW_FPS_COUNTER);
 	RNA_def_property_ui_text(prop, "FPS Counter",

@@ -409,6 +409,14 @@ private:
 	/// Occlusion culling resolution.
 	int m_dbvtOcclusionRes;
 
+	/** Automatic occluders (SCE_AUTO_OCCLUSION): occlusion runs only while it hides enough objects.
+	 * Every AUTO_OCCLUSION_PROBE frames one frame runs in the other mode to compare the visible counts. */
+	bool m_autoOcclusion;
+	bool m_autoOcclusionOn;
+	unsigned int m_autoOcclusionFrame;
+	float m_autoVisibleWith;
+	float m_autoVisibleWithout;
+
 	/// The framing settings used by this scene
 	RAS_FrameSettings m_frameSettings;
 
@@ -761,6 +769,10 @@ public:
 	bool GetDbvtCulling() const;
 	void SetDbvtOcclusionRes(int i);
 	int GetDbvtOcclusionRes() const;
+	void SetAutoOcclusion(bool autoOcclusion);
+	bool GetAutoOcclusion() const;
+	/// Whether automatic occlusion is currently running (always true without automatic occluders).
+	bool GetAutoOcclusionActive() const;
 
 	void SetSceneConverter(BL_SceneConverter *sceneConverter);
 

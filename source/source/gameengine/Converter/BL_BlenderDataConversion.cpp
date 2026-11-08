@@ -77,6 +77,8 @@
 #include "RAS_BucketManager.h"
 #include "RAS_BoundingBoxManager.h"
 #include "RAS_IMaterial.h"
+#include "RAS_MaterialBucket.h"
+#include "RAS_DisplayArray.h"
 
 #include "SG_Node.h"
 #include "SG_BBox.h"
@@ -1836,6 +1838,59 @@ void BL_ConvertActions(KX_Scene *scene, Main *maggie, BL_SceneConverter& convert
 	}
 }
 
+/* Automatic occluders (SCE_AUTO_OCCLUSION): large, simple, opaque static meshes hide what is behind them.
+ * Only the runtime occluder flag is set: the object keeps its physics (the Occluder physics type of the
+ * UI removes the collision). Every triangle is rasterized on the CPU each frame, hence the triangle cap. */
+static const unsigned int AUTO_OCCLUDER_MAX_TRIANGLES = 2048;
+static const float AUTO_OCCLUDER_MIN_SIDE = 1.5f; // m, second largest side of the world box
+static const float AUTO_OCCLUDER_MIN_AREA = 6.0f; // m2, largest face of the world box
+
+static bool BL_IsAutoOccluder(KX_GameObject *gameobj)
+{
+	Object *ob = gameobj->GetBlenderObject();
+	if (!ob || ob->type != OB_MESH || !gameobj->GetVisible() || gameobj->GetOccluder() ||
+	    gameobj->GetDeformer() || gameobj->GetMeshList().empty())
+	{
+		return false;
+	}
+	if (ob->gameflag & (OB_DYNAMIC | OB_RIGID_BODY | OB_SOFT_BODY | OB_CHARACTER | OB_SENSOR | OB_NAVMESH)) {
+		return false;
+	}
+
+	unsigned int triangles = 0;
+	for (KX_Mesh *mesh : gameobj->GetMeshList()) {
+		for (RAS_MeshMaterial *meshmat : mesh->GetMeshMaterialList()) {
+			RAS_IMaterial *mat = meshmat->GetBucket()->GetMaterial();
+			// See-through or non-surface materials must not hide anything.
+			if (mat->IsAlpha() || mat->IsAlphaDepth() || mat->IsZSort() || mat->IsWire() || mat->IsText() ||
+			    mat->IsHaloPoints() || !mat->IsVisible())
+			{
+				return false;
+			}
+			triangles += meshmat->GetDisplayArray()->GetTriangleIndexCount() / 3;
+		}
+	}
+	if (triangles == 0 || triangles > AUTO_OCCLUDER_MAX_TRIANGLES) {
+		return false;
+	}
+
+	// World-space box of the mesh bounds.
+	BoundBox *bb = BKE_object_boundbox_get(ob);
+	if (!bb) {
+		return false;
+	}
+	float lo[3] = {FLT_MAX, FLT_MAX, FLT_MAX};
+	float hi[3] = {-FLT_MAX, -FLT_MAX, -FLT_MAX};
+	for (int i = 0; i < 8; i++) {
+		float co[3];
+		mul_v3_m4v3(co, ob->obmat, bb->vec[i]);
+		minmax_v3v3_v3(lo, hi, co);
+	}
+	float side[3] = {hi[0] - lo[0], hi[1] - lo[1], hi[2] - lo[2]};
+	std::sort(side, side + 3);
+	return side[1] >= AUTO_OCCLUDER_MIN_SIDE && side[2] * side[1] >= AUTO_OCCLUDER_MIN_AREA;
+}
+
 static void BL_CreateGraphicObjectNew(KX_GameObject *gameobj, KX_Scene *kxscene, bool isActive, e_PhysicsEngine physics_engine)
 {
 	switch (physics_engine) {
@@ -3226,6 +3281,9 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 	const double cullingStart = PIL_check_seconds_timer();
 	if (kxscene->GetDbvtCulling()) {
 		bool occlusion = false;
+		const bool autoOcclusion = (blenderscene->gm.lodflag & SCE_AUTO_OCCLUSION) != 0;
+		unsigned int autoOccluders = 0;
+		kxscene->SetAutoOcclusion(autoOcclusion);
 		for (KX_GameObject *gameobj : sumolist) {
 			// The object can't be culled ?
 			if (gameobj->GetMeshList().empty() && gameobj->GetGameObjectType() != SCA_IObject::OBJ_TEXT) {
@@ -3233,10 +3291,17 @@ void BL_ConvertBlenderObjects(struct Main *maggie,
 			}
 
 			bool isactive = objectset.count(gameobj) != 0;
+			if (autoOcclusion && isactive && BL_IsAutoOccluder(gameobj)) {
+				gameobj->SetOccluder(true, false);
+				autoOccluders++;
+			}
 			BL_CreateGraphicObjectNew(gameobj, kxscene, isactive, physics_engine);
 			if (gameobj->GetOccluder()) {
 				occlusion = true;
 			}
+		}
+		if (autoOcclusion) {
+			CM_Message("auto occluders: " << autoOccluders << " in scene " << kxscene->GetName());
 		}
 		if (occlusion) {
 			kxscene->SetDbvtOcclusionRes(blenderscene->gm.occlusionRes);
