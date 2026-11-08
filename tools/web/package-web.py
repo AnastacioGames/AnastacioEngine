@@ -141,6 +141,10 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
   #touch .dpad i { position: absolute; width: calc(var(--u) * .8); height: calc(var(--u) * .8); border-radius: 6px;
                    background: rgba(255,255,255,.25); }
   #touch .zone.on .knob, #touch .btn.on, #touch .dpad i.on { background: rgba(232,134,42,.7); }
+  #mic-note { position: fixed; left: 50%; top: calc(12px + env(safe-area-inset-top, 0px)); transform: translateX(-50%);
+    z-index: 20; padding: 10px 16px; border-radius: 10px; background: rgba(0,0,0,.75); color: #fff;
+    font: 15px system-ui, sans-serif; pointer-events: none; }
+  #mic-note[hidden] { display: none; }
 </style>
 </head>
 <body>
@@ -159,6 +163,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
 <button id="fs" hidden>Tela cheia</button>
 <button id="touch-toggle" hidden aria-controls="touch" aria-pressed="true">Controles: ligados</button>
 <div id="touch" hidden></div>
+<div id="mic-note" hidden></div>
 <pre id="log"></pre>
 __PERF_SCRIPT__
 <script>
@@ -166,6 +171,7 @@ __PERF_SCRIPT__
   var GAME = "__GAME__";
   var EXTRAS = __EXTRAS__;
   var VERSION = "__VERSION__";
+  var MICROPHONE = __MICROPHONE__;  // --microphone: aviso de permissao do microfone
   var CARDBOARD = __CARDBOARD__;  // --cardboard: botao VR sempre visivel, sem controle de toque
   var el = function (id) { return document.getElementById(id); };
   var debug = /[?&]debug=1/.test(location.search);
@@ -809,6 +815,27 @@ __PERF_SCRIPT__
   var appHidden = false;
   window.rangeAppHidden = function (hidden) { appHidden = !!hidden; syncAudio(); };
 
+  // Microfone (plugins/webaudio/WebMicrophone.cpp, Module.rangeMic): pendente por mais de 1 s pede um
+  // toque (o AudioContext so roda depois de um gesto); negado explica onde liberar. ?micnote=0 desliga.
+  if (MICROPHONE && !/[?&]micnote=0/.test(location.search)) {
+    var micSince = 0;
+    setInterval(function () {
+      var M = window.Module && window.Module.rangeMic, note = el("mic-note"), text = "";
+      if (M && !M.closed) {
+        var ctx = window.Module.rangeAudio && window.Module.rangeAudio.ctx;
+        var pending = M.state === 1 || (M.state === 2 && ctx && ctx.state !== "running");
+        if (pending) {
+          micSince = micSince || Date.now();
+          if (Date.now() - micSince > 1000) text = "\\uD83C\\uDFA4 Toque para ativar o microfone";
+        }
+        else micSince = 0;
+        if (M.state === 3) text = "Microfone bloqueado: libere nas configura\\u00e7\\u00f5es";
+      } else micSince = 0;
+      if (note.textContent !== text) note.textContent = text;
+      note.hidden = !text;
+    }, 250);
+  }
+
   el("fs").addEventListener("click", toggleFullscreen);
   document.addEventListener("fullscreenchange", onFullscreenChange);
   document.addEventListener("webkitfullscreenchange", onFullscreenChange);
@@ -1199,6 +1226,8 @@ def main():
     ap.add_argument("--cardboard", action="store_true",
                     help="preset VR Cardboard: sem controle na tela (o toque vira gatilho), botao 'Entrar em VR' "
                          "sempre visivel; o APK gerado deste pacote sai em paisagem")
+    ap.add_argument("--microphone", action="store_true",
+                    help="o jogo usa o microfone: aviso de permissao na pagina e RECORD_AUDIO no APK gerado")
     args = ap.parse_args()
     if args.cardboard:
         args.touch_layout = "none"
@@ -1251,6 +1280,7 @@ def main():
             .replace("__PERF_SCRIPT__", '<script src="%s"></script>' % PERF_FILE if args.perf else "")
             .replace("__VERSION__", args.version)
             .replace("__CARDBOARD__", "true" if args.cardboard else "false")
+            .replace("__MICROPHONE__", "true" if args.microphone else "false")
             .replace("__PLAYER_ARGS__", json.dumps(player_args(args.debug_overlays)))
             .replace("__TOUCH__", json.dumps({"layout": args.touch_layout, "stick": args.touch_stick}))
             .replace("__WIDTH__", str(args.width))
@@ -1276,6 +1306,7 @@ def main():
         "requirements": {"webgl": 2, "threads": False, "cross_origin_isolation": False},
         "touch_controls": {"layout": args.touch_layout, "stick": args.touch_stick},
         "cardboard": args.cardboard,
+        "microphone": args.microphone,
         "runtime": {n: files[n] for n in RUNTIME_FILES},
         "files": files,
         "warnings": warnings,

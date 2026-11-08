@@ -112,6 +112,7 @@
 #include "BL_ArmatureActuator.h"
 #include "SCA_WaitActuator.h"
 #include "KX_VideoActuator.h"
+#include "KX_VoiceActuator.h"
 #include "RNA_access.h"
 #include "BL_Action.h"
 #include "BL_ActionData.h"
@@ -1351,6 +1352,14 @@ void BL_ConvertActuators(const char *maggiename,
 				baseact = new KX_VideoActuator(gameobj, video_act->mode, video_act->seconds,
 				                               (video_act->flag & ACT_VIDEO_RELATIVE) != 0,
 				                               converter.FindGameObject(video_act->ob));
+				break;
+			}
+			case ACT_VOICE:
+			{
+				bVoiceActuator *voice_act = (bVoiceActuator *)bact->data;
+				baseact = new KX_VoiceActuator(gameobj, voice_act->mode, voice_act->slot, voice_act->preset,
+				                               voice_act->amount, voice_act->volume, voice_act->max_seconds,
+				                               (voice_act->flag & ACT_VOICE_REVERB) != 0);
 				break;
 			}
 			case ACT_MOUSE:

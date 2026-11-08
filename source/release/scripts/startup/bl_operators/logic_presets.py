@@ -303,6 +303,22 @@ def _character(b, context):
         mb.link([s], [a], "Mouse Look")
 
 
+def _talk(b):
+    b.property("voice", 'FLOAT', 0.0)
+    s = b.sensor('MICROPHONE', "Talking", mode='TALKING', threshold=0.1, hold=0.3, property="voice")
+    a = b.actuator('MESSAGE', "Talk", subject="talk")
+    b.link([s], [a], "Talk")
+
+
+def _recorder(b):
+    rec = b.key('R', "Key R")
+    a = b.actuator('VOICE', "Record", mode='RECORD', slot="voice")
+    b.link([rec], [a], "Record")
+    play = b.key('P', "Key P")
+    a = b.actuator('VOICE', "Play Robot", mode='PLAY', slot="voice", effect='ROBOT')
+    b.link([play], [a], "Play")
+
+
 class LOGIC_OT_preset_add(Operator):
     """Add a group of logic bricks already linked"""
     bl_idname = "logic.preset_add"
@@ -342,6 +358,10 @@ class LOGIC_OT_preset_add(Operator):
             ('CHARACTER', "Character (Posture)", "Third person Character: WASD walks where the camera "
                                                  "looks and turns the character, Shift runs, C crouches, "
                                                  "Z crawls, Space jumps, the mouse turns the camera", 'ARMATURE_DATA', 15),
+            ('TALK', "Talk to Act", "While the player talks into the microphone the message \"talk\" is sent; "
+                                    "the property \"voice\" gets the voice level (0..1)", 'REC', 16),
+            ('RECORDER', "Voice Recorder", "Hold R to record the microphone, P plays it back with the "
+                                           "Robot effect (change it in the Voice actuator)", 'PLAY_AUDIO', 17),
         ),
     )
 
@@ -402,6 +422,8 @@ class LOGIC_OT_preset_add(Operator):
             'CHECKPOINT': _checkpoint,
             'PLATFORM': _platform,
             'MOUSE_LOOK': _mouse_look,
+            'TALK': _talk,
+            'RECORDER': _recorder,
         }[self.type](b)
         return {'FINISHED'}
 

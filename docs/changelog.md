@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-08 - Microfone (jogo, editor, Web e Android)
+
+- Núcleo `aud.Microphone` com backends OpenAL, WebAudio e Test; `aud.voice_fx`, `aud.edit`, `aud.peak`, WAV próprio.
+- Jogo: `Range.audio.microphone*`, `playVoice`, `playLive`; sensor Microphone, atuador Voice, nós e peças de UI.
+- Web/Android: `getUserMedia` + AudioWorklet, opção Microphone no export, `RECORD_AUDIO` só quando o jogo usa.
+- Editor: gravar e Ajustar Som no atuador, nó, Sequencer e evento Dialog; Record Voice no Rec Play.
+- Builds desktop e Web OK; testes em background com o backend Test. Falta aceite com microfone físico.
+
 ## 2026-11-07 - Automatic Occluders aprovado com janela
 
 - Cena jogável `criar_cena_visibilidade.py -- saida.range aceite` (W/A/S/D, setas, contador de FPS): nada some

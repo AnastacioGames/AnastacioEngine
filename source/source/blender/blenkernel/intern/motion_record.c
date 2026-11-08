@@ -25,9 +25,11 @@
 #include "MEM_guardedalloc.h"
 
 #include "BLI_math.h"
+#include "BLI_path_util.h"
 #include "BLI_string.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_appdir.h"
 #include "BKE_motion_record.h"
 
 typedef struct MotionTrack {
@@ -52,6 +54,7 @@ static struct {
 	float walk_speed;
 	bool layers, layers_collide, watch;
 	int replaced_take;
+	bool voice;
 } rec = {NULL};
 
 void BKE_motion_record_free(void)
@@ -80,6 +83,7 @@ void BKE_motion_record_begin(struct Object **actors, int actors_num, float fixed
 	rec.walk_speed = walk_speed;
 	rec.replaced_take = -1;
 	rec.active = true;
+	rec.voice = false;
 }
 
 void BKE_motion_record_set_layers(bool layers, bool collide, int replaced_take, bool watch)
@@ -88,6 +92,30 @@ void BKE_motion_record_set_layers(bool layers, bool collide, int replaced_take, 
 	rec.layers_collide = collide;
 	rec.replaced_take = replaced_take;
 	rec.watch = watch;
+}
+
+void BKE_motion_record_set_voice(bool voice)
+{
+	rec.voice = voice;
+}
+
+bool BKE_motion_record_voice(void)
+{
+	return rec.voice;
+}
+
+void BKE_motion_record_voice_temp_path(char *r_path, int maxlen)
+{
+	BLI_join_dirfile(r_path, maxlen, BKE_tempdir_session(), "recplay_voice.wav");
+}
+
+void BKE_motion_record_voice_file(const char *take_name, const char *main_path, char *r_path, int maxlen)
+{
+	char safe[128];
+	BLI_strncpy(safe, take_name, sizeof(safe));
+	BLI_filename_make_safe(safe);
+	BLI_snprintf(r_path, maxlen, "//sounds/take_%s.wav", safe);
+	BLI_path_abs(r_path, main_path);
 }
 
 bool BKE_motion_record_layers(void)

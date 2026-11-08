@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.ActivityNotFoundException
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Build
@@ -12,6 +13,7 @@ import android.util.Log
 import android.view.WindowManager
 import android.webkit.ConsoleMessage
 import android.webkit.JavascriptInterface
+import android.webkit.PermissionRequest
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
@@ -30,6 +32,9 @@ import java.io.ByteArrayInputStream
 class MainActivity : Activity() {
 
     private lateinit var webView: WebView
+
+    /** Pedido de microfone da pagina esperando a resposta do sistema (so um por vez). */
+    private var micRequest: PermissionRequest? = null
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +88,15 @@ class MainActivity : Activity() {
             override fun onConsoleMessage(message: ConsoleMessage): Boolean {
                 Log.i(LOG_TAG, "${message.message()} (${message.sourceId()}:${message.lineNumber()})")
                 return true
+            }
+
+            // getUserMedia do microfone (plugins/webaudio/WebMicrophone.cpp). Toda rota termina em grant ou deny.
+            override fun onPermissionRequest(request: PermissionRequest) {
+                runOnUiThread { handlePermission(request) }
+            }
+
+            override fun onPermissionRequestCanceled(request: PermissionRequest) {
+                if (micRequest === request) micRequest = null
             }
         }
         // Quit Game do jogo (Module.onRangeQuit no index.html) fecha o app.
@@ -141,7 +155,47 @@ class MainActivity : Activity() {
         webView.saveState(outState)
     }
 
+    private fun handlePermission(request: PermissionRequest) {
+        if (!request.resources.contains(PermissionRequest.RESOURCE_AUDIO_CAPTURE)) {
+            request.deny()
+            return
+        }
+        val audio = arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE)
+        if (!declaresRecordAudio()) {
+            // Jogo exportado sem "Microphone": o manifesto nao tem RECORD_AUDIO.
+            request.deny()
+            return
+        }
+        if (checkSelfPermission(RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+            request.grant(audio)
+            return
+        }
+        micRequest?.deny()
+        micRequest = request
+        requestPermissions(arrayOf(RECORD_AUDIO), MIC_REQUEST_CODE)
+    }
+
+    private fun declaresRecordAudio(): Boolean {
+        val info = packageManager.getPackageInfo(packageName, PackageManager.GET_PERMISSIONS)
+        return info.requestedPermissions?.contains(RECORD_AUDIO) == true
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != MIC_REQUEST_CODE) return
+        val request = micRequest ?: return
+        micRequest = null
+        // Negado (inclusive "nao perguntar de novo", que volta negado na hora) vira 'denied' na pagina.
+        if (grantResults.isNotEmpty() && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            request.grant(arrayOf(PermissionRequest.RESOURCE_AUDIO_CAPTURE))
+        } else {
+            request.deny()
+        }
+    }
+
     override fun onDestroy() {
+        micRequest?.deny()
+        micRequest = null
         webView.destroy()
         super.onDestroy()
     }
@@ -151,5 +205,7 @@ class MainActivity : Activity() {
         const val START_URL = "https://$APP_HOST/assets/www/index.html"
         const val LOG_TAG = "RangeWeb"
         const val UA_MARKER = "RangeWebView/1"
+        const val RECORD_AUDIO = android.Manifest.permission.RECORD_AUDIO
+        const val MIC_REQUEST_CODE = 41
     }
 }

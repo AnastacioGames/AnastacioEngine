@@ -5,6 +5,11 @@ concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](..
 e detalhados no [`changelog.md`](changelog.md) (histórico antigo em [`changelog-arquivo.md`](changelog-arquivo.md)).
 Ao concluir um item, apague-o daqui e registre no changelog.
 
+## Microfone
+
+Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Falta aceite com microfone físico
+(desktop, navegador e APK) e conferir se o export Web/APK leva a pasta `sounds/`.
+
 ## Track Tool (pistas e vias)
 
 - [Plano](plano-track-tool.md): traçado + perfil em faixas (asfalto, calçada, borda, talude, morro), sweep

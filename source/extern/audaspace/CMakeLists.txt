@@ -39,6 +39,7 @@ endif()
 set(SRC
 	src/devices/DefaultSynchronizer.cpp
 	src/devices/DeviceManager.cpp
+	src/devices/Microphone.cpp
 	src/devices/NULLDevice.cpp
 	src/devices/ReadDevice.cpp
 	src/devices/SoftwareDevice.cpp
@@ -91,6 +92,7 @@ set(SRC
 	src/fx/Sum.cpp
 	src/fx/Threshold.cpp
 	src/fx/Volume.cpp
+	src/fx/VoiceFX.cpp
 	src/fx/VolumeReader.cpp
 	src/fx/VolumeSound.cpp
 	src/fx/VolumeStorage.cpp	
@@ -147,6 +149,8 @@ set(PUBLIC_HDR
 	include/devices/IDeviceFactory.h
 	include/devices/IDevice.h
 	include/devices/IHandle.h
+	include/devices/IMicrophoneBackend.h
+	include/devices/Microphone.h
 	include/devices/ISynchronizer.h
 	include/devices/NULLDevice.h
 	include/devices/ReadDevice.h
@@ -205,6 +209,7 @@ set(PUBLIC_HDR
 	include/fx/Sum.h
 	include/fx/Threshold.h
 	include/fx/Volume.h
+	include/fx/VoiceFX.h
 	include/fx/VolumeReader.h
 	include/fx/VolumeSound.h
 	include/fx/VolumeStorage.h
@@ -373,6 +378,7 @@ if(WITH_C)
 		bindings/C/AUD_Sequence.cpp
 		bindings/C/AUD_Sound.cpp
 		bindings/C/AUD_Special.cpp
+		bindings/C/AUD_Microphone.cpp
 	)
 	set(C_HDR
 		bindings/C/GEEffects/AUD_OpenALEffect.h
@@ -385,6 +391,7 @@ if(WITH_C)
 		bindings/C/AUD_Sequence.h
 		bindings/C/AUD_Sound.h
 		bindings/C/AUD_Special.h
+		bindings/C/AUD_Microphone.h
 		bindings/C/AUD_Types.h
 	)
 
@@ -581,9 +588,9 @@ endif()
 
 # Saida AudioWorklet do runtime Web (substitui o ScriptProcessorNode do port SDL2; plugins/webaudio).
 if(EMSCRIPTEN)
-	list(APPEND SRC plugins/webaudio/WebAudioDevice.cpp)
-	list(APPEND HDR plugins/webaudio/WebAudioDevice.h)
-	list(APPEND STATIC_PLUGINS WebAudioDevice)
+	list(APPEND SRC plugins/webaudio/WebAudioDevice.cpp plugins/webaudio/WebMicrophone.cpp)
+	list(APPEND HDR plugins/webaudio/WebAudioDevice.h plugins/webaudio/WebMicrophone.h)
+	list(APPEND STATIC_PLUGINS WebAudioDevice WebMicrophone)
 endif()
 
 # OpenAL
@@ -596,10 +603,12 @@ if(WITH_OPENAL)
 		set(OPENAL_SRC
 			plugins/openal/OpenALDevice.cpp
 			plugins/openal/OpenALReader.cpp
+			plugins/openal/OpenALMicrophone.cpp
 		)
 		set(OPENAL_HDR
 			plugins/openal/OpenALDevice.h
 			plugins/openal/OpenALReader.h
+			plugins/openal/OpenALMicrophone.h
 		)
 
 		if(NOT PLUGIN_OPENAL)
@@ -607,7 +616,7 @@ if(WITH_OPENAL)
 			list(APPEND LIBRARIES ${OPENAL_LIBRARY})
 			list(APPEND SRC ${OPENAL_SRC})
 			list(APPEND HDR ${OPENAL_HDR})
-			list(APPEND STATIC_PLUGINS OpenALDevice)
+			list(APPEND STATIC_PLUGINS OpenALDevice OpenALMicrophone)
 		endif()
 
 		if(WIN32 AND AUDASPACE_STANDALONE)
@@ -928,6 +937,8 @@ if(WITH_PYTHON)
 	set(PYTHON_SRC
 		bindings/python/PyAPI.cpp
 		bindings/python/PyDevice.cpp
+		bindings/python/PyMicrophone.cpp
+		bindings/python/PyVoiceFX.cpp
 		bindings/python/PyDynamicMusic.cpp
 		bindings/python/PyHandle.cpp
 		bindings/python/PyPlaybackManager.cpp
@@ -940,6 +951,8 @@ if(WITH_PYTHON)
 	set(PYTHON_HDR
 		bindings/python/PyAPI.h
 		bindings/python/PyDevice.h
+		bindings/python/PyMicrophone.h
+		bindings/python/PyVoiceFX.h
 		bindings/python/PyDynamicMusic.h
 		bindings/python/PyHandle.h
 		bindings/python/PyPlaybackManager.h

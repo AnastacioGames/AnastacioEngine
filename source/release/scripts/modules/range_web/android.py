@@ -47,6 +47,8 @@ DEFAULTS = {
     "keyAlias": "",
     # Release: gera tambem o .aab (formato da Google Play), assinado com a mesma chave. Ignorado no debug.
     "aab": False,
+    # Microfone: vem do manifest.json do pacote Web (--microphone); sem ele o APK nao pede RECORD_AUDIO.
+    "microphone": False,
 }
 
 # Senha da chave para o terminal e para o Gradle (o template le as variaveis RANGE_ANDROID_*).
@@ -384,6 +386,12 @@ def apply_config(project, config):
     text = _read(manifest)
     text = _replace_once(text, r'android:screenOrientation="[^"]*"',
                          'android:screenOrientation="%s"' % ORIENTATIONS[config["orientation"]], manifest)
+    if config.get("microphone"):
+        # Antes de <application>: o WebView so libera getUserMedia com RECORD_AUDIO concedido (MainActivity.kt).
+        text = _replace_once(text, r"\n    <application",
+                             '\n    <uses-permission android:name="android.permission.RECORD_AUDIO" />'
+                             '\n    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />'
+                             '\n\n    <application', manifest)
     if config.get("icon"):
         mipmap = os.path.join(project, "app", "src", "main", "res", "mipmap-xxxhdpi")
         os.makedirs(mipmap, exist_ok=True)
@@ -586,6 +594,9 @@ def build_apk(package_dir, config, out_dir, toolchain=None, template=None, log=p
         # Pacote --cardboard: o visor so funciona deitado.
         config = dict(config, orientation="landscape")
         log("Pacote Cardboard: orientacao em paisagem")
+    config = dict(config, microphone=bool(manifest.get("microphone")))
+    if config["microphone"]:
+        log("Pacote com microfone: RECORD_AUDIO no manifesto")
 
     out_dir = os.path.abspath(out_dir)
     os.makedirs(out_dir, exist_ok=True)

@@ -374,6 +374,8 @@ static const char *sensor_name(int type)
 		return N_("Joystick");
 	case SENS_VR_HEAD:
 		return N_("VR Head");
+	case SENS_MICROPHONE:
+		return N_("Microphone");
 	}
 	return N_("Unknown");
 }
@@ -452,6 +454,8 @@ static const char *actuator_name(int type)
 		return N_("Wait");
 	case ACT_VIDEO:
 		return N_("Video");
+	case ACT_VOICE:
+		return N_("Voice");
 	}
 	return N_("Unknown");
 }
@@ -1409,6 +1413,22 @@ static void draw_sensor_vr_head(uiLayout *layout, PointerRNA *ptr)
 	}
 }
 
+static void draw_sensor_microphone(uiLayout *layout, PointerRNA *ptr)
+{
+	Object *ob = (Object *)ptr->id.data;
+	PointerRNA settings_ptr;
+	uiLayout *row;
+
+	uiItemR(layout, ptr, "mode", 0, NULL, ICON_NONE);
+	row = uiLayoutRow(layout, false);
+	uiItemR(row, ptr, "threshold", 0, NULL, ICON_NONE);
+	if (RNA_enum_get(ptr, "mode") != SENS_MIC_PEAK) {
+		uiItemR(row, ptr, "hold", 0, NULL, ICON_NONE);
+	}
+	RNA_pointer_create((ID *)ob, &RNA_GameObjectSettings, ob, &settings_ptr);
+	uiItemPointerR(layout, ptr, "property", &settings_ptr, "properties", NULL, ICON_NONE);
+}
+
 static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 {
 	uiLayout *box;
@@ -1473,6 +1493,9 @@ static void draw_brick_sensor(uiLayout *layout, PointerRNA *ptr, bContext *C)
 			break;
 		case SENS_VR_HEAD:
 			draw_sensor_vr_head(box, ptr);
+			break;
+		case SENS_MICROPHONE:
+			draw_sensor_microphone(box, ptr);
 			break;
 	}
 }
@@ -2570,9 +2593,26 @@ static void draw_actuator_scene(uiLayout *layout, PointerRNA *ptr)
 static void draw_actuator_sound(uiLayout *layout, PointerRNA *ptr, bContext *C)
 {
 	uiLayout *row, *col;
+	PointerRNA op_ptr;
+	Object *ob = (Object *)ptr->id.data;
+	bActuator *act = (bActuator *)ptr->data;
+	ID *sound_id = (ID *)RNA_pointer_get(ptr, "sound").data;
 
-	uiTemplateID(layout, C, ptr, "sound", NULL, "SOUND_OT_open", NULL, UI_TEMPLATE_ID_FILTER_ALL);
-	if (!RNA_pointer_get(ptr, "sound").data) {
+	/* Campo do som + gravar do microfone (sound.record_microphone, anastacio_sound_record.py)
+	 * e "Ajustar Som" (corte, fade, efeito). */
+	row = uiLayoutRow(layout, false);
+	uiTemplateID(row, C, ptr, "sound", NULL, "SOUND_OT_open", NULL, UI_TEMPLATE_ID_FILTER_ALL);
+	if (WM_operatortype_find("SOUND_OT_record_microphone", true)) {
+		uiItemFullO(row, "SOUND_OT_record_microphone", "", ICON_REC, NULL, WM_OP_INVOKE_DEFAULT, 0, &op_ptr);
+		RNA_enum_set_identifier(NULL, &op_ptr, "target", "ACTUATOR");
+		RNA_string_set(&op_ptr, "object", ob->id.name + 2);
+		RNA_string_set(&op_ptr, "brick", act->name);
+	}
+	if (sound_id && WM_operatortype_find("SOUND_OT_adjust", true)) {
+		uiItemFullO(row, "SOUND_OT_adjust", "", ICON_MODIFIER, NULL, WM_OP_INVOKE_DEFAULT, 0, &op_ptr);
+		RNA_string_set(&op_ptr, "sound", sound_id->name + 2);
+	}
+	if (!sound_id) {
 		uiItemL(layout, IFACE_("Select a sound from the list or load a new one"), ICON_NONE);
 		return;
 	}
@@ -2663,6 +2703,29 @@ static void draw_actuator_video(uiLayout *layout, PointerRNA *ptr)
 		row = uiLayoutRow(layout, false);
 		uiItemR(row, ptr, "seconds", 0, NULL, ICON_NONE);
 		uiItemR(row, ptr, "use_relative", 0, NULL, ICON_NONE);
+	}
+}
+
+static void draw_actuator_voice(uiLayout *layout, PointerRNA *ptr)
+{
+	uiLayout *row;
+	const int mode = RNA_enum_get(ptr, "mode");
+
+	row = uiLayoutRow(layout, false);
+	uiItemR(row, ptr, "mode", 0, "", ICON_NONE);
+	if (mode != ACT_VOICE_LIVE && mode != ACT_VOICE_STOP) {
+		uiItemR(row, ptr, "slot", 0, "", ICON_NONE);
+	}
+	if (mode == ACT_VOICE_RECORD) {
+		uiItemR(layout, ptr, "max_seconds", 0, NULL, ICON_NONE);
+	}
+	else if (mode == ACT_VOICE_PLAY || mode == ACT_VOICE_LIVE) {
+		row = uiLayoutRow(layout, false);
+		uiItemR(row, ptr, "effect", 0, "", ICON_NONE);
+		uiItemR(row, ptr, "amount", 0, NULL, ICON_NONE);
+		row = uiLayoutRow(layout, false);
+		uiItemR(row, ptr, "volume", 0, NULL, ICON_NONE);
+		uiItemR(row, ptr, "use_reverb", 0, NULL, ICON_NONE);
 	}
 }
 
@@ -2858,6 +2921,9 @@ static void draw_brick_actuator(uiLayout *layout, PointerRNA *ptr, bContext *C)
 			break;
 		case ACT_VIDEO:
 			draw_actuator_video(box, ptr);
+			break;
+		case ACT_VOICE:
+			draw_actuator_voice(box, ptr);
 			break;
 	}
 }

@@ -148,6 +148,8 @@ set(SRC
 	KX_ObstacleSimulation.cpp
 	KX_ParentActuator.cpp
 	KX_VideoActuator.cpp
+	KX_VoiceActuator.cpp
+	KX_MicrophoneSensor.cpp
 	KX_ParticleDebugUI.cpp
 	KX_ParticleSystem.cpp
 	KX_PlanarMap.cpp
@@ -279,6 +281,8 @@ set(SRC
 	KX_ObstacleSimulation.h
 	KX_ParentActuator.h
 	KX_VideoActuator.h
+	KX_VoiceActuator.h
+	KX_MicrophoneSensor.h
 	KX_ParticleDebugUI.h
 	KX_ParticleSystem.h
 	KX_PhysicsEngineEnums.h

@@ -24,6 +24,8 @@
 #include "PyDynamicMusic.h"
 #include "PyThreadPool.h"
 #include "PySource.h"
+#include "PyMicrophone.h"
+#include "PyVoiceFX.h"
 
 #ifdef WITH_CONVOLUTION
 #include "PyImpulseResponse.h"
@@ -102,6 +104,9 @@ PyInit_aud()
 	if(!initializeSource())
 		return nullptr;
 
+	if(!initializeMicrophone())
+		return nullptr;
+
 #ifdef WITH_CONVOLUTION
 	if(!initializeImpulseResponse())
 		return nullptr;
@@ -123,6 +128,8 @@ PyInit_aud()
 	addPlaybackManagerToModule(module);
 	addThreadPoolToModule(module);
 	addSourceToModule(module);
+	addMicrophoneToModule(module);
+	addVoiceFXToModule(module);
 
 #ifdef WITH_CONVOLUTION
 	addImpulseResponseToModule(module);
