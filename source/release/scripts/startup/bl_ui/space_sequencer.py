@@ -82,6 +82,14 @@ class SEQUENCER_HT_header(Header):
         if context.area.show_header_menus:
             SEQUENCER_MT_editor_menus.draw_collapsible(context, layout)
 
+        # Playback right in the header: the Sequencer often lives in its own window, without a Timeline.
+        row = layout.row(align=True)
+        row.operator("screen.frame_jump", text="", icon='REW').end = False
+        if context.screen.is_animation_playing:
+            row.operator("screen.animation_play", text="", icon='PAUSE')
+        else:
+            row.operator("screen.animation_play", text="", icon='PLAY')
+
         row = layout.row(align=True)
         row.prop(scene, "use_preview_range", text="", toggle=True)
         row.prop(scene, "lock_frame_selection_to_range", text="", toggle=True)

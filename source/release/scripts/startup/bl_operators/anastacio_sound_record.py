@@ -20,11 +20,13 @@
 Tudo sem DNA novo: valores ficam nas propriedades dos operadores.
 """
 
+import math
 import os
 import tempfile
 import time
 
 import bpy
+import bpy.utils.previews
 from bpy.types import Operator
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty, StringProperty
 
@@ -39,6 +41,62 @@ _preview = {"handle": None}
 
 def _has_mic():
     return aud is not None and hasattr(aud, "Microphone")
+
+
+# Estado mostrado no cabeçalho superior enquanto grava, como o Rec de vídeo.
+_status = {"text": ""}
+
+
+_mic_icon = {"colecao": None}
+
+
+def _mic_alpha(x, y):
+    """Cobertura (0..1) do desenho do microfone num quadro 32x32, y para cima."""
+    def capsula(ax, ay, bx, by):
+        dx, dy = bx - ax, by - ay
+        t = max(0.0, min(1.0, ((x - ax) * dx + (y - ay) * dy) / max(dx * dx + dy * dy, 1e-6)))
+        return math.hypot(x - ax - t * dx, y - ay - t * dy)
+    corpo = capsula(16, 17, 16, 24) - 5.5
+    raio = math.hypot(x - 16, y - 17)
+    arco = abs(raio - 10.0) - 1.4 if y <= 17 else capsula(6, 17, 6, 18) - 1.4
+    if x > 16 and y > 17:
+        arco = capsula(26, 17, 26, 18) - 1.4
+    haste = capsula(16, 7, 16, 3) - 1.4
+    base = capsula(10, 3, 22, 3) - 1.4
+    return max(0.0, min(1.0, 0.5 - min(corpo, arco, haste, base)))
+
+
+def mic_icon_id():
+    """Ícone de microfone cinza, desenhado por código (o conjunto de ícones não tem um)."""
+    if _mic_icon["colecao"] is None:
+        colecao = bpy.utils.previews.new()
+        preview = colecao.new("microfone")
+        pixels = []
+        for y in range(32):
+            for x in range(32):
+                pixels += (0.85, 0.85, 0.85, _mic_alpha(x + 0.5, y + 0.5))
+        preview.icon_size = preview.image_size = (32, 32)
+        preview.icon_pixels_float = pixels
+        preview.image_pixels_float = pixels
+        _mic_icon["colecao"] = colecao
+    return _mic_icon["colecao"]["microfone"].icon_id
+
+
+def recording_status():
+    """Texto do estado da gravação para a barra superior; "" = não está gravando."""
+    return _status["text"]
+
+
+def _status_show(context, text):
+    _status["text"] = text
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == 'INFO':
+                area.tag_redraw()
+
+
+def _status_hide(context):
+    _status_show(context, "")
 
 
 _device_cache = []  # o Blender guarda ponteiros para os textos de um enum dinâmico
@@ -248,16 +306,9 @@ class SOUND_OT_record_microphone(Operator):
     def poll(cls, context):
         return _has_mic()
 
-    def _header(self, context, text):
-        if self._area is not None:
-            self._area.header_text_set(text)
-            self._area.tag_redraw()
-
     def _finish(self, context):
         context.window_manager.event_timer_remove(self._timer)
-        if self._area is not None:
-            self._area.header_text_set()
-            self._area.tag_redraw()
+        _status_hide(context)
 
     def invoke(self, context, event):
         if self.target == 'DIALOG' and not bpy.data.filepath:
@@ -282,7 +333,6 @@ class SOUND_OT_record_microphone(Operator):
             self.report({'ERROR'}, "Microfone: %s" % (self._mic.error or "não abriu"))
             return {'CANCELLED'}
         stop_preview()
-        self._area = context.area
         self._begin = time.time() + self.countdown
         self._recording = False
         self._timer = context.window_manager.event_timer_add(0.05, context.window)
@@ -303,18 +353,17 @@ class SOUND_OT_record_microphone(Operator):
                 return {'CANCELLED'}
             now = time.time()
             if state != 'granted':
-                self._header(context, "Microfone: esperando permissão...  (botão direito: cancelar)")
+                _status_show(context, "Waiting for microphone...")
                 self._begin = max(self._begin, now)
                 return {'RUNNING_MODAL'}
             if now < self._begin:
-                self._header(context, "Gravando em %d...  %s" % (int(self._begin - now) + 1, _bar(mic.level)))
+                _status_show(context, "Recording in %d..." % (int(self._begin - now) + 1))
                 return {'RUNNING_MODAL'}
             if not self._recording:
                 mic.record_start()
                 self._recording = True
             elapsed = now - self._begin
-            self._header(context, "● REC  %s  %s  %s   Esc/Enter/clique: salvar   Botão direito: cancelar"
-                         % (_fmt(elapsed), _bar(mic.level), _device_label(self._device)))
+            _status_show(context, "Recording  %s  %s" % (_fmt(elapsed), _bar(mic.level, 10)))
             if elapsed >= self.max_seconds:
                 return self._save(context)
             return {'RUNNING_MODAL'}
@@ -587,7 +636,59 @@ class SEQUENCER_OT_bake_sound_strip(Operator):
 
 
 
+class SOUND_OT_recording_status(Operator):
+    """Gravando: clique para salvar, botão direito para cancelar"""
+    bl_idname = "sound.recording_status"
+    bl_label = "Recording"
+
+    def execute(self, context):
+        # o clique é atendido pelo modal da gravação
+        return {'CANCELLED'}
+
+
+class SOUND_OT_open_sequencer_window(Operator):
+    """Abre uma janela nova com o Video Sequencer"""
+    bl_idname = "sound.open_sequencer_window"
+    bl_label = "Open Video Sequencer Window"
+
+    def execute(self, context):
+        wm = context.window_manager
+        window = context.window
+        area = max(window.screen.areas, key=lambda a: a.width * a.height)  # a janela nasce do tamanho da área
+        antes = set(w.as_pointer() for w in wm.windows)
+        override = {"window": window, "screen": window.screen, "area": area}
+        bpy.ops.screen.area_dupli(override, 'INVOKE_DEFAULT')
+        novas = [w for w in wm.windows if w.as_pointer() not in antes]
+        if not novas:
+            self.report({'ERROR'}, "Não deu para abrir a janela")
+            return {'CANCELLED'}
+        novas[0].screen.areas[0].type = 'SEQUENCE_EDITOR'
+        return {'FINISHED'}
+
+
+class INFO_PT_record(bpy.types.Panel):
+    """Gravação de áudio: tudo num lugar só, na barra superior"""
+    bl_space_type = 'INFO'
+    bl_region_type = 'HEADER'
+    bl_label = "Record"
+    bl_ui_units_x = 13
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator("sound.record_microphone", text="Record to Sequencer", icon='REC').target = 'SEQUENCER'
+        layout.operator("sound.record_microphone", text="Record New Sound", icon='SOUND').target = 'NEW'
+        layout.separator()
+        layout.operator("sound.select_microphone", text="Select Microphone...", icon='SPEAKER')
+        layout.operator("sound.adjust", text="Adjust Sound of Active Strip...", icon='MODIFIER')
+        layout.separator()
+        layout.operator("sound.open_sequencer_window", icon='SEQUENCE')
+
+
 classes = (
+    SOUND_OT_recording_status,
+    SOUND_OT_open_sequencer_window,
+    INFO_PT_record,
     SOUND_OT_select_microphone,
     SOUND_OT_record_microphone,
     SOUND_OT_preview_fx,

@@ -54,10 +54,22 @@ class INFO_HT_header(Header):
             layout.operator("screen.back_to_previous", icon='SCREEN_BACK', text="Back to Previous")
         # Screen and scene selectors sit in the right corner (end of draw).
 
+        from bl_operators.anastacio_sound_record import mic_icon_id, recording_status
+        layout.separator(factor=1)
+        row = layout.row(align=True)
+        status = recording_status()
+        if status:
+            # Like the video Rec: the state lives here, in the top header.
+            row.alert = True
+            row.operator("sound.recording_status", text=status, icon='REC')
+        else:
+            row.operator("sound.record_microphone", text="  Record  ", icon_value=mic_icon_id()).target = 'SEQUENCER'
+            row.popover(panel="INFO_PT_record", text="")
+
         wm = context.window_manager
         if wm.info_show_screen_recorder:
             # Left side, next to the menus, away from the window corner.
-            layout.separator(factor=4)
+            layout.separator(factor=1)
             row = layout.row(align=True)
             if not wm.is_screencast_running:
                 # While recording, the red "Recording mm:ss" button (running jobs) stops it.

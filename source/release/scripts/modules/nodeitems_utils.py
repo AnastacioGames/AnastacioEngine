@@ -205,6 +205,7 @@ class NodeItemCustom:
 
 
 _node_categories = {}
+_POPOVER_MAX_ROWS = 12  # above this the add popover splits in two columns
 
 
 def register_node_categories(identifier, cat_list):
@@ -224,19 +225,22 @@ def register_node_categories(identifier, cat_list):
             if hasattr(wm, "node_add_search"):
                 layout.prop(wm, "node_add_search", text="", icon='VIEWZOOM')
                 search = wm.node_add_search.strip().lower()
-        col = layout.column()
-        if isinstance(self, bpy.types.Panel):
-            # taller buttons in the shelf/popover, room for the socket dots
-            col.scale_y = 1.4
         try:
-            shown = 0
-            for item in self.category.items(context):
-                if test is not None and not test(item):
-                    continue
-                if search and search not in getattr(item, "label", "").lower():
-                    continue
+            items = [item for item in self.category.items(context)
+                     if (test is None or test(item)) and
+                     (not search or search in getattr(item, "label", "").lower())]
+            shown = len(items)
+            popover = context.region is None or context.region.type != 'TOOLS'
+            if isinstance(self, bpy.types.Panel) and popover and shown > _POPOVER_MAX_ROWS:
+                # long lists don't fit the screen in one column
+                col = layout.column_flow(columns=2)
+            else:
+                col = layout.column()
+                if isinstance(self, bpy.types.Panel):
+                    # taller buttons in the shelf/popover, room for the socket dots
+                    col.scale_y = 1.4
+            for item in items:
                 item.draw(item, col, context)
-                shown += 1
             if (test is not None or search) and shown == 0:
                 col.label("No matching node")
         finally:
@@ -252,11 +256,16 @@ def register_node_categories(identifier, cat_list):
             "poll": cat.poll,
             "draw": draw_node_item,
         })
+        try:
+            longa = len(list(cat.items(None))) > _POPOVER_MAX_ROWS
+        except Exception:  # items() that really needs a context
+            longa = False
         panel_type = type("NODE_PT_category_" + cat.identifier, (bpy.types.Panel,), {
             "bl_space_type": 'NODE_EDITOR',
             "bl_region_type": 'TOOLS',
             "bl_label": cat.name,
             "bl_category": cat.name,
+            "bl_ui_units_x": 20 if longa else 0,
             "category": cat,
             "poll": cat.poll,
             "draw": draw_node_item,

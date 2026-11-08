@@ -1856,6 +1856,7 @@ static const EditorTypeItem animation_editors[] = {
 	{SPACE_IPO, "Graph Editor", ICON_IPO},
 	{SPACE_ACTION, "Dope Sheet", ICON_ACTION},
 	{SPACE_NLA, "NLA Editor", ICON_NLA},
+	{SPACE_SEQ, "Video Sequencer", ICON_SEQUENCE},
 	{0, NULL, 0}
 };
 
@@ -1868,7 +1869,6 @@ static const EditorTypeItem scripting_editors[] = {
 };
 
 static const EditorTypeItem more_editors[] = {
-	{SPACE_SEQ, "Video Sequencer", ICON_SEQUENCE},
 	{SPACE_CLIP, "Movie Clip Editor", ICON_CLIP},
 	{SPACE_CONSOLE, "Python Console", ICON_CONSOLE},
 	{SPACE_INFO, "Info", ICON_INFO},
