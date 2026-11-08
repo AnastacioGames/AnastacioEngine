@@ -165,9 +165,7 @@ class SEQUENCER_MT_view_toggle(Menu):
     def draw(self, context):
         layout = self.layout
 
-        layout.operator("sequencer.view_toggle").type = 'SEQUENCER'
-        layout.operator("sequencer.view_toggle").type = 'PREVIEW'
-        layout.operator("sequencer.view_toggle").type = 'SEQUENCER_PREVIEW'
+        layout.prop(context.space_data, "view_type", expand=True)
 
 
 class SEQUENCER_MT_view(Menu):

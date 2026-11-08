@@ -239,6 +239,9 @@ static void buttons_header_region_init(wmWindowManager *UNUSED(wm), ARegion *ar)
 static void buttons_header_region_draw(const bContext *C, ARegion *ar)
 {
 	SpaceButs *sbuts = CTX_wm_space_buts(C);
+	if (sbuts == NULL) {
+		return;
+	}
 
 	/* Needed for RNA to get the good values! */
 	buttons_context_compute(C, sbuts);

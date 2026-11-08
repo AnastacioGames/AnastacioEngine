@@ -761,6 +761,11 @@ static void mesh_undosys_step_decode(struct bContext *C, UndoStep *us_p, int UNU
 
 	MeshUndoStep *us = (MeshUndoStep *)us_p;
 	Object *obedit = us->obedit_ref.ptr;
+	/* Sem o objeto em edit-mode (mode_set falhou depois do memfile): não desreferenciar. */
+	if (obedit == NULL || obedit->type != OB_MESH || ((Mesh *)obedit->data)->edit_btmesh == NULL) {
+		printf("Mesh undo: edit-mode object not available, step skipped\n");
+		return;
+	}
 	Mesh *me = obedit->data;
 	BMEditMesh *em = me->edit_btmesh;
 	undomesh_to_editmesh(&us->data, em, obedit->data);
