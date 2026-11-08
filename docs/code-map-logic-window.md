@@ -3,7 +3,7 @@
 Índice do desenho do editor de Logic Bricks: sensores, controladores, atuadores, grupos e o realce ao vivo.
 Não descreve arquitetura; serve para achar a função certa sem ler 3.800 linhas.
 
-**Linhas conferidas em 2026-10-30 (`HEAD` `4a0c87cd`).** Os números envelhecem a cada edição: confirme com
+**Linhas conferidas em 2026-11-08 (`HEAD` `fa834071`).** Os números envelhecem a cada edição: confirme com
 `grep -n "nome" arquivo`. `python tools/check_docs.py --fix` corrige os números deste mapa.
 
 Arquivos vizinhos:
@@ -26,19 +26,19 @@ para a engine em `Converter/BL_ConvertSensors.cpp` ou `BL_ConvertActuators.cpp`.
 
 **Realce ao vivo (Highlight Active).** `logic_debug_*`, chamado no fim de `logic_buttons`.
 
-## `source/source/blender/editors/space_logic/logic_window.c` (3.801 linhas)
+## `source/source/blender/editors/space_logic/logic_window.c` (3.867 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
-| Eventos e nomes | `do_logic_buts` 104, `sensor_name` 340, `controller_name` 381, `actuator_name` 404, `set_sca_ob` 459, `get_selected_and_linked_obs` 476, `get_armature_bone_constraint` 646 |
-| Menus de adicionar e estados | `do_sensor_menu` 661, `sensor_menu` 690, `do_controller_menu` 710, `controller_menu` 739, `do_actuator_menu` 759, `actuator_menu` 788, `controller_state_mask_menu` 818, `is_sensor_linked` 858 |
-| Sensores | `draw_sensor_header` 900, `draw_sensor_internal_header` 952, `draw_sensor_animation_event` 984, `draw_sensor_collision` 1106, `draw_sensor_joystick` 1150, `draw_sensor_keyboard` 1189, `draw_sensor_mouse` 1223, `draw_sensor_property` 1270, `draw_sensor_ray` 1356, `draw_sensor_movement` 1391, `draw_sensor_vr_head` 1400, `draw_brick_sensor` 1412 (switch) |
-| Controladores | `draw_controller_header` 1481, `draw_controller_expression` 1529, `draw_controller_python` 1534, `draw_controller_state` 1550, `draw_brick_controller` 1555 (switch) |
-| Atuadores (A–F) | `draw_actuator_header` 1591, `draw_actuator_action` 1642, `draw_actuator_armature` 1690, `draw_actuator_camera` 1762, `draw_actuator_constraint` 1778, `draw_actuator_edit_object` 1878 |
-| 2D Filter | `filter2d_choice_menu` 2004, `filter2d_choice_draw` 2023, `draw_filter2d_uniforms` 2053, `draw_actuator_filter_2d` 2131 |
-| Atuadores (G–Z) | `draw_actuator_game` 2164, `draw_actuator_message` 2178, `draw_actuator_motion` 2201, `draw_actuator_parent` 2348, `draw_actuator_property` 2365, `draw_actuator_random` 2479, `draw_actuator_scene` 2544, `draw_actuator_sound` 2570, `draw_actuator_state` 2607, `draw_actuator_vibration` 2620, `draw_actuator_wait` 2646, `draw_actuator_video` 2655, `draw_actuator_visibility` 2669, `draw_actuator_steering` 2679, `draw_actuator_mouse` 2725, `draw_brick_actuator` 2787 (switch) |
-| Brick completo (caixa e links) | `draw_controller_brick` 2865, `draw_sensor_brick` 2941, `draw_actuator_brick` 2999, `sensor_is_shown` 3042 |
-| Grupos | `do_sensor_group_toggle` 3090, `logic_group_move` 3115, `draw_group_move_buttons` 3190, `draw_group_header_button` 3205 |
-| Colunas | `draw_sensor_column` 3221, `draw_controller_column` 3277, `draw_actuator_column` 3341 |
-| Realce ao vivo | `logic_debug_link_owner` 3410, `logic_debug_draw_wire` 3424, `logic_debug_draw` 3465 |
-| Entrada | **`logic_buttons`** 3562 (monta o bloco inteiro) |
+| Eventos e nomes | `do_logic_buts` 104, `sensor_name` 340, `controller_name` 383, `actuator_name` 406, `set_sca_ob` 463, `get_selected_and_linked_obs` 480, `get_armature_bone_constraint` 650 |
+| Menus de adicionar e estados | `do_sensor_menu` 665, `sensor_menu` 694, `do_controller_menu` 714, `controller_menu` 743, `do_actuator_menu` 763, `actuator_menu` 792, `controller_state_mask_menu` 822, `is_sensor_linked` 862 |
+| Sensores | `draw_sensor_header` 904, `draw_sensor_internal_header` 956, `draw_sensor_animation_event` 988, `draw_sensor_collision` 1110, `draw_sensor_joystick` 1154, `draw_sensor_keyboard` 1193, `draw_sensor_mouse` 1227, `draw_sensor_property` 1274, `draw_sensor_ray` 1360, `draw_sensor_movement` 1395, `draw_sensor_vr_head` 1404, `draw_brick_sensor` 1432 (switch) |
+| Controladores | `draw_controller_header` 1504, `draw_controller_expression` 1552, `draw_controller_python` 1557, `draw_controller_state` 1573, `draw_brick_controller` 1578 (switch) |
+| Atuadores (A–F) | `draw_actuator_header` 1614, `draw_actuator_action` 1665, `draw_actuator_armature` 1713, `draw_actuator_camera` 1785, `draw_actuator_constraint` 1801, `draw_actuator_edit_object` 1901 |
+| 2D Filter | `filter2d_choice_menu` 2027, `filter2d_choice_draw` 2046, `draw_filter2d_uniforms` 2076, `draw_actuator_filter_2d` 2154 |
+| Atuadores (G–Z) | `draw_actuator_game` 2187, `draw_actuator_message` 2201, `draw_actuator_motion` 2224, `draw_actuator_parent` 2371, `draw_actuator_property` 2388, `draw_actuator_random` 2502, `draw_actuator_scene` 2567, `draw_actuator_sound` 2593, `draw_actuator_state` 2647, `draw_actuator_vibration` 2660, `draw_actuator_wait` 2686, `draw_actuator_video` 2695, `draw_actuator_visibility` 2732, `draw_actuator_steering` 2742, `draw_actuator_mouse` 2788, `draw_brick_actuator` 2850 (switch) |
+| Brick completo (caixa e links) | `draw_controller_brick` 2931, `draw_sensor_brick` 3007, `draw_actuator_brick` 3065, `sensor_is_shown` 3108 |
+| Grupos | `do_sensor_group_toggle` 3156, `logic_group_move` 3181, `draw_group_move_buttons` 3256, `draw_group_header_button` 3271 |
+| Colunas | `draw_sensor_column` 3287, `draw_controller_column` 3343, `draw_actuator_column` 3407 |
+| Realce ao vivo | `logic_debug_link_owner` 3476, `logic_debug_draw_wire` 3490, `logic_debug_draw` 3531 |
+| Entrada | **`logic_buttons`** 3628 (monta o bloco inteiro) |
