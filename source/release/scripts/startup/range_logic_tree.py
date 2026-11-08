@@ -193,6 +193,7 @@ class TriggerNode(BrickNode):
 class ActionNode(BrickNode):
     kind = "actuator"
     has_then = False  # ações que concluem ganham a saída Then
+    defaults = {}  # valores iniciais do nó (o brick nasce vazio)
     base_color = ACTION_COLOR
 
     def init(self, context):
@@ -200,14 +201,18 @@ class ActionNode(BrickNode):
         sock.link_limit = 4095
         if self.has_then:
             self.outputs.new(PulseSocket.bl_idname, "Then")
+        for name, value in self.defaults.items():
+            setattr(self, name, value)
         self.paint()
 
 
 def _brick_node(base, idname, label, rna, brick_type, main, extra=(), fixed=None, required=(),
-                then=False):
+                then=False, defaults=None):
     attrs = {"bl_idname": idname, "bl_label": label, "brick_type": brick_type,
              "main": tuple(main), "extra": tuple(extra), "fixed": fixed or {},
              "required": tuple(required), "has_then": then}
+    if defaults:
+        attrs["defaults"] = dict(defaults)
     for f in tuple(main) + tuple(extra):
         attrs[f] = _prop_from_rna(rna.bl_rna.properties[f])
     return type(idname, (base, Node), attrs)
@@ -250,7 +255,8 @@ ACTION_NODES = (
     _brick_node(ActionNode, "RangeLogicSetProperty", "Set Property", T.PropertyActuator, 'PROPERTY',
                 ("property", "value"), fixed={"mode": 'ASSIGN'}, required=("property",)),
     _brick_node(ActionNode, "RangeLogicAddProperty", "Add to Property", T.PropertyActuator,
-                'PROPERTY', ("property", "value"), fixed={"mode": 'ADD'}, required=("property",)),
+                'PROPERTY', ("property", "value"), fixed={"mode": 'ADD'}, required=("property", "value"),
+                defaults={"value": "1"}),
     _brick_node(ActionNode, "RangeLogicToggleProperty", "Toggle Property", T.PropertyActuator,
                 'PROPERTY', ("property",), fixed={"mode": 'TOGGLE'}, required=("property",)),
     _brick_node(ActionNode, "RangeLogicMessageSend", "Send Message", T.MessageActuator, 'MESSAGE',
@@ -260,7 +266,7 @@ ACTION_NODES = (
     _brick_node(ActionNode, "RangeLogicRemove", "Remove Object", T.EditObjectActuator,
                 'EDIT_OBJECT', (), fixed={"mode": 'ENDOBJECT'}),
     _brick_node(ActionNode, "RangeLogicWait", "Wait", T.WaitActuator, 'WAIT',
-                ("duration",), ("use_restart",), then=True),
+                ("duration",), ("use_restart",), then=True, defaults={"duration": 1.0}),
     _brick_node(ActionNode, "RangeLogicAction", "Play Action", T.ActionActuator, 'ACTION',
                 ("action", "play_mode", "frame_start", "frame_end"),
                 ("property", "frame_property", "frame_blend_in", "priority", "layer",
@@ -295,7 +301,9 @@ class GoToStateNode(ActionNode, Node):
 
     def draw_buttons(self, context, layout):
         layout.prop(self, "range_logic_active")
-        layout.prop_search(self, "state", self.id_data, "nodes", text="", icon="NODETREE")
+        # Só os Frames de Estado, não todos os nós da árvore.
+        layout.context_pointer_set("range_logic_goto", self)
+        layout.menu("RANGE_MT_logic_state_frames", text=self.state or "Choose State", icon="NODETREE")
         err = self.error()
         if err:
             layout.label(err, icon="ERROR")
@@ -1725,9 +1733,41 @@ CATEGORIES = [
                   items=[NodeItem("NodeFrame"), NodeItem("NodeReroute")]),
 ]
 
+class RANGE_OT_logic_goto_set_state(Operator):
+    """Use this State Frame as the Go To State target"""
+    bl_idname = "node.range_logic_goto_set_state"
+    bl_label = "Set State"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    state = StringProperty()
+
+    @classmethod
+    def poll(cls, context):
+        return getattr(context, "range_logic_goto", None) is not None
+
+    def execute(self, context):
+        context.range_logic_goto.state = self.state
+        return {'FINISHED'}
+
+
+class RANGE_MT_logic_state_frames(bpy.types.Menu):
+    bl_label = "State Frames"
+
+    def draw(self, context):
+        layout = self.layout
+        node = getattr(context, "range_logic_goto", None)
+        frames = state_frames(node.id_data) if node is not None else []
+        if not frames:
+            layout.label("No State Frame in this tree", icon="INFO")
+        for frame in frames:
+            layout.context_pointer_set("range_logic_goto", node)
+            layout.operator(RANGE_OT_logic_goto_set_state.bl_idname, text=_label(frame)).state = _label(frame)
+
+
 CLASSES = (LogicTree, PulseSocket) + TRIGGER_NODES + GATE_NODES + ACTION_NODES + (
     RANGE_OT_logic_tree_compile, RANGE_OT_logic_tree_new, RANGE_OT_logic_tree_recipe,
-    RANGE_OT_logic_tree_clear_highlight, RANGE_OT_logic_tree_import, NODE_PT_range_logic_tree)
+    RANGE_OT_logic_tree_clear_highlight, RANGE_OT_logic_tree_import, NODE_PT_range_logic_tree,
+    RANGE_OT_logic_goto_set_state, RANGE_MT_logic_state_frames)
 
 
 def register():

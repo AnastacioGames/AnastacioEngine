@@ -556,7 +556,12 @@ class UIRuntime:
             print("[UI] invalid value for %s: %r" % (name, text))
             return
         current = self.owner.get(name, 0)
-        self.owner[name] = type(current)(current + delta) if isinstance(current, int) else current + delta
+        if isinstance(current, bool):
+            self.owner[name] = (current + delta) != 0  # bool continua bool
+        elif isinstance(current, int):
+            self.owner[name] = type(current)(current + delta)
+        else:
+            self.owner[name] = current + delta
 
     def run_python(self, path):
         import importlib
