@@ -47,8 +47,8 @@ int ModulatorReader::getLength() const
 	int len1 = m_reader1->getLength();
 	int len2 = m_reader2->getLength();
 	if((len1 < 0) || (len2 < 0))
-		return -1;
-	return std::max(len1, len2);
+		return std::max(len1, len2);
+	return std::min(len1, len2);
 }
 
 int ModulatorReader::getPosition() const
@@ -88,8 +88,9 @@ void ModulatorReader::read(int& length, bool& eos, sample_t* buffer)
 	for(int i = 0; i < len2 * specs.channels; i++)
 		buffer[i] *= buf[i];
 
-	length = std::max(len1, len2);
-	eos &= eos2;
+	/* O produto acaba quando qualquer um dos dois acaba (a voz modulada por um seno infinito). */
+	length = std::min(len1, len2);
+	eos = eos || eos2;
 }
 
 AUD_NAMESPACE_END

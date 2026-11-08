@@ -15,6 +15,7 @@
  ******************************************************************************/
 
 #include "fx/VoiceFX.h"
+#include "respec/ChannelMapper.h"
 #include "fx/Delay.h"
 #include "fx/Fader.h"
 #include "fx/Highpass.h"
@@ -80,9 +81,15 @@ SoundP VoiceFX::apply(SoundP s, const std::string& preset, float amount)
 	if(preset == "ROBOT")
 	{
 		/* Modulação em anel por um seno de 60 Hz, na taxa do próprio som. */
-		SampleRate rate = RATE_22050;
-		try { rate = s->createReader()->getSpecs().rate; } catch(Exception&) {}
-		SoundP ring(new Modulator(s, SoundP(new Sine(60.0f, rate))));
+		DeviceSpecs specs;
+		specs.format = FORMAT_FLOAT32;
+		specs.rate = RATE_22050;
+		specs.channels = CHANNELS_MONO;
+		try { specs.specs = s->createReader()->getSpecs(); } catch(Exception&) {}
+		SoundP sine(new Sine(60.0f, specs.rate));
+		if(specs.channels != CHANNELS_MONO)  // o Modulator exige o mesmo número de canais
+			sine = SoundP(new ChannelMapper(sine, specs));
+		SoundP ring(new Modulator(s, sine));
 		return mix(vol(s, 1.0f - 0.7f * a), vol(ring, 1.4f * a));
 	}
 	if(preset == "RADIO")
