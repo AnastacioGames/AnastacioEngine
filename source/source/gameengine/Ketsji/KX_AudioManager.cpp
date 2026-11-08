@@ -168,7 +168,8 @@ KX_AudioManager::KX_AudioManager(bool enabled)
 	m_microphoneUsers(0),
 	m_voiceModule(new Module()),
 	m_liveVoice(-1),
-	m_nextVoiceId(1)
+	m_nextVoiceId(1),
+	m_recPlayVoice(false)
 {
 	m_voiceModule->name = "__voice";
 	m_voiceModule->type = 0;

@@ -54,6 +54,7 @@ static struct {
 	float walk_speed;
 	bool layers, layers_collide, watch;
 	int replaced_take;
+	bool voice;
 } rec = {NULL};
 
 void BKE_motion_record_free(void)
