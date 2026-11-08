@@ -85,13 +85,15 @@ def abrir(cena=None, visivel=False, espera=60, args_extra=()):
     raise TimeoutError('o editor não respondeu; veja ' + str(log))
 
 
-def abrir_jogo(arquivo, visivel=False, espera=90, largura=1280, altura=720, env_extra=None):
+def abrir_jogo(arquivo, visivel=False, espera=90, largura=1280, altura=720, env_extra=None, exportado=False):
     """Roda o .range no AnastacioRuntime com o servidor_jogo.py; devolve um Jogo conectado."""
     PASTA.mkdir(parents=True, exist_ok=True)
     SESSAO_JOGO.unlink(missing_ok=True)
     env = dict(os.environ, RANGE_CONTROL_SCRIPT=str(AQUI / 'servidor_jogo.py'), RANGE_CONTROL_SESSION=str(SESSAO_JOGO),
                RANGE_NO_CRASH_DIALOG='1', **(env_extra or {}))
-    args = [str(RUNTIME), '-w', str(largura), str(altura), '0', '0', str(Path(arquivo).resolve())]
+    # exportado: `arquivo` é o próprio .exe do jogo, com a cena embutida
+    janela = ['-w', str(largura), str(altura), '0', '0']
+    args = [str(arquivo)] + janela if exportado else [str(RUNTIME)] + janela + [str(Path(arquivo).resolve())]
     log = PASTA / ('jogo_%d.log' % int(time.time() * 1000))  # um por execução: um jogo preso segura o seu
     if visivel:
         proc = subprocess.Popen(args, env=env, cwd=RAIZ, stdout=log.open('w'), stderr=subprocess.STDOUT)

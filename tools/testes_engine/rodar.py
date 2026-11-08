@@ -26,7 +26,7 @@ class Teste:
         self.abertos = []
         self.notas = []
 
-    def gerar(self, codigo, nome='cena'):
+    def gerar(self, codigo, nome='cena', limite=180):
         """Roda `codigo` (bpy) no editor em background sobre a cena padrão e salva <pasta>/<nome>.range.
         O código vê `saida` (caminho do .range) e pode salvar por conta própria; senão é salvo no fim."""
         destino = self.pasta / (nome + '.range')
@@ -34,7 +34,7 @@ class Teste:
         script.write_text('import bpy\nsaida = %r\n%s\nimport os\nif not os.path.exists(saida):\n'
                           '    bpy.ops.wm.save_as_mainfile(filepath=saida)\n' % (str(destino), codigo), encoding='utf-8')
         r = subprocess.run([str(controle.EDITOR), '-b', '--factory-startup', '--python-exit-code', '1',
-                            '--python', str(script)], capture_output=True, text=True, errors='replace', timeout=180)
+                            '--python', str(script)], capture_output=True, text=True, errors='replace', timeout=limite)
         if r.returncode or not destino.exists():
             raise RuntimeError('gerar %s falhou:\n%s' % (nome, (r.stdout + r.stderr)[-2000:]))
         return destino
