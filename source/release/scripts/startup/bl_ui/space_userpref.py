@@ -566,6 +566,7 @@ class USERPREF_MT_theme_background_textures(Menu):
         data_path = "user_preferences.themes[0].user_interface.background_tile_image"
         for label, value in (
                 ("None", ""),
+                ("Solid", "ui_textures/solid.png"),
                 ("Clouds", "ui_textures/clouds.png"),
                 ("Marble", "ui_textures/marble.png"),
                 ("Wood", "ui_textures/wood.png"),

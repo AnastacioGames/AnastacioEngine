@@ -76,3 +76,11 @@ for name, kind, setup in TEXTURES:
     image.file_format = 'PNG'
     image.save()
     print("UITEX", name, min(values), max(values))
+
+# Branco puro: o Tint do tema define a cor final.
+image = bpy.data.images.new("solid", SIZE, SIZE, alpha=False)
+image.pixels = [1.0] * (SIZE * SIZE * 4)
+image.filepath_raw = os.path.join(OUT, "solid.png")
+image.file_format = 'PNG'
+image.save()
+print("UITEX solid 1.0 1.0")
