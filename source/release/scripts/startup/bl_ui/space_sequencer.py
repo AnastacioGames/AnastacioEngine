@@ -362,6 +362,7 @@ class SEQUENCER_MT_add(Menu):
         layout.operator("sequencer.sound_strip_add", text="Sound")
         layout.operator("sound.record_microphone", text="Record Sound (Microphone)",
                         icon='REC').target = 'SEQUENCER'
+        layout.operator("sound.select_microphone", text="Select Microphone...", icon='SOUND')
 
         layout.menu("SEQUENCER_MT_add_generate")
         layout.menu("SEQUENCER_MT_add_effect")
@@ -944,6 +945,7 @@ class SEQUENCER_PT_sound(SequencerButtonsPanel, Panel):
             op.sound = sound.name
             row.operator("sound.adjust", text="Adjust Sound", icon='MODIFIER').sound = sound.name
             layout.operator("sequencer.bake_sound_strip", icon='FILE_TICK')
+            layout.operator("sound.select_microphone", text="Select Microphone...", icon='SOUND')
 
         if st.waveform_draw_type == 'DEFAULT_WAVEFORMS':
             layout.prop(strip, "show_waveform")

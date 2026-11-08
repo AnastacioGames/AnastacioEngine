@@ -41,15 +41,44 @@ def _has_mic():
     return aud is not None and hasattr(aud, "Microphone")
 
 
+_device_cache = []  # o Blender guarda ponteiros para os textos de um enum dinâmico
+
+
+def _device_names():
+    try:
+        return list(aud.Microphone.devices()) if _has_mic() else []
+    except Exception:
+        return []
+
+
+def _device_label(name):
+    return name.replace("OpenAL Soft on ", "") if name else "Padrão do sistema"
+
+
 def _device_items(self, context):
-    items = [("DEFAULT", "Default", "Dispositivo padrão do sistema")]
-    if _has_mic():
-        try:
-            for i, name in enumerate(aud.Microphone.devices()):
-                items.append(("D%d" % i, name, name))
-        except Exception:
-            pass
-    return items
+    items = [("DEFAULT", "Padrão do sistema", "Microfone padrão do Windows")]
+    for i, name in enumerate(_device_names()):
+        items.append(("D%d" % i, _device_label(name), name))
+    _device_cache[:] = items
+    return _device_cache
+
+
+def _device_file():
+    return os.path.join(bpy.utils.user_resource('CONFIG', create=True), "anastacio_microphone.txt")
+
+
+def saved_device():
+    """Nome do microfone escolhido; "" = padrão, None = nunca escolheu."""
+    try:
+        with open(_device_file(), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return None
+
+
+def save_device(name):
+    with open(_device_file(), "w", encoding="utf-8") as f:
+        f.write(name)
 
 
 def _preset_items(self, context):
@@ -79,9 +108,14 @@ def _free_name(folder, base):
     return "%s_%d.wav" % (base, int(time.time()))
 
 
+def _rel(path):
+    """Caminho //relativo com barras normais (o .range também abre no Linux e na Web)."""
+    return bpy.path.relpath(path).replace(chr(92), "/")
+
+
 def _load_sound(path, saved):
     """Cria o datablock Sound; arquivo não salvo: empacota para não depender do temporário."""
-    filepath = bpy.path.relpath(path) if saved else path
+    filepath = _rel(path) if saved else path
     snd = bpy.data.sounds.load(filepath, check_existing=False)
     if not saved:
         snd.pack()
@@ -93,7 +127,7 @@ def _repoint(snd, path, saved):
     if snd.packed_file:
         # 'REMOVE' nao solta o pacote do Sound; USE_ORIGINAL solta e nao apaga nada.
         snd.unpack(method='USE_ORIGINAL')
-    snd.filepath = bpy.path.relpath(path) if saved else path
+    snd.filepath = _rel(path) if saved else path
     if not saved:
         snd.pack()
 
@@ -193,7 +227,7 @@ def _assign(context, op, snd):
 
 
 class SOUND_OT_record_microphone(Operator):
-    """Grava do microfone (Esc, Enter ou clique: salvar; botão direito: cancelar)"""
+    """Grava do microfone (Esc, Enter ou clique: salvar; botão direito: cancelar). Ctrl+clique: escolher o microfone"""
     bl_idname = "sound.record_microphone"
     bl_label = "Record Sound (Microphone)"
     bl_options = {'REGISTER', 'UNDO'}
@@ -206,7 +240,6 @@ class SOUND_OT_record_microphone(Operator):
     sound = StringProperty(name="Sound", description="Sound a regravar (Replace)", options={'SKIP_SAVE'})
     sequence_index = IntProperty(default=-1, options={'HIDDEN', 'SKIP_SAVE'})
     event_index = IntProperty(default=-1, options={'HIDDEN', 'SKIP_SAVE'})
-    device = EnumProperty(name="Device", items=_device_items)
     countdown = IntProperty(name="Countdown", description="Contagem antes de gravar (s)",
                             default=0, min=0, max=5)
     max_seconds = FloatProperty(name="Max Seconds", default=120.0, min=1.0, max=600.0)
@@ -230,11 +263,16 @@ class SOUND_OT_record_microphone(Operator):
         if self.target == 'DIALOG' and not bpy.data.filepath:
             self.report({'ERROR'}, "Salve o arquivo antes de gravar a fala da cutscene")
             return {'CANCELLED'}
-        device = None
-        if self.device != 'DEFAULT':
-            for ident, name, _d in _device_items(self, context):
-                if ident == self.device:
-                    device = name
+        device = saved_device()
+        names = _device_names()
+        if event.ctrl or (device is None and len(names) > 1):
+            bpy.ops.sound.select_microphone('INVOKE_DEFAULT')
+            return {'CANCELLED'}
+        if device and device not in names:
+            self.report({'WARNING'}, "Microfone escolhido não encontrado; usando o padrão")
+            device = ""
+        self._device = device or ""
+        device = device or None
         try:
             self._mic = aud.Microphone(device=device, rate=RATE, channels=1, seconds=2.0)
         except Exception as e:
@@ -275,8 +313,8 @@ class SOUND_OT_record_microphone(Operator):
                 mic.record_start()
                 self._recording = True
             elapsed = now - self._begin
-            self._header(context, "● REC  %s  %s   Esc/Enter/clique: salvar   Botão direito: cancelar"
-                         % (_fmt(elapsed), _bar(mic.level)))
+            self._header(context, "● REC  %s  %s  %s   Esc/Enter/clique: salvar   Botão direito: cancelar"
+                         % (_fmt(elapsed), _bar(mic.level), _device_label(self._device)))
             if elapsed >= self.max_seconds:
                 return self._save(context)
             return {'RUNNING_MODAL'}
@@ -307,6 +345,7 @@ class SOUND_OT_record_microphone(Operator):
         if aud.duration(rec) < 0.05:
             self.report({'WARNING'}, "Gravação vazia")
             return {'CANCELLED'}
+        silent = aud.peak(rec) <= 0.0
         folder, saved = _sounds_dir()
         name = _free_name(folder, "rec")
         path = os.path.join(folder, name)
@@ -323,7 +362,41 @@ class SOUND_OT_record_microphone(Operator):
             snd = _load_sound(path, saved)
             snd.name = os.path.splitext(name)[0]
             _assign(context, self, snd)
-        self.report({'INFO'}, "Gravado %s (%s)" % (snd.name, _fmt(aud.duration(rec))))
+        if silent:
+            self.report({'WARNING'}, "Gravou silêncio: Ctrl+clique no botão de gravar para trocar o microfone")
+        else:
+            self.report({'INFO'}, "Gravado %s (%s)" % (snd.name, _fmt(aud.duration(rec))))
+        return {'FINISHED'}
+
+
+class SOUND_OT_select_microphone(Operator):
+    """Escolhe o microfone usado pelos botões de gravar do editor"""
+    bl_idname = "sound.select_microphone"
+    bl_label = "Select Microphone"
+
+    device = EnumProperty(name="Microfone", items=_device_items)
+
+    @classmethod
+    def poll(cls, context):
+        return _has_mic()
+
+    def invoke(self, context, event):
+        names = _device_names()
+        current = saved_device()
+        if current in names:
+            self.device = "D%d" % names.index(current)
+        return context.window_manager.invoke_props_dialog(self, width=420)
+
+    def draw(self, context):
+        self.layout.prop(self, "device")
+        self.layout.label(text="Depois clique em gravar. Ctrl+clique troca de novo.", icon='INFO')
+
+    def execute(self, context):
+        name = ""
+        if self.device != 'DEFAULT':
+            name = _device_names()[int(self.device[1:])]
+        save_device(name)
+        self.report({'INFO'}, "Microfone: %s" % _device_label(name))
         return {'FINISHED'}
 
 
@@ -515,6 +588,7 @@ class SEQUENCER_OT_bake_sound_strip(Operator):
 
 
 classes = (
+    SOUND_OT_select_microphone,
     SOUND_OT_record_microphone,
     SOUND_OT_preview_fx,
     SOUND_OT_adjust,
