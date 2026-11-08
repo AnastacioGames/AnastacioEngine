@@ -24,6 +24,8 @@ AQUI = Path(__file__).resolve().parent
 EDITOR = RAIZ / 'build/bin/AnastacioEngine.exe'
 PASTA = Path(os.environ.get('ANASTACIO_CONTROLE_PASTA', RAIZ / 'artifacts/testes/controle'))
 SESSAO = PASTA / 'sessao.json'
+RUNTIME = RAIZ / 'build/bin/AnastacioRuntime.exe'
+SESSAO_JOGO = PASTA / 'sessao_jogo.json'
 DESKTOP = 'AnastacioTestes'
 
 
@@ -83,10 +85,35 @@ def abrir(cena=None, visivel=False, espera=60):
     raise TimeoutError('o editor não respondeu; veja ' + str(log))
 
 
+def abrir_jogo(arquivo, visivel=False, espera=90, largura=1280, altura=720, env_extra=None):
+    """Roda o .range no AnastacioRuntime com o servidor_jogo.py; devolve um Jogo conectado."""
+    PASTA.mkdir(parents=True, exist_ok=True)
+    SESSAO_JOGO.unlink(missing_ok=True)
+    env = dict(os.environ, RANGE_CONTROL_SCRIPT=str(AQUI / 'servidor_jogo.py'), RANGE_CONTROL_SESSION=str(SESSAO_JOGO),
+               RANGE_NO_CRASH_DIALOG='1', **(env_extra or {}))
+    args = [str(RUNTIME), '-w', str(largura), str(altura), '0', '0', str(Path(arquivo).resolve())]
+    log = PASTA / ('jogo_%d.log' % int(time.time() * 1000))  # um por execução: um jogo preso segura o seu
+    if visivel:
+        proc = subprocess.Popen(args, env=env, cwd=RAIZ, stdout=log.open('w'), stderr=subprocess.STDOUT)
+    else:
+        proc = None
+        iniciar_invisivel(args, log, env)
+    limite = time.time() + espera
+    while time.time() < limite:
+        if SESSAO_JOGO.exists():
+            return Jogo()
+        if proc and proc.poll() is not None:
+            break
+        time.sleep(0.2)
+    raise TimeoutError('o jogo não respondeu; veja ' + str(log))
+
+
 class Editor:
     """Conexão com o editor aberto. Qualquer comando do servidor vira um método."""
+    ARQUIVO = SESSAO
+
     def __init__(self):
-        self.sessao = json.loads(SESSAO.read_text())
+        self.sessao = json.loads(self.ARQUIVO.read_text())
         self.socket = socket.create_connection(('127.0.0.1', self.sessao['porta']), timeout=120)
         self.canal = self.socket.makefile('rw', encoding='utf-8')
 
@@ -97,6 +124,25 @@ class Editor:
         if not linha:
             raise ConnectionError('o editor fechou ou caiu durante: ' + cmd)
         return json.loads(linha)
+
+
+class Jogo(Editor):
+    """Conexão com o jogo rodando: py, estado, tecla, soltar, mouse, esperar, tela, fechar."""
+    ARQUIVO = SESSAO_JOGO
+
+    def __getattr__(self, cmd):
+        def chamar(**dados):
+            r = self.pedir(cmd, **dados)
+            if not r['ok']:
+                raise RuntimeError(r.get('traceback') or r['erro'])
+            return r['resultado']
+        return chamar
+
+    def fechar(self):
+        try:
+            self.pedir('fechar')
+        except (ConnectionError, OSError):
+            pass
 
 
 def main():

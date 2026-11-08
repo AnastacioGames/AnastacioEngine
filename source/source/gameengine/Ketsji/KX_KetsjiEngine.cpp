@@ -704,6 +704,42 @@ static void trace_image_upload(const char *name, int w, int h, bool mipmap, doub
 	              std::to_string(h) + ",\"mipmap\":" + (mipmap ? "true" : "false") + ",\"ms\":" + std::to_string(ms));
 }
 
+#ifdef WITH_PYTHON
+/* RANGE_CONTROL_SCRIPT: Python file loaded once; its tique() runs at the start of every
+ * frame with the first scene active. Used by tools/testes_engine to drive the game. */
+static void run_control_script(EXP_ListValue<KX_Scene> *scenes)
+{
+	static const char *path = getenv("RANGE_CONTROL_SCRIPT");
+	static PyObject *tick = nullptr;
+	static bool failed = false;
+	if (!path || !path[0] || failed || !scenes || scenes->GetCount() == 0) {
+		return;
+	}
+	KX_SetActiveScene(scenes->GetFront());
+	if (!tick) {
+		PyObject *runpy = PyImport_ImportModule("runpy");
+		PyObject *globals = runpy ? PyObject_CallMethod(runpy, "run_path", "sOs", path, Py_None, "range_control") : nullptr;
+		Py_XDECREF(runpy);
+		tick = globals ? PyDict_GetItemString(globals, "tique") : nullptr;
+		Py_XINCREF(tick);
+		Py_XDECREF(globals);
+		if (!tick) {
+			if (PyErr_Occurred()) {
+				PyErr_Print();
+			}
+			CM_Error("RANGE_CONTROL_SCRIPT: could not load tique() from " << path);
+			failed = true;
+			return;
+		}
+	}
+	PyObject *ret = PyObject_CallObject(tick, nullptr);
+	if (!ret) {
+		PyErr_Print();
+	}
+	Py_XDECREF(ret);
+}
+#endif
+
 bool KX_KetsjiEngine::NextFrame()
 {
 	if (CM_TraceModules()) {
@@ -722,6 +758,9 @@ bool KX_KetsjiEngine::NextFrame()
 	}
 #ifndef __EMSCRIPTEN__
     net::anastacioSteamService().pump(); // Once per rendered frame, shared by all scenes.
+#endif
+#ifdef WITH_PYTHON
+	run_control_script(m_scenes);
 #endif
 	if (g_profileFrameEnd > 0.0) {
 		RANGE_PROFILE_ADD("frame.outside", (m_clock.GetTimeSecond() - g_profileFrameEnd) * 1000.0);

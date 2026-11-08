@@ -95,6 +95,7 @@ extern "C" {
 #include "KX_DynamicActuator.h"
 #include "KX_GameActuator.h"
 #include "KX_KetsjiEngine.h"
+#include "DEV_InputDevice.h"
 #include "KX_FontObject.h"
 #include "KXImgui/KX_PythonImgui.h"
 #include "KX_MouseActuator.h"
@@ -630,6 +631,32 @@ static PyObject *gPySetPhysicsDebug(PyObject *, PyObject *args)
 static PyObject *gPyGetPhysicsTicRate(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	return PyFloat_FromDouble(KX_GetPhysicsEnvironment()->GetFixedTimeStep());
+}
+
+/* Test hook for tools/testes_engine: only active with RANGE_CONTROL_SCRIPT set, so games can't use it. */
+static PyObject *gPySimulateInput(PyObject *, PyObject *args)
+{
+	int code, value, x = 0, y = 0;
+	if (!PyArg_ParseTuple(args, "ii|ii:_simulateInput", &code, &value, &x, &y)) {
+		return nullptr;
+	}
+	const char *control = getenv("RANGE_CONTROL_SCRIPT");
+	if (!control || !control[0]) {
+		PyErr_SetString(PyExc_RuntimeError, "_simulateInput needs RANGE_CONTROL_SCRIPT");
+		return nullptr;
+	}
+	DEV_InputDevice *device = dynamic_cast<DEV_InputDevice *>(KX_GetActiveEngine()->GetInputDevice());
+	if (!device || code <= SCA_IInputDevice::NOKEY || code >= SCA_IInputDevice::MAX_KEYS) {
+		PyErr_SetString(PyExc_ValueError, "_simulateInput: bad input code");
+		return nullptr;
+	}
+	if (code == SCA_IInputDevice::MOUSEX || code == SCA_IInputDevice::MOUSEY) {
+		device->ConvertMoveEvent(x, y);
+	}
+	else {
+		device->ConvertEvent((SCA_IInputDevice::SCA_EnumInputs)code, value, 0);
+	}
+	Py_RETURN_NONE;
 }
 
 static PyObject *gPyGetAverageFrameRate(PyObject *, PyObject *Py_UNUSED(ignored))
@@ -1387,6 +1414,7 @@ static struct PyMethodDef game_methods[] = {
 	 "The BGE frame time is the simulated time corresponding to the last call of the logic system"},
 	{"getRealTime", (PyCFunction)gPyGetRealTime, METH_NOARGS, (const char *)"Get the real system time. "
 	 "The real-time corresponds to the system time" },
+	{"_simulateInput", (PyCFunction)gPySimulateInput, METH_VARARGS, (const char *)"Test hook (RANGE_CONTROL_SCRIPT only)"},
 	{"getAverageFrameRate", (PyCFunction)gPyGetAverageFrameRate, METH_NOARGS, (const char *)"Gets the estimated average frame rate"},
 	{"getTimeScale", (PyCFunction)gPyGetTimeScale, METH_NOARGS, (const char *)"Get the time multiplier"},
 	{"setTimeScale", (PyCFunction)gPySetTimeScale, METH_VARARGS, (const char *)"Set the time multiplier"},
