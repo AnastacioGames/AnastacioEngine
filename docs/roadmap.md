@@ -22,9 +22,8 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Occluder automático
 
-- Feito ([plano](plano-visibilidade-portais.md)); falta aceite com janela num jogo de interior, dica no Scene
-  Doctor e decidir se vem ligado em cenas novas. Achado pendente: `use_frame_rate = False` não solta o FPS no
-  runtime (espera segue a taxa de lógica).
+- Feito, com dica no Scene Doctor ([plano](plano-visibilidade-portais.md)); padrão desligado (decisão do usuário).
+  Falta aceite com janela num jogo de interior.
 
 ## Água realista (estudo do water 0.99)
 

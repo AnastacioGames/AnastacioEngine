@@ -5404,7 +5404,7 @@ static void rna_def_scene_game_data(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_frame_rate", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", GAME_ENABLE_ALL_FRAMES);
 	RNA_def_property_ui_text(prop, "Use Frame Rate",
-	                         "Respect the frame rate rather than rendering as many frames as possible");
+	                         "Physics advances in fixed steps of the logic rate (steadier vehicles); off uses softer physics. The game is always paced by the logic FPS");
 
 	prop = RNA_def_property(srna, "use_deprecation_warnings", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", GAME_IGNORE_DEPRECATION_WARNINGS);

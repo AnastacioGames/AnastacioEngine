@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-07 - Use Frame Rate: descrição corrigida
+
+- O texto dizia que desligar renderiza o máximo de quadros possível; não é verdade desde a Range original: o
+  jogo sempre espera pela taxa de lógica (`KX_KetsjiEngine::UpdateSleepTime`) e o flag só escolhe o passo da
+  física (`ProceedDeltaTimeCar` x `ProceedDeltaTime`, em `KX_SimulationPipeline`). Comportamento mantido; texto e
+  traduções corrigidos. Para medir sem limite, suba o FPS de lógica da cena (ex.: 1000), como fazem
+  `criar_cena_benchmark_kx10.py` e `criar_cena_visibilidade.py`. As medições antigas de `medir_fsr.py` ficaram
+  presas em 60 FPS e não comparam os upscalers.
+- Scene Doctor: dica para ligar Automatic Occluders (>= 150 malhas e >= 8 paredes/prédios candidatos).
+
 ## 2026-11-07 - Automatic Occluders
 
 - Nova opção em Scene > Culling: malhas estáticas grandes, opacas e simples viram occluders no load sem perder
