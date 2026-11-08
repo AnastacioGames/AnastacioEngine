@@ -28,7 +28,7 @@ Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings
 | Objetos: criação/réplica/grupos | `AddNodeReplicaObject` 1169, `ReplicateLogic` 1371, `DupliGroupRecurse` 1457, `IsObjectInGroup` 1599, `FindInactiveObjectAcrossScenes` 1604, `AddReplicaObject` 1651 |
 | Objetos: remoção | `RemoveNodeDestructObject` 1159, `RemoveObject` 1749, `RemoveDupliGroup` 1762, `DelayedRemoveObject` 1771, `RemoveEuthanasyObjects` 1778, `NewRemoveObject` 1798 |
 | Câmera e estatísticas de culling | `Get/SetActiveCamera` 1450–1468, contadores `GetLast*` 1474–1504, `Get/SetOverrideCullingCamera` 1511–1516, `SetCameraOnTop` 2195 |
-| Culling e listas visíveis | `PhysicsCullingCallback` 2216, `CalculateVisibleMeshes` 2235–2258, `UpdateObjectActivity` 3534 |
+| Culling e listas visíveis | `PhysicsCullingCallback` 2216, `CalculateVisibleMeshes` 2235–2258, `UpdateObjectActivity` 3534; Automatic Occluders: `CountCullingCallback` 2243 e liga/desliga dentro de `CalculateVisibleMeshes` 2378 |
 | Debug (desenho e ImGui) | `GetDebugDraw` 2437, `DrawDebug` 2442, `RenderDebugProperties` 2479, `RenderDebugPropertiesImGui` 2532, `FlushDebugDraw` 2678, `AddObjectDebugProperties` 1141 |
 | Frame lógico | `LogicBeginFrame` 2683, `LogicUpdateFrame` 3008, `LogicEndFrame` 3034, `UpdateParents` 3057 |
 | Animação | `AddAnimatedObject` 2700, `UpdateAnimPoseTask` 2788, `UpdateAnimDeformTask` 2818, `UpdateAnimations` 2786, `UpdateAnimationDeformers` 2999 |
@@ -143,7 +143,7 @@ Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConve
 | Utilitários | `BL_ConvertKeyCode` 455, `BL_GetUvRgba` 460 |
 | Materiais e malhas | `BL_ConvertMaterial` 500, `BL_ConvertMesh` 635, `BL_ComputeVertexBoneData` 797, `BL_ConvertDerivedMeshToArray` 1158 |
 | Deformers e ações | `BL_ConvertDeformer` 1714, `BL_ConvertAction(s)` 834–843 |
-| Física e gráfico | `BL_CreateGraphicObjectNew` 1839, `BL_CreatePhysicsObjectNew` 1867 |
+| Física e gráfico | `BL_IsAutoOccluder` 1848 (Automatic Occluders), `BL_CreateGraphicObjectNew` 1839, `BL_CreatePhysicsObjectNew` 1867 |
 | LOD, animação, culling | `BL_LodManagerFromBlenderObject` 1916, `BL_AnimationEventManagerFromBlenderObject` 1932, `activityCullingInfoFromBlenderObject` 1946 |
 | Luz, câmera, speaker | `BL_GameLightFromBlenderLamp` 1979, `BL_GameCameraFromBlenderCamera` 2049, `BL_SpeakerFromBlenderSpeaker` 2130 |
 | Objeto de jogo | `BL_GameObjectFromBlenderObject` 2227 (~180 linhas) |

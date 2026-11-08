@@ -753,7 +753,7 @@ def rule_auto_occlusion(scene, objects):
     return [Issue(
         "auto_occlusion", scene.name, 'LOW',
         tip_("%d wall(s) or building(s) could hide what is behind them") % len(walls),
-        tip_("Automatic Occluders (Scene > Culling) uses large opaque static meshes to skip the objects behind "
+        tip_("Automatic Occluders (Scene > Game Settings > Physics > Culling) uses large opaque static meshes to skip the objects behind "
              "them, keeping their collision, and turns itself off where it hides little. It helps most indoors "
              "and on weak GPUs. Fix turns it on."),
         sorted(walls, key=lambda o: o.name), fix)]

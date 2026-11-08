@@ -31,7 +31,7 @@ as medições antigas de FSR (`artifacts/fsr`) ficaram presas em 60 FPS.
 
 ## Occluder automático (feito em 2026-11-07)
 
-Opção **Automatic Occluders** em Scene > Culling, embaixo de Occlusion Culling (`use_auto_occlusion`, bit
+Opção **Automatic Occluders** na aba Scene > Game Settings > Physics > Culling, embaixo de Occlusion Culling (`use_auto_occlusion`, bit
 `SCE_AUTO_OCCLUSION` em `GameData.lodflag`; desligada em arquivos antigos e novos).
 
 - **Escolha no load** (`BL_IsAutoOccluder`, `BL_BlenderDataConversion.cpp`): malha estática (sem Dynamic/Rigid/

@@ -76,7 +76,9 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 - Batching estático (`RAS_BatchDisplayArray`, `RAS_BatchGroup`); a opção Static Batch por objeto usa essa base.
 - LOD por distância (`KX_LodManager`, `KX_LodLevel`).
 - Frustum culling (`SG_CullingNode`, `KX_CullingHandler`, `SG_Frustum`) e occlusion culling por DBVT do Bullet
-  (`use_occlusion_culling` e objetos `Occluder`: é configuração de conteúdo, não falta de C++).
+  (`use_occlusion_culling` e objetos `Occluder`). **Automatic Occluders** (`use_auto_occlusion`, desligado por
+  padrão) escolhe os occluders no load sem tirar a colisão e liga/desliga a oclusão pelo ganho medido. PVS/portais
+  foram medidos e descartados: não ganham do Occluder ([plano](docs/plano-visibilidade-portais.md)).
 - Principled BSDF/PBR. Não criar outro modelo PBR antes de verificar o que já existe.
 - MSAA de ponta a ponta.
 
@@ -127,6 +129,8 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 
 ### Tempo e lógica
 
+- O jogo sempre segue o FPS de lógica (`ticrate`), herdado da Range: `Use Frame Rate` só escolhe o passo da física
+  (`ProceedDeltaTimeCar` x `ProceedDeltaTime`). Para medir sem limite, subir o FPS de lógica da cena de teste.
 - Por padrão, 1 `Update()` por frame com o catch-up por sleep herdado; com v-sync, `FrameOver()` zera o atraso.
   Fixed Timestep (opcional e sempre ligado no multiplayer) usa o acumulador do Plano 8, sem interpolação no render.
 - Bordas do joystick são acumuladas na captura e consumidas uma vez por passo lógico, após todas as cenas.

@@ -54,6 +54,13 @@ por frame, a referência manteve o FPS). Sem occlusion a Anastacio já ficava à
 Câmera girando, culling ligado, mesma rodada: Static Batch ~1.170 → ~1.700 FPS
 (referência ~1.680); sem Static Batch ~512 → ~640 FPS. Validado no jogo do usuário.
 
+## 3. Oclusão automática (2026-11-07)
+
+O Occluder herdado escondia bem (prédio de 36 salas: 50 objetos desenhados contra 554), mas o tipo de física
+Occluder tira a colisão, então ninguém marcava as paredes. **Automatic Occluders** escolhe os occluders no load
+(sem mexer na física) e liga/desliga a oclusão contando, a cada 30 quadros, quantos objetos ela esconde para a
+câmera ativa. Medição e limites em [plano-visibilidade-portais.md](plano-visibilidade-portais.md).
+
 ## Ferramenta derivada
 
 O padrão do bug 2 (trabalho por frame sobre dados que não mudaram) virou o detector
