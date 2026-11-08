@@ -65,6 +65,7 @@ extern "C"
 #  include "BKE_blender.h"
 #  include "BKE_depsgraph.h"
 #  include "BKE_global.h"
+#  include "BKE_font.h"
 #  include "BKE_icons.h"
 #  include "BKE_image.h"
 #  include "BKE_node.h"
@@ -96,6 +97,8 @@ extern int datatoc_roboto_mono_medium_ttf_size;
 extern char datatoc_roboto_mono_medium_ttf[];
 extern int datatoc_inter_medium_ttf_size;
 extern char datatoc_inter_medium_ttf[];
+extern int datatoc_roboto_medium_pfb_size;
+extern char datatoc_roboto_medium_pfb[];
 
 }
 
@@ -1150,6 +1153,8 @@ int main(int argc,
 	/* Roboto lacks arrows and symbols such as U+2191: draw those from Inter, as in the editor. */
 	BLF_fallback_set_mem((const unsigned char *)datatoc_inter_medium_ttf, datatoc_inter_medium_ttf_size);
 	BLF_load_mem("default", (unsigned char *)datatoc_roboto_medium_ttf, datatoc_roboto_medium_ttf_size);
+	/* Objetos Text com a fonte <builtin>: o editor registra em creator.c, o player também precisa. */
+	BKE_vfont_builtin_register(datatoc_roboto_medium_pfb, datatoc_roboto_medium_pfb_size);
 	if (blf_mono_font == -1) {
 		blf_mono_font = BLF_load_mem_unique("monospace", (unsigned char *)datatoc_roboto_mono_medium_ttf, datatoc_roboto_mono_medium_ttf_size);
 	}

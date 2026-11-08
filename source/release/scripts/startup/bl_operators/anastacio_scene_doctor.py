@@ -759,6 +759,30 @@ def rule_auto_occlusion(scene, objects):
         sorted(walls, key=lambda o: o.name), fix)]
 
 
+def rule_shadow_culling(scene, objects):
+    """Files opened without versioning and saved again keep Shadow Culling at 0."""
+    gs = scene.game_settings
+    if gs.shadows_on_off:
+        return []
+    suns = [ob for ob in _active_objects(scene, objects)
+            if ob.type == 'LAMP' and ob.data.type in {'SUN', 'SPOT'} and getattr(ob.data, "use_shadow", False)]
+    if not suns:
+        return []
+
+    def fix(gs=gs):
+        gs.shadows_on_off = 1
+
+        def revert():
+            gs.shadows_on_off = 0
+        return revert
+    return [Issue(
+        "shadow_culling", scene.name, 'MEDIUM',
+        tip_("Shadow Culling is off with %d shadow lamp(s)") % len(suns),
+        tip_("Shadow Culling at 0 is usually left over from an old file: shadows can go stale on moving "
+             "objects. Fix turns it back on (the new scene default)."),
+        sorted(suns, key=lambda o: o.name), fix)]
+
+
 def _trace_suggestions():
     if not _trace_path:
         return []
@@ -825,6 +849,7 @@ RULES = (
     rule_scripts_every_frame,
     rule_probe_volume,
     rule_auto_occlusion,
+    rule_shadow_culling,
     rule_game_trace,
 )
 

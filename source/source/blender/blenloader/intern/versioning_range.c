@@ -509,6 +509,17 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  /* Arquivos salvos com a resolucao dinamica zerada (aberto sem versioning): escala maxima 0
+   * nunca e valida, entao volta aos padroes sem ligar o recurso. */
+  LISTBASE_FOREACH (Scene *, scene, &main->scene) {
+    if (scene->gm.dynamicResolutionMaxScale == 0) {
+      scene->gm.dynamicResolutionTargetFPS = 60;
+      scene->gm.dynamicResolutionMinScale = 50;
+      scene->gm.dynamicResolutionMaxScale = 100;
+      scene->gm.dynamicResolutionStep = 5;
+    }
+  }
+
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 111)) {
     /* Preserve the original weather appearance in old files while constraining
      * ripples to nearby upward-facing surfaces. */
