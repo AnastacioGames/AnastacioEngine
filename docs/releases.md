@@ -32,6 +32,20 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 Estado: **em preparo (2026-11-09)**. Correções da 0.7.0 (Export Web) e ajustes de luz/material no editor sem
 recompilar shaders. Texto da página do GitHub: [release-notes-0.7.1.md](release-notes-0.7.1.md).
 
+### Linux (2026-11-09, notebook Linux, `main` em `507b7006`)
+
+Pacotes no rascunho `v0.7.1` com `SHA256SUMS-linux.txt` (o Windows sobe o zip e publica):
+
+- `AnastacioEngine-0.7.1-linux-x86_64.tar.xz` (272 MB) sha256 `15edc8cc7029873729ee583bb9b61871dfe348024f0b277f57ea53b5320dc5c3`
+- `RangeArmor-0.7.1-linux-x86_64.tar.xz` (7,0 MB) sha256 `0cc49cd9acba7b825345a344ad1f5207483fb60f5b40d61a18dc3cd79a317966`
+
+1. Runtime Web (`web-runtime-release-linux`): não linkava após `531c2f3a` (`ED_render_material_draw_changed`
+   sem stub no player); stub adicionado em `507b7006`.
+2. Container (`VERSION=0.7.1`, `WEB_RUNTIME_DIR=/work/build-web-release/bin`): build e pacote OK.
+3. `testar-release.sh 0.7.1`: **23/23 OK**. Export Web do pacote extraído: projeto com `3rd person.range` e
+   `fase #2.range`, Destruction e ImGui_example exportam.
+4. RangeArmor sem mudança desde a 0.7.0: mesmo conteúdo da 0.7.0 com a pasta renomeada para 0.7.1.
+
 ## 0.7.0
 
 Estado: **publicada completa em 2026-11-08** (tag `v0.7.0`), Windows e Linux.
