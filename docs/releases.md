@@ -36,6 +36,16 @@ Texto da página do GitHub: [release-notes-0.7.0.md](release-notes-0.7.0.md).
 
 Windows: zip extraído numa pasta limpa (`blender.crt/`, editor e runtime), suíte 16 de 16 no build e pré-release 15 de 15.
 
+### Linux: pacote substituído (2026-11-09)
+
+Relato de usuário: Export Web falhava com `nome de arquivo extra invalido: 3rd person.range`.
+O `AnastacioEngine-0.7.0-linux-x86_64.tar.xz` da release foi trocado pelo mesmo pacote com 4 arquivos
+Python atualizados (`range_web/collect.py`, `range_web/collect_bpy.py`, `bl_ui/properties_web.py`,
+`web/tools/package-web.py`, commits `62286ab7`, `11751f63` e `058d2348`); binários e runtime Web sem mudança.
+Novo sha256 `3399c78b5eff820a44cbdc09c7334f0e8a88b31532a2f1e7866ba7b8652ebc97` (254 MB), já no
+`SHA256SUMS.txt` da release. Testado extraído: os 6 demos e um projeto com extras `3rd person.range`
+e `fase #2.range` exportam. O pacote Windows não foi trocado aqui.
+
 ### Linux (2026-11-08, notebook Linux, `main` em `f2f5dabf`, sem mudança de código até `ceb5bea8`)
 
 Pacotes enviados ao rascunho `v0.7.0` com `SHA256SUMS-linux.txt` (o Windows publica):
