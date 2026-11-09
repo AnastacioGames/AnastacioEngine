@@ -29,8 +29,17 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.7.1
 
-Estado: **em preparo (2026-11-09)**. Correções da 0.7.0 (Export Web) e ajustes de luz/material no editor sem
+Estado: **publicada completa em 2026-11-09** (tag `v0.7.1`), Windows e Linux. Correções da 0.7.0 (Export Web) e ajustes de luz/material no editor sem
 recompilar shaders. Texto da página do GitHub: [release-notes-0.7.1.md](release-notes-0.7.1.md).
+
+### Windows (2026-11-09, `main` em `507b7006`)
+
+- `AnastacioEngine-0.7.1-windows-x64.zip` (213 MiB) sha256 `e626e2f4ce4026076010f23d6607455215e98056300e775db9f50cae9fa3654c`
+- `RangeArmor-0.7.1-windows-x64.zip` (26 MB) sha256 `b4f9dde00ea6708b43a06bb1c1e8870211919159b51d515846875320822e5726`
+
+`pre_release.bat` OK (ctest 15/15), runtime Web recompilado no mesmo commit. Zip extraído em pasta limpa: editor e
+runtime iniciam, `blender.crt/` presente, e Export Web com `3rd person.range` e nomes com `#`, `%` e acento passou
+com preflight no Edge.
 
 ### Linux (2026-11-09, notebook Linux, `main` em `507b7006`)
 
