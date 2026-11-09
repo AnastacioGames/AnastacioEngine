@@ -99,6 +99,7 @@ typedef struct MindMapCache {
 	MMElem *drag_node;      /* set while a mouse press may become a drag */
 	bool dragging;
 	int drag_start[2];
+	float drag_delta[2];    /* distance moved by the mouse, in view units */
 	const MMElem *drop_target;
 	int drop_zone;
 	int drop_side;
@@ -472,6 +473,53 @@ static void mindmap_draw_texts(const MMLayout *layout, const ARegion *ar)
 	}
 }
 
+/* Dims the idea being dragged and draws a copy of it following the mouse. */
+static void mindmap_draw_drag_ghost(const bContext *C, ARegion *ar, const MindMapCache *cache)
+{
+	const rctf *cur = &ar->v2d.cur;
+	const int index = cache->dragging ? mindmap_layout_find(cache->layout, cache->drag_node) : -1;
+	const MMLayoutNode *node;
+	float xmin, xmax, ymin, ymax, scale;
+	int pixels, font;
+
+	if (index == -1) {
+		return;
+	}
+	node = &cache->layout->nodes[index];
+	xmin = node->xmin + cache->drag_delta[0];
+	xmax = node->xmax + cache->drag_delta[0];
+	ymin = node->ymin + cache->drag_delta[1];
+	ymax = node->ymax + cache->drag_delta[1];
+
+	UI_view2d_view_ortho(&ar->v2d);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	UI_ThemeColorShadeAlpha(TH_BACK, 0, -90);
+	glRectf(node->xmin, node->ymin, node->xmax, node->ymax);
+	UI_ThemeColorShadeAlpha(TH_BACK, -30, -40);
+	glRectf(xmin, ymin, xmax, ymax);
+	UI_ThemeColor(TH_TEXT_HI);
+	glLineWidth(2.0f);
+	fdrawbox(xmin, ymin, xmax, ymax);
+	glLineWidth(1.0f);
+	glDisable(GL_BLEND);
+	UI_view2d_view_restore(C);
+
+	scale = ar->winx / max_ff(BLI_rctf_size_x(cur), 1.0f);
+	pixels = (int)(TEXT_POINTS * scale + 0.5f);
+	font = mindmap_font_id();
+	if (pixels >= TEXT_MIN_PIXELS) {
+		float width;
+
+		BLF_size(font, pixels, 72);
+		width = BLF_width(font, node->text, BLF_DRAW_STR_DUMMY_MAX);
+		UI_ThemeColor(TH_TEXT_HI);
+		BLF_position(font, floorf(((xmin + xmax) * 0.5f - cur->xmin) * scale - width * 0.5f),
+		             floorf(((ymin + ymax) * 0.5f - cur->ymin) * scale - pixels * 0.35f), 0.0f);
+		BLF_draw(font, node->text, BLF_DRAW_STR_DUMMY_MAX);
+	}
+}
+
 static void mindmap_edit_apply(bContext *C, void *arg, void *UNUSED(arg2))
 {
 	MindMapCache *cache = arg;
@@ -648,6 +696,7 @@ static void mindmap_main_region_draw(const bContext *C, ARegion *ar)
 	UI_view2d_view_restore(C);
 
 	mindmap_draw_texts(cache->layout, ar);
+	mindmap_draw_drag_ghost(C, ar, cache);
 
 	if (cache->editing) {
 		mindmap_draw_edit_field(C, ar, cache);
@@ -914,6 +963,11 @@ static void mindmap_drag_update(ARegion *ar, MindMapCache *cache, const int mval
 {
 	float co[2];
 	const int index = mindmap_hit_node(ar, cache->layout, cache->selected, mval, NULL, co);
+	float now[2], start[2];
+
+	UI_view2d_region_to_view(&ar->v2d, mval[0], mval[1], &now[0], &now[1]);
+	UI_view2d_region_to_view(&ar->v2d, cache->drag_start[0], cache->drag_start[1], &start[0], &start[1]);
+	sub_v2_v2v2(cache->drag_delta, now, start);
 
 	cache->drop_target = NULL;
 	if (index != -1 && !mindmap_elem_inside(cache->layout->nodes[index].elem, cache->drag_node)) {
