@@ -1193,6 +1193,7 @@ EXP_PYMETHODDEF_DOC_VARARGS(KX_Camera, sphereInsideFrustum,
 
 EXP_PYMETHODDEF_DOC_O(KX_Camera, boxInsideFrustum,
                       "boxInsideFrustum(box) -> Integer\n"
+                      "\tbox: eight (8) world points, or a KX_GameObject (its world bounding box).\n"
                       "\treturns INSIDE, OUTSIDE or INTERSECT if the given box is\n"
                       "\tinside/outside/intersects this camera's viewing frustum.\n\n"
                       "\tbox = a list of the eight (8) corners of the box (in world coordinates.)\n\n"
@@ -1216,9 +1217,23 @@ EXP_PYMETHODDEF_DOC_O(KX_Camera, boxInsideFrustum,
                       "\t\t# Box is outside the frustum !\n"
                       )
 {
-	unsigned int num_points = PySequence_Size(value);
+	/* Um KX_GameObject vira os 8 cantos WORLD da sua caixa (mesma conta de getBoundBoxCorners). */
+	PyObject *corners = nullptr;
+	if (PyObject_TypeCheck(value, &KX_GameObject::Type)) {
+		corners = PyObject_CallMethod(value, "getBoundBoxCorners", nullptr); /* new ref */
+		if (!corners) {
+			return nullptr;
+		}
+		value = corners;
+	}
+
+	const Py_ssize_t num_points = PySequence_Size(value);
 	if (num_points != 8) {
-		PyErr_Format(PyExc_TypeError, "camera.boxInsideFrustum(box): KX_Camera, expected eight (8) points, got %d", num_points);
+		if (num_points >= 0 || !PyErr_Occurred() || PyErr_ExceptionMatches(PyExc_TypeError)) {
+			PyErr_Clear();
+			PyErr_Format(PyExc_TypeError, "camera.boxInsideFrustum(box): KX_Camera, expected a KX_GameObject or eight (8) points, got %R", value);
+		}
+		Py_XDECREF(corners);
 		return nullptr;
 	}
 
@@ -1229,9 +1244,11 @@ EXP_PYMETHODDEF_DOC_O(KX_Camera, boxInsideFrustum,
 		bool error = !PyVecTo(item, box[p]);
 		Py_DECREF(item);
 		if (error) {
+			Py_XDECREF(corners);
 			return nullptr;
 		}
 	}
+	Py_XDECREF(corners);
 
 	return PyLong_FromLong(GetFrustum(RAS_Rasterizer::RAS_STEREO_LEFTEYE).BoxInsideFrustum(box)); /* new ref */
 }

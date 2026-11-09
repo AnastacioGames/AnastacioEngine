@@ -249,8 +249,9 @@ base class --- :class:`KX_GameObject`
 
       Tests the given box against the view frustum.
 
-      :arg box: Eight (8) corner points of the box (in world coordinates.)
-      :type box: list of lists
+      :arg box: Eight (8) corner points of the box (in world coordinates), or a
+         :class:`~bge.types.KX_GameObject` to test its world bounding box.
+      :type box: list of lists or :class:`~bge.types.KX_GameObject`
       :return: :data:`~bge.types.KX_Camera.INSIDE`, :data:`~bge.types.KX_Camera.OUTSIDE` or :data:`~bge.types.KX_Camera.INTERSECT`
 
       .. note::
@@ -280,14 +281,16 @@ base class --- :class:`KX_GameObject`
          else:
            # Box is outside the frustum !
 
-      To test a game object, pass its world corners from
-      :meth:`~bge.types.KX_GameObject.getBoundBoxCorners`:
+      To test a game object, pass the object itself. It is the same as passing its world corners
+      from :meth:`~bge.types.KX_GameObject.getBoundBoxCorners`:
 
       .. code-block:: python
 
-         box = obj.getBoundBoxCorners('WORLD')
-         if cam.boxInsideFrustum(box) != cam.OUTSIDE:
+         if cam.boxInsideFrustum(obj) != cam.OUTSIDE:
              print(obj.name, "is visible (at least partly)")
+
+         # same result:
+         cam.boxInsideFrustum(obj.getBoundBoxCorners('WORLD'))
 
    .. method:: pointInsideFrustum(point)
 
