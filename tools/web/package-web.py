@@ -34,8 +34,8 @@ RUNTIME_FILES = ("RangeRuntime.js", "RangeRuntime.wasm", "RangeRuntime.data")
 PERF_FILE = "frame-time-perf.js"
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
 # Extras mantem o nome original (o jogo os abre pelo caminho, ex.: LibLoad("3rd person.range")):
-# aceita espaco e acentos; recusa so o que quebra URL ou FS (% # ? \\ e controle).
-EXTRA_PART_RE = re.compile(r"^[^\x00-\x1f%#?\\\\]+$")
+# aceita espaco e acentos; recusa so o que quebra FS (\\ e controle).
+EXTRA_PART_RE = re.compile(r"^[^\x00-\x1f\\\\]+$")
 
 
 def die(msg):
@@ -1028,7 +1028,7 @@ __PERF_SCRIPT__
         });
         return Promise.all(names.map(function (n) {
           var rec = { name: n, status: null, mime: "", error: "", expected_sha256: man.files[n].sha256 };
-          return fetch(n + "?v=" + encodeURIComponent(VERSION), { cache: "no-store" }).then(function (r) {
+          return fetch(n.split("/").map(encodeURIComponent).join("/") + "?v=" + encodeURIComponent(VERSION), { cache: "no-store" }).then(function (r) {
             rec.status = r.status;
             rec.mime = (r.headers.get("content-type") || "").split(";")[0];
             return r.arrayBuffer();
