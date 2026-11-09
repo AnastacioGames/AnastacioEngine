@@ -62,6 +62,10 @@ luz indireta por volumes de sondas, texturas KTX2 e FSR 1, além de muitas corre
 
 - `AnastacioEngine-0.7.0-windows-x64.zip`: editor e runtime para Windows, portátil (extraia e rode).
 - `RangeArmor-0.7.0-windows-x64.zip`: ferramenta para criar e empacotar projetos (Windows).
+- `AnastacioEngine-0.7.0-linux-x86_64.tar.xz`: editor e runtime, portátil, com as bibliotecas incluídas.
+- `RangeArmor-0.7.0-linux-x86_64.tar.xz`: ferramenta para criar e empacotar projetos (Linux).
 - `SHA256SUMS.txt`: hashes para conferir o download.
 
 No Windows: extraia e abra `AnastacioEngine.exe`.
+
+No Linux: extraia, abra `AnastacioEngine` e, se quiser o ícone no menu, rode `./install-desktop.sh`.
