@@ -56,7 +56,9 @@ class Snapshot:
         if self.stdlib is None:
             return None
         # O runtime registra Range e os apelidos bge/range (KX_PythonInit), na Web tambem.
-        tops = set(self.stdlib) | self.project_tops | {"Range", "bge", "range"}
+        tops = set(self.stdlib) | self.project_tops | {"Range", "bge", "range",
+                                                       # Nomes antigos que o motor registra em sys.modules.
+                                                       "GameLogic", "GameKeys", "GameTypes", "Rasterizer", "PhysicsConstraints"}
         for name in self.texts:
             tops.add(name[:-3] if name.endswith(".py") else name)
         return tops

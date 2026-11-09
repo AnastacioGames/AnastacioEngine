@@ -39,6 +39,8 @@ def _project_tops(root):
             tops.add(entry[:-3])
         elif os.path.isfile(os.path.join(full, "__init__.py")):
             tops.add(entry)
+        elif os.path.isdir(full) and any(n.endswith(".py") for n in os.listdir(full)):
+            tops.add(entry)  # pacote sem __init__.py (namespace): o Python importa igual
     return tops
 
 
@@ -215,7 +217,9 @@ def _voice_files(root, scenes):
     """Falas da cutscene (evento Dialog, por caminho) e vozes dos Takes (sounds/take_*.wav)."""
     files = glob.glob(os.path.join(root, "sounds", "take_*.wav"))
     for scene in scenes:
-        for sequence in scene.cutscene_settings.sequences:
+        # Cenas sem cutscene (ex.: arquivos antigos) têm cutscene_settings vazio.
+        settings = getattr(scene, "cutscene_settings", None)
+        for sequence in (settings.sequences if settings else ()):
             for event in sequence.events:
                 path = event.dialog_audio_path
                 if event.type == 'DIALOG' and path and not path.startswith("slot:"):

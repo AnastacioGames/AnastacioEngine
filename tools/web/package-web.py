@@ -33,6 +33,9 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_FILES = ("RangeRuntime.js", "RangeRuntime.wasm", "RangeRuntime.data")
 PERF_FILE = "frame-time-perf.js"
 NAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+# Extras mantem o nome original (o jogo os abre pelo caminho, ex.: LibLoad("3rd person.range")):
+# aceita espaco e acentos; recusa so o que quebra URL ou FS (% # ? \\ e controle).
+EXTRA_PART_RE = re.compile(r"^[^\x00-\x1f%#?\\\\]+$")
 
 
 def die(msg):
@@ -880,7 +883,9 @@ __PERF_SCRIPT__
       }
       Module.addRunDependency("game-files");
       var jobs = [fetchInto("game/" + GAME, GAME)];
-      EXTRAS.forEach(function (n) { jobs.push(fetchInto("game/" + n, n)); });
+      EXTRAS.forEach(function (n) {
+        jobs.push(fetchInto("game/" + n.split("/").map(encodeURIComponent).join("/"), n));
+      });
       Promise.all(jobs).then(function () {
         Module.removeRunDependency("game-files");
       }).catch(function (e) { fail("Falha ao baixar arquivos do jogo: " + e.message); });
@@ -1246,7 +1251,7 @@ def main():
         if not x.is_file():
             die(f"arquivo extra nao encontrado: {x}")
         rel = extra_rel(x, args.extra_root)
-        if not all(NAME_RE.match(part) and part not in (".", "..") for part in rel.split("/")):
+        if not all(EXTRA_PART_RE.match(part) and part.strip() == part and part not in (".", "..") for part in rel.split("/")):
             die(f"nome de arquivo extra invalido: {rel}")
     names = [game_name] + [extra_rel(x, args.extra_root) for x in args.extra]
     if len(set(names)) != len(names):
