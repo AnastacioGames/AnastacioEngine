@@ -98,6 +98,7 @@ static float place_branch(LayoutContext *ctx, const MMElem *node, int parent, in
 	float width, child_x, height, y = y_top;
 	int first = 1;
 
+	out->elem = (MMElem *)node;
 	out->text = single_line_text(node);
 	out->parent = parent;
 	out->side = side;
@@ -174,6 +175,7 @@ MMLayout *mm_layout_build(const MMDoc *doc, MMTextWidthFn width_fn, void *user_d
 	ctx.user_data = user_data;
 
 	out = &layout->nodes[layout->count++];
+	out->elem = (MMElem *)root;
 	out->text = single_line_text(root);
 	out->parent = -1;
 	width = width_fn(out->text, user_data) + 2.0f * NODE_PADDING;

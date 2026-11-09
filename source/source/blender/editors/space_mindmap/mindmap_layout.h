@@ -30,6 +30,7 @@ struct MMDoc;
 typedef float (*MMTextWidthFn)(const char *text, void *user_data);
 
 typedef struct MMLayoutNode {
+	struct MMElem *elem;
 	char *text;                 /* single line, shortened when very long */
 	float xmin, xmax, ymin, ymax;
 	int parent;                 /* index in MMLayout.nodes, -1 for the root */
