@@ -416,6 +416,33 @@ MMElem *mm_node_add_sibling(MMElem *node, const char *text)
 	return e;
 }
 
+static MMElem *mm_elem_clone(const MMElem *src)
+{
+	MMElem *e = MM_CALLOC(sizeof(MMElem));
+	const MMAttr *a;
+	const MMElem *c;
+
+	e->tag = src->tag ? mm_strdup(src->tag) : NULL;
+	e->raw = src->raw ? mm_strdup(src->raw) : NULL;
+	for (a = src->attr_first; a; a = a->next) {
+		if (!(mm_is_tag(src, "node") && strcmp(a->name, "ID") == 0)) {
+			mm_attr_add_owned(e, mm_strdup(a->name), mm_strdup(a->value));
+		}
+	}
+	for (c = src->first; c; c = c->next) {
+		mm_elem_append(e, mm_elem_clone(c));
+	}
+	return e;
+}
+
+MMElem *mm_node_copy_into(const MMElem *node, MMElem *parent)
+{
+	MMElem *e = mm_elem_clone(node);
+
+	mm_elem_append(parent, e);
+	return e;
+}
+
 int mm_node_remove(MMElem *node)
 {
 	if (!mm_is_tag(node->parent, "node")) {

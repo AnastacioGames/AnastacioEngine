@@ -1,6 +1,6 @@
 # Plano: editor Mind Map
 
-Estado: etapas 1-7 implementadas em 2026-11-09; arraste e menu aceitos com janela; falta aceite da etapa 7 e o teste com o FreeMind.
+Estado: etapas 1-8 implementadas em 2026-11-09; arraste e menu aceitos com janela; falta aceite das etapas 7-8 e o teste com o FreeMind.
 
 ## Objetivo
 
@@ -77,11 +77,15 @@ Novo mapa, seletor de mapas, importar e exportar `.mm`, cor, ícones básicos e 
 traduções e documentação.
 Aceite: arquivo exportado abre no FreeMind; mapa volta intacto após salvar o `.range`.
 
-**Fim da versão 1.**
+**Fim da versão 1.** O teste de abertura no FreeMind segue pendente, pois ele não está instalado na máquina de desenvolvimento.
 
 ### 7. Integração com a engine (versão 2)
 Ligar ideia a objeto, cena, `Text`/script; clique abre o alvo. Ideias como tarefas, com progresso por ramo.
 Os vínculos ficam em atributos próprios do `.mm`, ignoráveis por outros programas.
+
+### 8. Busca e área de transferência
+`Ctrl+F` e `F3` buscam em texto e nota, abrindo ramos dobrados. `Ctrl+C`, `Ctrl+X` e `Ctrl+V` usam a área de
+transferência do sistema, em XML `.mm`; texto comum vira uma ideia por linha.
 
 ## Riscos
 

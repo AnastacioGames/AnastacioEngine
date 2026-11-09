@@ -79,6 +79,10 @@ int mm_node_remove(MMElem *node);
  * Returns 0 for the root node or when parent is inside the moved branch. */
 int mm_node_move(MMElem *node, MMElem *parent, MMElem *before);
 
+/* Copies a branch as the last child of parent, which may be in another document.
+ * The copies lose their ID attribute, so IDs stay unique. */
+MMElem *mm_node_copy_into(const MMElem *node, MMElem *parent);
+
 /* FreeMind BUILTIN name of the first icon, or NULL. Release with mm_str_free. */
 char *mm_node_icon(const MMElem *node);
 /* Replaces the first icon, NULL removes it. */

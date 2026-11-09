@@ -106,6 +106,7 @@ typedef struct MindMapCache {
 	bool dragging;
 	int drag_start[2];
 	float drag_delta[2];    /* distance moved by the mouse, in view units */
+	char find_text[256];
 	const MMElem *drop_target;
 	int drop_zone;
 	int drop_side;
@@ -1512,6 +1513,250 @@ static void MINDMAP_OT_open_link(wmOperatorType *ot)
 	ot->poll = mindmap_edit_poll;
 }
 
+/* ---------------- copy and paste ---------------- */
+
+static int mindmap_copy_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	const MindMapCache *cache = mindmap_edit_cache(C);
+	MMDoc *holder = mm_new("Clipboard");
+	char *xml;
+
+	mm_node_copy_into(cache->selected, mm_root_node(holder));
+	xml = mm_write(holder, NULL);
+	WM_clipboard_text_set(xml, false);
+	mm_str_free(xml);
+	mm_free(holder);
+	return OPERATOR_FINISHED;
+}
+
+static void MINDMAP_OT_copy(wmOperatorType *ot)
+{
+	ot->name = "Copy Branch";
+	ot->idname = "MINDMAP_OT_copy";
+	ot->description = "Copy the selected idea and its branch";
+	ot->exec = mindmap_copy_exec;
+	ot->poll = mindmap_edit_poll;
+}
+
+static int mindmap_cut_exec(bContext *C, wmOperator *op)
+{
+	const MindMapCache *cache = mindmap_edit_cache(C);
+
+	if (cache->selected == mm_root_node(cache->doc)) {
+		BKE_report(op->reports, RPT_WARNING, "The central idea cannot be cut");
+		return OPERATOR_CANCELLED;
+	}
+	mindmap_copy_exec(C, op);
+	return mindmap_delete_exec(C, op);
+}
+
+static void MINDMAP_OT_cut(wmOperatorType *ot)
+{
+	ot->name = "Cut Branch";
+	ot->idname = "MINDMAP_OT_cut";
+	ot->description = "Copy the selected idea and its branch, then remove them";
+	ot->exec = mindmap_cut_exec;
+	ot->poll = mindmap_edit_poll;
+}
+
+/* Text that is not a map becomes one idea per line. */
+static MMElem *mindmap_paste_lines(MMElem *parent, char *text)
+{
+	MMElem *first = NULL;
+	char *line = text;
+
+	while (line && *line) {
+		char *end = line + strcspn(line, "\r\n");
+		const char stop = *end;
+
+		*end = '\0';
+		if (line[strspn(line, " \t")] != '\0') {
+			MMElem *node = mm_node_add_child(parent, line + strspn(line, " \t"));
+
+			first = first ? first : node;
+		}
+		line = stop ? end + 1 : NULL;
+	}
+	return first;
+}
+
+static int mindmap_paste_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	MindMapCache *cache = mindmap_edit_cache(C);
+	MMElem *parent = cache->selected, *first = NULL, *child;
+	MMElem *previous_last = NULL;
+	const MMElem *root = mm_root_node(cache->doc);
+	int len = 0;
+	char *text = WM_clipboard_text_get(false, &len);
+	MMDoc *pasted;
+
+	if (text == NULL || len == 0) {
+		if (text) {
+			MEM_freeN(text);
+		}
+		return OPERATOR_CANCELLED;
+	}
+	for (child = mm_node_first_child(parent); child; child = mm_node_next(child)) {
+		previous_last = child;
+	}
+
+	pasted = strstr(text, "<map") ? mm_parse(text, len, NULL, 0) : NULL;
+	if (pasted && mm_root_node(pasted)) {
+		const MMElem *src;
+
+		for (src = mm_node_first_child(mm_root_node(pasted)); src; src = mm_node_next(src)) {
+			MMElem *copy = mm_node_copy_into(src, parent);
+
+			first = first ? first : copy;
+		}
+	}
+	else {
+		first = mindmap_paste_lines(parent, text);
+	}
+	mm_free(pasted);
+	MEM_freeN(text);
+	if (first == NULL) {
+		return OPERATOR_CANCELLED;
+	}
+
+	for (child = previous_last ? mm_node_next(previous_last) : mm_node_first_child(parent);
+	     child;
+	     child = mm_node_next(child))
+	{
+		if (parent != root) {
+			mm_attr_remove(child, "POSITION");
+		}
+		else {
+			char *position = mm_attr_get(child, "POSITION");
+
+			if (position == NULL) {
+				mm_attr_set(child, "POSITION", "right");
+			}
+			mm_str_free(position);
+		}
+	}
+	if (parent != root && mm_node_folded(parent)) {
+		mm_node_folded_set(parent, 0);
+	}
+	cache->selected = first;
+	cache->reveal = true;
+	mindmap_cache_commit(cache);
+	return mindmap_finish(C, "Paste Branch");
+}
+
+static void MINDMAP_OT_paste(wmOperatorType *ot)
+{
+	ot->name = "Paste Branch";
+	ot->idname = "MINDMAP_OT_paste";
+	ot->description = "Paste a copied branch, or lines of text, below the selected idea";
+	ot->exec = mindmap_paste_exec;
+	ot->poll = mindmap_edit_poll;
+}
+
+/* ---------------- find ---------------- */
+
+static MMElem *mindmap_next_in_tree(MMElem *elem, MMElem *root)
+{
+	MMElem *child = mm_node_first_child(elem);
+
+	if (child) {
+		return child;
+	}
+	for (; elem != root; elem = elem->parent) {
+		MMElem *next = mm_node_next(elem);
+
+		if (next) {
+			return next;
+		}
+	}
+	return root;
+}
+
+static bool mindmap_elem_matches(const MMElem *elem, const char *query)
+{
+	char *text = mm_node_text(elem);
+	char *note = mm_node_note(elem);
+	const bool found = (text && BLI_strcasestr(text, query)) || (note && BLI_strcasestr(note, query));
+
+	mm_str_free(text);
+	mm_str_free(note);
+	return found;
+}
+
+static int mindmap_find_step(bContext *C, wmOperator *op, MindMapCache *cache)
+{
+	MMElem *root = mm_root_node(cache->doc);
+	MMElem *start = cache->selected ? cache->selected : root;
+	MMElem *cur = start, *up;
+	bool unfolded = false;
+
+	if (cache->find_text[0] == '\0') {
+		return OPERATOR_CANCELLED;
+	}
+	do {
+		cur = mindmap_next_in_tree(cur, root);
+		if (mindmap_elem_matches(cur, cache->find_text)) {
+			for (up = cur->parent; up && up != root && up != cur; up = up->parent) {
+				if (mm_node_folded(up)) {
+					mm_node_folded_set(up, 0);
+					unfolded = true;
+				}
+			}
+			cache->selected = cur;
+			cache->reveal = true;
+			if (unfolded) {
+				mindmap_cache_commit(cache);
+			}
+			return mindmap_finish(C, unfolded ? "Find Idea" : NULL);
+		}
+	} while (cur != start);
+
+	BKE_reportf(op->reports, RPT_WARNING, "Not found: %s", cache->find_text);
+	return OPERATOR_CANCELLED;
+}
+
+static int mindmap_find_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
+{
+	RNA_string_set(op->ptr, "text", mindmap_edit_cache(C)->find_text);
+	return WM_operator_props_dialog_popup(C, op, 12 * UI_UNIT_X, UI_UNIT_Y);
+}
+
+static int mindmap_find_exec(bContext *C, wmOperator *op)
+{
+	MindMapCache *cache = mindmap_edit_cache(C);
+
+	RNA_string_get(op->ptr, "text", cache->find_text);
+	return mindmap_find_step(C, op, cache);
+}
+
+static void MINDMAP_OT_find(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	ot->name = "Find Idea";
+	ot->idname = "MINDMAP_OT_find";
+	ot->description = "Find an idea by its text or note, opening folded branches";
+	ot->invoke = mindmap_find_invoke;
+	ot->exec = mindmap_find_exec;
+	ot->poll = mindmap_edit_poll;
+	prop = RNA_def_string(ot->srna, "text", NULL, 256, "Text", "");
+	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
+}
+
+static int mindmap_find_next_exec(bContext *C, wmOperator *op)
+{
+	return mindmap_find_step(C, op, mindmap_edit_cache(C));
+}
+
+static void MINDMAP_OT_find_next(wmOperatorType *ot)
+{
+	ot->name = "Find Next";
+	ot->idname = "MINDMAP_OT_find_next";
+	ot->description = "Go to the next idea matching the last search";
+	ot->exec = mindmap_find_next_exec;
+	ot->poll = mindmap_edit_poll;
+}
+
 static int mindmap_context_menu_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
 {
 	ARegion *ar = CTX_wm_region(C);
@@ -1543,6 +1788,10 @@ static int mindmap_context_menu_invoke(bContext *C, wmOperator *UNUSED(op), cons
 	uiItemO(layout, "Open Link", ICON_NONE, "MINDMAP_OT_open_link");
 	uiItemO(layout, "Clear Link", ICON_NONE, "MINDMAP_OT_clear_link");
 	uiItemO(layout, "Task", ICON_NONE, "MINDMAP_OT_cycle_task");
+	uiItemS(layout);
+	uiItemO(layout, "Copy", ICON_NONE, "MINDMAP_OT_copy");
+	uiItemO(layout, "Cut", ICON_NONE, "MINDMAP_OT_cut");
+	uiItemO(layout, "Paste", ICON_NONE, "MINDMAP_OT_paste");
 	uiItemS(layout);
 	uiItemO(layout, "Fold or Unfold", ICON_NONE, "MINDMAP_OT_toggle_fold");
 	uiItemO(layout, "Delete", ICON_NONE, "MINDMAP_OT_delete");
@@ -1686,6 +1935,11 @@ static void mindmap_operatortypes(void)
 	WM_operatortype_append(MINDMAP_OT_edit_note);
 	WM_operatortype_append(MINDMAP_OT_context_menu);
 	WM_operatortype_append(MINDMAP_OT_cycle_task);
+	WM_operatortype_append(MINDMAP_OT_copy);
+	WM_operatortype_append(MINDMAP_OT_cut);
+	WM_operatortype_append(MINDMAP_OT_paste);
+	WM_operatortype_append(MINDMAP_OT_find);
+	WM_operatortype_append(MINDMAP_OT_find_next);
 	WM_operatortype_append(MINDMAP_OT_set_engine_icon);
 	WM_operatortype_append(MINDMAP_OT_set_link);
 	WM_operatortype_append(MINDMAP_OT_clear_link);
@@ -1703,6 +1957,11 @@ static void mindmap_keymap(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "MINDMAP_OT_context_menu", RIGHTMOUSE, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_edit_note", NKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_cycle_task", TKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_copy", CKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_cut", XKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_paste", VKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_find", FKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_find_next", F3KEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_set_engine_icon", IKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_set_link", LKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_open_link", OKEY, KM_PRESS, 0, 0);

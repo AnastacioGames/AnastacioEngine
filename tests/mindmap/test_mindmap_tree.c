@@ -261,8 +261,34 @@ static void test_icon_note(void)
 	mm_free(doc);
 }
 
+static void test_copy_into(void)
+{
+	MMDoc *from = parse("<map><node ID=\"A\" TEXT=\"R\"><node ID=\"B\" TEXT=\"x &amp; y\" COLOR=\"#ff0000\">"
+	                    "<icon BUILTIN=\"idea\"/><node ID=\"C\" TEXT=\"f\"/></node></node></map>");
+	MMDoc *to = mm_new("Destino");
+	MMElem *copy = mm_node_copy_into(mm_node_first_child(mm_root_node(from)), mm_root_node(to));
+	char *value;
+
+	mm_free(from);
+	CHECK(text_is(copy, "x & y") && text_is(mm_node_first_child(copy), "f"));
+	value = mm_attr_get(copy, "COLOR");
+	CHECK(value && strcmp(value, "#ff0000") == 0);
+	mm_str_free(value);
+	value = mm_attr_get(copy, "ID");
+	CHECK(value == NULL);
+	mm_str_free(value);
+	value = mm_attr_get(mm_node_first_child(copy), "ID");
+	CHECK(value == NULL);
+	mm_str_free(value);
+	value = mm_node_icon(copy);
+	CHECK(value && strcmp(value, "idea") == 0);
+	mm_str_free(value);
+	mm_free(to);
+}
+
 int main(void)
 {
+	test_copy_into();
 	test_read();
 	test_round_trip();
 	test_edit();
