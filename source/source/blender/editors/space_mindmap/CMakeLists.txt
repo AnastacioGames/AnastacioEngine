@@ -34,9 +34,11 @@ set(INC_SYS
 )
 
 set(SRC
+	mindmap_layout.c
 	mindmap_tree.c
 	space_mindmap.c
 
+	mindmap_layout.h
 	mindmap_tree.h
 )
 

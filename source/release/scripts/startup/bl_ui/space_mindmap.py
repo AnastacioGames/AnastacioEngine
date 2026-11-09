@@ -24,7 +24,9 @@ class MINDMAP_HT_header(Header):
     bl_space_type = 'MINDMAP_EDITOR'
 
     def draw(self, context):
-        self.layout.row(align=True).template_header()
+        layout = self.layout
+        layout.row(align=True).template_header()
+        layout.template_ID(context.space_data, "text", new="text.new", unlink="text.unlink", open="text.open")
 
 
 classes = (

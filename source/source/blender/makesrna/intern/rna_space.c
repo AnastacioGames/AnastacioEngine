@@ -4726,7 +4726,9 @@ static void rna_def_space_mindmap(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "text", PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_type(prop, "Text");
+	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Text", "Text data-block holding the map");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
 }
 
 static void rna_def_space_logic(BlenderRNA *brna)
