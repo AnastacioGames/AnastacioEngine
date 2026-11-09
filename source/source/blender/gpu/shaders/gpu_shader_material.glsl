@@ -2244,6 +2244,16 @@ void lamp_falloff_invsquarecutoff(float radius, float dist, float cutoff, out fl
 	}
 }
 
+void lamp_sphere_select_dist(float use_sphere, float dist, out float outdist)
+{
+	outdist = (use_sphere > 0.5) ? dist : 1.0;
+}
+
+void lamp_visibility_sphere_live(float use_sphere, float lampdist, float dist, float visifac, out float outvisifac)
+{
+	outvisifac = (use_sphere > 0.5) ? visifac * max(lampdist - dist, 0.0) / lampdist : visifac;
+}
+
 void lamp_visibility_sphere(float lampdist, float dist, float visifac, out float outvisifac)
 {
 	float t = lampdist - dist;

@@ -228,6 +228,7 @@ struct GPULamp {
 	float lampscale[3];
 	float dyndist, dynatt1, dynatt2;
 	float dist, att1, att2;
+	float use_sphere; /* live Sphere toggle of the editor shaders */
 	float coeff_const, coeff_lin, coeff_quad;
 	float shadow_color[3];
 

@@ -1968,7 +1968,13 @@ static GPUNodeLink *lamp_get_visibility(GPUMaterial *mat, GPULamp *lamp, GPUNode
 	}
 	else if (lamp->type == LA_HEMI) {
 		mat->dynproperty |= DYN_LAMP_CO;
-		if (lamp->mode & LA_SPHERE) {
+		if (GPU_material_lamp_values_live()) {
+			GPU_link(mat, "lamp_visibility_other", GPU_material_builtin(mat, GPU_VIEW_POSITION),
+				GPU_dynamic_uniform(lamp->dynco, GPU_DYNAMIC_LAMP_DYNCO, lamp->ob), lv, dist, &visifac);
+			GPU_link(mat, "lamp_sphere_select_dist",
+				GPU_dynamic_uniform(&lamp->use_sphere, GPU_DYNAMIC_NONE, NULL), *dist, dist);
+		}
+		else if (lamp->mode & LA_SPHERE) {
 			GPU_link(mat, "lamp_visibility_other", GPU_material_builtin(mat, GPU_VIEW_POSITION),
 				GPU_dynamic_uniform(lamp->dynco, GPU_DYNAMIC_LAMP_DYNCO, lamp->ob), lv, dist, &visifac);
 		}
@@ -2039,7 +2045,12 @@ static GPUNodeLink *lamp_get_visibility(GPUMaterial *mat, GPULamp *lamp, GPUNode
 			}
 		}
 
-		if (lamp->mode & LA_SPHERE)
+		if (GPU_material_lamp_values_live())
+			GPU_link(mat, "lamp_visibility_sphere_live",
+			         GPU_dynamic_uniform(&lamp->use_sphere, GPU_DYNAMIC_NONE, NULL),
+			         GPU_select_uniform(&lamp->dist, GPU_DYNAMIC_LAMP_DISTANCE, lamp->ob, ma),
+			         *dist, visifac, &visifac);
+		else if (lamp->mode & LA_SPHERE)
 			GPU_link(mat, "lamp_visibility_sphere",
 			         GPU_select_uniform(&lamp->dist, GPU_DYNAMIC_LAMP_DISTANCE, lamp->ob, ma),
 			         *dist, visifac, &visifac);
@@ -2418,11 +2429,15 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 	else if (lamp->type == LA_AREA) {
 		mat->dynproperty |= DYN_LAMP_VEC | DYN_LAMP_CO | DYN_LAMP_AREAMAT;
 
+		/* Live in the editor (see GPU_material_lamp_values_live), baked in the game. */
+		const bool live = GPU_material_lamp_values_live();
+
 		GPU_link(mat, "shade_inp_area",
 			GPU_builtin(GPU_VIEW_POSITION), vn,
 			GPU_dynamic_uniform(lamp->dynvec, GPU_DYNAMIC_LAMP_DYNVEC, lamp->ob),
 			anear, adist, visifac,
-			GPU_uniform(&lamp->dist), GPU_uniform(&lamp->k),
+			live ? GPU_dynamic_uniform(&lamp->dist, GPU_DYNAMIC_NONE, NULL) : GPU_uniform(&lamp->dist),
+			live ? GPU_dynamic_uniform(&lamp->k, GPU_DYNAMIC_NONE, NULL) : GPU_uniform(&lamp->k),
 			&inp);
 	}
 	else {
@@ -5176,6 +5191,16 @@ void GPU_lamp_update_distance(GPULamp *lamp, float distance, float att1, float a
 	lamp->coeff_quad = coeff_quad;
 }
 
+void GPU_lamp_update_area_gamma(GPULamp *lamp, float k)
+{
+	lamp->k = k;
+}
+
+void GPU_lamp_update_sphere(GPULamp *lamp, int mode)
+{
+	lamp->use_sphere = (mode & LA_SPHERE) ? 1.0f : 0.0f;
+}
+
 void GPU_lamp_update_spot(GPULamp *lamp, float spotsize, float spotblend)
 {
 	if (!lamp->update_spotsize_valid || lamp->update_spotsize != spotsize) {
@@ -5195,6 +5220,7 @@ static void gpu_lamp_from_blender(Scene *scene, Object *ob, Object *par, Lamp *l
 
 	/* add_render_lamp */
 	lamp->mode = la->mode;
+	lamp->use_sphere = (la->mode & LA_SPHERE) ? 1.0f : 0.0f;
 	lamp->type = la->type;
 	lamp->update_obmat_valid = false;
 	lamp->update_spotsize_valid = false;

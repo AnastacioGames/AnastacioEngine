@@ -139,6 +139,8 @@ static void gpu_render_lamp_update(Scene *scene, View3D *v3d,
 		GPU_lamp_update_distance(lamp, la->dist, la->att1, la->att2,
 		                         la->coeff_const, la->coeff_lin, la->coeff_quad);
 		GPU_lamp_update_spot(lamp, la->spotsize, la->spotblend);
+		GPU_lamp_update_sphere(lamp, la->mode);
+		GPU_lamp_update_area_gamma(lamp, la->k);
 
 		layers = lay & v3d->lay;
 		if (srl)

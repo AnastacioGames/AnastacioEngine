@@ -205,51 +205,26 @@ static void rna_Lamp_shadow_frustum_update(Main *bmain, Scene *scene, PointerRNA
 	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
 }
 
-/* Color, Energy, Distance, falloff values and Spot Blend are live uniforms (the 3D View copies
- * them into the GPULamp on every draw), so dragging them only redraws instead of freeing the GLSL
- * of every material in lamp_changed(). Rebuild only where the value is fixed in the shader:
- * materials with Constant Lamp, an Area lamp's distance and a Sun's Spot Blend on/off. */
-static bool rna_Lamp_values_in_shader(Main *bmain, Lamp *la)
+/* Color, Energy, Distance, falloff values, Sphere and Spot Blend are live uniforms of the editor
+ * shaders, even with Constant Lamp (the 3D View copies them into the GPULamp on every draw), so
+ * editing them only redraws instead of freeing the GLSL of every material in lamp_changed().
+ * Rebuild only where the value is fixed in the shader: a Sun's Spot Blend on/off. */
+static void rna_Lamp_redraw_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
 {
-	if (la->type == LA_AREA || la->type == LA_SUN)
-		return true;
-	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
-		if (ma->constflag & MA_CONSTANT_LAMP)
-			return true;
-	}
-	return false;
+	Lamp *la = ptr->id.data;
+
+	BKE_icon_changed(BKE_icon_id_ensure(&la->id));
+	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
 }
 
 static void rna_Lamp_value_update(Main *bmain, Scene *scene, PointerRNA *ptr)
 {
 	Lamp *la = ptr->id.data;
 
-	if (rna_Lamp_values_in_shader(bmain, la)) {
+	if (la->type == LA_SUN)
 		rna_Lamp_draw_update(bmain, scene, ptr);
-		return;
-	}
-	BKE_icon_changed(BKE_icon_id_ensure(&la->id));
-	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
-}
-
-/* Color and Energy reach the shader as uniforms for every lamp type. */
-static void rna_Lamp_color_update(Main *bmain, Scene *scene, PointerRNA *ptr)
-{
-	Lamp *la = ptr->id.data;
-	bool constant = false;
-
-	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
-		if (ma->constflag & MA_CONSTANT_LAMP) {
-			constant = true;
-			break;
-		}
-	}
-	if (constant) {
-		rna_Lamp_draw_update(bmain, scene, ptr);
-		return;
-	}
-	BKE_icon_changed(BKE_icon_id_ensure(&la->id));
-	WM_main_add_notifier(NC_LAMP | ND_LIGHTING_DRAW, la);
+	else
+		rna_Lamp_redraw_update(bmain, scene, ptr);
 }
 
 static void rna_Lamp_sky_update(Main *UNUSED(bmain), Scene *UNUSED(scene), PointerRNA *ptr)
@@ -475,13 +450,13 @@ static void rna_def_lamp(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "energy", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_ui_range(prop, 0, 10, 1, 3);
 	RNA_def_property_ui_text(prop, "Energy", "Amount of light that the lamp emits");
-	RNA_def_property_update(prop, 0, "rna_Lamp_color_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "r");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Color", "Light color");
-	RNA_def_property_update(prop, 0, "rna_Lamp_color_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "use_own_layer", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_LAYER);
@@ -578,7 +553,7 @@ static void rna_def_lamp_falloff(StructRNA *srna)
 	prop = RNA_def_property(srna, "use_sphere", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_SPHERE);
 	RNA_def_property_ui_text(prop, "Sphere", "Set light intensity to zero beyond lamp distance");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "linear_attenuation", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "att1");
@@ -960,7 +935,7 @@ static void rna_def_area_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "k");
 	RNA_def_property_ui_range(prop, 0.001, 2.0, 0.1, 3);
 	RNA_def_property_ui_text(prop, "Gamma", "Light gamma correction value");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 }
 
 static void rna_def_spot_lamp(BlenderRNA *brna)
@@ -1171,7 +1146,7 @@ static void rna_def_hemi_lamp(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_sphere", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_SPHERE);
 	RNA_def_property_ui_text(prop, "Sphere", "Set light intensity to zero beyond lamp distance");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 }
 
 void RNA_def_lamp(BlenderRNA *brna)

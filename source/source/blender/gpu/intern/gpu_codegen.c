@@ -206,6 +206,20 @@ void GPU_material_uniform_values_set(bool enable)
 	shader_uniform_values_game = enable;
 }
 
+/* Editor shaders keep lamp values as uniforms even with Constant Lamp, so editing them never
+ * recompiles; the game turns this off and bakes them as before. */
+static bool shader_lamp_values_live = true;
+
+void GPU_material_lamp_values_live_set(bool enable)
+{
+	shader_lamp_values_live = enable;
+}
+
+bool GPU_material_lamp_values_live(void)
+{
+	return shader_lamp_values_live;
+}
+
 static bool shader_uniform_values_enabled(void)
 {
 	static int env_enabled = -1;
@@ -3203,7 +3217,7 @@ GPUNodeLink *GPU_select_uniform(float *num, GPUDynamicType dynamictype, void *da
 		dynamic = !(material->constflag & MA_CONSTANT_MATERIAL);
 	}
 	else if (GPU_DYNAMIC_GROUP_FROM_TYPE(dynamictype) == GPU_DYNAMIC_GROUP_LAMP) {
-		dynamic = !(material->constflag & MA_CONSTANT_LAMP);
+		dynamic = shader_lamp_values_live || !(material->constflag & MA_CONSTANT_LAMP);
 	}
 	else if (GPU_DYNAMIC_GROUP_FROM_TYPE(dynamictype) == GPU_DYNAMIC_GROUP_TEX) {
 		dynamic = !(material->constflag & MA_CONSTANT_TEXTURE);

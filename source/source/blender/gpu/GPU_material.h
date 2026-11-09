@@ -343,6 +343,8 @@ void GPU_materials_free(struct Main *bmain);
 bool GPU_materials_free_text(struct Main *bmain, struct Text *text);
 /* Fixed material values as uniforms (faster loading, slower drawing), see gpu_codegen.c. */
 void GPU_material_uniform_values_set(bool enable);
+void GPU_material_lamp_values_live_set(bool enable);
+bool GPU_material_lamp_values_live(void);
 
 bool GPU_lamp_visible(GPULamp *lamp, struct SceneRenderLayer *srl, struct Material *ma);
 void GPU_material_update_lamps(GPUMaterial *material, float viewmat[4][4], float viewinv[4][4]);
@@ -520,6 +522,8 @@ void GPU_lamp_update_colors(GPULamp *lamp, float r, float g, float b, float ener
 void GPU_lamp_update_distance(GPULamp *lamp, float distance, float att1, float att2,
                               float coeff_const, float coeff_lin, float coeff_quad);
 void GPU_lamp_update_spot(GPULamp *lamp, float spotsize, float spotblend);
+void GPU_lamp_update_sphere(GPULamp *lamp, int mode);
+void GPU_lamp_update_area_gamma(GPULamp *lamp, float k);
 int GPU_lamp_shadow_layer(GPULamp *lamp);
 GPUNodeLink *GPU_lamp_get_data(
         GPUMaterial *mat, GPULamp *lamp,

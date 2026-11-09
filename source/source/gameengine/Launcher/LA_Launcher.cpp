@@ -309,6 +309,7 @@ void LA_Launcher::InitEngine()
 
 	// Before any material is converted: the game's shaders take fixed values as uniforms.
 	GPU_material_uniform_values_set(gm.flag & GAME_FAST_SHADER_LOAD);
+	GPU_material_lamp_values_live_set(false);
 
 	m_rasterizer = new RAS_Rasterizer();
 
@@ -579,6 +580,7 @@ void LA_Launcher::ExitEngine()
 	}
 	// The editor viewport keeps compiling materials with constants.
 	GPU_material_uniform_values_set(false);
+	GPU_material_lamp_values_live_set(true);
 	if (m_ketsjiEngine) {
 		delete m_ketsjiEngine;
 		m_ketsjiEngine = nullptr;
