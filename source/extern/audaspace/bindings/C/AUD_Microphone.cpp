@@ -63,6 +63,19 @@ AUD_API int AUD_Microphone_isActive(AUD_Microphone* m) { return mic(m)->isActive
 AUD_API int AUD_Microphone_getState(AUD_Microphone* m) { return int(mic(m)->getState()); }
 AUD_API float AUD_Microphone_getLevel(AUD_Microphone* m) { return mic(m)->getLevel(); }
 AUD_API float AUD_Microphone_getPeak(AUD_Microphone* m) { return mic(m)->getPeak(); }
+AUD_API float AUD_Microphone_getPitch(AUD_Microphone* m, float* confidence)
+{
+	const aud::PitchResult result = mic(m)->getPitch();
+	if(confidence)
+		*confidence = result.confidence;
+	return result.frequency;
+}
+AUD_API int AUD_Microphone_noteFromFrequency(float frequency, float a4, float* cents)
+{
+	const aud::NoteResult result = aud::PitchDetector::note(frequency, a4);
+	*cents = result.cents;
+	return result.midi;
+}
 AUD_API int AUD_Microphone_getDropped(AUD_Microphone* m) { return mic(m)->getDropped(); }
 AUD_API int AUD_Microphone_getRate(AUD_Microphone* m) { return int(mic(m)->getSpecs().rate); }
 AUD_API void AUD_Microphone_recordStart(AUD_Microphone* m) { mic(m)->startRecording(); }

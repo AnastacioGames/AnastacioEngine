@@ -217,7 +217,8 @@ std::vector<std::string> Microphone::getDeviceNames(const std::string& backend)
 Microphone::Microphone(const std::string& device, Specs specs, const std::string& backend, float seconds) :
 	m_device(device), m_backend_name(backend), m_requested(specs), m_specs(specs),
 	m_seconds(std::max(seconds, 0.25f)), m_state(MICROPHONE_STATE_CLOSED),
-	m_ring_frames(0), m_written(0), m_level(0), m_peak(0), m_dropped(0), m_recording(false)
+	m_ring_frames(0), m_written(0), m_level(0), m_peak(0), m_dropped(0), m_recording(false),
+	m_pitch_written(0), m_pitch{0.0f, 0.0f}, m_pitch_count(0), m_pitch_gaps(0)
 {
 	if(m_requested.channels != CHANNELS_STEREO)
 		m_requested.channels = CHANNELS_MONO;
@@ -282,6 +283,8 @@ void Microphone::stop()
 	m_backend.reset();
 	m_state = MICROPHONE_STATE_CLOSED;
 	m_level = 0;
+	m_pitch = {0.0f, 0.0f};
+	m_pitch_count = m_pitch_gaps = 0;
 }
 
 bool Microphone::isActive() const
@@ -374,6 +377,58 @@ Specs Microphone::getSpecs() const
 {
 	std::lock_guard<std::recursive_mutex> lock(m_mutex);
 	return m_specs;
+}
+
+PitchResult Microphone::getPitch()
+{
+	std::lock_guard<std::recursive_mutex> lock(m_mutex);
+	if(!m_backend || m_ring_frames <= 0)
+		return {0.0f, 0.0f};
+
+	/* Taxas altas (Web: 48 kHz) caem para perto de 22 kHz: a analise custa bem menos. */
+	const int decimate = std::max(1, int(m_specs.rate / 22050.0 + 0.01));
+	const float rate = float(m_specs.rate) / decimate;
+	const int count = int(rate * 1024.0f / 22050.0f);
+	const int frames = count * decimate;
+	if(frames > m_ring_frames || m_written < uint64_t(frames) || m_written - m_pitch_written < uint64_t(frames / 4))
+		return m_pitch;
+	m_pitch_written = m_written;
+
+	const int channels = m_specs.channels;
+	m_pitch_buffer.resize(count);
+	uint64_t position = m_written - frames;
+	for(int i = 0; i < count; i++)
+	{
+		float sum = 0.0f;
+		for(int d = 0; d < decimate; d++, position++)
+		{
+			const size_t slot = size_t(position % uint64_t(m_ring_frames)) * channels;
+			for(int c = 0; c < channels; c++)
+				sum += m_ring[slot + c];
+		}
+		m_pitch_buffer[i] = sum / (decimate * channels);
+	}
+
+	const PitchResult now = m_pitch_detector.detect(m_pitch_buffer.data(), count, rate);
+	if(now.frequency <= 0.0f)
+	{
+		/* Falha curta no meio da nota nao apaga a leitura. */
+		if(++m_pitch_gaps >= 8)
+		{
+			m_pitch = {0.0f, 0.0f};
+			m_pitch_count = 0;
+		}
+		return m_pitch;
+	}
+
+	m_pitch_gaps = 0;
+	m_pitch_history[m_pitch_count++ % 3] = now.frequency;
+	float sorted[3] = {m_pitch_history[0], m_pitch_history[1], m_pitch_history[2]};
+	const int used = std::min(m_pitch_count, 3);
+	std::sort(sorted, sorted + used);
+	m_pitch.frequency = sorted[used / 2];
+	m_pitch.confidence = now.confidence;
+	return m_pitch;
 }
 
 float Microphone::getLevel() const

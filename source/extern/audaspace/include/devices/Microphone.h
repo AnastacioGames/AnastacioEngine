@@ -29,6 +29,7 @@
  */
 
 #include "devices/IMicrophoneBackend.h"
+#include "util/PitchDetector.h"
 
 #include <cstdint>
 #include <map>
@@ -70,6 +71,15 @@ private:
 	std::vector<sample_t> m_record;
 	std::shared_ptr<ISound> m_last_recording;
 	Specs m_last_recording_specs;
+
+	PitchDetector m_pitch_detector;
+	std::vector<float> m_pitch_buffer;
+	uint64_t m_pitch_written;
+	PitchResult m_pitch;
+	/// Ultimas frequencias com nota: a mediana tira um erro isolado.
+	float m_pitch_history[3];
+	int m_pitch_count;
+	int m_pitch_gaps;
 
 	mutable std::recursive_mutex m_mutex;
 
@@ -115,6 +125,9 @@ public:
 	float getPeak() const;
 	/// Quantas vezes houve perda de amostras (fila do backend cheia ou leitor atrasado).
 	int getDropped() const;
+
+	/// Nota sendo cantada/tocada agora; frequency = 0 sem nota clara. Analisa so quando chega audio novo.
+	PitchResult getPitch();
 
 	void startRecording();
 	/// Para a gravacao e devolve o som gravado (tambem guardado em getLastRecording()).

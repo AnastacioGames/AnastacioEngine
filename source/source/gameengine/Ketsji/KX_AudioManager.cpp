@@ -1107,6 +1107,11 @@ static bool microphone_open(void *&microphone, bool enabled, const std::string& 
 		char error[256];
 		AUD_Microphone_getError(microphone, error, sizeof(error));
 		CM_Warning("Microphone: " << error);
+		if (!device.empty()) {
+			/* O nome fica guardado no objeto: sem isso nao daria para tentar o padrao. */
+			AUD_Microphone_free(microphone);
+			microphone = nullptr;
+		}
 		return false;
 	}
 	return true;
@@ -1178,6 +1183,18 @@ std::string KX_AudioManager::MicrophoneError() const
 	}
 #endif
 	return m_enabled ? "" : "audio is off (headless server)";
+}
+
+float KX_AudioManager::MicrophonePitch(float *confidence)
+{
+	if (confidence) {
+		*confidence = 0.0f;
+	}
+#ifdef WITH_AUDASPACE
+	return m_microphone ? AUD_Microphone_getPitch(m_microphone, confidence) : 0.0f;
+#else
+	return 0.0f;
+#endif
 }
 
 float KX_AudioManager::MicrophoneLevel() const
@@ -1797,6 +1814,36 @@ static PyObject *py_audio_microphoneError(PyObject *, PyObject *Py_UNUSED(ignore
 	return manager ? PyUnicode_FromStdString(manager->MicrophoneError()) : nullptr;
 }
 
+static PyObject *py_audio_microphonePitch(PyObject *, PyObject *Py_UNUSED(ignored))
+{
+	KX_AudioManager *manager = py_audio_manager();
+	return manager ? PyFloat_FromDouble(manager->MicrophonePitch()) : nullptr;
+}
+
+static PyObject *py_audio_microphoneNote(PyObject *, PyObject *args, PyObject *kwds)
+{
+	static const char *kwlist[] = {"a4", nullptr};
+	static const char *names[] = {"C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"};
+	float a4 = 440.0f;
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "|f:microphoneNote", const_cast<char **>(kwlist), &a4)) {
+		return nullptr;
+	}
+	KX_AudioManager *manager = py_audio_manager();
+	if (!manager) {
+		return nullptr;
+	}
+#ifdef WITH_AUDASPACE
+	const float frequency = manager->MicrophonePitch();
+	if (frequency > 0.0f && a4 > 0.0f) {
+		float cents = 0.0f;
+		const int midi = AUD_Microphone_noteFromFrequency(frequency, a4, &cents);
+		const std::string name = std::string(names[((midi % 12) + 12) % 12]) + std::to_string(midi / 12 - 1);
+		return Py_BuildValue("(sfi)", name.c_str(), cents, midi);
+	}
+#endif
+	return Py_BuildValue("(sfi)", "", 0.0f, 0);
+}
+
 static PyObject *py_audio_microphoneLevel(PyObject *, PyObject *Py_UNUSED(ignored))
 {
 	KX_AudioManager *manager = py_audio_manager();
@@ -2072,6 +2119,10 @@ static PyMethodDef py_audio_methods[] = {
 	 "microphoneState()\n'closed', 'pending', 'granted', 'denied' or 'error'."},
 	{"microphoneError", py_audio_microphoneError, METH_NOARGS,
 	 "microphoneError()\nWhy it did not open."},
+	{"microphonePitch", py_audio_microphonePitch, METH_NOARGS,
+	 "microphonePitch()\nFrequency of the note being sung or played, in Hz; 0 with no clear note."},
+	{"microphoneNote", (PyCFunction)py_audio_microphoneNote, METH_VARARGS | METH_KEYWORDS,
+	 "microphoneNote(a4=440.0)\n(name, cents, midi) of the current note, e.g. ('A4', -12.5, 69); ('', 0.0, 0) with no clear note."},
 	{"microphoneLevel", py_audio_microphoneLevel, METH_NOARGS,
 	 "microphoneLevel()\nVoice level now, 0..1."},
 	{"microphonePeak", py_audio_microphonePeak, METH_NOARGS,

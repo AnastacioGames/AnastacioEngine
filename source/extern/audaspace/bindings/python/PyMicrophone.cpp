@@ -262,6 +262,12 @@ static PyObject* Microphone_get_active(MicrophoneP* self, void*)
 	return PyBool_FromLong(mic(self)->isActive());
 }
 
+static PyObject* Microphone_get_pitch(MicrophoneP* self, void*)
+{
+	const aud::PitchResult result = mic(self)->getPitch();
+	return Py_BuildValue("(ff)", result.frequency, result.confidence);
+}
+
 static PyObject* Microphone_get_level(MicrophoneP* self, void*)
 {
 	return PyFloat_FromDouble(mic(self)->getLevel());
@@ -313,6 +319,7 @@ static PyGetSetDef Microphone_properties[] = {
 	{(char*)"error", (getter)Microphone_get_error, nullptr, (char*)"Last error message.", nullptr},
 	{(char*)"backend", (getter)Microphone_get_backend, nullptr, (char*)"Backend in use.", nullptr},
 	{(char*)"active", (getter)Microphone_get_active, nullptr, (char*)"Whether the capture is open.", nullptr},
+	{(char*)"pitch", (getter)Microphone_get_pitch, nullptr, (char*)"(frequency in Hz, confidence); frequency is 0 with no clear note.", nullptr},
 	{(char*)"level", (getter)Microphone_get_level, nullptr, (char*)"RMS level of the last block (0..1).", nullptr},
 	{(char*)"peak", (getter)Microphone_get_peak, nullptr, (char*)"Peak level with smooth fall (0..1).", nullptr},
 	{(char*)"dropped", (getter)Microphone_get_dropped, nullptr, (char*)"How many times samples were lost.", nullptr},

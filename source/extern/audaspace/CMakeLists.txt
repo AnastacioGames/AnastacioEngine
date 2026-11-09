@@ -133,6 +133,7 @@ set(SRC
 	src/util/Barrier.cpp
 	src/util/Buffer.cpp
 	src/util/BufferReader.cpp
+	src/util/PitchDetector.cpp
 	src/util/StreamBuffer.cpp
 	src/util/ThreadPool.cpp
 )
@@ -253,6 +254,7 @@ set(PUBLIC_HDR
 	include/util/Barrier.h
 	include/util/Buffer.h
 	include/util/BufferReader.h
+	include/util/PitchDetector.h
 	include/util/ILockable.h
 	include/util/Math3D.h
 	include/util/StreamBuffer.h

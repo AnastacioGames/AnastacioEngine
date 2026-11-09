@@ -123,6 +123,8 @@ public:
 	std::string MicrophoneState() const;
 	std::string MicrophoneError() const;
 	float MicrophoneLevel() const;
+	/// Hz da nota atual; 0 sem nota clara.
+	float MicrophonePitch(float *confidence = nullptr);
 	float MicrophonePeak() const;
 	int MicrophoneDropped() const;
 	bool MicrophoneRecordStart();

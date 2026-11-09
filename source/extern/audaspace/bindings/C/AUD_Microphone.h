@@ -49,6 +49,10 @@ extern AUD_API int AUD_Microphone_getState(AUD_Microphone* microphone);
 extern AUD_API void AUD_Microphone_getError(AUD_Microphone* microphone, char* buffer, int size);
 extern AUD_API float AUD_Microphone_getLevel(AUD_Microphone* microphone);
 extern AUD_API float AUD_Microphone_getPeak(AUD_Microphone* microphone);
+/// Frequencia da nota atual em Hz (0 = sem nota); confidence pode ser NULL.
+extern AUD_API float AUD_Microphone_getPitch(AUD_Microphone* microphone, float* confidence);
+/// Numero MIDI da nota mais proxima da frequencia; cents recebe o desvio.
+extern AUD_API int AUD_Microphone_noteFromFrequency(float frequency, float a4, float* cents);
 extern AUD_API int AUD_Microphone_getDropped(AUD_Microphone* microphone);
 extern AUD_API int AUD_Microphone_getRate(AUD_Microphone* microphone);
 extern AUD_API void AUD_Microphone_recordStart(AUD_Microphone* microphone);
