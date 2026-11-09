@@ -72,7 +72,8 @@ Ambos convergem em `LA_Launcher`, que por sua vez dirige `KX_KetsjiEngine`.
 `EngineNextFrame()` com `emscripten_set_main_loop_arg` e o navegador chama um frame por vez. Os trechos
 específicos da Web ficam em `#ifdef __EMSCRIPTEN__` (input, joystick, ImGui, Python, filtros 2D e o rasterizer
 OpenGL, que roda em WebGL2). O **Android** oficial é um APK com WebView que carrega esse pacote Web; não há
-build C++ próprio (ver [build-dirs.md](build-dirs.md)).
+build C++ próprio (ver [build-dirs.md](build-dirs.md)). O microfone na Web usa `getUserMedia` + AudioWorklet; o APK só
+pede `RECORD_AUDIO` quando o pacote Web foi exportado com microfone.
 
 ## Ordem do frame (`KX_KetsjiEngine::NextFrame()`)
 
@@ -112,6 +113,9 @@ documentação primeiro.
 Desde 2026-10-27 há um relógio único: frame, lógica, animação e física avançam pelo passo escalado
 (`m_framestep`), então `setTimeScale` afeta tudo junto e escala 0 pausa. A cutscene tem relógio próprio
 (`KX_CutsceneManager::Advance`), parado com a cena suspensa; `setUseExternalClock` foi descontinuado.
+
+Com **Automatic Occluders**, a cada 30 quadros a câmera ativa roda o outro modo só para contar os objetos visíveis e
+decidir se a oclusão fica ligada; em campo aberto ela não gasta CPU (`KX_Scene.cpp`).
 
 O profiling de cada trecho usa `KX_TimeCategoryLogger` (`m_logger.StartLog(tc_XXX)`), com
 categorias no enum `KX_TimeCategory` (`KX_KetsjiEngine.h`) rotuladas em paralelo por
