@@ -2696,6 +2696,8 @@ TABLE = (
     ('Cut Branch', 'Recortar ramo', 'Cortar rama', 'Вырезать ветвь'),
     ('Paste Branch', 'Colar ramo', 'Pegar rama', 'Вставить ветвь'),
     ('Find Idea', 'Buscar ideia', 'Buscar idea', 'Найти идею'),
+    ('Export Mind Map Image', 'Exportar imagem do mapa mental', 'Exportar imagen del mapa mental', 'Экспорт изображения ментальной карты'),
+    ('Add to Selection', 'Adicionar à seleção', 'Añadir a la selección', 'Добавить к выделению'),
     ('Link Idea', 'Vincular ideia', 'Vincular idea', 'Связать идею'),
     ('Link...', 'Vincular...', 'Vincular...', 'Связать...'),
     ('Open Link', 'Abrir vínculo', 'Abrir vínculo', 'Открыть связь'),

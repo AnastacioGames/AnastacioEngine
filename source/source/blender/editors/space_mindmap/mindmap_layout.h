@@ -34,6 +34,7 @@ enum { MM_TASK_NONE, MM_TASK_TODO, MM_TASK_DONE };
 #define MM_ATTR_TASK "ANASTACIO_TASK"
 #define MM_ATTR_LINK "ANASTACIO_LINK"
 #define MM_ATTR_ICON "ANASTACIO_ICON"
+#define MM_ATTR_LINK_ID "ANASTACIO_LINK_ID"
 
 typedef struct MMLayoutNode {
 	struct MMElem *elem;
@@ -52,6 +53,7 @@ typedef struct MMLayoutNode {
 	float text_right;           /* width used by the marks at the right of the text */
 	int task;                   /* MM_TASK_NONE, MM_TASK_TODO or MM_TASK_DONE */
 	int has_link;
+	int marked;
 	char progress[32];          /* "done/total" of the tasks below, empty when none */
 } MMLayoutNode;
 

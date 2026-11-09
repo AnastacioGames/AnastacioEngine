@@ -39,6 +39,7 @@ typedef struct MMElem {
 	char *tag;    /* NULL for raw content (text, comment, CDATA) */
 	char *raw;
 	MMAttr *attr_first, *attr_last;
+	int marked;   /* selected as part of a group, never saved */
 } MMElem;
 
 typedef struct MMDoc {

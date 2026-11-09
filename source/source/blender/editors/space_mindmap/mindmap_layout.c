@@ -158,6 +158,7 @@ static float fill_appearance(LayoutContext *ctx, const MMElem *node, MMLayoutNod
 	out->has_note = mm_node_has_note(node);
 	out->has_children = mm_node_first_child(node) != NULL;
 	out->task = mm_node_task(node);
+	out->marked = node->marked;
 	value = mm_attr_get(node, MM_ATTR_ICON);
 	if (value) {
 		snprintf(out->engine_icon, sizeof(out->engine_icon), "%s", value);

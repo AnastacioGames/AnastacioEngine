@@ -23,15 +23,19 @@
 #include <float.h>
 #include <math.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <string.h>
+#include <time.h>
 
 #include "MEM_guardedalloc.h"
 
 #include "BLI_blenlib.h"
 #include "BLI_math_base.h"
 #include "BLI_math_vector.h"
+#include "BLI_rect.h"
 #include "BLI_utildefines.h"
 
+#include "DNA_ID.h"
 #include "DNA_object_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
@@ -41,6 +45,7 @@
 #include "DNA_windowmanager_types.h"
 
 #include "BKE_context.h"
+#include "BKE_idprop.h"
 #include "BKE_main.h"
 #include "BKE_report.h"
 #include "BKE_scene.h"
@@ -55,6 +60,11 @@
 
 #include "BIF_gl.h"
 #include "BIF_glutil.h"
+
+#include "GPU_framebuffer.h"
+
+#include "IMB_imbuf.h"
+#include "IMB_imbuf_types.h"
 
 #include "RNA_access.h"
 #include "RNA_define.h"
@@ -388,6 +398,12 @@ static void mindmap_draw_boxes(const MMLayout *layout, const rctf *cur, const MM
 			fdrawbox(node->xmin, node->ymin, node->xmax, node->ymax);
 			glLineWidth(1.0f);
 		}
+		else if (node->marked) {
+			UI_ThemeColorShade(TH_TEXT_HI, -50);
+			glLineWidth(2.0f);
+			fdrawbox(node->xmin, node->ymin, node->xmax, node->ymax);
+			glLineWidth(1.0f);
+		}
 		else {
 			UI_ThemeColorShade(TH_TEXT, -40);
 			fdrawbox(node->xmin, node->ymin, node->xmax, node->ymax);
@@ -716,6 +732,23 @@ static void mindmap_main_region_init(wmWindowManager *wm, ARegion *ar)
 	WM_event_add_keymap_handler(&ar->handlers, keymap);
 }
 
+static void mindmap_draw_map(const bContext *C, ARegion *ar, const MindMapCache *cache)
+{
+	UI_view2d_view_ortho(&ar->v2d);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glEnable(GL_LINE_SMOOTH);
+	mindmap_draw_links(cache->layout, &ar->v2d.cur);
+	mindmap_draw_boxes(cache->layout, &ar->v2d.cur, cache->selected);
+	mindmap_draw_drop_hint(cache);
+	glDisable(GL_LINE_SMOOTH);
+	glDisable(GL_BLEND);
+	UI_view2d_view_restore(C);
+
+	mindmap_draw_texts(cache->layout, ar);
+	mindmap_draw_drag_ghost(C, ar, cache);
+}
+
 static void mindmap_main_region_draw(const bContext *C, ARegion *ar)
 {
 	const SpaceMindMap *smm = (SpaceMindMap *)CTX_wm_space_data(C);
@@ -743,19 +776,7 @@ static void mindmap_main_region_draw(const bContext *C, ARegion *ar)
 		mindmap_view_reveal(ar, cache);
 	}
 
-	UI_view2d_view_ortho(&ar->v2d);
-	glEnable(GL_BLEND);
-	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	glEnable(GL_LINE_SMOOTH);
-	mindmap_draw_links(cache->layout, &ar->v2d.cur);
-	mindmap_draw_boxes(cache->layout, &ar->v2d.cur, cache->selected);
-	mindmap_draw_drop_hint(cache);
-	glDisable(GL_LINE_SMOOTH);
-	glDisable(GL_BLEND);
-	UI_view2d_view_restore(C);
-
-	mindmap_draw_texts(cache->layout, ar);
-	mindmap_draw_drag_ghost(C, ar, cache);
+	mindmap_draw_map(C, ar, cache);
 
 	if (cache->editing) {
 		mindmap_draw_edit_field(C, ar, cache);
@@ -958,21 +979,82 @@ static void MINDMAP_OT_edit(wmOperatorType *ot)
 	ot->poll = mindmap_edit_poll;
 }
 
+/* ---------------- group selection ---------------- */
+
+static int mindmap_count_nodes(const MMElem *node)
+{
+	const MMElem *child;
+	int count = 1;
+
+	for (child = mm_node_first_child(node); child; child = mm_node_next(child)) {
+		count += mindmap_count_nodes(child);
+	}
+	return count;
+}
+
+static void mindmap_collect(MMElem *node, const MMElem *root, const MMElem *selected, bool branches, MMElem **items, int *count)
+{
+	MMElem *child;
+
+	if ((node->marked || node == selected) && !(branches && node == root)) {
+		items[(*count)++] = node;
+		if (branches) {
+			return;
+		}
+	}
+	for (child = mm_node_first_child(node); child; child = mm_node_next(child)) {
+		mindmap_collect(child, root, selected, branches, items, count);
+	}
+}
+
+/* Selected ideas in map order. With branches, leaves out the root and what is inside
+ * another selected idea. Release with MEM_freeN. */
+static MMElem **mindmap_targets(const MindMapCache *cache, bool branches, int *r_count)
+{
+	MMElem *root = mm_root_node(cache->doc);
+	MMElem **items = MEM_mallocN(sizeof(*items) * mindmap_count_nodes(root), "mindmap targets");
+
+	*r_count = 0;
+	mindmap_collect(root, root, cache->selected, branches, items, r_count);
+	return items;
+}
+
+static void mindmap_marks_clear(MMElem *node)
+{
+	MMElem *child;
+
+	node->marked = 0;
+	for (child = mm_node_first_child(node); child; child = mm_node_next(child)) {
+		mindmap_marks_clear(child);
+	}
+}
+
 static int mindmap_delete_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	MindMapCache *cache = mindmap_edit_cache(C);
-	MMElem *node = cache->selected;
-	MMElem *next, *other, *previous = NULL;
+	int count, i;
+	MMElem **items = mindmap_targets(cache, true, &count);
 
-	if (node == mm_root_node(cache->doc)) {
+	if (count == 0) {
+		MEM_freeN(items);
 		return OPERATOR_CANCELLED;
 	}
-	for (other = mm_node_first_child(node->parent); other != node; other = mm_node_next(other)) {
-		previous = other;
+	if (count == 1) {
+		MMElem *node = items[0], *next, *other, *previous = NULL;
+
+		for (other = mm_node_first_child(node->parent); other != node; other = mm_node_next(other)) {
+			previous = other;
+		}
+		next = mm_node_next(node);
+		cache->selected = next ? next : (previous ? previous : node->parent);
 	}
-	next = mm_node_next(node);
-	cache->selected = next ? next : (previous ? previous : node->parent);
-	mm_node_remove(node);
+	else {
+		cache->selected = items[0]->parent;
+	}
+	for (i = 0; i < count; i++) {
+		mm_node_remove(items[i]);
+	}
+	MEM_freeN(items);
 	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Delete Idea");
 }
@@ -1018,7 +1100,7 @@ static bool mindmap_elem_inside(const MMElem *elem, const MMElem *branch)
 	return false;
 }
 
-static void mindmap_task_set(MindMapCache *cache, MMElem *node, int task)
+static void mindmap_task_write(MMElem *node, int task)
 {
 	if (task == MM_TASK_NONE) {
 		mm_attr_remove(node, MM_ATTR_TASK);
@@ -1026,23 +1108,87 @@ static void mindmap_task_set(MindMapCache *cache, MMElem *node, int task)
 	else {
 		mm_attr_set(node, MM_ATTR_TASK, task == MM_TASK_DONE ? "done" : "todo");
 	}
-	mindmap_cache_commit(cache);
 }
 
-/* The link is the ID name with its type prefix: OBCube, SCScene or TXscript.py */
-static bool mindmap_open_link(bContext *C, ReportList *reports, const char *link)
+/* Link: the ID name with its type prefix (OBCube, SCScene, TXscript.py). Link id: a
+ * token also stored in the target, which finds it again after it is renamed. */
+#define MINDMAP_ID_PROP "mindmap_link_id"
+
+static ListBase *mindmap_link_list(Main *bmain, const char *link)
+{
+	if (STREQLEN(link, "OB", 2)) {
+		return &bmain->object;
+	}
+	if (STREQLEN(link, "SC", 2)) {
+		return &bmain->scene;
+	}
+	return STREQLEN(link, "TX", 2) ? &bmain->text : NULL;
+}
+
+static const char *mindmap_id_token(ID *id)
+{
+	IDProperty *group = IDP_GetProperties(id, false);
+	IDProperty *prop = group ? IDP_GetPropertyFromGroup(group, MINDMAP_ID_PROP) : NULL;
+
+	return (prop && prop->type == IDP_STRING) ? prop->data.pointer : NULL;
+}
+
+/* Returns NULL for data from a library, which cannot be changed. */
+static const char *mindmap_id_token_ensure(ID *id)
+{
+	const char *token = mindmap_id_token(id);
+
+	if (token == NULL && id->lib == NULL) {
+		char buffer[32];
+
+		BLI_snprintf(buffer, sizeof(buffer), "%08x%08x", (unsigned int)time(NULL), (unsigned int)(intptr_t)id);
+		IDP_AddToGroup(IDP_GetProperties(id, true), IDP_NewString(buffer, MINDMAP_ID_PROP, sizeof(buffer) - 1));
+		token = mindmap_id_token(id);
+	}
+	return token;
+}
+
+static ID *mindmap_link_find(Main *bmain, const char *link, const char *token)
+{
+	ListBase *list = mindmap_link_list(bmain, link);
+	ID *id, *by_name;
+
+	if (list == NULL || strlen(link) <= 2) {
+		return NULL;
+	}
+	by_name = BLI_findstring(list, link + 2, offsetof(ID, name) + 2);
+	if (token == NULL) {
+		return by_name;
+	}
+	/* The name goes first: a duplicated object carries the same token. */
+	if (by_name && STREQ(mindmap_id_token(by_name) ? mindmap_id_token(by_name) : "", token)) {
+		return by_name;
+	}
+	for (id = list->first; id; id = id->next) {
+		const char *other = mindmap_id_token(id);
+
+		if (other && STREQ(other, token)) {
+			return id;
+		}
+	}
+	return by_name;
+}
+
+static bool mindmap_open_link(bContext *C, ReportList *reports, const MMElem *node)
 {
 	Main *bmain = CTX_data_main(C);
 	bScreen *screen = CTX_wm_screen(C);
-	const char *name = (strlen(link) > 2) ? link + 2 : "";
-	const int name_offset = offsetof(ID, name) + 2;
+	char *link = mm_attr_get(node, MM_ATTR_LINK);
+	char *token = mm_attr_get(node, MM_ATTR_LINK_ID);
+	ID *id = link ? mindmap_link_find(bmain, link, token) : NULL;
+	bool opened = false;
 
-	if (STREQLEN(link, "OB", 2)) {
-		Object *ob = BLI_findstring(&bmain->object, name, name_offset);
+	if (id && GS(id->name) == ID_OB) {
+		Object *ob = (Object *)id;
 		Scene *scene = CTX_data_scene(C), *sce;
-		Base *base = ob ? BKE_scene_base_find(scene, ob) : NULL;
+		Base *base = BKE_scene_base_find(scene, ob);
 
-		for (sce = bmain->scene.first; ob && !base && sce; sce = sce->id.next) {
+		for (sce = bmain->scene.first; !base && sce; sce = sce->id.next) {
 			base = BKE_scene_base_find(sce, ob);
 			if (base) {
 				scene = sce;
@@ -1053,35 +1199,34 @@ static bool mindmap_open_link(bContext *C, ReportList *reports, const char *link
 			BKE_scene_base_deselect_all(scene);
 			BKE_scene_base_select(scene, base);
 			WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
-			return true;
+			opened = true;
 		}
 	}
-	else if (STREQLEN(link, "SC", 2)) {
-		Scene *scene = BLI_findstring(&bmain->scene, name, name_offset);
-
-		if (scene) {
-			WM_event_add_notifier(C, NC_SCREEN | ND_SCENEBROWSE, scene);
-			return true;
-		}
+	else if (id && GS(id->name) == ID_SCE) {
+		WM_event_add_notifier(C, NC_SCREEN | ND_SCENEBROWSE, id);
+		opened = true;
 	}
-	else if (STREQLEN(link, "TX", 2)) {
-		Text *text = BLI_findstring(&bmain->text, name, name_offset);
+	else if (id && GS(id->name) == ID_TXT) {
 		ScrArea *sa;
 
-		if (text) {
-			for (sa = screen->areabase.first; sa; sa = sa->next) {
-				if (sa->spacetype == SPACE_TEXT) {
-					((SpaceText *)sa->spacedata.first)->text = text;
-					ED_area_tag_redraw(sa);
-					return true;
-				}
+		for (sa = screen->areabase.first; sa; sa = sa->next) {
+			if (sa->spacetype == SPACE_TEXT) {
+				((SpaceText *)sa->spacedata.first)->text = (Text *)id;
+				ED_area_tag_redraw(sa);
+				opened = true;
+				break;
 			}
+		}
+		if (!opened) {
 			BKE_report(reports, RPT_WARNING, "Open a Text Editor area to see this text");
-			return false;
 		}
 	}
-	BKE_reportf(reports, RPT_WARNING, "Linked item not found: %s", name);
-	return false;
+	if (id == NULL) {
+		BKE_reportf(reports, RPT_WARNING, "Linked item not found: %s", (link && strlen(link) > 2) ? link + 2 : "");
+	}
+	mm_str_free(link);
+	mm_str_free(token);
+	return opened;
 }
 
 static void mindmap_drag_update(ARegion *ar, MindMapCache *cache, const int mval[2])
@@ -1108,14 +1253,23 @@ static void mindmap_drag_update(ARegion *ar, MindMapCache *cache, const int mval
 
 static void mindmap_drag_apply(bContext *C, MindMapCache *cache)
 {
-	MMElem *node = cache->drag_node;
 	MMElem *target = (MMElem *)cache->drop_target;
 	const MMElem *root = mm_root_node(cache->doc);
 	MMElem *parent, *before = NULL;
+	MMElem **items;
 	char *position = NULL;
+	bool moved = false;
+	int count, i;
 
 	if (target == NULL) {
 		return;
+	}
+	items = mindmap_targets(cache, true, &count);
+	for (i = 0; i < count; i++) {
+		if (mindmap_elem_inside(target, items[i])) {
+			MEM_freeN(items);
+			return;
+		}
 	}
 	if (cache->drop_zone == DROP_CHILD) {
 		parent = target;
@@ -1126,22 +1280,33 @@ static void mindmap_drag_apply(bContext *C, MindMapCache *cache)
 	else {
 		parent = target->parent;
 		before = (cache->drop_zone == DROP_BEFORE) ? target : mm_node_next(target);
+		while (before && (before->marked || before == cache->selected)) {
+			before = mm_node_next(before);
+		}
 		position = mm_attr_get(target, "POSITION");
 	}
 
-	if (mm_node_move(node, parent, before)) {
-		if (parent != root) {
-			mm_attr_remove(node, "POSITION");
+	for (i = 0; i < count; i++) {
+		MMElem *node = items[i];
+
+		if (mm_node_move(node, parent, before)) {
+			moved = true;
+			if (parent != root) {
+				mm_attr_remove(node, "POSITION");
+			}
+			else if (position) {
+				mm_attr_set(node, "POSITION", position);
+			}
+			else {
+				mm_attr_set(node, "POSITION", cache->drop_side > 0 ? "right" : "left");
+			}
 		}
-		else if (position) {
-			mm_attr_set(node, "POSITION", position);
-		}
-		else {
-			mm_attr_set(node, "POSITION", cache->drop_side > 0 ? "right" : "left");
-		}
+	}
+	if (moved) {
 		mindmap_cache_commit(cache);
 		ED_undo_push(C, "Move Idea");
 	}
+	MEM_freeN(items);
 	mm_str_free(position);
 }
 
@@ -1164,23 +1329,29 @@ static int mindmap_click_invoke(bContext *C, wmOperator *op, const wmEvent *even
 	MMElem *node;
 
 	if (index == -1) {
+		mindmap_marks_clear(mm_root_node(cache->doc));
+		mindmap_cache_rebuild_layout(cache);
+		ED_region_tag_redraw(ar);
 		return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
 	}
 	hit = &cache->layout->nodes[index];
 	node = hit->elem;
+	if (!node->marked) {
+		mindmap_marks_clear(mm_root_node(cache->doc));
+		mindmap_cache_rebuild_layout(cache);
+		hit = &cache->layout->nodes[mindmap_layout_find(cache->layout, node)];
+	}
 	cache->selected = node;
 	ED_region_tag_redraw(ar);
 
 	if (!on_mark && hit->task != MM_TASK_NONE && co[0] <= hit->xmin + 16.0f) {
-		mindmap_task_set(cache, node, hit->task == MM_TASK_DONE ? MM_TASK_TODO : MM_TASK_DONE);
+		mindmap_task_write(node, hit->task == MM_TASK_DONE ? MM_TASK_TODO : MM_TASK_DONE);
+		mindmap_cache_commit(cache);
 		ED_undo_push(C, "Toggle Task");
 		return OPERATOR_FINISHED;
 	}
 	if (!on_mark && hit->has_link && co[0] >= hit->xmax - 16.0f) {
-		char *link = mm_attr_get(node, MM_ATTR_LINK);
-
-		mindmap_open_link(C, op->reports, link);
-		mm_str_free(link);
+		mindmap_open_link(C, op->reports, node);
 		return OPERATOR_FINISHED;
 	}
 
@@ -1223,6 +1394,10 @@ static int mindmap_click_modal(bContext *C, wmOperator *op, const wmEvent *event
 				if (cache->dragging) {
 					mindmap_drag_apply(C, cache);
 				}
+				else {
+					mindmap_marks_clear(mm_root_node(cache->doc));
+					mindmap_cache_rebuild_layout(cache);
+				}
 				mindmap_drag_end(ar, cache);
 				return OPERATOR_FINISHED;
 			}
@@ -1260,13 +1435,18 @@ static int mindmap_set_color_exec(bContext *C, wmOperator *op)
 {
 	MindMapCache *cache = mindmap_edit_cache(C);
 	const char *value = mindmap_color_values[RNA_enum_get(op->ptr, "color")];
+	int count, i;
+	MMElem **items = mindmap_targets(cache, false, &count);
 
-	if (value) {
-		mm_attr_set(cache->selected, "COLOR", value);
+	for (i = 0; i < count; i++) {
+		if (value) {
+			mm_attr_set(items[i], "COLOR", value);
+		}
+		else {
+			mm_attr_remove(items[i], "COLOR");
+		}
 	}
-	else {
-		mm_attr_remove(cache->selected, "COLOR");
-	}
+	MEM_freeN(items);
 	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Idea Color");
 }
@@ -1298,8 +1478,14 @@ static int mindmap_set_icon_exec(bContext *C, wmOperator *op)
 {
 	MindMapCache *cache = mindmap_edit_cache(C);
 
-	mm_node_icon_set(cache->selected, mindmap_icon_values[RNA_enum_get(op->ptr, "icon")]);
-	mm_attr_remove(cache->selected, MM_ATTR_ICON);
+	int count, i;
+	MMElem **items = mindmap_targets(cache, false, &count);
+
+	for (i = 0; i < count; i++) {
+		mm_node_icon_set(items[i], mindmap_icon_values[RNA_enum_get(op->ptr, "icon")]);
+		mm_attr_remove(items[i], MM_ATTR_ICON);
+	}
+	MEM_freeN(items);
 	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Idea Icon");
 }
@@ -1334,11 +1520,19 @@ static int mindmap_set_engine_icon_exec(bContext *C, wmOperator *op)
 	if (!RNA_property_enum_identifier(C, op->ptr, op->type->prop, value, &identifier)) {
 		return OPERATOR_CANCELLED;
 	}
-	if (value == ICON_NONE) {
-		mm_attr_remove(cache->selected, MM_ATTR_ICON);
-	}
-	else {
-		mm_attr_set(cache->selected, MM_ATTR_ICON, identifier);
+	{
+		int count, i;
+		MMElem **items = mindmap_targets(cache, false, &count);
+
+		for (i = 0; i < count; i++) {
+			if (value == ICON_NONE) {
+				mm_attr_remove(items[i], MM_ATTR_ICON);
+			}
+			else {
+				mm_attr_set(items[i], MM_ATTR_ICON, identifier);
+			}
+		}
+		MEM_freeN(items);
 	}
 	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Idea Engine Icon");
@@ -1408,7 +1602,15 @@ static int mindmap_cycle_task_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	MindMapCache *cache = mindmap_edit_cache(C);
 
-	mindmap_task_set(cache, cache->selected, (mm_node_task(cache->selected) + 1) % 3);
+	const int task = (mm_node_task(cache->selected) + 1) % 3;
+	int count, i;
+	MMElem **items = mindmap_targets(cache, false, &count);
+
+	for (i = 0; i < count; i++) {
+		mindmap_task_write(items[i], task);
+	}
+	MEM_freeN(items);
+	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Idea Task");
 }
 
@@ -1455,7 +1657,24 @@ static int mindmap_set_link_exec(bContext *C, wmOperator *op)
 	if (!RNA_property_enum_identifier(C, op->ptr, op->type->prop, RNA_property_enum_get(op->ptr, op->type->prop), &identifier)) {
 		return OPERATOR_CANCELLED;
 	}
-	mm_attr_set(cache->selected, MM_ATTR_LINK, identifier);
+	{
+		ListBase *list = mindmap_link_list(CTX_data_main(C), identifier);
+		ID *id = list ? BLI_findstring(list, identifier, offsetof(ID, name)) : NULL;
+		const char *token = id ? mindmap_id_token_ensure(id) : NULL;
+		int count, i;
+		MMElem **items = mindmap_targets(cache, false, &count);
+
+		for (i = 0; i < count; i++) {
+			mm_attr_set(items[i], MM_ATTR_LINK, identifier);
+			if (token) {
+				mm_attr_set(items[i], MM_ATTR_LINK_ID, token);
+			}
+			else {
+				mm_attr_remove(items[i], MM_ATTR_LINK_ID);
+			}
+		}
+		MEM_freeN(items);
+	}
 	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Link Idea");
 }
@@ -1481,6 +1700,7 @@ static int mindmap_clear_link_exec(bContext *C, wmOperator *UNUSED(op))
 	MindMapCache *cache = mindmap_edit_cache(C);
 
 	mm_attr_remove(cache->selected, MM_ATTR_LINK);
+	mm_attr_remove(cache->selected, MM_ATTR_LINK_ID);
 	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Clear Idea Link");
 }
@@ -1497,10 +1717,8 @@ static void MINDMAP_OT_clear_link(wmOperatorType *ot)
 static int mindmap_open_link_exec(bContext *C, wmOperator *op)
 {
 	const MindMapCache *cache = mindmap_edit_cache(C);
-	char *link = mm_attr_get(cache->selected, MM_ATTR_LINK);
-	const bool opened = link && mindmap_open_link(C, op->reports, link);
+	const bool opened = mindmap_open_link(C, op->reports, cache->selected);
 
-	mm_str_free(link);
 	return opened ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
 }
 
@@ -1513,6 +1731,120 @@ static void MINDMAP_OT_open_link(wmOperatorType *ot)
 	ot->poll = mindmap_edit_poll;
 }
 
+/* ---------------- image ---------------- */
+
+static int mindmap_render_png_exec(bContext *C, wmOperator *op)
+{
+	ARegion *ar = BKE_area_find_region_type(CTX_wm_area(C), RGN_TYPE_WINDOW);
+	ARegion *previous_region = CTX_wm_region(C);
+	MindMapCache *cache = mindmap_edit_cache(C);
+	const MMLayout *layout = cache->layout;
+	const float margin = 24.0f;
+	const float size_x = layout->xmax - layout->xmin + margin * 2.0f;
+	const float size_y = layout->ymax - layout->ymin + margin * 2.0f;
+	const float scale = min_fff(2.0f, 8000.0f / size_x, 8000.0f / size_y);
+	const int width = max_ii((int)(size_x * scale), 1), height = max_ii((int)(size_y * scale), 1);
+	const View2D saved_v2d = ar->v2d;
+	const rcti saved_winrct = ar->winrct;
+	const short saved_winx = ar->winx, saved_winy = ar->winy;
+	MMElem *saved_selected = cache->selected;
+	char filepath[FILE_MAX], error[256];
+	GPUOffScreen *ofs;
+	ImBuf *ibuf;
+	short saved;
+
+	RNA_string_get(op->ptr, "filepath", filepath);
+	ofs = GPU_offscreen_create(width, height, 0, error);
+	if (ofs == NULL) {
+		BKE_reportf(op->reports, RPT_ERROR, "Could not create the image: %s", error);
+		return OPERATOR_CANCELLED;
+	}
+
+	ar->v2d.cur.xmin = layout->xmin - margin;
+	ar->v2d.cur.xmax = layout->xmax + margin;
+	ar->v2d.cur.ymin = layout->ymin - margin;
+	ar->v2d.cur.ymax = layout->ymax + margin;
+	BLI_rcti_init(&ar->v2d.mask, 0, width - 1, 0, height - 1);
+	BLI_rcti_init(&ar->winrct, 0, width - 1, 0, height - 1);
+	ar->winx = width;
+	ar->winy = height;
+	cache->selected = NULL;
+	CTX_wm_region_set(C, ar);
+	UI_SetTheme(SPACE_MINDMAP, RGN_TYPE_WINDOW);
+
+	glPushAttrib(GL_SCISSOR_BIT | GL_ENABLE_BIT | GL_VIEWPORT_BIT);
+	glDisable(GL_SCISSOR_TEST);
+	GPU_offscreen_bind(ofs, true);
+	UI_ThemeClearColor(TH_BACK);
+	glClear(GL_COLOR_BUFFER_BIT);
+	mindmap_draw_map(C, ar, cache);
+	ibuf = IMB_allocImBuf(width, height, 24, IB_rect);
+	GPU_offscreen_read_pixels(ofs, GL_UNSIGNED_BYTE, ibuf->rect);
+	GPU_offscreen_unbind(ofs, true);
+	glPopAttrib();
+	GPU_offscreen_free(ofs);
+
+	CTX_wm_region_set(C, previous_region);
+	cache->selected = saved_selected;
+	ar->v2d = saved_v2d;
+	ar->winrct = saved_winrct;
+	ar->winx = saved_winx;
+	ar->winy = saved_winy;
+	ED_region_tag_redraw(ar);
+
+	ibuf->ftype = IMB_FTYPE_PNG;
+	saved = IMB_saveiff(ibuf, filepath, IB_rect);
+	IMB_freeImBuf(ibuf);
+	if (!saved) {
+		BKE_reportf(op->reports, RPT_ERROR, "Could not save: %s", filepath);
+		return OPERATOR_CANCELLED;
+	}
+	return OPERATOR_FINISHED;
+}
+
+static void MINDMAP_OT_render_png(wmOperatorType *ot)
+{
+	ot->name = "Render Map to PNG";
+	ot->idname = "MINDMAP_OT_render_png";
+	ot->description = "Save the whole map as a PNG image";
+	ot->exec = mindmap_render_png_exec;
+	ot->poll = mindmap_edit_poll;
+	RNA_def_string_file_path(ot->srna, "filepath", NULL, FILE_MAX, "File Path", "");
+}
+
+/* Shift+click adds an idea to the selected group, or takes it out. */
+static int mindmap_toggle_mark_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
+{
+	ARegion *ar = CTX_wm_region(C);
+	MindMapCache *cache = mindmap_edit_cache(C);
+	const int index = mindmap_hit_node(ar, cache->layout, cache->selected, event->mval, NULL, NULL);
+	MMElem *node;
+
+	if (index == -1) {
+		return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
+	}
+	node = cache->layout->nodes[index].elem;
+	cache->selected->marked = 1;
+	if (node != cache->selected) {
+		node->marked = !node->marked;
+		if (node->marked) {
+			cache->selected = node;
+		}
+	}
+	mindmap_cache_rebuild_layout(cache);
+	ED_region_tag_redraw(ar);
+	return OPERATOR_FINISHED;
+}
+
+static void MINDMAP_OT_toggle_mark(wmOperatorType *ot)
+{
+	ot->name = "Add to Selection";
+	ot->idname = "MINDMAP_OT_toggle_mark";
+	ot->description = "Add the idea under the mouse to the selected group, or take it out";
+	ot->invoke = mindmap_toggle_mark_invoke;
+	ot->poll = mindmap_edit_poll;
+}
+
 /* ---------------- copy and paste ---------------- */
 
 static int mindmap_copy_exec(bContext *C, wmOperator *UNUSED(op))
@@ -1520,8 +1852,16 @@ static int mindmap_copy_exec(bContext *C, wmOperator *UNUSED(op))
 	const MindMapCache *cache = mindmap_edit_cache(C);
 	MMDoc *holder = mm_new("Clipboard");
 	char *xml;
+	int count, i;
+	MMElem **items = mindmap_targets(cache, true, &count);
 
-	mm_node_copy_into(cache->selected, mm_root_node(holder));
+	if (count == 0) {
+		mm_node_copy_into(cache->selected, mm_root_node(holder));
+	}
+	for (i = 0; i < count; i++) {
+		mm_node_copy_into(items[i], mm_root_node(holder));
+	}
+	MEM_freeN(items);
 	xml = mm_write(holder, NULL);
 	WM_clipboard_text_set(xml, false);
 	mm_str_free(xml);
@@ -1542,7 +1882,10 @@ static int mindmap_cut_exec(bContext *C, wmOperator *op)
 {
 	const MindMapCache *cache = mindmap_edit_cache(C);
 
-	if (cache->selected == mm_root_node(cache->doc)) {
+	int count;
+
+	MEM_freeN(mindmap_targets(cache, true, &count));
+	if (count == 0) {
 		BKE_report(op->reports, RPT_WARNING, "The central idea cannot be cut");
 		return OPERATOR_CANCELLED;
 	}
@@ -1935,6 +2278,8 @@ static void mindmap_operatortypes(void)
 	WM_operatortype_append(MINDMAP_OT_edit_note);
 	WM_operatortype_append(MINDMAP_OT_context_menu);
 	WM_operatortype_append(MINDMAP_OT_cycle_task);
+	WM_operatortype_append(MINDMAP_OT_render_png);
+	WM_operatortype_append(MINDMAP_OT_toggle_mark);
 	WM_operatortype_append(MINDMAP_OT_copy);
 	WM_operatortype_append(MINDMAP_OT_cut);
 	WM_operatortype_append(MINDMAP_OT_paste);
@@ -1954,6 +2299,7 @@ static void mindmap_keymap(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "MINDMAP_OT_view_all", NDOF_BUTTON_FIT, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_edit", LEFTMOUSE, KM_DBL_CLICK, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_click", LEFTMOUSE, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_toggle_mark", LEFTMOUSE, KM_PRESS, KM_SHIFT, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_context_menu", RIGHTMOUSE, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_edit_note", NKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_cycle_task", TKEY, KM_PRESS, 0, 0);

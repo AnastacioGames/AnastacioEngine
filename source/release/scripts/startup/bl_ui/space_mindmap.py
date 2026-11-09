@@ -35,6 +35,7 @@ class MINDMAP_HT_header(Header):
         layout.template_ID(space, "text", new="mindmap.new", open="mindmap.import_map")
         if space.text:
             layout.operator("mindmap.export_map", text="Export .mm", icon='EXPORT')
+            layout.operator("mindmap.export_png", text="PNG", icon='IMAGE_DATA')
 
 
 class MINDMAP_OT_new(Operator):
@@ -99,11 +100,29 @@ class MINDMAP_OT_export_map(Operator, ExportHelper):
         return {'FINISHED'}
 
 
+class MINDMAP_OT_export_png(Operator, ExportHelper):
+    """Save the whole map as a PNG image"""
+    bl_idname = "mindmap.export_png"
+    bl_label = "Export Mind Map Image"
+
+    filename_ext = ".png"
+    filter_glob = StringProperty(default="*.png", options={'HIDDEN'})
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return space and space.type == 'MINDMAP_EDITOR' and space.text
+
+    def execute(self, context):
+        return bpy.ops.mindmap.render_png(filepath=self.filepath)
+
+
 classes = (
     MINDMAP_HT_header,
     MINDMAP_OT_new,
     MINDMAP_OT_import_map,
     MINDMAP_OT_export_map,
+    MINDMAP_OT_export_png,
 )
 
 if __name__ == "__main__":  # only for live edit.

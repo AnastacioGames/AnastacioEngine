@@ -1,6 +1,6 @@
 # Plano: editor Mind Map
 
-Estado: etapas 1-8 implementadas em 2026-11-09; arraste e menu aceitos com janela; falta aceite das etapas 7-8 e o teste com o FreeMind.
+Estado: etapas 1-9 implementadas em 2026-11-09; arraste e menu aceitos com janela; falta aceite das etapas 7-9 e o teste com o FreeMind.
 
 ## Objetivo
 
@@ -86,6 +86,11 @@ Os vínculos ficam em atributos próprios do `.mm`, ignoráveis por outros progr
 ### 8. Busca e área de transferência
 `Ctrl+F` e `F3` buscam em texto e nota, abrindo ramos dobrados. `Ctrl+C`, `Ctrl+X` e `Ctrl+V` usam a área de
 transferência do sistema, em XML `.mm`; texto comum vira uma ideia por linha.
+
+### 9. Grupo, imagem e vínculo estável
+`Shift+clique` forma um grupo para cor, ícone, tarefa, vínculo, copiar, apagar e arrastar. O mapa inteiro pode ser
+salvo em PNG. O vínculo guarda também um identificador gravado no alvo (`mindmap_link_id`), que o reencontra após
+renomear. Medido com o mapa inteiro na tela: 1.000 ideias, redesenho 2,3 ms; 5.000 ideias, 24 ms e edição com undo 10 ms, sem necessidade de otimizar.
 
 ## Riscos
 
