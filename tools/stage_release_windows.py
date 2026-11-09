@@ -55,6 +55,9 @@ def should_skip(path: Path) -> bool:
         return True
     if any(tag in lower for tag in EXCLUDE_EXE_SUBSTRINGS):
         return True
+    # Copias de executaveis presos ou antigos (AnastacioRuntime.preso.exe, _old15...) nao vao no pacote.
+    if lower.startswith("anastacio") and lower.endswith(".exe") and lower not in ("anastacioengine.exe", "anastacioruntime.exe"):
+        return True
     return False
 
 
