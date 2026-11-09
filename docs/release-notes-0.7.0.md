@@ -26,6 +26,8 @@ luz indireta por volumes de sondas, texturas KTX2 e FSR 1, além de muitas corre
 - **Track Tool:** gerador de pistas com faixas, inclinação, cenário e terreno.
 - **Minimap na UI Tree:** Add, Bake, mapa inteiro, marcador e Show on Minimap com cor por objeto.
 
+## Melhorias
+
 ### Gráficos e desempenho
 
 - **Light Probe Volumes:** luz indireta por grade de sondas numa caixa Empty, com ajuste automático pelo Quality
