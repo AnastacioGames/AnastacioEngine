@@ -29,12 +29,12 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.7.0
 
-Estado: **em preparo** (versão aplicada em 2026-11-08). Windows primeiro; falta decidir se o Linux sai junto.
+Estado: **publicada completa em 2026-11-08** (tag `v0.7.0`), Windows e Linux.
 Destaque: microfone e gravação de voz no jogo, no editor, na Web e no Android.
 
 Texto da página do GitHub: [release-notes-0.7.0.md](release-notes-0.7.0.md).
 
-Pendências antes de publicar: splash novo, aceite do microfone físico no pacote final.
+Windows: zip extraído numa pasta limpa (`blender.crt/`, editor e runtime), suíte 16 de 16 no build e pré-release 15 de 15.
 
 ### Linux (2026-11-08, notebook Linux, `main` em `f2f5dabf`, sem mudança de código até `ceb5bea8`)
 

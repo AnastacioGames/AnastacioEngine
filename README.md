@@ -14,20 +14,26 @@ compatíveis: o formato `.range` e os módulos `Range` e `bge` permanecem os mes
 
 ## Download
 
-Versão atual: **[AnastacioEngine 0.6.1](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.6.1)** (Windows e Linux)
+Versão atual: **[AnastacioEngine 0.7.0](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.7.0)** (Windows e Linux)
 
 | Pacote | Conteúdo |
 |---|---|
-| [Windows x64 (0.6.1)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.1/AnastacioEngine-0.6.1-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
-| [Linux x86_64 (0.6.1)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.1/AnastacioEngine-0.6.1-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. |
-| [RangeArmor 0.6.1 Windows](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.1/RangeArmor-0.6.1-windows-x64.zip) · [Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.1/RangeArmor-0.6.1-linux-x86_64.tar.xz) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
-| [SHA-256 dos pacotes 0.6.1](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.6.1/SHA256SUMS.txt) | Hashes para conferir o download. |
+| [Windows x64 (0.7.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.7.0/AnastacioEngine-0.7.0-windows-x64.zip) | Editor e runtime, portátil (extraia e rode). |
+| [Linux x86_64 (0.7.0)](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.7.0/AnastacioEngine-0.7.0-linux-x86_64.tar.xz) | Editor e runtime, portátil (extraia e rode), com as bibliotecas incluídas. |
+| [RangeArmor 0.7.0 Windows](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.7.0/RangeArmor-0.7.0-windows-x64.zip) · [Linux](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.7.0/RangeArmor-0.7.0-linux-x86_64.tar.xz) | Ferramenta separada para criar e empacotar projetos. O painel roda no Windows e no Linux e exporta jogos para Windows e Linux. |
+| [SHA-256 dos pacotes 0.7.0](https://github.com/AnastacioGames/AnastacioEngine/releases/download/v0.7.0/SHA256SUMS.txt) | Hashes para conferir o download. |
 
 **Como usar:** extraia o pacote numa pasta própria e abra `AnastacioEngine.exe` (Windows) ou `AnastacioEngine` (Linux).
 Para rodar um jogo exportado, use `AnastacioRuntime.exe` (Windows) ou `AnastacioRuntime` (Linux). Os alvos de build continuam `RangeEngine`/`RangeRuntime`.
 No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
+
+## Novidades da 0.7.0
+
+Microfone e gravação de voz no jogo, no editor, na Web e no Android, com botão Record na barra superior.
+Também traz Rec Play, Light Probe Volumes, KTX2, FSR 1 e muitas correções. Detalhes nas
+[notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.7.0).
 
 ## Novidades da 0.6.1
 
