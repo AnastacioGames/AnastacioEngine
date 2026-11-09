@@ -1227,6 +1227,9 @@ base class --- :class:`SCA_IObject`
       :type space: string
       :rtype: list of :class:`mathutils.Vector`
 
+      The ``'WORLD'`` corners can be passed straight to
+      :meth:`~bge.types.KX_Camera.boxInsideFrustum` to test if the object is in the camera view.
+
    .. method:: getBoundBoxVolume()
 
       Compatibility with Range 1.x scripts: returns ``[volume, corner1, ..., corner8]``. The volume uses
