@@ -428,6 +428,7 @@ class SCENE_OT_range_web_export(Operator):
         import subprocess
         import sys
         import tempfile
+        import time
         from range_web import export
         from range_web.i18n import tr
 
@@ -459,6 +460,8 @@ class SCENE_OT_range_web_export(Operator):
                 _save_game_copy(game, game_copy)
                 cmd = [python, packager, "--game", game_copy, "--name", name,
                        "--runtime-dir", info.directory, "--out-dir", scratch]
+                # Versao unica por export: o ?v= impede o navegador de misturar runtime antigo em cache com o novo.
+                cmd += ["--version", time.strftime("%Y%m%d-%H%M%S")]
                 cmd += ["--extra-root", collect_bpy.project_root()]
                 cmd += ["--touch-layout", web.touch_layout.lower(), "--touch-stick", web.touch_stick.lower()]
                 if web.keep_debug_overlays:
