@@ -3185,6 +3185,9 @@ static void write_screen(WriteData *wd, bScreen *sc)
 					writestruct(wd, DATA, bNodeTreePath, 1, path);
 				}
 			}
+			else if (sl->spacetype == SPACE_MINDMAP) {
+				writestruct(wd, DATA, SpaceMindMap, 1, sl);
+			}
 			else if (sl->spacetype == SPACE_LOGIC) {
 				writestruct(wd, DATA, SpaceLogic, 1, sl);
 			}

@@ -77,6 +77,7 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
 	{0, "", ICON_NONE, "Scripting", ""},
 	{SPACE_TEXT, "TEXT_EDITOR", ICON_TEXT, "Text Editor", "Edit scripts and in-file documentation"},
 	{SPACE_LOGIC, "LOGIC_EDITOR", ICON_LOGIC, "Logic Bricks Editor", "Logic bricks editor"},
+	{SPACE_MINDMAP, "MINDMAP_EDITOR", ICON_FILE_TEXT, "Mind Map", "Organize ideas in a tree"},
 	{SPACE_CONSOLE, "CONSOLE", ICON_CONSOLE, "Python Console", "Interactive programmatic console for "
 	                "advanced editing and script development"},
 	{SPACE_INFO, "INFO", ICON_INFO, "Info", "Main menu bar and list of error messages "
@@ -312,6 +313,8 @@ static StructRNA *rna_Space_refine(struct PointerRNA *ptr)
 			return &RNA_SpaceNodeEditor;
 		case SPACE_LOGIC:
 			return &RNA_SpaceLogicEditor;
+		case SPACE_MINDMAP:
+			return &RNA_SpaceMindMapEditor;
 		case SPACE_CONSOLE:
 			return &RNA_SpaceConsole;
 		case SPACE_USERPREF:
@@ -4712,6 +4715,20 @@ static void rna_def_space_node(BlenderRNA *brna)
 	RNA_api_space_node(srna);
 }
 
+static void rna_def_space_mindmap(BlenderRNA *brna)
+{
+	StructRNA *srna;
+	PropertyRNA *prop;
+
+	srna = RNA_def_struct(brna, "SpaceMindMapEditor", "Space");
+	RNA_def_struct_sdna(srna, "SpaceMindMap");
+	RNA_def_struct_ui_text(srna, "Space Mind Map Editor", "Mind map editor space data");
+
+	prop = RNA_def_property(srna, "text", PROP_POINTER, PROP_NONE);
+	RNA_def_property_struct_type(prop, "Text");
+	RNA_def_property_ui_text(prop, "Text", "Text data-block holding the map");
+}
+
 static void rna_def_space_logic(BlenderRNA *brna)
 {
 	StructRNA *srna;
@@ -5082,6 +5099,7 @@ void RNA_def_space(BlenderRNA *brna)
 	rna_def_node_tree_path(brna);
 	rna_def_space_node(brna);
 	rna_def_space_logic(brna);
+	rna_def_space_mindmap(brna);
 	rna_def_space_clip(brna);
 }
 

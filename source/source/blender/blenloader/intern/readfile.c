@@ -6978,6 +6978,13 @@ static void lib_link_screen(FileData *fd, Main *main)
 							sclip->mask_info.mask = newlibadr_real_us(fd, sc->id.lib, sclip->mask_info.mask);
 							break;
 						}
+						case SPACE_MINDMAP:
+						{
+							SpaceMindMap *smm = (SpaceMindMap *)sl;
+
+							smm->text = newlibadr(fd, sc->id.lib, smm->text);
+							break;
+						}
 						case SPACE_LOGIC:
 						{
 							SpaceLogic *slogic = (SpaceLogic *)sl;
@@ -7370,6 +7377,11 @@ void blo_lib_link_screen_restore(Main *newmain, bScreen *curscreen, Scene *cursc
 					sclip->mask_info.mask = restore_pointer_by_name(id_map, (ID *)sclip->mask_info.mask, USER_REAL);
 
 					sclip->scopes.ok = 0;
+				}
+				else if (sl->spacetype == SPACE_MINDMAP) {
+					SpaceMindMap *smm = (SpaceMindMap *)sl;
+
+					smm->text = restore_pointer_by_name(id_map, (ID *)smm->text, USER_REAL);
 				}
 				else if (sl->spacetype == SPACE_LOGIC) {
 					SpaceLogic *slogic = (SpaceLogic *)sl;

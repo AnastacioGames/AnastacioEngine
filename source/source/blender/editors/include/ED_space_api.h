@@ -48,6 +48,7 @@ void ED_spacetype_script(void);
 void ED_spacetype_text(void);
 void ED_spacetype_sequencer(void);
 void ED_spacetype_logic(void);
+void ED_spacetype_mindmap(void);
 void ED_spacetype_console(void);
 void ED_spacetype_userpref(void);
 void ED_spacetype_clip(void);

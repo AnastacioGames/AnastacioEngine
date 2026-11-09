@@ -157,6 +157,7 @@ const uchar *UI_ThemeGetColorPtr(bTheme *btheme, int spacetype, int colorid)
 					ts = &btheme->tnode;
 					break;
 				case SPACE_LOGIC:
+				case SPACE_MINDMAP:
 					ts = &btheme->tlogic;
 					break;
 				case SPACE_CLIP:

@@ -1863,6 +1863,7 @@ static const EditorTypeItem animation_editors[] = {
 static const EditorTypeItem scripting_editors[] = {
 	{SPACE_TEXT, "Text Editor", ICON_TEXT},
 	{SPACE_LOGIC, "Logic Bricks Editor", ICON_LOGIC},
+	{SPACE_MINDMAP, "Mind Map", ICON_FILE_TEXT},
 	{SPACE_OUTLINER, "Outliner", ICON_OOPS},
 	{SPACE_BUTS, "Properties", ICON_BUTS},
 	{0, NULL, 0}

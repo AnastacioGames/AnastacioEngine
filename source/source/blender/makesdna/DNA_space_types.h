@@ -1300,6 +1300,18 @@ typedef struct SpaceLogic {
 	struct bGPdata *gpd;        /* grease-pencil data */
 } SpaceLogic;
 
+/* Mind Map editor. */
+typedef struct SpaceMindMap {
+	SpaceLink *next, *prev;
+	ListBase regionbase;        /* storage of regions for inactive spaces */
+	char spacetype;
+	char link_flag;
+	char _pad0[6];
+	/* End 'SpaceLink' header. */
+
+	struct Text *text;          /* map, stored as FreeMind XML */
+} SpaceMindMap;
+
 /* SpaceLogic.flag */
 enum {
 	/* Realce dos bricks ativos durante o jogo desligado (bit negado: ligado por padrão). */
@@ -1507,8 +1519,9 @@ typedef enum eSpace_Type {
 	SPACE_CONSOLE  = 18,
 	SPACE_USERPREF = 19,
 	SPACE_CLIP     = 20,
+	SPACE_MINDMAP  = 21,
 
-	SPACE_TYPE_LAST = SPACE_CLIP
+	SPACE_TYPE_LAST = SPACE_MINDMAP
 } eSpace_Type;
 
 /* use for function args */
