@@ -53,7 +53,8 @@
 
 KX_Camera::View::View()
 	:projectionDirty(true),
-	frustumDirty(true)
+	frustumDirty(true),
+	updated(false)
 {
 }
 
@@ -668,6 +669,7 @@ void KX_Camera::UpdateView(RAS_Rasterizer* rasty, KX_Scene* scene, RAS_Rasterize
 		RAS_Rasterizer::StereoEye eye, const RAS_Rect& viewport, const RAS_Rect& area)
 {
 	View& view = m_views[eye];
+	view.updated = true;
 
 	// Update modelview everytime, the frustum is rebuilt only when it changed.
 	const mt::mat4 modelview = rasty->GetViewMatrix(stereoMode, eye, GetWorldToCamera(), m_camdata.m_perspective);
@@ -880,6 +882,26 @@ const SG_Frustum& KX_Camera::GetFrustum(RAS_Rasterizer::StereoEye eye)
 {
 	ExtractFrustum(eye);
 	return m_views[eye].frustum;
+}
+
+const SG_Frustum& KX_Camera::GetPythonFrustum()
+{
+	const RAS_Rasterizer::StereoEye eye = RAS_Rasterizer::RAS_STEREO_LEFTEYE;
+	View& view = m_views[eye];
+	KX_KetsjiEngine *engine = KX_GetActiveEngine();
+	if (!view.updated && engine && GetScene()) {
+		/* Antes do primeiro render as matrizes estão zeradas e todo teste daria INSIDE. */
+		RAS_Rasterizer *rasty = engine->GetRasterizer();
+		const RAS_Rasterizer::StereoMode stereoMode = rasty->GetStereoMode();
+		const RAS_Rect displayArea = rasty->GetRenderArea(engine->GetCanvas(), stereoMode, eye);
+		RAS_Rect area, viewport;
+		engine->GetSceneViewport(GetScene(), this, displayArea, area, viewport);
+		const bool projectionDirty = view.projectionDirty;
+		UpdateView(rasty, GetScene(), stereoMode, eye, viewport, area);
+		/* O render ainda calcula a projeção com a área definitiva dele. */
+		view.projectionDirty = projectionDirty;
+	}
+	return GetFrustum(eye);
 }
 
 bool KX_Camera::GetFrustumCulling() const
@@ -1182,7 +1204,7 @@ EXP_PYMETHODDEF_DOC_VARARGS(KX_Camera, sphereInsideFrustum,
 	if (PyArg_ParseTuple(args, "Of:sphereInsideFrustum", &pycenter, &radius)) {
 		mt::vec3 center;
 		if (PyVecTo(pycenter, center)) {
-			return PyLong_FromLong(GetFrustum(RAS_Rasterizer::RAS_STEREO_LEFTEYE).SphereInsideFrustum(center, radius)); /* new ref */
+			return PyLong_FromLong(GetPythonFrustum().SphereInsideFrustum(center, radius)); /* new ref */
 		}
 	}
 
@@ -1250,7 +1272,7 @@ EXP_PYMETHODDEF_DOC_O(KX_Camera, boxInsideFrustum,
 	}
 	Py_XDECREF(corners);
 
-	return PyLong_FromLong(GetFrustum(RAS_Rasterizer::RAS_STEREO_LEFTEYE).BoxInsideFrustum(box)); /* new ref */
+	return PyLong_FromLong(GetPythonFrustum().BoxInsideFrustum(box)); /* new ref */
 }
 
 EXP_PYMETHODDEF_DOC_O(KX_Camera, pointInsideFrustum,
@@ -1271,7 +1293,7 @@ EXP_PYMETHODDEF_DOC_O(KX_Camera, pointInsideFrustum,
 {
 	mt::vec3 point;
 	if (PyVecTo(value, point)) {
-		return PyLong_FromLong(GetFrustum(RAS_Rasterizer::RAS_STEREO_LEFTEYE).PointInsideFrustum(point)); /* new ref */
+		return PyLong_FromLong(GetPythonFrustum().PointInsideFrustum(point)); /* new ref */
 	}
 
 	PyErr_SetString(PyExc_TypeError, "camera.pointInsideFrustum(point): KX_Camera, expected point argument.");

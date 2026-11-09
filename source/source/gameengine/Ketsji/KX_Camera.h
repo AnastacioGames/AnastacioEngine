@@ -166,6 +166,8 @@ protected:
 		bool projectionDirty;
 		/// True if the frustum must be updated.
 		bool frustumDirty;
+		/// True once UpdateView filled the matrices at least once.
+		bool updated;
 	};
 
 	/// All views available.
@@ -324,6 +326,8 @@ public:
 	void SetActivityCulling(bool enable);
 
 	const SG_Frustum& GetFrustum(RAS_Rasterizer::StereoEye eye);
+	/// Frustum for Python queries: computes the view first if this camera was never rendered.
+	const SG_Frustum& GetPythonFrustum();
 
 	/**
 	 * Gets this camera's culling status.bool
