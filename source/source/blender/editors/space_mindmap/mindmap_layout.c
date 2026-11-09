@@ -38,6 +38,7 @@
 #define GAP_X 56.0f
 #define GAP_Y 8.0f
 #define MAX_TEXT_BYTES 80
+#define MARK_WIDTH 16.0f
 
 typedef struct LayoutContext {
 	MMLayout *layout;
@@ -88,6 +89,68 @@ static char *single_line_text(const MMElem *node)
 	return text;
 }
 
+static char icon_letter(const char *builtin)
+{
+	static const struct {
+		const char *name;
+		char letter;
+	} icons[] = {
+		{"idea", '*'}, {"help", '?'}, {"yes", '!'}, {"messagebox_warning", '!'},
+		{"button_ok", 'V'}, {"button_cancel", 'X'}, {"flag", 'F'}, {"info", 'i'},
+	};
+	size_t i;
+
+	if (builtin) {
+		for (i = 0; i < sizeof(icons) / sizeof(icons[0]); i++) {
+			if (strcmp(builtin, icons[i].name) == 0) {
+				return icons[i].letter;
+			}
+		}
+	}
+	return 0;
+}
+
+static int hex_digit(char c)
+{
+	if (c >= '0' && c <= '9') return c - '0';
+	if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+	if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+	return -1;
+}
+
+/* Fills what is drawn besides the text and returns the box width. */
+static float fill_appearance(LayoutContext *ctx, const MMElem *node, MMLayoutNode *out)
+{
+	char *value = mm_node_icon(node);
+	float marks = 0.0f;
+
+	out->icon = icon_letter(value);
+	mm_str_free(value);
+	out->has_note = mm_node_has_note(node);
+	out->has_children = mm_node_first_child(node) != NULL;
+	marks = ((out->icon ? 1 : 0) + (out->has_note ? 1 : 0)) * MARK_WIDTH;
+	out->text_offset = marks;
+
+	value = mm_attr_get(node, "COLOR");
+	if (value && value[0] == '#' && strlen(value) == 7) {
+		int i, valid = 1;
+
+		for (i = 0; i < 3; i++) {
+			const int hi = hex_digit(value[1 + i * 2]), lo = hex_digit(value[2 + i * 2]);
+
+			if (hi < 0 || lo < 0) {
+				valid = 0;
+				break;
+			}
+			out->color[i] = (unsigned char)(hi * 16 + lo);
+		}
+		out->has_color = valid;
+	}
+	mm_str_free(value);
+
+	return ctx->width_fn(out->text, ctx->user_data) + 2.0f * NODE_PADDING + marks;
+}
+
 /* Places a node with its branch below y_top and returns the height used. */
 static float place_branch(LayoutContext *ctx, const MMElem *node, int parent, int side, float x, float y_top)
 {
@@ -104,7 +167,7 @@ static float place_branch(LayoutContext *ctx, const MMElem *node, int parent, in
 	out->side = side;
 	out->has_hidden_children = mm_node_folded(node) && mm_node_first_child(node);
 
-	width = ctx->width_fn(out->text, ctx->user_data) + 2.0f * NODE_PADDING;
+	width = fill_appearance(ctx, node, out);
 	out->xmin = (side > 0) ? x : x - width;
 	out->xmax = out->xmin + width;
 	child_x = (side > 0) ? out->xmax + GAP_X : out->xmin - GAP_X;
@@ -178,7 +241,7 @@ MMLayout *mm_layout_build(const MMDoc *doc, MMTextWidthFn width_fn, void *user_d
 	out->elem = (MMElem *)root;
 	out->text = single_line_text(root);
 	out->parent = -1;
-	width = width_fn(out->text, user_data) + 2.0f * NODE_PADDING;
+	width = fill_appearance(&ctx, root, out);
 	out->xmin = -width * 0.5f;
 	out->xmax = width * 0.5f;
 	out->ymin = -NODE_HEIGHT * 0.5f;

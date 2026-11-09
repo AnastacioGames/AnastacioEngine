@@ -70,6 +70,10 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 - **Ferramentas:** Decimate High Quality, RangeArmor com cooking, pacote Universal, relatório de crash sem PDB.
 - **Releases** 0.5.0 a 0.5.4.
 
+### Novembro 2026
+
+- Editor Mind Map: mapas FreeMind `.mm` em datablocks `Text`, com edição por teclado e mouse.
+
 ## Capacidades herdadas que não devem ser reimplementadas
 
 - GPU instancing (`RAS_InstancingBuffer`, `RAS_DisplayArrayBucket::RunInstancingNode`).

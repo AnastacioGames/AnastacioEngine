@@ -36,6 +36,12 @@ typedef struct MMLayoutNode {
 	int parent;                 /* index in MMLayout.nodes, -1 for the root */
 	int side;                   /* 1 right, -1 left, 0 root */
 	int has_hidden_children;    /* folded with children */
+	int has_children;
+	int has_note;
+	char icon;                  /* letter standing for a known icon, 0 when none */
+	int has_color;
+	unsigned char color[3];
+	float text_offset;          /* width used by the marks at the left of the text */
 } MMLayoutNode;
 
 typedef struct MMLayout {

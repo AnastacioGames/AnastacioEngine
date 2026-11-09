@@ -14,6 +14,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Microfone escolhido em Record > Select Microphone vale para a UI Tree no jogo; nome inválido cai no padrão do sistema.
 - Detector YIN em `audaspace/util/PitchDetector`, `Microphone::getPitch()`, `aud.Microphone.pitch`, `Range.audio.microphonePitch()` e `microphoneNote(a4=440.0)`; nó Tuner na UI Tree; demo `tools/debug/cenas/criar_demo_bolinha_voz.py`. Teste sintético em `tests/pitch` (pior acerto 3,84 cents com harmônicos, 0,35 ms por análise).
 
+## 2026-11-09 — Editor Mind Map (versão 1)
+
+- Área nova `Mind Map`: mapas no formato FreeMind `.mm`, guardados em datablocks `Text`, com leitura e gravação que preservam o que o editor não conhece.
+- Desenho com raiz central e ramos para os dois lados; zoom, pan e `Home`. O desfazer global cobre as edições.
+- Teclado: `Insert`, `Enter`, `F2`, `Delete`, setas, `Espaço`, `N`. Mouse: selecionar, arrastar para outro pai ou reordenar, duplo clique, menu do botão direito, indicador de dobra.
+- Cor, ícone e nota por ideia; novo mapa, importar e exportar `.mm`. Plano em `docs/plano-mind-map.md`; testes em `tests/mindmap`.
+
 ## 2026-11-09 — Versão 0.7.1 em preparo
 
 - Versão no executável, no About e nos scripts de release; notas em `docs/release-notes-0.7.1.md`.

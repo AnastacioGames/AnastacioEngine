@@ -1,6 +1,6 @@
 # Plano: editor Mind Map
 
-Estado: proposta de 2026-11-09, nada implementado.
+Estado: etapas 1-6 implementadas em 2026-11-09, aguardando aceite; etapa 7 não iniciada.
 
 ## Objetivo
 

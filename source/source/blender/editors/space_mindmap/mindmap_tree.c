@@ -427,6 +427,202 @@ int mm_node_remove(MMElem *node)
 	return 1;
 }
 
+int mm_node_move(MMElem *node, MMElem *parent, MMElem *before)
+{
+	const MMElem *e;
+
+	if (!mm_is_tag(node->parent, "node")) {
+		return 0;
+	}
+	for (e = parent; e; e = e->parent) {
+		if (e == node) {
+			return 0;
+		}
+	}
+	if (before == node) {
+		before = mm_node_next(node);
+	}
+
+	mm_elem_unlink(node);
+	node->next = node->prev = NULL;
+	if (before == NULL) {
+		mm_elem_append(parent, node);
+	}
+	else if (before->prev) {
+		mm_elem_insert_after(before->prev, node);
+	}
+	else {
+		node->parent = parent;
+		node->next = before;
+		before->prev = node;
+		parent->first = node;
+	}
+	return 1;
+}
+
+static MMElem *mm_child_with_tag(const MMElem *node, const char *tag)
+{
+	MMElem *e;
+
+	for (e = node->first; e; e = e->next) {
+		if (mm_is_tag(e, tag)) {
+			return e;
+		}
+	}
+	return NULL;
+}
+
+static void mm_elem_delete(MMElem *e)
+{
+	mm_elem_unlink(e);
+	mm_elem_clear(e);
+	MM_FREE(e);
+}
+
+char *mm_node_icon(const MMElem *node)
+{
+	const MMElem *icon = mm_child_with_tag(node, "icon");
+
+	return icon ? mm_attr_get(icon, "BUILTIN") : NULL;
+}
+
+void mm_node_icon_set(MMElem *node, const char *builtin)
+{
+	MMElem *icon = mm_child_with_tag(node, "icon");
+
+	if (builtin == NULL) {
+		if (icon) {
+			mm_elem_delete(icon);
+		}
+		return;
+	}
+	if (icon == NULL) {
+		icon = mm_elem_new("icon", 4);
+		mm_elem_append(node, icon);
+	}
+	mm_attr_set(icon, "BUILTIN", builtin);
+}
+
+static MMElem *mm_note_elem(const MMElem *node)
+{
+	MMElem *e;
+
+	for (e = node->first; e; e = e->next) {
+		if (mm_is_tag(e, "richcontent")) {
+			const MMAttr *type = mm_attr_find(e, "TYPE");
+
+			if (type && strcmp(type->value, "NOTE") == 0) {
+				return e;
+			}
+		}
+	}
+	return NULL;
+}
+
+int mm_node_has_note(const MMElem *node)
+{
+	return mm_note_elem(node) != NULL;
+}
+
+static size_t mm_note_collect(const MMElem *e, char *out)
+{
+	const MMElem *c;
+	size_t n = 0;
+
+	for (c = e->first; c; c = c->next) {
+		if (c->tag == NULL) {
+			if (c->raw && c->raw[0] != '<') {
+				const size_t len = strlen(c->raw);
+
+				if (out) {
+					memcpy(out + n, c->raw, len);
+				}
+				n += len;
+			}
+		}
+		else if (!mm_is_tag(c, "head")) {
+			n += mm_note_collect(c, out ? out + n : NULL);
+			if (out) {
+				out[n] = ' ';
+			}
+			n++;
+		}
+	}
+	return n;
+}
+
+char *mm_node_note(const MMElem *node)
+{
+	const MMElem *note = mm_note_elem(node);
+	char *raw, *text, *d;
+	const char *p;
+	size_t n;
+
+	if (note == NULL) {
+		return NULL;
+	}
+	n = mm_note_collect(note, NULL);
+	raw = MM_CALLOC(n + 1);
+	mm_note_collect(note, raw);
+
+	/* &nbsp; is not an XML entity, the other ones are decoded after. */
+	d = raw;
+	for (p = raw; *p;) {
+		if (strncmp(p, "&nbsp;", 6) == 0) {
+			*d++ = ' ';
+			p += 6;
+		}
+		else if (mm_is_space(*p)) {
+			*d++ = ' ';
+			p++;
+		}
+		else {
+			*d++ = *p++;
+		}
+	}
+	*d = '\0';
+
+	text = mm_unescape(raw);
+	MM_FREE(raw);
+
+	d = text;
+	for (p = text; *p; p++) {
+		if (*p != ' ' || (d != text && d[-1] != ' ')) {
+			*d++ = *p;
+		}
+	}
+	while (d != text && d[-1] == ' ') {
+		d--;
+	}
+	*d = '\0';
+	return text;
+}
+
+void mm_node_note_set(MMElem *node, const char *text)
+{
+	MMElem *old = mm_note_elem(node);
+	MMElem *rich, *html, *body, *par, *raw;
+
+	if (old) {
+		mm_elem_delete(old);
+	}
+	if (text == NULL || text[0] == '\0') {
+		return;
+	}
+	rich = mm_elem_new("richcontent", 11);
+	html = mm_elem_new("html", 4);
+	body = mm_elem_new("body", 4);
+	par = mm_elem_new("p", 1);
+	raw = MM_CALLOC(sizeof(MMElem));
+	raw->raw = mm_escape(text);
+	mm_attr_set(rich, "TYPE", "NOTE");
+	mm_elem_append(par, raw);
+	mm_elem_append(body, par);
+	mm_elem_append(html, body);
+	mm_elem_append(rich, html);
+	mm_elem_append(node, rich);
+}
+
 /* ---------------- parser ---------------- */
 
 static void mm_error(char *err, size_t err_size, const char *buf, const char *at, const char *msg)

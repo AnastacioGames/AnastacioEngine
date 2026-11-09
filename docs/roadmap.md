@@ -5,6 +5,10 @@ concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](..
 e detalhados no [`changelog.md`](changelog.md) (histórico antigo em [`changelog-arquivo.md`](changelog-arquivo.md)).
 Ao concluir um item, apague-o daqui e registre no changelog.
 
+## Mind Map
+
+Versão 1 (etapas 1-6 de [plano-mind-map.md](plano-mind-map.md)) aguardando aceite com janela. Falta abrir um `.mm` real do FreeMind e abrir no FreeMind um arquivo exportado. Etapa 7 (ligar ideias a objetos e tarefas) é a versão 2.
+
 ## Microfone
 
 Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Desktop aprovado com microfone físico; Web testada em Chrome com microfone simulado. Falta aceite no navegador

@@ -198,6 +198,69 @@ static void test_not_terminated(void)
 	mm_free(doc);
 }
 
+static void test_move(void)
+{
+	MMDoc *doc = mm_new("R");
+	MMElem *root = mm_root_node(doc);
+	MMElem *a = mm_node_add_child(root, "a");
+	MMElem *b = mm_node_add_child(root, "b");
+	MMElem *c = mm_node_add_child(a, "c");
+
+	CHECK(mm_node_move(root, a, NULL) == 0);
+	CHECK(mm_node_move(a, c, NULL) == 0);
+	CHECK(mm_node_move(a, a, NULL) == 0);
+	CHECK(mm_node_first_child(a) == c && mm_node_next(a) == b);
+
+	CHECK(mm_node_move(b, root, a) == 1);
+	CHECK(mm_node_first_child(root) == b && mm_node_next(b) == a && mm_node_next(a) == NULL);
+	CHECK(root->last == a && b->prev == NULL);
+	CHECK(mm_node_move(c, b, NULL) == 1);
+	CHECK(mm_node_first_child(a) == NULL && c->parent == b);
+	CHECK(mm_node_move(b, root, b) == 1);
+	mm_free(doc);
+}
+
+static void test_icon_note(void)
+{
+	MMDoc *doc = parse(freemind_map);
+	MMElem *root = mm_root_node(doc);
+	MMElem *motor = mm_node_first_child(root);
+	MMElem *fases = mm_node_next(motor);
+	MMDoc *back;
+	char *s, *out;
+
+	s = mm_node_icon(motor);
+	CHECK(s && strcmp(s, "idea") == 0);
+	mm_str_free(s);
+	s = mm_node_note(fases);
+	CHECK(s && strcmp(s, "Nota forte x") == 0);
+	mm_str_free(s);
+	CHECK(mm_node_note(motor) == NULL && !mm_node_has_note(motor));
+
+	mm_node_icon_set(motor, "flag");
+	mm_node_note_set(motor, "a < b & \xC3\xA7");
+	mm_node_note_set(fases, NULL);
+	CHECK(!mm_node_has_note(fases));
+	out = mm_write(doc, NULL);
+	back = parse(out);
+	CHECK(back != NULL);
+	if (back) {
+		MMElem *m = mm_node_first_child(mm_root_node(back));
+		s = mm_node_note(m);
+		CHECK(s && strcmp(s, "a < b & \xC3\xA7") == 0);
+		mm_str_free(s);
+		s = mm_node_icon(m);
+		CHECK(s && strcmp(s, "flag") == 0);
+		mm_str_free(s);
+		mm_node_icon_set(m, NULL);
+		s = mm_node_icon(m);
+		CHECK(s == NULL);
+		mm_free(back);
+	}
+	mm_str_free(out);
+	mm_free(doc);
+}
+
 int main(void)
 {
 	test_read();
@@ -206,6 +269,8 @@ int main(void)
 	test_escapes();
 	test_invalid();
 	test_not_terminated();
+	test_move();
+	test_icon_note();
 	printf(failures ? "%d FALHA(S)\n" : "TODOS OK\n", failures);
 	return failures != 0;
 }

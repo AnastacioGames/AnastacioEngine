@@ -75,5 +75,19 @@ MMElem *mm_node_add_child(MMElem *parent, const char *text);
 MMElem *mm_node_add_sibling(MMElem *node, const char *text);
 /* Removes node and its branch. The root node cannot be removed (returns 0). */
 int mm_node_remove(MMElem *node);
+/* Moves node under parent, before the sibling node `before` or last when NULL.
+ * Returns 0 for the root node or when parent is inside the moved branch. */
+int mm_node_move(MMElem *node, MMElem *parent, MMElem *before);
+
+/* FreeMind BUILTIN name of the first icon, or NULL. Release with mm_str_free. */
+char *mm_node_icon(const MMElem *node);
+/* Replaces the first icon, NULL removes it. */
+void mm_node_icon_set(MMElem *node, const char *builtin);
+
+int mm_node_has_note(const MMElem *node);
+/* Plain text of the note on one line, or NULL. Release with mm_str_free. */
+char *mm_node_note(const MMElem *node);
+/* Replaces the note, formatted or not. NULL or "" removes it. */
+void mm_node_note_set(MMElem *node, const char *text);
 
 #endif  /* __MINDMAP_TREE_H__ */
