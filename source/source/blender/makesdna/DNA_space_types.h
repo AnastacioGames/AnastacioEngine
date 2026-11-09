@@ -1310,7 +1310,14 @@ typedef struct SpaceMindMap {
 	/* End 'SpaceLink' header. */
 
 	struct Text *text;          /* map, stored as FreeMind XML */
+	int flag;                   /* eSpaceMindMap_Flag */
+	char _pad1[4];
 } SpaceMindMap;
+
+/* SpaceMindMap.flag (negated bit: hints are on in maps saved before it existed) */
+typedef enum eSpaceMindMap_Flag {
+	SPACE_MINDMAP_HINTS_OFF = (1 << 0),
+} eSpaceMindMap_Flag;
 
 /* SpaceLogic.flag */
 enum {

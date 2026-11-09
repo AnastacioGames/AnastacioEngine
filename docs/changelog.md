@@ -16,6 +16,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 ## 2026-11-09 — Editor Mind Map (versão 1)
 
+- Mind Map: painel lateral `N` com texto, nota, cor, ícones, tarefa e vínculo da ideia; painel `T` com as ferramentas e o visual da caixa (cor de fundo `BACKGROUND_COLOR`, cor do texto e formato caixa ou linha `STYLE="fork"`, como no FreeMind). Tarefa passou para `Shift+T` e nota para `Shift+N`.
+- Mind Map: menus Map, Edit, Idea, View e Help, guia rápido e faixa de atalhos no topo (botão `Hints` desliga). Buscas de enum mostram o ícone do item. Ícone novo `MINDMAP` nos três estilos (`tools/icons/make_mindmap_icon.py`).
+
 - Mind Map: exportar o mapa inteiro em PNG, selecionar várias ideias com `Shift+clique` e vínculo que continua válido depois de renomear o alvo.
 - Mind Map: busca por texto e nota (`Ctrl+F`, `F3`), abrindo ramos dobrados; copiar, recortar e colar ramos pela área de transferência (`Ctrl+C`, `Ctrl+X`, `Ctrl+V`), com linhas de texto virando ideias.
 - Mind Map desenha ícones reais da engine e permite buscar qualquer um deles (`I`, atributo `ANASTACIO_ICON`).

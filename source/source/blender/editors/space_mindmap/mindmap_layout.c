@@ -119,6 +119,24 @@ static int hex_digit(char c)
 	return -1;
 }
 
+static int parse_hex_color(const char *value, unsigned char r_color[3])
+{
+	int i;
+
+	if (value == NULL || value[0] != '#' || strlen(value) != 7) {
+		return 0;
+	}
+	for (i = 0; i < 3; i++) {
+		const int hi = hex_digit(value[1 + i * 2]), lo = hex_digit(value[2 + i * 2]);
+
+		if (hi < 0 || lo < 0) {
+			return 0;
+		}
+		r_color[i] = (unsigned char)(hi * 16 + lo);
+	}
+	return 1;
+}
+
 int mm_node_task(const MMElem *node)
 {
 	char *value = mm_attr_get(node, MM_ATTR_TASK);
@@ -181,20 +199,13 @@ static float fill_appearance(LayoutContext *ctx, const MMElem *node, MMLayoutNod
 	out->text_right = right;
 
 	value = mm_attr_get(node, "COLOR");
-	if (value && value[0] == '#' && strlen(value) == 7) {
-		int i, valid = 1;
-
-		for (i = 0; i < 3; i++) {
-			const int hi = hex_digit(value[1 + i * 2]), lo = hex_digit(value[2 + i * 2]);
-
-			if (hi < 0 || lo < 0) {
-				valid = 0;
-				break;
-			}
-			out->color[i] = (unsigned char)(hi * 16 + lo);
-		}
-		out->has_color = valid;
-	}
+	out->has_color = parse_hex_color(value, out->color);
+	mm_str_free(value);
+	value = mm_attr_get(node, "BACKGROUND_COLOR");
+	out->has_background = parse_hex_color(value, out->background);
+	mm_str_free(value);
+	value = mm_attr_get(node, "STYLE");
+	out->fork = (value && strcmp(value, "fork") == 0);
 	mm_str_free(value);
 
 	return ctx->width_fn(out->text, ctx->user_data) + 2.0f * NODE_PADDING + marks + right;

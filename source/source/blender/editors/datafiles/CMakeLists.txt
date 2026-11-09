@@ -474,6 +474,7 @@ set(ICON_NAMES
 	snap_midpoint
 	snap_perpendicular
 	material_nodes
+	mindmap
 	gate_and
 	gate_or
 	gate_nand

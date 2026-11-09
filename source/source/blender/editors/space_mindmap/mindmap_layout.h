@@ -49,6 +49,9 @@ typedef struct MMLayoutNode {
 	char engine_icon[64];       /* name of an engine icon, wins over icon */
 	int has_color;
 	unsigned char color[3];
+	int has_background;         /* BACKGROUND_COLOR of FreeMind */
+	unsigned char background[3];
+	int fork;                   /* STYLE="fork": only a line under the text */
 	float text_offset;          /* width used by the marks at the left of the text */
 	float text_right;           /* width used by the marks at the right of the text */
 	int task;                   /* MM_TASK_NONE, MM_TASK_TODO or MM_TASK_DONE */

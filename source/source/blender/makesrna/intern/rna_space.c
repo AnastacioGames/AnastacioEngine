@@ -77,7 +77,7 @@ const EnumPropertyItem rna_enum_space_type_items[] = {
 	{0, "", ICON_NONE, "Scripting", ""},
 	{SPACE_TEXT, "TEXT_EDITOR", ICON_TEXT, "Text Editor", "Edit scripts and in-file documentation"},
 	{SPACE_LOGIC, "LOGIC_EDITOR", ICON_LOGIC, "Logic Bricks Editor", "Logic bricks editor"},
-	{SPACE_MINDMAP, "MINDMAP_EDITOR", ICON_FILE_TEXT, "Mind Map", "Organize ideas in a tree"},
+	{SPACE_MINDMAP, "MINDMAP_EDITOR", ICON_MINDMAP, "Mind Map", "Organize ideas in a tree"},
 	{SPACE_CONSOLE, "CONSOLE", ICON_CONSOLE, "Python Console", "Interactive programmatic console for "
 	                "advanced editing and script development"},
 	{SPACE_INFO, "INFO", ICON_INFO, "Info", "Main menu bar and list of error messages "
@@ -4728,6 +4728,11 @@ static void rna_def_space_mindmap(BlenderRNA *brna)
 	RNA_def_property_struct_type(prop, "Text");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Text", "Text data-block holding the map");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
+	prop = RNA_def_property(srna, "show_hints", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag", SPACE_MINDMAP_HINTS_OFF);
+	RNA_def_property_ui_text(prop, "Hints", "Show the keyboard and mouse shortcuts over the map");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
 }
 
