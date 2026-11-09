@@ -67,11 +67,22 @@ ANCHORS = ("TOP_LEFT", "TOP", "TOP_RIGHT", "LEFT", "CENTER", "RIGHT",
            "BOTTOM_LEFT", "BOTTOM", "BOTTOM_RIGHT")
 
 
+def _keep_image(self, context):
+    # O nó guarda só o nome: sem fake user a imagem não seria salva no arquivo.
+    image = bpy.data.images.get(self.image_name)
+    if image is not None:
+        image.use_fake_user = True
+
+
+KEY_HELP = "Key in locale/translations.csv; the text follows the game language (empty or unknown key = uses the text typed here)"
+
+
 class UIWidgetNode(UINode):
     """Base dos widgets: o nó fica recolhido e serve de alça; o widget é a
     prévia desenhada embaixo dele, com largura = largura do nó e altura =
     Height."""
     bl_width_min = 20.0  # deixa a alça recolhida (width_hidden) estreita
+    bl_width_max = 4096.0  # a largura do nó é a do widget na tela
 
     button_height = FloatProperty(name="Height", default=40.0, min=8.0, soft_max=200.0,
                                   description="Widget height (the width is the node's)")
@@ -85,6 +96,11 @@ class UIWidgetNode(UINode):
         self.hide = True
         self.width_hidden = 20.0
 
+    def draw_size(self, layout):
+        row = layout.row(align=True)
+        row.prop(self, "width", text="Width")
+        row.prop(self, "button_height")
+
     def draw_label(self):
         # Recolhido, o nó é só a alça: sem texto para não cobrir a prévia.
         return " " if self.hide else self.bl_label
@@ -95,6 +111,11 @@ class UIButtonNode(UIWidgetNode, Node):
     bl_label = "Button"
 
     text = StringProperty(name="Text", default="Button")
+    translation_key = StringProperty(name="Translation Key", description=KEY_HELP)
+    image_name = StringProperty(name="Image", update=_keep_image, description="Shown instead of the button background. In the game it is read from the file: use a relative path (//)")
+    image_tint = _color("Tint", (1.0, 1.0, 1.0, 1.0))
+    image_hover_tint = _color("Hover Tint", (1.0, 1.0, 1.0, 1.0))
+    image_press_tint = _color("Pressed Tint", (0.7, 0.7, 0.7, 1.0))
     color = _color("Color", (0.20, 0.22, 0.26, 0.90))
     hover_color = _color("Hover", (0.30, 0.45, 0.75, 0.95))
     press_color = _color("Pressed", (0.15, 0.30, 0.55, 1.0))
@@ -131,10 +152,19 @@ class UIButtonNode(UIWidgetNode, Node):
 
     def draw_buttons_ext(self, context, layout):
         layout.prop(self, "text")
-        layout.prop(self, "button_height")
+        layout.prop(self, "translation_key")
+        self.draw_size(layout)
+        layout.prop_search(self, "image_name", bpy.data, "images")
         col = layout.column(align=True)
-        for prop in ("color", "hover_color", "press_color", "text_color"):
-            col.prop(self, prop)
+        if self.image():
+            for prop in ("image_tint", "image_hover_tint", "image_press_tint"):
+                col.prop(self, prop)
+            layout.operator(RANGE_OT_ui_tree_image_aspect.bl_idname, icon="IMAGE_COL")
+            col = layout.column(align=True)
+        else:
+            for prop in ("color", "hover_color", "press_color"):
+                col.prop(self, prop)
+        col.prop(self, "text_color")
         layout.prop(self, "radius", slider=True)
         row = layout.row(align=True)
         row.prop(self, "border")
@@ -148,14 +178,26 @@ class UIButtonNode(UIWidgetNode, Node):
         col.prop(self, "press_scale")
         col.prop(self, "anim_time")
 
+    def image(self):
+        return bpy.data.images.get(self.image_name) if self.image_name else None
+
     def style(self):
+        image = self.image()
+        if image:
+            # Com imagem as cores de estado viram tinta, e a animação é a mesma.
+            return self.base_style(image.filepath, self.image_tint, self.image_hover_tint,
+                                   self.image_press_tint, (0.45, 0.45, 0.45, 0.7))
+        return self.base_style("", self.color, self.hover_color, self.press_color, self.disabled_color)
+
+    def base_style(self, image, color, hover, press, disabled):
         return {
-            "color": tuple(self.color), "hover": tuple(self.hover_color),
-            "press": tuple(self.press_color), "text_color": tuple(self.text_color),
+            "image": image,
+            "color": tuple(color), "hover": tuple(hover),
+            "press": tuple(press), "text_color": tuple(self.text_color),
             "radius": self.radius, "border": self.border,
             "border_color": tuple(self.border_color), "text_size": self.text_size,
             "align": self.align, "shadow": self.shadow,
-            "disabled": tuple(self.disabled_color),
+            "disabled": tuple(disabled),
             "hover_scale": self.hover_scale, "press_scale": self.press_scale,
             "anim_time": self.anim_time,
         }
@@ -170,9 +212,9 @@ class UIHudNode(UIWidgetNode):
         layout.prop_search(self, "object_name", context.scene, "objects", text="")
 
 
-class UIProgressBarNode(UIHudNode, Node):
-    bl_idname = "RangeUIProgressBar"
-    bl_label = "Progress Bar"
+class UIProgressBase(UIHudNode):
+    """Comum à Progress Bar e ao Microphone Meter.  Um nó registrado não pode
+    herdar de outro nó registrado: a classe do pai deixa de ser achada."""
 
     prop_name = StringProperty(name="Property", default="vida")
     min_value = FloatProperty(name="Min", default=0.0)
@@ -196,7 +238,7 @@ class UIProgressBarNode(UIHudNode, Node):
         row = layout.row(align=True)
         row.prop(self, "min_value")
         row.prop(self, "max_value")
-        layout.prop(self, "button_height")
+        self.draw_size(layout)
         col = layout.column(align=True)
         col.prop(self, "bg_color")
         col.prop(self, "fill_color")
@@ -219,6 +261,11 @@ class UIProgressBarNode(UIHudNode, Node):
         return {self.prop_name: self.min_value + 0.7 * (self.max_value - self.min_value)}
 
 
+class UIProgressBarNode(UIProgressBase, Node):
+    bl_idname = "RangeUIProgressBar"
+    bl_label = "Progress Bar"
+
+
 class UILabelNode(UIHudNode, Node):
     bl_idname = "RangeUILabel"
     bl_label = "Label"
@@ -226,6 +273,7 @@ class UILabelNode(UIHudNode, Node):
     text_format = StringProperty(
         name="Format", default="{velocidade:.0f} km/h",
         description="Text with properties in braces, e.g. {vida:.0f}, Lap {volta}/3")
+    translation_key = StringProperty(name="Translation Key", description=KEY_HELP)
     text_color = _color("Color", (1.0, 1.0, 1.0, 1.0))
     text_size = FloatProperty(name="Text Size", default=0.8, min=0.1, max=1.0)
     align = EnumProperty(name="Align", default="LEFT", items=(
@@ -235,7 +283,8 @@ class UILabelNode(UIHudNode, Node):
     def draw_buttons_ext(self, context, layout):
         layout.prop_search(self, "object_name", context.scene, "objects")
         layout.prop(self, "text_format")
-        layout.prop(self, "button_height")
+        layout.prop(self, "translation_key")
+        self.draw_size(layout)
         layout.prop(self, "text_color")
         layout.prop(self, "text_size", slider=True)
         layout.row().prop(self, "align", expand=True)
@@ -243,7 +292,7 @@ class UILabelNode(UIHudNode, Node):
 
     def widget(self):
         return {
-            "kind": "LABEL", "format": self.text_format, "color": tuple(self.text_color),
+            "kind": "LABEL", "format": self.text_format, "key": self.translation_key, "color": tuple(self.text_color),
             "text_size": self.text_size, "align": self.align, "shadow": self.shadow,
         }
 
@@ -270,7 +319,7 @@ class UIPanelNode(UIHudNode, Node):
         layout.prop(self, "color", text="")
 
     def draw_buttons_ext(self, context, layout):
-        layout.prop(self, "button_height")
+        self.draw_size(layout)
         layout.prop(self, "color")
         layout.prop(self, "radius", slider=True)
         row = layout.row(align=True)
@@ -291,7 +340,7 @@ class UIImageNode(UIHudNode, Node):
     bl_idname = "RangeUIImage"
     bl_label = "Image"
 
-    image_name = StringProperty(name="Image")
+    image_name = StringProperty(name="Image", update=_keep_image)
     tint = _color("Tint", (1.0, 1.0, 1.0, 1.0))
 
     def init(self, context):
@@ -303,7 +352,7 @@ class UIImageNode(UIHudNode, Node):
 
     def draw_buttons_ext(self, context, layout):
         layout.prop_search(self, "image_name", bpy.data, "images")
-        layout.prop(self, "button_height")
+        self.draw_size(layout)
         layout.prop(self, "tint")
         layout.operator(RANGE_OT_ui_tree_image_aspect.bl_idname, icon="IMAGE_COL")
 
@@ -326,7 +375,7 @@ class UIMinimapNode(UIHudNode, Node):
     bl_idname = "RangeUIMinimap"
     bl_label = "Minimap"
 
-    image_name = StringProperty(name="Image", description="Map seen from above (empty = only the background)")
+    image_name = StringProperty(name="Image", update=_keep_image, description="Map seen from above (empty = only the background)")
     tint = _color("Tint", (1.0, 1.0, 1.0, 1.0))
     world_min = FloatVectorProperty(name="World Min", size=2, default=(-50.0, -50.0),
                                     description="World X/Y at the lower left corner of the image")
@@ -384,7 +433,7 @@ class UIMinimapNode(UIHudNode, Node):
         row = layout.row(align=True)
         row.operator(RANGE_OT_ui_tree_minimap_bake_image.bl_idname, icon="RENDER_STILL")
         row.operator(RANGE_OT_ui_tree_minimap_fit.bl_idname, icon="FULLSCREEN_ENTER")
-        layout.prop(self, "button_height")
+        self.draw_size(layout)
         layout.operator(RANGE_OT_ui_tree_image_aspect.bl_idname, icon="IMAGE_COL")
         layout.prop(self, "zoom")
         row = layout.row()
@@ -474,7 +523,7 @@ class UIGaugeNode(UIHudNode, Node):
         row = layout.row(align=True)
         row.prop(self, "min_value")
         row.prop(self, "max_value")
-        layout.prop(self, "button_height")
+        self.draw_size(layout)
         layout.prop(self, "arc")
         layout.prop(self, "thickness", slider=True)
         col = layout.column(align=True)
@@ -568,7 +617,7 @@ class UIDialogueNode(UIHudNode, Node):
         box.prop(self, "letter_sound", text="Sound")
         box = layout.box()
         box.label("Look", icon="COLOR")
-        box.prop(self, "button_height")
+        self.draw_size(box)
         col = box.column(align=True)
         for prop in ("color", "text_color", "speaker_color"):
             col.prop(self, prop)
@@ -634,7 +683,7 @@ class UIToggleNode(UIControlNode, Node):
         layout.prop(self, "prop_name")
         layout.prop(self, "text")
         layout.prop(self, "audio")
-        layout.prop(self, "button_height")
+        self.draw_size(layout)
         col = layout.column(align=True)
         for prop in ("color", "on_color", "text_color"):
             col.prop(self, prop)
@@ -673,7 +722,7 @@ class UISliderNode(UIControlNode, Node):
         row.prop(self, "min_value")
         row.prop(self, "max_value")
         layout.prop(self, "audio")
-        layout.prop(self, "button_height")
+        self.draw_size(layout)
         col = layout.column(align=True)
         for prop in ("bg_color", "fill_color", "knob_color"):
             col.prop(self, prop)
@@ -688,30 +737,72 @@ class UISliderNode(UIControlNode, Node):
         return {self.prop_name: self.min_value + 0.5 * (self.max_value - self.min_value)}
 
 
-class UIMicMeterNode(UIProgressBarNode):
+class UIMicMeterNode(UIProgressBase, Node):
     """Barra com o nível da voz no microfone (liga o microfone; na Web, depois de um clique)."""
     bl_idname = "RangeUIMicMeter"
     bl_label = "Microphone Meter"
 
     def init(self, context):
-        UIProgressBarNode.init(self, context)
+        UIProgressBase.init(self, context)
         self.prop_name = "microphone"
         self.min_value = 0.0
         self.max_value = 1.0
         self.use_low_color = False
 
+    def draw_buttons(self, context, layout):
+        pass  # o nível vem do microfone, não de um objeto
+
     def draw_buttons_ext(self, context, layout):
         layout.label("Shows the voice level (0..1)", icon='REC')
-        UIProgressBarNode.draw_buttons_ext(self, context, layout)
+        UIProgressBase.draw_buttons_ext(self, context, layout)
 
     def widget(self):
-        data = UIProgressBarNode.widget(self)
+        data = UIProgressBase.widget(self)
         data["source"] = "MIC"
         return data
 
 
+class UITunerNode(UIHudNode, Node):
+    """Afinador: mostra a nota do microfone e quantos cents ela está desafinada."""
+    bl_idname = "RangeUITuner"
+    bl_label = "Tuner"
+
+    a4 = FloatProperty(name="A4 (Hz)", default=440.0, min=400.0, max=480.0,
+                       description="Reference frequency of the note A4")
+    tolerance = FloatProperty(name="Tolerance", default=5.0, min=1.0, max=50.0,
+                              description="Cents from the exact note still shown as in tune")
+    bg_color = _color("Background", (0.05, 0.06, 0.08, 0.8))
+    in_tune_color = _color("In Tune", (0.25, 0.9, 0.35, 1.0))
+    off_color = _color("Out of Tune", (1.0, 0.55, 0.1, 1.0))
+    text_color = _color("Text Color", (1.0, 1.0, 1.0, 1.0))
+
+    def init(self, context):
+        UIWidgetNode.init(self, context)
+        self.width = 300
+        self.button_height = 140.0
+
+    def draw_buttons(self, context, layout):
+        layout.prop(self, "a4")
+
+    def draw_buttons_ext(self, context, layout):
+        layout.prop(self, "a4")
+        layout.prop(self, "tolerance")
+        self.draw_size(layout)
+        col = layout.column(align=True)
+        for prop in ("bg_color", "in_tune_color", "off_color", "text_color"):
+            col.prop(self, prop)
+
+    def widget(self):
+        return {"kind": "TUNER", "source": "PITCH", "a4": self.a4, "tolerance": self.tolerance,
+                "bg": tuple(self.bg_color), "in_tune": tuple(self.in_tune_color),
+                "off": tuple(self.off_color), "text_color": tuple(self.text_color)}
+
+    def preview_values(self):
+        return {"note": "A4", "cents": 3.0}
+
+
 HUD_NODES = (UIProgressBarNode, UILabelNode, UIPanelNode, UIImageNode, UIMinimapNode, UIGaugeNode,
-             UIToggleNode, UISliderNode, UIDialogueNode, UIMicMeterNode)
+             UIToggleNode, UISliderNode, UIDialogueNode, UIMicMeterNode, UITunerNode)
 
 
 class UIActionNode(UINode):
@@ -758,6 +849,9 @@ class UISceneNode(UIActionNode, Node):
     bl_label = "Change Scene"
     action = "SCENE"
     param_label = "Scene"
+
+    def draw_buttons(self, context, layout):
+        layout.prop_search(self, "value", bpy.data, "scenes", text=self.param_label)
 
 
 class UIQuitNode(UIActionNode, Node):
@@ -929,6 +1023,7 @@ def bake_tree(tree, scene):
             buttons.append({
                 "name": node.text or node.name,
                 "text": node.text,
+                "key": node.translation_key,
                 "rect": rect,
                 "style": node.style(),
                 "anchor": node.anchor,
@@ -1017,7 +1112,7 @@ class RANGE_OT_ui_tree_image_aspect(Operator):
 
     def execute(self, context):
         node = context.active_node
-        image = node.image() if isinstance(node, (UIImageNode, UIMinimapNode)) else None
+        image = node.image() if isinstance(node, (UIImageNode, UIMinimapNode, UIButtonNode)) else None
         if image is None or not image.size[0]:
             return {'CANCELLED'}
         node.button_height = node.width * image.size[1] / image.size[0]
@@ -1655,11 +1750,17 @@ def _draw_previews():
                 if image is not None and not image.gl_load():
                     bindcode = image.bindcode[0]
             markers = node.preview_markers() if isinstance(node, UIMinimapNode) else None
-            range_ui_draw.draw_widget(bgl, blf, node.widget(), node.preview_values(),
+            data = node.widget()
+            if data.get("key"):
+                data["format"] = data["key"]  # a tradução só existe no jogo
+            range_ui_draw.draw_widget(bgl, blf, data, node.preview_values(),
                                       x, y, w, h, bindcode=bindcode, markers=markers)
         else:
             state = tree.preview_state if node.select else "NORMAL"
-            range_ui_draw.draw_button(bgl, blf, node.style(), node.text, x, y, w, h, state)
+            image = node.image()
+            bindcode = image.bindcode[0] if image is not None and not image.gl_load() else 0
+            range_ui_draw.draw_button(bgl, blf, node.style(), node.translation_key or node.text,
+                                      x, y, w, h, state, bindcode=bindcode)
         if node.select:
             bgl.glColor4f(1.0, 0.6, 0.2, 1.0)
             bgl.glBegin(bgl.GL_LINE_LOOP)
@@ -1764,6 +1865,7 @@ CATEGORIES = [
         NodeItem(UIMinimapNode.bl_idname),
         NodeItem(UIDialogueNode.bl_idname),
         NodeItem(UIMicMeterNode.bl_idname),
+        NodeItem(UITunerNode.bl_idname),
     ]),
     UICategory("RANGE_UI_ACTIONS", "Actions",
                items=[NodeItem(cls.bl_idname) for cls in ACTION_NODES]),

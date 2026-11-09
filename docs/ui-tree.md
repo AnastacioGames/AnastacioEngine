@@ -23,7 +23,9 @@ Jogar esconde o menu e liga o HUD; Som e Volume mandam no volume geral do jogo.
   (Capture Camera). **HUD Screen** fica sempre por baixo do menu; com **Camera** preenchida,
   desenha só no viewport daquela câmera (split screen).
 - **Widgets**: Button, Toggle, Slider, Panel, Image; HUD: Progress Bar, Label (`{vida:.0f}`),
-  Gauge, Minimap. Cada widget pode ler as propriedades de outro objeto (campo Object).
+  Gauge, Minimap, Microphone Meter e Tuner (nota e cents do microfone). Cada widget pode ler
+  as propriedades de outro objeto (campo Object). Label e Button aceitam **Translation Key**
+  (`locale/translations.csv`), e o Button aceita **Image** com tinta por estado.
 - **Minimap** (HUD): imagem do mapa vista de cima cobrindo World Min..Max (X/Y do mundo;
   **Fit to Scene** mede pelos objetos selecionados ou por todas as malhas). Object = jogador
   (seta); marcadores (pontos) = objetos com a propriedade Marker Property (padrão `minimap`)

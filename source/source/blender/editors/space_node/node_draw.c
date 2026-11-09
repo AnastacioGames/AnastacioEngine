@@ -516,6 +516,12 @@ static void node_update_hidden(bNode *node)
 	/* get "global" coords */
 	node_to_view(node, 0.0f, 0.0f, &locx, &locy);
 
+	/* UI Tree widget (bl_width_min = 20): the preview fills the node's width,
+	 * so the handle sits beside it instead of covering it. */
+	if (node->typeinfo && STREQLEN(node->typeinfo->idname, "RangeUI", 7) && node->typeinfo->minwidth <= 20.0f) {
+		locx += node->width * UI_DPI_FAC;
+	}
+
 	/* calculate minimal radius */
 	for (nsock = node->inputs.first; nsock; nsock = nsock->next)
 		if (!nodeSocketIsHidden(nsock))

@@ -419,7 +419,7 @@ class SOUND_OT_record_microphone(Operator):
 
 
 class SOUND_OT_select_microphone(Operator):
-    """Escolhe o microfone usado pelos botões de gravar do editor"""
+    """Escolhe o microfone usado pelos botões de gravar do editor e pela UI Tree no jogo"""
     bl_idname = "sound.select_microphone"
     bl_label = "Select Microphone"
 

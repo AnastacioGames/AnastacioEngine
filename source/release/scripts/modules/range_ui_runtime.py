@@ -141,6 +141,37 @@ _DRAW_ORDER = {"PANEL": 0, "IMAGE": 1, "MINIMAP": 1}
 _hex_colors = {}
 
 
+def _saved_microphone():
+    """Microfone escolhido no cabeçalho do editor (sound.select_microphone); "" = padrão."""
+    import os
+    folder = os.environ.get("BLENDER_USER_CONFIG")
+    if not folder:
+        base = os.environ.get("APPDATA") or os.path.expanduser("~/.config")
+        folder = os.path.join(base, "RangeEngine", "Blender", "2.79", "config")
+    try:
+        with open(os.path.join(folder, "anastacio_microphone.txt"), encoding="utf-8") as f:
+            return f.read()
+    except OSError:
+        return ""
+
+
+def _start_microphone():
+    """Liga o microfone escolhido; em outro PC ele não existe e vale o padrão do sistema."""
+    from Range import audio
+    name = _saved_microphone()
+    if not (name and audio.microphoneStart(name)):
+        audio.microphoneStart()
+
+
+def _translated(key, fallback):
+    """Texto da chave no idioma atual; sem chave ou sem a linha na tabela, o do nó."""
+    if key:
+        import range_locale
+        if range_locale.has(key):
+            return range_locale.tr(key)
+    return fallback
+
+
 def _hex_color(text):
     """'#rrggbb' -> (r, g, b, 1); None se vazio ou inválido (usa a cor do nó)."""
     if not isinstance(text, str):
@@ -535,7 +566,7 @@ class UIRuntime:
                 self.run_python(value)
             elif action == "MIC_ON":
                 from Range import audio
-                audio.microphoneStart()
+                _start_microphone()
 
     def set_property(self, name, text):
         """Converte o texto para o tipo atual da propriedade (bool/int/float)."""
@@ -613,12 +644,20 @@ class UIRuntime:
     # -- desenho -------------------------------------------------------------
 
     def widget_values(self, data):
+        if data.get("source") == "PITCH":
+            # Tuner: a nota do microfone, sem script.
+            from Range import audio
+            if not getattr(self, "_mic_started", False):
+                self._mic_started = True
+                _start_microphone()
+            note, cents, _midi = audio.microphoneNote(data["a4"])
+            return {"note": note, "cents": cents}
         if data.get("source") == "MIC":
             # Microphone Meter: o nível da voz no lugar da propriedade.
             from Range import audio
             if not getattr(self, "_mic_started", False):
                 self._mic_started = True
-                audio.microphoneStart()
+                _start_microphone()
             return {data["property"]: audio.microphoneLevel()}
         obj = self.obj_for(data)
         if obj is None:
@@ -718,6 +757,8 @@ class UIRuntime:
             kind = data["kind"]
             bindcode = self.texture(data["path"]) if kind in ("IMAGE", "MINIMAP") and data["path"] else 0
             markers = self.minimap_markers(data) if kind == "MINIMAP" else None
+            if data.get("key"):
+                data = dict(data, format=_translated(data["key"], data["format"]))
             range_ui_draw.draw_widget(bgl, blf, data, self.widget_values(data),
                                       x, y, w, h, bindcode=bindcode, markers=markers)
         for dialogue in screen.dialogues:
@@ -751,8 +792,10 @@ class UIRuntime:
             x, y, w, h = screen.place(data, width, height)
             if animate:
                 button.animate(dt, self.owner)
-            range_ui_draw.draw_button(bgl, blf, data["style"], data["text"], x, y, w, h,
-                                      button.state(self.owner), button.color, button.scale)
+            image = data["style"].get("image")
+            range_ui_draw.draw_button(bgl, blf, data["style"], _translated(data.get("key"), data["text"]),
+                                      x, y, w, h, button.state(self.owner), button.color, button.scale,
+                                      bindcode=self.texture(image) if image else 0)
 
     def draw(self):
         hud = self.huds if self.owner.get("ui_hud", True) else []

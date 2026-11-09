@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-09 — UI Tree e notas do microfone
+
+- UI Tree: corrigido `Cannot add node of type RangeUIProgressBar` (nó registrado herdando de outro); campo Width; alça do widget ao lado da prévia; Translation Key em Label e Button (`locale/translations.csv`); imagem no Button com tintas por estado; Change Scene lista as cenas; imagem escolhida ganha fake user para não sumir ao salvar.
+- Microfone escolhido em Record > Select Microphone vale para a UI Tree no jogo; nome inválido cai no padrão do sistema.
+- Detector YIN em `audaspace/util/PitchDetector`, `Microphone::getPitch()`, `aud.Microphone.pitch`, `Range.audio.microphonePitch()` e `microphoneNote(a4=440.0)`; nó Tuner na UI Tree; demo `tools/debug/cenas/criar_demo_bolinha_voz.py`. Teste sintético em `tests/pitch` (pior acerto 3,84 cents com harmônicos, 0,35 ms por análise).
+
 ## 2026-11-09 — Versão 0.7.1 em preparo
 
 - Versão no executável, no About e nos scripts de release; notas em `docs/release-notes-0.7.1.md`.

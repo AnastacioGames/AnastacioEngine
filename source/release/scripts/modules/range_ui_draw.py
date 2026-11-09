@@ -69,7 +69,7 @@ def state_target(style, state):
     return style["color"], 1.0
 
 
-def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL", color=None, scale=None):
+def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL", color=None, scale=None, bindcode=0):
     """Desenha o botão com canto inferior esquerdo em (x, y), em pixels.
 
     color/scale substituem os do estado (o jogo passa os valores animados);
@@ -85,12 +85,16 @@ def draw_button(bgl, blf, style, text, x, y, w, h, state="NORMAL", color=None, s
     radius = style["radius"] * min(w, h) * 0.5
     bgl.glEnable(bgl.GL_BLEND)
     bgl.glBlendFunc(bgl.GL_SRC_ALPHA, bgl.GL_ONE_MINUS_SRC_ALPHA)
-    if style["shadow"]:
+    image = style.get("image")
+    if style["shadow"] and not image:
         off = max(1.0, h * 0.08)
         _color(bgl, (0.0, 0.0, 0.0, 0.35))
         _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x + off, y - off, w, h, radius)
-    _color(bgl, color)
-    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x, y, w, h, radius)
+    if image:
+        draw_image(bgl, {"tint": color}, bindcode, x, y, w, h)
+    else:
+        _color(bgl, color)
+        _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x, y, w, h, radius)
     border = style["border"] * h
     if state == "SELECTED":
         border = max(border, 2.0)
@@ -614,6 +618,41 @@ def draw_dialogue(bgl, blf, data, speaker, page, visible, x, y, w, h, show_next)
         bgl.glEnd()
 
 
+def draw_tuner(bgl, blf, data, note, cents, x, y, w, h):
+    """Afinador: nota grande em cima e régua de -50 a +50 cents embaixo."""
+    _blend(bgl)
+    _color(bgl, data["bg"])
+    _rounded_polygon(bgl, bgl.GL_TRIANGLE_FAN, x, y, w, h, min(w, h) * 0.1)
+    in_tune = bool(note) and abs(cents) <= data["tolerance"]
+    color = data["in_tune"] if in_tune else data["off"] if note else data["text_color"]
+    _text(bgl, blf, note or "--", color, h * 0.5, x, y + h * 0.42, w, h * 0.5)
+    ruler_y, left, span = y + h * 0.24, x + w * 0.08, w * 0.84
+    # Faixa da tolerância, marcas e ponteiro.
+    band = span * min(data["tolerance"], 50.0) / 100.0
+    _color(bgl, data["in_tune"][:3] + (0.3,))
+    bgl.glBegin(bgl.GL_QUADS)
+    for px, py in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+        bgl.glVertex2f(left + span * 0.5 + px * band, ruler_y + py * h * 0.12)
+    bgl.glEnd()
+    bgl.glLineWidth(1.0)
+    _color(bgl, data["text_color"])
+    bgl.glBegin(bgl.GL_LINES)
+    for i in range(11):
+        tick = h * (0.13 if i == 5 else 0.07)
+        bgl.glVertex2f(left + span * i / 10.0, ruler_y - tick)
+        bgl.glVertex2f(left + span * i / 10.0, ruler_y + tick)
+    bgl.glEnd()
+    if note:
+        px = left + span * (max(-50.0, min(50.0, cents)) + 50.0) / 100.0
+        bgl.glLineWidth(max(2.0, w * 0.012))
+        _color(bgl, color)
+        bgl.glBegin(bgl.GL_LINES)
+        bgl.glVertex2f(px, ruler_y - h * 0.16)
+        bgl.glVertex2f(px, ruler_y + h * 0.16)
+        bgl.glEnd()
+        bgl.glLineWidth(1.0)
+
+
 def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False, markers=None):
     """Desenha um widget (HUD ou controle) com os valores dados."""
     kind = data["kind"]
@@ -627,6 +666,8 @@ def draw_widget(bgl, blf, data, values, x, y, w, h, bindcode=0, hover=False, mar
         draw_image(bgl, data, bindcode, x, y, w, h)
     elif kind == "MINIMAP":
         draw_minimap(bgl, data, bindcode, markers or (), x, y, w, h)
+    elif kind == "TUNER":
+        draw_tuner(bgl, blf, data, values.get("note", ""), values.get("cents", 0.0), x, y, w, h)
     elif kind == "GAUGE":
         draw_gauge(bgl, blf, data, bar_fraction(data, values), values, x, y, w, h)
     elif kind == "TOGGLE":
