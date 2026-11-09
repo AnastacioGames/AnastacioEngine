@@ -7,7 +7,7 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Mind Map
 
-Versão 1 (etapas 1-6 de [plano-mind-map.md](plano-mind-map.md)) aguardando aceite com janela. Falta abrir um `.mm` real do FreeMind e abrir no FreeMind um arquivo exportado. Etapa 7 (ligar ideias a objetos e tarefas) é a versão 2.
+Versão 1 (etapas 1-6 de [plano-mind-map.md](plano-mind-map.md)) aguardando aceite com janela. Falta abrir um `.mm` real do FreeMind e abrir no FreeMind um arquivo exportado. Etapa 7 (vínculos com objeto, cena e texto, tarefas com progresso por ramo) implementada, aguardando aceite com janela.
 
 ## Microfone
 

@@ -1,6 +1,6 @@
 # Plano: editor Mind Map
 
-Estado: etapas 1-6 implementadas em 2026-11-09, aguardando aceite; etapa 7 não iniciada.
+Estado: etapas 1-7 implementadas em 2026-11-09; arraste e menu aceitos com janela; falta aceite da etapa 7 e o teste com o FreeMind.
 
 ## Objetivo
 

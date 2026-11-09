@@ -29,6 +29,12 @@ struct MMDoc;
 /* Width of a single line of text, in layout units. */
 typedef float (*MMTextWidthFn)(const char *text, void *user_data);
 
+enum { MM_TASK_NONE, MM_TASK_TODO, MM_TASK_DONE };
+
+#define MM_ATTR_TASK "ANASTACIO_TASK"
+#define MM_ATTR_LINK "ANASTACIO_LINK"
+#define MM_ATTR_ICON "ANASTACIO_ICON"
+
 typedef struct MMLayoutNode {
 	struct MMElem *elem;
 	char *text;                 /* single line, shortened when very long */
@@ -39,9 +45,14 @@ typedef struct MMLayoutNode {
 	int has_children;
 	int has_note;
 	char icon;                  /* letter standing for a known icon, 0 when none */
+	char engine_icon[64];       /* name of an engine icon, wins over icon */
 	int has_color;
 	unsigned char color[3];
 	float text_offset;          /* width used by the marks at the left of the text */
+	float text_right;           /* width used by the marks at the right of the text */
+	int task;                   /* MM_TASK_NONE, MM_TASK_TODO or MM_TASK_DONE */
+	int has_link;
+	char progress[32];          /* "done/total" of the tasks below, empty when none */
 } MMLayoutNode;
 
 typedef struct MMLayout {
@@ -50,6 +61,7 @@ typedef struct MMLayout {
 	float xmin, xmax, ymin, ymax;
 } MMLayout;
 
+int mm_node_task(const struct MMElem *node);
 MMLayout *mm_layout_build(const struct MMDoc *doc, MMTextWidthFn width_fn, void *user_data);
 void mm_layout_free(MMLayout *layout);
 

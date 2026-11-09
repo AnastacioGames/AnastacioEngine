@@ -18,6 +18,7 @@
  *  \ingroup spmindmap
  */
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -118,18 +119,65 @@ static int hex_digit(char c)
 	return -1;
 }
 
+int mm_node_task(const MMElem *node)
+{
+	char *value = mm_attr_get(node, MM_ATTR_TASK);
+	const int task = !value ? MM_TASK_NONE : (strcmp(value, "done") == 0 ? MM_TASK_DONE : MM_TASK_TODO);
+
+	mm_str_free(value);
+	return task;
+}
+
+/* Counts the tasks below a node, folded branches included. */
+static void count_tasks(const MMElem *node, int *done, int *total)
+{
+	const MMElem *child;
+
+	for (child = mm_node_first_child(node); child; child = mm_node_next(child)) {
+		const int task = mm_node_task(child);
+
+		if (task != MM_TASK_NONE) {
+			(*total)++;
+			if (task == MM_TASK_DONE) {
+				(*done)++;
+			}
+		}
+		count_tasks(child, done, total);
+	}
+}
+
 /* Fills what is drawn besides the text and returns the box width. */
 static float fill_appearance(LayoutContext *ctx, const MMElem *node, MMLayoutNode *out)
 {
 	char *value = mm_node_icon(node);
-	float marks = 0.0f;
+	float marks = 0.0f, right = 0.0f;
+	int done = 0, total = 0;
 
 	out->icon = icon_letter(value);
 	mm_str_free(value);
 	out->has_note = mm_node_has_note(node);
 	out->has_children = mm_node_first_child(node) != NULL;
-	marks = ((out->icon ? 1 : 0) + (out->has_note ? 1 : 0)) * MARK_WIDTH;
+	out->task = mm_node_task(node);
+	value = mm_attr_get(node, MM_ATTR_ICON);
+	if (value) {
+		snprintf(out->engine_icon, sizeof(out->engine_icon), "%s", value);
+	}
+	mm_str_free(value);
+	marks = ((out->icon || out->engine_icon[0] ? 1 : 0) + (out->has_note ? 1 : 0) + (out->task != MM_TASK_NONE ? 1 : 0)) * MARK_WIDTH;
 	out->text_offset = marks;
+
+	value = mm_attr_get(node, MM_ATTR_LINK);
+	out->has_link = value != NULL;
+	mm_str_free(value);
+	if (out->has_link) {
+		right += MARK_WIDTH;
+	}
+	count_tasks(node, &done, &total);
+	if (total > 0) {
+		snprintf(out->progress, sizeof(out->progress), "%d/%d", done, total);
+		right += ctx->width_fn(out->progress, ctx->user_data) + NODE_PADDING;
+	}
+	out->text_right = right;
 
 	value = mm_attr_get(node, "COLOR");
 	if (value && value[0] == '#' && strlen(value) == 7) {
@@ -148,7 +196,7 @@ static float fill_appearance(LayoutContext *ctx, const MMElem *node, MMLayoutNod
 	}
 	mm_str_free(value);
 
-	return ctx->width_fn(out->text, ctx->user_data) + 2.0f * NODE_PADDING + marks;
+	return ctx->width_fn(out->text, ctx->user_data) + 2.0f * NODE_PADDING + marks + right;
 }
 
 /* Places a node with its branch below y_top and returns the height used. */

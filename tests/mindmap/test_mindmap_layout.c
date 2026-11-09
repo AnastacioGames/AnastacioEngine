@@ -139,8 +139,33 @@ static void test_text_cleanup(void)
 	mm_free(doc);
 }
 
+static void test_tasks_and_link(void)
+{
+	MMDoc *doc;
+	MMLayout *l = layout_of(
+	        "<map><node TEXT=\"R\">"
+	        "<node TEXT=\"A\" ANASTACIO_LINK=\"OBCube\" FOLDED=\"true\">"
+	        "<node TEXT=\"B\" ANASTACIO_TASK=\"done\"/><node TEXT=\"C\" ANASTACIO_TASK=\"todo\"/></node>"
+	        "<node TEXT=\"D\" ANASTACIO_TASK=\"todo\" ANASTACIO_ICON=\"MESH_CUBE\"/>"
+	        "</node></map>", &doc);
+
+	CHECK(l && l->count == 3);
+	if (l && l->count == 3) {
+		const MMLayoutNode *a = &l->nodes[find(l, "A")], *d = &l->nodes[find(l, "D")];
+
+		CHECK(strcmp(l->nodes[0].progress, "1/3") == 0);
+		CHECK(strcmp(a->progress, "1/2") == 0 && a->has_link && a->task == MM_TASK_NONE);
+		CHECK(d->progress[0] == '\0' && !d->has_link && d->task == MM_TASK_TODO);
+		CHECK(strcmp(d->engine_icon, "MESH_CUBE") == 0 && a->engine_icon[0] == '\0');
+		CHECK(d->text_offset == 32.0f);
+	}
+	mm_layout_free(l);
+	mm_free(doc);
+}
+
 int main(void)
 {
+	test_tasks_and_link();
 	test_sides_and_fold();
 	test_no_overlap();
 	test_text_cleanup();

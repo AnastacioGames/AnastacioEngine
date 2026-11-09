@@ -16,6 +16,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 ## 2026-11-09 — Editor Mind Map (versão 1)
 
+- Mind Map desenha ícones reais da engine e permite buscar qualquer um deles (`I`, atributo `ANASTACIO_ICON`).
+- Versão 2 do Mind Map: vínculo de ideia com objeto, cena ou texto (`L`, `O` ou clique em `>`) e tarefas com progresso por ramo (`T`), em atributos `ANASTACIO_LINK` e `ANASTACIO_TASK` do `.mm`.
 - Área nova `Mind Map`: mapas no formato FreeMind `.mm`, guardados em datablocks `Text`, com leitura e gravação que preservam o que o editor não conhece.
 - Desenho com raiz central e ramos para os dois lados; zoom, pan e `Home`. O desfazer global cobre as edições.
 - Teclado: `Insert`, `Enter`, `F2`, `Delete`, setas, `Espaço`, `N`. Mouse: selecionar, arrastar para outro pai ou reordenar, duplo clique, menu do botão direito, indicador de dobra.

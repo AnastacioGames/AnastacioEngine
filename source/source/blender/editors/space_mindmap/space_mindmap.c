@@ -32,6 +32,8 @@
 #include "BLI_math_vector.h"
 #include "BLI_utildefines.h"
 
+#include "DNA_object_types.h"
+#include "DNA_scene_types.h"
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_text_types.h"
@@ -39,7 +41,9 @@
 #include "DNA_windowmanager_types.h"
 
 #include "BKE_context.h"
+#include "BKE_main.h"
 #include "BKE_report.h"
+#include "BKE_scene.h"
 #include "BKE_screen.h"
 #include "BKE_text.h"
 
@@ -54,12 +58,14 @@
 
 #include "RNA_access.h"
 #include "RNA_define.h"
+#include "RNA_enum_types.h"
 
 #include "WM_api.h"
 #include "WM_keymap.h"
 #include "WM_types.h"
 
 #include "UI_interface.h"
+#include "UI_interface_icons.h"
 #include "UI_resources.h"
 #include "UI_view2d.h"
 
@@ -387,6 +393,17 @@ static void mindmap_draw_boxes(const MMLayout *layout, const rctf *cur, const MM
 		}
 		UI_ThemeColorShade(TH_TEXT, -40);
 
+		if (node->task != MM_TASK_NONE) {
+			const float y = (node->ymin + node->ymax) * 0.5f;
+
+			fdrawbox(node->xmin + 4.0f, y - 5.0f, node->xmin + 14.0f, y + 5.0f);
+			if (node->task == MM_TASK_DONE) {
+				UI_ThemeColor(TH_TEXT_HI);
+				glRectf(node->xmin + 6.0f, y - 3.0f, node->xmin + 12.0f, y + 3.0f);
+				UI_ThemeColorShade(TH_TEXT, -40);
+			}
+		}
+
 		if (node->has_hidden_children || (node->has_children && node->elem == selected && i != 0)) {
 			const float x = (node->side > 0) ? node->xmax + FOLD_MARK_SIZE : node->xmin - FOLD_MARK_SIZE;
 			const float y = (node->ymin + node->ymax) * 0.5f;
@@ -425,6 +442,35 @@ static void mindmap_draw_drop_hint(const MindMapCache *cache)
 	glLineWidth(1.0f);
 }
 
+static int mindmap_mark_icon(const MMLayoutNode *node)
+{
+	int value;
+
+	if (node->engine_icon[0] && RNA_enum_value_from_id(rna_enum_icon_items, node->engine_icon, &value)) {
+		return value;
+	}
+	switch (node->icon) {
+		case '*': return ICON_SOLO_ON;
+		case '?': return ICON_QUESTION;
+		case '!': return ICON_ERROR;
+		case 'V': return ICON_CHECKBOX_HLT;
+		case 'X': return ICON_CANCEL;
+		case 'F': return ICON_BOOKMARKS;
+		case 'i': return ICON_INFO;
+		default: return ICON_NONE;
+	}
+}
+
+static void mindmap_draw_mark(float x, float center_y, float scale, int icon)
+{
+	const int size = max_ii((int)(14.0f * scale + 0.5f), 8);
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	UI_icon_draw_size(floorf(x), floorf(center_y - size * 0.5f), size, icon, 1.0f);
+	glDisable(GL_BLEND);
+}
+
 static void mindmap_draw_texts(const MMLayout *layout, const ARegion *ar)
 {
 	const rctf *cur = &ar->v2d.cur;
@@ -443,10 +489,11 @@ static void mindmap_draw_texts(const MMLayout *layout, const ARegion *ar)
 
 		if (mindmap_rect_visible(cur, node->xmin, node->xmax, node->ymin, node->ymax)) {
 			const float width = BLF_width(font, node->text, BLF_DRAW_STR_DUMMY_MAX);
-			const float center_x = ((node->xmin + node->text_offset + node->xmax) * 0.5f - cur->xmin) * scale;
+			const float center_x = ((node->xmin + node->text_offset + node->xmax - node->text_right) * 0.5f - cur->xmin) * scale;
 			const float center_y = ((node->ymin + node->ymax) * 0.5f - cur->ymin) * scale;
 			const float baseline = floorf(center_y - pixels * 0.35f);
-			float mark_x = (node->xmin + 7.0f - cur->xmin) * scale;
+			const int mark_icon = mindmap_mark_icon(node);
+			float mark_x = (node->xmin + 4.0f + (node->task != MM_TASK_NONE ? 16.0f : 0.0f) - cur->xmin) * scale;
 
 			if (node->has_color) {
 				glColor3ubv(node->color);
@@ -457,16 +504,27 @@ static void mindmap_draw_texts(const MMLayout *layout, const ARegion *ar)
 			BLF_position(font, floorf(center_x - width * 0.5f), baseline, 0.0f);
 			BLF_draw(font, node->text, BLF_DRAW_STR_DUMMY_MAX);
 
-			if (node->icon || node->has_note) {
-				UI_ThemeColor(TH_TEXT_HI);
-				if (node->icon) {
-					BLF_position(font, floorf(mark_x), baseline, 0.0f);
-					BLF_draw(font, &node->icon, 1);
-					mark_x += 16.0f * scale;
+			if (node->icon || node->engine_icon[0]) {
+				if (mark_icon != ICON_NONE) {
+					mindmap_draw_mark(mark_x, center_y, scale, mark_icon);
 				}
-				if (node->has_note) {
-					BLF_position(font, floorf(mark_x), baseline, 0.0f);
-					BLF_draw(font, "n", 1);
+				mark_x += 16.0f * scale;
+			}
+			if (node->has_note) {
+				mindmap_draw_mark(mark_x, center_y, scale, ICON_TEXT);
+			}
+			if (node->has_link || node->progress[0]) {
+				float right_x = (node->xmax - cur->xmin) * scale;
+
+				UI_ThemeColor(TH_TEXT_HI);
+				if (node->has_link) {
+					mindmap_draw_mark(right_x - 16.0f * scale, center_y, scale, ICON_LINKED);
+					UI_ThemeColor(TH_TEXT_HI);
+					right_x -= 16.0f * scale;
+				}
+				if (node->progress[0]) {
+					BLF_position(font, floorf(right_x - 6.0f * scale - BLF_width(font, node->progress, BLF_DRAW_STR_DUMMY_MAX)), baseline, 0.0f);
+					BLF_draw(font, node->progress, BLF_DRAW_STR_DUMMY_MAX);
 				}
 			}
 		}
@@ -959,6 +1017,72 @@ static bool mindmap_elem_inside(const MMElem *elem, const MMElem *branch)
 	return false;
 }
 
+static void mindmap_task_set(MindMapCache *cache, MMElem *node, int task)
+{
+	if (task == MM_TASK_NONE) {
+		mm_attr_remove(node, MM_ATTR_TASK);
+	}
+	else {
+		mm_attr_set(node, MM_ATTR_TASK, task == MM_TASK_DONE ? "done" : "todo");
+	}
+	mindmap_cache_commit(cache);
+}
+
+/* The link is the ID name with its type prefix: OBCube, SCScene or TXscript.py */
+static bool mindmap_open_link(bContext *C, ReportList *reports, const char *link)
+{
+	Main *bmain = CTX_data_main(C);
+	bScreen *screen = CTX_wm_screen(C);
+	const char *name = (strlen(link) > 2) ? link + 2 : "";
+	const int name_offset = offsetof(ID, name) + 2;
+
+	if (STREQLEN(link, "OB", 2)) {
+		Object *ob = BLI_findstring(&bmain->object, name, name_offset);
+		Scene *scene = CTX_data_scene(C), *sce;
+		Base *base = ob ? BKE_scene_base_find(scene, ob) : NULL;
+
+		for (sce = bmain->scene.first; ob && !base && sce; sce = sce->id.next) {
+			base = BKE_scene_base_find(sce, ob);
+			if (base) {
+				scene = sce;
+				WM_event_add_notifier(C, NC_SCREEN | ND_SCENEBROWSE, scene);
+			}
+		}
+		if (base) {
+			BKE_scene_base_deselect_all(scene);
+			BKE_scene_base_select(scene, base);
+			WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
+			return true;
+		}
+	}
+	else if (STREQLEN(link, "SC", 2)) {
+		Scene *scene = BLI_findstring(&bmain->scene, name, name_offset);
+
+		if (scene) {
+			WM_event_add_notifier(C, NC_SCREEN | ND_SCENEBROWSE, scene);
+			return true;
+		}
+	}
+	else if (STREQLEN(link, "TX", 2)) {
+		Text *text = BLI_findstring(&bmain->text, name, name_offset);
+		ScrArea *sa;
+
+		if (text) {
+			for (sa = screen->areabase.first; sa; sa = sa->next) {
+				if (sa->spacetype == SPACE_TEXT) {
+					((SpaceText *)sa->spacedata.first)->text = text;
+					ED_area_tag_redraw(sa);
+					return true;
+				}
+			}
+			BKE_report(reports, RPT_WARNING, "Open a Text Editor area to see this text");
+			return false;
+		}
+	}
+	BKE_reportf(reports, RPT_WARNING, "Linked item not found: %s", name);
+	return false;
+}
+
 static void mindmap_drag_update(ARegion *ar, MindMapCache *cache, const int mval[2])
 {
 	float co[2];
@@ -1033,15 +1157,31 @@ static int mindmap_click_invoke(bContext *C, wmOperator *op, const wmEvent *even
 	ARegion *ar = CTX_wm_region(C);
 	MindMapCache *cache = mindmap_edit_cache(C);
 	bool on_mark;
-	const int index = mindmap_hit_node(ar, cache->layout, cache->selected, event->mval, &on_mark, NULL);
+	float co[2];
+	const int index = mindmap_hit_node(ar, cache->layout, cache->selected, event->mval, &on_mark, co);
+	const MMLayoutNode *hit;
 	MMElem *node;
 
 	if (index == -1) {
 		return OPERATOR_CANCELLED | OPERATOR_PASS_THROUGH;
 	}
-	node = cache->layout->nodes[index].elem;
+	hit = &cache->layout->nodes[index];
+	node = hit->elem;
 	cache->selected = node;
 	ED_region_tag_redraw(ar);
+
+	if (!on_mark && hit->task != MM_TASK_NONE && co[0] <= hit->xmin + 16.0f) {
+		mindmap_task_set(cache, node, hit->task == MM_TASK_DONE ? MM_TASK_TODO : MM_TASK_DONE);
+		ED_undo_push(C, "Toggle Task");
+		return OPERATOR_FINISHED;
+	}
+	if (!on_mark && hit->has_link && co[0] >= hit->xmax - 16.0f) {
+		char *link = mm_attr_get(node, MM_ATTR_LINK);
+
+		mindmap_open_link(C, op->reports, link);
+		mm_str_free(link);
+		return OPERATOR_FINISHED;
+	}
 
 	if (on_mark) {
 		mm_node_folded_set(node, !mm_node_folded(node));
@@ -1158,6 +1298,7 @@ static int mindmap_set_icon_exec(bContext *C, wmOperator *op)
 	MindMapCache *cache = mindmap_edit_cache(C);
 
 	mm_node_icon_set(cache->selected, mindmap_icon_values[RNA_enum_get(op->ptr, "icon")]);
+	mm_attr_remove(cache->selected, MM_ATTR_ICON);
 	mindmap_cache_commit(cache);
 	return mindmap_finish(C, "Idea Icon");
 }
@@ -1166,12 +1307,12 @@ static void MINDMAP_OT_set_icon(wmOperatorType *ot)
 {
 	static const EnumPropertyItem items[] = {
 		{0, "NONE", 0, "None", ""},
-		{1, "IDEA", 0, "Idea (*)", ""},
-		{2, "HELP", 0, "Question (?)", ""},
-		{3, "WARNING", 0, "Warning (!)", ""},
-		{4, "OK", 0, "Done (V)", ""},
-		{5, "CANCEL", 0, "Cancelled (X)", ""},
-		{6, "FLAG", 0, "Flag (F)", ""},
+		{1, "IDEA", ICON_SOLO_ON, "Idea", ""},
+		{2, "HELP", ICON_QUESTION, "Question", ""},
+		{3, "WARNING", ICON_ERROR, "Warning", ""},
+		{4, "OK", ICON_CHECKBOX_HLT, "Done", ""},
+		{5, "CANCEL", ICON_CANCEL, "Cancelled", ""},
+		{6, "FLAG", ICON_BOOKMARKS, "Flag", ""},
 		{0, NULL, 0, NULL, NULL},
 	};
 
@@ -1181,6 +1322,40 @@ static void MINDMAP_OT_set_icon(wmOperatorType *ot)
 	ot->exec = mindmap_set_icon_exec;
 	ot->poll = mindmap_edit_poll;
 	RNA_def_enum(ot->srna, "icon", items, 0, "Icon", "");
+}
+
+static int mindmap_set_engine_icon_exec(bContext *C, wmOperator *op)
+{
+	MindMapCache *cache = mindmap_edit_cache(C);
+	const char *identifier = NULL;
+	const int value = RNA_property_enum_get(op->ptr, op->type->prop);
+
+	if (!RNA_property_enum_identifier(C, op->ptr, op->type->prop, value, &identifier)) {
+		return OPERATOR_CANCELLED;
+	}
+	if (value == ICON_NONE) {
+		mm_attr_remove(cache->selected, MM_ATTR_ICON);
+	}
+	else {
+		mm_attr_set(cache->selected, MM_ATTR_ICON, identifier);
+	}
+	mindmap_cache_commit(cache);
+	return mindmap_finish(C, "Idea Engine Icon");
+}
+
+static void MINDMAP_OT_set_engine_icon(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	ot->name = "Engine Icon";
+	ot->idname = "MINDMAP_OT_set_engine_icon";
+	ot->description = "Search all the icons of the engine for the selected idea";
+	ot->invoke = WM_enum_search_invoke;
+	ot->exec = mindmap_set_engine_icon_exec;
+	ot->poll = mindmap_edit_poll;
+	prop = RNA_def_enum(ot->srna, "icon", rna_enum_icon_items, ICON_NONE, "Icon", "");
+	RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
+	ot->prop = prop;
 }
 
 static int mindmap_edit_note_invoke(bContext *C, wmOperator *op, const wmEvent *UNUSED(event))
@@ -1228,6 +1403,115 @@ static void MINDMAP_OT_edit_note(wmOperatorType *ot)
 	RNA_def_property_flag(prop, PROP_SKIP_SAVE);
 }
 
+static int mindmap_cycle_task_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	MindMapCache *cache = mindmap_edit_cache(C);
+
+	mindmap_task_set(cache, cache->selected, (mm_node_task(cache->selected) + 1) % 3);
+	return mindmap_finish(C, "Idea Task");
+}
+
+static void MINDMAP_OT_cycle_task(wmOperatorType *ot)
+{
+	ot->name = "Task";
+	ot->idname = "MINDMAP_OT_cycle_task";
+	ot->description = "Turn the selected idea into a task, mark it done, or remove the task";
+	ot->exec = mindmap_cycle_task_exec;
+	ot->poll = mindmap_edit_poll;
+}
+
+static const EnumPropertyItem *mindmap_link_itemf(
+        bContext *C, PointerRNA *UNUSED(ptr), PropertyRNA *UNUSED(prop), bool *r_free)
+{
+	Main *bmain = CTX_data_main(C);
+	EnumPropertyItem *items = NULL, item = {0};
+	const struct {
+		ListBase *list;
+		int icon;
+	} kinds[] = {{&bmain->object, ICON_OBJECT_DATA}, {&bmain->scene, ICON_SCENE_DATA}, {&bmain->text, ICON_TEXT}};
+	int total = 0, k;
+	ID *id;
+
+	for (k = 0; k < ARRAY_SIZE(kinds); k++) {
+		for (id = kinds[k].list->first; id; id = id->next) {
+			item.value = total;
+			item.identifier = id->name;
+			item.name = id->name + 2;
+			item.icon = kinds[k].icon;
+			RNA_enum_item_add(&items, &total, &item);
+		}
+	}
+	RNA_enum_item_end(&items, &total);
+	*r_free = true;
+	return items;
+}
+
+static int mindmap_set_link_exec(bContext *C, wmOperator *op)
+{
+	MindMapCache *cache = mindmap_edit_cache(C);
+	const char *identifier = NULL;
+
+	if (!RNA_property_enum_identifier(C, op->ptr, op->type->prop, RNA_property_enum_get(op->ptr, op->type->prop), &identifier)) {
+		return OPERATOR_CANCELLED;
+	}
+	mm_attr_set(cache->selected, MM_ATTR_LINK, identifier);
+	mindmap_cache_commit(cache);
+	return mindmap_finish(C, "Link Idea");
+}
+
+static void MINDMAP_OT_set_link(wmOperatorType *ot)
+{
+	PropertyRNA *prop;
+
+	ot->name = "Link Idea";
+	ot->idname = "MINDMAP_OT_set_link";
+	ot->description = "Link the selected idea to an object, scene or text";
+	ot->invoke = WM_enum_search_invoke;
+	ot->exec = mindmap_set_link_exec;
+	ot->poll = mindmap_edit_poll;
+	prop = RNA_def_enum(ot->srna, "target", DummyRNA_NULL_items, 0, "Target", "");
+	RNA_def_enum_funcs(prop, mindmap_link_itemf);
+	RNA_def_property_flag(prop, PROP_ENUM_NO_TRANSLATE);
+	ot->prop = prop;
+}
+
+static int mindmap_clear_link_exec(bContext *C, wmOperator *UNUSED(op))
+{
+	MindMapCache *cache = mindmap_edit_cache(C);
+
+	mm_attr_remove(cache->selected, MM_ATTR_LINK);
+	mindmap_cache_commit(cache);
+	return mindmap_finish(C, "Clear Idea Link");
+}
+
+static void MINDMAP_OT_clear_link(wmOperatorType *ot)
+{
+	ot->name = "Clear Link";
+	ot->idname = "MINDMAP_OT_clear_link";
+	ot->description = "Remove the link of the selected idea";
+	ot->exec = mindmap_clear_link_exec;
+	ot->poll = mindmap_edit_poll;
+}
+
+static int mindmap_open_link_exec(bContext *C, wmOperator *op)
+{
+	const MindMapCache *cache = mindmap_edit_cache(C);
+	char *link = mm_attr_get(cache->selected, MM_ATTR_LINK);
+	const bool opened = link && mindmap_open_link(C, op->reports, link);
+
+	mm_str_free(link);
+	return opened ? OPERATOR_FINISHED : OPERATOR_CANCELLED;
+}
+
+static void MINDMAP_OT_open_link(wmOperatorType *ot)
+{
+	ot->name = "Open Link";
+	ot->idname = "MINDMAP_OT_open_link";
+	ot->description = "Open the object, scene or text linked to the selected idea";
+	ot->exec = mindmap_open_link_exec;
+	ot->poll = mindmap_edit_poll;
+}
+
 static int mindmap_context_menu_invoke(bContext *C, wmOperator *UNUSED(op), const wmEvent *event)
 {
 	ARegion *ar = CTX_wm_region(C);
@@ -1253,7 +1537,12 @@ static int mindmap_context_menu_invoke(bContext *C, wmOperator *UNUSED(op), cons
 	uiItemMenuEnumO(layout, C, "MINDMAP_OT_set_icon", "icon", "Icon", ICON_NONE);
 	uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_REGION_WIN);
 	uiItemO(layout, "Note...", ICON_NONE, "MINDMAP_OT_edit_note");
+	uiItemO(layout, "Engine Icon...", ICON_NONE, "MINDMAP_OT_set_engine_icon");
+	uiItemO(layout, "Link...", ICON_NONE, "MINDMAP_OT_set_link");
 	uiLayoutSetOperatorContext(layout, WM_OP_EXEC_REGION_WIN);
+	uiItemO(layout, "Open Link", ICON_NONE, "MINDMAP_OT_open_link");
+	uiItemO(layout, "Clear Link", ICON_NONE, "MINDMAP_OT_clear_link");
+	uiItemO(layout, "Task", ICON_NONE, "MINDMAP_OT_cycle_task");
 	uiItemS(layout);
 	uiItemO(layout, "Fold or Unfold", ICON_NONE, "MINDMAP_OT_toggle_fold");
 	uiItemO(layout, "Delete", ICON_NONE, "MINDMAP_OT_delete");
@@ -1396,6 +1685,11 @@ static void mindmap_operatortypes(void)
 	WM_operatortype_append(MINDMAP_OT_set_icon);
 	WM_operatortype_append(MINDMAP_OT_edit_note);
 	WM_operatortype_append(MINDMAP_OT_context_menu);
+	WM_operatortype_append(MINDMAP_OT_cycle_task);
+	WM_operatortype_append(MINDMAP_OT_set_engine_icon);
+	WM_operatortype_append(MINDMAP_OT_set_link);
+	WM_operatortype_append(MINDMAP_OT_clear_link);
+	WM_operatortype_append(MINDMAP_OT_open_link);
 }
 
 static void mindmap_keymap(wmKeyConfig *keyconf)
@@ -1408,6 +1702,10 @@ static void mindmap_keymap(wmKeyConfig *keyconf)
 	WM_keymap_add_item(keymap, "MINDMAP_OT_click", LEFTMOUSE, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_context_menu", RIGHTMOUSE, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_edit_note", NKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_cycle_task", TKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_set_engine_icon", IKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_set_link", LKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "MINDMAP_OT_open_link", OKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_add_child", INSERTKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_add_sibling", RETKEY, KM_PRESS, 0, 0);
 	WM_keymap_add_item(keymap, "MINDMAP_OT_add_sibling", PADENTER, KM_PRESS, 0, 0);
