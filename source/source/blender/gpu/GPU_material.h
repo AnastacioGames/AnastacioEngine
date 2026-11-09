@@ -523,6 +523,7 @@ void GPU_lamp_update_distance(GPULamp *lamp, float distance, float att1, float a
                               float coeff_const, float coeff_lin, float coeff_quad);
 void GPU_lamp_update_spot(GPULamp *lamp, float spotsize, float spotblend);
 void GPU_lamp_update_sphere(GPULamp *lamp, int mode);
+void GPU_lamp_update_shadow_values(GPULamp *lamp);
 void GPU_lamp_update_area_gamma(GPULamp *lamp, float k);
 int GPU_lamp_shadow_layer(GPULamp *lamp);
 GPUNodeLink *GPU_lamp_get_data(

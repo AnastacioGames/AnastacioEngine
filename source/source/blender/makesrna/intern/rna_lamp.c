@@ -593,13 +593,13 @@ static void rna_def_lamp_falloff(StructRNA *srna)
 	RNA_def_property_range(prop, 0.001, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0.001, 1000, 1, 3);
 	RNA_def_property_ui_text(prop, "Radius", "The ligth's radius");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "cutoff_threshold", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "cutoff");
 	RNA_def_property_range(prop, 0.000f, 0.999f);
 	RNA_def_property_ui_text(prop, "Cutoff", "Cutoff Threshold");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 }
 
 static void rna_def_lamp_shadow(StructRNA *srna, int spot, int area)
@@ -737,19 +737,19 @@ static void rna_def_lamp_shadow(StructRNA *srna, int spot, int area)
 	RNA_def_property_float_sdna(prop, NULL, "bias");
 	RNA_def_property_range(prop, 0.001f, 5.0f);
 	RNA_def_property_ui_text(prop, "Shadow Buffer Bias", "Shadow buffer sampling bias");
-	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "shadow_buffer_slope_bias", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "slopebias");
 	RNA_def_property_range(prop, 0.0f, 5.0f);
 	RNA_def_property_ui_text(prop, "Shadow Buffer Slope Bias", "Shadow buffer sampling slope bias");
-	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "shadow_buffer_bleed_bias", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "bleedbias");
 	RNA_def_property_range(prop, 0.f, 1.f);
 	RNA_def_property_ui_text(prop, "Shadow Buffer Bleed Bias", "Bias for reducing light-bleed on variance shadow maps");
-	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "shadow_buffer_soft", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "soft");
@@ -808,7 +808,7 @@ static void rna_def_lamp_shadow(StructRNA *srna, int spot, int area)
 	RNA_def_property_float_sdna(prop, NULL, "shdwr");
 	RNA_def_property_array(prop, 3);
 	RNA_def_property_ui_text(prop, "Shadow Color", "Color of shadows cast by the lamp");
-	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "use_only_shadow", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_ONLYSHADOW);
@@ -921,7 +921,7 @@ static void rna_def_area_lamp(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.0f, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0, 100, 0.1, 3);
 	RNA_def_property_ui_text(prop, "Size", "Size of the area of the area Lamp, X direction size for Rectangle shapes");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "size_y", PROP_FLOAT, PROP_DISTANCE);
 	RNA_def_property_range(prop, 0.0f, FLT_MAX);
@@ -929,7 +929,7 @@ static void rna_def_area_lamp(BlenderRNA *brna)
 	RNA_def_property_ui_range(prop, 0, 100, 0.1, 3);
 	RNA_def_property_ui_text(prop, "Size Y",
 	                         "Size of the area of the area Lamp in the Y direction for Rectangle shapes");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "gamma", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "k");
@@ -983,7 +983,7 @@ static void rna_def_spot_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "spotsize");
 	RNA_def_property_range(prop, DEG2RADF(1.0f), DEG2RADF(180.0f));
 	RNA_def_property_ui_text(prop, "Spot Size", "Angle of the spotlight beam");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "show_cone", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_SHOW_CONE);
@@ -1077,7 +1077,7 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "csm_bias[0]");
 	RNA_def_property_range(prop, 0.001f, 5.0f);
 	RNA_def_property_ui_text(prop, "CSM Bias Medium", "Sampling bias for the Middle cascade");
-	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "shadow_csm_three_buffer_size", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "csm_bufsize[1]");
@@ -1095,7 +1095,7 @@ static void rna_def_sun_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "csm_bias[1]");
 	RNA_def_property_range(prop, 0.001f, 5.0f);
 	RNA_def_property_ui_text(prop, "CSM Bias Low", "Sampling bias for the Low/far cascade");
-	RNA_def_property_update(prop, 0, "rna_Lamp_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	/* sky */
 	prop = RNA_def_property(srna, "sky", PROP_POINTER, PROP_NONE);
@@ -1141,7 +1141,7 @@ static void rna_def_hemi_lamp(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "cutoff");
 	RNA_def_property_range(prop, 0.0f, 0.999f);
 	RNA_def_property_ui_text(prop, "Cutoff", "Hemi cutoff threshold");
-	RNA_def_property_update(prop, 0, "rna_Lamp_draw_update");
+	RNA_def_property_update(prop, 0, "rna_Lamp_redraw_update");
 
 	prop = RNA_def_property(srna, "use_sphere", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "mode", LA_SPHERE);

@@ -133,14 +133,16 @@ static void gpu_render_lamp_update(Scene *scene, View3D *v3d,
 	lamp = GPU_lamp_from_blender(scene, ob, par);
 
 	if (lamp) {
+		/* Before GPU_lamp_update: the shadow projection reads the spot size. */
+		GPU_lamp_update_spot(lamp, la->spotsize, la->spotblend);
 		GPU_lamp_update(lamp, lay, (ob->restrictflag & OB_RESTRICT_RENDER), obmat);
 		GPU_lamp_update_colors(lamp, la->r, la->g, la->b, la->energy);
 		/* Live values: editing them only redraws (rna_Lamp_value_update), no GLSL rebuild. */
 		GPU_lamp_update_distance(lamp, la->dist, la->att1, la->att2,
 		                         la->coeff_const, la->coeff_lin, la->coeff_quad);
-		GPU_lamp_update_spot(lamp, la->spotsize, la->spotblend);
 		GPU_lamp_update_sphere(lamp, la->mode);
 		GPU_lamp_update_area_gamma(lamp, la->k);
+		GPU_lamp_update_shadow_values(lamp);
 
 		layers = lay & v3d->lay;
 		if (srl)

@@ -252,14 +252,6 @@ static void rna_World_draw_update(Main *bmain, Scene *UNUSED(scene), PointerRNA 
 {
 	World *wo = ptr->id.data;
 
-	/* Materials with Constant World/Mist get these values written into their GLSL: rebuild. */
-	for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
-		if (ma->constflag & (MA_CONSTANT_WORLD | MA_CONSTANT_MIST)) {
-			DAG_id_tag_update(&wo->id, 0);
-			break;
-		}
-	}
-
 	BKE_icon_changed(BKE_icon_id_ensure(&wo->id));
 	WM_main_add_notifier(NC_WORLD | ND_WORLD_DRAW, wo);
 	WM_main_add_notifier(NC_OBJECT | ND_DRAW, NULL);
@@ -301,6 +293,24 @@ static void rna_World_exposure_update(Main *bmain, Scene *scene, PointerRNA *ptr
 	World *wo = ptr->id.data;
 
 	if (wo->exp == 0.0f || wo->range == 1.0f)
+		rna_World_shader_draw_update(bmain, scene, ptr);
+	else
+		rna_World_draw_update(bmain, scene, ptr);
+}
+
+/* Energy is a live uniform; materials skip the environment light while it is 0. */
+static void rna_World_env_energy_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	World *wo = ptr->id.data;
+	/* The previous value tells when the slider leaves 0, too; a first edit rebuilds once. */
+	static const World *last_world = NULL;
+	static float last_energy = 0.0f;
+	const bool rebuild = wo != last_world || wo->ao_env_energy == 0.0f || last_energy == 0.0f;
+
+	last_world = wo;
+	last_energy = wo->ao_env_energy;
+
+	if (rebuild)
 		rna_World_shader_draw_update(bmain, scene, ptr);
 	else
 		rna_World_draw_update(bmain, scene, ptr);
@@ -510,7 +520,7 @@ static void rna_def_lighting(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "ao_env_energy");
 	RNA_def_property_ui_range(prop, 0, FLT_MAX, 1, 3);
 	RNA_def_property_ui_text(prop, "Environment Color", "Defines the strength of environment light");
-	RNA_def_property_update(prop, 0, "rna_World_shader_draw_update");
+	RNA_def_property_update(prop, 0, "rna_World_env_energy_update");
 
 	prop = RNA_def_property(srna, "environment_color", PROP_ENUM, PROP_NONE);
 	RNA_def_property_enum_sdna(prop, NULL, "aocolor");

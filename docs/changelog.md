@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-09 — Editor: valores de lâmpada, sombra e mundo sem recompilar shaders
+
+- Materiais vêm com Constant Lamp/World/Mist ligados, então os ajustes ainda recompilavam tudo. No editor esses valores agora são sempre uniforms; no jogo continuam fixos (`GPU_material_lamp_values_live_set`, desligado pelo `LA_Launcher`).
+- Só redesenham: Distance, atenuações, Sphere, Color, Energy, Gamma/Size da Area, Hemi Cutoff, Cutoff Threshold, Radius, Spot Size, Shadow Color, Bias, Slope/Bleed Bias e valores do mundo/névoa.
+- Continuam recompilando: Soft da sombra, Clip, tamanho do buffer, Frustum Size, tipo/forma/método/filtros, Environment Color e Environment Energy ao entrar/sair de 0.
+- Aceite: Distance e Sphere na Hemi e Distance/Gamma na Area confirmados pelo usuário com janela.
+
 ## 2026-11-08 - Testes da engine no Linux; Save As Runtime leva lib/
 
 - `tools/testes_engine` roda no Linux: usa o pacote mais novo de `build-linux/dist` (extraído em `artifacts/testes/pacote`) e abre na tela real com GPU; `ANASTACIO_TELA_VIRTUAL=1` usa Xvfb/Xephyr (llvmpipe, ~13 FPS: física e animação por frame falham).
