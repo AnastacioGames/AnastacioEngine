@@ -23,6 +23,8 @@ luz indireta por volumes de sondas, texturas KTX2 e FSR 1, além de muitas corre
 - **Rec Play:** grave o que acontece jogando em Takes, com camadas, regravação, janela Rec Studio e botão Movie.
   Os Takes podem entrar numa Cutscene.
 - **Personagem automático:** do Fuse ao personagem riggado, sem Mixamo, por File > Import > Fuse Character.
+- **Posturas do Character:** abaixar, rastejar e encolher no pulo, com velocidade por postura, auto crouch e
+  configuração na aba de física e na Logic Tree.
 - **Track Tool:** gerador de pistas com faixas, inclinação, cenário e terreno.
 - **Minimap na UI Tree:** Add, Bake, mapa inteiro, marcador e Show on Minimap com cor por objeto.
 
@@ -50,15 +52,55 @@ luz indireta por volumes de sondas, texturas KTX2 e FSR 1, além de muitas corre
 
 ## Correções
 
-- Vários crashes corrigidos, achados por varredura automática de operadores: redo depois de passo em Edit Mode,
-  `G` no Node Editor quando a área muda, criação de links com prévia rodando e `joint_rotation`, entre outros.
-- Normal maps não ficam mais pretas no Adreno, e o Static Batch funciona na Web sem `glMultiDrawElements`.
-- Export standalone leva módulos de runtime, arquivos do projeto e `.cooked` com os assets; o Export Web leva os
-  `.range` usados por LibLoad, as falas de cutscene e as vozes de Take.
-- Runtime: `end()` + `addScene` no mesmo frame, mensagens de erro do LibLoad e fonte padrão no player.
-- Arquivos antigos recebem os valores certos de sombra em cascata, Light LOD e resolução dinâmica.
+### Crashes
+
+- Redo depois de um passo em Edit Mode.
+- `G` no Node Editor quando a área muda no meio da operação.
+- Criação de links de nós com a prévia rodando.
+- `joint_rotation` em animação.
+- Vários outros, achados por varredura automática de operadores.
+
+### Colisão do Character
+
+- A cápsula acompanha a malha, inclusive em personagens fora do centro e com escala.
+- Mudança de escala em tempo de jogo enquanto abaixado.
+- Pares de colisão são limpos quando a forma muda.
+
+### Editor e nós
+
 - Mudar cores e valores do céu não trava mais a 3D View.
-- Teclas sem mapeamento (como Print Screen) não disparam mais controles vazios.
+- UI Tree com fake user ao salvar, e diálogos reabrem com a mesma fala.
+- Logic Tree: valores iniciais em Add to Property e Wait; Go To State lista só Frames de Estado.
+- Collada exporta textura DDS/KTX2 empacotada como PNG.
+- Correções em Dope Sheet, `curve.draw`, UV Follow Active Quads e painéis.
+
+### Jogo e Python
+
+- `end()` + `addScene` no mesmo frame.
+- Mensagens de erro mais claras no LibLoad e no VideoTexture.
+- `KX_MeshBuilder` não perde vértices.
+- `setActionFrame` com speed 0.
+- Fonte padrão registrada no player.
+- Teclas sem mapeamento (como Print Screen) não disparam controles vazios.
+
+### Gráficos
+
+- Normal maps não ficam mais pretas no Adreno.
+- Static Batch não perde mais o sol e as sombras.
+- Geometry Instancing fica fora do Static Batch.
+- Nuvens sem quadriculado na viewport.
+- Interpolação do Fixed Timestep sem erro de culling.
+
+### Export e Web
+
+- Export standalone leva módulos de runtime, arquivos do projeto e `.cooked` com os assets.
+- Export Web leva os `.range` usados por LibLoad, as falas de cutscene e as vozes de Take.
+- Static Batch na Web sem `glMultiDrawElements`.
+- A Web não prende mais a CPU para limitar o FPS.
+
+### Arquivos antigos
+
+- Valores certos de sombra em cascata, Light LOD e resolução dinâmica.
 
 ## Downloads
 
