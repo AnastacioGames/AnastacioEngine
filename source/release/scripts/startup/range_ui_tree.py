@@ -183,8 +183,8 @@ class UIButtonNode(UIWidgetNode, Node):
 
     def style(self):
         image = self.image()
-        if image:
-            # Com imagem as cores de estado viram tinta, e a animação é a mesma.
+        if image and image.filepath:
+            # Com imagem (só a de arquivo: o jogo lê do disco) as cores de estado viram tinta, e a animação é a mesma.
             return self.base_style(image.filepath, self.image_tint, self.image_hover_tint,
                                    self.image_press_tint, (0.45, 0.45, 0.45, 0.7))
         return self.base_style("", self.color, self.hover_color, self.press_color, self.disabled_color)

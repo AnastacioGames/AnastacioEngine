@@ -518,7 +518,9 @@ static void node_update_hidden(bNode *node)
 
 	/* UI Tree widget (bl_width_min = 20): the preview fills the node's width,
 	 * so the handle sits beside it instead of covering it. */
-	if (node->typeinfo && STREQLEN(node->typeinfo->idname, "RangeUI", 7) && node->typeinfo->minwidth <= 20.0f) {
+	const bool ui_widget = node->typeinfo && STREQLEN(node->typeinfo->idname, "RangeUI", 7) &&
+	                       node->typeinfo->minwidth <= 20.0f;
+	if (ui_widget) {
 		locx += node->width * UI_DPI_FAC;
 	}
 
@@ -548,6 +550,20 @@ static void node_update_hidden(bNode *node)
 			nsock->locx = node->totr.xmax - hiddenrad + sinf(rad) * hiddenrad;
 			nsock->locy = node->totr.ymin + hiddenrad + cosf(rad) * hiddenrad;
 			rad += drad;
+		}
+	}
+
+	/* UI Tree widget: events in a row to the right, farther apart than the click
+	 * area (node_find_indicated_socket), so a click never takes the neighbor. */
+	if (ui_widget) {
+		const float step = 2.6f * (NODE_SOCKSIZE + 4);
+		float x = node->totr.xmax + NODE_SOCKSIZE + 4;
+		for (nsock = node->outputs.first; nsock; nsock = nsock->next) {
+			if (!nodeSocketIsHidden(nsock)) {
+				nsock->locx = x;
+				nsock->locy = BLI_rctf_cent_y(&node->totr);
+				x += step;
+			}
 		}
 	}
 

@@ -1043,3 +1043,11 @@ endif()
 if(WITH_DOCS OR WITH_BINDING_DOCS)
 	install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/doc/ DESTINATION ${DOCUMENTATION_INSTALL_PATH})
 endif()
+
+# Anastacio: teste do detector de notas (sinais sinteticos, sem microfone).
+if(NOT EMSCRIPTEN AND NOT CMAKE_CROSSCOMPILING)
+	add_executable(aud_pitch_tests ${CMAKE_CURRENT_SOURCE_DIR}/../../../tests/pitch/test_pitch_detector.cpp
+	               ${CMAKE_CURRENT_SOURCE_DIR}/src/util/PitchDetector.cpp)
+	target_include_directories(aud_pitch_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+	add_test(NAME pitch_detector COMMAND aud_pitch_tests)
+endif()

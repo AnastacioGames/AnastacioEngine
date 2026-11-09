@@ -827,10 +827,19 @@ static bNode *visible_node(SpaceNode *snode, const rctf *rct)
 	bNode *node;
 
 	for (node = snode->edittree->nodes.last; node; node = node->prev) {
-		if (BLI_rctf_isect(&node->totr, rct, NULL))
+		/* A frame is drawn behind the sockets, it never hides them. */
+		if (node->type != NODE_FRAME && BLI_rctf_isect(&node->totr, rct, NULL))
 			break;
 	}
 	return node;
+}
+
+/* The socket of node at rct can be clicked: no other node is drawn over it
+ * (UI Tree widgets keep their sockets outside the node body). */
+static bool socket_visible(SpaceNode *snode, bNode *node, const rctf *rct)
+{
+	bNode *top = visible_node(snode, rct);
+	return top == NULL || top == node;
 }
 
 /* ********************** size widget operator ******************** */
@@ -1096,7 +1105,7 @@ int node_find_indicated_socket(SpaceNode *snode, bNode **nodep, bNodeSocket **so
 			for (sock = node->inputs.first; sock; sock = sock->next) {
 				if (!nodeSocketIsHidden(sock)) {
 					if (BLI_rctf_isect_pt(&rect, sock->locx, sock->locy)) {
-						if (node == visible_node(snode, &rect)) {
+						if (socket_visible(snode, node, &rect)) {
 							*nodep = node;
 							*sockp = sock;
 							return 1;
@@ -1109,7 +1118,7 @@ int node_find_indicated_socket(SpaceNode *snode, bNode **nodep, bNodeSocket **so
 			for (sock = node->outputs.first; sock; sock = sock->next) {
 				if (!nodeSocketIsHidden(sock)) {
 					if (BLI_rctf_isect_pt(&rect, sock->locx, sock->locy)) {
-						if (node == visible_node(snode, &rect)) {
+						if (socket_visible(snode, node, &rect)) {
 							*nodep = node;
 							*sockp = sock;
 							return 1;
