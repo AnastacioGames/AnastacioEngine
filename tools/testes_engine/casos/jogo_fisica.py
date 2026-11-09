@@ -5,6 +5,8 @@ cube = bpy.data.objects['Cube']
 cube.delta_location = (0, 0, 0)  # o Cube de fábrica vem com delta z=1
 cube.location = (0, 0, 6)
 cube.game.physics_type = 'RIGID_BODY'
+if 'Plane' in bpy.data.objects:  # a cena padrão do Windows já tem um plano no mesmo lugar
+    bpy.data.objects.remove(bpy.data.objects['Plane'], do_unlink=True)
 antes = set(bpy.data.objects)
 bpy.ops.mesh.primitive_plane_add(radius=30, location=(0, 0, 0))
 chao = (set(bpy.data.objects) - antes).pop()  # em background o context.object não acompanha o operador

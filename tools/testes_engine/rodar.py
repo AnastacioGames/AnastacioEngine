@@ -94,6 +94,7 @@ def carregar(arquivo):
 
 
 def main():
+    sys.stdout.reconfigure(errors='replace')  # nomes de microfone podem fugir da codificação do console
     filtro = sys.argv[1] if len(sys.argv) > 1 else ''
     # a exportação vai por último: depois dela os jogos seguintes abriram até 20x mais devagar
     arquivos = sorted((a for a in CASOS.glob('*.py') if not a.name.startswith('_') and filtro in a.stem),
