@@ -896,6 +896,9 @@ void ED_area_tag_redraw_regiontype(struct ScrArea *sa, int regiontype) RET_NONE
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_render_engine_changed) */
 void ED_render_engine_changed(struct Main *bmain) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* redesenho de material no editor (rna_material/rna_texture) */
+void ED_render_material_draw_changed(struct Main *bmain, struct Material *ma) RET_NONE
+#endif
 
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_file_read_bookmarks) */
 void ED_file_read_bookmarks(void) RET_NONE
