@@ -36,6 +36,28 @@ Texto da página do GitHub: [release-notes-0.7.0.md](release-notes-0.7.0.md).
 
 Pendências antes de publicar: splash novo, aceite do microfone físico no pacote final.
 
+### Linux (2026-11-08, notebook Linux, `main` em `f2f5dabf`, sem mudança de código até `ceb5bea8`)
+
+Pacotes enviados ao rascunho `v0.7.0` com `SHA256SUMS-linux.txt` (o Windows publica):
+
+- `AnastacioEngine-0.7.0-linux-x86_64.tar.xz` (272 MB) sha256 `ee00495842fa1e6787189d8408b4eb4c625bebd9cb0ace5e7b011c685f37f599`
+- `RangeArmor-0.7.0-linux-x86_64.tar.xz` (7,1 MB) sha256 `0c54de8514c95ffa49bae6055845b95d9e40872dab0b2a78275822e95cfe6a7c`
+
+Resultados:
+
+1. Runtime Web (`web-runtime-release-linux`, `PYTHON_WASM_ROOT_DIR=~/web-python-poc/python-wasm-web`):
+   manifesto com 242 módulos, incluído no pacote (`web/runtime/`).
+2. Container (`VERSION=0.7.0`, `WEB_RUNTIME_DIR=/work/build-web-release/bin`): build e pacote OK.
+3. `testar-release.sh 0.7.0`: **23/23 OK** (ldd, arquivos, Python 3.11.9, versão 0.7.0 no binário, os 13
+   `tools/test_*.py`, runtime `--server` 60 frames e `test_material_atlas_modal`).
+4. `tools/testes_engine/rodar.py` no pacote, na tela real (Intel RPL-P): **16/16 OK**, com microfone real
+   (OpenAL) e Test, física, Character, UI Tree e jogo exportado (Save As Runtime agora leva `lib/`).
+5. RangeArmor: painel em `rust:1.95-bullseye` (GLIBC máx. 2.30), launchers do zip Windows 0.6.1 (`3cb1ade9…`).
+   Export **Universal com Compile Scripts** (`.rasec` gerado pela engine): `data/` só com `.rasec`, `.cooked`
+   e `.pyc`; `test_universal_linux.py --run` 7/7 OK e o jogo rodou o `.pyc` (`MARKER_PYC frames=60`).
+   Lado Windows do Universal foi um `.exe` falso.
+6. Com janela: editor do pacote abre com o splash da oficina e o About certos (conferido pelo usuário).
+
 ## 0.6.1
 
 Estado: **publicada completa em 2026-10-28** (tag `v0.6.1`). Pacotes Linux montados e
