@@ -553,20 +553,6 @@ static void node_update_hidden(bNode *node)
 		}
 	}
 
-	/* UI Tree widget: events in a row to the right, farther apart than the click
-	 * area (node_find_indicated_socket), so a click never takes the neighbor. */
-	if (ui_widget) {
-		const float step = 2.6f * (NODE_SOCKSIZE + 4);
-		float x = node->totr.xmax + NODE_SOCKSIZE + 4;
-		for (nsock = node->outputs.first; nsock; nsock = nsock->next) {
-			if (!nodeSocketIsHidden(nsock)) {
-				nsock->locx = x;
-				nsock->locy = BLI_rctf_cent_y(&node->totr);
-				x += step;
-			}
-		}
-	}
-
 	/* input sockets */
 	rad = drad = -(float)M_PI / (1.0f + (float)totin);
 
