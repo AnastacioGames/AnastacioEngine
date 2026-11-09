@@ -280,12 +280,43 @@ static int nodes_use_material(bNodeTree *ntree, Material *ma)
 	return 0;
 }
 
-static void material_changed(Main *bmain, Material *ma)
+/* Objects drawn with Texture display keep material data in their buffers. */
+void ED_render_material_draw_changed(Main *bmain, Material *ma)
 {
-	Material *parent;
 	Object *ob;
 	Scene *scene;
 	int texture_draw = false;
+
+	/* find if we have a scene with textured display */
+	for (scene = bmain->scene.first; scene; scene = scene->id.next) {
+		if (scene->customdata_mask & CD_MASK_MTFACE) {
+			texture_draw = true;
+			break;
+		}
+	}
+
+	/* find textured objects */
+	if (texture_draw) {
+		for (ob = bmain->object.first; ob; ob = ob->id.next) {
+			DerivedMesh *dm = ob->derivedFinal;
+			Material ***material = give_matarar(ob);
+			short a, *totmaterial = give_totcolp(ob);
+
+			if (dm && totmaterial && material) {
+				for (a = 0; a < *totmaterial; a++) {
+					if ((*material)[a] == ma) {
+						GPU_drawobject_free(dm);
+						break;
+					}
+				}
+			}
+		}
+	}
+}
+
+static void material_changed(Main *bmain, Material *ma)
+{
+	Material *parent;
 
 	/* icons */
 	BKE_icon_changed(BKE_icon_id_ensure(&ma->id));
@@ -317,32 +348,7 @@ static void material_changed(Main *bmain, Material *ma)
 			GPU_material_free(&parent->gpumaterialskinning);
 	}
 
-	/* find if we have a scene with textured display */
-	for (scene = bmain->scene.first; scene; scene = scene->id.next) {
-		if (scene->customdata_mask & CD_MASK_MTFACE) {
-			texture_draw = true;
-			break;
-		}
-	}
-
-	/* find textured objects */
-	if (texture_draw) {
-		for (ob = bmain->object.first; ob; ob = ob->id.next) {
-			DerivedMesh *dm = ob->derivedFinal;
-			Material ***material = give_matarar(ob);
-			short a, *totmaterial = give_totcolp(ob);
-
-			if (dm && totmaterial && material) {
-				for (a = 0; a < *totmaterial; a++) {
-					if ((*material)[a] == ma) {
-						GPU_drawobject_free(dm);
-						break;
-					}
-				}
-			}
-		}
-	}
-
+	ED_render_material_draw_changed(bmain, ma);
 }
 
 static void lamp_changed(Main *bmain, Lamp *la)

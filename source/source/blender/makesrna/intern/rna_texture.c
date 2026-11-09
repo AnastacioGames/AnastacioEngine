@@ -114,6 +114,7 @@ static const EnumPropertyItem blend_type_items[] = {
 #include "BKE_main.h"
 
 #include "ED_node.h"
+#include "BKE_icons.h"
 #include "ED_render.h"
 
 static StructRNA *rna_Texture_refine(struct PointerRNA *ptr)
@@ -218,6 +219,20 @@ static void rna_Texture_type_set(PointerRNA *ptr, int value)
 	Tex *tex = (Tex *)ptr->data;
 
 	BKE_texture_type_set(tex, value);
+}
+
+/* Offset/Size/Rotation of a material slot are live uniforms of the editor shaders. */
+static void rna_TextureSlot_value_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	ID *id = ptr->id.data;
+
+	if (GS(id->name) == ID_MA) {
+		BKE_icon_changed(BKE_icon_id_ensure(id));
+		ED_render_material_draw_changed(bmain, (Material *)id);
+		WM_main_add_notifier(NC_MATERIAL | ND_SHADING_DRAW, id);
+		return;
+	}
+	rna_TextureSlot_update(bmain, scene, ptr);
 }
 
 void rna_TextureSlot_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *ptr)
@@ -661,19 +676,19 @@ static void rna_def_mtex(BlenderRNA *brna)
 	RNA_def_property_float_sdna(prop, NULL, "ofs");
 	RNA_def_property_ui_range(prop, -10, 10, 10, RNA_TRANSLATION_PREC_DEFAULT);
 	RNA_def_property_ui_text(prop, "Offset", "Fine tune of the texture mapping X, Y and Z locations");
-	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
+	RNA_def_property_update(prop, 0, "rna_TextureSlot_value_update");
 
 	prop = RNA_def_property(srna, "scale", PROP_FLOAT, PROP_XYZ);
 	RNA_def_property_float_sdna(prop, NULL, "size");
 	RNA_def_property_flag(prop, PROP_PROPORTIONAL);
 	RNA_def_property_ui_range(prop, -100, 100, 10, 2);
 	RNA_def_property_ui_text(prop, "Size", "Set scaling for the texture's X, Y and Z sizes");
-	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
+	RNA_def_property_update(prop, 0, "rna_TextureSlot_value_update");
 
 	prop = RNA_def_property(srna, "rotation", PROP_FLOAT, PROP_EULER);
 	RNA_def_property_float_sdna(prop, NULL, "rot");
 	RNA_def_property_ui_text(prop, "Rotation", "Set rotation for the texture");
-	RNA_def_property_update(prop, 0, "rna_TextureSlot_update");
+	RNA_def_property_update(prop, 0, "rna_TextureSlot_value_update");
 
 	prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "r");

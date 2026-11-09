@@ -29,6 +29,7 @@
 struct GPUMaterial {
 	Scene *scene;
 	Material *ma;
+	bool values_live; /* built for the editor: the game must not reuse it */
 
 	/* material for mesh surface, worlds or something else.
 	 * some code generation is done differently depending on the use case */

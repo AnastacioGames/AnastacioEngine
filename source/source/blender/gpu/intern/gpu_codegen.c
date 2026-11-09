@@ -3214,16 +3214,16 @@ GPUNodeLink *GPU_select_uniform(float *num, GPUDynamicType dynamictype, void *da
 {
 	bool dynamic = false;
 	if (GPU_DYNAMIC_GROUP_FROM_TYPE(dynamictype) == GPU_DYNAMIC_GROUP_MAT) {
-		dynamic = !(material->constflag & MA_CONSTANT_MATERIAL);
+		dynamic = shader_lamp_values_live || !(material->constflag & MA_CONSTANT_MATERIAL);
 	}
 	else if (GPU_DYNAMIC_GROUP_FROM_TYPE(dynamictype) == GPU_DYNAMIC_GROUP_LAMP) {
 		dynamic = shader_lamp_values_live || !(material->constflag & MA_CONSTANT_LAMP);
 	}
 	else if (GPU_DYNAMIC_GROUP_FROM_TYPE(dynamictype) == GPU_DYNAMIC_GROUP_TEX) {
-		dynamic = !(material->constflag & MA_CONSTANT_TEXTURE);
+		dynamic = shader_lamp_values_live || !(material->constflag & MA_CONSTANT_TEXTURE);
 	}
 	else if (GPU_DYNAMIC_GROUP_FROM_TYPE(dynamictype) == GPU_DYNAMIC_GROUP_TEX_UV) {
-		dynamic = !(material->constflag & MA_CONSTANT_TEXTURE_UV);
+		dynamic = shader_lamp_values_live || !(material->constflag & MA_CONSTANT_TEXTURE_UV);
 	}
 	else if (GPU_DYNAMIC_GROUP_FROM_TYPE(dynamictype) == GPU_DYNAMIC_GROUP_WORLD) {
 		dynamic = shader_lamp_values_live || !(material->constflag & MA_CONSTANT_WORLD);

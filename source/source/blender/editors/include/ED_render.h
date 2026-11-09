@@ -28,6 +28,7 @@
 
 struct ID;
 struct MTex;
+struct Material;
 struct Main;
 struct Render;
 struct Scene;
@@ -42,6 +43,7 @@ void ED_operatortypes_render(void);
 /* render_shading.c */
 
 void ED_render_id_flush_update(struct Main *bmain, struct ID *id);
+void ED_render_material_draw_changed(struct Main *bmain, struct Material *ma);
 void ED_render_engine_changed(struct Main *bmain);
 void ED_render_engine_area_exit(struct Main *bmain, struct ScrArea *sa);
 void ED_render_scene_update(struct Main *bmain, struct Scene *scene, int updated);

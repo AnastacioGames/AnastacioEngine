@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-09 — Editor: valores de material e slots de textura sem recompilar shaders
+
+- No editor, Diffuse, Specular, Alpha, Emit, Hardness, Ambient, Translucency, Mirror e os fatores/Offset/Size/Rotation dos slots só redesenham; os ramos que pulavam código por valor padrão ficam ligados nos shaders do editor.
+- Shaders do editor (`values_live`) não são reutilizados pelo jogo: o Play no editor volta a compilar shaders dobrados, como o player.
+- Continuam recompilando: Normal Factor, Ambient/Translucency Factor, parâmetros de textura procedural e demais campos que mudam código.
+- Medição: `tools/debug/cenas/medir_valores_vivos.py` (~3 ms por ajuste). Aguardando aceite visual.
+
 ## 2026-11-09 — Editor: valores de lâmpada, sombra e mundo sem recompilar shaders
 
 - Materiais vêm com Constant Lamp/World/Mist ligados, então os ajustes ainda recompilavam tudo. No editor esses valores agora são sempre uniforms; no jogo continuam fixos (`GPU_material_lamp_values_live_set`, desligado pelo `LA_Launcher`).
