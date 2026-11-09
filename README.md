@@ -31,9 +31,29 @@ as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo
 
 ## Novidades da 0.7.0
 
-Microfone e gravação de voz no jogo, no editor, na Web e no Android, com botão Record na barra superior.
-Também traz Rec Play, Light Probe Volumes, KTX2, FSR 1 e muitas correções. Detalhes nas
-[notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.7.0).
+- **Microfone e gravação de voz:** microfone no jogo, no editor, na Web e no Android. API `Range.audio`, sensor
+  Microphone, atuador Voice, nós When Talking e Voice na Logic Tree e peças de UI (Microphone Meter e Enable Microphone).
+- **Botão Record na barra superior:** um clique grava direto para o Sequencer, e ao lado ficam as opções e o Video
+  Sequencer em janela própria. Também dá para gravar na fala da cutscene, no nó Sound e nos strips de som.
+- **Ajustar Som:** corte, fades, normalizar e efeitos de voz, salvos num WAV novo.
+- **Rec Play:** grave cenas jogando em Takes, com camadas, regravação, janela Rec Studio e botão Movie.
+- **Posturas do Character:** abaixar, rastejar e encolher no pulo, com velocidade por postura, auto crouch e
+  configuração na aba de física e na Logic Tree. A cápsula de colisão agora acompanha a malha.
+- **Track Tool:** gerador de pistas com faixas, inclinação, cenário e terreno.
+- **Minimap na UI Tree:** Add, Bake, mapa inteiro, marcador e Show on Minimap com cor por objeto.
+- **Light Probe Volumes:** luz indireta por grade de sondas numa caixa Empty, ajustada pelo Quality Preset.
+- **Automatic Occluders:** escolhe os occluders ao carregar e liga ou desliga a oclusão sozinho (desligado por padrão).
+- **KTX2 / Basis Universal:** um arquivo de textura que vira BC, ETC2 ou ASTC ao carregar, DDS BC5 para normal maps
+  e upload comprimido de DDS na Web.
+- **FSR 1** como upscale padrão da resolução dinâmica.
+- **Chuva com superfícies molhadas:** escurece e dá brilho enquanto chove, e seca depois.
+- **Game Trace e Trace Doctor:** relatório que explica como corrigir o problema encontrado.
+- **Editor:** Video Sequencer direto no menu de editores, Play no cabeçalho dele, listas longas de nós em duas
+  colunas, textura de fundo no tema e addon Sprytile 0.4.6 incluído.
+- **Correções:** muitos crashes corrigidos por testes automáticos, além de melhorias no export standalone e Web,
+  arquivos antigos, normal maps no Adreno, Static Batch e API Python.
+
+Lista completa nas [notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.7.0).
 
 ## Novidades da 0.6.1
 
