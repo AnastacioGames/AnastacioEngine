@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-09 — Versão 0.7.1 em preparo
+
+- Versão no executável, no About e nos scripts de release; notas em `docs/release-notes-0.7.1.md`.
+
 ## 2026-11-09 — Editor: valores de material e slots de textura sem recompilar shaders
 
 - No editor, Diffuse, Specular, Alpha, Emit, Hardness, Ambient, Translucency, Mirror e os fatores/Offset/Size/Rotation dos slots só redesenham; os ramos que pulavam código por valor padrão ficam ligados nos shaders do editor.

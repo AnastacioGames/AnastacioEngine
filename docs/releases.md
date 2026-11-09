@@ -27,6 +27,11 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
   zip Windows publicado da RangeArmor.
 - Abra janelas do jogo/editor só quando o usuário pedir; o resto valide em background.
 
+## 0.7.1
+
+Estado: **em preparo (2026-11-09)**. Correções da 0.7.0 (Export Web) e ajustes de luz/material no editor sem
+recompilar shaders. Texto da página do GitHub: [release-notes-0.7.1.md](release-notes-0.7.1.md).
+
 ## 0.7.0
 
 Estado: **publicada completa em 2026-11-08** (tag `v0.7.0`), Windows e Linux.
