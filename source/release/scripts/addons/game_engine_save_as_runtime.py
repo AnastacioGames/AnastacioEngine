@@ -207,6 +207,13 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
             src = os.path.join(blender_dir, file)
             dst = os.path.join(runtime_dir, file)
             shutil.copy2(src, dst)
+        # Linux: the player looks for its shared libraries in $ORIGIN/lib (RPATH).
+        if os.name == 'posix' and sys.platform != 'darwin':
+            lib_dir = os.path.join(blender_dir, "lib")
+            if os.path.isdir(lib_dir):
+                shutil.copytree(lib_dir, os.path.join(runtime_dir, "lib"), dirs_exist_ok=True, symlinks=True)
+            for file in [i for i in os.listdir(blender_dir) if i.endswith('.so')]:
+                shutil.copy2(os.path.join(blender_dir, file), os.path.join(runtime_dir, file))
         print("done")
 
     if copy_dlls and os.path.isdir(os.path.join(blender_dir, "blender.crt")):

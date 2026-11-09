@@ -5,8 +5,9 @@ cube = bpy.data.objects['Cube']
 cube.delta_location = (0, 0, 0)  # o Cube de fábrica vem com delta z=1
 cube.location = (0, 0, 6)
 cube.game.physics_type = 'RIGID_BODY'
+antes = set(bpy.data.objects)
 bpy.ops.mesh.primitive_plane_add(radius=30, location=(0, 0, 0))
-chao = bpy.data.objects['Plane']  # em background o context.object não acompanha o operador
+chao = (set(bpy.data.objects) - antes).pop()  # em background o context.object não acompanha o operador
 chao.name = 'Chao'
 chao.game.physics_type = 'STATIC'
 '''

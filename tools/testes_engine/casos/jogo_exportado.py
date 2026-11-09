@@ -1,5 +1,7 @@
 """Save As Runtime gera um pacote que abre sozinho, com Python, DLLs e a cena embutida."""
-import shutil
+import os, shutil
+
+EXT = '.exe' if os.name == 'nt' else ''
 
 CENA = '''
 import bpy.utils, importlib.util, os
@@ -13,8 +15,9 @@ cube.game.physics_type = 'NO_COLLISION'
 bpy.context.scene.game_settings.show_fullscreen = False  # tela cheia não abre no desktop invisível
 pasta = os.path.join(os.path.dirname(saida), 'pacote')
 os.makedirs(pasta)
-player = os.path.join(os.path.dirname(bpy.app.binary_path), 'AnastacioRuntime.exe')
-assert m.WriteRuntime(player, os.path.join(pasta, 'Jogo.exe'), True, True, True, False, True)
+ext = '.exe' if os.name == 'nt' else ''
+player = os.path.join(os.path.dirname(bpy.app.binary_path), 'AnastacioRuntime' + ext)
+assert m.WriteRuntime(player, os.path.join(pasta, 'Jogo' + ext), True, True, True, False, True)
 '''
 
 
@@ -22,9 +25,14 @@ def testar(t):
     t.gerar(CENA, limite=540)  # copiar o Python leva minutos
     pasta = t.pasta / 'pacote'
     t.abertos.append(lambda: shutil.rmtree(pasta, ignore_errors=True))  # roda por último: o pacote é grande
-    for parte in ('Jogo.exe', 'python311.dll', 'blender.crt/blender.crt.manifest', '2.79/python/lib/encodings/__init__.py'):
+    if os.name == 'nt':
+        partes = ('Jogo.exe', 'python311.dll', 'blender.crt/blender.crt.manifest', '2.79/python/lib/encodings/__init__.py')
+    else:
+        partes = ('Jogo', 'lib/libOpenColorIO.so.1')
+        assert list(pasta.glob('2.79/python/lib/**/encodings/__init__.py')), 'faltou a biblioteca Python no pacote'
+    for parte in partes:
         assert (pasta / parte).exists(), 'faltou no pacote: ' + parte
-    j = t.jogo(pasta / 'Jogo.exe', exportado=True, espera=300)  # 1ª abertura de pacote novo é lenta
+    j = t.jogo(pasta / ('Jogo' + EXT), exportado=True, espera=300)  # 1ª abertura de pacote novo é lenta
     j.esperar(frames=5)
     nomes = j.py(codigo="resultado = [o.name for o in cena().objects]")
     assert 'Marcado' in nomes, 'a cena embutida não veio: %s' % nomes

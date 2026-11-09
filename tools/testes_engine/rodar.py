@@ -22,6 +22,7 @@ class Teste:
     """Ferramentas que o caso recebe; fecha o que abriu ao terminar."""
     def __init__(self, nome):
         self.nome = nome
+        controle.PASTA.mkdir(parents=True, exist_ok=True)
         self.pasta = Path(tempfile.mkdtemp(prefix=nome + '_', dir=controle.PASTA))
         self.abertos = []
         self.notas = []

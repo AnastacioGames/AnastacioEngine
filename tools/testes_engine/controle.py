@@ -14,23 +14,58 @@
   python tools/testes_engine/controle.py fechar
 
 Por padrão o editor abre num desktop Windows separado, invisível e com config própria.
+No Linux abre na tela real (com GPU); ANASTACIO_TELA_VIRTUAL=1 usa Xvfb ou Xephyr.
 """
-import argparse, ctypes, json, os, socket, subprocess, sys, tempfile, time
-from ctypes import wintypes
+import argparse, ctypes, json, os, shutil, signal, socket, subprocess, sys, tempfile, time
 from pathlib import Path
+
+WINDOWS = os.name == 'nt'
+if WINDOWS:
+    from ctypes import wintypes
 
 RAIZ = Path(__file__).resolve().parents[2]
 AQUI = Path(__file__).resolve().parent
-EDITOR = RAIZ / 'build/bin/AnastacioEngine.exe'
+if WINDOWS:
+    EDITOR = RAIZ / 'build/bin/AnastacioEngine.exe'
+    RUNTIME = RAIZ / 'build/bin/AnastacioRuntime.exe'
+else:
+    def pacote_linux():
+        """O binário de build-linux-editor/ vem do container e não acha as libs; o pacote traz lib/.
+        Extrai (uma vez) o .tar.xz mais novo de build-linux/dist em artifacts/testes/pacote."""
+        import tarfile
+        pacotes = sorted((RAIZ / 'build-linux/dist').glob('AnastacioEngine-*-linux-x86_64.tar.xz'),
+                         key=lambda a: a.stat().st_mtime)
+        if not pacotes:
+            return RAIZ / 'build-linux-editor/bin'
+        destino = RAIZ / 'artifacts/testes/pacote'
+        nome = pacotes[-1].name[:-len('.tar.xz')]
+        marca = destino / (nome + '.extraido')
+        if not marca.exists() or marca.stat().st_mtime < pacotes[-1].stat().st_mtime:
+            shutil.rmtree(destino, ignore_errors=True)
+            destino.mkdir(parents=True)
+            with tarfile.open(pacotes[-1]) as tar:
+                tar.extractall(destino, filter='tar')
+            marca.touch()
+        return destino / nome
+
+    _BIN = None if 'ANASTACIO_EDITOR' in os.environ else pacote_linux()
+    EDITOR = Path(os.environ.get('ANASTACIO_EDITOR') or _BIN / 'AnastacioEngine')
+    RUNTIME = Path(os.environ.get('ANASTACIO_RUNTIME') or EDITOR.with_name('AnastacioRuntime'))
 PASTA = Path(os.environ.get('ANASTACIO_CONTROLE_PASTA', RAIZ / 'artifacts/testes/controle'))
 SESSAO = PASTA / 'sessao.json'
-RUNTIME = RAIZ / 'build/bin/AnastacioRuntime.exe'
 SESSAO_JOGO = PASTA / 'sessao_jogo.json'
 DESKTOP = 'AnastacioTestes'
 
 
-class STARTUPINFO(ctypes.Structure):
-    _fields_ = [('cb', wintypes.DWORD), ('lpReserved', wintypes.LPWSTR), ('lpDesktop', wintypes.LPWSTR),
+class _Nada:
+    pass
+
+
+Estrutura = ctypes.Structure if WINDOWS else _Nada
+
+
+class STARTUPINFO(Estrutura):
+    _fields_ = [] if not WINDOWS else [('cb', wintypes.DWORD), ('lpReserved', wintypes.LPWSTR), ('lpDesktop', wintypes.LPWSTR),
                 ('lpTitle', wintypes.LPWSTR), ('dwX', wintypes.DWORD), ('dwY', wintypes.DWORD),
                 ('dwXSize', wintypes.DWORD), ('dwYSize', wintypes.DWORD), ('dwXCountChars', wintypes.DWORD),
                 ('dwYCountChars', wintypes.DWORD), ('dwFillAttribute', wintypes.DWORD),
@@ -39,13 +74,50 @@ class STARTUPINFO(ctypes.Structure):
                 ('hStdOutput', wintypes.HANDLE), ('hStdError', wintypes.HANDLE)]
 
 
-class PROCINFO(ctypes.Structure):
-    _fields_ = [('hProcess', wintypes.HANDLE), ('hThread', wintypes.HANDLE),
+class PROCINFO(Estrutura):
+    _fields_ = [] if not WINDOWS else [('hProcess', wintypes.HANDLE), ('hThread', wintypes.HANDLE),
                 ('dwProcessId', wintypes.DWORD), ('dwThreadId', wintypes.DWORD)]
+
+
+TELA_X = {'display': None, 'proc': None}
+
+
+def tela_virtual():
+    """Linux: sobe (uma vez) um servidor X à parte e devolve o DISPLAY dele."""
+    if TELA_X['proc'] and TELA_X['proc'].poll() is None:
+        return TELA_X['display']
+    for n in range(90, 120):
+        if not Path('/tmp/.X11-unix/X%d' % n).exists() and not Path('/tmp/.X%d-lock' % n).exists():
+            break
+    display = ':%d' % n
+    if shutil.which('Xvfb'):
+        args = ['Xvfb', display, '-screen', '0', '1920x1080x24', '-nolisten', 'tcp']
+    elif shutil.which('Xephyr'):
+        args = ['Xephyr', display, '-screen', '1920x1080', '-nolisten', 'tcp', '-no-host-grab']
+    else:
+        raise RuntimeError('instale o Xvfb (sudo apt install xvfb) ou use --visivel')
+    proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+    limite = time.time() + 10
+    while not Path('/tmp/.X11-unix/X%d' % n).exists():
+        if proc.poll() is not None or time.time() > limite:
+            raise RuntimeError('a tela virtual %s não subiu (%s)' % (display, args[0]))
+        time.sleep(0.1)
+    TELA_X.update(display=display, proc=proc)
+    import atexit
+    atexit.register(lambda: proc.poll() is None and proc.terminate())
+    return display
 
 
 def iniciar_invisivel(args, log, env):
     """Inicia no desktop separado, com a saída indo para `log`."""
+    if not WINDOWS:
+        # Linux: abre na tela real (usa a GPU). ANASTACIO_TELA_VIRTUAL=1 usa Xvfb/Xephyr (sem GPU, ~13 FPS).
+        if os.environ.get('ANASTACIO_TELA_VIRTUAL') == '1':
+            env = dict(env, DISPLAY=tela_virtual())
+            env.pop('WAYLAND_DISPLAY', None)
+        proc = subprocess.Popen(args, env=env, cwd=RAIZ, stdout=open(log, 'w'), stderr=subprocess.STDOUT,
+                                start_new_session=True)
+        return proc.pid
     u32 = ctypes.WinDLL('user32', use_last_error=True)
     k32 = ctypes.WinDLL('kernel32', use_last_error=True)
     u32.CreateDesktopW.restype = wintypes.HANDLE
@@ -65,6 +137,18 @@ def iniciar_invisivel(args, log, env):
 
 
 def rodando(pid):
+    if not WINDOWS:
+        try:
+            fim, _ = os.waitpid(pid, os.WNOHANG)  # filho nosso: colhe o zumbi
+            if fim:
+                return False
+        except ChildProcessError:
+            pass
+        try:
+            os.kill(pid, 0)
+            return True
+        except OSError:
+            return False
     saida = subprocess.run(['tasklist', '/FI', 'PID eq %d' % pid, '/NH'], capture_output=True, text=True, errors='replace').stdout
     return str(pid) in saida
 
@@ -76,6 +160,12 @@ def encerrar(pid, espera=0):
         if not rodando(pid):
             return
         time.sleep(0.2)
+    if not WINDOWS:
+        try:
+            os.killpg(pid, signal.SIGKILL)  # o grupo inteiro (start_new_session)
+        except OSError:
+            pass
+        return
     subprocess.run(['taskkill', '/T', '/F', '/PID', str(pid)], capture_output=True)
 
 

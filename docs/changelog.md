@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-08 - Testes da engine no Linux; Save As Runtime leva lib/
+
+- `tools/testes_engine` roda no Linux: usa o pacote mais novo de `build-linux/dist` (extraído em `artifacts/testes/pacote`) e abre na tela real com GPU; `ANASTACIO_TELA_VIRTUAL=1` usa Xvfb/Xephyr (llvmpipe, ~13 FPS: física e animação por frame falham).
+- Save As Runtime no Linux não copiava `lib/` nem `*.so`: o jogo exportado não abria (`libOpenColorIO.so.1`). Agora copia; o player acha por `$ORIGIN/lib`.
+- Caso novo `jogo_microfone_real` (OpenAL com o dispositivo do sistema). `jogo_fisica` pega o plano criado, não o "Plane" da cena padrão do pacote Linux. `rodar.py` cria a pasta de saída.
+- Linux (Intel RPL-P, pacote 0.7.0 com o addon corrigido): 16 de 16 OK. Microfone físico gravou WAV válido; nível 0 (entrada muda ou silêncio).
+
 ## 2026-11-08 - Versão 0.7.0 em preparo
 
 - Versão no executável, no About e nos scripts de release; notas em `docs/release-notes-0.7.0.md`.
