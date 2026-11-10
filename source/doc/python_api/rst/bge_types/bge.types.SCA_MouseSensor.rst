@@ -17,14 +17,20 @@ base class --- :class:`SCA_ISensor`
 
       sensor mode.
 
+      Unlike UPBGE, Range has the thumb buttons and buttons 6 and 7 before the wheel, so wheel up, wheel down and movement are 8, 9 and 10 (4, 5 and 6 in UPBGE). Compare with the bge.logic.KX_MOUSESENSORMODE_* constants instead of numbers. Mouse sensors in .blend files from UPBGE and the original BGE are converted when the file is opened.
+
       :type: integer
 
          * KX_MOUSESENSORMODE_LEFTBUTTON(1)
          * KX_MOUSESENSORMODE_MIDDLEBUTTON(2)
          * KX_MOUSESENSORMODE_RIGHTBUTTON(3)
-         * KX_MOUSESENSORMODE_WHEELUP(4)
-         * KX_MOUSESENSORMODE_WHEELDOWN(5)
-         * KX_MOUSESENSORMODE_MOVEMENT(6)
+         * KX_MOUSESENSORMODE_LEFTTHUMBMOUSE(4)
+         * KX_MOUSESENSORMODE_RIGHTTHUMBMOUSE(5)
+         * KX_MOUSESENSORMODE_BUTTON6(6)
+         * KX_MOUSESENSORMODE_BUTTON7(7)
+         * KX_MOUSESENSORMODE_WHEELUP(8)
+         * KX_MOUSESENSORMODE_WHEELDOWN(9)
+         * KX_MOUSESENSORMODE_MOVEMENT(10)
 
    .. method:: getButtonStatus(button)
 
