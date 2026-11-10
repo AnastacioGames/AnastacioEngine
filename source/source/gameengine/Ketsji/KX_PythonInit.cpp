@@ -112,6 +112,7 @@ extern "C" {
 #include "KX_SteeringActuator.h"
 #include "KX_TrackToActuator.h"
 
+#include "SCA_MouseSensor.h"
 #include "SCA_IInputDevice.h"
 #include "SCA_PropertySensor.h"
 #include "SCA_RandomActuator.h"
@@ -2574,6 +2575,19 @@ PyMODINIT_FUNC initGameLogicPythonBinding()
 	KX_MACRO_addTypesToDict(d, KX_MOUSE_BUT_RIGHTTHUMBMOUSE, SCA_IInputDevice::RIGHTTHUMBMOUSE);
 	KX_MACRO_addTypesToDict(d, KX_MOUSE_BUT_BUTTON6, SCA_IInputDevice::BUTTON6MOUSE);
 	KX_MACRO_addTypesToDict(d, KX_MOUSE_BUT_BUTTON7, SCA_IInputDevice::BUTTON7MOUSE);
+
+	/* Mouse Sensor mode (sensor.mode). Range inseriu os botoes do polegar/6/7 antes da roda,
+	 * entao roda/movimento nao valem 4/5/6 como na UPBGE: use estas constantes. */
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_LEFTBUTTON, SCA_MouseSensor::KX_MOUSESENSORMODE_LEFTBUTTON);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_MIDDLEBUTTON, SCA_MouseSensor::KX_MOUSESENSORMODE_MIDDLEBUTTON);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_RIGHTBUTTON, SCA_MouseSensor::KX_MOUSESENSORMODE_RIGHTBUTTON);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_LEFTTHUMBMOUSE, SCA_MouseSensor::KX_MOUSESENSORMODE_LEFTTHUMBMOUSE);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_RIGHTTHUMBMOUSE, SCA_MouseSensor::KX_MOUSESENSORMODE_RIGHTTHUMBMOUSE);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_BUTTON6, SCA_MouseSensor::KX_MOUSESENSORMODE_BUTTON6);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_BUTTON7, SCA_MouseSensor::KX_MOUSESENSORMODE_BUTTON7);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_WHEELUP, SCA_MouseSensor::KX_MOUSESENSORMODE_WHEELUP);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_WHEELDOWN, SCA_MouseSensor::KX_MOUSESENSORMODE_WHEELDOWN);
+	KX_MACRO_addTypesToDict(d, KX_MOUSESENSORMODE_MOVEMENT, SCA_MouseSensor::KX_MOUSESENSORMODE_MOVEMENT);
 
 	KX_MACRO_addTypesToDict(d, KX_JOYSTICK_BUT_A, KX_PythonJoystick::A);
 	KX_MACRO_addTypesToDict(d, KX_JOYSTICK_BUT_B, KX_PythonJoystick::B);
