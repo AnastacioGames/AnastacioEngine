@@ -50,6 +50,7 @@ _modules = [
     "anastacio_lightmap",
     "anastacio_ssgi",
     "anastacio_text_atlas",
+    "anastacio_palette_atlas",
     "anastacio_locale",
     "anastacio_material_recipes",
     "anastacio_screencast",

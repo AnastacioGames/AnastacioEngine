@@ -1515,11 +1515,25 @@ class MATERIAL_PT_anastacio_atlas(MaterialButtonsPanel, Panel):
         has_source = ob.data.get('_anastacio_atlas_source') is not None
         show_info = wm.ae_atlas_show_info
 
+        from bl_operators.anastacio_palette_atlas import classify
+        summary = classify(ob) if not has_source else []
+        flat = sum(1 for item in summary if item[2])
+        bake = len(summary) - flat
+        mode = wm.ae_atlas_mode
+        if mode == 'AUTO':
+            use_palette = bool(summary) and bake == 0
+        else:
+            use_palette = mode == 'PALETTE'
+
+        layout.prop(wm, "ae_atlas_mode", expand=True)
         split = layout.split(factor=0.8, align=True)
         action_col = split.column(align=True)
-        action_col.enabled = (ob.mode == 'OBJECT' and
-                               context.scene.game_settings.use_shading_nodes)
-        action_col.operator("material.anastacio_atlas_bake", icon='RENDER_STILL')
+        action_col.enabled = ob.mode == 'OBJECT' and (
+            use_palette or context.scene.game_settings.use_shading_nodes)
+        op = action_col.operator("material.anastacio_atlas_auto",
+                                 text="Palette Atlas" if use_palette else "Bake Material Atlas",
+                                 icon='COLOR' if use_palette else 'RENDER_STILL')
+        op.mode = mode
         if has_source:
             restore_col = action_col.column(align=True)
             restore_col.enabled = ob.mode == 'OBJECT'
@@ -1528,11 +1542,20 @@ class MATERIAL_PT_anastacio_atlas(MaterialButtonsPanel, Panel):
         info_col = split.column(align=True)
         info_col.prop(wm, "ae_atlas_show_info", text="", icon='INFO', toggle=True)
 
+        if summary:
+            row = layout.row()
+            row.label("%d material(s): %d palette, %d bake" % (len(summary), flat, bake),
+                      icon='INFO')
+
         if not show_info:
             return
 
         box = layout.box()
-        box.label("Combine opaque PBR materials", icon='MATERIAL')
+        box.label("Auto: flat colors use Palette, textures use Bake", icon='MATERIAL')
+        box.label("Palette is one image shared by the whole scene", icon='INFO')
+        for _i, name, is_flat, reason in summary:
+            if not is_flat:
+                box.label("%s: %s" % (name, reason), icon='TEXTURE')
         box.label("Keeps original mesh and Lightmap UV", icon='INFO')
         box.label("Escape cancels the bake and restores the source", icon='INFO')
         if has_source:
@@ -1581,6 +1604,12 @@ classes = (
     # MATERIAL_PT_custom_props,  # disabled: Custom Properties panel unused
 )
 
+bpy.types.WindowManager.ae_atlas_mode = bpy.props.EnumProperty(
+    name="Atlas Mode",
+    items=[('AUTO', "Auto", "Palette when every material is flat color, Bake otherwise"),
+           ('PALETTE', "Palette", "Shared palette image for flat-color materials"),
+           ('BAKE', "Bake", "Bake every material to new maps (Cycles)")],
+    default='AUTO')
 bpy.types.WindowManager.ae_atlas_show_info = bpy.props.BoolProperty(
     name="Show Info",
     description="Show help text for Material Atlas",

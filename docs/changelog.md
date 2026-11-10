@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-10 — Material Atlas com paleta de cores
+
+- Material Atlas ganhou modos Auto, Palette e Bake. Auto olha os materiais do objeto: só cores lisas usa Palette; com textura usa o Bake de antes. O painel mostra o resumo (materiais na paleta x no bake) e o motivo de cada material que precisa de bake.
+- Palette (`material.anastacio_palette_atlas`, `bl_operators/anastacio_palette_atlas.py`): uma imagem 256x256 por cena (`AnastacioPalette`, quadrados de 8 px, até 1024 cores) e `AnastacioPaletteData` (Roughness/Metallic/Specular). A UV `AnastacioPalette` aponta cada face para o centro do quadrado da sua cor, então a cor nunca vaza para o vizinho. Vale para PBR (Principled, Principled + Emission, Mix com Transparent BSDF para alpha) e legado sem texture slot. Transparentes vão para `AnastacioPalette_Alpha`. Objetos convertidos depois reaproveitam as cores e os materiais de resultado, o que ajuda o Static Batch. Restore Original Materials desfaz.
+- Bake em objeto misturado: materiais Principled sem nada ligado nos mapas viram quadrados exatos numa faixa embaixo do atlas (`use_palette_cells`, ligado por padrão), sem gastar área de bake.
+- Testes: `tools/test_palette_atlas.py` e `tools/test_palette_atlas_mixed.py`; `tools/test_material_atlas.py` continua passando. Falta aceite visual no jogo.
+
 ## 2026-11-09 — UI Tree e notas do microfone
 
 - UI Tree: corrigido `Cannot add node of type RangeUIProgressBar` (nó registrado herdando de outro); campo Width; alça do widget ao lado da prévia; Translation Key em Label e Button (`locale/translations.csv`); imagem no Button com tintas por estado; Change Scene lista as cenas; imagem escolhida ganha fake user para não sumir ao salvar.

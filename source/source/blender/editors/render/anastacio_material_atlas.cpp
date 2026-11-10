@@ -240,7 +240,27 @@ void update_object(Main *main, Object *ob)
   DAG_relations_tag_update(main);
 }
 
-void pack_uv(Mesh *mesh, Object *ob, int size, int margin)
+/* Mixed objects: flat-color slots (no linked map input) skip the bake area and get one
+ * 8 px palette cell each in a strip at the bottom of the atlas. Their UV is a single point
+ * at the cell center, so the GPU always samples mip 0 there and never bleeds. */
+constexpr int palette_cell = 8;
+
+int palette_strip_pixels(int cells, int size, int margin)
+{
+  if (cells == 0) return 0;
+  const int columns = size / palette_cell;
+  const int rows = (cells + columns - 1) / columns;
+  return rows * palette_cell + margin;
+}
+
+void palette_cell_uv(int cell, int size, float r_uv[2])
+{
+  const int columns = size / palette_cell;
+  r_uv[0] = ((cell % columns) * palette_cell + palette_cell * 0.5f) / size;
+  r_uv[1] = ((cell / columns) * palette_cell + palette_cell * 0.5f) / size;
+}
+
+void pack_uv(Mesh *mesh, Object *ob, int size, int margin, const std::vector<int> &flat_cell = {})
 {
   char path[FILE_MAX];
   BLI_strncpy(path, BKE_appdir_program_path(), sizeof(path));
@@ -260,11 +280,25 @@ void pack_uv(Mesh *mesh, Object *ob, int size, int margin)
                        int, int, int, float *);
   Pack pack = reinterpret_cast<Pack>(BLI_dynlib_find_symbol(lib, "ae_uvatlas"));
   require(pack != nullptr, "ae_uvatlas has no compatible entry point");
-  const int triangles = mesh->totloop - 2 * mesh->totpoly;
-  require(triangles > 0, "Mesh has no triangles");
-  std::vector<MLoopTri> tris(triangles);
+  const int all_triangles = mesh->totloop - 2 * mesh->totpoly;
+  require(all_triangles > 0, "Mesh has no triangles");
+  std::vector<MLoopTri> all_tris(all_triangles);
   BKE_mesh_recalc_looptri(mesh->mloop, mesh->mpoly, mesh->mvert,
-                         mesh->totloop, mesh->totpoly, tris.data());
+                         mesh->totloop, mesh->totpoly, all_tris.data());
+  auto cell_of = [&](int poly) {
+    const int slot = mesh->mpoly[poly].mat_nr;
+    return slot < int(flat_cell.size()) ? flat_cell[slot] : -1;
+  };
+  std::vector<MLoopTri> tris;
+  int cells = 0;
+  for (const MLoopTri &tri : all_tris) {
+    if (cell_of(tri.poly) < 0) tris.push_back(tri);
+  }
+  for (int cell : flat_cell) cells = std::max(cells, cell + 1);
+  const int triangles = int(tris.size());
+  require(triangles > 0, "Mesh has no textured faces to bake");
+  const float strip = float(palette_strip_pixels(cells, size, margin)) / size;
+  const float scale = 1.0f - strip;
   std::vector<float> positions(mesh->totvert * 3);
   std::vector<unsigned int> indices(triangles * 3);
   std::vector<float> output(triangles * 6);
@@ -284,10 +318,22 @@ void pack_uv(Mesh *mesh, Object *ob, int size, int margin)
   require(uv != nullptr, "Cannot create atlas UV layer");
   CustomData_add_layer_named(&mesh->pdata, CD_MTEXPOLY, CD_CALLOC, nullptr, mesh->totpoly, atlas_uv);
   std::vector<bool> seen(mesh->totloop, false);
+  for (int p = 0; p < mesh->totpoly; p++) {
+    const int cell = cell_of(p);
+    if (cell >= 0) {
+      for (int l = 0; l < mesh->mpoly[p].totloop; l++) {
+        palette_cell_uv(cell, size, uv[mesh->mpoly[p].loopstart + l].uv);
+      }
+    }
+  }
   for (int i = 0; i < triangles; i++) {
     for (int j = 0; j < 3; j++) {
       int loop = tris[i].tri[j];
-      const float *corner = &output[(i * 3 + j) * 2];
+      float corner[2] = {output[(i * 3 + j) * 2], output[(i * 3 + j) * 2 + 1]};
+      if (strip > 0.0f) {
+        corner[0] *= scale;
+        corner[1] = strip + corner[1] * scale;
+      }
       require(std::isfinite(corner[0]) && std::isfinite(corner[1]) &&
                   corner[0] >= 0 && corner[0] <= 1 && corner[1] >= 0 && corner[1] <= 1,
               "Packed UV outside the atlas");
@@ -342,6 +388,8 @@ struct AtlasTransaction {
   std::vector<Image *> images;
   Material *result = nullptr;
   bool applied = false;
+  std::vector<int> flat_cell;                  /* per slot, -1 = baked */
+  std::vector<std::vector<float>> flat_values; /* per slot: 4 passes x RGBA */
 
   AtlasTransaction(bContext *C)
       : main(CTX_data_main(C)), scene(CTX_data_scene(C)), ob(CTX_data_active_object(C)),
@@ -520,6 +568,32 @@ int start_bake_pass(bContext *C, wmOperator *op, AtlasTransaction &tx, int pass,
   return status;
 }
 
+/* Constant values of a flat slot go straight into its cell: exact, no bake noise. */
+void paint_palette_cells(AtlasTransaction &tx, int pass, int size, Image *image)
+{
+  void *lock;
+  ImBuf *ibuf = BKE_image_acquire_ibuf(image, nullptr, &lock);
+  if (ibuf && ibuf->rect_float) {
+    const int columns = size / palette_cell;
+    for (size_t slot = 0; slot < tx.flat_cell.size(); slot++) {
+      const int cell = tx.flat_cell[slot];
+      if (cell < 0) continue;
+      float value[4] = {0.5f, 0.5f, 1.0f, 1.0f}; /* flat tangent normal */
+      if (pass < 4) {
+        copy_v4_v4(value, &tx.flat_values[slot][pass * 4]);
+      }
+      const int x0 = (cell % columns) * palette_cell, y0 = (cell / columns) * palette_cell;
+      for (int y = y0; y < y0 + palette_cell; y++) {
+        for (int x = x0; x < x0 + palette_cell; x++) {
+          copy_v4_v4(&ibuf->rect_float[(y * size + x) * 4], value);
+        }
+      }
+    }
+    ibuf->userflags |= IB_RECT_INVALID | IB_DISPLAY_BUFFER_INVALID;
+  }
+  BKE_image_release_ibuf(image, ibuf, lock);
+}
+
 void finish_bake_pass(AtlasTransaction &tx, int pass, int size, int status)
 {
   Image *image = tx.images.back();
@@ -546,6 +620,7 @@ void finish_bake_pass(AtlasTransaction &tx, int pass, int size, int status)
   BKE_image_release_ibuf(image, ibuf, lock);
   require(covered && finite, std::string("Empty or invalid bake: ") + map_names[pass]);
   require(representable, std::string("Map values outside 0-1 cannot be preserved in PNG: ") + map_names[pass]);
+  paint_palette_cells(tx, pass, size, image);
   /* Pack as 16-bit PNG, preserving linear/data encoding with bounded quantization.
    * The API baker has already filled the gutters; never blur material maps. */
   BKE_image_memorypack(image);
@@ -705,6 +780,37 @@ int restore_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+/* A slot is flat when no map input of its Principled is linked. Mixed objects only:
+ * if every slot is flat (or none is), nothing changes and the full bake runs. */
+void classify_flat_slots(AtlasTransaction &tx, Object *ob)
+{
+  std::vector<int> cells(ob->totcol, -1);
+  std::vector<std::vector<float>> values(ob->totcol);
+  int flat = 0;
+  for (int i = 0; i < ob->totcol; i++) {
+    Material *mat = give_current_material(ob, i + 1);
+    bNode *shader = surface_shader(mat);
+    bool linked = input_link(mat->nodetree, socket(shader, "Normal")) != nullptr;
+    for (const char *name : map_inputs) {
+      linked |= input_link(mat->nodetree, socket(shader, name)) != nullptr;
+    }
+    if (linked) continue;
+    std::vector<float> &v = values[i];
+    v.resize(16);
+    copy_v4_v4(&v[0], static_cast<bNodeSocketValueRGBA *>(socket(shader, "Base Color")->default_value)->value);
+    v[3] = 1.0f;
+    for (int pass = 1; pass < 4; pass++) {
+      const float f = static_cast<bNodeSocketValueFloat *>(socket(shader, map_inputs[pass])->default_value)->value;
+      v[pass * 4 + 0] = v[pass * 4 + 1] = v[pass * 4 + 2] = f;
+      v[pass * 4 + 3] = 1.0f;
+    }
+    cells[i] = flat++;
+  }
+  if (flat == 0 || flat == ob->totcol) return;
+  tx.flat_cell = cells;
+  tx.flat_values = values;
+}
+
 std::unique_ptr<AtlasTransaction> prepare_atlas(bContext *C, wmOperator *op)
 {
     Scene *scene = CTX_data_scene(C);
@@ -747,8 +853,11 @@ std::unique_ptr<AtlasTransaction> prepare_atlas(bContext *C, wmOperator *op)
     require(margin * 4 < size, "Margin is too large for this resolution");
     std::unique_ptr<AtlasTransaction> transaction(new AtlasTransaction(C));
     AtlasTransaction &tx = *transaction;
+    if (RNA_boolean_get(op->ptr, "use_palette_cells")) {
+      classify_flat_slots(tx, ob);
+    }
     stage_materials(C, tx);
-    pack_uv(tx.work, ob, size, margin);
+    pack_uv(tx.work, ob, size, margin, tx.flat_cell);
     BLI_strncpy(scene->r.engine, "CYCLES", sizeof(scene->r.engine));
     RNA_int_set(&tx.cycles, "samples", RNA_int_get(op->ptr, "samples"));
     if (!RNA_boolean_get(op->ptr, "use_configured_device")) {
@@ -953,6 +1062,8 @@ extern "C" void MATERIAL_OT_anastacio_atlas_bake(wmOperatorType *ot)
   RNA_def_int(ot->srna, "resolution", 1024, 64, 4096, "Resolution", "Power of two, in pixels", 64, 4096);
   RNA_def_int(ot->srna, "margin", 4, 1, 64, "Margin", "Padding between UV islands, in pixels", 1, 32);
   RNA_def_int(ot->srna, "samples", 32, 1, 1024, "Samples", "Cycles samples per bake", 1, 128);
+  RNA_def_boolean(ot->srna, "use_palette_cells", true, "Flat Colors as Palette Cells",
+                  "Mixed objects: flat-color materials use small color cells instead of bake area");
   RNA_def_boolean(ot->srna, "use_configured_device", false, "Use Configured Cycles Device",
                   "Use the current Cycles CPU/GPU configuration; disabled uses CPU");
 }

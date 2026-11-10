@@ -3,6 +3,15 @@
 Data: 2026-10-07. Estado: primeira versão nativa em C++, com suporte delimitado abaixo.
 Pedido inicial: pesquisa sem implementação; depois o usuário autorizou implementação nativa.
 
+## Paleta de cores (2026-11-10)
+
+Botão do painel virou **Build Material Atlas** com Auto / Palette / Bake. Palette junta materiais só de
+cor dos objetos selecionados numa imagem da cena (`AnastacioPalette` + `AnastacioPaletteData`), com UV
+`AnastacioPalette` no centro de cada quadrado de 8 px. No Bake de objeto misturado, os slots Principled
+sem mapa ligado ficam em quadrados numa faixa embaixo do atlas (`use_palette_cells`). Limites: no objeto
+misturado, material liso transparente ainda é recusado (o bake só aceita opacos); paleta cheia em 1024
+cores; compressão DXT/KTX2 pode arredondar a cor do quadrado. Testes em `tools/test_palette_atlas*.py`.
+
 ## Versão nativa atual
 
 Properties > Material > **Build Material Atlas** > **Bake Material Atlas**.
