@@ -113,6 +113,7 @@ def register():
     from bpy.props import (
         EnumProperty,
         BoolProperty,
+        BoolVectorProperty,
         StringProperty,
         IntProperty,
         CollectionProperty,
@@ -151,6 +152,15 @@ def register():
         default=-1,
         update=action_list_index_update,
     )
+
+    WindowManager.theme_box_open = BoolVectorProperty(
+        name="Theme Box Open", size=32, default=(True,) * 32,
+    )
+    # Mais vetores para os boxes das outras áreas do tema
+    for _i in range(8):
+        setattr(WindowManager, "theme_box_open_%d" % _i, BoolVectorProperty(
+            name="Theme Box Open", size=32, default=(True,) * 32,
+        ))
 
     WindowManager.addon_search = StringProperty(
         name="Search",

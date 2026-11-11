@@ -17,7 +17,7 @@
 # ##### END GPL LICENSE BLOCK #####
 
 # <pep8 compliant>
-import bpy, os, json
+import bpy, os, json, math
 from bpy.types import (
     Header,
     Menu,
@@ -578,6 +578,139 @@ class USERPREF_MT_theme_background_textures(Menu):
             props.value = value
 
 
+def _theme_color_props(data):
+    # Nomes das cores (RGB/RGBA) de um struct do tema
+    return [p.identifier for p in data.bl_rna.properties
+            if p.type == 'FLOAT' and p.subtype in {'COLOR', 'COLOR_GAMMA'}
+            and p.array_length in {3, 4}]
+
+
+class USERPREF_OT_theme_flash(bpy.types.Operator):
+    """Pisca duas vezes na interface o que usa estas cores"""
+    bl_idname = "ui.theme_flash"
+    bl_label = "Show in Interface"
+    bl_options = {'INTERNAL'}
+
+    # caminhos dentro do tema separados por ";", ex.: "view_3d.space"
+    path = StringProperty()
+    # opcional: só estas cores (separadas por ",")
+    names = StringProperty()
+
+    _glow = (1.0, 0.85, 0.2)
+    _duration = 1.0
+    _running = set()
+
+    def _apply(self, k):
+        # k = 1 brilho total, 0 cor original
+        for (data, name), orig in self._orig.items():
+            val = [o + (g - o) * k for o, g in zip(orig, self._glow)]
+            if len(orig) == 4:
+                val.append(orig[3] + (1.0 - orig[3]) * k)
+            setattr(data, name, val)
+        for win in bpy.context.window_manager.windows:
+            for area in win.screen.areas:
+                area.tag_redraw()
+
+    def invoke(self, context, event):
+        key = self.path + "|" + self.names
+        if key in self._running:
+            return {'CANCELLED'}
+        theme = context.user_preferences.themes[0]
+        only = set(n for n in self.names.split(",") if n)
+        self._orig = {}
+        for path in self.path.split(";"):
+            try:
+                data = theme.path_resolve(path)
+            except ValueError:
+                continue
+            for name in _theme_color_props(data):
+                if not only or name in only:
+                    self._orig[(data, name)] = tuple(getattr(data, name))
+        if not self._orig:
+            return {'CANCELLED'}
+        self._key = key
+        self._running.add(key)
+        self._t = 0.0
+        wm = context.window_manager
+        self._timer = wm.event_timer_add(1.0 / 30.0, context.window)
+        wm.modal_handler_add(self)
+        self._apply(1.0)
+        return {'RUNNING_MODAL'}
+
+    def modal(self, context, event):
+        if event.type != 'TIMER':
+            return {'PASS_THROUGH'}
+        self._t += 1.0 / 30.0
+        # duas piscadas: acende, apaga, acende, apaga
+        done = self._t >= self._duration
+        k = 0.0 if done else 0.5 + 0.5 * math.cos(2.0 * math.pi * 2 * self._t / self._duration)
+        self._apply(k)
+        if done:
+            for (data, name), orig in self._orig.items():
+                setattr(data, name, orig)
+            context.window_manager.event_timer_remove(self._timer)
+            self._running.discard(self._key)
+            return {'FINISHED'}
+        return {'PASS_THROUGH'}
+
+
+def _theme_flash_button(header, path, names=""):
+    # botão no canto direito do cabeçalho
+    right = header.row(align=True)
+    right.alignment = 'RIGHT'
+    op = right.operator("ui.theme_flash", text="", icon='LAMP')
+    op.path = path
+    op.names = names
+
+
+def _theme_box(layout, title, index, flash="", names=""):
+    # Box com seta para abrir/fechar; devolve None quando fechado
+    wm = bpy.context.window_manager
+    box = layout.box()
+    opened = wm.theme_box_open[index]
+    header = box.row()
+    row = header.row(align=True)
+    row.alignment = 'LEFT'
+    row.prop(wm, "theme_box_open", index=index, text=title, emboss=False,
+             icon='TRIA_DOWN' if opened else 'TRIA_RIGHT')
+    if flash:
+        _theme_flash_button(header, flash, names)
+    return box if opened else None
+
+
+# Cada chave (área/nome) ganha uma posição fixa nos vetores theme_box_open_N
+_theme_slots = {}
+
+
+def _theme_box_key(layout, title, key, flash="", names=""):
+    # Igual ao _theme_box, mas a posição vem da chave
+    slot = _theme_slots.setdefault(key, len(_theme_slots))
+    if slot >= 8 * 32:
+        box = layout.box()
+        box.label(text=title)
+        return box
+    wm = bpy.context.window_manager
+    prop = "theme_box_open_%d" % (slot // 32)
+    index = slot % 32
+    box = layout.box()
+    opened = getattr(wm, prop)[index]
+    header = box.row()
+    row = header.row(align=True)
+    row.alignment = 'LEFT'
+    row.prop(wm, prop, index=index, text=title, emboss=False,
+             icon='TRIA_DOWN' if opened else 'TRIA_RIGHT')
+    if flash:
+        _theme_flash_button(header, flash, names)
+    return box if opened else None
+
+
+def _theme_color_inline(row, data, name):
+    # Nome à esquerda e a cor à direita, na mesma linha
+    split = row.split(factor=0.35)
+    split.label(text=data.bl_rna.properties[name].name + ":")
+    split.prop(data, name, text="")
+
+
 class USERPREF_PT_theme(Panel):
     bl_space_type = 'USER_PREFERENCES'
     bl_label = "Themes"
@@ -610,7 +743,7 @@ class USERPREF_PT_theme(Panel):
     }
 
     @staticmethod
-    def _theme_generic(split, themedata, theme_area):
+    def _theme_generic(split, themedata, theme_area, base="", flash_base=None):
 
         col = split.column()
 
@@ -636,26 +769,30 @@ class USERPREF_PT_theme(Panel):
             "wcol_state": "State",
         }
 
-        def theme_generic_recurse(data, data_label=None):
+        def theme_generic_recurse(data, data_label=None, path="", rna=base):
             if theme_area == 'GLOBAL_THEME_UI' and data_label is not None:
                 label = global_ui_labels.get(data_label, data_label)
             else:
                 label = data.rna_type.name
 
-            box = col.box()
-            box.label(label)
-            row = box.row()
-            subsplit = row.split(factor=0.95)
+            path = path + "/" + (data_label or label)
+            flash = ""
+            if _theme_color_props(data):
+                flash = flash_base if (flash_base and not data_label) else rna
+            box = _theme_box_key(col, label, theme_area + path, flash=flash)
+            row = box.row() if box else None
+            if row:
+                subsplit = row.split(factor=0.95)
 
-            padding1 = subsplit.split(factor=0.15)
-            padding1.column()
+                padding1 = subsplit.split(factor=0.15)
+                padding1.column()
 
-            subsplit = row.split(factor=0.85)
+                subsplit = row.split(factor=0.85)
 
-            padding2 = subsplit.split(factor=0.15)
-            padding2.column()
+                padding2 = subsplit.split(factor=0.15)
+                padding2.column()
 
-            colsub_pair = padding1.column(), padding2.column()
+                colsub_pair = padding1.column(), padding2.column()
 
             props_type = {}
 
@@ -669,7 +806,10 @@ class USERPREF_PT_theme(Panel):
             for props_type, props_ls in sorted(props_type.items()):
                 if props_type[0] == 'POINTER':
                     for i, prop in enumerate(props_ls):
-                        theme_generic_recurse(getattr(data, prop.identifier), prop.identifier)
+                        theme_generic_recurse(getattr(data, prop.identifier), prop.identifier, path,
+                                              rna + "." + prop.identifier)
+                elif not row:
+                    continue
                 else:
                     if th_delimiters is None:
                         # simple, no delimiters
@@ -744,57 +884,63 @@ class USERPREF_PT_theme(Panel):
         layout.separator(factor=1)
 
     @staticmethod
+    def _theme_state_options(outer, ui):
+        ui_state = ui.wcol_state
+        col = _theme_box(outer, "State:", 0, flash="user_interface.wcol_state")
+        if col:
+            col.prop(ui_state, "blend")
+            flow = col.column_flow(columns=3)
+            for name in ("inner_anim", "inner_anim_sel", "inner_driven", "inner_driven_sel",
+                         "inner_key", "inner_key_sel", "inner_overridden", "inner_overridden_sel",
+                         "inner_changed", "inner_changed_sel"):
+                flow.prop(ui_state, name)
+
+        col = _theme_box(outer, "Styles:", 1)
+        if col:
+            row = col.row()
+            split = row.split(factor=0.5)
+            left, right = split.column(), split.column()
+            left.prop(ui, "menu_shadow_fac")
+            left.prop(ui, "menu_shadow_width")
+            left.prop(ui, "icon_alpha")
+            right.prop(ui, "widget_emboss")
+
+    @staticmethod
     def _theme_interface_options(col, ui):
         ui_state = ui.wcol_state
         outer = col
-        col = outer.box()
-        col.label(text="State:")
-        col.prop(ui_state, "blend")
-        flow = col.column_flow(columns=3)
-        for name in ("inner_anim", "inner_anim_sel", "inner_driven", "inner_driven_sel",
-                     "inner_key", "inner_key_sel", "inner_overridden", "inner_overridden_sel",
-                     "inner_changed", "inner_changed_sel"):
-            flow.prop(ui_state, name)
-
-        col = outer.box()
-        col.label(text="Styles:")
-        row = col.row()
-        split = row.split(factor=0.5)
-        left, right = split.column(), split.column()
-        left.prop(ui, "menu_shadow_fac")
-        left.prop(ui, "menu_shadow_width")
-        left.prop(ui, "icon_alpha")
-        right.prop(ui, "widget_emboss")
-
-        col = outer.box()
-        col.label(text="Background Texture:")
-        row = col.row(align=True)
-        row.menu("USERPREF_MT_theme_background_textures", text="Presets")
-        row.prop(ui, "background_tile_image", text="")
-        row = col.row()
-        row.prop(ui, "background_tile_strength")
-        row.prop(ui, "background_tile_scale")
-        row.prop(ui, "background_tile_tint", text="")
-        row = col.row()
-        row.prop(ui, "background_tile_menus")
-        row.prop(ui, "background_tile_panels")
-        row.prop(ui, "background_tile_buttons")
-        row.prop(ui, "background_tile_editors")
-
-        col = outer.box()
-        col.label(text="Axis Colors:")
-        row = col.row()
-        row.column().prop(ui, "axis_x")
-        row.column().prop(ui, "axis_y")
-        row.column().prop(ui, "axis_z")
-
-        col = outer.box()
-        col.label(text="Icon Colors:")
-        for names in (("icon_collection", "icon_scene", "icon_object"),
-                      ("icon_object_data", "icon_modifier", "icon_shading")):
+        col = _theme_box(outer, "Background Texture:", 2)
+        if col:
+            row = col.row(align=True)
+            row.menu("USERPREF_MT_theme_background_textures", text="Presets")
+            row.prop(ui, "background_tile_image", text="")
             row = col.row()
-            for name in names:
-                row.column().prop(ui, name)
+            row.prop(ui, "background_tile_strength")
+            row.prop(ui, "background_tile_scale")
+            row.prop(ui, "background_tile_tint", text="")
+            row = col.row()
+            row.prop(ui, "background_tile_menus")
+            row.prop(ui, "background_tile_panels")
+            row.prop(ui, "background_tile_buttons")
+            row.prop(ui, "background_tile_editors")
+
+        # Axis e Icon lado a lado, 3 linhas cada
+        pair = outer.split(factor=0.5)
+        col = _theme_box(pair.column(), "Axis Colors:", 3, flash="user_interface",
+                         names="axis_x,axis_y,axis_z")
+        if col:
+            for name in ("axis_x", "axis_y", "axis_z"):
+                _theme_color_inline(col.row(), ui, name)
+
+        col = _theme_box(pair.column(), "Icon Colors:", 4, flash="user_interface",
+                         names="icon_collection,icon_modifier,icon_scene,icon_shading,icon_object,icon_object_data")
+        if col:
+            for names in (("icon_collection", "icon_modifier"),
+                          ("icon_scene", "icon_shading"),
+                          ("icon_object", "icon_object_data")):
+                row = col.row()
+                for name in names:
+                    _theme_color_inline(row, ui, name)
 
     @classmethod
     def poll(cls, context):
@@ -825,126 +971,127 @@ class USERPREF_PT_theme(Panel):
         split = split_themes.split()
 
         if theme.theme_area == 'USER_INTERFACE':
-            col = split.column()
             ui = theme.user_interface
+            outer = split.column()
 
-            self._theme_interface_options(col, ui)
+            # Opções gerais em uma coluna; boxes de widget em duas
+            self._theme_interface_options(outer, ui)
+            ui_cols = outer.split(factor=0.5)
+            col = ui_cols.column()
+            col_right = ui_cols.column()
 
-            box = col.box()
-            box.label(text="Regular:")
-            self._theme_widget_style(box, ui.wcol_regular)
+            box = _theme_box(col, "Regular:", 5, flash="user_interface.wcol_regular")
+            if box:
+                self._theme_widget_style(box, ui.wcol_regular)
 
-            box = col.box()
-            box.label(text="Tool:")
-            self._theme_widget_style(box, ui.wcol_tool)
+            box = _theme_box(col, "Tool:", 6, flash="user_interface.wcol_tool")
+            if box:
+                self._theme_widget_style(box, ui.wcol_tool)
 
-            box = col.box()
-            box.label(text="Radio Buttons:")
-            self._theme_widget_style(box, ui.wcol_radio)
+            box = _theme_box(col, "Radio Buttons:", 7, flash="user_interface.wcol_radio")
+            if box:
+                self._theme_widget_style(box, ui.wcol_radio)
 
-            box = col.box()
-            box.label(text="Text:")
-            self._theme_widget_style(box, ui.wcol_text)
+            box = _theme_box(col, "Text:", 8, flash="user_interface.wcol_text")
+            if box:
+                self._theme_widget_style(box, ui.wcol_text)
 
-            box = col.box()
-            box.label(text="Option:")
-            self._theme_widget_style(box, ui.wcol_option)
+            box = _theme_box(col, "Option:", 9, flash="user_interface.wcol_option")
+            if box:
+                self._theme_widget_style(box, ui.wcol_option)
 
-            box = col.box()
-            box.label(text="Toggle:")
-            self._theme_widget_style(box, ui.wcol_toggle)
+            box = _theme_box(col, "Toggle:", 10, flash="user_interface.wcol_toggle")
+            if box:
+                self._theme_widget_style(box, ui.wcol_toggle)
 
-            box = col.box()
-            box.label(text="Number Field:")
-            self._theme_widget_style(box, ui.wcol_num)
+            box = _theme_box(col, "Number Field:", 11, flash="user_interface.wcol_num")
+            if box:
+                self._theme_widget_style(box, ui.wcol_num)
 
-            box = col.box()
-            box.label(text="Value Slider:")
-            self._theme_widget_style(box, ui.wcol_numslider)
+            box = _theme_box(col, "Value Slider:", 12, flash="user_interface.wcol_numslider")
+            if box:
+                self._theme_widget_style(box, ui.wcol_numslider)
 
-            box = col.box()
-            box.label(text="Box:")
-            self._theme_widget_style(box, ui.wcol_box)
+            box = _theme_box(col, "Box:", 13, flash="user_interface.wcol_box")
+            if box:
+                self._theme_widget_style(box, ui.wcol_box)
 
-            box = col.box()
-            box.label(text="Menu:")
-            self._theme_widget_style(box, ui.wcol_menu)
+            col = col_right
 
-            box = col.box()
-            box.label(text="Pie Menu:")
-            self._theme_widget_style(box, ui.wcol_pie_menu)
+            box = _theme_box(col, "Menu:", 14, flash="user_interface.wcol_menu")
+            if box:
+                self._theme_widget_style(box, ui.wcol_menu)
 
-            box = col.box()
-            box.label(text="Pulldown:")
-            self._theme_widget_style(box, ui.wcol_pulldown)
+            box = _theme_box(col, "Pie Menu:", 15, flash="user_interface.wcol_pie_menu")
+            if box:
+                self._theme_widget_style(box, ui.wcol_pie_menu)
 
-            box = col.box()
-            box.label(text="Menu Back:")
-            self._theme_widget_style(box, ui.wcol_menu_back)
+            box = _theme_box(col, "Pulldown:", 16, flash="user_interface.wcol_pulldown")
+            if box:
+                self._theme_widget_style(box, ui.wcol_pulldown)
 
-            box = col.box()
-            box.label(text="Tooltip:")
-            self._theme_widget_style(box, ui.wcol_tooltip)
+            box = _theme_box(col, "Menu Back:", 17, flash="user_interface.wcol_menu_back")
+            if box:
+                self._theme_widget_style(box, ui.wcol_menu_back)
 
-            box = col.box()
-            box.label(text="Menu Item:")
-            self._theme_widget_style(box, ui.wcol_menu_item)
+            box = _theme_box(col, "Tooltip:", 18, flash="user_interface.wcol_tooltip")
+            if box:
+                self._theme_widget_style(box, ui.wcol_tooltip)
 
-            box = col.box()
-            box.label(text="Scroll Bar:")
-            self._theme_widget_style(box, ui.wcol_scroll)
+            box = _theme_box(col, "Menu Item:", 19, flash="user_interface.wcol_menu_item")
+            if box:
+                self._theme_widget_style(box, ui.wcol_menu_item)
 
-            box = col.box()
-            box.label(text="Progress Bar:")
-            self._theme_widget_style(box, ui.wcol_progress)
+            box = _theme_box(col, "Scroll Bar:", 20, flash="user_interface.wcol_scroll")
+            if box:
+                self._theme_widget_style(box, ui.wcol_scroll)
 
-            box = col.box()
-            box.label(text="List Item:")
-            self._theme_widget_style(box, ui.wcol_list_item)
+            box = _theme_box(col, "Progress Bar:", 21, flash="user_interface.wcol_progress")
+            if box:
+                self._theme_widget_style(box, ui.wcol_progress)
+
+            box = _theme_box(col, "List Item:", 22, flash="user_interface.wcol_list_item")
+            if box:
+                self._theme_widget_style(box, ui.wcol_list_item)
+
+            self._theme_state_options(outer, ui)
 
         elif theme.theme_area == 'GLOBAL_THEME':
             col = split.column()
 
-            box = col.box()
-            box.label(text="Copy Global Theme To:")
-            copy_split = box.split(factor=0.5)
-            copy_left = copy_split.column()
-            copy_right = copy_split.column()
-
-            copy_left.prop(theme, "global_copy_user_interface")
-            copy_left.prop(theme, "global_copy_view_3d")
-            copy_left.prop(theme, "global_copy_timeline")
-            copy_left.prop(theme, "global_copy_graph_editor")
-            copy_left.prop(theme, "global_copy_dopesheet")
-            copy_left.prop(theme, "global_copy_nla")
-            copy_left.prop(theme, "global_copy_image_editor")
-            copy_left.prop(theme, "global_copy_sequence_editor")
-            copy_left.prop(theme, "global_copy_text_editor")
-            copy_right.prop(theme, "global_copy_node_editor")
-            copy_right.prop(theme, "global_copy_logic_editor")
-            copy_right.prop(theme, "global_copy_properties")
-            copy_right.prop(theme, "global_copy_outliner")
-            copy_right.prop(theme, "global_copy_user_preferences")
-            copy_right.prop(theme, "global_copy_info")
-            copy_right.prop(theme, "global_copy_file_browser")
-            copy_right.prop(theme, "global_copy_console")
-            copy_right.prop(theme, "global_copy_clip_editor")
+            box = _theme_box_key(col, "Copy Global Theme To:", "GLOBAL/copy")
+            if box:
+                copy_split = box.split(factor=0.5)
+                copy_left = copy_split.column()
+                copy_right = copy_split.column()
+                for name in ("user_interface", "view_3d", "timeline", "graph_editor",
+                             "dopesheet", "nla", "image_editor", "sequence_editor", "text_editor"):
+                    copy_left.prop(theme, "global_copy_" + name)
+                for name in ("node_editor", "logic_editor", "properties", "outliner",
+                             "user_preferences", "info", "file_browser", "console", "clip_editor"):
+                    copy_right.prop(theme, "global_copy_" + name)
 
             col.label(text="Shared Theme Space Settings:")
-            self._theme_generic(col, theme.global_theme, 'GLOBAL_THEME')
+            self._theme_generic(col, theme.global_theme, 'GLOBAL_THEME', "global_theme")
 
-            box = col.box()
-            box.label(text="All Widget Colors:")
-            self._theme_widget_style(box, theme.global_ui.wcol_regular)
+            all_wcol = ";".join("user_interface." + p.identifier
+                                for p in theme.user_interface.bl_rna.properties
+                                if p.identifier.startswith("wcol_") and p.identifier != "wcol_state")
+            box = _theme_box_key(col, "All Widget Colors:", "GLOBAL/widgets", flash=all_wcol)
+            if box:
+                self._theme_widget_style(box, theme.global_ui.wcol_regular)
 
             col.label(text="Widget State Colors:")
-            self._theme_generic(col, theme.global_ui.wcol_state, 'GLOBAL_THEME')
+            self._theme_generic(col, theme.global_ui.wcol_state, 'GLOBAL_THEME', "global_ui.wcol_state",
+                                flash_base="user_interface.wcol_state")
         elif theme.theme_area == 'BONE_COLOR_SETS':
             col = split.column()
 
             for i, ui in enumerate(theme.bone_color_sets, 1):
-                box = col.box()
-                box.label(iface_(f"Color Set {i:d}"), translate=False)
+                box = _theme_box_key(col, iface_(f"Color Set {i:d}"), f"BONE/{i}",
+                                     flash="bone_color_sets[%d]" % (i - 1))
+                if not box:
+                    continue
 
                 row = box.row()
 
@@ -968,19 +1115,15 @@ class USERPREF_PT_theme(Panel):
 
             style = context.user_preferences.ui_styles[0]
 
-            box = col.box()
-            box.label(text="Panel Title:")
-            self._ui_font_style(box, style.panel_title)
-
-            box = col.box()
-            box.label(text="Widget:")
-            self._ui_font_style(box, style.widget)
-
-            box = col.box()
-            box.label(text="Widget Label:")
-            self._ui_font_style(box, style.widget_label)
+            for title, key, fs in (("Panel Title:", "panel_title", style.panel_title),
+                                   ("Widget:", "widget", style.widget),
+                                   ("Widget Label:", "widget_label", style.widget_label)):
+                box = _theme_box_key(col, title, "STYLE/" + key)
+                if box:
+                    self._ui_font_style(box, fs)
         else:
-            self._theme_generic(split, getattr(theme, theme.theme_area.lower()), theme.theme_area)
+            self._theme_generic(split, getattr(theme, theme.theme_area.lower()), theme.theme_area,
+                                theme.theme_area.lower())
 
 
 class USERPREF_PT_file(Panel):
@@ -1590,6 +1733,7 @@ class USERPREF_PT_addons(Panel):
 
 
 classes = (
+    USERPREF_OT_theme_flash,
     USERPREF_HT_header,
     USERPREF_PT_navigation,
     USERPREF_MT_interaction_presets,
