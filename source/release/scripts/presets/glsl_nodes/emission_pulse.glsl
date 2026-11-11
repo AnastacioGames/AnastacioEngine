@@ -9,6 +9,7 @@
 void node(inout Shade c)
 {
     float pulse = 0.5 + 0.5 * sin(TIME * params.speed);
-    c.emission += params.glow * params.strength * pulse;
-    c.albedo.rgb = mix(c.albedo.rgb, params.glow, 0.25 * pulse);
+    // The material's Emit is a single value that multiplies Albedo: the glow color goes in Albedo.
+    c.albedo.rgb = mix(c.albedo.rgb, params.glow, pulse);
+    c.emission += vec3(params.strength * pulse);
 }
