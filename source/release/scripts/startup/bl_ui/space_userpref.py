@@ -694,32 +694,28 @@ class USERPREF_PT_theme(Panel):
 
     @staticmethod
     def _theme_widget_style(layout, widget_style):
-
+        # 4 colunas: cores de fundo, cores de texto, forma e degradê
         row = layout.row()
 
-        subsplit = row.split(factor=0.95)
+        col = row.column()
+        col.prop(widget_style, "outline")
+        col.prop(widget_style, "item", slider=True)
 
-        padding = subsplit.split(factor=0.15)
-        colsub = padding.column()
-        colsub = padding.column()
-        colsub.row().prop(widget_style, "outline")
-        colsub.row().prop(widget_style, "item", slider=True)
-        colsub.row().prop(widget_style, "inner", slider=True)
-        colsub.row().prop(widget_style, "inner_sel", slider=True)
-        colsub.row().prop(widget_style, "roundness")
+        col = row.column()
+        col.prop(widget_style, "inner", slider=True)
+        col.prop(widget_style, "inner_sel", slider=True)
 
-        subsplit = row.split(factor=0.85)
+        col = row.column()
+        col.prop(widget_style, "text")
+        col.prop(widget_style, "text_sel")
 
-        padding = subsplit.split(factor=0.15)
-        colsub = padding.column()
-        colsub = padding.column()
-        colsub.row().prop(widget_style, "text")
-        colsub.row().prop(widget_style, "text_sel")
-        colsub.prop(widget_style, "show_shaded")
-        subsub = colsub.column(align=True)
-        subsub.active = widget_style.show_shaded
-        subsub.prop(widget_style, "shadetop")
-        subsub.prop(widget_style, "shadedown")
+        col = row.column()
+        col.prop(widget_style, "roundness")
+        col.prop(widget_style, "show_shaded")
+        sub = col.column(align=True)
+        sub.active = widget_style.show_shaded
+        sub.prop(widget_style, "shadetop")
+        sub.prop(widget_style, "shadedown")
 
     @staticmethod
     def _ui_font_style(layout, font_style):
@@ -749,20 +745,12 @@ class USERPREF_PT_theme(Panel):
         outer = col
         col = outer.box()
         col.label(text="State:")
-        row = col.row()
-        split = row.split(factor=0.5)
-        left, right = split.column(), split.column()
-        left.prop(ui_state, "inner_anim")
-        left.prop(ui_state, "inner_anim_sel")
-        left.prop(ui_state, "inner_driven")
-        left.prop(ui_state, "inner_driven_sel")
-        right.prop(ui_state, "blend")
-        right.prop(ui_state, "inner_key")
-        right.prop(ui_state, "inner_key_sel")
-        right.prop(ui_state, "inner_overridden")
-        right.prop(ui_state, "inner_overridden_sel")
-        right.prop(ui_state, "inner_changed")
-        right.prop(ui_state, "inner_changed_sel")
+        col.prop(ui_state, "blend")
+        flow = col.column_flow(columns=3)
+        for name in ("inner_anim", "inner_anim_sel", "inner_driven", "inner_driven_sel",
+                     "inner_key", "inner_key_sel", "inner_overridden", "inner_overridden_sel",
+                     "inner_changed", "inner_changed_sel"):
+            flow.prop(ui_state, name)
 
         col = outer.box()
         col.label(text="Styles:")
@@ -792,23 +780,17 @@ class USERPREF_PT_theme(Panel):
         col = outer.box()
         col.label(text="Axis Colors:")
         row = col.row()
-        split = row.split(factor=0.5)
-        left, right = split.column(), split.column()
-        left.prop(ui, "axis_x")
-        left.prop(ui, "axis_y")
-        left.prop(ui, "axis_z")
+        row.column().prop(ui, "axis_x")
+        row.column().prop(ui, "axis_y")
+        row.column().prop(ui, "axis_z")
 
         col = outer.box()
         col.label(text="Icon Colors:")
-        row = col.row()
-        split = row.split(factor=0.5)
-        left, right = split.column(), split.column()
-        left.prop(ui, "icon_collection")
-        left.prop(ui, "icon_scene")
-        left.prop(ui, "icon_object")
-        left.prop(ui, "icon_object_data")
-        right.prop(ui, "icon_modifier")
-        right.prop(ui, "icon_shading")
+        for names in (("icon_collection", "icon_scene", "icon_object"),
+                      ("icon_object_data", "icon_modifier", "icon_shading")):
+            row = col.row()
+            for name in names:
+                row.column().prop(ui, name)
 
     @classmethod
     def poll(cls, context):
