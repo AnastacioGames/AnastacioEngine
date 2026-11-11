@@ -272,29 +272,38 @@ def native_library(name, setup):
 XATLAS_BRUTE_FORCE = 0  # 1: brute-force chart placement, measured slower with no gain
 
 
-def ngon_triangles(me, polys, start):
-    """Ear-clipped triangles of the given polygons, as mesh loop indices (flat array)."""
-    import bmesh
+def loop_triangles(me):
+    """Triangles of every polygon as mesh loop indices (flat int64 array). Triangles directly; quads and
+    n-gons by Blender's tessellation (a fan of a concave polygon covers area outside it: xatlas then
+    folds it over other islands). Falls back to fans when bmesh drops an invalid face (its face indices
+    would no longer match the mesh)."""
     import numpy as np
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bm.faces.ensure_lookup_table()
-    wanted = set(int(p) for p in polys)
-    out = []
-    for tri in bm.calc_tessface():
-        face = tri[0].face
-        if face.index not in wanted:
-            continue
-        first = face.loops[0]
-        for l in tri:
-            # bmesh keeps the mesh loop order of each face: loop index = loop_start + position in the face
-            pos, cur = 0, first
-            while cur != l:
-                cur = cur.link_loop_next
-                pos += 1
-            out.append(int(start[face.index]) + pos)
-    bm.free()
-    return np.array(out, dtype=np.int64)
+    start = np.empty(len(me.polygons), dtype=np.int64)
+    total = np.empty(len(me.polygons), dtype=np.int64)
+    me.polygons.foreach_get("loop_start", start)
+    me.polygons.foreach_get("loop_total", total)
+    tri = total == 3
+    t = start[tri]
+    out = [np.stack([t, t + 1, t + 2], axis=1).reshape(-1)]
+    if not tri.all():
+        import bmesh
+        bm = bmesh.new()
+        bm.from_mesh(me)
+        if len(bm.faces) == len(me.polygons):
+            # bmesh keeps the face order and the loop order of each face: loop = loop_start + position
+            for f in bm.faces:
+                base = int(start[f.index])
+                for i, l in enumerate(f.loops):
+                    l.index = base + i
+            out.append(np.array([l.index for t3 in bm.calc_tessface() if len(t3[0].face.loops) > 3
+                                 for l in t3], dtype=np.int64))
+        else:
+            s_start, n = start[~tri], total[~tri] - 2
+            poly = np.repeat(np.arange(len(s_start)), n)
+            k = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n) + 1
+            out.append(np.stack([s_start[poly], s_start[poly] + k, s_start[poly] + k + 1], axis=1).reshape(-1))
+        bm.free()
+    return np.concatenate(out)
 
 
 def xatlas_pack(objects, size, margin_px):
@@ -318,21 +327,7 @@ def xatlas_pack(objects, size, margin_px):
         co = (co @ m[:3, :3].T) * lightmap_scale(ob)
         loop_vert = np.empty(len(me.loops), dtype=np.int64)
         me.loops.foreach_get("vertex_index", loop_vert)
-        start = np.empty(len(me.polygons), dtype=np.int64)
-        total = np.empty(len(me.polygons), dtype=np.int64)
-        me.polygons.foreach_get("loop_start", start)
-        me.polygons.foreach_get("loop_total", total)
-        # triangles of every polygon, as loop indices (the UV is written per loop): fan for triangles and
-        # quads (fast), ear clipping for n-gons (a fan of a concave n-gon covers area outside the polygon,
-        # xatlas then splits it into folded charts and the polygon lands over other islands)
-        small = total <= 4
-        s_start, s_total = start[small], total[small]
-        n = s_total - 2
-        poly = np.repeat(np.arange(len(s_start)), n)
-        k = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n) + 1
-        tris = np.stack([s_start[poly], s_start[poly] + k, s_start[poly] + k + 1], axis=1).reshape(-1)
-        if not small.all():
-            tris = np.concatenate([tris, ngon_triangles(me, np.nonzero(~small)[0], start)])
+        tris = loop_triangles(me)
         positions.append(co)
         indices.append(loop_vert[tris].astype(np.uint32))
         corners.append(tris)
@@ -350,11 +345,20 @@ def xatlas_pack(objects, size, margin_px):
         return False
     out = out.reshape(-1, 2)
     offset = 0
+    results = []
     for ob, tris in zip(objects, corners):
         me = ob.data
         uv = np.zeros(len(me.loops) * 2, dtype=np.float32)
-        uv.reshape(-1, 2)[tris] = out[offset:offset + len(tris)]
+        part = out[offset:offset + len(tris)]
+        uv.reshape(-1, 2)[tris] = part
         offset += len(tris)
+        # a loop shared by triangles that xatlas put in different charts can hold only one UV: then the
+        # polygon would stretch across the atlas; keep Lightmap Pack instead
+        if np.abs(uv.reshape(-1, 2)[tris] - part).max(initial=0.0) > 1e-6:
+            print("AE lightmap: xatlas split a polygon of %s across charts, using Lightmap Pack" % ob.name)
+            return False
+        results.append((me, uv))
+    for me, uv in results:
         me.uv_layers[UV_NAME].data.foreach_set("uv", uv)
         me.update()
     return True
@@ -368,20 +372,14 @@ def read_uvs(ob):
 
 
 def uv_area(objects, uvs=None):
-    """Fraction of the atlas covered by the "Lightmap" UVs (fan triangles of every polygon)."""
+    """Fraction of the atlas covered by the "Lightmap" UVs (same triangles given to xatlas)."""
     import numpy as np
     total = 0.0
     for i, ob in enumerate(objects):
         me = ob.data
         uv = (uvs[i] if uvs else read_uvs(ob)).reshape(-1, 2)
-        start = np.empty(len(me.polygons), dtype=np.int64)
-        count = np.empty(len(me.polygons), dtype=np.int64)
-        me.polygons.foreach_get("loop_start", start)
-        me.polygons.foreach_get("loop_total", count)
-        n = count - 2
-        poly = np.repeat(np.arange(len(start)), n)
-        k = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n) + 1
-        a, b, c = uv[start[poly]], uv[start[poly] + k], uv[start[poly] + k + 1]
+        t = loop_triangles(me).reshape(-1, 3)
+        a, b, c = uv[t[:, 0]], uv[t[:, 1]], uv[t[:, 2]]
         total += 0.5 * np.abs((b[:, 0] - a[:, 0]) * (c[:, 1] - a[:, 1]) - (c[:, 0] - a[:, 0]) * (b[:, 1] - a[:, 1])).sum()
     return total
 

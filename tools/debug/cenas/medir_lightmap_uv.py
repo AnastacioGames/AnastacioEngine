@@ -30,6 +30,9 @@ def add_concave_ngon(scene):
     # face degenerada (três pontos alinhados) colada ao lado
     a, b, c = bm.verts.new((5, 0, 0)), bm.verts.new((6, 0, 0)), bm.verts.new((7, 0, 0))
     bm.faces.new((a, b, c))
+    # quad côncavo (bumerangue): o leque 0-2 sai do quad
+    q = [bm.verts.new(p) for p in ((8, 0, 0), (10, 0, 0), (8.5, 0.5, 0), (8, 2, 0))]
+    bm.faces.new(q)
     bm.to_mesh(me)
     ob = bpy.data.objects.new("ngon", me)
     scene.objects.link(ob)
@@ -87,6 +90,8 @@ def triangles(objects):
 def raster(tris):
     owner = np.full((SIZE, SIZE), -1, dtype=np.int64)
     overlap = 0
+    overlap_any = 0
+    count = np.zeros((SIZE, SIZE), dtype=np.int32)
     pairs = {}
     owner_name = {}
     ys, xs = np.mgrid[0:SIZE, 0:SIZE]
@@ -105,15 +110,20 @@ def raster(tris):
         w1 = ((c[1] - a[1]) * (X - c[0]) + (a[0] - c[0]) * (Y - c[1])) / d
         inside = (w0 > 1e-4) & (w1 > 1e-4) & (1 - w0 - w1 > 1e-4)
         sub = owner[y0:y1 + 1, x0:x1 + 1]
+        cnt = count[y0:y1 + 1, x0:x1 + 1]
+        twice = inside & (cnt > 0)
+        cnt[inside] += 1
+        overlap_any += int(np.count_nonzero(twice))
         hit = inside & (sub >= 0) & (sub != isl)
         if hit.any():
             others = {owner_name[i] for i in np.unique(sub[hit])}
             for o in others:
-                pairs[(name, o)] = pairs.get((name, o), 0) + int(np.count_nonzero(hit))
+                n = int(np.count_nonzero(hit & np.isin(sub, [i for i, v in owner_name.items() if v == o])))
+                pairs[(name, o)] = pairs.get((name, o), 0) + n
         overlap += int(np.count_nonzero(hit))
         owner_name[isl] = name
         sub[inside] = isl
-    return owner, overlap, pairs
+    return owner, overlap, pairs, overlap_any
 
 
 def min_gap(owner):
@@ -137,13 +147,16 @@ def main():
     objects = build(scene)
     lm.make_lightmap_uvs(scene, objects, SIZE, MARGIN)
     tris = triangles(objects)
-    owner, overlap, pairs = raster(tris)
+    owner, overlap, pairs, overlap_any = raster(tris)
     for k, v in sorted(pairs.items(), key=lambda kv: -kv[1])[:10]:
         print('MEDIR_LM sobrepoe', k, v)
     covered = np.count_nonzero(owner >= 0) / float(SIZE * SIZE)
     print("MEDIR_LM objetos=%d triangulos=%d ilhas=%d" % (len(objects), len(tris), len({t[1] for t in tris})))
-    print("MEDIR_LM cobertura=%.1f%% sobreposicao_px=%d menor_vao_texels=%d (margem pedida %d -> esperado >= %d)"
-          % (100 * covered, overlap, min_gap(owner), MARGIN, 2 * MARGIN))
+    gap = min_gap(owner)
+    gap_txt = ("> %d" % (gap - 1)) if gap > 2 * MARGIN + 2 else str(gap)
+    print("MEDIR_LM cobertura=%.1f%% sobreposicao_entre_ilhas_px=%d sobreposicao_total_px=%d menor_vao_texels=%s"
+          " (margem pedida %d -> esperado >= %d)" % (100 * covered, overlap, overlap_any, gap_txt, MARGIN, 2 * MARGIN))
+    print("MEDIR_LM limites: amostra no centro do pixel, borda exclui 1e-4, triângulo degenerado ignorado")
 
 
 main()
