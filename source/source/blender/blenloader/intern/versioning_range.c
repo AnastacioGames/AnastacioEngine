@@ -579,6 +579,14 @@ void blo_do_versions_range(FileData *fd, Library *lib, Main *main)
     }
   }
 
+  if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 114)) {
+    /* The capsule now fits the mesh height (6a46711e). Files made before it, including
+     * every file from the original Range Engine, keep the taller capsule they were tuned for. */
+    LISTBASE_FOREACH (Object *, ob, &main->object) {
+      ob->gameflag2 |= OB_CAPSULE_LEGACY_HEIGHT;
+    }
+  }
+
   if (!MAIN_VERSION_RANGE_ATLEAST(main, 1, 6, 119)) {
     /* Keep the new Rain sub-panels open for existing files, preserving the previous
      * fully expanded presentation on their first load in this version. */

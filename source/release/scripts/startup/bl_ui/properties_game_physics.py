@@ -416,6 +416,9 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, Panel):
         sub.active = game.physics_type not in {'SOFT_BODY', 'CHARACTER'}
         sub.prop(game, "use_collision_compound", text="Children Compound")
 
+        if game.collision_bounds_type == 'CAPSULE':
+            col.prop(context.active_object, "use_legacy_capsule_height")
+
         layout.separator()
         split = layout.split()
         col = split.column()

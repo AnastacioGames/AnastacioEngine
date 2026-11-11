@@ -3649,7 +3649,13 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 		{
 			shapeInfo->m_radius = std::max(bounds_extends[0], bounds_extends[1]);
 			// Bullet's capsule height excludes the two hemispherical caps.
-			shapeInfo->m_height = 2.0f * (bounds_extends[2] - shapeInfo->m_radius);
+			// Legacy (old Range files): full mesh height between the cap centers.
+			if (blenderobject->gameflag2 & OB_CAPSULE_LEGACY_HEIGHT) {
+				shapeInfo->m_height = 2.0f * bounds_extends[2];
+			}
+			else {
+				shapeInfo->m_height = 2.0f * (bounds_extends[2] - shapeInfo->m_radius);
+			}
 			if (shapeInfo->m_height < 0.0f) {
 				shapeInfo->m_height = 0.0f;
 			}

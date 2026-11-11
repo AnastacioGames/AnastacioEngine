@@ -3494,6 +3494,11 @@ static void rna_def_object(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Start Asleep", "Start the game with this body asleep: it stays still and costs almost nothing until an awake body (e.g. a moving car) touches it, then it wakes up with normal physics (use for many breakable props like fences)");
 	RNA_def_property_update(prop, NC_OBJECT, NULL);
 
+	prop = RNA_def_property(srna, "use_legacy_capsule_height", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_CAPSULE_LEGACY_HEIGHT);
+	RNA_def_property_ui_text(prop, "Legacy Capsule Height", "Use the old Range Engine capsule, one radius taller than the mesh at the top and at the bottom (on by default in files made in the Range Engine, so their physics behave as before)");
+	RNA_def_property_update(prop, NC_OBJECT, NULL);
+
 	prop = RNA_def_property(srna, "use_static_batch", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "gameflag2", OB_STATIC_BATCH);
 	RNA_def_property_ui_text(prop, "Static Batch", "Merge this mesh at game start with the other Static Batch objects of the scene, drawing them together in fewer draw calls (only for objects that never move; Static or No Collision physics)");

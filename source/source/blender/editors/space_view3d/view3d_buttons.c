@@ -958,7 +958,31 @@ static void v3d_transform_butsR(uiLayout *layout, PointerRNA *ptr)
 			break;
 		default: /* euler rotations */
 			colsub = uiLayoutColumn(split, true);
-			uiItemR(colsub, ptr, "rotation_euler", 0, IFACE_("Rotation"), ICON_NONE);
+			{
+				/* Rotacao diferente de 0 fica em vermelho e avisa no rotulo, como a escala. */
+				PropertyRNA *rot_prop = RNA_struct_find_property(ptr, "rotation_euler");
+				float rot[3];
+				bool rot_off = false;
+				int i;
+				static const char *rot_names[3] = {"X", "Y", "Z"};
+				RNA_property_float_get_array(ptr, rot_prop, rot);
+				for (i = 0; i < 3; i++) {
+					if (fabsf(rot[i]) > 1e-6f) rot_off = true;
+				}
+				if (rot_off) {
+					uiLayout *row = uiLayoutRow(colsub, false);
+					uiLayoutSetRedAlert(row, true);
+					uiItemL(row, IFACE_("Rotation: (not 0, apply with Ctrl+A)"), ICON_ERROR);
+				}
+				else {
+					uiItemL(colsub, IFACE_("Rotation:"), ICON_NONE);
+				}
+				for (i = 0; i < 3; i++) {
+					uiLayoutSetRedAlert(colsub, fabsf(rot[i]) > 1e-6f);
+					uiItemFullR(colsub, ptr, rot_prop, i, 0, 0, rot_names[i], ICON_NONE);
+				}
+				uiLayoutSetRedAlert(colsub, false);
+			}
 			colsub = uiLayoutColumn(split, true);
 			uiItemL(colsub, "", ICON_NONE);
 			uiItemR(colsub, ptr, "lock_rotation", UI_ITEM_R_TOGGLE | UI_ITEM_R_ICON_ONLY, "", ICON_NONE);

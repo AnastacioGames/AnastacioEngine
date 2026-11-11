@@ -1194,6 +1194,10 @@ enum {
 	OB_STATIC_BATCH                  = 1 << 18,
 	/* Dynamic/Rigid Body starts asleep (no jitter, ~no cost) until an awake body touches it. */
 	OB_START_ASLEEP                  = 1 << 19,
+	/* Capsule bounds use the old Range height (2 * half Z between the cap centers, so the
+	 * capsule sticks out one radius above and below the mesh). Set by versioning on files
+	 * made before the mesh-fitting capsule, so their characters keep the tuned behavior. */
+	OB_CAPSULE_LEGACY_HEIGHT         = 1 << 20,
 
 /*	OB_LIFE     = OB_PROP | OB_DYNAMIC | OB_ACTOR | OB_MAINACTOR | OB_CHILD, */
 };
