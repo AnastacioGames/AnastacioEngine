@@ -297,6 +297,9 @@ def analyze(events):
             work_rows.append((k, _median(v), _percentile(v, 0.95), v[-1]))
 
     memory = [(e['t'], e['mb']) for e in events if e['ev'] == 'memory']
+    # GPU side of the memory events (vram, shared, gpu3d, igpu), only where the system reports it.
+    gpu_all = [e for e in events if e['ev'] == 'memory']
+    gpu_mem = [e for e in gpu_all if e['t'] >= startup_s and ('vram' in e or 'gpu3d' in e)]
     sounds = defaultdict(lambda: [0, '', 0.0])
     for e in events:
         if e['ev'] == 'sound':
@@ -307,7 +310,7 @@ def analyze(events):
     marks = [(e['t'], e['ev'], e['scene']) for e in events if e['ev'] in ('scene_add', 'scene_remove')]
     marks += [(e['t'], 'sound', e['name']) for e in events if e['ev'] == 'sound']
     return dict(session=session, play=play, load_end=load_end, startup_s=startup_s, scripts=scripts,
-                memory=memory, sounds=sorted(sounds.items(), key=lambda x: x[1][0], reverse=True), marks=marks,
+                memory=memory, gpu_mem=gpu_mem, gpu_all=gpu_all, sounds=sorted(sounds.items(), key=lambda x: x[1][0], reverse=True), marks=marks,
                 has_runtime='runtime' in session.get('modules', []),
                 has_scripts='scripts' in session.get('modules', []), median=median, limit=limit, spikes=spikes, categories=categories,
                 p95=_percentile(costs, 0.95), p99=_percentile(costs, 0.99), worst=max(costs) if costs else 0.0,
@@ -596,6 +599,7 @@ def advice(a, shader_items):
         if tris >= 10000 or len(a['never']) >= 20:
             out.append(('warn', _('%d objects (%d triangles) were loaded but never seen by the camera. '
                                   'If they are not needed, remove them or set Load Mode to On Demand.') % (len(a['never']), tris)))
+    out.extend(gpu_advice(a))
     grow, base = memory_growth(a)
     if base and grow > max(100.0, base * 0.3):
         out.append(('warn', _('Memory grew %.0f MB during play (from %.0f MB). If it keeps growing in longer runs, '
@@ -678,7 +682,8 @@ def _memory_chart(a):
     span = max(hi - lo, 1.0)
     pts = ' '.join('%.1f,%.1f' % ((t - t0) / (t1 - t0) * w, h - 4 - (mb - lo) / span * (h - 8)) for t, mb in mem)
     return ('<svg viewBox="0 0 %d %d" preserveAspectRatio="none" class="chart mem"><polyline points="%s" class="memline"/></svg>'
-            '<p class="note">%s</p>' % (w, h, pts, _esc(_('Process memory: %.0f MB at the start, %.0f MB at the peak, %.0f MB at the end.')
+            '<div class="legend"><span><i class="dot" style="background:var(--warn)"></i>%s</span></div>'
+            '<p class="note">%s</p>' % (w, h, pts, _esc(_('Process memory (RAM)')), _esc(_('Process memory: %.0f MB at the start, %.0f MB at the peak, %.0f MB at the end.')
                                                          % (mem[0][1], hi, mem[-1][1]))))
 
 
@@ -693,6 +698,90 @@ WORK_LIMITS = {
 def _work_level(name, value):
     limits = WORK_LIMITS.get(name)
     return _level(value, *limits) if limits else 'mut'
+
+
+def gpu_summary(a):
+    """Peak VRAM, peak shared memory, median GPU 3D use and integrated flag during play, or None."""
+    g = a.get('gpu_mem') or []
+    if not g:
+        return None
+    vram = [e['vram'] for e in g if 'vram' in e]
+    shared = [e['shared'] for e in g if 'shared' in e]
+    busy = [e['gpu3d'] for e in g if 'gpu3d' in e]
+    return dict(vram=max(vram) if vram else None, shared=max(shared) if shared else None,
+                busy=_median(busy) if busy else None, igpu=bool(g[-1].get('igpu', 0)))
+
+
+def _gpu_memory_note(a):
+    s = gpu_summary(a)
+    if not s:
+        return ''
+    parts = []
+    if s['shared'] is not None:
+        parts.append(_('system memory used by the GPU peak %.0f MB') % s['shared'])
+    if s['busy'] is not None:
+        parts.append(_('GPU 3D use %.0f%% (median)') % s['busy'])
+    if s['igpu']:
+        parts.append(_('integrated GPU'))
+    if not parts:
+        return _gpu_chart(a)
+    return _gpu_chart(a) + '<p class="note">%s</p>' % _esc(_('GPU: ') + ', '.join(parts) + '.')
+
+
+def _gpu_chart(a):
+    """VRAM (own scale) and GPU 3D use (0-100%) over time."""
+    g = a.get('gpu_all') or []
+    if len(g) < 2 or not a.get('gpu_mem'):
+        return ''
+    w, h = 1000, 90
+    t0, t1 = g[0]['t'], max(g[-1]['t'], g[0]['t'] + 0.001)
+    def x(t):
+        return (t - t0) / (t1 - t0) * w
+    lines = []
+    vram = [(e['t'], e['vram']) for e in g if 'vram' in e]
+    if len(vram) >= 2:
+        hi = max(max(v for _t, v in vram), 1.0)
+        lines.append('<polyline points="%s" class="vramline"/>' % ' '.join(
+            '%.1f,%.1f' % (x(t), h - 4 - v / hi * (h - 8)) for t, v in vram))
+    busy = [(e['t'], e['gpu3d']) for e in g if 'gpu3d' in e]
+    if len(busy) >= 2:
+        lines.append('<polyline points="%s" class="busyline"/>' % ' '.join(
+            '%.1f,%.1f' % (x(t), h - 4 - b / 100.0 * (h - 8)) for t, b in busy))
+    if not lines:
+        return ''
+    # 0% and 100% guides for the GPU use line.
+    if len(busy) >= 2:
+        lines[:0] = ['<line x1="0" x2="%d" y1="%.1f" y2="%.1f" class="ref"/>' % (w, y, y) for y in (4, h - 4)]
+    legend = []
+    if len(vram) >= 2:
+        legend.append('<span><i class="dot" style="background:var(--good)"></i>%s</span>' % _esc(
+            _('VRAM: %.0f MB at the end, peak %.0f MB (line scaled to the peak)') % (vram[-1][1], max(v for _t, v in vram))))
+    if len(busy) >= 2:
+        legend.append('<span><i class="dot" style="background:var(--acc2)"></i>%s</span>' % _esc(
+            _('GPU 3D use: %.0f%% at the end (dashed lines: 0%% and 100%%)') % busy[-1][1]))
+    return ('<h3 class="gsub">%s</h3><svg viewBox="0 0 %d %d" preserveAspectRatio="none" class="chart mem">%s</svg>'
+            '<div class="legend">%s</div>' % (_esc(_('GPU')), w, h, ''.join(lines), ''.join(legend)))
+
+
+def gpu_advice(a):
+    """Tips from the GPU counters: GPU or CPU bound, and video memory spilling to system memory."""
+    out = []
+    s = gpu_summary(a)
+    if not s:
+        return out
+    frame_budget = 1000.0 / 60.0
+    if s['busy'] is not None and a['median'] > frame_budget:
+        if s['busy'] >= 90:
+            out.append(('bad', _('The GPU is busy %.0f%% of the time: it is the limit. Lower resolution, anti-aliasing, '
+                                 'shadows or screen effects before touching scripts or physics.') % s['busy']))
+        elif s['busy'] < 60:
+            out.append(('warn', _('The GPU is busy only %.0f%% of the time while frames are slow: the CPU is the limit '
+                                  '(logic, physics, scripts, draw calls). See where the frame time goes below.') % s['busy']))
+    if not s['igpu'] and s['shared'] is not None and s['vram'] and s['shared'] > max(256.0, s['vram'] * 0.5):
+        out.append(('warn', _('The GPU uses %.0f MB of system memory next to %.0f MB of VRAM. When video memory is full, '
+                              'textures move to system memory and drawing gets slower: use smaller or compressed '
+                              'textures (DDS/KTX2).') % (s['shared'], s['vram'])))
+    return out
 
 
 def memory_growth(a):
@@ -761,6 +850,8 @@ td:first-child{white-space:nowrap}td.barcell{width:55%}.n{text-align:right;font-
 .loads{margin:0;padding-left:18px}
 .mscn{stroke:var(--warn);stroke-width:1.5;stroke-dasharray:3 3}.msnd{stroke:var(--good);stroke-width:2}
 .chart.mem{height:90px}.memline{fill:none;stroke:var(--warn);stroke-width:1.6}
+.gsub{font-size:13px;margin:18px 0 6px;color:var(--mut);border-top:1px solid var(--line);padding-top:12px}
+.vramline{fill:none;stroke:var(--good);stroke-width:1.6}.busyline{fill:none;stroke:var(--acc2);stroke-width:1.4}
 .bar{height:10px;background:var(--acc);border-radius:6px;min-width:3px}
 .bar.warn{background:var(--warn)}.bar.bad{background:var(--bad)}.bar.good{background:var(--good)}
 .ok,.vgood{color:var(--good)}.vwarn{color:var(--warn);font-weight:600}.vbad{color:var(--bad);font-weight:700}.vmut{color:var(--mut)}
@@ -818,6 +909,13 @@ def write_html(folder, title=None):
         (_('Loads during play'), '%d' % len(a['late']), _level(len(a['late']), 1, 5)),
         (_('Objects never drawn'), '%d' % len(a['never']) if a['has_usage'] else '-', _level(len(a['never']), 1, 1000)),
     ]
+    gs = gpu_summary(a)
+    if gs and gs['vram'] is not None:
+        kpis.append((_('VRAM peak'), '%.0f MB' % gs['vram'], 'mut'))
+    if gs and gs['busy'] is not None:
+        # Busy GPU with slow frames is the GPU limit; busy GPU with fast frames is fine.
+        slow = a['median'] > 1000 / 55
+        kpis.append((_('GPU 3D use'), '%.0f%%' % gs['busy'], _level(gs['busy'], 90, 100) if slow else 'good'))
     w.append('<div class="kpis">' + ''.join('<div class="kpi %s"><b>%s</b><span>%s</span></div>' % (lvl, _esc(v), _esc(k))
                                              for k, v, lvl in kpis) + '</div>')
 
@@ -840,7 +938,7 @@ def write_html(folder, title=None):
                        'Orange dashed lines: scenes added or removed; green ticks at the bottom: sounds (hover for details). '
                        'Click a red dot to see that frame.'))))
     if a['has_runtime'] and a['memory']:
-        w.append('<h2>%s</h2><div class="card">%s</div>' % (_esc(_('Memory')), _memory_chart(a)))
+        w.append('<h2>%s</h2><div class="card">%s%s</div>' % (_esc(_('Memory')), _memory_chart(a), _gpu_memory_note(a)))
 
     if a['categories']:
         total = sum(v for _k, v in a['categories']) or 1.0

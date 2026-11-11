@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Performance Report: VRAM e uso da GPU
+
+- O evento `memory` do Game Trace (módulo `runtime`) ganhou `vram`, `shared`, `gpu3d` e `igpu`, lidos uma vez por segundo numa thread própria (`CM_Trace.cpp`, `GpuSampler`). Windows: DXGI `QueryVideoMemoryInfo` (local/non local) e contador PDH `GPU Engine(pid_*engtype_3D)`, ambos por `LoadLibrary`, sem lib nova no link. Linux: `/proc/self/fdinfo` `drm-*` (AMD/Intel; o driver NVIDIA não escreve). Web fora. Ideia tirada do gputaskman (MIT), sem código dele.
+- Relatório: gráfico GPU (VRAM + uso 3D 0-100%) na seção Memória com legendas, quadros "Pico de VRAM" e "Uso 3D da GPU", dicas de limite GPU x CPU e de VRAM transbordando para a memória do sistema. Traces antigos geram o relatório como antes.
+
 ## 2026-11-10 — Material Atlas com paleta de cores
 
 - Material Atlas ganhou modos Auto, Palette e Bake. Auto olha os materiais do objeto: só cores lisas usa Palette; com textura usa o Bake de antes. O painel mostra o resumo (materiais na paleta x no bake) e o motivo de cada material que precisa de bake.

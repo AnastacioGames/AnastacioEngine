@@ -41,6 +41,9 @@
 #  endif
 #  include <psapi.h>
 #  include <tlhelp32.h>
+#  include <dxgi1_4.h>
+#  include <pdh.h>
+#  include <pdhmsg.h>
 #else
 #  include <dirent.h>
 #  include <sys/syscall.h>
@@ -222,6 +225,303 @@ void CM_TraceScriptsFlush()
 	}
 }
 
+#ifndef __EMSCRIPTEN__
+namespace {
+
+/* GPU memory and 3D engine use of this process, read once per second on a thread of its own
+ * (the Windows counters can take a few ms). Negative values mean "not known here".
+ * Windows: DXGI QueryVideoMemoryInfo (local = VRAM, non local = system memory the GPU uses) and
+ * the "GPU Engine" counters (the same as Task Manager), both loaded at run time.
+ * Linux: /proc/self/fdinfo drm-* fields (AMD, Intel; the NVIDIA driver does not write them). */
+struct GpuReading
+{
+	double vram = -1.0, shared = -1.0, busy = -1.0;
+	int integrated = -1;
+};
+
+#ifdef _WIN32
+struct GpuReaderWin
+{
+	HMODULE dxgi = nullptr, pdh = nullptr;
+	IDXGIFactory1 *factory = nullptr;
+	PDH_HQUERY query = nullptr;
+	PDH_HCOUNTER counter = nullptr;
+	decltype(&PdhCollectQueryData) collect = nullptr;
+	decltype(&PdhGetFormattedCounterArrayW) array = nullptr;
+	decltype(&PdhCloseQuery) close = nullptr;
+	bool primed = false;
+
+	GpuReaderWin()
+	{
+		dxgi = LoadLibraryW(L"dxgi.dll");
+		if (dxgi) {
+			typedef HRESULT(WINAPI * CreateFactoryFn)(REFIID, void **);
+			CreateFactoryFn create = (CreateFactoryFn)GetProcAddress(dxgi, "CreateDXGIFactory1");
+			if (!create || FAILED(create(__uuidof(IDXGIFactory1), (void **)&factory))) {
+				factory = nullptr;
+			}
+		}
+		pdh = LoadLibraryW(L"pdh.dll");
+		if (pdh) {
+			auto open = (decltype(&PdhOpenQueryW))GetProcAddress(pdh, "PdhOpenQueryW");
+			auto add = (decltype(&PdhAddEnglishCounterW))GetProcAddress(pdh, "PdhAddEnglishCounterW");
+			collect = (decltype(&PdhCollectQueryData))GetProcAddress(pdh, "PdhCollectQueryData");
+			array = (decltype(&PdhGetFormattedCounterArrayW))GetProcAddress(pdh, "PdhGetFormattedCounterArrayW");
+			close = (decltype(&PdhCloseQuery))GetProcAddress(pdh, "PdhCloseQuery");
+			wchar_t path[128];
+			swprintf(path, 128, L"\\GPU Engine(pid_%lu_*engtype_3D)\\Utilization Percentage", GetCurrentProcessId());
+			if (!(open && add && collect && array && close && open(nullptr, 0, &query) == ERROR_SUCCESS)) {
+				query = nullptr;
+			}
+			else if (add(query, path, 0, &counter) != ERROR_SUCCESS) {
+				close(query);
+				query = nullptr;
+			}
+		}
+	}
+
+	~GpuReaderWin()
+	{
+		if (query) {
+			close(query);
+		}
+		if (factory) {
+			factory->Release();
+		}
+		if (pdh) {
+			FreeLibrary(pdh);
+		}
+		if (dxgi) {
+			FreeLibrary(dxgi);
+		}
+	}
+
+	GpuReading Read()
+	{
+		GpuReading r;
+		if (factory) {
+			// Sum over the adapters (a hybrid notebook may use both); the adapter with the most
+			// local memory in use says whether the game runs on an integrated GPU.
+			double vram = 0.0, shared = 0.0, most = -1.0;
+			bool any = false;
+			IDXGIAdapter1 *adapter = nullptr;
+			for (UINT i = 0; factory->EnumAdapters1(i, &adapter) != DXGI_ERROR_NOT_FOUND; ++i) {
+				DXGI_ADAPTER_DESC1 desc;
+				IDXGIAdapter3 *adapter3 = nullptr;
+				if (SUCCEEDED(adapter->GetDesc1(&desc)) && !(desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE) &&
+				    SUCCEEDED(adapter->QueryInterface(__uuidof(IDXGIAdapter3), (void **)&adapter3)))
+				{
+					DXGI_QUERY_VIDEO_MEMORY_INFO local, nonLocal;
+					if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &local)) &&
+					    SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_NON_LOCAL, &nonLocal)))
+					{
+						any = true;
+						vram += local.CurrentUsage / (1024.0 * 1024.0);
+						shared += nonLocal.CurrentUsage / (1024.0 * 1024.0);
+						const double used = (double)local.CurrentUsage + nonLocal.CurrentUsage;
+						if (used > most) {
+							most = used;
+							// Integrated GPUs get at most a small carve-out as dedicated memory.
+							r.integrated = desc.DedicatedVideoMemory < (size_t)512 * 1024 * 1024 ? 1 : 0;
+						}
+					}
+					adapter3->Release();
+				}
+				adapter->Release();
+			}
+			if (any) {
+				r.vram = vram;
+				r.shared = shared;
+			}
+		}
+		if (query && collect(query) == ERROR_SUCCESS) {
+			if (primed) {
+				DWORD size = 0, count = 0;
+				if (array(counter, PDH_FMT_DOUBLE, &size, &count, nullptr) == PDH_MORE_DATA && size) {
+					std::vector<unsigned char> buffer(size);
+					PDH_FMT_COUNTERVALUE_ITEM_W *items = (PDH_FMT_COUNTERVALUE_ITEM_W *)buffer.data();
+					if (array(counter, PDH_FMT_DOUBLE, &size, &count, items) == ERROR_SUCCESS) {
+						// One instance per 3D engine of each adapter; the busiest is the GPU in use.
+						double busy = 0.0;
+						for (DWORD i = 0; i < count; ++i) {
+							if (items[i].FmtValue.CStatus == ERROR_SUCCESS) {
+								busy = std::max(busy, items[i].FmtValue.doubleValue);
+							}
+						}
+						r.busy = std::min(busy, 100.0);
+					}
+				}
+			}
+			primed = true;  // rates need two collects
+		}
+		return r;
+	}
+};
+#else
+struct GpuReaderLinux
+{
+	double lastNs = -1.0, lastWall = 0.0;
+
+	static double ToMb(double value, const char *unit)
+	{
+		if (strncmp(unit, "GiB", 3) == 0) {
+			return value * 1024.0;
+		}
+		if (strncmp(unit, "MiB", 3) == 0) {
+			return value;
+		}
+		if (strncmp(unit, "KiB", 3) == 0) {
+			return value / 1024.0;
+		}
+		return value / (1024.0 * 1024.0);  // bytes
+	}
+
+	GpuReading Read()
+	{
+		GpuReading r;
+		DIR *dir = opendir("/proc/self/fdinfo");
+		if (!dir) {
+			return r;
+		}
+		// One DRM client can be open in several fds: count each client id once.
+		std::vector<unsigned long long> clients;
+		double vram = 0.0, shared = 0.0, ns = 0.0;
+		bool anyMem = false, anyEngine = false;
+		while (dirent *item = readdir(dir)) {
+			if (item->d_name[0] == '.') {
+				continue;
+			}
+			const std::string path = std::string("/proc/self/fdinfo/") + item->d_name;
+			FILE *f = fopen(path.c_str(), "r");
+			if (!f) {
+				continue;
+			}
+			char line[256];
+			unsigned long long client = 0;
+			bool hasClient = false;
+			double fdVram = 0.0, fdShared = 0.0, fdNs = 0.0;
+			bool fdMem = false, fdEngine = false;
+			while (fgets(line, sizeof(line), f)) {
+				char key[96], unit[16] = "";
+				double value = 0.0;
+				if (sscanf(line, "%95[^:]: %lf %15s", key, &value, unit) < 2) {
+					continue;
+				}
+				if (strcmp(key, "drm-client-id") == 0) {
+					client = (unsigned long long)value;
+					hasClient = true;
+				}
+				else if (strcmp(key, "drm-engine-gfx") == 0 || strcmp(key, "drm-engine-render") == 0) {
+					fdNs += value;
+					fdEngine = true;
+				}
+				else if (strncmp(key, "drm-memory-vram", 15) == 0 || strncmp(key, "drm-total-vram", 14) == 0 ||
+				         strncmp(key, "drm-total-local", 15) == 0)
+				{
+					fdVram = std::max(fdVram, ToMb(value, unit));
+					fdMem = true;
+				}
+				else if (strncmp(key, "drm-memory-gtt", 14) == 0 || strncmp(key, "drm-total-gtt", 13) == 0 ||
+				         strncmp(key, "drm-total-system", 16) == 0)
+				{
+					fdShared = std::max(fdShared, ToMb(value, unit));
+					fdMem = true;
+				}
+			}
+			fclose(f);
+			if (!hasClient || std::find(clients.begin(), clients.end(), client) != clients.end()) {
+				continue;
+			}
+			clients.push_back(client);
+			vram += fdVram;
+			shared += fdShared;
+			ns += fdNs;
+			anyMem |= fdMem;
+			anyEngine |= fdEngine;
+		}
+		closedir(dir);
+		if (anyMem) {
+			r.vram = vram;
+			r.shared = shared;
+		}
+		const double wall = TraceNowMs();
+		if (anyEngine) {
+			if (lastNs >= 0.0 && wall > lastWall) {
+				r.busy = std::min(std::max((ns - lastNs) / 1e6 / (wall - lastWall) * 100.0, 0.0), 100.0);
+			}
+			lastNs = ns;
+			lastWall = wall;
+		}
+		return r;
+	}
+};
+#endif
+
+struct GpuSampler
+{
+	std::atomic<double> vramMb{-1.0}, sharedMb{-1.0}, busy3d{-1.0};
+	std::atomic<int> integrated{-1};
+	std::mutex mutex;
+	std::condition_variable wake;
+	std::thread thread;
+	bool stop = false;
+
+	void Start()
+	{
+		if (thread.joinable()) {
+			return;
+		}
+		stop = false;
+		thread = std::thread([this]() {
+#ifdef _WIN32
+			GpuReaderWin reader;
+#else
+			GpuReaderLinux reader;
+#endif
+			std::unique_lock<std::mutex> lock(mutex);
+			while (!stop) {
+				lock.unlock();
+				const GpuReading r = reader.Read();
+				vramMb = r.vram;
+				sharedMb = r.shared;
+				busy3d = r.busy;
+				integrated = r.integrated;
+				lock.lock();
+				wake.wait_for(lock, std::chrono::seconds(1), [this]() { return stop; });
+			}
+		});
+	}
+
+	void Stop()
+	{
+		if (!thread.joinable()) {
+			return;
+		}
+		{
+			std::lock_guard<std::mutex> lock(mutex);
+			stop = true;
+		}
+		wake.notify_all();
+		thread.join();
+		vramMb = sharedMb = busy3d = -1.0;
+		integrated = -1;
+	}
+
+	~GpuSampler()
+	{
+		Stop();
+	}
+};
+
+GpuSampler& GetGpuSampler()
+{
+	static GpuSampler sampler;
+	return sampler;
+}
+
+}  // namespace
+#endif
+
 void CM_TraceMemorySample()
 {
 	static double last = -1.0;
@@ -246,9 +546,31 @@ void CM_TraceMemorySample()
 		fclose(statm);
 	}
 #endif
+	std::string fields;
 	char buf[48];
 	snprintf(buf, sizeof(buf), "\"mb\":%.1f", mb);
-	CM_TraceEvent("memory", buf);
+	fields = buf;
+#ifndef __EMSCRIPTEN__
+	GpuSampler& gpu = GetGpuSampler();
+	gpu.Start();
+	const double vram = gpu.vramMb.load(), shared = gpu.sharedMb.load(), busy = gpu.busy3d.load();
+	if (vram >= 0.0) {
+		snprintf(buf, sizeof(buf), ",\"vram\":%.1f", vram);
+		fields += buf;
+	}
+	if (shared >= 0.0) {
+		snprintf(buf, sizeof(buf), ",\"shared\":%.1f", shared);
+		fields += buf;
+	}
+	if (busy >= 0.0) {
+		snprintf(buf, sizeof(buf), ",\"gpu3d\":%.1f", busy);
+		fields += buf;
+	}
+	if (gpu.integrated.load() >= 0) {
+		fields += gpu.integrated.load() ? ",\"igpu\":1" : ",\"igpu\":0";
+	}
+#endif
+	CM_TraceEvent("memory", fields);
 }
 
 namespace {
@@ -477,6 +799,7 @@ void CM_TraceEnd()
 {
 #ifndef __EMSCRIPTEN__
 	GetSampler().Stop();
+	GetGpuSampler().Stop();
 #endif
 	if (CM_TraceModules()) {
 		CM_TraceEvent("end", "");
