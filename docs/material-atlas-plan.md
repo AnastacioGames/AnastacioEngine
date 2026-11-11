@@ -8,8 +8,10 @@ Pedido inicial: pesquisa sem implementação; depois o usuário autorizou implem
 Botão do painel virou **Build Material Atlas** com Auto / Palette / Bake. Palette junta materiais só de
 cor dos objetos selecionados numa imagem da cena (`AnastacioPalette` + `AnastacioPaletteData`), com UV
 `AnastacioPalette` no centro de cada quadrado de 8 px. No Bake de objeto misturado, os slots Principled
-sem mapa ligado ficam em quadrados numa faixa embaixo do atlas (`use_palette_cells`). Limites: no objeto
-misturado, material liso transparente ainda é recusado (o bake só aceita opacos); paleta cheia em 1024
+sem mapa ligado ficam em quadrados numa faixa embaixo do atlas (`use_palette_cells`). Material liso transparente
+num objeto misturado fica fora do bake: o Auto reserva a cor na paleta e passa `skip_slots` ao bake, que
+põe essas faces no `AnastacioPalette_Alpha` com UV `AnastacioPalette` (objeto com 2 materiais; Restore
+desfaz). Limites: paleta cheia em 1024
 cores; compressão DXT/KTX2 pode arredondar a cor do quadrado. Testes em `tools/test_palette_atlas*.py`.
 
 ## Versão nativa atual

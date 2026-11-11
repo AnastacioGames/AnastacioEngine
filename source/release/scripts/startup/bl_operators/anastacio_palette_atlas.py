@@ -548,9 +548,36 @@ class MATERIAL_OT_anastacio_atlas_auto(Operator):
             mode = 'PALETTE' if summary and all(flat for _i, _n, flat, _r in summary) else 'BAKE'
         if mode == 'PALETTE':
             return bpy.ops.material.anastacio_palette_atlas()
+        try:
+            skips = transparent_skips(context, context.object)
+        except RuntimeError as error:
+            self.report({'ERROR'}, str(error))
+            return {'CANCELLED'}
         if invoke:
-            return bpy.ops.material.anastacio_atlas_bake('INVOKE_DEFAULT')
-        return bpy.ops.material.anastacio_atlas_bake()
+            return bpy.ops.material.anastacio_atlas_bake('INVOKE_DEFAULT', skip_slots=skips)
+        return bpy.ops.material.anastacio_atlas_bake(skip_slots=skips)
+
+
+def transparent_skips(context, ob):
+    """Bake de objeto misturado: slots PBR lisos e transparentes ficam fora do bake.
+    Reserva as cores na paleta da cena, cria o material _Alpha e devolve as linhas
+    "slot<TAB>material<TAB>u<TAB>v" que o bake nativo aplica no resultado."""
+    found = []
+    for index in sorted(used_slots(ob)):
+        info, _reason = material_info(ob.material_slots[index].material, ob.data)
+        if info is not None and info[2]["kind"] == "pbr" and info[2]["transparent"]:
+            found.append((index, info))
+    if not found or len(found) == len(used_slots(ob)):
+        return ""
+    palette = Palette(context.scene)
+    cells = [(index, palette.cell(color, data)) for index, (color, data, _sig) in found]
+    palette.write(True)
+    lines = []
+    for (index, (_color, _data, sig)), (_i, cell) in zip(found, cells):
+        mat = result_material(ob.material_slots[index].material, palette, sig)
+        u, v = Palette.uv(cell)
+        lines.append("%d\t%s\t%.6f\t%.6f" % (index, mat.name, u, v))
+    return "\n".join(lines)
 
 
 classes = (

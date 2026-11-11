@@ -59,6 +59,7 @@ namespace {
 constexpr const char *atlas_uv = "AnastacioAtlas";
 constexpr const char *backup_key = "_anastacio_atlas_source";
 constexpr const char *backup_slot_key = "_anastacio_atlas_source_slot";
+constexpr const char *palette_uv_name = "AnastacioPalette";
 bool atlas_busy = false;
 const char *map_inputs[] = {"Base Color", "Roughness", "Metallic", "Specular"};
 const char *map_names[] = {"BaseColor", "Roughness", "Metallic", "Specular", "Normal"};
@@ -292,7 +293,7 @@ void pack_uv(Mesh *mesh, Object *ob, int size, int margin, const std::vector<int
   std::vector<MLoopTri> tris;
   int cells = 0;
   for (const MLoopTri &tri : all_tris) {
-    if (cell_of(tri.poly) < 0) tris.push_back(tri);
+    if (cell_of(tri.poly) == -1) tris.push_back(tri);
   }
   for (int cell : flat_cell) cells = std::max(cells, cell + 1);
   const int triangles = int(tris.size());
@@ -388,7 +389,20 @@ struct AtlasTransaction {
   std::vector<Image *> images;
   Material *result = nullptr;
   bool applied = false;
-  std::vector<int> flat_cell;                  /* per slot, -1 = baked */
+  std::vector<int> flat_cell;                  /* per slot, -1 = baked, -2 = skipped */
+  struct Skip {
+    int slot;
+    Material *material;
+    float uv[2];
+  };
+  std::vector<Skip> skips; /* transparent flat slots: palette material, no bake area */
+  bool skipped(int slot) const
+  {
+    for (const Skip &skip : skips) {
+      if (skip.slot == slot) return true;
+    }
+    return false;
+  }
   std::vector<std::vector<float>> flat_values; /* per slot: 4 passes x RGBA */
 
   AtlasTransaction(bContext *C)
@@ -447,7 +461,10 @@ struct AtlasTransaction {
 void stage_materials(bContext *C, AtlasTransaction &tx)
 {
   tx.work = BKE_mesh_copy(tx.main, tx.source);
+  std::vector<int> stage_of(tx.slots, 0);
   for (int i = 0; i < tx.slots; i++) {
+    if (tx.skipped(i)) continue;
+    stage_of[i] = int(tx.materials.size());
     Material *copy = BKE_material_copy(tx.main, give_current_material(tx.ob, i + 1));
     bNode *out;
     bNode *shader = surface_shader(copy, &out);
@@ -470,7 +487,7 @@ void stage_materials(bContext *C, AtlasTransaction &tx)
   tx.ob->mat = static_cast<Material **>(MEM_callocN(sizeof(Material *) * tx.slots, "Atlas overrides"));
   tx.ob->matbits = static_cast<char *>(MEM_callocN(tx.slots, "Atlas links"));
   for (int i = 0; i < tx.slots; i++) {
-    tx.ob->mat[i] = tx.materials[i].material;
+    tx.ob->mat[i] = tx.materials[stage_of[i]].material;
     tx.ob->matbits[i] = 1;
   }
   tx.ob->data = tx.work;
@@ -696,7 +713,35 @@ void build_result(bContext *C, AtlasTransaction &tx)
   BKE_material_append_id(tx.main, &tx.work->id, mat);
   id_us_min(&mat->id); /* append now owns the new material's initial user. */
   for (Image *image : tx.images) id_us_min(&image->id); /* result texture nodes own them. */
-  for (int i = 0; i < tx.work->totpoly; i++) tx.work->mpoly[i].mat_nr = 0;
+  std::vector<int> remap(tx.slots, 0);
+  if (!tx.skips.empty()) {
+    MLoopUV *palette_uv = static_cast<MLoopUV *>(CustomData_add_layer_named(
+        &tx.work->ldata, CD_MLOOPUV, CD_CALLOC, nullptr, tx.work->totloop, palette_uv_name));
+    require(palette_uv != nullptr, "Cannot create palette UV layer");
+    CustomData_add_layer_named(&tx.work->pdata, CD_MTEXPOLY, CD_CALLOC, nullptr, tx.work->totpoly,
+                               palette_uv_name);
+    BKE_mesh_update_customdata_pointers(tx.work, false);
+    std::vector<Material *> extra;
+    for (const AtlasTransaction::Skip &skip : tx.skips) {
+      auto found = std::find(extra.begin(), extra.end(), skip.material);
+      if (found == extra.end()) {
+        extra.push_back(skip.material);
+        BKE_material_append_id(tx.main, &tx.work->id, skip.material);
+        found = extra.end() - 1;
+      }
+      remap[skip.slot] = 1 + int(found - extra.begin());
+    }
+    for (int i = 0; i < tx.work->totpoly; i++) {
+      const MPoly &poly = tx.work->mpoly[i];
+      for (const AtlasTransaction::Skip &skip : tx.skips) {
+        if (skip.slot != poly.mat_nr) continue;
+        for (int l = 0; l < poly.totloop; l++) copy_v2_v2(palette_uv[poly.loopstart + l].uv, skip.uv);
+      }
+    }
+  }
+  for (int i = 0; i < tx.work->totpoly; i++) {
+    tx.work->mpoly[i].mat_nr = short(remap[std::min<int>(tx.work->mpoly[i].mat_nr, tx.slots - 1)]);
+  }
   /* Commit only after every pass, packing and material construction succeeded. */
   IDProperty *properties = IDP_GetProperties(&tx.work->id, true);
   IDPropertyTemplate source_value = {};
@@ -710,8 +755,8 @@ void build_result(bContext *C, AtlasTransaction &tx)
   id_us_min(&tx.source->id);
   tx.ob->data = tx.work;
   BKE_material_resize_object(tx.main, tx.ob, 0, true);
-  BKE_material_resize_object(tx.main, tx.ob, 1, false);
-  tx.ob->matbits[0] = 0;
+  BKE_material_resize_object(tx.main, tx.ob, tx.work->totcol, false);
+  for (int i = 0; i < tx.ob->totcol; i++) tx.ob->matbits[i] = 0;
   tx.ob->actcol = 1;
   tx.applied = true;
   update_object(tx.main, tx.ob);
@@ -780,6 +825,37 @@ int restore_exec(bContext *C, wmOperator *op)
   return OPERATOR_FINISHED;
 }
 
+/* skip_slots: one line per slot, "slot<TAB>material<TAB>u<TAB>v". Written by the Auto
+ * button for transparent flat materials, already placed in the scene palette. */
+std::vector<AtlasTransaction::Skip> parse_skips(Main *main, wmOperator *op, int slots)
+{
+  std::vector<AtlasTransaction::Skip> skips;
+  char *text = RNA_string_get_alloc(op->ptr, "skip_slots", nullptr, 0);
+  std::string all = text ? text : "";
+  if (text) MEM_freeN(text);
+  size_t start = 0;
+  while (start < all.size()) {
+    size_t end = all.find('\n', start);
+    if (end == std::string::npos) end = all.size();
+    std::string line = all.substr(start, end - start);
+    start = end + 1;
+    if (line.empty()) continue;
+    size_t a = line.find('\t'), b = line.find('\t', a + 1), c = line.find('\t', b + 1);
+    require(a != std::string::npos && b != std::string::npos && c != std::string::npos,
+            "Invalid skip_slots line");
+    AtlasTransaction::Skip skip;
+    skip.slot = std::stoi(line.substr(0, a));
+    const std::string name = line.substr(a + 1, b - a - 1);
+    skip.uv[0] = std::stof(line.substr(b + 1, c - b - 1));
+    skip.uv[1] = std::stof(line.substr(c + 1));
+    require(skip.slot >= 0 && skip.slot < slots, "skip_slots: invalid slot");
+    skip.material = reinterpret_cast<Material *>(BKE_libblock_find_name(main, ID_MA, name.c_str()));
+    require(skip.material != nullptr, "skip_slots: palette material not found: " + name);
+    skips.push_back(skip);
+  }
+  return skips;
+}
+
 /* A slot is flat when no map input of its Principled is linked. Mixed objects only:
  * if every slot is flat (or none is), nothing changes and the full bake runs. */
 void classify_flat_slots(AtlasTransaction &tx, Object *ob)
@@ -787,7 +863,13 @@ void classify_flat_slots(AtlasTransaction &tx, Object *ob)
   std::vector<int> cells(ob->totcol, -1);
   std::vector<std::vector<float>> values(ob->totcol);
   int flat = 0;
+  int baked_slots = 0;
   for (int i = 0; i < ob->totcol; i++) {
+    if (tx.skipped(i)) {
+      cells[i] = -2;
+      continue;
+    }
+    baked_slots++;
     Material *mat = give_current_material(ob, i + 1);
     bNode *shader = surface_shader(mat);
     bool linked = input_link(mat->nodetree, socket(shader, "Normal")) != nullptr;
@@ -806,7 +888,9 @@ void classify_flat_slots(AtlasTransaction &tx, Object *ob)
     }
     cells[i] = flat++;
   }
-  if (flat == 0 || flat == ob->totcol) return;
+  if (flat == 0 || flat == baked_slots) {
+    for (int &cell : cells) cell = cell == -2 ? -2 : -1;
+  }
   tx.flat_cell = cells;
   tx.flat_values = values;
 }
@@ -829,11 +913,26 @@ std::unique_ptr<AtlasTransaction> prepare_atlas(bContext *C, wmOperator *op)
     for (int i = 0; i < mesh->totpoly; i++) {
       require(mesh->mpoly[i].mat_nr < ob->totcol, "Face references an invalid material slot");
     }
-    Material *first = give_current_material(ob, 1);
+    std::vector<AtlasTransaction::Skip> skips = parse_skips(CTX_data_main(C), op, ob->totcol);
+    auto is_skipped = [&](int slot) {
+      for (const auto &skip : skips) {
+        if (skip.slot == slot) return true;
+      }
+      return false;
+    };
+    int first_slot = 0;
+    while (first_slot < ob->totcol && is_skipped(first_slot)) first_slot++;
+    require(first_slot < ob->totcol, "Every material is skipped; use Palette instead");
+    require(skips.empty() || CustomData_number_of_layers(&mesh->ldata, CD_MLOOPUV) < 7,
+            "No free UV layer slot for the palette UV");
+    require(skips.empty() || !CustomData_get_layer_named(&mesh->ldata, CD_MLOOPUV, palette_uv_name),
+            "AnastacioPalette UV already exists; restore the source mesh first");
+    Material *first = give_current_material(ob, first_slot + 1);
     bNode *reference = surface_shader(first);
     for (int i = 0; i < ob->totcol; i++) {
       require(!ob->matbits || !ob->matbits[i],
               "Use data-linked material slots so the source mesh backup remains complete");
+      if (is_skipped(i)) continue;
       Material *mat = give_current_material(ob, i + 1);
       try {
         validate_material(mat, reference, mesh);
@@ -853,8 +952,13 @@ std::unique_ptr<AtlasTransaction> prepare_atlas(bContext *C, wmOperator *op)
     require(margin * 4 < size, "Margin is too large for this resolution");
     std::unique_ptr<AtlasTransaction> transaction(new AtlasTransaction(C));
     AtlasTransaction &tx = *transaction;
+    tx.skips = skips;
     if (RNA_boolean_get(op->ptr, "use_palette_cells")) {
       classify_flat_slots(tx, ob);
+    }
+    else if (!skips.empty()) {
+      tx.flat_cell.assign(ob->totcol, -1);
+      for (const auto &skip : skips) tx.flat_cell[skip.slot] = -2;
     }
     stage_materials(C, tx);
     pack_uv(tx.work, ob, size, margin, tx.flat_cell);
@@ -1062,6 +1166,9 @@ extern "C" void MATERIAL_OT_anastacio_atlas_bake(wmOperatorType *ot)
   RNA_def_int(ot->srna, "resolution", 1024, 64, 4096, "Resolution", "Power of two, in pixels", 64, 4096);
   RNA_def_int(ot->srna, "margin", 4, 1, 64, "Margin", "Padding between UV islands, in pixels", 1, 32);
   RNA_def_int(ot->srna, "samples", 32, 1, 1024, "Samples", "Cycles samples per bake", 1, 128);
+  PropertyRNA *skip = RNA_def_string(ot->srna, "skip_slots", nullptr, 0, "Skip Slots",
+                                     "Internal: transparent flat slots sent to the scene palette");
+  RNA_def_property_flag(skip, PropertyFlag(PROP_HIDDEN | PROP_SKIP_SAVE));
   RNA_def_boolean(ot->srna, "use_palette_cells", true, "Flat Colors as Palette Cells",
                   "Mixed objects: flat-color materials use small color cells instead of bake area");
   RNA_def_boolean(ot->srna, "use_configured_device", false, "Use Configured Cycles Device",

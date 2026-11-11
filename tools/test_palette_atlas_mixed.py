@@ -64,18 +64,38 @@ def main():
     tex_mat.node_tree.links.new(node.outputs["Color"], principled(tex_mat).inputs["Base Color"])
     red = flat("Red", (0.8, 0.05, 0.05), 0.4, 0.0)
     iron = flat("Iron", (0.55, 0.56, 0.57), 0.3, 1.0)
-    for m in (tex_mat, red, iron):
+    glass = flat("Glass", (0.6, 0.7, 0.8), 0.1, 1.0)
+    gt = glass.node_tree
+    out = [n for n in gt.nodes if n.type == 'OUTPUT_MATERIAL'][0]
+    tr = gt.nodes.new("ShaderNodeBsdfTransparent")
+    mix = gt.nodes.new("ShaderNodeMixShader")
+    mix.inputs[0].default_value = 0.35
+    gt.links.new(tr.outputs["BSDF"], mix.inputs[1])
+    gt.links.new(principled(glass).outputs["BSDF"], mix.inputs[2])
+    gt.links.new(mix.outputs["Shader"], out.inputs["Surface"])
+    glass.game_settings.alpha_blend = 'ALPHA'
+    glass.use_transparency = True
+    glass.alpha = 0.999
+    for m in (tex_mat, red, iron, glass):
         mesh.materials.append(m)
     for i, poly in enumerate(mesh.polygons):
-        poly.material_index = [0, 0, 0, 0, 1, 2][i]
+        poly.material_index = [0, 0, 0, 3, 1, 2][i]
 
     from bl_operators import anastacio_palette_atlas as pa
     summary = pa.classify(ob)
-    check([s[2] for s in summary] == [False, True, True], "classify: %s" % summary)
+    check([s[2] for s in summary] == [False, True, True, True], "classify: %s" % summary)
 
-    size = 256
-    bpy.ops.material.anastacio_atlas_bake(resolution=size, margin=2, samples=1)
-    check(ob.data.name != "Mixed" and len(ob.data.materials) == 1, "bake did not apply")
+    size = 1024
+    bpy.ops.material.anastacio_atlas_auto(mode='AUTO')
+    check(ob.data.name != "Mixed" and len(ob.data.materials) == 2, "bake did not apply: %s" % [m.name for m in ob.data.materials])
+    check(ob.data.materials[1].name.startswith("AnastacioPalette_Alpha"), "glass slot not palette alpha")
+    pal = bpy.data.images[pa.PALETTE_NAME]
+    puv = ob.data.uv_layers[pa.UV_NAME]
+    gpoly = ob.data.polygons[3]
+    check(gpoly.material_index == 1, "glass face not on alpha slot")
+    point = tuple(puv.data[gpoly.loop_indices[0]].uv)
+    check(abs(pixel(pal, point)[3] - 0.35) < 0.01, "glass alpha in palette: %s" % (pixel(pal, point),))
+    check(all(p.material_index == 0 for p in ob.data.polygons if p.index != 3), "other faces must use atlas")
     atlas = ob.data.uv_layers["AnastacioAtlas"]
     strip = (8 + 2) / size
     base = bpy.data.images["AnastacioAtlas_BaseColor"]
@@ -84,7 +104,9 @@ def main():
     want = {1: (red, 0.4, 0.0), 2: (iron, 0.3, 1.0)}
     for poly in ob.data.polygons:
         uvs = [tuple(atlas.data[li].uv) for li in poly.loop_indices]
-        src = [0, 0, 0, 0, 1, 2][poly.index]
+        src = [0, 0, 0, 3, 1, 2][poly.index]
+        if src == 3:
+            continue
         if src == 0:
             check(all(v[1] >= strip - 1e-4 for v in uvs), "textured face %d inside strip" % poly.index)
             continue
@@ -95,6 +117,8 @@ def main():
         check(all(abs(a - b) < 0.002 for a, b in zip(got[:3], col[:3])), "color %s vs %s" % (got, list(col)))
         check(abs(pixel(rough, uvs[0])[0] - r) < 0.002, "roughness cell")
         check(abs(pixel(metal, uvs[0])[0] - m) < 0.002, "metallic cell")
+    check(bpy.ops.material.anastacio_atlas_restore() == {'FINISHED'}, "restore failed")
+    check([m.name for m in ob.data.materials] == ["Textured", "Red", "Iron", "Glass"], "restore materials")
     print("MIXED PALETTE ATLAS TEST OK")
 
 
