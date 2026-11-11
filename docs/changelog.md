@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Nodes GLSL: parâmetro image e contagem de usuários de node->prop
+
+- `@param <nome>: image` no formato com cabeçalho (até 4 por nó): botão de escolha no nó, `img_<nome>(uv)` no
+  código. `GPU_link_script` recebe as imagens como `GPU_TEX2D` e `codegen_print_scripts` define `SCRIPT_IMG<i>`.
+- Correção da engine: `node_free_node_ex` tirava usuários dos IDs de `node->prop` também ao liberar a cópia
+  localizada do material, então uma imagem guardada no nó ia a 0 usuários a cada compilação e não era salva.
+  Agora só `nodeFreeNode` tira (como os sockets), e duplicar/colar/separar do grupo soma com
+  `nodePropIDUsersPlus`. Conferido: 3 compilações, duplicar, apagar a cópia, salvar e reabrir. Os dois pontos
+  foram apontados ou revisados pelo Codex.
+
 ## 2026-11-11 — Nodes GLSL por arquivo (cabeçalho @name/@input/@param)
 
 - O nó GLSL Script aceita o formato da spec "Formato de Node GLSL": cabeçalho de comentários (`@output`,
