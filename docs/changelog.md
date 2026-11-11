@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Nodes GLSL por arquivo (cabeçalho @name/@input/@param)
+
+- O nó GLSL Script aceita o formato da spec "Formato de Node GLSL": cabeçalho de comentários (`@output`,
+  `@input`, `@param` float/int/bool/color/enum, `@name`, `@category`) + `vec4 node(vec2 uv)`. É traduzido para
+  uniforms `u_` + `main`, reaproveitando sockets, `@choice`, uniforms sem recompilar e erro com linha.
+  Add > GLSL Library lista `presets/glsl_nodes/*.glsl` (Noise e Checker Tint de exemplo). Detalhes e limites em
+  [shader-nodes.md](shader-nodes.md#arquivos-de-node-com-cabeçalho-2026-11-11). Análise de lacunas pelo Codex.
+- Código: `node_shader_glsl_script.c` (`script_translate_header`), `bl_operators/node.py`
+  (`NODE_OT_glsl_node_add`), `nodeitems_builtins.py`.
+
 ## 2026-11-11 — TAA: movimento de GPU Skinning
 
 - Personagens com "RanGE GPU Skinning" passam a ter vetor de movimento da pose (paleta de ossos do quadro

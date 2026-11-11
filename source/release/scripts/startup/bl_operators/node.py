@@ -955,6 +955,82 @@ class NODE_OT_shader_preset_add(Operator):
         return {'FINISHED'}
 
 
+def glsl_node_library():
+    """GLSL node files (presets/glsl_nodes/*.glsl): (path, name, category, description)."""
+    import os
+    found = []
+    for folder in bpy.utils.preset_paths("glsl_nodes"):
+        for fname in sorted(os.listdir(folder)):
+            if not fname.lower().endswith(".glsl"):
+                continue
+            path = os.path.join(folder, fname)
+            info = {"name": os.path.splitext(fname)[0], "category": "Custom", "description": ""}
+            try:
+                with open(path, encoding="utf-8") as f:
+                    for line in f:
+                        s = line.strip()
+                        if not s:
+                            continue
+                        if not s.startswith("//"):
+                            break
+                        s = s[2:].strip()
+                        for tag in ("name", "category", "description"):
+                            if s.startswith("@" + tag + " "):
+                                info[tag] = s[len(tag) + 2:].strip()
+            except OSError:
+                continue
+            found.append((path, info["name"], info["category"], info["description"]))
+    return found
+
+
+class NODE_OT_glsl_node_add(Operator):
+    """Add a GLSL node from a .glsl file of the node library (game engine)"""
+    bl_idname = "node.glsl_node_add"
+    bl_label = "Add GLSL Node"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    filepath: StringProperty(name="File", subtype='FILE_PATH')
+
+    @classmethod
+    def poll(cls, context):
+        space = context.space_data
+        return (space is not None and space.type == 'NODE_EDITOR' and
+                space.tree_type == 'ShaderNodeTree' and space.edit_tree is not None)
+
+    @classmethod
+    def description(cls, context, properties):
+        for path, _name, _cat, desc in glsl_node_library():
+            if path == properties.filepath and desc:
+                return desc
+        return cls.__doc__
+
+    def execute(self, context):
+        import os
+        try:
+            with open(self.filepath, encoding="utf-8") as f:
+                source = f.read()
+        except OSError as ex:
+            self.report({'ERROR'}, str(ex))
+            return {'CANCELLED'}
+        # The code is copied into the .range: the game does not need the library file.
+        name = os.path.basename(self.filepath)
+        text = bpy.data.texts.get(name)
+        if text is None or text.as_string() != source:
+            text = bpy.data.texts.new(name)
+            text.from_string(source)
+
+        space = context.space_data
+        tree = space.edit_tree
+        for node in tree.nodes:
+            node.select = False
+        node = tree.nodes.new("ShaderNodeGLSLScript")
+        node.script = text
+        node.location = space.cursor_location
+        node.select = True
+        tree.nodes.active = node
+        return {'FINISHED'}
+
+
 class MATERIAL_OT_show_generated_code(Operator):
     """Write the generated vertex, geometry and fragment GLSL of the material to Text """ \
         """datablocks (game engine)"""
@@ -1241,6 +1317,7 @@ classes = (
     MATERIAL_OT_show_generated_code,
     NODE_OT_damage_mix_add,
     NODE_OT_shader_preset_add,
+    NODE_OT_glsl_node_add,
 
     NODE_OT_add_and_link_node,
     NODE_OT_add_linked,

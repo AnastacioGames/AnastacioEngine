@@ -177,6 +177,25 @@ def shader_preset_items(context):
     yield NodeItemCustom(draw=shader_preset_draw)
 
 
+# GLSL node files, see NODE_OT_glsl_node_add
+def glsl_library_draw(self, layout, context):
+    from bl_operators.node import glsl_node_library
+    nodes = glsl_node_library()
+    if not nodes:
+        layout.label(text="No .glsl files in presets/glsl_nodes")
+        return
+    for category in sorted(set(n[2] for n in nodes)):
+        layout.label(text=category)
+        for path, name, cat, _desc in nodes:
+            if cat == category:
+                props = layout.operator("node.glsl_node_add", text=name)
+                props.filepath = path
+
+
+def glsl_library_items(context):
+    yield NodeItemCustom(draw=glsl_library_draw)
+
+
 # All standard node categories currently used in nodes.
 
 shader_node_categories = [
@@ -247,6 +266,7 @@ shader_node_categories = [
     ShaderOldNodeCategory("SH_SCRIPT", "Script", items=[
         NodeItem("ShaderNodeGLSLScript"),
     ]),
+    ShaderOldNodeCategory("SH_GLSL_LIBRARY", "GLSL Library", items=glsl_library_items),
     ShaderOldNodeCategory("SH_GROUP", "Group", items=node_group_items),
     ShaderOldNodeCategory("SH_PRESETS", "Presets", items=shader_preset_items),
     
@@ -372,6 +392,7 @@ shader_node_categories = [
         NodeItem("ShaderNodeGLSLScript"),
         NodeItem("ShaderNodeScript"),
     ]),
+    ShaderNewNodeCategory("SH_NEW_GLSL_LIBRARY", "GLSL Library", items=glsl_library_items),
     ShaderNewNodeCategory("SH_NEW_GROUP", "Group", items=node_group_items),
     ShaderNewNodeCategory("SH_NEW_PRESETS", "Presets", items=shader_preset_items),
     ShaderNewNodeCategory("SH_NEW_LAYOUT", "Layout", items=[

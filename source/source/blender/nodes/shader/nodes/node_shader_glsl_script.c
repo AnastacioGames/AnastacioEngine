@@ -260,10 +260,411 @@ static bool script_uses_word(const char *code, const char *word)
 	return false;
 }
 
-static int script_read(bNode *node, ScriptParam *params, char **r_code)
+/* ---------------------------------------------------------------------------------------------
+ * Header format (docs/glsl-node-files.md): a node file whose first comment lines declare
+ *
+ *   // @name Noise                         // @category Generators
+ *   // @output gray                        // @input mask: gray = 1
+ *   // @param scale: float(1, 64) = 6      // @param style: enum(Soft, Hard) = Soft
+ *   vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
+ *
+ * is translated here to the plain format above (u_ uniforms + main), so the sockets, the uniforms,
+ * @choice menus and the error colouring all stay the ones of the GLSL Script node. The original
+ * text follows a "#line 1", so compile errors still give the line of the Text. */
+
+#define HEADER_MAX_ENTRIES 32
+
+enum {
+	HDR_IN_COLOR,
+	HDR_IN_GRAY,
+	HDR_FLOAT,
+	HDR_INT,
+	HDR_BOOL,
+	HDR_COLOR,
+	HDR_ENUM,
+};
+
+typedef struct HeaderEntry {
+	char name[48];
+	int kind;
+	float min, max;
+	float def[4];
+	int totdef;
+	char choice[512];
+} HeaderEntry;
+
+typedef struct HeaderInfo {
+	char name[64];
+	bool output_gray;
+} HeaderInfo;
+
+/* "// @tag rest": pointer to rest (spaces skipped), NULL when the line is another tag or text. */
+static const char *header_tag(const char *line, const char *tag)
+{
+	const size_t len = strlen(tag);
+	if (line[0] != '@' || strncmp(line + 1, tag, len) != 0 || script_ident_char(line[len + 1])) {
+		return NULL;
+	}
+	const char *p = line + len + 1;
+	while (*p == ' ' || *p == '\t') p++;
+	return p;
+}
+
+static const char *header_space(const char *p)
+{
+	while (*p == ' ' || *p == '\t') p++;
+	return p;
+}
+
+/* Up to 4 numbers separated by commas or spaces, until end of line. */
+static int header_numbers(const char *p, float r_values[4])
+{
+	int tot = 0;
+	while (tot < 4) {
+		p = header_space(p);
+		while (*p == ',') p = header_space(p + 1);
+		if (!*p || *p == '\n' || *p == '\r') {
+			break;
+		}
+		char *end;
+		const double v = strtod(p, &end);
+		if (end == p) {
+			return -1;
+		}
+		r_values[tot++] = (float)v;
+		p = end;
+	}
+	return tot;
+}
+
+/* "name: type(args) = default", type already known to be an input (is_input) or a param. */
+static bool header_entry(const char *p, bool is_input, HeaderEntry *e)
+{
+	memset(e, 0, sizeof(*e));
+	p = script_read_ident(header_space(p), e->name, sizeof(e->name));
+	if (!e->name[0]) {
+		return false;
+	}
+	p = header_space(p);
+	if (*p != ':') {
+		return false;
+	}
+	char type[16];
+	p = script_read_ident(header_space(p + 1), type, sizeof(type));
+	p = header_space(p);
+
+	char args[512] = "";
+	if (*p == '(') {
+		const char *close = strchr(p, ')');
+		if (!close || close - p - 1 >= (int)sizeof(args)) {
+			return false;
+		}
+		BLI_strncpy(args, p + 1, (size_t)(close - p));
+		p = header_space(close + 1);
+	}
+	const char *def = NULL;
+	if (*p == '=') {
+		def = header_space(p + 1);
+	}
+	else if (*p && *p != '\n' && *p != '\r') {
+		return false;
+	}
+
+	if (is_input) {
+		if (STREQ(type, "color")) e->kind = HDR_IN_COLOR;
+		else if (STREQ(type, "gray")) e->kind = HDR_IN_GRAY;
+		else return false;
+	}
+	else if (STREQ(type, "float") || STREQ(type, "int")) {
+		e->kind = STREQ(type, "float") ? HDR_FLOAT : HDR_INT;
+		float lim[4];
+		if (header_numbers(args, lim) != 2 || lim[0] > lim[1]) {
+			return false;
+		}
+		e->min = lim[0];
+		e->max = lim[1];
+	}
+	else if (STREQ(type, "bool")) e->kind = HDR_BOOL;
+	else if (STREQ(type, "color")) e->kind = HDR_COLOR;
+	else if (STREQ(type, "enum")) {
+		e->kind = HDR_ENUM;
+		/* "A, B, C" -> "A=0, B=1, C=2"; the default is a label. */
+		DynStr *ds = BLI_dynstr_new();
+		const char *a = args;
+		int index = 0, def_index = 0;
+		char label[64];
+		while (*(a = header_space(a))) {
+			a = script_read_ident(a, label, sizeof(label));
+			if (!label[0]) {
+				BLI_dynstr_free(ds);
+				return false;
+			}
+			if (def) {
+				char want[64];
+				script_read_ident(def, want, sizeof(want));
+				if (STREQ(want, label)) def_index = index;
+			}
+			BLI_dynstr_appendf(ds, "%s%s=%d", index ? ", " : "", label, index);
+			index++;
+			a = header_space(a);
+			if (*a == ',') a++;
+			else if (*a) {
+				BLI_dynstr_free(ds);
+				return false;
+			}
+		}
+		const int len = BLI_dynstr_get_len(ds);
+		if (index == 0 || len >= (int)sizeof(e->choice)) {
+			BLI_dynstr_free(ds);
+			return false;
+		}
+		BLI_dynstr_get_cstring_ex(ds, e->choice);
+		BLI_dynstr_free(ds);
+		e->def[0] = (float)def_index;
+		e->totdef = 1;
+		return true;
+	}
+	else {
+		return false;
+	}
+
+	if (e->kind == HDR_BOOL) {
+		e->def[0] = (def && STREQLEN(def, "true", 4)) ? 1.0f : 0.0f;
+		e->totdef = 1;
+		return !def || STREQLEN(def, "true", 4) || STREQLEN(def, "false", 5);
+	}
+	if (def) {
+		e->totdef = header_numbers(def, e->def);
+		if (e->totdef < 0) {
+			return false;
+		}
+	}
+	if (e->kind == HDR_COLOR || e->kind == HDR_IN_COLOR) {
+		/* One number is a gray, three a colour; alpha is always 1. */
+		const float base = (e->kind == HDR_COLOR) ? 0.5f : 0.0f;
+		if (e->totdef == 0) {
+			e->def[0] = e->def[1] = e->def[2] = base;
+		}
+		else if (e->totdef == 1) {
+			e->def[1] = e->def[2] = e->def[0];
+		}
+		else if (e->totdef != 3) {
+			return false;
+		}
+		e->def[3] = 1.0f;
+		e->totdef = 4;
+	}
+	else if (e->totdef > 1) {
+		return false;
+	}
+	else if (e->totdef == 0) {
+		e->def[0] = (e->kind == HDR_FLOAT || e->kind == HDR_INT) ? e->min : 0.0f;
+		e->totdef = 1;
+	}
+	if (e->kind == HDR_FLOAT || e->kind == HDR_INT) {
+		CLAMP(e->def[0], e->min, e->max);
+	}
+	return true;
+}
+
+static void header_error(const bNode *node, int line, const char *msg)
+{
+	printf("GLSL node \"%s\", line %d: %s\n", node ? node->name : "?", line, msg);
+}
+
+/* Translated code, or NULL when src is not in the header format (no "@output") or is broken
+ * (r_broken set, the reason printed with its line). */
+static char *script_translate_header(const bNode *node, const char *src, HeaderInfo *info, bool *r_broken)
+{
+	HeaderEntry entries[HEADER_MAX_ENTRIES];
+	int tot = 0, totin = 0, totparam = 0, line = 0;
+	bool has_output = false;
+
+	memset(info, 0, sizeof(*info));
+	*r_broken = false;
+
+	/* The header: comment lines (blank lines allowed) before the first line of code. */
+	for (const char *p = src; *p; ) {
+		line++;
+		const char *eol = strchr(p, '\n');
+		const size_t len = eol ? (size_t)(eol - p) : strlen(p);
+		char buf[1024];
+		BLI_strncpy(buf, p, MIN2(len + 1, sizeof(buf)));
+		p = eol ? eol + 1 : p + len;
+
+		const char *s = header_space(buf);
+		if (!*s || *s == '\r') {
+			continue;
+		}
+		if (s[0] != '/' || s[1] != '/') {
+			break;
+		}
+		s = header_space(s + 2);
+		const char *rest;
+		if ((rest = header_tag(s, "output"))) {
+			has_output = true;
+			info->output_gray = STREQLEN(rest, "gray", 4);
+			if (!info->output_gray && !STREQLEN(rest, "color", 5)) {
+				header_error(node, line, "@output must be color or gray");
+				*r_broken = true;
+			}
+		}
+		else if ((rest = header_tag(s, "name"))) {
+			BLI_strncpy(info->name, rest, sizeof(info->name));
+			for (int n = (int)strlen(info->name) - 1; n >= 0 && strchr(" \t\r", info->name[n]); n--) {
+				info->name[n] = '\0';
+			}
+		}
+		else if ((rest = header_tag(s, "input")) || (rest = header_tag(s, "param"))) {
+			const bool is_input = header_tag(s, "input") != NULL;
+			if (tot >= HEADER_MAX_ENTRIES || (is_input && totin >= 8) || (!is_input && totparam >= 16)) {
+				header_error(node, line, "too many inputs (8) or params (16)");
+				*r_broken = true;
+				continue;
+			}
+			HeaderEntry *e = &entries[tot];
+			if (!header_entry(rest, is_input, e)) {
+				header_error(node, line, is_input ? "expected: name: color|gray = default" :
+				             "expected: name: float(min, max) = v | int(min, max) = v | bool = true | "
+				             "color = r, g, b | enum(A, B) = A");
+				*r_broken = true;
+				continue;
+			}
+			for (int i = 0; i < tot; i++) {
+				if (STREQ(entries[i].name, e->name)) {
+					header_error(node, line, "name already used");
+					*r_broken = true;
+				}
+			}
+			tot++;
+			if (is_input) totin++; else totparam++;
+		}
+		else if (header_tag(s, "shading")) {
+			header_error(node, line, "@shading nodes are not supported yet, use vec4 node(vec2 uv)");
+			*r_broken = true;
+		}
+	}
+
+	if (!has_output) {
+		*r_broken = false;
+		return NULL;
+	}
+	if (!script_uses_word(src, "node")) {
+		header_error(node, 1, "missing vec4 node(vec2 uv)");
+		*r_broken = true;
+	}
+	if (*r_broken) {
+		return NULL;
+	}
+
+	DynStr *ds = BLI_dynstr_new();
+	for (int i = 0; i < tot; i++) {
+		const HeaderEntry *e = &entries[i];
+		switch (e->kind) {
+			case HDR_IN_COLOR:
+			case HDR_COLOR:
+				BLI_dynstr_appendf(ds, "uniform vec4 u_%s; // @default %g %g %g %g\n", e->name,
+				                   e->def[0], e->def[1], e->def[2], e->def[3]);
+				break;
+			case HDR_IN_GRAY:
+				BLI_dynstr_appendf(ds, "uniform float u_%s; // @default %g\n", e->name, e->def[0]);
+				break;
+			case HDR_FLOAT:
+				BLI_dynstr_appendf(ds, "uniform float u_%s; // @min %g @max %g @default %g\n", e->name,
+				                   e->min, e->max, e->def[0]);
+				break;
+			case HDR_INT:
+				BLI_dynstr_appendf(ds, "uniform int u_%s; // @min %g @max %g @default %g\n", e->name,
+				                   e->min, e->max, e->def[0]);
+				break;
+			case HDR_BOOL:
+				BLI_dynstr_appendf(ds, "uniform int u_%s; // @choice Off=0, On=1 @default %d\n", e->name,
+				                   (int)e->def[0]);
+				break;
+			case HDR_ENUM:
+				BLI_dynstr_appendf(ds, "uniform int u_%s; // @choice %s @default %d\n", e->name, e->choice,
+				                   (int)e->def[0]);
+				break;
+		}
+	}
+	if (totparam) {
+		BLI_dynstr_append(ds, "struct Params {");
+		for (int i = 0; i < tot; i++) {
+			const HeaderEntry *e = &entries[i];
+			const char *type = (e->kind == HDR_FLOAT) ? "float" : (e->kind == HDR_BOOL) ? "bool" :
+			                   (e->kind == HDR_COLOR) ? "vec3" : (e->kind == HDR_INT || e->kind == HDR_ENUM) ? "int" :
+			                   NULL;
+			if (type) {
+				BLI_dynstr_appendf(ds, " %s %s;", type, e->name);
+			}
+		}
+		BLI_dynstr_append(ds, " };\nParams params;\n");
+	}
+	for (int i = 0; i < tot; i++) {
+		const HeaderEntry *e = &entries[i];
+		if (e->kind == HDR_IN_COLOR) {
+			BLI_dynstr_appendf(ds, "vec4 in_%s(vec2 uv) { return u_%s; }\n", e->name, e->name);
+		}
+		else if (e->kind == HDR_IN_GRAY) {
+			BLI_dynstr_appendf(ds, "float in_%s(vec2 uv) { return u_%s; }\n", e->name, e->name);
+		}
+	}
+	BLI_dynstr_append(ds, "vec2 res() { return vec2(1024.0); }\n#line 1\n");
+	BLI_dynstr_append(ds, src);
+	BLI_dynstr_appendf(ds, "\nvoid main(vec3 UV, out %s)\n{\n", info->output_gray ? "float Value" : "vec4 Color");
+	for (int i = 0; i < tot; i++) {
+		const HeaderEntry *e = &entries[i];
+		if (e->kind == HDR_BOOL) BLI_dynstr_appendf(ds, "\tparams.%s = (u_%s != 0);\n", e->name, e->name);
+		else if (e->kind == HDR_COLOR) BLI_dynstr_appendf(ds, "\tparams.%s = u_%s.rgb;\n", e->name, e->name);
+		else if (e->kind != HDR_IN_COLOR && e->kind != HDR_IN_GRAY)
+			BLI_dynstr_appendf(ds, "\tparams.%s = u_%s;\n", e->name, e->name);
+	}
+	BLI_dynstr_append(ds, info->output_gray ? "\tValue = node(UV.xy).r;\n}\n" : "\tColor = node(UV.xy);\n}\n");
+
+	char *code = MEM_mallocN((size_t)BLI_dynstr_get_len(ds) + 1, "glsl header script");
+	BLI_dynstr_get_cstring_ex(ds, code);
+	BLI_dynstr_free(ds);
+	return code;
+}
+
+/* "u_uv_offset" -> "Uv Offset" for the sockets of a header node. */
+static void script_pretty_name(const char *name, char *r_name, int size)
+{
+	if (name[0] == 'u' && name[1] == '_') {
+		name += 2;
+	}
+	int n = 0;
+	bool word_start = true;
+	for (; *name && n < size - 1; name++) {
+		char c = (*name == '_') ? ' ' : *name;
+		if (word_start && c >= 'a' && c <= 'z') {
+			c = (char)(c - 'a' + 'A');
+		}
+		word_start = (c == ' ');
+		r_name[n++] = c;
+	}
+	r_name[n] = '\0';
+}
+
+static int script_read_ex(bNode *node, ScriptParam *params, char **r_code, HeaderInfo *r_info, bool *r_header)
 {
 	Text *text = (Text *)node->id;
 	char *code = text ? txt_to_buf(text) : NULL;
+	HeaderInfo info;
+	bool broken = false;
+	*r_header = false;
+
+	if (code) {
+		char *translated = script_translate_header(node, code, &info, &broken);
+		if (translated || broken) {
+			MEM_freeN(code);
+			code = translated;
+			*r_header = true;
+			if (r_info) {
+				*r_info = info;
+			}
+		}
+	}
 	int tot = code ? script_parse(code, params) : -1;
 	if (tot >= 0) {
 		tot = script_parse_uniforms(code, params, tot, r_code != NULL);
@@ -275,6 +676,12 @@ static int script_read(bNode *node, ScriptParam *params, char **r_code)
 		MEM_freeN(code);
 	}
 	return tot;
+}
+
+static int script_read(bNode *node, ScriptParam *params, char **r_code)
+{
+	bool header;
+	return script_read_ex(node, params, r_code, NULL, &header);
 }
 
 /* A float uniform with both limits is drawn as a slider. */
@@ -379,8 +786,13 @@ static void node_shader_update_glsl_script(bNodeTree *ntree, bNode *node)
 {
 	ScriptParam params[SCRIPT_MAX_PARAMS];
 	char *code = NULL;
+	HeaderInfo info;
+	bool header = false;
 	/* The code stays alive: params[].choice points into it. */
-	int tot = script_read(node, params, &code);
+	int tot = script_read_ex(node, params, &code, &info, &header);
+	if (header && tot >= 0 && info.name[0] && !node->label[0]) {
+		BLI_strncpy(node->label, info.name, sizeof(node->label));
+	}
 	if (tot < 0) {
 		/* No valid main (yet): keep the sockets, the user may be typing. */
 		MEM_SAFE_FREE(code);
@@ -420,6 +832,13 @@ static void node_shader_update_glsl_script(bNodeTree *ntree, bNode *node)
 				const bool has_choice = script_choice_build(&params[i], choice, &choice_default);
 				script_socket_uniform(sock, &params[i], is_new, has_choice ? &choice_default : NULL);
 				script_socket_choice(sock, has_choice ? choice : NULL);
+			}
+			if (header) {
+				/* Header nodes: readable names; UV follows the mesh UV while not linked. */
+				script_pretty_name(params[i].name, sock->name, sizeof(sock->name));
+				if (STREQ(params[i].name, "UV") && in_out == SOCK_IN) {
+					sock->flag |= SOCK_HIDE_VALUE;
+				}
 			}
 			/* Same order as the parameters. */
 			BLI_remlink(sockets, sock);
@@ -527,8 +946,14 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 {
 	ScriptParam params[SCRIPT_MAX_PARAMS];
 	char *code = NULL;
-	int tot = script_read(node, params, &code);
+	bool header = false;
+	int tot = script_read_ex(node, params, &code, NULL, &header);
 	int ok = 0;
+
+	/* Header nodes: the first input is UV, the mesh UV while not linked. */
+	if (header && tot > 0 && in && in[0].type != GPU_NONE && !in[0].link) {
+		in[0].link = GPU_attribute(CD_MTFACE, "");
+	}
 
 	/* The sockets must match main, otherwise the call would not compile. */
 	int totin = 0, totout = 0, sockin = 0, sockout = 0;

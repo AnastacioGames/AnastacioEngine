@@ -171,6 +171,39 @@ São aceitos de 1 a 32 itens, com rótulos de até 63 bytes, e os valores inteir
 - Uma entrada ligada mantém o desenho normal de socket ligado; o link prevalece. Ao desligá-la, o valor local
   anterior volta a valer.
 
+### Arquivos de node com cabeçalho (2026-11-11)
+
+Segue a spec "Formato de Node GLSL" (Claude Docs). O mesmo nó GLSL Script aceita um Text cujas primeiras linhas
+de comentário declaram o node; o corpo traz `vec4 node(vec2 uv)`:
+
+```glsl
+// @name Noise
+// @category Generators
+// @description Ruído fractal.
+// @output gray                         (color = vec4, gray = .r)
+// @input mask: gray = 1                (color | gray, até 8)
+// @param style: enum(Perlin, Value) = Perlin
+// @param scale: float(1, 64) = 6       (também int(min, max), bool = true, color = r, g, b; até 16)
+
+vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
+```
+
+- Inputs são lidos com `in_<nome>(uv)`, parâmetros com `params.<nome>`, e `res()` devolve 1024x1024.
+- O nó traduz o cabeçalho para o formato de sempre (uniforms `u_` com `@min/@max/@default/@choice` e um `main`).
+  Então tudo continua valendo: sockets ligáveis, valor por uniform sem recompilar
+  (`setScriptUniform("u_scale", ...)`), menus de enum e bool, TIME e o nó vermelho em erro de compilação.
+  O texto original fica após um `#line 1`, então o erro mostra a linha do arquivo.
+- O socket **UV** usa a UV da malha enquanto estiver solto. Os sockets aparecem com nome legível
+  (`uv_offset` vira "Uv Offset") e `@name` vira o rótulo do nó quando ele não tem rótulo.
+- Um cabeçalho com erro mantém os sockets e imprime no console `GLSL node "<nó>", line N: <motivo>`.
+- Biblioteca: os arquivos de `release/scripts/presets/glsl_nodes/*.glsl` aparecem em Add > **GLSL Library**,
+  agrupados por `@category` (tooltip = `@description`). O operador `node.glsl_node_add` copia o código para um Text
+  dentro do `.range`, então o jogo exportado não depende da biblioteca.
+- Ainda não suportados: `image`/`meshmap`, `@shading`/`@surface`, e `in_<nome>(uv)` com UV diferente da do pixel.
+  O input é avaliado uma vez pelo grafo e a UV pedida é ignorada.
+- Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
+  Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.
+
 ### TIME
 
 `TIME` (tempo do jogo, em segundos) pode ser usado no script sem ligar um nó Time.

@@ -5,6 +5,13 @@ concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](..
 e detalhados no [`changelog.md`](changelog.md) (histórico antigo em [`changelog-arquivo.md`](changelog-arquivo.md)).
 Ao concluir um item, apague-o daqui e registre no changelog.
 
+## Nodes GLSL por arquivo
+
+- Feito 2026-11-11: cabeçalho `@input/@param/@output` no GLSL Script + Add > GLSL Library
+  ([shader-nodes.md](shader-nodes.md#arquivos-de-node-com-cabeçalho-2026-11-11)). Falta aceite com janela do menu.
+- Próximos: params `image`/`meshmap`, `in_<nome>(uv)` reavaliando o subgrafo em outra UV, `@shading`
+  (`node(Shade c)`), recarregar o .glsl externo ao salvar, mais nodes na biblioteca e build Web conferido.
+
 ## Mind Map
 
 Versão 1 (etapas 1-6 de [plano-mind-map.md](plano-mind-map.md)) aguardando aceite com janela. Falta abrir um `.mm` real do FreeMind e abrir no FreeMind um arquivo exportado. Etapa 7 (vínculos com objeto, cena e texto, tarefas com progresso por ramo) implementada, aguardando aceite com janela.
