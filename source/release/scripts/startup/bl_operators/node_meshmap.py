@@ -46,6 +46,8 @@ def _mesh_data(ob):
     """Triangles in UV with position, normal and vertex curvature, plus the BVH of the mesh."""
     import bmesh
     from mathutils.bvhtree import BVHTree
+    if ob.mode == 'EDIT':
+        ob.update_from_editmode()  # bake the current edit (and a fresh unwrap), not the last saved mesh
     bm = bmesh.new()
     bm.from_mesh(ob.data)
     uv = bm.loops.layers.uv.active
@@ -149,9 +151,15 @@ def _dilate(img, mask, steps):
     for _ in range(steps):
         acc = np.zeros_like(img)
         cnt = np.zeros(mask.shape, np.float32)
+        # Shift without wrapping: a texel only takes values from its real neighbours.
+        h, w = mask.shape
         for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            m = np.roll(np.roll(mask, dy, 0), dx, 1)
-            v = np.roll(np.roll(img, dy, 0), dx, 1)
+            m = np.zeros_like(mask)
+            v = np.zeros_like(img)
+            dst = (slice(max(dy, 0), h + min(dy, 0)), slice(max(dx, 0), w + min(dx, 0)))
+            src = (slice(max(-dy, 0), h + min(-dy, 0)), slice(max(-dx, 0), w + min(-dx, 0)))
+            m[dst] = mask[src]
+            v[dst] = img[src]
             acc[m] += v[m]
             cnt[m] += 1
         grow = (~mask) & (cnt > 0)
