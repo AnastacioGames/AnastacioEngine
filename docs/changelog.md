@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Nodes GLSL: parâmetro meshmap
+
+- `@param x: meshmap(ao|curvature|thickness|normal|position)` reaproveita o slot de imagem, amostra sem sRGB
+  e gera `mesh_x(uv)` com decodificação e valor neutro sem mapa. Preset Mesh Wear (categoria Mesh Maps).
+- Correção (revisão do Codex): o limite de 4 imagens era checado pelo texto `": image"`; `x:image` sem
+  espaço passava e escrevia fora de `info->images`. Agora a checagem usa o tipo já lido.
+
 ## 2026-11-11 — Nodes GLSL: parâmetro image e contagem de usuários de node->prop
 
 - `@param <nome>: image` no formato com cabeçalho (até 4 por nó): botão de escolha no nó, `img_<nome>(uv)` no

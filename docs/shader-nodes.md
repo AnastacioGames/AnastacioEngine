@@ -203,6 +203,11 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   limpar, operador `node.glsl_image_set`) e fica numa propriedade de ID `img_<nome>` do nó, salva no `.range`.
   Sem imagem, `img_tex` devolve preto transparente. O gerador expõe o sampler como `SCRIPT_IMG<i>` (`samp<N>`).
   Exemplo: `presets/glsl_nodes/image_tint.glsl`.
+- `@param ao: meshmap(ao|curvature|thickness|normal|position)`: mapa assado da malha, escolhido no mesmo
+  botão e lido como dado (sem sRGB) por `mesh_ao(uv)`. Os mapas cinza devolvem `float` (canal R), `normal`
+  devolve `vec3` em -1..1 e `position` o `vec3` gravado. Sem mapa: AO 1, curvatura 0.5, espessura 0,
+  normal (0,0,1), posição 0. `image` e `meshmap` somam no limite de 4. Não há bake automático nem os bits
+  de componente em `info.w` da spec. Exemplo: `presets/glsl_nodes/mesh_wear.glsl`.
 - Ainda não suportados: `meshmap`, `@shading`/`@surface`, e `in_<nome>(uv)` com UV diferente da do pixel.
   O input é avaliado uma vez pelo grafo e a UV pedida é ignorada.
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,

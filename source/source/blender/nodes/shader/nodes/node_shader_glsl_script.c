@@ -296,7 +296,13 @@ typedef struct HeaderEntry {
 	float def[4];
 	int totdef;
 	char choice[512];
+	/* HDR_IMAGE only: 0 = color image, else a MESHMAP_* baked mesh map (read as data). */
+	int mesh;
 } HeaderEntry;
+
+/* "@param x: meshmap(<type>)": a map baked from the mesh, read by mesh_<name>(uv). */
+enum { MESHMAP_NONE, MESHMAP_AO, MESHMAP_CURVATURE, MESHMAP_THICKNESS, MESHMAP_NORMAL, MESHMAP_POSITION };
+static const char *meshmap_names[] = {"", "ao", "curvature", "thickness", "normal", "position"};
 
 typedef struct HeaderInfo {
 	char name[64];
@@ -305,6 +311,7 @@ typedef struct HeaderInfo {
 	char images[HEADER_MAX_IMAGES][48];
 	int totimage;
 	struct Image *image_ids[HEADER_MAX_IMAGES];
+	bool image_data[HEADER_MAX_IMAGES];
 	int totbound;
 } HeaderInfo;
 
@@ -419,6 +426,15 @@ static bool header_entry(const char *p, bool is_input, HeaderEntry *e)
 	else if (STREQ(type, "image")) {
 		e->kind = HDR_IMAGE;
 		return args[0] == '\0' && def == NULL;
+	}
+	else if (STREQ(type, "meshmap")) {
+		e->kind = HDR_IMAGE;
+		for (int i = MESHMAP_AO; i <= MESHMAP_POSITION; i++) {
+			if (STREQ(args, meshmap_names[i])) {
+				e->mesh = i;
+			}
+		}
+		return e->mesh != MESHMAP_NONE && def == NULL;
 	}
 	else if (STREQ(type, "bool")) e->kind = HDR_BOOL;
 	else if (STREQ(type, "color")) e->kind = HDR_COLOR;
@@ -561,12 +577,6 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		}
 		else if ((rest = header_tag(s, "input")) || (rest = header_tag(s, "param"))) {
 			const bool is_input = header_tag(s, "input") != NULL;
-			const bool is_image = !is_input && strstr(rest, ": image") != NULL;
-			if (is_image && info->totimage >= HEADER_MAX_IMAGES) {
-				header_error(node, line, "too many image params (4)");
-				*r_broken = true;
-				continue;
-			}
 			if (tot >= HEADER_MAX_ENTRIES || (is_input && totin >= 8) || (!is_input && totparam >= 16)) {
 				header_error(node, line, "too many inputs (8) or params (16)");
 				*r_broken = true;
@@ -576,7 +586,14 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 			if (!header_entry(rest, is_input, e)) {
 				header_error(node, line, is_input ? "expected: name: color|gray = default" :
 				             "expected: name: float(min, max) = v | int(min, max) = v | bool = true | "
-				             "color = r, g, b | enum(A, B) = A");
+				             "color = r, g, b | enum(A, B) = A | image | "
+				             "meshmap(ao|curvature|thickness|normal|position)");
+				*r_broken = true;
+				continue;
+			}
+			/* Checked on the parsed kind: spacing in the line ("x:meshmap(ao)") must not skip the limit. */
+			if (e->kind == HDR_IMAGE && info->totimage >= HEADER_MAX_IMAGES) {
+				header_error(node, line, "too many image/meshmap params (4)");
 				*r_broken = true;
 				continue;
 			}
@@ -664,9 +681,32 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		}
 		else if (e->kind == HDR_IMAGE) {
 			struct Image *ima = node ? header_node_image(node, e->name) : NULL;
-			if (ima) {
+			if (e->mesh != MESHMAP_NONE) {
+				/* Gray maps read .r; normal decodes 0..1 to -1..1; position is used as stored.
+				 * Without a map: no occlusion, flat curvature, zero thickness, normal up. */
+				const bool vec = (e->mesh == MESHMAP_NORMAL || e->mesh == MESHMAP_POSITION);
+				const char *fallback = (e->mesh == MESHMAP_AO) ? "1.0" : (e->mesh == MESHMAP_CURVATURE) ? "0.5" :
+				                       (e->mesh == MESHMAP_NORMAL) ? "vec3(0.0, 0.0, 1.0)" :
+				                       vec ? "vec3(0.0)" : "0.0";
+				if (ima) {
+					const char *read = (e->mesh == MESHMAP_NORMAL) ?
+					                       "normalize(texture2D(SCRIPT_IMG%d, uv).rgb * 2.0 - 1.0)" :
+					                   vec ? "texture2D(SCRIPT_IMG%d, uv).rgb" : "texture2D(SCRIPT_IMG%d, uv).r";
+					BLI_dynstr_appendf(ds, "%s mesh_%s(vec2 uv) { return ", vec ? "vec3" : "float", e->name);
+					BLI_dynstr_appendf(ds, read, info->totbound);
+					BLI_dynstr_append(ds, "; }\n");
+					info->image_data[info->totbound] = true;
+					info->image_ids[info->totbound++] = ima;
+				}
+				else {
+					BLI_dynstr_appendf(ds, "%s mesh_%s(vec2 uv) { return %s; }\n", vec ? "vec3" : "float", e->name,
+					                   fallback);
+				}
+			}
+			else if (ima) {
 				BLI_dynstr_appendf(ds, "vec4 img_%s(vec2 uv) { return texture2D(SCRIPT_IMG%d, uv); }\n", e->name,
 				                   info->totbound);
+				info->image_data[info->totbound] = false;
 				info->image_ids[info->totbound++] = ima;
 			}
 			else {
@@ -1096,7 +1136,7 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 		const int totimage = header ? info.totbound : 0;
 		GPUNodeLink *images[HEADER_MAX_IMAGES];
 		for (int i = 0; i < totimage; i++) {
-			images[i] = GPU_image(info.image_ids[i], NULL, false);
+			images[i] = GPU_image(info.image_ids[i], NULL, info.image_data[i]);
 		}
 		char *wrapper = script_wrapper(params, tot, use_time, totimage);
 		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time, node->name, images, totimage);
