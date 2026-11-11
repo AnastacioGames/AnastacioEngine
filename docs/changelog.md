@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Nodes GLSL: @shading
+
+- `// @shading` + `void node(inout Shade c)`: entradas e saídas Albedo, Normal, Roughness, Metallic,
+  Emission e Alpha; Normal solto recebe a normal da superfície. Preset Wet Surface (categoria Shading).
+- Revisão do Codex: no modo sem world space a normal solta precisava do sinal do Blender Internal
+  (negada, como no Normal Map); conferido na viewport com o node em identidade.
+
 ## 2026-11-11 — Nodes GLSL: in_<nome>(uv) em outra UV
 
 - Input ligado direto num Image Texture (Flat, sem mapping, Vector solto) é relido na UV pedida pelo

@@ -307,9 +307,24 @@ typedef struct HeaderEntry {
 enum { MESHMAP_NONE, MESHMAP_AO, MESHMAP_CURVATURE, MESHMAP_THICKNESS, MESHMAP_NORMAL, MESHMAP_POSITION };
 static const char *meshmap_names[] = {"", "ao", "curvature", "thickness", "normal", "position"};
 
+/* "// @shading": void node(inout Shade c) edits the surface. Each field is an input socket
+ * (u_<name>) and an output of the same name. */
+static const struct {
+	const char *name, *socket_type, *def;
+} shade_fields[] = {
+	{"albedo", "vec4", "0.8 0.8 0.8 1"},
+	{"normal", "vec3", "0 0 1"},
+	{"roughness", "float", "0.5"},
+	{"metallic", "float", "0"},
+	{"emission", "vec4", "0 0 0 1"},
+	{"alpha", "float", "1"},
+};
+#define SHADE_TOT ((int)(sizeof(shade_fields) / sizeof(shade_fields[0])))
+
 typedef struct HeaderInfo {
 	char name[64];
 	bool output_gray;
+	bool shading;
 	/* Image params in header order, and which of them have an image (only those are bound). */
 	char images[HEADER_MAX_IMAGES][48];
 	int totimage;
@@ -582,7 +597,7 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 {
 	HeaderEntry entries[HEADER_MAX_ENTRIES];
 	int tot = 0, totin = 0, totparam = 0, line = 0;
-	bool has_output = false;
+	bool has_output = false, has_shading = false;
 
 	memset(info, 0, sizeof(*info));
 	*r_broken = false;
@@ -655,17 +670,30 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 			else totparam++;
 		}
 		else if (header_tag(s, "shading")) {
-			header_error(node, line, "@shading nodes are not supported yet, use vec4 node(vec2 uv)");
-			*r_broken = true;
+			has_shading = true;
 		}
 	}
 
-	if (!has_output) {
+	if (!has_output && !has_shading) {
 		*r_broken = false;
 		return NULL;
 	}
+	if (has_output && has_shading) {
+		header_error(node, 1, "use @output or @shading, not both");
+		*r_broken = true;
+	}
+	if (has_shading) {
+		for (int i = 0; i < tot; i++) {
+			for (int f = 0; f < SHADE_TOT; f++) {
+				if (STREQ(entries[i].name, shade_fields[f].name)) {
+					header_error(node, 1, "a field of Shade is already a socket, pick another name");
+					*r_broken = true;
+				}
+			}
+		}
+	}
 	if (!script_uses_word(src, "node")) {
-		header_error(node, 1, "missing vec4 node(vec2 uv)");
+		header_error(node, 1, has_shading ? "missing void node(inout Shade c)" : "missing vec4 node(vec2 uv)");
 		*r_broken = true;
 	}
 	if (*r_broken) {
@@ -673,6 +701,17 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 	}
 
 	DynStr *ds = BLI_dynstr_new();
+	if (has_shading) {
+		/* The surface fields come in as linkable sockets (loose: these defaults; Normal: the
+		 * geometry normal, see the GPU callback) and go out by the outputs of main. */
+		for (int f = 0; f < SHADE_TOT; f++) {
+			BLI_dynstr_appendf(ds, "uniform %s u_%s; // @default %s\n", shade_fields[f].socket_type,
+			                   shade_fields[f].name, shade_fields[f].def);
+		}
+		BLI_dynstr_append(ds, "struct Shade { vec2 uv; vec4 albedo; vec3 normal; float roughness; float metallic; "
+		                      "vec3 emission; float alpha; };\n");
+	}
+	info->shading = has_shading;
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];
 		switch (e->kind) {
@@ -803,7 +842,13 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 	BLI_dynstr_append(ds, "\n");
 	/* script_parse starts here: a "main" in a comment of the user code is not ours. */
 	*r_main_offset = BLI_dynstr_get_len(ds);
-	BLI_dynstr_appendf(ds, "void main(vec3 UV, out %s)\n{\n", info->output_gray ? "float Value" : "vec4 Color");
+	if (has_shading) {
+		BLI_dynstr_append(ds, "void main(vec3 UV, out vec4 Albedo, out vec3 Normal, out float Roughness, "
+		                      "out float Metallic, out vec4 Emission, out float Alpha)\n{\n");
+	}
+	else {
+		BLI_dynstr_appendf(ds, "void main(vec3 UV, out %s)\n{\n", info->output_gray ? "float Value" : "vec4 Color");
+	}
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];
 		if (e->kind == HDR_BOOL) BLI_dynstr_appendf(ds, "\tparams.%s = (u_%s != 0);\n", e->name, e->name);
@@ -811,7 +856,21 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		else if (e->kind != HDR_IN_COLOR && e->kind != HDR_IN_GRAY && e->kind != HDR_IMAGE)
 			BLI_dynstr_appendf(ds, "\tparams.%s = u_%s;\n", e->name, e->name);
 	}
-	BLI_dynstr_append(ds, info->output_gray ? "\tValue = node(UV.xy).r;\n}\n" : "\tColor = node(UV.xy);\n}\n");
+	if (has_shading) {
+		/* A zero normal from the script keeps the incoming one. */
+		BLI_dynstr_append(ds,
+		                  "\tShade c;\n"
+		                  "\tc.uv = UV.xy; c.albedo = u_albedo; c.normal = u_normal; c.roughness = u_roughness;\n"
+		                  "\tc.metallic = u_metallic; c.emission = u_emission.rgb; c.alpha = u_alpha;\n"
+		                  "\tnode(c);\n"
+		                  "\tAlbedo = c.albedo;\n"
+		                  "\tNormal = (dot(c.normal, c.normal) > 1e-12) ? normalize(c.normal) : u_normal;\n"
+		                  "\tRoughness = c.roughness; Metallic = c.metallic;\n"
+		                  "\tEmission = vec4(c.emission, 1.0); Alpha = c.alpha;\n}\n");
+	}
+	else {
+		BLI_dynstr_append(ds, info->output_gray ? "\tValue = node(UV.xy).r;\n}\n" : "\tColor = node(UV.xy);\n}\n");
+	}
 
 	char *code = MEM_mallocN((size_t)BLI_dynstr_get_len(ds) + 1, "glsl header script");
 	BLI_dynstr_get_cstring_ex(ds, code);
@@ -1189,6 +1248,7 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 	bool header = false;
 	HeaderInfo info;
 	info.totbound = 0;
+	info.shading = false;
 	int tot = script_read_ex(node, params, &code, &info, &header, GPU_material_do_color_management(mat));
 	int ok = 0;
 
@@ -1214,6 +1274,27 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 		for (int i = 0; i < tot; i++) {
 			if (!params[i].output) {
 				uniform_names[input++] = params[i].uniform ? params[i].name : NULL;
+			}
+		}
+		/* @shading: a loose Normal is the surface normal in the convention Normal Map outputs (world
+		 * with world space shading; negated view normal otherwise). */
+		if (header && info.shading) {
+			int k = 0;
+			for (int i = 0; i < tot; i++) {
+				if (params[i].output) {
+					continue;
+				}
+				if (STREQ(params[i].name, "u_normal") && !in[k].link) {
+					if (GPU_material_use_world_space_shading(mat)) {
+						GPU_link(mat, "direction_transform_m4v3", GPU_material_builtin(mat, GPU_VIEW_NORMAL),
+						         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), &in[k].link);
+					}
+					else {
+						/* Negated, like Normal Map here: the material input expects Blender Internal's sign. */
+						GPU_link(mat, "vec_math_negate", GPU_material_builtin(mat, GPU_VIEW_NORMAL), &in[k].link);
+					}
+				}
+				k++;
 			}
 		}
 		const bool use_time = script_uses_word(code, "TIME");

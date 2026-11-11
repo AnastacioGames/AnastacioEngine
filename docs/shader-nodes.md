@@ -213,7 +213,15 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   linear em Color; saída Alpha; input `gray` usa a luminância). Nos outros casos (outro nó, mapping, Box,
   input solto) devolve o valor que chegou no socket e a UV é ignorada. Exemplo:
   `presets/glsl_nodes/box_blur.glsl`. A imagem conta como sampler do nó (até 4 params + 8 inputs).
-- Ainda não suportados: `@shading`/`@surface` e reavaliar um subgrafo qualquer em outra UV.
+- `// @shading` (no lugar de `@output`): o código escreve `void node(inout Shade c)`, com
+  `c.uv`, `c.albedo` (vec4), `c.normal`, `c.roughness`, `c.metallic`, `c.emission` (vec3) e `c.alpha`.
+  Cada campo vira um socket de entrada (padrões 0.8 cinza, 0.5, 0, preto, 1) e uma saída de mesmo nome,
+  para ligar entre o que alimenta e o Extended Material/Principled. Normal solto = normal da superfície
+  na mesma convenção do Normal Map (mundo com world space shading; senão view com o sinal do Blender
+  Internal). Normal zero devolve a de entrada. A saída Emission tem alpha 1. `@param`/`@input` não podem
+  usar os nomes dos campos. O Emit do Extended Material é escalar e o Principled não tem Emission/Alpha:
+  essas saídas pedem nós próprios. Exemplo: `presets/glsl_nodes/wet_surface.glsl`.
+- Ainda não suportados: `@surface` e reavaliar um subgrafo qualquer em outra UV.
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
   Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.
 
