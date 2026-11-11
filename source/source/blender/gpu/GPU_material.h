@@ -301,7 +301,7 @@ bool GPU_material_geometry_stage_supported(void);
  * uniform socket is uploaded on every bind (GPU_material_script_uniform_set changes it without compiling). */
 bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
                      const char **uniform_names, bool use_time, const char *orig_node_name,
-                     struct GPUNodeLink **images, int totimage);
+                     struct GPUNodeLink **images, int totimage, struct GPUNodeLink **extras, const GPUType *extra_types, int totextra);
 /* GLSL Script "u_" uniforms of every compiled variant of the material. Set returns how many were found. */
 int GPU_material_script_uniform_set(struct Material *ma, const char *name, const float *value, int len);
 bool GPU_material_script_uniform_get(struct Material *ma, const char *name, float r_value[4], int *r_size);

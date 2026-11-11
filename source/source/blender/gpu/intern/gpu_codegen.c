@@ -3485,7 +3485,7 @@ bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNod
  * inputs first, then the outputs. */
 bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
                      const char **uniform_names, bool use_time, const char *orig_node_name,
-                     GPUNodeLink **images, int totimage)
+                     GPUNodeLink **images, int totimage, GPUNodeLink **extras, const GPUType *extra_types, int totextra)
 {
 	const char *name = gpu_material_add_script(mat, code, wrapper, use_time, orig_node_name);
 	if (!name) {
@@ -3513,6 +3513,10 @@ bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GP
 	 * reads them as SCRIPT_IMG<i> (codegen_print_scripts). */
 	for (int i = 0; i < totimage; i++) {
 		gpu_node_input_link(node, images[i], GPU_TEX2D);
+	}
+	/* Internal inputs after the images (@surface: object position, view normal, loc-to-view matrix). */
+	for (int i = 0; i < totextra; i++) {
+		gpu_node_input_link(node, extras[i], extra_types[i]);
 	}
 	if (out) {
 		for (int i = 0; out[i].type != GPU_NONE; i++) {

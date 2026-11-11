@@ -325,6 +325,8 @@ typedef struct HeaderInfo {
 	char name[64];
 	bool output_gray;
 	bool shading;
+	/* "// @surface": the script also gets the object position and normal (surface(), triplanar_<image>()). */
+	bool surface;
 	/* Image params in header order, and which of them have an image (only those are bound). */
 	char images[HEADER_MAX_IMAGES][48];
 	int totimage;
@@ -597,7 +599,7 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 {
 	HeaderEntry entries[HEADER_MAX_ENTRIES];
 	int tot = 0, totin = 0, totparam = 0, line = 0;
-	bool has_output = false, has_shading = false;
+	bool has_output = false, has_shading = false, has_surface = false;
 
 	memset(info, 0, sizeof(*info));
 	*r_broken = false;
@@ -672,14 +674,22 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		else if (header_tag(s, "shading")) {
 			has_shading = true;
 		}
+		else if (header_tag(s, "surface")) {
+			has_surface = true;
+		}
 	}
 
-	if (!has_output && !has_shading) {
+	/* @surface alone is a color node, like "@output color". */
+	if (!has_output && !has_shading && !has_surface) {
 		*r_broken = false;
 		return NULL;
 	}
 	if (has_output && has_shading) {
 		header_error(node, 1, "use @output or @shading, not both");
+		*r_broken = true;
+	}
+	if (has_surface && has_shading) {
+		header_error(node, 1, "use @surface or @shading, not both");
 		*r_broken = true;
 	}
 	if (has_shading) {
@@ -712,6 +722,15 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		                      "vec3 emission; float alpha; };\n");
 	}
 	info->shading = has_shading;
+	info->surface = has_surface;
+	if (has_surface) {
+		/* Filled by the wrapper: position and normal of this fragment in object space. */
+		BLI_dynstr_append(ds, "vec3 script_surf_pos; vec3 script_surf_nor;\n"
+		                      "struct Surface { vec3 position; vec3 normal; };\n"
+		                      "Surface surface(vec2 uv) { Surface s; s.position = script_surf_pos; "
+		                      "s.normal = script_surf_nor; return s; }\n"
+		                      "float covered(vec2 uv) { return 1.0; }\n");
+	}
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];
 		switch (e->kind) {
@@ -835,6 +854,21 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 				/* No image chosen yet: transparent black, the shader still compiles. */
 				BLI_dynstr_appendf(ds, "vec4 img_%s(vec2 uv) { return vec4(0.0); }\n", e->name);
 			}
+		}
+	}
+	/* @surface: each image param projected from the three axes, blended by the normal. Each side is
+	 * read as seen from outside (the sign of the normal flips it), so opposite faces are not mirrored. */
+	for (int i = 0; has_surface && i < tot; i++) {
+		const HeaderEntry *e = &entries[i];
+		if (e->kind == HDR_IMAGE && e->mesh == MESHMAP_NONE) {
+			BLI_dynstr_appendf(ds,
+			                   "vec4 triplanar_%s(float scale) {\n"
+			                   "\tvec3 n = script_surf_nor; vec3 w = abs(n); w /= max(w.x + w.y + w.z, 1e-8);\n"
+			                   "\tvec3 p = script_surf_pos * scale;\n"
+			                   "\tvec3 sg = vec3(n.x < 0.0 ? -1.0 : 1.0, n.y < 0.0 ? -1.0 : 1.0, n.z < 0.0 ? -1.0 : 1.0);\n"
+			                   "\treturn img_%s(vec2(p.y * sg.x, p.z)) * w.x + img_%s(vec2(-p.x * sg.y, p.z)) * w.y +\n"
+			                   "\t       img_%s(vec2(p.x * sg.z, p.y)) * w.z;\n}\n",
+			                   e->name, e->name, e->name, e->name);
 		}
 	}
 	BLI_dynstr_append(ds, "vec2 res() { return vec2(1024.0); }\n#line 1\n");
@@ -1150,7 +1184,7 @@ static const char *script_socket_glsl(int socktype)
 /* SCRIPT_ENTRY(inputs..., [time,] outputs...) calls SCRIPT_MAIN with the parameters in the user
  * order and converts int/vec2 from and to the socket types. The uniforms of the script are globals
  * here, filled from their sockets before the call. */
-static char *script_wrapper(const ScriptParam *params, int tot, bool use_time, int totimage)
+static char *script_wrapper(const ScriptParam *params, int tot, bool use_time, int totimage, bool surface)
 {
 	DynStr *ds = BLI_dynstr_new();
 	bool first = true;
@@ -1174,6 +1208,11 @@ static char *script_wrapper(const ScriptParam *params, int tot, bool use_time, i
 			BLI_dynstr_appendf(ds, "%ssampler2D scr_img%d", first ? "" : ", ", i);
 			first = false;
 		}
+		/* Same order as the extras of GPU_link_script. */
+		if (pass == 0 && surface) {
+			BLI_dynstr_appendf(ds, "%svec3 scr_spos, vec3 scr_snor, mat4 scr_slv", first ? "" : ", ");
+			first = false;
+		}
 	}
 	BLI_dynstr_append(ds, ")\n{\n");
 
@@ -1184,6 +1223,18 @@ static char *script_wrapper(const ScriptParam *params, int tot, bool use_time, i
 	}
 	if (use_time) {
 		BLI_dynstr_append(ds, "\tTIME = scr_time;\n");
+	}
+	if (surface) {
+		/* Object axes with the object scale (meters): the view part of loc-to-view is rigid, so its
+		 * column lengths are the object scale; transpose(mat3) * view normal / scale is the normal in
+		 * those axes (written with dot, no transpose() on GLSL ES 1.0). Zero normal falls back to up. */
+		BLI_dynstr_append(ds, "\tvec3 scr_ssc = vec3(length(scr_slv[0].xyz), length(scr_slv[1].xyz), "
+		                      "length(scr_slv[2].xyz));\n"
+		                      "\tscript_surf_pos = scr_spos * scr_ssc;\n"
+		                      "\tvec3 scr_sn = vec3(dot(scr_slv[0].xyz, scr_snor), dot(scr_slv[1].xyz, scr_snor), "
+		                      "dot(scr_slv[2].xyz, scr_snor)) / max(scr_ssc, vec3(1e-8));\n"
+		                      "\tscript_surf_nor = (dot(scr_sn, scr_sn) > 1e-12) ? normalize(scr_sn) : "
+		                      "vec3(0.0, 0.0, 1.0);\n");
 	}
 
 	/* Uniforms first, then the call. */
@@ -1249,6 +1300,7 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 	HeaderInfo info;
 	info.totbound = 0;
 	info.shading = false;
+	info.surface = false;
 	int tot = script_read_ex(node, params, &code, &info, &header, GPU_material_do_color_management(mat));
 	int ok = 0;
 
@@ -1303,8 +1355,21 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 		for (int i = 0; i < totimage; i++) {
 			images[i] = GPU_image(info.image_ids[i], NULL, info.image_data[i]);
 		}
-		char *wrapper = script_wrapper(params, tot, use_time, totimage);
-		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time, node->name, images, totimage);
+		/* @surface: the position back to object space; the wrapper scales it and turns the view
+		 * normal with the loc-to-view matrix. */
+		const bool surface = header && info.surface;
+		GPUNodeLink *extras[3];
+		const GPUType extra_types[3] = {GPU_VEC3, GPU_VEC3, GPU_MAT4};
+		if (surface) {
+			/* One builtin link per use: GPU_link takes it over. */
+			GPU_link(mat, "point_transform_m4v3", GPU_material_builtin(mat, GPU_VIEW_POSITION),
+			         GPU_material_builtin(mat, GPU_INVERSE_LOC_TO_VIEW_MATRIX), &extras[0]);
+			extras[1] = GPU_material_builtin(mat, GPU_VIEW_NORMAL);
+			extras[2] = GPU_material_builtin(mat, GPU_LOC_TO_VIEW_MATRIX);
+		}
+		char *wrapper = script_wrapper(params, tot, use_time, totimage, surface);
+		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time, node->name, images, totimage,
+		                     extras, extra_types, surface ? 3 : 0);
 		MEM_freeN(wrapper);
 	}
 	MEM_SAFE_FREE(code);
