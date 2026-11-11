@@ -13,7 +13,8 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 - Param `meshmap` feito 2026-11-11 (mapa assado escolhido no botão; sem bake automático).
 - `in_<nome>(uv)` em outra UV feito 2026-11-11 para Image Texture ligado direto (subgrafo qualquer: futuro).
 - `@shading` feito 2026-11-11 (pares de sockets Albedo/Normal/Roughness/Metallic/Emission/Alpha).
-- Próximos: reload do .glsl externo ao salvar, mais nós da biblioteca, conferir Web e runtime
+- Reload do .glsl ao salvar feito 2026-11-11 (Text editado na engine não é sobrescrito).
+- Próximos: mais nós da biblioteca, conferir Web e runtime
   (`node(Shade c)`), recarregar o .glsl externo ao salvar, mais nodes na biblioteca e build Web conferido.
 
 ## Mind Map

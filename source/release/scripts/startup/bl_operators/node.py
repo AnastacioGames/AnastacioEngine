@@ -1025,6 +1025,12 @@ class NODE_OT_glsl_node_add(Operator):
             text = bpy.data.texts.new(os.path.basename(self.filepath))
             text.from_string(source)
             text["glsl_node_file"] = source_path
+            try:
+                # Saving the .glsl outside the engine updates this Text (glsl_node_reload.py).
+                from glsl_node_reload import mark_text
+                mark_text(text, source_path, source)
+            except ImportError:
+                pass
 
         space = context.space_data
         tree = space.edit_tree

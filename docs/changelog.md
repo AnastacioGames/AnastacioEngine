@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Nodes GLSL: recarregar o .glsl ao salvar
+
+- `startup/glsl_node_reload.py`: a cada 1 s confere o mtime dos arquivos da GLSL Library usados por Texts;
+  arquivo mudado e Text intacto (hash) → atualiza o Text e refaz os nós. Revisão do Codex: mtime só
+  gravado depois de ler, comparação por diferença, Texts antigos protegidos e Texts linkados ignorados.
+
 ## 2026-11-11 — Nodes GLSL: @shading
 
 - `// @shading` + `void node(inout Shade c)`: entradas e saídas Albedo, Normal, Roughness, Metallic,

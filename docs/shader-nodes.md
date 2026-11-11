@@ -221,6 +221,10 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   Internal). Normal zero devolve a de entrada. A saída Emission tem alpha 1. `@param`/`@input` não podem
   usar os nomes dos campos. O Emit do Extended Material é escalar e o Principled não tem Emission/Alpha:
   essas saídas pedem nós próprios. Exemplo: `presets/glsl_nodes/wet_surface.glsl`.
+- Recarregar ao salvar: o Text criado pela GLSL Library guarda o caminho, o mtime e o hash do arquivo.
+  Salvar o `.glsl` fora da engine atualiza o Text em até 1 s e refaz sockets e shader dos nós que o usam
+  (`startup/glsl_node_reload.py`). Um Text editado dentro da engine não é sobrescrito (aviso no console).
+  Só no editor; caminhos de rede lentos podem atrasar a interface na checagem.
 - Ainda não suportados: `@surface` e reavaliar um subgrafo qualquer em outra UV.
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
   Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.
