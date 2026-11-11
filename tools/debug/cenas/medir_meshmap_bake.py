@@ -53,3 +53,33 @@ for ob in (sc.objects["Suzanne"], sc.objects["Peca"], sc.objects["Cubo"]):
         import numpy as np; np.save(os.path.join(out, "%s_%s.npy" % (ob.name, kind)), np.array(img.pixels[:], np.float32).reshape(256, 256, 4))
         print("MESHMAP %s %s %.2fs" % (ob.name, kind, time.time() - t))
 bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "meshmap_teste.range"))
+
+# Material com o Mesh Wear ligado nos mapas assados, para ver no jogo (os 3 objetos girando).
+import math
+lib = os.path.join(bpy.utils.preset_paths("glsl_nodes")[0], "mesh_wear.glsl")
+text = bpy.data.texts.new("mesh_wear.glsl"); text.from_string(open(lib, encoding="utf-8").read())
+for i, ob in enumerate((sc.objects["Suzanne"], sc.objects["Peca"], sc.objects["Cubo"])):
+    ob.location = ((i - 1) * 3.2, 0, 0)
+    mat = bpy.data.materials.new("Wear_" + ob.name); mat.use_nodes = True
+    mat.specular_intensity = 0.3
+    ob.data.materials.append(mat)
+    tree = mat.node_tree
+    base = [n for n in tree.nodes if n.type in ('MATERIAL', 'MATERIAL_EXT')][0]
+    node = tree.nodes.new("ShaderNodeGLSLScript"); node.script = text
+    tree.interface_update(bpy.context)
+    node["img_ao"] = bpy.data.images[ob.name + "_ao"]
+    node["img_curvature"] = bpy.data.images[ob.name + "_curvature"]
+    tree.interface_update(bpy.context)
+    tree.links.new(node.outputs[0], base.inputs["Color"])
+    bpy.ops.logic.sensor_add(type='ALWAYS', object=ob.name)
+    bpy.ops.logic.actuator_add(type='MOTION', object=ob.name)
+    ob.game.actuators[-1].offset_rotation = (0, 0, 0.01)
+    bpy.ops.logic.controller_add(type='LOGIC_AND', object=ob.name)
+    ob.game.controllers[-1].link(ob.game.sensors[-1], ob.game.actuators[-1])
+cam = bpy.data.objects.new("Camera", bpy.data.cameras.new("Camera")); sc.objects.link(cam)
+cam.location = (0, -9, 2.5); cam.rotation_euler = (math.radians(78), 0, 0); sc.camera = cam
+sun = bpy.data.objects.new("Sol", bpy.data.lamps.new("Sol", 'SUN')); sc.objects.link(sun)
+sun.rotation_euler = (math.radians(50), 0, math.radians(30))
+sc.world = sc.world or bpy.data.worlds.new("World"); sc.world.horizon_color = (0.25, 0.27, 0.3)
+sc.render.engine = 'BLENDER_GAME'
+bpy.ops.wm.save_as_mainfile(filepath=os.path.join(out, "meshmap_teste.range"))
