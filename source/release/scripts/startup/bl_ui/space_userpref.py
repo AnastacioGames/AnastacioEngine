@@ -694,28 +694,32 @@ class USERPREF_PT_theme(Panel):
 
     @staticmethod
     def _theme_widget_style(layout, widget_style):
-        # 4 colunas: cores de fundo, cores de texto, forma e degradê
+
         row = layout.row()
 
-        col = row.column()
-        col.prop(widget_style, "outline")
-        col.prop(widget_style, "item", slider=True)
+        subsplit = row.split(factor=0.95)
 
-        col = row.column()
-        col.prop(widget_style, "inner", slider=True)
-        col.prop(widget_style, "inner_sel", slider=True)
+        padding = subsplit.split(factor=0.15)
+        colsub = padding.column()
+        colsub = padding.column()
+        colsub.row().prop(widget_style, "outline")
+        colsub.row().prop(widget_style, "item", slider=True)
+        colsub.row().prop(widget_style, "inner", slider=True)
+        colsub.row().prop(widget_style, "inner_sel", slider=True)
+        colsub.row().prop(widget_style, "roundness")
 
-        col = row.column()
-        col.prop(widget_style, "text")
-        col.prop(widget_style, "text_sel")
+        subsplit = row.split(factor=0.85)
 
-        col = row.column()
-        col.prop(widget_style, "roundness")
-        col.prop(widget_style, "show_shaded")
-        sub = col.column(align=True)
-        sub.active = widget_style.show_shaded
-        sub.prop(widget_style, "shadetop")
-        sub.prop(widget_style, "shadedown")
+        padding = subsplit.split(factor=0.15)
+        colsub = padding.column()
+        colsub = padding.column()
+        colsub.row().prop(widget_style, "text")
+        colsub.row().prop(widget_style, "text_sel")
+        colsub.prop(widget_style, "show_shaded")
+        subsub = colsub.column(align=True)
+        subsub.active = widget_style.show_shaded
+        subsub.prop(widget_style, "shadetop")
+        subsub.prop(widget_style, "shadedown")
 
     @staticmethod
     def _ui_font_style(layout, font_style):
