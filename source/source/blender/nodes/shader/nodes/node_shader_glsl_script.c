@@ -784,8 +784,11 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 			bNode *tex_node = (info->totbound < HEADER_MAX_BOUND) ? header_input_image_node(node, e->name, &alpha) :
 			                                                         NULL;
 			if (!tex_node) {
-				BLI_dynstr_appendf(ds, "%s in_%s(vec2 uv) { return u_%s; }\n", gray ? "float" : "vec4", e->name,
-				                   e->name);
+				/* Linked to other nodes: the material code may define SCRIPT_IN_<name>, those nodes run
+				 * again at uv (gpu_codegen.c, codegen_print_script_inputs). */
+				BLI_dynstr_appendf(ds, "%s in_%s(vec2 uv)\n{\n#ifdef SCRIPT_IN_%s\n\treturn SCRIPT_IN_%s(uv);\n"
+				                   "#else\n\treturn u_%s;\n#endif\n}\n", gray ? "float" : "vec4", e->name, e->name,
+				                   e->name, e->name);
 				continue;
 			}
 			const NodeTexImage *tex = tex_node->storage;

@@ -23,6 +23,8 @@
  * Convert material node-trees to GLSL.
  */
 
+#include <ctype.h>
+
 #include "MEM_guardedalloc.h"
 
 #include "DNA_customdata_types.h"
@@ -942,21 +944,22 @@ static void codegen_declare_tmps(DynStr *ds, ListBase *nodes)
 	BLI_dynstr_append(ds, "\n");
 }
 
-static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *finaloutputs[8])
+/* "uv" (vec2) as the given type, for the mesh UV read inside an in_<name>(uv) function. */
+static void codegen_print_uv(DynStr *ds, GPUType to)
 {
-	GPUNode *node;
+	if (to == GPU_FLOAT) BLI_dynstr_append(ds, "uv.x");
+	else if (to == GPU_VEC3) BLI_dynstr_append(ds, "vec3(uv, 0.0)");
+	else if (to == GPU_VEC4) BLI_dynstr_append(ds, "vec4(uv, 0.0, 1.0)");
+	else BLI_dynstr_append(ds, "uv");
+}
+
+/* One node call. uv_override: the default mesh UV is read from "uv" (in_<name>(uv) functions). */
+static void codegen_call_node(DynStr *ds, GPUNode *node, bool uv_override)
+{
 	GPUInput *input;
 	GPUOutput *output;
 
-	for (node = nodes->first; node; node = node->next) {
-		if (!codegen_node_in_fragment(node)) {
-			continue;
-		}
-		if (STREQ(node->name, "node_shell_layer")) {
-			/* Fur Shells / Outline layer, from the generated geometry stage (see code_generate_fragment). */
-			BLI_dynstr_appendf(ds, "\ttmp%d = shell_layer;\n", ((GPUOutput *)node->outputs.first)->id);
-			continue;
-		}
+	{
 		BLI_dynstr_appendf(ds, "\t%s(", node->name);
 
 		for (input = node->inputs.first; input; input = input->next) {
@@ -982,7 +985,10 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 					BLI_dynstr_appendf(ds, "cons%d", input->id);
 			}
 			else if (input->source == GPU_SOURCE_ATTRIB) {
-				codegen_print_attrib(ds, input, "var");
+				if (uv_override && input->attribtype == CD_MTFACE)
+					codegen_print_uv(ds, input->type);
+				else
+					codegen_print_attrib(ds, input, "var");
 			}
 			else if (input->source == GPU_SOURCE_OPENGL_BUILTIN) {
 				if (input->oglbuiltin == GPU_MATCAP_NORMAL)
@@ -1001,6 +1007,24 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 		}
 
 		BLI_dynstr_append(ds, ");\n");
+	}
+}
+
+static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *finaloutputs[8])
+{
+	GPUNode *node;
+	GPUOutput *output;
+
+	for (node = nodes->first; node; node = node->next) {
+		if (!codegen_node_in_fragment(node)) {
+			continue;
+		}
+		if (STREQ(node->name, "node_shell_layer")) {
+			/* Fur Shells / Outline layer, from the generated geometry stage (see code_generate_fragment). */
+			BLI_dynstr_appendf(ds, "\ttmp%d = shell_layer;\n", ((GPUOutput *)node->outputs.first)->id);
+			continue;
+		}
+		codegen_call_node(ds, node, false);
 
 		if (STREQ(node->name, "user_get")) {
 			BLI_dynstr_appendf(ds, "\tfragment();\n");
@@ -1228,6 +1252,148 @@ static void codegen_script_names(ScriptNames *sn, const char *code)
 	}
 }
 
+/* Nodes upstream of a script input that in_<name>(uv) can run again at another UV: they only read
+ * the default mesh UV, uniforms, constants and images. Position, normal, other attributes, pixel
+ * textures, other scripts and the shell layer give false (the value at this pixel is kept). */
+#define SCRIPT_IN_MAX_NODES 64
+
+static bool codegen_script_in_collect(GPUNodeLink *link, GPUNode **set, int *tot, const char **r_bad)
+{
+	GPUNode *node = link->output->node;
+	for (int i = 0; i < *tot; i++) {
+		if (set[i] == node) {
+			return true;
+		}
+	}
+	if (STREQ(node->name, "node_shell_layer") || STREQ(node->name, "user_get") ||
+	    STREQLEN(node->name, "glsl_script", 11) || *tot >= SCRIPT_IN_MAX_NODES)
+	{
+		*r_bad = node->name;
+		return false;
+	}
+	if (STREQ(node->name, "node_tex_coord")) {
+		/* Only its UV output can be read again (checked by codegen_script_in_texco_ok). */
+		set[(*tot)++] = node;
+		return true;
+	}
+	for (GPUInput *input = node->inputs.first; input; input = input->next) {
+		bool ok = true;
+		if (input->source == GPU_SOURCE_TEX_PIXEL) {
+			ok = input->link && input->link->output && codegen_script_in_collect(input->link, set, tot, r_bad);
+			if (!ok && !*r_bad) *r_bad = node->name;
+			if (!ok) return false;
+			continue;
+		}
+		if (input->source == GPU_SOURCE_BUILTIN) {
+			ok = !ELEM(input->builtin, GPU_VIEW_NORMAL, GPU_VIEW_POSITION);
+		}
+		else if (input->source == GPU_SOURCE_ATTRIB) {
+			ok = (input->attribtype == CD_MTFACE && input->attribname[0] == '\0');
+		}
+		else if (input->source == GPU_SOURCE_OPENGL_BUILTIN) {
+			ok = false;
+		}
+		else if (input->source == GPU_SOURCE_TEX) {
+			ok = (input->link == NULL);
+		}
+		if (!ok) {
+			*r_bad = node->name;
+			return false;
+		}
+	}
+	set[(*tot)++] = node;
+	return true;
+}
+
+/* The third output of node_tex_coord is UV: true when nothing in the set reads another one. */
+static bool codegen_script_in_link_ok(GPUNodeLink *link)
+{
+	GPUNode *node = link->output->node;
+	return !STREQ(node->name, "node_tex_coord") || BLI_findindex(&node->outputs, link->output) == 2;
+}
+
+static bool codegen_script_in_texco_ok(GPUNodeLink *root, GPUNode **set, int tot)
+{
+	if (!codegen_script_in_link_ok(root)) {
+		return false;
+	}
+	for (int i = 0; i < tot; i++) {
+		for (GPUInput *input = set[i]->inputs.first; input; input = input->next) {
+			if (input->source == GPU_SOURCE_TEX_PIXEL && input->link && input->link->output &&
+			    !codegen_script_in_link_ok(input->link))
+			{
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+/* For each linked header input the script reads with in_<name>(uv): a function that runs the nodes
+ * linked to it again with "uv" in place of the mesh UV, and SCRIPT_IN_<name> naming it (the header
+ * code calls it when defined). Returns the macros to undefine after the script. */
+static void codegen_print_script_inputs(DynStr *ds, ListBase *nodes, GPUNode *snode, const char *code,
+                                        const char *script_name, DynStr *undefs)
+{
+	GPUNode *set[SCRIPT_IN_MAX_NODES];
+	for (GPUInput *input = snode->inputs.first; input; input = input->next) {
+		if (!input->script_in[0] || input->source != GPU_SOURCE_TEX_PIXEL || !input->link || !input->link->output) {
+			continue;
+		}
+		char key[80], word[56];
+		BLI_snprintf(key, sizeof(key), "SCRIPT_IN_%s", input->script_in);
+		BLI_snprintf(word, sizeof(word), "in_%s", input->script_in);
+		/* The header defines in_<name> once: a second word is a call by the script. */
+		int uses = 0;
+		const size_t len = strlen(word);
+		for (const char *c = strstr(code, word); c && uses < 2; c = strstr(c + len, word)) {
+			const char before = (c > code) ? c[-1] : ' ';
+			const char after = c[len];
+			const bool ident_before = (before == '_' || isalnum((unsigned char)before));
+			const bool ident_after = (after == '_' || isalnum((unsigned char)after));
+			if (!ident_before && !ident_after) {
+				uses++;
+			}
+		}
+		if (uses < 2) {
+			continue;
+		}
+		int tot = 0;
+		const char *bad = NULL;
+		if (!codegen_script_in_collect(input->link, set, &tot, &bad) ||
+		    (!bad && !codegen_script_in_texco_ok(input->link, set, tot) && (bad = "node_tex_coord")))
+		{
+			fprintf(stderr, "GLSL Script: in_%s(uv) reads the value at this pixel (%s can not be read at another UV)\n",
+			        input->script_in, bad ? bad : "?");
+			continue;
+		}
+		BLI_dynstr_appendf(ds, "%s %s_reval_%s(vec2 uv)\n{\n", GPU_DATATYPE_STR[input->type], script_name,
+		                   input->script_in);
+		/* In the order of the material: every node comes after the ones it reads. */
+		for (GPUNode *node = nodes->first; node; node = node->next) {
+			for (int i = 0; i < tot; i++) {
+				if (set[i] == node) {
+					const bool texco = STREQ(node->name, "node_tex_coord");
+					int k = 0;
+					for (GPUOutput *output = node->outputs.first; output; output = output->next, k++) {
+						BLI_dynstr_appendf(ds, "\t%s tmp%d", GPU_DATATYPE_STR[output->type], output->id);
+						/* Texture Coordinate: only UV is read, at the asked UV. */
+						BLI_dynstr_append(ds, !texco ? ";\n" : (k == 2) ? " = vec3(uv, 0.0);\n" : " = vec3(0.0);\n");
+					}
+					if (!texco) {
+						codegen_call_node(ds, node, true);
+					}
+					break;
+				}
+			}
+		}
+		BLI_dynstr_append(ds, "\treturn ");
+		codegen_convert_datatype(ds, input->link->output->type, input->type, "tmp", input->link->output->id);
+		BLI_dynstr_appendf(ds, ";\n}\n#define %s %s_reval_%s\n", key, script_name, input->script_in);
+		BLI_dynstr_appendf(undefs, "#undef %s\n", key);
+	}
+}
+
 /* GLSL Script node functions used by the given stage. The user writes a function called main;
  * it is renamed to the unique name of its node, and so are the other names of the script. */
 static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts, int stage)
@@ -1250,6 +1416,16 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 			if (script->use_time) {
 				/* Set by the wrapper from the time of the material. */
 				BLI_dynstr_appendf(ds, "float %s_TIME;\n#define TIME %s_TIME\n", script->name, script->name);
+			}
+			/* Before the renames of the script: a user name must not change the node calls in them. */
+			DynStr *in_undefs = BLI_dynstr_new();
+			if (stage == GPU_NODE_STAGE_FRAGMENT) {
+				for (GPUNode *node = nodes->first; node; node = node->next) {
+					if (STREQ(node->name, script->name)) {
+						codegen_print_script_inputs(ds, nodes, node, script->code, script->name, in_undefs);
+						break;
+					}
+				}
 			}
 			BLI_dynstr_append(ds, defs);
 			/* Images of the script by order: the global sampler the generated code declared. */
@@ -1285,6 +1461,10 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 			if (script->use_time) {
 				BLI_dynstr_append(ds, "#undef TIME\n");
 			}
+			char *in_undef_str = BLI_dynstr_get_cstring(in_undefs);
+			BLI_dynstr_append(ds, in_undef_str);
+			MEM_freeN(in_undef_str);
+			BLI_dynstr_free(in_undefs);
 			BLI_dynstr_append(ds, undefs);
 
 			MEM_freeN(defs);
@@ -3503,6 +3683,10 @@ bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GP
 			}
 			else {
 				gpu_node_input_socket(node, &in[i]);
+			}
+			GPUInput *input = node->inputs.last;
+			if (uniform_names && uniform_names[i] && STREQLEN(uniform_names[i], "u_", 2) && input) {
+				BLI_strncpy(input->script_in, uniform_names[i] + 2, sizeof(input->script_in));
 			}
 		}
 	}

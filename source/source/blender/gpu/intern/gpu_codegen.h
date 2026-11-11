@@ -150,6 +150,9 @@ typedef struct GPUInput {
 	GPUType attribvartype;       /* type var<id>/att<id> was declared with (by the first one) */
 	GPUBuiltin builtin;          /* builtin uniform */
 	GPUOpenGLBuiltin oglbuiltin; /* opengl built in varying */
+	/* GLSL Script header input: its name (without "u_"), so in_<name>(uv) can re-evaluate what
+	 * is linked to it at another UV (codegen_print_script_inputs). */
+	char script_in[48];
 } GPUInput;
 
 struct GPUPass {
