@@ -272,6 +272,31 @@ def native_library(name, setup):
 XATLAS_BRUTE_FORCE = 0  # 1: brute-force chart placement, measured slower with no gain
 
 
+def ngon_triangles(me, polys, start):
+    """Ear-clipped triangles of the given polygons, as mesh loop indices (flat array)."""
+    import bmesh
+    import numpy as np
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.faces.ensure_lookup_table()
+    wanted = set(int(p) for p in polys)
+    out = []
+    for tri in bm.calc_tessface():
+        face = tri[0].face
+        if face.index not in wanted:
+            continue
+        first = face.loops[0]
+        for l in tri:
+            # bmesh keeps the mesh loop order of each face: loop index = loop_start + position in the face
+            pos, cur = 0, first
+            while cur != l:
+                cur = cur.link_loop_next
+                pos += 1
+            out.append(int(start[face.index]) + pos)
+    bm.free()
+    return np.array(out, dtype=np.int64)
+
+
 def xatlas_pack(objects, size, margin_px):
     """Charts and packs the "Lightmap" UV layer of all objects with xatlas (ae_uvatlas): charts follow
     the mesh shape and fill the atlas tightly, so the same resolution gives more texels per meter.
@@ -297,11 +322,17 @@ def xatlas_pack(objects, size, margin_px):
         total = np.empty(len(me.polygons), dtype=np.int64)
         me.polygons.foreach_get("loop_start", start)
         me.polygons.foreach_get("loop_total", total)
-        # fan triangles of every polygon, as loop indices (the UV is written per loop)
-        n = total - 2
-        poly = np.repeat(np.arange(len(start)), n)
+        # triangles of every polygon, as loop indices (the UV is written per loop): fan for triangles and
+        # quads (fast), ear clipping for n-gons (a fan of a concave n-gon covers area outside the polygon,
+        # xatlas then splits it into folded charts and the polygon lands over other islands)
+        small = total <= 4
+        s_start, s_total = start[small], total[small]
+        n = s_total - 2
+        poly = np.repeat(np.arange(len(s_start)), n)
         k = np.arange(n.sum()) - np.repeat(np.cumsum(n) - n, n) + 1
-        tris = np.stack([start[poly], start[poly] + k, start[poly] + k + 1], axis=1).reshape(-1)
+        tris = np.stack([s_start[poly], s_start[poly] + k, s_start[poly] + k + 1], axis=1).reshape(-1)
+        if not small.all():
+            tris = np.concatenate([tris, ngon_triangles(me, np.nonzero(~small)[0], start)])
         positions.append(co)
         indices.append(loop_vert[tris].astype(np.uint32))
         corners.append(tris)
@@ -406,6 +437,9 @@ def make_lightmap_uvs(scene, objects, size, margin_px=4):
             for ob, uv in zip(objects, xatlas_uvs):
                 ob.data.uv_layers[UV_NAME].data.foreach_set("uv", uv)
                 ob.data.update()
+        print("AE lightmap: UV packer used: %s" % ("xatlas" if xatlas_area >= pack_area else "Lightmap Pack"))
+    else:
+        print("AE lightmap: UV packer used: Lightmap Pack (xatlas unavailable or failed)")
 
 
 def emulate_game_lamp(ob):

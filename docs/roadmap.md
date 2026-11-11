@@ -567,7 +567,7 @@ existem no `_prepareData` mas não são usados e a pasta `Track/` está vazia.
 - **Luz indireta (GI) baked** ([plano técnico](baked-lighting-plan.md)): lightmap Cycles + OIDN + light volume,
   painel com AO, `Static Lighting + Shadows` e GTAO feitos; AO e modo estático aceitos em cena simples. Falta:
   avaliação visual em cena maior e materiais variados, confirmar no jogo o fim do aviso OpenCL
-  `kernel_lamp_emission`, validar no Linux e no Web, UV da lightmap por xatlas. Se o `LNK1104` do executável
+  `kernel_lamp_emission`, validar no Linux e no Web. UV por xatlas já integrada (n-gon côncavo corrigido 2026-11-11, `tools/debug/cenas/medir_lightmap_uv.py`). Se o `LNK1104` do executável
   voltar, capturar o processo pelo Restart Manager antes de repetir o link.
 - **SSGI nativo experimental** ([plano](ssgi-native-plan.md)): pendentes avaliação visual no jogo/Play, MSAA,
   core profile completo, VRAM total, temporal/Hi-Z e suporte além de Principled opaco direto.
