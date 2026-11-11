@@ -232,7 +232,18 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   Texture Coordinate só pela saída UV, valores) é rodada de novo na UV pedida, até 64 nós. Cadeia com
   normal, posição, outra camada de UV ou outro GLSL Script lê o valor do pixel atual e avisa no console.
   Conferido no editor, no runtime e no Web.
-- Ainda não suportados: Node Groups e presets de material como arquivo; `res()` fixo em 1024.
+- Node Groups e presets de material como arquivo (2026-11-11): `.json` na mesma pasta `presets/glsl_nodes`,
+  listados no menu GLSL Library pela `category` (ícone de grupo ou de material). **Save Group to Library**
+  (com um nó de grupo ativo) e **Save Material as Preset** gravam na pasta do usuário
+  (`scripts/presets/glsl_nodes`); pedem Overwrite para trocar um arquivo existente. O arquivo guarda nós,
+  propriedades, valores, links, ColorRamp, curvas, grupos aninhados, o código dos GLSL Script, imagens pelo
+  nome/caminho e o Blend Mode do material. Carregar um grupo reaproveita um grupo de conteúdo igual;
+  carregar um preset cria um material novo no slot ativo (o antigo continua no arquivo). O nó Material
+  aponta para o material base (`<nome> Base`, como o use_nodes cria), com as configurações dele guardadas.
+  O que não volta (imagem ausente, socket sumido) aparece como aviso. Código em
+  `startup/bl_operators/node_files.py`; exemplos `tinted_sharpen.json` (grupo) e `stone.json` (material).
+- Ainda não suportados: `res()` fixo em 1024; ponteiros para outro material, textura ou objeto nos
+  arquivos de nós (só o nome, com aviso).
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
   Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.
 

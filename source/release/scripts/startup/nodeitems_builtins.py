@@ -180,16 +180,24 @@ def shader_preset_items(context):
 # GLSL node files, see NODE_OT_glsl_node_add
 def glsl_library_draw(self, layout, context):
     from bl_operators.node import glsl_node_library
-    nodes = glsl_node_library()
-    if not nodes:
-        layout.label(text="No .glsl files in presets/glsl_nodes")
-        return
-    for category in sorted(set(n[2] for n in nodes)):
+    from bl_operators.node_files import node_file_library
+    # (path, name, category, operator): .glsl nodes, node group files and material presets
+    ops = {"group": "node.glsl_group_add", "material": "node.glsl_material_preset_load"}
+    items = [(p, n, c, "node.glsl_node_add") for p, n, c, _d in glsl_node_library()]
+    items += [(p, n, c, ops[k]) for p, k, n, c, _d in node_file_library()]
+    if not items:
+        layout.label(text="No files in presets/glsl_nodes")
+    for category in sorted(set(i[2] for i in items)):
         layout.label(text=category)
-        for path, name, cat, _desc in nodes:
+        for path, name, cat, op in items:
             if cat == category:
-                props = layout.operator("node.glsl_node_add", text=name)
+                icon = 'NODETREE' if op == "node.glsl_group_add" else (
+                    'MATERIAL' if op == "node.glsl_material_preset_load" else 'NONE')
+                props = layout.operator(op, text=name, icon=icon)
                 props.filepath = path
+    layout.separator()
+    layout.operator("node.glsl_group_save", icon='FILE_TICK')
+    layout.operator("node.glsl_material_preset_save", icon='FILE_TICK')
 
 
 def glsl_library_items(context):

@@ -61,6 +61,7 @@ _modules = [
     "mesh",
     "node",
     "node_effects",
+    "node_files",
     "object_align",
     "object",
     "object_randomize_transform",

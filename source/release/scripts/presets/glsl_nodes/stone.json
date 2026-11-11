@@ -1,0 +1,450 @@
+{
+ "format": "range-nodes",
+ "version": 1,
+ "kind": "material",
+ "name": "Stone",
+ "category": "Materials",
+ "description": "Pedra: ru\u00eddo com rampa de cinzas (preset de material de exemplo).",
+ "tree": {
+  "nodes": [
+   {
+    "type": "ShaderNodeOutput",
+    "name": "Output",
+    "label": "",
+    "location": [
+     300.0,
+     300.0
+    ],
+    "width": 140.0,
+    "parent": null,
+    "hide": false,
+    "mute": false,
+    "props": {
+     "is_active_output": true
+    },
+    "inputs": [
+     {
+      "id": "Color",
+      "index": 0,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     },
+     {
+      "id": "Alpha",
+      "index": 1,
+      "type": "NodeSocketFloat",
+      "value": 1.0
+     },
+     {
+      "id": "Vertex Offset",
+      "index": 2,
+      "type": "NodeSocketVector",
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    ],
+    "outputs": []
+   },
+   {
+    "type": "ShaderNodeExtendedMaterial",
+    "name": "Extended Material",
+    "label": "",
+    "location": [
+     10.0,
+     300.0
+    ],
+    "width": 240.0,
+    "parent": null,
+    "hide": false,
+    "mute": false,
+    "props": {
+     "invert_normal": false,
+     "use_energy_conserv": false
+    },
+    "inputs": [
+     {
+      "id": "Color",
+      "index": 0,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     },
+     {
+      "id": "Color Intensity",
+      "index": 1,
+      "type": "NodeSocketFloatFactor",
+      "value": 0.0
+     },
+     {
+      "id": "Spec",
+      "index": 2,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     },
+     {
+      "id": "Spec Intensity",
+      "index": 3,
+      "type": "NodeSocketFloatFactor",
+      "value": 0.0
+     },
+     {
+      "id": "Metallic",
+      "index": 4,
+      "type": "NodeSocketFloatFactor",
+      "value": 0.0
+     },
+     {
+      "id": "Roughness",
+      "index": 5,
+      "type": "NodeSocketFloatFactor",
+      "value": 0.0
+     },
+     {
+      "id": "Normal",
+      "index": 6,
+      "type": "NodeSocketVectorDirection",
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "id": "Mirror",
+      "index": 7,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ]
+     },
+     {
+      "id": "Ambient",
+      "index": 8,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     },
+     {
+      "id": "Emit",
+      "index": 9,
+      "type": "NodeSocketFloatUnsigned",
+      "value": 0.0
+     },
+     {
+      "id": "Spec Translucency",
+      "index": 10,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     },
+     {
+      "id": "Reflectivity",
+      "index": 11,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     },
+     {
+      "id": "Alpha",
+      "index": 12,
+      "type": "NodeSocketFloatUnsigned",
+      "value": 0.0
+     },
+     {
+      "id": "Translucency",
+      "index": 13,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     }
+    ],
+    "outputs": [
+     {
+      "id": "Color",
+      "index": 0,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "id": "Alpha",
+      "index": 1,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     },
+     {
+      "id": "Normal",
+      "index": 2,
+      "type": "NodeSocketVector",
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "id": "Diffuse",
+      "index": 3,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "id": "Spec",
+      "index": 4,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "id": "AO",
+      "index": 5,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ]
+     }
+    ],
+    "material": "BASE",
+    "base": {
+     "diffuse_color": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "diffuse_intensity": 1.0,
+     "specular_color": [
+      1.0,
+      1.0,
+      1.0
+     ],
+     "specular_intensity": 0.5,
+     "specular_hardness": 50,
+     "alpha": 1.0,
+     "emit": 0.0,
+     "ambient": 1.0,
+     "use_shadeless": false
+    }
+   },
+   {
+    "type": "ShaderNodeGLSLScript",
+    "name": "GLSL Script",
+    "label": "Noise",
+    "location": [
+     -600.0,
+     200.0
+    ],
+    "width": 160.0,
+    "parent": null,
+    "hide": false,
+    "mute": false,
+    "props": {},
+    "inputs": [
+     {
+      "id": "UV",
+      "index": 0,
+      "type": "NodeSocketVector",
+      "value": [
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "id": "u_mask",
+      "index": 1,
+      "type": "NodeSocketFloat",
+      "value": 1.0
+     },
+     {
+      "id": "u_style",
+      "index": 2,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     },
+     {
+      "id": "u_scale",
+      "index": 3,
+      "type": "NodeSocketFloatFactor",
+      "value": 6.0
+     },
+     {
+      "id": "u_octaves",
+      "index": 4,
+      "type": "NodeSocketFloatFactor",
+      "value": 5.0
+     },
+     {
+      "id": "u_roughness",
+      "index": 5,
+      "type": "NodeSocketFloatFactor",
+      "value": 0.5
+     },
+     {
+      "id": "u_seed",
+      "index": 6,
+      "type": "NodeSocketFloatFactor",
+      "value": 0.0
+     }
+    ],
+    "outputs": [
+     {
+      "id": "Value",
+      "index": 0,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     }
+    ],
+    "script": {
+     "name": "noise.glsl",
+     "code": "// @name Noise\n// @category Generators\n// @description Ru\u00eddo fractal: suave, valor, turbul\u00eancia ou cristas.\n// @output gray\n// @input mask: gray = 1\n// @param style: enum(Perlin, Value, Turbulence, Ridged) = Perlin\n// @param scale: float(1, 64) = 6\n// @param octaves: int(1, 8) = 5\n// @param roughness: float(0, 1) = 0.5\n// @param seed: int(0, 1000) = 0\n\nfloat hash(vec2 p)\n{\n    return fract(sin(dot(p, vec2(127.1, 311.7)) + float(params.seed) * 17.13) * 43758.5453);\n}\n\nfloat value_noise(vec2 p)\n{\n    vec2 i = floor(p);\n    vec2 f = fract(p);\n    vec2 u = f * f * (3.0 - 2.0 * f);\n    return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), u.x),\n               mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), u.x), u.y);\n}\n\nfloat grad_noise(vec2 p)\n{\n    vec2 i = floor(p);\n    vec2 f = fract(p);\n    vec2 u = f * f * (3.0 - 2.0 * f);\n    float a = dot(vec2(hash(i), hash(i + 7.0)) * 2.0 - 1.0, f);\n    float b = dot(vec2(hash(i + vec2(1.0, 0.0)), hash(i + vec2(8.0, 7.0))) * 2.0 - 1.0, f - vec2(1.0, 0.0));\n    float c = dot(vec2(hash(i + vec2(0.0, 1.0)), hash(i + vec2(7.0, 8.0))) * 2.0 - 1.0, f - vec2(0.0, 1.0));\n    float d = dot(vec2(hash(i + vec2(1.0, 1.0)), hash(i + vec2(8.0, 8.0))) * 2.0 - 1.0, f - vec2(1.0, 1.0));\n    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y) * 0.5 + 0.5;\n}\n\nvec4 node(vec2 uv)\n{\n    vec2 p = uv * params.scale;\n    float sum = 0.0, amp = 1.0, total = 0.0;\n    for (int o = 0; o < 8; o++) {\n        if (o >= params.octaves) break;\n        float n = (params.style == 1) ? value_noise(p) : grad_noise(p);\n        if (params.style == 2) n = abs(n * 2.0 - 1.0);\n        if (params.style == 3) n = 1.0 - abs(n * 2.0 - 1.0);\n        sum += n * amp;\n        total += amp;\n        amp *= params.roughness;\n        p *= 2.0;\n    }\n    return vec4(sum / total * in_mask(uv));\n}\n",
+     "file": ""
+    }
+   },
+   {
+    "type": "ShaderNodeValToRGB",
+    "name": "ColorRamp",
+    "label": "",
+    "location": [
+     -300.0,
+     200.0
+    ],
+    "width": 240.0,
+    "parent": null,
+    "hide": false,
+    "mute": false,
+    "props": {},
+    "inputs": [
+     {
+      "id": "Fac",
+      "index": 0,
+      "type": "NodeSocketFloatFactor",
+      "value": 0.5
+     }
+    ],
+    "outputs": [
+     {
+      "id": "Color",
+      "index": 0,
+      "type": "NodeSocketColor",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ]
+     },
+     {
+      "id": "Alpha",
+      "index": 1,
+      "type": "NodeSocketFloat",
+      "value": 0.0
+     }
+    ],
+    "color_ramp": {
+     "interpolation": "LINEAR",
+     "color_mode": "RGB",
+     "elements": [
+      [
+       0.0,
+       [
+        0.18000000715255737,
+        0.17000000178813934,
+        0.1599999964237213,
+        1.0
+       ]
+      ],
+      [
+       0.550000011920929,
+       [
+        0.4000000059604645,
+        0.3799999952316284,
+        0.3499999940395355,
+        1.0
+       ]
+      ],
+      [
+       1.0,
+       [
+        0.6200000047683716,
+        0.6000000238418579,
+        0.5600000023841858,
+        1.0
+       ]
+      ]
+     ]
+    }
+   }
+  ],
+  "links": [
+   {
+    "from": "Extended Material",
+    "from_id": "Color",
+    "from_index": 0,
+    "to": "Output",
+    "to_id": "Color",
+    "to_index": 0
+   },
+   {
+    "from": "Extended Material",
+    "from_id": "Alpha",
+    "from_index": 1,
+    "to": "Output",
+    "to_id": "Alpha",
+    "to_index": 1
+   },
+   {
+    "from": "GLSL Script",
+    "from_id": "Value",
+    "from_index": 0,
+    "to": "ColorRamp",
+    "to_id": "Fac",
+    "to_index": 0
+   },
+   {
+    "from": "ColorRamp",
+    "from_id": "Color",
+    "from_index": 0,
+    "to": "Extended Material",
+    "to_id": "Color",
+    "to_index": 0
+   }
+  ]
+ },
+ "material": {
+  "alpha_blend": "OPAQUE",
+  "use_backface_culling": true
+ },
+ "groups": {}
+}

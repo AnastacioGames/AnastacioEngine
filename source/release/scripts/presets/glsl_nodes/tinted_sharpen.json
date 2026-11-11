@@ -1,0 +1,319 @@
+{
+ "format": "range-nodes",
+ "version": 1,
+ "kind": "group",
+ "name": "Tinted Sharpen",
+ "category": "Groups",
+ "description": "Sharpen seguido de uma cor que multiplica (grupo de exemplo).",
+ "root": "Tinted Sharpen",
+ "groups": {
+  "Tinted Sharpen": {
+   "nodes": [
+    {
+     "type": "NodeGroupInput",
+     "name": "Group Input",
+     "label": "",
+     "location": [
+      -500.0,
+      0.0
+     ],
+     "width": 140.0,
+     "parent": null,
+     "hide": false,
+     "mute": false,
+     "props": {},
+     "inputs": [],
+     "outputs": [
+      {
+       "id": "Input_1",
+       "index": 0,
+       "type": "NodeSocketColor",
+       "value": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+       ]
+      },
+      {
+       "id": "Input_3",
+       "index": 1,
+       "type": "NodeSocketFloat",
+       "value": 1.5
+      },
+      {
+       "id": "Input_5",
+       "index": 2,
+       "type": "NodeSocketColor",
+       "value": [
+        1.0,
+        0.8500000238418579,
+        0.699999988079071,
+        1.0
+       ]
+      },
+      {
+       "id": "__extend__",
+       "index": 3,
+       "type": "NodeSocketVirtual"
+      }
+     ]
+    },
+    {
+     "type": "NodeGroupOutput",
+     "name": "Group Output",
+     "label": "",
+     "location": [
+      400.0,
+      0.0
+     ],
+     "width": 140.0,
+     "parent": null,
+     "hide": false,
+     "mute": false,
+     "props": {
+      "is_active_output": true
+     },
+     "inputs": [
+      {
+       "id": "Output_7",
+       "index": 0,
+       "type": "NodeSocketColor",
+       "value": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ]
+      },
+      {
+       "id": "__extend__",
+       "index": 1,
+       "type": "NodeSocketVirtual"
+      }
+     ],
+     "outputs": []
+    },
+    {
+     "type": "ShaderNodeGLSLScript",
+     "name": "GLSL Script",
+     "label": "Sharpen",
+     "location": [
+      -200.0,
+      0.0
+     ],
+     "width": 160.0,
+     "parent": null,
+     "hide": false,
+     "mute": false,
+     "props": {},
+     "inputs": [
+      {
+       "id": "UV",
+       "index": 0,
+       "type": "NodeSocketVector",
+       "value": [
+        0.0,
+        0.0,
+        0.0
+       ]
+      },
+      {
+       "id": "u_src",
+       "index": 1,
+       "type": "NodeSocketColor",
+       "value": [
+        1.0,
+        1.0,
+        1.0,
+        1.0
+       ]
+      },
+      {
+       "id": "u_amount",
+       "index": 2,
+       "type": "NodeSocketFloatFactor",
+       "value": 1.0
+      },
+      {
+       "id": "u_texel",
+       "index": 3,
+       "type": "NodeSocketFloatFactor",
+       "value": 0.0020000000949949026
+      }
+     ],
+     "outputs": [
+      {
+       "id": "Color",
+       "index": 0,
+       "type": "NodeSocketColor",
+       "value": [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+       ]
+      }
+     ],
+     "script": {
+      "name": "sharpen.glsl",
+      "code": "// @name Sharpen\n// @category Images\n// @description Real\u00e7a os detalhes da imagem ligada em src (l\u00ea os vizinhos com in_src em outra UV).\n// @output color\n// @input src: color = 1, 1, 1\n// @param amount: float(0, 4) = 1\n// @param texel: float(0.0001, 0.02) = 0.002\n\nvec4 node(vec2 uv)\n{\n    vec2 d = vec2(params.texel, 0.0);\n    vec4 c = in_src(uv);\n    vec4 around = in_src(uv + d.xy) + in_src(uv - d.xy) + in_src(uv + d.yx) + in_src(uv - d.yx);\n    return vec4(max(c.rgb + (c.rgb * 4.0 - around.rgb) * params.amount, 0.0), c.a);\n}\n",
+      "file": ""
+     }
+    },
+    {
+     "type": "ShaderNodeMixRGB",
+     "name": "Mix",
+     "label": "",
+     "location": [
+      100.0,
+      0.0
+     ],
+     "width": 140.0,
+     "parent": null,
+     "hide": false,
+     "mute": false,
+     "props": {
+      "blend_type": "MULTIPLY",
+      "use_alpha": false,
+      "use_clamp": false
+     },
+     "inputs": [
+      {
+       "id": "Fac",
+       "index": 0,
+       "type": "NodeSocketFloatFactor",
+       "value": 1.0
+      },
+      {
+       "id": "Color1",
+       "index": 1,
+       "type": "NodeSocketColor",
+       "value": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+       ]
+      },
+      {
+       "id": "Color2",
+       "index": 2,
+       "type": "NodeSocketColor",
+       "value": [
+        0.5,
+        0.5,
+        0.5,
+        1.0
+       ]
+      }
+     ],
+     "outputs": [
+      {
+       "id": "Color",
+       "index": 0,
+       "type": "NodeSocketColor",
+       "value": [
+        0.0,
+        0.0,
+        0.0,
+        0.0
+       ]
+      }
+     ]
+    }
+   ],
+   "links": [
+    {
+     "from": "Group Input",
+     "from_id": "Input_1",
+     "from_index": 0,
+     "to": "GLSL Script",
+     "to_id": "u_src",
+     "to_index": 1
+    },
+    {
+     "from": "Group Input",
+     "from_id": "Input_3",
+     "from_index": 1,
+     "to": "GLSL Script",
+     "to_id": "u_amount",
+     "to_index": 2
+    },
+    {
+     "from": "GLSL Script",
+     "from_id": "Color",
+     "from_index": 0,
+     "to": "Mix",
+     "to_id": "Color1",
+     "to_index": 1
+    },
+    {
+     "from": "Group Input",
+     "from_id": "Input_5",
+     "from_index": 2,
+     "to": "Mix",
+     "to_id": "Color2",
+     "to_index": 2
+    },
+    {
+     "from": "Mix",
+     "from_id": "Color",
+     "from_index": 0,
+     "to": "Group Output",
+     "to_id": "Output_7",
+     "to_index": 0
+    }
+   ],
+   "interface": {
+    "inputs": [
+     {
+      "type": "NodeSocketColor",
+      "name": "Src",
+      "value": [
+       0.5,
+       0.5,
+       0.5,
+       1.0
+      ],
+      "min": null,
+      "max": null
+     },
+     {
+      "type": "NodeSocketFloat",
+      "name": "Amount",
+      "value": 1.5,
+      "min": 0.0,
+      "max": 4.0
+     },
+     {
+      "type": "NodeSocketColor",
+      "name": "Tint",
+      "value": [
+       1.0,
+       0.8500000238418579,
+       0.699999988079071,
+       1.0
+      ],
+      "min": null,
+      "max": null
+     }
+    ],
+    "outputs": [
+     {
+      "type": "NodeSocketColor",
+      "name": "Color",
+      "value": [
+       0.0,
+       0.0,
+       0.0,
+       1.0
+      ],
+      "min": null,
+      "max": null
+     }
+    ]
+   }
+  }
+ }
+}
