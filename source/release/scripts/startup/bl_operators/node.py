@@ -977,7 +977,8 @@ def glsl_node_library():
                         for tag in ("name", "category", "description"):
                             if s.startswith("@" + tag + " "):
                                 info[tag] = s[len(tag) + 2:].strip()
-            except OSError:
+            except (OSError, UnicodeDecodeError):
+                # unreadable or not UTF-8: left out of the menu
                 continue
             found.append((path, info["name"], info["category"], info["description"]))
     return found
@@ -1009,15 +1010,21 @@ class NODE_OT_glsl_node_add(Operator):
         try:
             with open(self.filepath, encoding="utf-8") as f:
                 source = f.read()
-        except OSError as ex:
-            self.report({'ERROR'}, str(ex))
+        except (OSError, UnicodeDecodeError) as ex:
+            self.report({'ERROR'}, "Cannot read %s: %s" % (self.filepath, ex))
             return {'CANCELLED'}
-        # The code is copied into the .range: the game does not need the library file.
-        name = os.path.basename(self.filepath)
-        text = bpy.data.texts.get(name)
-        if text is None or text.as_string() != source:
-            text = bpy.data.texts.new(name)
+        # The code is copied into the .range: the game does not need the library file. A Text made
+        # from the same file with the same code is shared; an edited one is left alone.
+        source_path = os.path.normcase(os.path.abspath(self.filepath))
+        text = None
+        for t in bpy.data.texts:
+            if t.get("glsl_node_file") == source_path and t.as_string() == source:
+                text = t
+                break
+        if text is None:
+            text = bpy.data.texts.new(os.path.basename(self.filepath))
             text.from_string(source)
+            text["glsl_node_file"] = source_path
 
         space = context.space_data
         tree = space.edit_tree
@@ -1025,6 +1032,8 @@ class NODE_OT_glsl_node_add(Operator):
             node.select = False
         node = tree.nodes.new("ShaderNodeGLSLScript")
         node.script = text
+        # Sockets right away (the tree would only update on the next redraw).
+        tree.interface_update(context)
         node.location = space.cursor_location
         node.select = True
         tree.nodes.active = node

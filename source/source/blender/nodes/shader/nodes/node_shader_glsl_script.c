@@ -320,15 +320,18 @@ static const char *header_space(const char *p)
 static int header_numbers(const char *p, float r_values[4])
 {
 	int tot = 0;
-	while (tot < 4) {
+	for (;;) {
 		p = header_space(p);
-		while (*p == ',') p = header_space(p + 1);
+		if (tot > 0 && *p == ',') {
+			p = header_space(p + 1);
+		}
 		if (!*p || *p == '\n' || *p == '\r') {
 			break;
 		}
 		char *end;
 		const double v = strtod(p, &end);
-		if (end == p) {
+		/* Only plain finite numbers, at most 4, and nothing else on the line. */
+		if (end == p || tot == 4 || !(v > -FLT_MAX && v < FLT_MAX) || (*end && !strchr(" \t,\r\n", *end))) {
 			return -1;
 		}
 		r_values[tot++] = (float)v;
@@ -341,9 +344,19 @@ static int header_numbers(const char *p, float r_values[4])
 static bool header_entry(const char *p, bool is_input, HeaderEntry *e)
 {
 	memset(e, 0, sizeof(*e));
-	p = script_read_ident(header_space(p), e->name, sizeof(e->name));
-	if (!e->name[0]) {
-		return false;
+	p = header_space(p);
+	{
+		/* A GLSL name that fits (no truncation) and does not start with a digit. */
+		const char *start = p;
+		while (script_ident_char(*p)) p++;
+		const int len = (int)(p - start);
+		if (len == 0 || len >= (int)sizeof(e->name) || (*start >= '0' && *start <= '9') ||
+		    (start[0] == '_' && start[1] == '_'))
+		{
+			return false;
+		}
+		memcpy(e->name, start, (size_t)len);
+		e->name[len] = '\0';
 	}
 	p = header_space(p);
 	if (*p != ':') {
@@ -391,7 +404,7 @@ static bool header_entry(const char *p, bool is_input, HeaderEntry *e)
 		/* "A, B, C" -> "A=0, B=1, C=2"; the default is a label. */
 		DynStr *ds = BLI_dynstr_new();
 		const char *a = args;
-		int index = 0, def_index = 0;
+		int index = 0, def_index = def ? -1 : 0;
 		char label[64];
 		while (*(a = header_space(a))) {
 			a = script_read_ident(a, label, sizeof(label));
@@ -414,7 +427,7 @@ static bool header_entry(const char *p, bool is_input, HeaderEntry *e)
 			}
 		}
 		const int len = BLI_dynstr_get_len(ds);
-		if (index == 0 || len >= (int)sizeof(e->choice)) {
+		if (index == 0 || def_index < 0 || len >= (int)sizeof(e->choice)) {
 			BLI_dynstr_free(ds);
 			return false;
 		}
@@ -429,9 +442,16 @@ static bool header_entry(const char *p, bool is_input, HeaderEntry *e)
 	}
 
 	if (e->kind == HDR_BOOL) {
-		e->def[0] = (def && STREQLEN(def, "true", 4)) ? 1.0f : 0.0f;
+		char word[16] = "";
+		if (def) {
+			const char *end = header_space(script_read_ident(def, word, sizeof(word)));
+			if ((*end && *end != '\r' && *end != '\n') || !(STREQ(word, "true") || STREQ(word, "false"))) {
+				return false;
+			}
+		}
+		e->def[0] = STREQ(word, "true") ? 1.0f : 0.0f;
 		e->totdef = 1;
-		return !def || STREQLEN(def, "true", 4) || STREQLEN(def, "false", 5);
+		return true;
 	}
 	if (def) {
 		e->totdef = header_numbers(def, e->def);
@@ -474,7 +494,8 @@ static void header_error(const bNode *node, int line, const char *msg)
 
 /* Translated code, or NULL when src is not in the header format (no "@output") or is broken
  * (r_broken set, the reason printed with its line). */
-static char *script_translate_header(const bNode *node, const char *src, HeaderInfo *info, bool *r_broken)
+static char *script_translate_header(const bNode *node, const char *src, HeaderInfo *info, bool *r_broken,
+                                     int *r_main_offset)
 {
 	HeaderEntry entries[HEADER_MAX_ENTRIES];
 	int tot = 0, totin = 0, totparam = 0, line = 0;
@@ -611,7 +632,10 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 	}
 	BLI_dynstr_append(ds, "vec2 res() { return vec2(1024.0); }\n#line 1\n");
 	BLI_dynstr_append(ds, src);
-	BLI_dynstr_appendf(ds, "\nvoid main(vec3 UV, out %s)\n{\n", info->output_gray ? "float Value" : "vec4 Color");
+	BLI_dynstr_append(ds, "\n");
+	/* script_parse starts here: a "main" in a comment of the user code is not ours. */
+	*r_main_offset = BLI_dynstr_get_len(ds);
+	BLI_dynstr_appendf(ds, "void main(vec3 UV, out %s)\n{\n", info->output_gray ? "float Value" : "vec4 Color");
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];
 		if (e->kind == HDR_BOOL) BLI_dynstr_appendf(ds, "\tparams.%s = (u_%s != 0);\n", e->name, e->name);
@@ -652,10 +676,11 @@ static int script_read_ex(bNode *node, ScriptParam *params, char **r_code, Heade
 	char *code = text ? txt_to_buf(text) : NULL;
 	HeaderInfo info;
 	bool broken = false;
+	int main_offset = 0;
 	*r_header = false;
 
 	if (code) {
-		char *translated = script_translate_header(node, code, &info, &broken);
+		char *translated = script_translate_header(node, code, &info, &broken, &main_offset);
 		if (translated || broken) {
 			MEM_freeN(code);
 			code = translated;
@@ -665,7 +690,7 @@ static int script_read_ex(bNode *node, ScriptParam *params, char **r_code, Heade
 			}
 		}
 	}
-	int tot = code ? script_parse(code, params) : -1;
+	int tot = code ? script_parse(code + main_offset, params) : -1;
 	if (tot >= 0) {
 		tot = script_parse_uniforms(code, params, tot, r_code != NULL);
 	}
@@ -952,7 +977,9 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 
 	/* Header nodes: the first input is UV, the mesh UV while not linked. */
 	if (header && tot > 0 && in && in[0].type != GPU_NONE && !in[0].link) {
-		in[0].link = GPU_attribute(CD_MTFACE, "");
+		/* Through texco_uv (vec2 -> vec3): the UV attribute is shared with the rest of the
+		 * material, which reads it as vec2. */
+		GPU_link(mat, "texco_uv", GPU_attribute(CD_MTFACE, ""), &in[0].link);
 	}
 
 	/* The sockets must match main, otherwise the call would not compile. */
