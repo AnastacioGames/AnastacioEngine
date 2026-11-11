@@ -26,7 +26,7 @@ Esforço: 1 sessão curta.
 
 Biblioteca C++ pequena, sem dependências. Dois usos:
 
-### 2a. Ordem de desenho dos triângulos (runtime)
+### 2a. Ordem de desenho dos triângulos (runtime) — feito 2026-11-11 (ver changelog)
 
 O .cooked não guarda buffers de GPU prontos: `BL_CookedArrays::Save` (`BL_BlenderDataConversion.cpp`) grava
 loops de origem, normais, tangentes e listas de índices; a leitura reconstrói o resto. A chave da malha tem

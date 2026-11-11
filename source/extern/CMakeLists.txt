@@ -72,6 +72,7 @@ if(WITH_GAMEENGINE)
 	add_subdirectory(imgui)
 	add_subdirectory(implot)
 	add_subdirectory(cjson)
+	add_subdirectory(meshoptimizer)
 endif()
 
 if(WITH_LZO AND NOT WITH_SYSTEM_LZO)

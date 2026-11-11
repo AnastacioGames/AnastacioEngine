@@ -133,6 +133,7 @@
 #include "BL_Texture.h"
 
 #include "CM_Message.h"
+#include "PIL_time.h"
 
 #include "GPU_texture.h"
 
@@ -222,6 +223,8 @@ extern Material defmaterial;
 }
 
 #include "wm_event_types.h"
+
+#include "meshoptimizer.h"
 
 // For construction to find shared vertices.
 struct BL_SharedVertex {
@@ -609,6 +612,22 @@ bool BL_MaterialUsesWireframe(const Material *ma)
 	return ma && ma->use_nodes && BL_NodeTreeHasWireframe(ma->nodetree, 0);
 }
 
+/** The triangle order of this material's arrays is visible (alpha/additive blending, depth transparency, wire):
+ * same rules as KX_BlenderMaterial's raster mode, read from the Blender material so the cooked key built by
+ * BL_PrepareMeshes (Blender materials) and by BL_CookedMeshKey (converted materials) agree. */
+static bool BL_DrawOrderMatters(const Material *ma)
+{
+	if (!ma) {
+		return true;
+	}
+	short blend = ma->game.alpha_blend;
+	if ((ma->mode & MA_TRANSP) && (ma->mode & MA_ZTRANSP) && blend == GEMAT_SOLID) {
+		blend = GEMAT_ALPHA;
+	}
+	return ELEM(blend, GEMAT_ALPHA, GEMAT_ALPHA_SORT, GEMAT_ADD) || (ma->mode2 & MA_DEPTH_TRANSP) ||
+	       ma->material_type == MA_TYPE_WIRE || BL_MaterialUsesWireframe(ma);
+}
+
 /** Mesh data computed ahead by BL_PrepareMeshes on worker threads: the derived mesh with its loop normals and
  * tangents already added (when they will be needed), and the loop data hash taken before. */
 struct BL_PreparedMesh
@@ -633,6 +652,53 @@ struct BL_PreparedMeshes
 
 // Only set while BL_ConvertBlenderObjects runs (thread_local: async LibLoad converts in a worker).
 static thread_local BL_PreparedMeshes *preparedMeshes = nullptr;
+
+/// RANGE_MESHOPT_OFF=1 keeps the converted draw order (A/B); part of the cooked mesh key.
+static bool BL_MeshoptDisabled()
+{
+	static const bool disabled = (getenv("RANGE_MESHOPT_OFF") != nullptr);
+	return disabled;
+}
+
+/** Reorders the draw indices of each opaque triangle array for the GPU post-transform vertex cache
+ * (meshoptimizer, docs/plano-opensource.md). Called by the raw conversion path before the .cooked record
+ * is saved, so a cooked load gets the same order without paying for it; never in BL_ModifierDeformer's
+ * per-frame rebuild. Only the draw order changes: vertices and the triangle list (getPolygon, physics)
+ * stay as converted. */
+static void BL_OptimizeDrawOrder(const std::vector<BL_MeshMaterial>& mats)
+{
+	if (BL_MeshoptDisabled()) {
+		return;
+	}
+	static const bool log = (getenv("RANGE_MESHOPT_LOG") != nullptr);
+	std::vector<unsigned int> reordered;
+	for (const BL_MeshMaterial& mat : mats) {
+		RAS_DisplayArray *array = mat.array;
+		if (!array || !mat.bucket || array->GetPrimitiveType() != RAS_DisplayArray::TRIANGLES || mat.wire ||
+		    mat.barycentric || BL_DrawOrderMatters(mat.bucket->GetMaterial()->GetBlenderMaterial()))
+		{
+			continue;
+		}
+		const unsigned int count = array->GetPrimitiveIndexCount();
+		// Below a few hundred triangles the cache order changes nothing measurable.
+		if (count < 3 * 256 || count % 3 != 0) {
+			continue;
+		}
+		unsigned int *indices = array->GetPrimitiveIndicesForReorder();
+		const unsigned int vertexCount = array->GetVertexCount();
+		const float acmrBefore = log ? meshopt_analyzeVertexCache(indices, count, vertexCount, 32, 0, 0).acmr : 0.0f;
+		const double start = log ? PIL_check_seconds_timer() : 0.0;
+		reordered.resize(count);
+		meshopt_optimizeVertexCache(reordered.data(), indices, count, vertexCount);
+		memcpy(indices, reordered.data(), sizeof(unsigned int) * count);
+		const double elapsed = log ? PIL_check_seconds_timer() - start : 0.0;
+		if (log) {
+			const float acmrAfter = meshopt_analyzeVertexCache(indices, count, vertexCount, 32, 0, 0).acmr;
+			CM_Message("meshopt: " << count / 3 << " tris, ACMR " << acmrBefore << " -> " << acmrAfter << ", "
+			           << elapsed * 1000.0 << " ms");
+		}
+	}
+}
 
 KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneConverter& converter)
 {
@@ -747,7 +813,7 @@ KX_Mesh *BL_ConvertMesh(Mesh *me, Object *blenderobj, KX_Scene *scene, BL_SceneC
 
 	std::vector<KX_Mesh::BitmapTextFace> bitmapTextFaces;
 	BL_ConvertDerivedMeshToArray(dm, me, blenderobj, mats, layersInfo, bitmapText ? &bitmapTextFaces : nullptr, true,
-	                             preparedLoopHash);
+	                             preparedLoopHash, !bitmapText);
 	meshobj->SetBitmapTextFaces(bitmapTextFaces);
 
 	{
@@ -963,21 +1029,22 @@ static uint64_t BL_LoopDataHash(DerivedMesh *dm, Mesh *me, int tangentUv)
 #ifdef WITH_BULLET
 /** Key of the cooked display arrays: the loop data hash plus everything else the vertex loop reads
  * (material slots, UV and color layers). */
-/// Per material slot flags of the cooked key (array, visible, twoside, collider, wire, barycentric, format).
+/// Per material slot flags of the cooked key (array, visible, twoside, collider, wire, barycentric, format, draw order matters).
 struct BL_CookedSlotFlags
 {
-	int flags[7];
+	int flags[8];
 };
 
 static uint64_t BL_CookedMeshKeyFlags(uint64_t loopHash, DerivedMesh *dm, const std::vector<BL_CookedSlotFlags>& slots,
                                       const RAS_Mesh::LayersInfo& layersInfo, bool withTangents)
 {
 	// Bump when the vertex loop or BL_CookedArrays change.
-	const uint32_t version = 4;
+	// 5: draw indices in vertex cache order (meshoptimizer).
+	const uint32_t version = 5;
 	uint64_t h = loopHash;
 	hash_bytes(h, &version, sizeof(version));
-	const int head[5] = {withTangents, layersInfo.activeUv, layersInfo.activeColor, (int)layersInfo.uvLayers.size(),
-	                     (int)layersInfo.colorLayers.size()};
+	const int head[6] = {withTangents, layersInfo.activeUv, layersInfo.activeColor, (int)layersInfo.uvLayers.size(),
+	                     (int)layersInfo.colorLayers.size(), BL_MeshoptDisabled()};
 	hash_bytes(h, head, sizeof(head));
 	for (const BL_CookedSlotFlags& slot : slots) {
 		hash_bytes(h, slot.flags, sizeof(slot.flags));
@@ -1010,7 +1077,8 @@ static uint64_t BL_CookedMeshKey(uint64_t loopHash, DerivedMesh *dm, const std::
 		const BL_MeshMaterial& mat = mats[i];
 		const BL_CookedSlotFlags slot = {{mat.array != nullptr, mat.visible, mat.twoside, mat.collider, mat.wire, mat.barycentric,
 		                                  mat.array ? mat.array->GetFormat().uvSize | (mat.array->GetFormat().colorSize << 8) |
-		                                  (mat.array->GetFormat().hasBoneData << 16) : 0}};
+		                                  (mat.array->GetFormat().hasBoneData << 16) : 0,
+		                                  mat.bucket ? BL_DrawOrderMatters(mat.bucket->GetMaterial()->GetBlenderMaterial()) : 1}};
 		slots[i] = slot;
 	}
 	return BL_CookedMeshKeyFlags(loopHash, dm, slots, layersInfo, withTangents);
@@ -1159,7 +1227,7 @@ struct BL_CookedArrays
 
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo, std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces,
-                                  bool needTangents, uint64_t preparedLoopHash)
+                                  bool needTangents, uint64_t preparedLoopHash, bool optimizeDrawOrder)
 {
 	const MTexPoly *mtpolys = bitmapTextFaces ? (MTexPoly *)CustomData_get_layer(&dm->polyData, CD_MTEXPOLY) : nullptr;
 	std::map<Image *, std::shared_ptr<std::vector<KX_Mesh::BitmapGlyph> > > fontGlyphs;
@@ -1218,7 +1286,8 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 	uint64_t cookKey = 0;
 	std::unique_ptr<BL_CookedArrays> cookedArrays;
 	std::vector<BL_CookedArrays::View> cookedViews;
-	if (loopHash && !bitmapTextFaces && !bMayHaveBoneData) {
+	// optimizeDrawOrder false (BL_ModifierDeformer rebuild): never reads or writes the cooked draw order.
+	if (loopHash && !bitmapTextFaces && !bMayHaveBoneData && optimizeDrawOrder) {
 		BL_LoadTimer cookTimer(loadStats.meshCooked);
 		cookKey = BL_CookedMeshKey(loopHash, dm, mats, layersInfo, withTangents);
 		cookedArrays.reset(new BL_CookedArrays(mats));
@@ -1552,6 +1621,10 @@ void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj,
 		}
 	}
 
+	if (optimizeDrawOrder) {
+		BL_OptimizeDrawOrder(mats);
+	}
+
 #ifdef WITH_BULLET
 	std::vector<char> cookedData;
 	if (recorder && recorder->Save(cookedData, withTangents)) {
@@ -1670,7 +1743,7 @@ static void BL_PrepareMeshes(const std::vector<Object *>& objects, BL_PreparedMe
 				const Material *ma = entry.materials[m];
 				const BL_CookedSlotFlags slot = {{1, (ma->game.flag & GEMAT_INVISIBLE) == 0, (ma->game.flag & GEMAT_BACKCULL) == 0,
 				                                  (ma->game.flag & GEMAT_NOPHYSICS) == 0, ma->material_type == MA_TYPE_WIRE,
-				                                  BL_MaterialUsesWireframe(ma), format}};
+				                                  BL_MaterialUsesWireframe(ma), format, BL_DrawOrderMatters(ma)}};
 				slots[m] = slot;
 			}
 			entry.cookKey = BL_CookedMeshKeyFlags(entry.loopHash, dm, slots, layersInfo, entry.withTangents);

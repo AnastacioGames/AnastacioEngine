@@ -76,7 +76,8 @@ bool BL_ObjectConverted(const struct Object *ob);
 void BL_ConvertDerivedMeshToArray(DerivedMesh *dm, Mesh *me, Object *blenderobj, const std::vector<BL_MeshMaterial>& mats,
                                   const RAS_Mesh::LayersInfo& layersInfo,
                                   std::vector<KX_Mesh::BitmapTextFace> *bitmapTextFaces = nullptr,
-                                  bool needTangents = true, uint64_t preparedLoopHash = 0);
+                                  bool needTangents = true, uint64_t preparedLoopHash = 0,
+                                  bool optimizeDrawOrder = false);
 
 RAS_Deformer *BL_ConvertDeformer(KX_GameObject *object, KX_Mesh *meshobj);
 

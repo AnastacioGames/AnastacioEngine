@@ -8,6 +8,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — meshoptimizer: ordem dos triângulos para o cache de vértices
+
+- `source/extern/meshoptimizer` (MIT, v0.22 sem modificação) e `BL_OptimizeDrawOrder`
+  (`BL_BlenderDataConversion.cpp`): `meshopt_optimizeVertexCache` só nos índices de desenho
+  (`m_primitiveIndices`) de arrays de triângulos com ≥256 tris cuja ordem não aparece (sem Alpha/Add/
+  Alpha Sort, Depth Transp, wire ou nó Wireframe: `BL_DrawOrderMatters`). Lista de triângulos
+  (`getPolygon`, física) e vértices intactos; nunca no rebuild por quadro do `BL_ModifierDeformer`.
+- Roda no caminho cru antes de gravar o `.cooked`: com cache o custo é zero. Chave da malha versão 5, com
+  o critério por slot e `RANGE_MESHOPT_OFF` (A/B). `RANGE_MESHOPT_LOG=1` mostra ACMR e tempo.
+- Cena controlada (`tools/debug/cenas/criar_cena_meshopt.py` + `tools/debug/medir_meshopt.py`, 64 x 82 mil
+  tris, RX 6800M): GPU `render.cameras` 5,83 → 5,29 ms (ordem do Blender, ACMR 0,94 → 0,65) e
+  9,79 → 5,34 ms (faces embaralhadas, ACMR 3,0 → 0,66). Custo sem `.cooked`: 18-25 ms por malha de
+  82 mil tris. `getPolygon`/`getVertex`/`rayCast` idênticos ligado/desligado, com e sem `.cooked`;
+  material Alpha Blend não é reordenado. Revisão do Codex: transparente sem ZSort e chave por slot.
+
+
+
 ## 2026-11-11 — Nodes GLSL: recarregar o .glsl ao salvar
 
 - `startup/glsl_node_reload.py`: a cada 1 s confere o mtime dos arquivos da GLSL Library usados por Texts;

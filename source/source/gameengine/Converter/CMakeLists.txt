@@ -59,6 +59,7 @@ set(INC_SYS
 	../../../intern/debugbreak
 	../../../intern/mathfu
 	../../../extern/recastnavigation/Detour/Include
+	../../../extern/meshoptimizer/src
 	${EIGEN3_INCLUDE_DIRS}
 	${PTHREADS_INCLUDE_DIRS}
 	${BOOST_INCLUDE_DIR}
@@ -116,6 +117,7 @@ set(LIB
 	ge_physics_bullet
 	ge_ketsji
 	ge_rasterizer
+	extern_meshoptimizer
 )
 
 if(WITH_BULLET)

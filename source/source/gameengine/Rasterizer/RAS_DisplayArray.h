@@ -311,6 +311,14 @@ public:
 		m_triangleIndices.insert(m_triangleIndices.end(), triangles, triangles + numTriangles);
 	}
 
+	/** Draw indices for in-place reordering at conversion (vertex cache order). Only the draw order changes:
+	 * the triangle list read by getPolygon() and physics stays as converted. */
+	inline unsigned int *GetPrimitiveIndicesForReorder()
+	{
+		InvalidatePolygonCenters();
+		return m_primitiveIndices.data();
+	}
+
 	inline void AddPrimitiveIndex(const unsigned int index)
 	{
 		m_primitiveIndices.push_back(index);
