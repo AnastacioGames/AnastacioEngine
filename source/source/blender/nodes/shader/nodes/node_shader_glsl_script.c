@@ -874,7 +874,14 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 			                   e->name, e->name, e->name, e->name);
 		}
 	}
-	BLI_dynstr_append(ds, "vec2 res() { return vec2(1024.0); }\n#line 1\n");
+	/* Size in texels of the first image the node reads (image param or Image Texture on an input);
+	 * 1024 when it reads none. */
+	if (info->totbound > 0) {
+		BLI_dynstr_append(ds, "vec2 res() { return vec2(textureSize(SCRIPT_IMG0, 0)); }\n#line 1\n");
+	}
+	else {
+		BLI_dynstr_append(ds, "vec2 res() { return vec2(1024.0); }\n#line 1\n");
+	}
 	BLI_dynstr_append(ds, src);
 	BLI_dynstr_append(ds, "\n");
 	/* script_parse starts here: a "main" in a comment of the user code is not ours. */

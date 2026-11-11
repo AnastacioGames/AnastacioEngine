@@ -188,7 +188,7 @@ de comentário declaram o node; o corpo traz `vec4 node(vec2 uv)`:
 vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
 ```
 
-- Inputs são lidos com `in_<nome>(uv)`, parâmetros com `params.<nome>`, e `res()` devolve 1024x1024.
+- Inputs são lidos com `in_<nome>(uv)`, parâmetros com `params.<nome>`, e `res()` devolve o tamanho em texels da primeira imagem que o nó lê (1024x1024 sem imagem).
 - O nó traduz o cabeçalho para o formato de sempre (uniforms `u_` com `@min/@max/@default/@choice` e um `main`).
   Então tudo continua valendo: sockets ligáveis, valor por uniform sem recompilar
   (`setScriptUniform("u_scale", ...)`), menus de enum e bool, TIME e o nó vermelho em erro de compilação.
@@ -242,7 +242,7 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   aponta para o material base (`<nome> Base`, como o use_nodes cria), com as configurações dele guardadas.
   O que não volta (imagem ausente, socket sumido) aparece como aviso. Código em
   `startup/bl_operators/node_files.py`; exemplos `tinted_sharpen.json` (grupo) e `stone.json` (material).
-- Ainda não suportados: `res()` fixo em 1024; ponteiros para outro material, textura ou objeto nos
+- Ainda não suportados: ponteiros para outro material, textura ou objeto nos
   arquivos de nós (só o nome, com aviso).
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
   Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.
