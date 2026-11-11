@@ -225,7 +225,14 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   Salvar o `.glsl` fora da engine atualiza o Text em até 1 s e refaz sockets e shader dos nós que o usam
   (`startup/glsl_node_reload.py`). Um Text editado dentro da engine não é sobrescrito (aviso no console).
   Só no editor; caminhos de rede lentos podem atrasar a interface na checagem.
-- Ainda não suportados: `@surface` e reavaliar um subgrafo qualquer em outra UV.
+- `@surface` (2026-11-11): `surface(uv)` dá posição e normal do objeto (em metros, com a escala do
+  objeto), `covered(uv)` devolve 1 e cada `@param` image ganha `triplanar_<nome>(escala)`, sem espelhar
+  faces opostas. Não combina com `@shading`. Exemplo: `presets/glsl_nodes/triplanar.glsl`.
+- `in_<nome>(uv)` com nós antes da entrada (2026-11-11): a cadeia ligada (Image Texture, Mix, Mapping,
+  Texture Coordinate só pela saída UV, valores) é rodada de novo na UV pedida, até 64 nós. Cadeia com
+  normal, posição, outra camada de UV ou outro GLSL Script lê o valor do pixel atual e avisa no console.
+  Conferido no editor, no runtime e no Web.
+- Ainda não suportados: Node Groups e presets de material como arquivo; `res()` fixo em 1024.
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
   Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.
 

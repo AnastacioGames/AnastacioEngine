@@ -1301,6 +1301,11 @@ static bool codegen_script_in_collect(GPUNodeLink *link, GPUNode **set, int *tot
 			return false;
 		}
 	}
+	/* The inputs above may have filled the set: the check at the top ran before them. */
+	if (*tot >= SCRIPT_IN_MAX_NODES) {
+		*r_bad = node->name;
+		return false;
+	}
 	set[(*tot)++] = node;
 	return true;
 }
