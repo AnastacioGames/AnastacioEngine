@@ -41,6 +41,10 @@ uniform mat4 unfobmat;
 /* TAA motion (docs/plano-taa.md, etapa 2): object matrix of the last rendered frame. */
 uniform mat4 unfprevobmat;
 out vec3 varmotion;
+#ifdef USE_SKINNING
+/* Bone palette of the last rendered frame. */
+uniform mat4 prevBoneMatrices[MAX_BONES];
+#endif
 #endif
 
 #ifdef USE_CORE_PROFILE
@@ -293,6 +297,15 @@ void main()
 	             + boneWeights.z * boneMatrices[int(boneIndices.z)]
 	             + boneWeights.w * boneMatrices[int(boneIndices.w)];
 
+#ifdef USE_VELOCITY
+	mat4 prevSkinMat = boneWeights.x * prevBoneMatrices[int(boneIndices.x)]
+	                 + boneWeights.y * prevBoneMatrices[int(boneIndices.y)]
+	                 + boneWeights.z * prevBoneMatrices[int(boneIndices.z)]
+	                 + boneWeights.w * prevBoneMatrices[int(boneIndices.w)];
+	/* Pose change of this vertex since the last frame, in mesh space. */
+	vec3 skinmotion = (prevSkinMat * position).xyz - (skinMat * position).xyz;
+#endif
+
 	position = skinMat * position;
 	normal = mat3(skinMat) * normal;
 #endif
@@ -322,9 +335,13 @@ void main()
 #endif
 
 #ifdef USE_VELOCITY
-	/* Rigid motion of the object only: skinning, instancing and vertex offsets use this frame's
-	 * shape in both terms. */
-	varmotion = (unfprevobmat * vec4(VERTEX, 1.0)).xyz - (unfobmat * vec4(VERTEX, 1.0)).xyz;
+	/* Object motion plus the GPU skinning pose change; instancing and vertex offsets use this
+	 * frame's shape in both terms. */
+	vec3 prevvertex = VERTEX;
+#ifdef USE_SKINNING
+	prevvertex += skinmotion;
+#endif
+	varmotion = (unfprevobmat * vec4(prevvertex, 1.0)).xyz - (unfobmat * vec4(VERTEX, 1.0)).xyz;
 #endif
 
 #ifdef USE_CORE_PROFILE

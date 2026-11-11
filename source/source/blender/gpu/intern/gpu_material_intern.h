@@ -167,6 +167,8 @@ struct GPUMaterial {
 	int damagehitsloc, damagestrengthloc, damagecountloc;
 	/* TAA motion (unfprevobmat), bound per object by GPU_material_bind_prev_object_matrix(). */
 	int prevobmatloc;
+	/* prevBoneMatrices (GPU skinning motion), bound by GPU_material_bind_prev_bone_matrices(). */
+	int prevbonematloc;
 
 	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
 	struct {

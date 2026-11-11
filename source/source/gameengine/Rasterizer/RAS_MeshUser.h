@@ -33,6 +33,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <vector>
 
 class RAS_BoundingBox;
 class RAS_BatchGroup;
@@ -72,6 +73,10 @@ private:
 	mt::mat4 m_lastDrawnMatrix;
 	/// Render frame of m_lastDrawnMatrix, 0 = never drawn.
 	uint64_t m_drawnFrame;
+	/// TAA motion of GPU skinning: bone palettes of the last rendered frame and the one before it.
+	std::vector<float> m_prevBones;
+	std::vector<float> m_lastBones;
+	uint64_t m_bonesFrame;
 
 public:
 	RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_Deformer *deformer);
@@ -93,6 +98,9 @@ public:
 	/** Object matrix of the previous rendered frame (TAA motion). The current matrix when the
 	 * object was not drawn in that frame (new, culled or hidden): no motion rather than a jump. */
 	const mt::mat4& GetPreviousMatrix();
+	/** Bone palette of the previous rendered frame (GPU skinning, TAA motion), same rules as
+	 * GetPreviousMatrix: the current palette when there is none of that frame. */
+	const float *GetPreviousBones(const float *bones, int count);
 	/// Once per rendered frame, before the scenes are drawn.
 	static void NextRenderFrame();
 

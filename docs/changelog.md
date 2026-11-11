@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAA: movimento de GPU Skinning
+
+- Personagens com "RanGE GPU Skinning" passam a ter vetor de movimento da pose (paleta de ossos do quadro
+  anterior em `prevBoneMatrices`, guardada por `RAS_MeshUser::GetPreviousBones`). Medido com
+  `tools/debug/cenas/criar_cena_taa_skin.py`: rastro cai de +2,6 para +1,0 ponto de pixels cinza, igual ao
+  objeto rígido. Skinning na CPU, instancing e partículas continuam sem vetor
+  ([plano-taa.md](plano-taa.md#como-ficou-a-etapa-2-2026-11-11)).
+
 ## 2026-11-11 — TAA etapa 2: movimento por objeto
 
 - Objetos que andam junto com a câmera (carro visto de trás) não borram nem deixam rastro com TAA. Materiais

@@ -73,8 +73,14 @@ com a câmera do histórico. Assim o tratamento de jitter da etapa 1 não mudou.
 - Matriz anterior: `RAS_MeshUser::GetPreviousMatrix`, com um contador por quadro de render
   (`NextRenderFrame`, antes das sondas). Objeto que não foi desenhado no quadro anterior fica sem movimento.
 - Sem vetor (o TAA usa só a câmera nesses pixels): céu, transparentes, Static Batch, halo/billboard,
-  instancing, estágio de geometria (Fur Shells, Outline...), shaders Python próprios (`BL_Shader`). Skinning e
-  Vertex Offset entram só com o movimento do objeto.
+  instancing, estágio de geometria (Fur Shells, Outline...), shaders Python próprios (`BL_Shader`). Skinning na CPU
+  e Vertex Offset entram só com o movimento do objeto.
+- GPU Skinning (armature em "RanGE GPU Skinning"): o shader recebe também a paleta de ossos do quadro
+  anterior (`prevBoneMatrices`, `RAS_MeshUser::GetPreviousBones`) e soma a mudança de pose ao movimento.
+  Teste: `tools/debug/cenas/criar_cena_taa_skin.py` + `medir_taa_movimento.py <cena> --cinza` (câmera parada,
+  osso indo e voltando, pixels cinza a mais andando): só câmera +2,6 pontos, com vetor +1,0; o mesmo
+  vai-e-volta com o objeto inteiro dá +1,75 x +0,70, então o skinning ficou no nível do objeto rígido (a sobra
+  é borda que revela fundo).
 - O alvo é zerado no começo de cada cena, depois do céu.
 - A/B: `RANGE_TAA_VELOCITY_OFF=1` volta para a etapa 1.
 - Teste: `tools/debug/cenas/criar_cena_taa_movimento.py` + `tools/debug/medir_taa_movimento.py` (runtime no

@@ -306,6 +306,9 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 		RAS_Deformer *deformer = meshUser->GetDeformer();
 		if (deformer && deformer->GetBoneMatrices(&boneMatrices, &boneCount)) {
 			GPU_material_bind_bone_matrices(m_gpuMat, boneMatrices, boneCount);
+			if (GPU_material_use_prev_bone_matrices(m_gpuMat)) {
+				GPU_material_bind_prev_bone_matrices(m_gpuMat, meshUser->GetPreviousBones(boneMatrices, boneCount), boneCount);
+			}
 		}
 		else {
 			/* Material has "GPU Skinning" enabled but this object's armature isn't in the
@@ -321,6 +324,9 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 				return mats;
 			}();
 			GPU_material_bind_bone_matrices(m_gpuMat, identityPalette.data(), GPU_MAX_SKINNING_BONES);
+			if (GPU_material_use_prev_bone_matrices(m_gpuMat)) {
+				GPU_material_bind_prev_bone_matrices(m_gpuMat, identityPalette.data(), GPU_MAX_SKINNING_BONES);
+			}
 
 			if (!m_skinningMismatchWarned) {
 				CM_Warning("material \"" << m_mat->id.name + 2 << "\" has \"GPU Skinning\" enabled, but a user of it "

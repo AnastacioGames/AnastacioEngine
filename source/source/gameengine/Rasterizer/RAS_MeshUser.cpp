@@ -64,6 +64,26 @@ const mt::mat4& RAS_MeshUser::GetPreviousMatrix()
 	return m_prevMatrix;
 }
 
+const float *RAS_MeshUser::GetPreviousBones(const float *bones, int count)
+{
+	const size_t size = (size_t)count * 16;
+	if (m_bonesFrame != s_renderFrame) {
+		const bool valid = (m_bonesFrame + 1 == s_renderFrame) && m_lastBones.size() == size;
+		const float *prev = valid ? m_lastBones.data() : bones;
+		m_prevBones.assign(prev, prev + size);
+		m_lastBones.assign(bones, bones + size);
+		m_bonesFrame = s_renderFrame;
+	}
+	else if (m_lastBones.size() != size || memcmp(m_lastBones.data(), bones, size * sizeof(float)) != 0) {
+		/* The pose changed after an earlier draw of this frame: keep the previous frame's palette. */
+		if (m_prevBones.size() != size) {
+			m_prevBones.assign(bones, bones + size);
+		}
+		m_lastBones.assign(bones, bones + size);
+	}
+	return m_prevBones.data();
+}
+
 RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_Deformer *deformer)
 	:m_layer((1 << 20) - 1),
 	m_passIndex(0),
@@ -76,7 +96,8 @@ RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_De
 	m_batchGroup(nullptr),
 	m_deformer(deformer),
 	m_instancingVersion(NextInstancingVersion()),
-	m_drawnFrame(0)
+	m_drawnFrame(0),
+	m_bonesFrame(0)
 {
 	BLI_assert(m_boundingBox);
 	m_boundingBox->AddUser();

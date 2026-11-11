@@ -576,6 +576,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->damagestrengthloc = GPU_shader_get_uniform(shader, "unfdamagestrength");
 		material->damagecountloc = GPU_shader_get_uniform(shader, "unfdamagecount");
 		material->prevobmatloc = GPU_shader_get_uniform(shader, "unfprevobmat");
+		material->prevbonematloc = GPU_shader_get_uniform(shader, "prevBoneMatrices");
 
 		material->iesinfoloc = GPU_shader_get_uniform(shader, "unfiesinfo");
 		material->iesaxesloc = GPU_shader_get_uniform(shader, "unfiesaxes");
@@ -6671,6 +6672,19 @@ void GPU_material_bind_prev_object_matrix(GPUMaterial *material, const float pre
 	GPUShader *shader = material->pass ? GPU_pass_shader(material->pass) : NULL;
 	if (shader && material->prevobmatloc != -1) {
 		GPU_shader_uniform_vector(shader, material->prevobmatloc, 16, 1, (const float *)prevobmat);
+	}
+}
+
+bool GPU_material_use_prev_bone_matrices(GPUMaterial *material)
+{
+	return material->pass && material->prevbonematloc != -1;
+}
+
+void GPU_material_bind_prev_bone_matrices(GPUMaterial *material, const float *matrices, int count)
+{
+	GPUShader *shader = material->pass ? GPU_pass_shader(material->pass) : NULL;
+	if (shader && material->prevbonematloc != -1) {
+		GPU_shader_uniform_vector(shader, material->prevbonematloc, 16, count, matrices);
 	}
 }
 

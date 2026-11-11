@@ -1,20 +1,25 @@
-"""Mede a etapa 2 do TAA (vetores de movimento) sem abrir janela na tela do usuário.
+"""Mede os vetores de movimento do TAA sem abrir janela na tela do usuário.
 
-    python tools/debug/medir_taa_movimento.py [cena.range]
+    python tools/debug/medir_taa_movimento.py [cena.range] [--cinza]
 
-Cena: tools/debug/cenas/criar_cena_taa_movimento.py (carro listrado andando, câmera presa atrás).
 Roda o AnastacioRuntime no desktop invisível do controle.py em três modos:
   sem_taa      TAA desligado (referência de nitidez, com serrilhado)
   so_camera    TAA só com a reprojeção da câmera (RANGE_TAA_VELOCITY_OFF=1, etapa 1)
   com_vetor    TAA com o vetor de movimento por objeto (etapa 2)
-Para cada um tira um print com o carro parado e outro andando. O carro fica parado na tela (a câmera
-vai junto), então o retângulo dele deveria sair igual nos dois prints: mede a diferença média e a
-fração de pixels com diferença > 40. Esperado: com_vetor perto de sem_taa; so_camera bem acima
-(rastro nas bordas). Imprime "TAAMOV ..." e o veredito. Medido em 2026-11-11 (RX 6800M):
-sem_taa 0,97 / 0,4%; so_camera 8,83 / 7,1%; com_vetor 1,64 / 0,4%.
+Para cada um tira um print com o objeto "Carro" parado e outro com a propriedade "andar" ligada.
+Prints ao lado da cena.
+
+Modo padrão (cena tools/debug/cenas/criar_cena_taa_movimento.py): o carro anda com a câmera presa
+atrás, fica parado na tela; mede a fração de pixels do retângulo do carro com diferença > 40 entre
+os dois prints. Medido em 2026-11-11 (RX 6800M): sem_taa 0,4%; so_camera 7,1%; com_vetor 0,4%.
+
+Modo --cinza (cena tools/debug/cenas/criar_cena_taa_skin.py, câmera parada, osso indo e voltando):
+as listras são só preto e branco, então rastro do TAA vira cinza; mede a fração de pixels cinza
+(40-215) numa área larga em volta da barra, parado x andando. Esperado: com_vetor andando perto do
+parado, so_camera bem acima. Também imprime a métrica cinza no modo padrão.
+Imprime "TAAMOV ..." e o veredito.
 """
 
-import os
 import sys
 from pathlib import Path
 
@@ -25,17 +30,24 @@ RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / 'tools/testes_engine'))
 import controle  # noqa: E402
 
-CENA = Path(sys.argv[1] if len(sys.argv) > 1 else RAIZ / 'artifacts/testes/taa2/taa_mov.range')
-SAIDA = RAIZ / 'artifacts/testes/taa2'
-SAIDA.mkdir(parents=True, exist_ok=True)
-# Retângulo do carro no print (frações da janela): câmera fixa em relação a ele.
+ARGS = [a for a in sys.argv[1:] if not a.startswith('--')]
+CINZA = '--cinza' in sys.argv
+CENA = Path(ARGS[0] if ARGS else RAIZ / 'artifacts/testes/taa2/taa_mov.range').resolve()
+SAIDA = CENA.parent  # prints ao lado da cena
+# Retângulos (frações da janela): o do carro (câmera fixa em relação a ele) e o da barra indo e voltando.
 CAIXA = (0.38, 0.32, 0.62, 0.80)
+CAIXA_CINZA = (0.15, 0.25, 0.85, 0.85) if CINZA else (0.42, 0.36, 0.58, 0.76)
 
 
-def regiao(arquivo):
+def regiao(arquivo, caixa):
     img = np.asarray(Image.open(arquivo).convert('L'), dtype=np.float32)
     h, w = img.shape
-    return img[int(CAIXA[1] * h):int(CAIXA[3] * h), int(CAIXA[0] * w):int(CAIXA[2] * w)]
+    return img[int(caixa[1] * h):int(caixa[3] * h), int(caixa[0] * w):int(caixa[2] * w)]
+
+
+def cinza(arquivo):
+    r = regiao(arquivo, CAIXA_CINZA)
+    return float(((r > 40) & (r < 215)).mean() * 100)
 
 
 def rodar(nome, taa, env):
@@ -55,10 +67,11 @@ def rodar(nome, taa, env):
             jogo.fechar()
         except Exception:
             pass
-    dif = np.abs(regiao(parado) - regiao(andando))
-    media, fora = float(dif.mean()), float((dif > 40).mean() * 100)
-    print('TAAMOV %-10s dif_media=%.2f pixels_errados=%.2f%%' % (nome, media, fora))
-    return media, fora
+    dif = np.abs(regiao(parado, CAIXA) - regiao(andando, CAIXA))
+    fora = float((dif > 40).mean() * 100)
+    c0, c1 = cinza(parado), cinza(andando)
+    print('TAAMOV %-10s pixels_errados=%.2f%% cinza_parado=%.2f%% cinza_andando=%.2f%%' % (nome, fora, c0, c1))
+    return fora, c0, c1
 
 
 r = {
@@ -66,6 +79,11 @@ r = {
     'so_camera': rodar('so_camera', True, {'RANGE_TAA_VELOCITY_OFF': '1'}),
     'com_vetor': rodar('com_vetor', True, {}),
 }
-ok = r['com_vetor'][1] < max(1.0, 2.0 * r['sem_taa'][1]) and r['so_camera'][1] > 2.0 * r['com_vetor'][1]
+if CINZA:
+    extra_cam = r['so_camera'][2] - r['so_camera'][1]
+    extra_vet = r['com_vetor'][2] - r['com_vetor'][1]
+    ok = extra_cam > 0.5 and extra_vet < 0.5 * extra_cam
+else:
+    ok = r['com_vetor'][0] < max(1.0, 2.0 * r['sem_taa'][0]) and r['so_camera'][0] > 2.0 * r['com_vetor'][0]
 print('TAAMOV', 'PASS' if ok else 'FAIL')
 print('TAAMOV prints em', SAIDA)

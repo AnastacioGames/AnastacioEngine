@@ -610,6 +610,8 @@ void GPU_material_bind_planar(GPUMaterial *material, struct GPUTexture *tex, con
 bool GPU_material_use_damage(GPUMaterial *material);
 bool GPU_material_use_velocity(GPUMaterial *material);
 void GPU_material_bind_prev_object_matrix(GPUMaterial *material, const float prevobmat[4][4]);
+bool GPU_material_use_prev_bone_matrices(GPUMaterial *material);
+void GPU_material_bind_prev_bone_matrices(GPUMaterial *material, const float *matrices, int count);
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count);
 
 /* One slot of that same scene-light loop, with the values the fixed-function glLight* calls
