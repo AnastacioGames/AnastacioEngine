@@ -4,7 +4,7 @@
 (física de jogo, destruição, explosivo, deformação, partículas GPU, reverb, raio, rede, LOD). Não descreve
 arquitetura.
 
-**Linhas conferidas em 2026-10-31 (`HEAD` `d1f0db34`).** Os números envelhecem a cada edição: confirme com
+**Linhas conferidas em 2026-11-11 (`HEAD` `abc48958`).** Os números envelhecem a cada edição: confirme com
 `grep -n "nome" arquivo`. `python tools/check_docs.py --fix` corrige os números deste mapa.
 
 Cada arquivo tem duas metades: callbacks `rna_*` (get, set, update) dentro de `#ifdef RNA_RUNTIME` e definições
@@ -30,7 +30,7 @@ zero não servir (arquivos da Range original pulam nosso versioning). 2) `RNA_de
 `rna_object.c` (`rna_GameObjectSettings_use_explosive_set` e vizinhos); os `*_set` internos de cada sistema ficam
 em `rna_object_game.c`.
 
-## `source/source/blender/makesrna/intern/rna_object.c` (4.105 linhas)
+## `source/source/blender/makesrna/intern/rna_object.c` (4.110 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
@@ -48,7 +48,7 @@ em `rna_object_game.c`.
 | Definições: auxiliares | `rna_def_vertex_group` 1901, `rna_def_material_slot` 1965, `rna_def_game_object_activity_culling` 2006 |
 | Definições: jogo | `rna_def_game_state_name` 2046, `rna_def_logic_brick_group` 2069, `rna_def_object_game_components` 2106, **`rna_def_object_game_settings`** 2134 (≈470 linhas: física, colisão, estados) |
 | Definições: coleções e veículo | `rna_def_object_constraints` 2674, `rna_def_object_modifiers` 2722, `rna_def_object_vertex_groups` 2807, `rna_def_object_lodlevel` 2856, `rna_def_object_wheel_settings` 2932, `rna_def_object_gear_ratio` 3046, `rna_def_object_animation_event` 3064 |
-| Definição principal | **`rna_def_object`** 3114 (≈870 linhas), `rna_def_dupli_object` 3982, `rna_def_object_base` 4040, `RNA_def_object` 4085 |
+| Definição principal | **`rna_def_object`** 3114 (≈870 linhas), `rna_def_dupli_object` 3987, `rna_def_object_base` 4045, `RNA_def_object` 4090 |
 
 ## `source/source/blender/makesrna/intern/rna_object_game.c` (1.619 linhas)
 

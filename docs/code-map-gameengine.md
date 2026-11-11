@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-08 (`HEAD` `8c48a7d5`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-11 (`HEAD` `abc48958`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -50,7 +50,7 @@ cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`,
 
 ---
 
-## `Ketsji/KX_PythonInit.cpp` (3.930 linhas)
+## `Ketsji/KX_PythonInit.cpp` (3.944 linhas)
 
 Bootstrap do Python embutido e módulos `Range`/`bge`. O registro dos **tipos** (`KX_GameObject`, `KX_Scene`…)
 não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específico de Web (`__EMSCRIPTEN__`) em 69,
@@ -61,28 +61,28 @@ não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específic
 | Utilitários do módulo `Range` (funções globais `gPy*`) | aleatório/gravidade/caminho 214–243, `gPyStartGame`/`EndGame`/`RestartGame` 261–289, `SaveGlobalDict`/`LoadGlobalDict` 300–318, `GetProfileInfo` 336, `SendMessage` 349, `GetSpectrum` 372 |
 | Taxas e relógio | tic rate, render rate, animation rate, exit key, max frames, clock/time scale 384–602 |
 | Lista de arquivos e cenas | `.blend`/`.range`/`.rasec` 607–660, `AddScene`/`GetCurrentScene`/`GetSceneList` 671–707 |
-| Informação de sistema | `pyPrintStats` 891, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 973 |
-| Bibliotecas externas | `gLibLoad` 992, `gLibNew` 1217, `gLibFree` 1271, `gLibList` 1287, `gPyNextFrame` 1313 |
+| Informação de sistema | `pyPrintStats` 892, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 974 |
+| Bibliotecas externas | `gLibLoad` 993, `gLibNew` 1218, `gLibFree` 1272, `gLibList` 1288, `gPyNextFrame` 1314 |
 | Tabela `game_methods[]` | 997 |
-| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1451–1645 |
-| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1956, janela/fullscreen 1507–1524 |
+| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1452–1646 |
+| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1957, janela/fullscreen 1507–1524 |
 | Áudio e debug na tela | `MasterVolume` 1585–1597, `ShowFramerate`/`ShowProfile`/`ShowProperties`/`AutoDebugList` 1606–1650, `GetDisplayDimensions` 1660 |
 | Tabela `rasterizer_methods[]` | 1679 |
-| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2325 (~430 linhas, constantes de tipos/estados) |
-| Ambiente `sys` e caminhos | `backupPySysObjects` 2755 … `restorePySysObjects` 2830, `appendPythonPath` 2858, `addImportMain`/`removeImportMain` 2869–2874 |
-| Módulo `Range` e compatibilidade | `addSubModule` 2891, `initRANGE` 2899, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2938, `installLegacyAudFactoryAlias` 2992 (alias `bge`/`aud`) |
-| Init/saída do Python | `initPlayerPython` 3040, `exitPlayerPython` 3080, console 2528–2595, `initGamePython` 3171, `exitGamePython` 3268 |
-| Console e joystick | `createPythonConsole` 3291, `getPythonJoystick` 3303, `updatePythonJoysticks` 3308 |
-| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3349 |
-| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3483 (~190 linhas de constantes) |
-| Módulo `Application` | `initApplicationPythonBinding` 3678 |
-| Config persistente do jogo | `saveGamePythonConfig` 3740, `loadGamePythonConfig` 3819, `pathGamePythonConfig` 3896 (contém código Web/IDBFS) |
+| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2326 (~430 linhas, constantes de tipos/estados) |
+| Ambiente `sys` e caminhos | `backupPySysObjects` 2769 … `restorePySysObjects` 2844, `appendPythonPath` 2872, `addImportMain`/`removeImportMain` 2883–2888 |
+| Módulo `Range` e compatibilidade | `addSubModule` 2905, `initRANGE` 2913, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2952, `installLegacyAudFactoryAlias` 3006 (alias `bge`/`aud`) |
+| Init/saída do Python | `initPlayerPython` 3054, `exitPlayerPython` 3094, console 2528–2595, `initGamePython` 3185, `exitGamePython` 3282 |
+| Console e joystick | `createPythonConsole` 3305, `getPythonJoystick` 3317, `updatePythonJoysticks` 3322 |
+| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3363 |
+| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3497 (~190 linhas de constantes) |
+| Módulo `Application` | `initApplicationPythonBinding` 3692 |
+| Config persistente do jogo | `saveGamePythonConfig` 3754, `loadGamePythonConfig` 3833, `pathGamePythonConfig` 3910 (contém código Web/IDBFS) |
 
 Observação: `initPlayerPython` (editor não usa) é o caminho do standalone; o editor entra por `BPY_python_start`.
 
 ---
 
-## `Physics/Bullet/CcdPhysicsEnvironment.cpp` (4.131 linhas)
+## `Physics/Bullet/CcdPhysicsEnvironment.cpp` (4.137 linhas)
 
 Ambiente físico Bullet. O header é `CcdPhysicsEnvironment.h` (391 linhas). `m_dynamicsWorld` é membro do
 ambiente; o callback de subtick é registrado no construtor com `this`.
@@ -104,8 +104,8 @@ ambiente; o callback de subtick é registrado no construtor com `this`.
 | Criação de shapes | `CreateSphereController` 2822, `CreateConeController` 3192, `Ccd_FindClosestNode` 2849 |
 | Constraints (criação) | `CreateConstraint` 2866 (~290 linhas) |
 | Exportação e fábrica | `getAppliedImpulse` 3106, `ExportFile` 3239, `Create` 3303 |
-| Conversão de objeto | `ConvertObject` 3328 (~530 linhas), `SetupObjectConstraints` 3961 |
-| Dados de colisão | `CcdCollData` 4048–4104 (contatos, atrito, restituição) |
+| Conversão de objeto | `ConvertObject` 3328 (~530 linhas), `SetupObjectConstraints` 3967 |
+| Dados de colisão | `CcdCollData` 4054–4110 (contatos, atrito, restituição) |
 
 Observação: ~520 linhas de `OcclusionBuffer` estão neste arquivo sem relação com o mundo Bullet; é o candidato
 mais óbvio a viver em outro arquivo se um dia dividirem esse `.cpp`.

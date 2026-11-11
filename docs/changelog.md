@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Organização dos mapas de código
+
+- Atualizadas as referências de linhas e tamanhos nos mapas de game engine e RNA Object com `tools/check_docs.py --fix`; a verificação passou sem erros ou avisos.
+- `KX_FontObject`: a textura do atlas volta a ser consultada após a liberação do cache, evitando letras como retângulos brancos. O usuário confirmou o teste visual numa versão compilada após a alteração.
+
 ## 2026-11-11 — Performance Report: VRAM e uso da GPU
 
 - O evento `memory` do Game Trace (módulo `runtime`) ganhou `vram`, `shared`, `gpu3d` e `igpu`, lidos uma vez por segundo numa thread própria (`CM_Trace.cpp`, `GpuSampler`). Windows: DXGI `QueryVideoMemoryInfo` (local/non local) e contador PDH `GPU Engine(pid_*engtype_3D)`, ambos por `LoadLibrary`, sem lib nova no link. Linux: `/proc/self/fdinfo` `drm-*` (AMD/Intel; o driver NVIDIA não escreve). Web fora. Ideia tirada do gputaskman (MIT), sem código dele.

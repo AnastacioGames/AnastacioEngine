@@ -366,7 +366,10 @@ void KX_FontObject::UpdateBuckets()
 	textUser->SetShadowOffset(m_shadow_offset);
 	textUser->SetShadowColor(m_shadow_color);
 
-	if (UseAtlas() && !m_atlasTextureTried) {
+	// Busca de novo a cada desenho enquanto deu certo: a textura fica em cache na Image (custa so a
+	// consulta) e setTextureQuality/GPU_free_images apaga esse cache. Guardar o ponteiro deixava o
+	// texto com textura liberada (letras viravam retangulos brancos). So para de tentar se falhou.
+	if (UseAtlas() && (m_atlasTexture || !m_atlasTextureTried)) {
 		// GL context needed, so fetched here and not at conversion (cached on the Image).
 		ImageUser iuser = {nullptr};
 		iuser.ok = 1;
