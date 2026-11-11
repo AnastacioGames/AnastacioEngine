@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Build HLOD: Method "Sloppy" (meshoptimizer)
+
+- `meshopt_simplifySloppy` pela nova `source/intern/ae_meshopt` (só no editor, por ctypes). Ignora topologia e
+  funde partes próximas; material, UV e cor por vértice vêm do triângulo original mais próximo.
+- 2,2x mais rápido que o Decimate e mais próximo da forma na cena de teste
+  (`tools/debug/cenas/medir_hlod_sloppy.py`). Decimate continua padrão.
+
 ## 2026-11-11 — meshoptimizer: ordem dos triângulos para o cache de vértices
 
 - `source/extern/meshoptimizer` (MIT, v0.22 sem modificação) e `BL_OptimizeDrawOrder`

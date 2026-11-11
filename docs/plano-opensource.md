@@ -50,7 +50,12 @@ diferente com e sem cache.
    tempo de GPU por etapa, inclusive em iGPU física e Web (ganho não é garantido). Regressões: `getVertex`,
    `getPolygon`, raycast com UV/face, skinning, shape keys, Dent, Static Batch, Geometry Instancing.
 
-### 2b. Proxies do HLOD
+### 2b. Proxies do HLOD — Method "Sloppy" feito 2026-11-11
+
+Feito: `source/intern/ae_meshopt` + Method Decimate/Sloppy no Build HLOD (padrão Decimate). Material, UV e cor
+por vértice saem do triângulo original mais próximo. Medição (`tools/debug/cenas/medir_hlod_sloppy.py`, 16
+objetos, ratio 0,1): Decimate 0,83 s, distância média/máx. original→proxy 0,058/0,485; Sloppy 0,38 s,
+0,044/0,299. Falta: proxies no .cooked (item 3 abaixo) e aceite visual com janela.
 
 1. `anastacio_hlod.py` hoje junta e usa Decimate Collapse. Adicionar modo "Sloppy" via `ae_meshopt`
    (biblioteca nativa no mesmo esquema do `ae_uvatlas`, chamada por ctypes): `meshopt_simplifySloppy`
