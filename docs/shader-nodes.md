@@ -210,7 +210,7 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   Bake (2026-11-11): painel **GLSL Mesh Maps** na barra lateral (N) do Node Editor, com o nó ativo, assa os
   mapas do objeto ativo (precisa de UV; usa a malha sem modificadores), um por param ou **Bake All**, em
   imagens `<objeto>_<tipo>` empacotadas no `.range`. AO e espessura lançam 24 raios por texel contra a
-  própria malha; curvatura é por vértice (malha mais densa = mais detalhe); normal em espaço de objeto;
+  própria malha; curvatura marca as quinas (faces Flat: faixa clara na convexa, escura na fenda) e, em faces Smooth, é por vértice; espessura é esticada até a parte mais grossa; normal em espaço de objeto;
   posição normalizada na caixa do objeto. 256 px numa Suzanne subdividida (3.936 tri) leva 1-5 s por mapa.
   Código em `startup/bl_operators/node_meshmap.py`. Sem os bits de componente em `info.w` da spec.
 - `in_<nome>(uv)` em outra UV: quando o input está ligado direto num **Image Texture** (projeção Flat,

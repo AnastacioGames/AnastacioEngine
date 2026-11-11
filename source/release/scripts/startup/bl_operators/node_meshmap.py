@@ -43,7 +43,7 @@ def _directions(n):
 
 
 def _mesh_data(ob):
-    """Triangles in UV with position, normal and vertex curvature, plus the BVH of the mesh."""
+    """Triangles in UV with position, normal and the sharp edges of their face, plus the BVH of the mesh."""
     import bmesh
     from mathutils.bvhtree import BVHTree
     if ob.mode == 'EDIT':
@@ -54,10 +54,28 @@ def _mesh_data(ob):
     if uv is None:
         bm.free()
         raise ValueError("'%s' has no UV map" % ob.name)
-    bmesh.ops.triangulate(bm, faces=bm.faces[:])
-    bm.verts.ensure_lookup_table()
     bm.normal_update()
-    # Curvature per vertex: how much the neighbours fall below (convex) or above (concave) its plane.
+    # Curvature by the sharp edges: each face keeps its edges as 3D segments with the signed angle
+    # to the neighbour face (+ convex, - concave). Texels near an edge take that angle, the rest stays neutral.
+    src = bm.faces.layers.int.new("meshmap_src")
+    face_edges = []
+    for i, f in enumerate(bm.faces):
+        f[src] = i
+        c = f.calc_center_median()
+        edges = []
+        for e in f.edges:
+            if len(e.link_faces) != 2:
+                continue
+            g = e.link_faces[0] if e.link_faces[1] == f else e.link_faces[1]
+            ang = f.normal.angle(g.normal, 0.0)
+            if ang < 1e-3:
+                continue
+            convex = (g.calc_center_median() - c).dot(f.normal) < 0.0
+            if f.smooth and g.smooth:
+                continue  # part of a curved surface: the vertex curvature below covers it
+            edges.append((tuple(e.verts[0].co), tuple(e.verts[1].co), ang if convex else -ang))
+        face_edges.append(edges)
+    # Smooth faces: vertex curvature, how much the neighbours fall below (convex) or above (concave) its plane.
     curv = []
     for v in bm.verts:
         acc, cnt = 0.0, 0
@@ -67,12 +85,14 @@ def _mesh_data(ob):
                 acc += -v.normal.dot(d.normalized())
                 cnt += 1
         curv.append(acc / cnt if cnt else 0.0)
+    bmesh.ops.triangulate(bm, faces=bm.faces[:])
+    bm.normal_update()
     tris = []
     for f in bm.faces:
         ls = f.loops
         tris.append(([tuple(l[uv].uv) for l in ls], [tuple(l.vert.co) for l in ls],
                      [tuple(l.vert.normal if f.smooth else f.normal) for l in ls],
-                     [curv[l.vert.index] for l in ls]))
+                     [curv[l.vert.index] if f.smooth else 0.0 for l in ls], face_edges[f[src]]))
     bvh = BVHTree.FromBMesh(bm)
     lo = [min(v.co[i] for v in bm.verts) for i in range(3)]
     hi = [max(v.co[i] for v in bm.verts) for i in range(3)]
@@ -80,14 +100,33 @@ def _mesh_data(ob):
     return tris, bvh, lo, hi
 
 
-def _rasterize(tris, size):
-    """Per texel (y, x): position, normal and curvature interpolated in the triangle that covers it."""
+CURV_WIDTH = 0.03          # band of an edge, share of the mesh diagonal
+CURV_FULL = math.pi / 6.0  # edge angle that gives full white/black
+
+
+def _edge_curvature(p, edges, width):
+    """Signed curvature of points p (n, 3) from the nearest weighted edge of their face."""
+    import numpy as np
+    best = np.zeros(len(p))
+    for a, b, ang in edges:
+        a, b = np.array(a), np.array(b)
+        ab = b - a
+        t = np.clip((p - a) @ ab / max(ab @ ab, 1e-12), 0.0, 1.0)
+        d = np.linalg.norm(p - (a + t[:, None] * ab), axis=1)
+        f = np.clip(1.0 - d / width, 0.0, 1.0) ** 2
+        v = f * max(-1.0, min(1.0, ang / CURV_FULL))
+        best = np.where(np.abs(v) > np.abs(best), v, best)
+    return best
+
+
+def _rasterize(tris, size, width):
+    """Per texel (y, x): position, normal and edge curvature in the triangle that covers it."""
     import numpy as np
     pos = np.zeros((size, size, 3), np.float32)
     nor = np.zeros((size, size, 3), np.float32)
     cur = np.zeros((size, size), np.float32)
     mask = np.zeros((size, size), bool)
-    for uvs, cos, nos, cus in tris:
+    for uvs, cos, nos, cus, edges in tris:
         p = np.array(uvs, np.float64) * size - 0.5
         x0, y0 = np.floor(p.min(axis=0)).astype(int)
         x1, y1 = np.ceil(p.max(axis=0)).astype(int)
@@ -112,7 +151,10 @@ def _rasterize(tris, size):
         n = w @ np.array(nos)
         n /= np.maximum(np.linalg.norm(n, axis=1, keepdims=True), 1e-9)
         nor[yy, xx] = n
-        cur[yy, xx] = w @ np.array(cus)
+        c = w @ np.array(cus) * 2.0
+        if edges:
+            c = np.clip(c + _edge_curvature(w @ np.array(cos), edges, width), -1.0, 1.0)
+        cur[yy, xx] = c
         mask[yy, xx] = True
     return pos, nor, cur, mask
 
@@ -172,16 +214,19 @@ def bake(ob, kind, size):
     """RGBA float array (size, size, 4) of the map."""
     import numpy as np
     tris, bvh, lo, hi = _mesh_data(ob)
-    pos, nor, cur, mask = _rasterize(tris, size)
     diag = max(math.sqrt(sum((h - l) ** 2 for h, l in zip(hi, lo))), 1e-6)
+    pos, nor, cur, mask = _rasterize(tris, size, diag * CURV_WIDTH)
     if kind == "ao":
         v = _rays(pos, nor, mask, bvh, diag * 0.25, False)
         rgb = np.repeat(v[:, :, None], 3, axis=2)
     elif kind == "thickness":
-        v = np.clip(_rays(pos, nor, mask, bvh, diag * 0.5, True), 0.0, 1.0)
+        v = _rays(pos, nor, mask, bvh, diag * 0.5, True)
+        # Stretch to 0-1 by the thickest part (98th percentile), so thin and thick read apart.
+        top = np.percentile(v[mask], 98) if mask.any() else 1.0
+        v = np.clip(v / max(top, 1e-6), 0.0, 1.0)
         rgb = np.repeat(v[:, :, None], 3, axis=2)
     elif kind == "curvature":
-        v = np.clip(0.5 + cur, 0.0, 1.0)
+        v = np.clip(0.5 + 0.5 * cur, 0.0, 1.0)
         rgb = np.repeat(v[:, :, None], 3, axis=2)
     elif kind == "normal":
         rgb = nor * 0.5 + 0.5
