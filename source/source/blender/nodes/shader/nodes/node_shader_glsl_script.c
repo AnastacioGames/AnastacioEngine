@@ -282,7 +282,12 @@ enum {
 	HDR_BOOL,
 	HDR_COLOR,
 	HDR_ENUM,
+	HDR_IMAGE,
 };
+
+#define HEADER_MAX_IMAGES 4
+/* node->prop key of an image param: "img_<name>", an IDP_ID (NULL while none is chosen). */
+#define HEADER_IMAGE_PREFIX "img_"
 
 typedef struct HeaderEntry {
 	char name[48];
@@ -296,7 +301,21 @@ typedef struct HeaderEntry {
 typedef struct HeaderInfo {
 	char name[64];
 	bool output_gray;
+	/* Image params in header order, and which of them have an image (only those are bound). */
+	char images[HEADER_MAX_IMAGES][48];
+	int totimage;
+	struct Image *image_ids[HEADER_MAX_IMAGES];
+	int totbound;
 } HeaderInfo;
+
+static struct Image *header_node_image(const bNode *node, const char *name)
+{
+	char key[64];
+	BLI_snprintf(key, sizeof(key), HEADER_IMAGE_PREFIX "%s", name);
+	IDProperty *prop = node->prop ? IDP_GetPropertyTypeFromGroup(node->prop, key, IDP_ID) : NULL;
+	ID *id = prop ? IDP_Id(prop) : NULL;
+	return (id && GS(id->name) == ID_IM) ? (struct Image *)id : NULL;
+}
 
 /* "// @tag rest": pointer to rest (spaces skipped), NULL when the line is another tag or text. */
 static const char *header_tag(const char *line, const char *tag)
@@ -396,6 +415,10 @@ static bool header_entry(const char *p, bool is_input, HeaderEntry *e)
 		}
 		e->min = lim[0];
 		e->max = lim[1];
+	}
+	else if (STREQ(type, "image")) {
+		e->kind = HDR_IMAGE;
+		return args[0] == '\0' && def == NULL;
 	}
 	else if (STREQ(type, "bool")) e->kind = HDR_BOOL;
 	else if (STREQ(type, "color")) e->kind = HDR_COLOR;
@@ -538,6 +561,12 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		}
 		else if ((rest = header_tag(s, "input")) || (rest = header_tag(s, "param"))) {
 			const bool is_input = header_tag(s, "input") != NULL;
+			const bool is_image = !is_input && strstr(rest, ": image") != NULL;
+			if (is_image && info->totimage >= HEADER_MAX_IMAGES) {
+				header_error(node, line, "too many image params (4)");
+				*r_broken = true;
+				continue;
+			}
 			if (tot >= HEADER_MAX_ENTRIES || (is_input && totin >= 8) || (!is_input && totparam >= 16)) {
 				header_error(node, line, "too many inputs (8) or params (16)");
 				*r_broken = true;
@@ -558,7 +587,11 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 				}
 			}
 			tot++;
-			if (is_input) totin++; else totparam++;
+			if (e->kind == HDR_IMAGE) {
+				BLI_strncpy(info->images[info->totimage++], e->name, sizeof(info->images[0]));
+			}
+			else if (is_input) totin++;
+			else totparam++;
 		}
 		else if (header_tag(s, "shading")) {
 			header_error(node, line, "@shading nodes are not supported yet, use vec4 node(vec2 uv)");
@@ -629,6 +662,18 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		else if (e->kind == HDR_IN_GRAY) {
 			BLI_dynstr_appendf(ds, "float in_%s(vec2 uv) { return u_%s; }\n", e->name, e->name);
 		}
+		else if (e->kind == HDR_IMAGE) {
+			struct Image *ima = node ? header_node_image(node, e->name) : NULL;
+			if (ima) {
+				BLI_dynstr_appendf(ds, "vec4 img_%s(vec2 uv) { return texture2D(SCRIPT_IMG%d, uv); }\n", e->name,
+				                   info->totbound);
+				info->image_ids[info->totbound++] = ima;
+			}
+			else {
+				/* No image chosen yet: transparent black, the shader still compiles. */
+				BLI_dynstr_appendf(ds, "vec4 img_%s(vec2 uv) { return vec4(0.0); }\n", e->name);
+			}
+		}
 	}
 	BLI_dynstr_append(ds, "vec2 res() { return vec2(1024.0); }\n#line 1\n");
 	BLI_dynstr_append(ds, src);
@@ -640,7 +685,7 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		const HeaderEntry *e = &entries[i];
 		if (e->kind == HDR_BOOL) BLI_dynstr_appendf(ds, "\tparams.%s = (u_%s != 0);\n", e->name, e->name);
 		else if (e->kind == HDR_COLOR) BLI_dynstr_appendf(ds, "\tparams.%s = u_%s.rgb;\n", e->name, e->name);
-		else if (e->kind != HDR_IN_COLOR && e->kind != HDR_IN_GRAY)
+		else if (e->kind != HDR_IN_COLOR && e->kind != HDR_IN_GRAY && e->kind != HDR_IMAGE)
 			BLI_dynstr_appendf(ds, "\tparams.%s = u_%s;\n", e->name, e->name);
 	}
 	BLI_dynstr_append(ds, info->output_gray ? "\tValue = node(UV.xy).r;\n}\n" : "\tColor = node(UV.xy);\n}\n");
@@ -701,6 +746,44 @@ static int script_read_ex(bNode *node, ScriptParam *params, char **r_code, Heade
 		MEM_freeN(code);
 	}
 	return tot;
+}
+
+/* One "img_<name>" IDP_ID in node->prop per image param of the header; a chosen image is kept
+ * while the param exists, the slot of a removed param is freed (and its user with it). */
+static void script_sync_image_props(bNode *node, const HeaderInfo *info)
+{
+	if (!node->prop) {
+		if (info->totimage == 0) {
+			return;
+		}
+		IDPropertyTemplate val = {0};
+		node->prop = IDP_New(IDP_GROUP, &val, "RNA_NodeProps");
+	}
+	IDProperty *next;
+	for (IDProperty *prop = node->prop->data.group.first; prop; prop = next) {
+		next = prop->next;
+		if (prop->type != IDP_ID || !STREQLEN(prop->name, HEADER_IMAGE_PREFIX, strlen(HEADER_IMAGE_PREFIX))) {
+			continue;
+		}
+		bool used = false;
+		for (int i = 0; i < info->totimage; i++) {
+			if (STREQ(prop->name + strlen(HEADER_IMAGE_PREFIX), info->images[i])) {
+				used = true;
+			}
+		}
+		if (!used) {
+			IDP_FreeFromGroup(node->prop, prop);
+		}
+	}
+	for (int i = 0; i < info->totimage; i++) {
+		char key[64];
+		BLI_snprintf(key, sizeof(key), HEADER_IMAGE_PREFIX "%s", info->images[i]);
+		if (!IDP_GetPropertyFromGroup(node->prop, key)) {
+			IDPropertyTemplate val = {0};
+			val.id = NULL;
+			IDP_AddToGroup(node->prop, IDP_New(IDP_ID, &val, key));
+		}
+	}
 }
 
 static int script_read(bNode *node, ScriptParam *params, char **r_code)
@@ -818,6 +901,9 @@ static void node_shader_update_glsl_script(bNodeTree *ntree, bNode *node)
 	if (header && tot >= 0 && info.name[0] && !node->label[0]) {
 		BLI_strncpy(node->label, info.name, sizeof(node->label));
 	}
+	if (header && tot >= 0) {
+		script_sync_image_props(node, &info);
+	}
 	if (tot < 0) {
 		/* No valid main (yet): keep the sockets, the user may be typing. */
 		MEM_SAFE_FREE(code);
@@ -881,7 +967,7 @@ static const char *script_socket_glsl(int socktype)
 /* SCRIPT_ENTRY(inputs..., [time,] outputs...) calls SCRIPT_MAIN with the parameters in the user
  * order and converts int/vec2 from and to the socket types. The uniforms of the script are globals
  * here, filled from their sockets before the call. */
-static char *script_wrapper(const ScriptParam *params, int tot, bool use_time)
+static char *script_wrapper(const ScriptParam *params, int tot, bool use_time, int totimage)
 {
 	DynStr *ds = BLI_dynstr_new();
 	bool first = true;
@@ -898,6 +984,11 @@ static char *script_wrapper(const ScriptParam *params, int tot, bool use_time)
 		}
 		if (pass == 0 && use_time) {
 			BLI_dynstr_appendf(ds, "%sfloat scr_time", first ? "" : ", ");
+			first = false;
+		}
+		/* Same order as GPU_link_script; the code reads them as SCRIPT_IMG<i>. */
+		for (int i = 0; pass == 0 && i < totimage; i++) {
+			BLI_dynstr_appendf(ds, "%ssampler2D scr_img%d", first ? "" : ", ", i);
 			first = false;
 		}
 	}
@@ -972,7 +1063,9 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 	ScriptParam params[SCRIPT_MAX_PARAMS];
 	char *code = NULL;
 	bool header = false;
-	int tot = script_read_ex(node, params, &code, NULL, &header);
+	HeaderInfo info;
+	info.totbound = 0;
+	int tot = script_read_ex(node, params, &code, &info, &header);
 	int ok = 0;
 
 	/* Header nodes: the first input is UV, the mesh UV while not linked. */
@@ -1000,8 +1093,13 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 			}
 		}
 		const bool use_time = script_uses_word(code, "TIME");
-		char *wrapper = script_wrapper(params, tot, use_time);
-		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time, node->name);
+		const int totimage = header ? info.totbound : 0;
+		GPUNodeLink *images[HEADER_MAX_IMAGES];
+		for (int i = 0; i < totimage; i++) {
+			images[i] = GPU_image(info.image_ids[i], NULL, false);
+		}
+		char *wrapper = script_wrapper(params, tot, use_time, totimage);
+		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time, node->name, images, totimage);
 		MEM_freeN(wrapper);
 	}
 	MEM_SAFE_FREE(code);

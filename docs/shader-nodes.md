@@ -199,7 +199,11 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
 - Biblioteca: os arquivos de `release/scripts/presets/glsl_nodes/*.glsl` aparecem em Add > **GLSL Library**,
   agrupados por `@category` (tooltip = `@description`). O operador `node.glsl_node_add` copia o código para um Text
   dentro do `.range`, então o jogo exportado não depende da biblioteca.
-- Ainda não suportados: `image`/`meshmap`, `@shading`/`@surface`, e `in_<nome>(uv)` com UV diferente da do pixel.
+- `@param tex: image` (até 4): lido com `img_tex(uv)`. A imagem é escolhida no botão do nó (busca + X para
+  limpar, operador `node.glsl_image_set`) e fica numa propriedade de ID `img_<nome>` do nó, salva no `.range`.
+  Sem imagem, `img_tex` devolve preto transparente. O gerador expõe o sampler como `SCRIPT_IMG<i>` (`samp<N>`).
+  Exemplo: `presets/glsl_nodes/image_tint.glsl`.
+- Ainda não suportados: `meshmap`, `@shading`/`@surface`, e `in_<nome>(uv)` com UV diferente da do pixel.
   O input é avaliado uma vez pelo grafo e a UV pedida é ignorada.
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
   Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.

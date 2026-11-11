@@ -1040,6 +1040,53 @@ class NODE_OT_glsl_node_add(Operator):
         return {'FINISHED'}
 
 
+# Enum items must stay alive while Blender uses them.
+_glsl_image_items = []
+
+
+def _glsl_image_enum(self, context):
+    _glsl_image_items[:] = [("NONE", "None", "No image: the param reads transparent black", 0)]
+    for i, image in enumerate(sorted(bpy.data.images, key=lambda im: im.name)):
+        _glsl_image_items.append((image.name, image.name, "", i + 1))
+    return _glsl_image_items
+
+
+class NODE_OT_glsl_image_set(Operator):
+    """Choose the image of an "@param <name>: image" of a GLSL node"""
+    bl_idname = "node.glsl_image_set"
+    bl_label = "Choose Image"
+    bl_options = {'REGISTER', 'UNDO'}
+    bl_property = "image"
+
+    node_name: StringProperty(name="Node")
+    param: StringProperty(name="Param")
+    image: EnumProperty(name="Image", items=_glsl_image_enum)
+
+    def node(self, context):
+        space = context.space_data
+        tree = getattr(space, "edit_tree", None)
+        return tree, (tree.nodes.get(self.node_name) if tree else None)
+
+    def invoke(self, context, event):
+        context.window_manager.invoke_search_popup(self)
+        return {'RUNNING_MODAL'}
+
+    def execute(self, context):
+        tree, node = self.node(context)
+        key = "img_" + self.param
+        if node is None or key not in node.keys():
+            return {'CANCELLED'}
+        image = bpy.data.images.get(self.image) if self.image != 'NONE' else None
+        if image is None:
+            # The node puts back an empty slot on update.
+            del node[key]
+        else:
+            node[key] = image
+        # Recompiles the material with the new sampler.
+        tree.interface_update(context)
+        return {'FINISHED'}
+
+
 class MATERIAL_OT_show_generated_code(Operator):
     """Write the generated vertex, geometry and fragment GLSL of the material to Text """ \
         """datablocks (game engine)"""
@@ -1327,6 +1374,7 @@ classes = (
     NODE_OT_damage_mix_add,
     NODE_OT_shader_preset_add,
     NODE_OT_glsl_node_add,
+    NODE_OT_glsl_image_set,
 
     NODE_OT_add_and_link_node,
     NODE_OT_add_linked,

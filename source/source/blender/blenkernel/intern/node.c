@@ -1022,6 +1022,27 @@ bNode *nodeCopyNode(bNodeTree *ntree, bNode *node)
 	return BKE_node_copy_ex(ntree, node, LIB_ID_CREATE_NO_USER_REFCOUNT);
 }
 
+static void node_prop_id_users_plus(IDProperty *group)
+{
+	for (IDProperty *prop = group->data.group.first; prop; prop = prop->next) {
+		if (prop->type == IDP_ID && prop->data.pointer) {
+			id_us_plus(prop->data.pointer);
+		}
+		else if (prop->type == IDP_GROUP) {
+			node_prop_id_users_plus(prop);
+		}
+	}
+}
+
+/* nodeCopyNode does not count users, and nodeFreeNode drops those of node->prop: a copy kept in
+ * a real tree (duplicate, paste, group) adds them here, as the operators do for node->id. */
+void nodePropIDUsersPlus(bNode *node)
+{
+	if (node->prop) {
+		node_prop_id_users_plus(node->prop);
+	}
+}
+
 /* also used via rna api, so we check for proper input output direction */
 bNodeLink *nodeAddLink(bNodeTree *ntree, bNode *fromnode, bNodeSocket *fromsock, bNode *tonode, bNodeSocket *tosock)
 {
@@ -1743,7 +1764,11 @@ static void node_free_node_ex(bNodeTree *ntree, bNode *node, bool remove_animdat
 	BLI_freelistN(&node->internal_links);
 
 	if (node->prop) {
-		IDP_FreeProperty(node->prop);
+		/* Like the sockets: ID users only when the node itself is deleted (nodeFreeNode). A whole
+		 * tree free gets its users dropped by the ID code, and a localized copy (material
+		 * compile) never added any; dropping them here left IDP_ID images of GLSL nodes at 0
+		 * users, so they were not saved. */
+		IDP_FreeProperty_ex(node->prop, use_api_free_cb);
 		MEM_freeN(node->prop);
 	}
 

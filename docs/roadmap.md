@@ -9,7 +9,8 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 - Feito 2026-11-11: cabeçalho `@input/@param/@output` no GLSL Script + Add > GLSL Library
   ([shader-nodes.md](shader-nodes.md#arquivos-de-node-com-cabeçalho-2026-11-11)). Falta aceite com janela do menu.
-- Próximos: params `image`/`meshmap`, `in_<nome>(uv)` reavaliando o subgrafo em outra UV, `@shading`
+- Param `image` feito 2026-11-11 (escolha pela interface testada pelo controle).
+- Próximos: `meshmap`, `in_<nome>(uv)` reavaliando o subgrafo em outra UV, `@shading`
   (`node(Shade c)`), recarregar o .glsl externo ao salvar, mais nodes na biblioteca e build Web conferido.
 
 ## Mind Map

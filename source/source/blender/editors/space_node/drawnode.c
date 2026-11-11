@@ -1170,6 +1170,30 @@ static void node_shader_buts_script(uiLayout *layout, bContext *UNUSED(C), Point
 static void node_shader_buts_glsl_script(uiLayout *layout, bContext *C, PointerRNA *ptr)
 {
 	uiTemplateID(layout, C, ptr, "script", "TEXT_OT_new", "TEXT_OT_open", NULL, UI_TEMPLATE_ID_FILTER_ALL);
+
+	/* "@param <name>: image" of a header node: one image picker per "img_<name>" property. */
+	/* RNA keeps ID properties read-only, so the pick goes through node.glsl_image_set (Python). */
+	bNode *node = ptr->data;
+	if (node->prop) {
+		for (IDProperty *prop = node->prop->data.group.first; prop; prop = prop->next) {
+			if (prop->type == IDP_ID && STREQLEN(prop->name, "img_", 4)) {
+				ID *id = prop->data.pointer;
+				uiLayout *row = uiLayoutRow(layout, true);
+				PointerRNA opptr;
+				uiItemL(row, prop->name + 4, ICON_NONE);
+				uiItemFullO(row, "NODE_OT_glsl_image_set", id ? id->name + 2 : IFACE_("Choose Image"), ICON_IMAGE_DATA,
+				            NULL, WM_OP_INVOKE_DEFAULT, 0, &opptr);
+				RNA_string_set(&opptr, "node_name", node->name);
+				RNA_string_set(&opptr, "param", prop->name + 4);
+				if (id) {
+					uiItemFullO(row, "NODE_OT_glsl_image_set", "", ICON_X, NULL, WM_OP_EXEC_DEFAULT, 0, &opptr);
+					RNA_string_set(&opptr, "node_name", node->name);
+					RNA_string_set(&opptr, "param", prop->name + 4);
+					RNA_enum_set(&opptr, "image", 0);
+				}
+			}
+		}
+	}
 }
 
 static void node_shader_buts_script_ex(uiLayout *layout, bContext *C, PointerRNA *ptr)

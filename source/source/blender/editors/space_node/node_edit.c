@@ -1171,6 +1171,7 @@ static int node_duplicate_exec(bContext *C, wmOperator *op)
 	for (node = ntree->nodes.first; node; node = node->next) {
 		if (node->flag & SELECT) {
 			newnode = nodeCopyNode(ntree, node);
+			nodePropIDUsersPlus(newnode);
 
 			if (newnode->id) {
 				/* simple id user adjustment, node internal functions don't touch this
@@ -2142,6 +2143,7 @@ static int node_clipboard_paste_exec(bContext *C, wmOperator *op)
 
 		/* needed since nodeCopyNode() doesn't increase ID's */
 		id_us_plus(node->id);
+		nodePropIDUsersPlus(new_node);
 
 		/* pasted nodes are selected */
 		nodeSetSelected(new_node, true);

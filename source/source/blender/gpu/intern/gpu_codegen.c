@@ -1230,6 +1230,18 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 				BLI_dynstr_appendf(ds, "float %s_TIME;\n#define TIME %s_TIME\n", script->name, script->name);
 			}
 			BLI_dynstr_append(ds, defs);
+			/* Images of the script by order: the global sampler the generated code declared. */
+			int totimage = 0;
+			for (GPUNode *node = nodes->first; node; node = node->next) {
+				if (STREQ(node->name, script->name)) {
+					for (GPUInput *input = node->inputs.first; input; input = input->next) {
+						if (input->ima && codegen_input_has_texture(input)) {
+							BLI_dynstr_appendf(ds, "#define SCRIPT_IMG%d samp%d\n", totimage++, input->texid);
+						}
+					}
+					break;
+				}
+			}
 			/* Compile errors give the line of the Text. The second #line argument (source string
 			 * number, GLSL spec) is this script's id + 1 (0 is the material's own Fragment/Vertex/
 			 * Geometry code): a compile error log then starts with "<id+1>:<line>" or "<id+1>(<line>)"
@@ -1245,6 +1257,9 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 			/* Inside the renames: the wrapper fills the uniforms of the script. */
 			BLI_dynstr_append(ds, script->wrapper);
 			BLI_dynstr_append(ds, "\n#undef main\n#undef SCRIPT_MAIN\n#undef SCRIPT_ENTRY\n");
+			for (int i = 0; i < totimage; i++) {
+				BLI_dynstr_appendf(ds, "#undef SCRIPT_IMG%d\n", i);
+			}
 			if (script->use_time) {
 				BLI_dynstr_append(ds, "#undef TIME\n");
 			}
@@ -3443,7 +3458,8 @@ bool GPU_stack_link(GPUMaterial *mat, const char *name, GPUNodeStack *in, GPUNod
 /* GLSL Script node: the user function (called main in code) with one parameter per socket, the
  * inputs first, then the outputs. */
 bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GPUNodeStack *in, GPUNodeStack *out,
-                     const char **uniform_names, bool use_time, const char *orig_node_name)
+                     const char **uniform_names, bool use_time, const char *orig_node_name,
+                     GPUNodeLink **images, int totimage)
 {
 	const char *name = gpu_material_add_script(mat, code, wrapper, use_time, orig_node_name);
 	if (!name) {
@@ -3466,6 +3482,11 @@ bool GPU_link_script(GPUMaterial *mat, const char *code, const char *wrapper, GP
 	}
 	if (use_time) {
 		gpu_node_input_link(node, GPU_builtin(GPU_TIME), GPU_FLOAT);
+	}
+	/* Image params of header nodes: sampler2D parameters of SCRIPT_ENTRY, and the script code
+	 * reads them as SCRIPT_IMG<i> (codegen_print_scripts). */
+	for (int i = 0; i < totimage; i++) {
+		gpu_node_input_link(node, images[i], GPU_TEX2D);
 	}
 	if (out) {
 		for (int i = 0; out[i].type != GPU_NONE; i++) {
