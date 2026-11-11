@@ -604,6 +604,28 @@ static void codegen_convert_datatype(DynStr *ds, int from, int to, const char *t
 	}
 }
 
+/* A shared attribute is declared with the type of its first user: another user reading it with
+ * another size (texco_uv takes vec2, Image Texture vec3) gets its components, not a color mix. */
+static void codegen_print_attrib(DynStr *ds, const GPUInput *input, const char *prefix)
+{
+	const GPUType from = input->attribvartype ? input->attribvartype : input->type, to = input->type;
+	const char *sw[] = {"", ".x", ".xy", ".xyz", ""};
+	if (from == to || from < GPU_FLOAT || from > GPU_VEC4 || to < GPU_FLOAT || to > GPU_VEC4) {
+		BLI_dynstr_appendf(ds, "%s%d", prefix, input->attribid);
+	}
+	else if (to < from) {
+		BLI_dynstr_appendf(ds, "%s%d%s", prefix, input->attribid, sw[to]);
+	}
+	else {
+		static const char *pad[] = {"", "", "0.0", "0.0", "1.0"};
+		BLI_dynstr_appendf(ds, "vec%d(%s%d", (int)to, prefix, input->attribid);
+		for (int c = (int)from + 1; c <= (int)to; c++) {
+			BLI_dynstr_appendf(ds, ", %s", pad[c]);
+		}
+		BLI_dynstr_append(ds, ")");
+	}
+}
+
 static void codegen_print_datatype(DynStr *ds, const GPUType type, float *data)
 {
 	int i;
@@ -960,7 +982,7 @@ static void codegen_call_functions(DynStr *ds, ListBase *nodes, GPUNodeLink *fin
 					BLI_dynstr_appendf(ds, "cons%d", input->id);
 			}
 			else if (input->source == GPU_SOURCE_ATTRIB) {
-				BLI_dynstr_appendf(ds, "var%d", input->attribid);
+				codegen_print_attrib(ds, input, "var");
 			}
 			else if (input->source == GPU_SOURCE_OPENGL_BUILTIN) {
 				if (input->oglbuiltin == GPU_MATCAP_NORMAL)
@@ -1432,7 +1454,7 @@ static void codegen_vertex_input(DynStr *ds, GPUInput *input)
 	}
 	else if (input->source == GPU_SOURCE_ATTRIB) {
 		/* The varyings are only written at the end of main(), read the attribute itself. */
-		BLI_dynstr_appendf(ds, "att%d", input->attribid);
+		codegen_print_attrib(ds, input, "att");
 	}
 	else if (input->source == GPU_SOURCE_OPENGL_BUILTIN) {
 		if (input->oglbuiltin == GPU_COLOR)
@@ -3159,6 +3181,8 @@ static void gpu_nodes_get_vertex_attributes(ListBase *nodes, GPUVertexAttribs *a
 	GPUInput *input;
 	int a;
 
+	GPUType vartype[GPU_MAX_ATTRIB] = {0};
+
 	/* convert attributes requested by node inputs to an array of layers,
 	 * checking for duplicates and assigning id's starting from zero. */
 
@@ -3179,6 +3203,7 @@ static void gpu_nodes_get_vertex_attributes(ListBase *nodes, GPUVertexAttribs *a
 					if (a == attribs->totlayer) {
 						input->attribid = attribs->totlayer++;
 						input->attribfirst = 1;
+						vartype[a] = input->type;
 
 						attribs->layer[a].type = input->attribtype;
 						attribs->layer[a].attribid = input->attribid;
@@ -3188,6 +3213,7 @@ static void gpu_nodes_get_vertex_attributes(ListBase *nodes, GPUVertexAttribs *a
 					else {
 						input->attribid = attribs->layer[a].attribid;
 					}
+					input->attribvartype = vartype[a];
 				}
 			}
 		}

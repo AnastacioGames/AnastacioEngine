@@ -286,6 +286,9 @@ enum {
 };
 
 #define HEADER_MAX_IMAGES 4
+/* Bound samplers: the image params plus the Image Texture nodes read again by in_<name>(uv). */
+#define HEADER_MAX_INPUTS 8
+#define HEADER_MAX_BOUND (HEADER_MAX_IMAGES + HEADER_MAX_INPUTS) /* one per image param + input: never full */
 /* node->prop key of an image param: "img_<name>", an IDP_ID (NULL while none is chosen). */
 #define HEADER_IMAGE_PREFIX "img_"
 
@@ -310,8 +313,8 @@ typedef struct HeaderInfo {
 	/* Image params in header order, and which of them have an image (only those are bound). */
 	char images[HEADER_MAX_IMAGES][48];
 	int totimage;
-	struct Image *image_ids[HEADER_MAX_IMAGES];
-	bool image_data[HEADER_MAX_IMAGES];
+	struct Image *image_ids[HEADER_MAX_BOUND];
+	bool image_data[HEADER_MAX_BOUND];
 	int totbound;
 } HeaderInfo;
 
@@ -533,8 +536,49 @@ static void header_error(const bNode *node, int line, const char *msg)
 
 /* Translated code, or NULL when src is not in the header format (no "@output") or is broken
  * (r_broken set, the reason printed with its line). */
+static void script_pretty_name(const char *name, char *r_name, int size);
+
+/* The Image Texture whose output feeds the header input <name>, when in_<name>(uv) can sample it
+ * at another UV like the node does: flat projection, no mapping, Vector not linked, not muted. */
+static bNode *header_input_image_node(const bNode *node, const char *name, bool *r_alpha)
+{
+	if (!node) {
+		return NULL;
+	}
+	char uname[64], pretty[64];
+	BLI_snprintf(uname, sizeof(uname), "u_%s", name);
+	script_pretty_name(uname, pretty, sizeof(pretty));
+	for (bNodeSocket *sock = node->inputs.first; sock; sock = sock->next) {
+		if (!STREQ(sock->name, pretty) || !sock->link) {
+			continue;
+		}
+		bNode *from = sock->link->fromnode;
+		bNodeSocket *vector = from ? from->inputs.first : NULL;
+		if (!from || from->type != SH_NODE_TEX_IMAGE || !from->id || !from->storage ||
+		    (from->flag & NODE_MUTED) || (vector && vector->link))
+		{
+			return NULL;
+		}
+		const NodeTexImage *tex = from->storage;
+		const TexMapping *map = &tex->base.tex_mapping;
+		if (tex->projection != SHD_PROJ_FLAT || (map->flag & (TEXMAP_CLIP_MIN | TEXMAP_CLIP_MAX)) ||
+		    map->projx != PROJ_X || map->projy != PROJ_Y || map->projz != PROJ_Z || !is_zero_v3(map->loc) ||
+		    !is_zero_v3(map->rot) || !is_one_v3(map->size))
+		{
+			return NULL;
+		}
+		const int index = BLI_findindex(&from->outputs, sock->link->fromsock);
+		if (index != 0 && index != 1) {
+			return NULL;
+		}
+		*r_alpha = (index == 1);
+		return from;
+	}
+	return NULL;
+}
+
 static char *script_translate_header(const bNode *node, const char *src, HeaderInfo *info, bool *r_broken,
-                                     int *r_main_offset)
+                                     int *r_main_offset, bool color_manage)
 {
 	HeaderEntry entries[HEADER_MAX_ENTRIES];
 	int tot = 0, totin = 0, totparam = 0, line = 0;
@@ -577,7 +621,7 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		}
 		else if ((rest = header_tag(s, "input")) || (rest = header_tag(s, "param"))) {
 			const bool is_input = header_tag(s, "input") != NULL;
-			if (tot >= HEADER_MAX_ENTRIES || (is_input && totin >= 8) || (!is_input && totparam >= 16)) {
+			if (tot >= HEADER_MAX_ENTRIES || (is_input && totin >= HEADER_MAX_INPUTS) || (!is_input && totparam >= 16)) {
 				header_error(node, line, "too many inputs (8) or params (16)");
 				*r_broken = true;
 				continue;
@@ -671,13 +715,52 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		}
 		BLI_dynstr_append(ds, " };\nParams params;\n");
 	}
+	bool lin_helper = false;
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];
-		if (e->kind == HDR_IN_COLOR) {
-			BLI_dynstr_appendf(ds, "vec4 in_%s(vec2 uv) { return u_%s; }\n", e->name, e->name);
-		}
-		else if (e->kind == HDR_IN_GRAY) {
-			BLI_dynstr_appendf(ds, "float in_%s(vec2 uv) { return u_%s; }\n", e->name, e->name);
+		const bool gray = (e->kind == HDR_IN_GRAY);
+		if (e->kind == HDR_IN_COLOR || gray) {
+			/* Linked to an Image Texture: sample it at the given UV, with the same color conversion and
+			 * socket conversion as the normal path. Otherwise the value that reached the socket. */
+			bool alpha = false;
+			bNode *tex_node = (info->totbound < HEADER_MAX_BOUND) ? header_input_image_node(node, e->name, &alpha) :
+			                                                         NULL;
+			if (!tex_node) {
+				BLI_dynstr_appendf(ds, "%s in_%s(vec2 uv) { return u_%s; }\n", gray ? "float" : "vec4", e->name,
+				                   e->name);
+				continue;
+			}
+			const NodeTexImage *tex = tex_node->storage;
+			struct Image *ima = (struct Image *)tex_node->id;
+			bool to_linear = false;
+			if (!alpha && color_manage && tex->color_space == SHD_COLORSPACE_COLOR) {
+				ImBuf *ibuf = BKE_image_acquire_ibuf(ima, NULL, NULL);
+				to_linear = ibuf && (ibuf->colormanage_flag & IMB_COLORMANAGE_IS_DATA) == 0;
+				BKE_image_release_ibuf(ima, ibuf, NULL);
+			}
+			if (to_linear && !lin_helper) {
+				BLI_dynstr_append(ds, "float script_lin1(float c) { return (c < 0.04045) ? max(c, 0.0) / 12.92 : "
+				                      "pow((c + 0.055) / 1.055, 2.4); }\n"
+				                      "vec4 script_lin(vec4 c) { return vec4(script_lin1(c.r), script_lin1(c.g), "
+				                      "script_lin1(c.b), c.a); }\n");
+				lin_helper = true;
+			}
+			const int slot = info->totbound;
+			char read[96];
+			BLI_snprintf(read, sizeof(read), to_linear ? "script_lin(texture2D(SCRIPT_IMG%d, uv))" :
+			             "texture2D(SCRIPT_IMG%d, uv)", slot);
+			if (alpha) {
+				BLI_dynstr_appendf(ds, gray ? "float in_%s(vec2 uv) { return %s.a; }\n" :
+				                   "vec4 in_%s(vec2 uv) { float a = %s.a; return vec4(a, a, a, 1.0); }\n",
+				                   e->name, read);
+			}
+			else {
+				BLI_dynstr_appendf(ds, gray ? "float in_%s(vec2 uv) { vec4 c = %s; "
+				                   "return c.r * 0.2126 + c.g * 0.7152 + c.b * 0.0722; }\n" :
+				                   "vec4 in_%s(vec2 uv) { return %s; }\n", e->name, read);
+			}
+			info->image_data[slot] = (tex->color_space == SHD_COLORSPACE_NONE);
+			info->image_ids[info->totbound++] = ima;
 		}
 		else if (e->kind == HDR_IMAGE) {
 			struct Image *ima = node ? header_node_image(node, e->name) : NULL;
@@ -755,7 +838,8 @@ static void script_pretty_name(const char *name, char *r_name, int size)
 	r_name[n] = '\0';
 }
 
-static int script_read_ex(bNode *node, ScriptParam *params, char **r_code, HeaderInfo *r_info, bool *r_header)
+static int script_read_ex(bNode *node, ScriptParam *params, char **r_code, HeaderInfo *r_info, bool *r_header,
+                          bool color_manage)
 {
 	Text *text = (Text *)node->id;
 	char *code = text ? txt_to_buf(text) : NULL;
@@ -765,7 +849,7 @@ static int script_read_ex(bNode *node, ScriptParam *params, char **r_code, Heade
 	*r_header = false;
 
 	if (code) {
-		char *translated = script_translate_header(node, code, &info, &broken, &main_offset);
+		char *translated = script_translate_header(node, code, &info, &broken, &main_offset, color_manage);
 		if (translated || broken) {
 			MEM_freeN(code);
 			code = translated;
@@ -829,7 +913,7 @@ static void script_sync_image_props(bNode *node, const HeaderInfo *info)
 static int script_read(bNode *node, ScriptParam *params, char **r_code)
 {
 	bool header;
-	return script_read_ex(node, params, r_code, NULL, &header);
+	return script_read_ex(node, params, r_code, NULL, &header, false);
 }
 
 /* A float uniform with both limits is drawn as a slider. */
@@ -937,7 +1021,7 @@ static void node_shader_update_glsl_script(bNodeTree *ntree, bNode *node)
 	HeaderInfo info;
 	bool header = false;
 	/* The code stays alive: params[].choice points into it. */
-	int tot = script_read_ex(node, params, &code, &info, &header);
+	int tot = script_read_ex(node, params, &code, &info, &header, false);
 	if (header && tot >= 0 && info.name[0] && !node->label[0]) {
 		BLI_strncpy(node->label, info.name, sizeof(node->label));
 	}
@@ -1105,7 +1189,7 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 	bool header = false;
 	HeaderInfo info;
 	info.totbound = 0;
-	int tot = script_read_ex(node, params, &code, &info, &header);
+	int tot = script_read_ex(node, params, &code, &info, &header, GPU_material_do_color_management(mat));
 	int ok = 0;
 
 	/* Header nodes: the first input is UV, the mesh UV while not linked. */
@@ -1134,7 +1218,7 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 		}
 		const bool use_time = script_uses_word(code, "TIME");
 		const int totimage = header ? info.totbound : 0;
-		GPUNodeLink *images[HEADER_MAX_IMAGES];
+		GPUNodeLink *images[HEADER_MAX_BOUND];
 		for (int i = 0; i < totimage; i++) {
 			images[i] = GPU_image(info.image_ids[i], NULL, info.image_data[i]);
 		}

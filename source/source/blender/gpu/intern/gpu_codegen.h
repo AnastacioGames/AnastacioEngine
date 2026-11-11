@@ -147,6 +147,7 @@ typedef struct GPUInput {
 	CustomDataType attribtype;   /* attribute type */
 	char attribname[MAX_CUSTOMDATA_LAYER_NAME]; /* attribute name */
 	int attribfirst;             /* this is the first one that is bound */
+	GPUType attribvartype;       /* type var<id>/att<id> was declared with (by the first one) */
 	GPUBuiltin builtin;          /* builtin uniform */
 	GPUOpenGLBuiltin oglbuiltin; /* opengl built in varying */
 } GPUInput;

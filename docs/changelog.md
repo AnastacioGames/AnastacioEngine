@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Nodes GLSL: in_<nome>(uv) em outra UV
+
+- Input ligado direto num Image Texture (Flat, sem mapping, Vector solto) é relido na UV pedida pelo
+  sampler do próprio nó, com sRGB → linear, saída Alpha e luminância para `gray`; senão o valor do socket.
+  Preset Box Blur (categoria Images).
+- Correção (codegen): um atributo compartilhado (UV) era declarado com o tipo do primeiro nó que o lê; com
+  Image Texture (vec3) e um nó GLSL de cabeçalho (texco_uv vec2) no mesmo material o shader não compilava.
+  Agora cada leitura converte por componentes (`.xy`, `vec3(var, 0.0)`).
+
 ## 2026-11-11 — Nodes GLSL: parâmetro meshmap
 
 - `@param x: meshmap(ao|curvature|thickness|normal|position)` reaproveita o slot de imagem, amostra sem sRGB

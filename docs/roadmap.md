@@ -11,7 +11,8 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   ([shader-nodes.md](shader-nodes.md#arquivos-de-node-com-cabeçalho-2026-11-11)). Falta aceite com janela do menu.
 - Param `image` feito 2026-11-11 (escolha pela interface testada pelo controle).
 - Param `meshmap` feito 2026-11-11 (mapa assado escolhido no botão; sem bake automático).
-- Próximos: `in_<nome>(uv)` reavaliando o subgrafo em outra UV, `@shading`
+- `in_<nome>(uv)` em outra UV feito 2026-11-11 para Image Texture ligado direto (subgrafo qualquer: futuro).
+- Próximos: `@shading`
   (`node(Shade c)`), recarregar o .glsl externo ao salvar, mais nodes na biblioteca e build Web conferido.
 
 ## Mind Map

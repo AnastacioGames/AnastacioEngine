@@ -208,8 +208,12 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   devolve `vec3` em -1..1 e `position` o `vec3` gravado. Sem mapa: AO 1, curvatura 0.5, espessura 0,
   normal (0,0,1), posição 0. `image` e `meshmap` somam no limite de 4. Não há bake automático nem os bits
   de componente em `info.w` da spec. Exemplo: `presets/glsl_nodes/mesh_wear.glsl`.
-- Ainda não suportados: `meshmap`, `@shading`/`@surface`, e `in_<nome>(uv)` com UV diferente da do pixel.
-  O input é avaliado uma vez pelo grafo e a UV pedida é ignorada.
+- `in_<nome>(uv)` em outra UV: quando o input está ligado direto num **Image Texture** (projeção Flat,
+  mapping padrão, Vector solto), a imagem é lida de novo na UV pedida, com a mesma conversão do nó (sRGB →
+  linear em Color; saída Alpha; input `gray` usa a luminância). Nos outros casos (outro nó, mapping, Box,
+  input solto) devolve o valor que chegou no socket e a UV é ignorada. Exemplo:
+  `presets/glsl_nodes/box_blur.glsl`. A imagem conta como sampler do nó (até 4 params + 8 inputs).
+- Ainda não suportados: `@shading`/`@surface` e reavaliar um subgrafo qualquer em outra UV.
 - Teste: sockets em background e compilação na GPU pelo controle (`tools/testes_engine/controle.py`). Noise,
   Checker Tint e um erro proposital (linha 6 apontada certa) conferidos em 2026-11-11.
 
