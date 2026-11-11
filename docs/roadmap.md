@@ -12,8 +12,8 @@ Ao concluir um item, apague-o daqui e registre no changelog.
   reload do .glsl, `res()`, Node Groups e presets de material em .json, bake dos meshmaps (painel GLSL Mesh Maps,
   curvatura por quinas; teste em `tools/debug/cenas/medir_meshmap_bake.py`). Runtime e Web conferidos.
 - Limites que ficaram (nenhum impede o uso):
-  - bake ignora modificadores (Bevel/Subdivision); próximo sugerido: assar a malha avaliada;
-  - bake em Python: 1-5 s por mapa de 256 px numa Suzanne; 1024 px em malha grande demora;
+  - curvatura/espessura/posição ainda em Python (1-4 s por mapa de 256 px numa Suzanne); AO e normal
+    já usam o bake do Blender Internal (~0,2 s) e todos usam a malha com modificadores (2026-11-11);
   - imagens de Node Groups/presets .json guardadas só pelo nome (renomear quebra a ligação);
   - bits de componente em `info.w` da spec não implementados (ninguém usa).
 - `in_<nome>(uv)` em subgrafo qualquer (hoje só Image Texture ligado direto): futuro.

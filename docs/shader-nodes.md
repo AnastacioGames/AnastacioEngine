@@ -208,10 +208,10 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   devolve `vec3` em -1..1 e `position` o `vec3` gravado. Sem mapa: AO 1, curvatura 0.5, espessura 0,
   normal (0,0,1), posição 0. `image` e `meshmap` somam no limite de 4. Exemplo: `presets/glsl_nodes/mesh_wear.glsl`.
   Bake (2026-11-11): painel **GLSL Mesh Maps** na barra lateral (N) do Node Editor, com o nó ativo, assa os
-  mapas do objeto ativo (precisa de UV; usa a malha sem modificadores), um por param ou **Bake All**, em
-  imagens `<objeto>_<tipo>` empacotadas no `.range`. AO e espessura lançam 24 raios por texel contra a
+  mapas do objeto ativo (precisa de UV; usa a malha com modificadores), um por param ou **Bake All**, em
+  imagens `<objeto>_<tipo>` empacotadas no `.range`. AO e normal usam o bake do Blender Internal (só o próprio objeto, cena restaurada depois); espessura lança 24 raios por texel contra a
   própria malha; curvatura marca as quinas (faces Flat: faixa clara na convexa, escura na fenda) e, em faces Smooth, é por vértice; espessura é esticada até a parte mais grossa; normal em espaço de objeto;
-  posição normalizada na caixa do objeto. 256 px numa Suzanne subdividida (3.936 tri) leva 1-5 s por mapa.
+  posição normalizada na caixa do objeto. 256 px numa Suzanne subdividida (3.936 tri) leva ~0,2 s em AO/normal e 1-4 s nos outros.
   Código em `startup/bl_operators/node_meshmap.py`. Sem os bits de componente em `info.w` da spec.
 - `in_<nome>(uv)` em outra UV: quando o input está ligado direto num **Image Texture** (projeção Flat,
   mapping padrão, Vector solto), a imagem é lida de novo na UV pedida, com a mesma conversão do nó (sRGB →

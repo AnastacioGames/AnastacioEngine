@@ -42,6 +42,16 @@ def _directions(n):
     return out
 
 
+def _bounds(ob):
+    """Object space box of the mesh with modifiers."""
+    me = ob.to_mesh(bpy.context.scene, True, 'PREVIEW')
+    try:
+        cos = [v.co for v in me.vertices] or [(0.0, 0.0, 0.0)]
+        return [min(c[i] for c in cos) for i in range(3)], [max(c[i] for c in cos) for i in range(3)]
+    finally:
+        bpy.data.meshes.remove(me)
+
+
 def _mesh_data(ob):
     """Triangles in UV with position, normal and the sharp edges of their face, plus the BVH of the mesh."""
     import bmesh
@@ -49,7 +59,12 @@ def _mesh_data(ob):
     if ob.mode == 'EDIT':
         ob.update_from_editmode()  # bake the current edit (and a fresh unwrap), not the last saved mesh
     bm = bmesh.new()
-    bm.from_mesh(ob.data)
+    # The mesh with its modifiers (Bevel, Subdivision...), as the game draws it.
+    me = ob.to_mesh(bpy.context.scene, True, 'PREVIEW')
+    try:
+        bm.from_mesh(me)
+    finally:
+        bpy.data.meshes.remove(me)
     uv = bm.loops.layers.uv.active
     if uv is None:
         bm.free()
@@ -210,9 +225,102 @@ def _dilate(img, mask, steps):
     return img
 
 
+# Maps the Blender Internal bake already makes (in C: fast, with modifiers). The rest is baked here.
+INTERNAL = {"ao": 'AO', "normal": 'NORMALS'}
+
+
+def _bake_internal(ob, kind, size, diag):
+    """AO or object space normal by the Blender Internal bake; the scene settings are put back after."""
+    import numpy as np
+    sc = bpy.context.scene
+    r = sc.render
+    if ob.data.uv_textures.active is None:
+        raise ValueError("'%s' has no UV map" % ob.name)
+    keys = ("engine", "bake_type", "bake_margin", "bake_normal_space", "use_bake_normalize",
+            "use_bake_selected_to_active", "use_bake_clear", "use_bake_multires", "use_bake_to_vertex_color")
+    saved = {k: getattr(r, k) for k in keys}
+    selected = [o for o in sc.objects if o.select]
+    active = sc.objects.active
+    edit = ob.mode == 'EDIT'
+    if edit:
+        # The UV faces of the mesh are only written back when leaving Edit Mode: read them after.
+        bpy.ops.object.mode_set(mode='OBJECT')
+    uvt = ob.data.uv_textures.active
+    old_images = [d.image for d in uvt.data]
+    world, temp_world, ls_saved = sc.world, None, None
+    hidden = []
+    tmp = bpy.data.images.new("_meshmap_bake", size, size, alpha=False, float_buffer=True)
+    try:
+        r.engine = 'BLENDER_RENDER'
+        r.bake_type = INTERNAL[kind]
+        r.bake_margin = PADDING
+        r.bake_normal_space = 'OBJECT'
+        r.use_bake_normalize = True
+        r.use_bake_selected_to_active = False
+        r.use_bake_clear = True
+        r.use_bake_multires = False
+        r.use_bake_to_vertex_color = False
+        if kind == "ao":
+            if world is None:
+                world = temp_world = bpy.data.worlds.new("_meshmap_world")
+                sc.world = world
+            ls = world.light_settings
+            ls_keys = ("use_ambient_occlusion", "distance", "samples", "gather_method", "ao_blend_type",
+                       "use_falloff")
+            ls_saved = {k: getattr(ls, k) for k in ls_keys}
+            ls.use_ambient_occlusion = True
+            ls.gather_method = 'RAYTRACE'
+            ls.distance = diag * 0.25
+            ls.samples = 8
+            ls.ao_blend_type = 'MULTIPLY'
+            ls.use_falloff = False
+        # Only the object itself: the map travels with its material, the neighbours of this scene stay out.
+        for o in sc.objects:
+            if o != ob and not o.hide_render:
+                o.hide_render = True
+                hidden.append(o)
+        for d in uvt.data:
+            d.image = tmp
+        for o in selected:
+            o.select = False
+        ob.select = True
+        sc.objects.active = ob
+        bpy.ops.object.bake_image()
+        px = np.array(tmp.pixels[:], np.float32).reshape(size, size, 4)
+    finally:
+        for o in hidden:
+            o.hide_render = False
+        for d, im in zip(uvt.data, old_images):
+            d.image = im
+        for k, v in saved.items():
+            setattr(r, k, v)
+        if ls_saved:
+            for k, v in ls_saved.items():
+                setattr(world.light_settings, k, v)
+        if temp_world is not None:
+            sc.world = None
+            bpy.data.worlds.remove(temp_world)
+        ob.select = False
+        for o in selected:
+            o.select = True
+        sc.objects.active = active
+        if edit:
+            bpy.ops.object.mode_set(mode='EDIT')
+        bpy.data.images.remove(tmp)
+    if kind == "normal":
+        px[:, :, 1:3] = 1.0 - px[:, :, 1:3]  # Blender Internal writes Y and Z flipped; the maps use +X +Y +Z
+    px[:, :, 3] = 1.0
+    return px
+
+
 def bake(ob, kind, size):
     """RGBA float array (size, size, 4) of the map."""
     import numpy as np
+    if ob.mode == 'EDIT':
+        ob.update_from_editmode()
+    if kind in INTERNAL:
+        lo, hi = _bounds(ob)
+        return _bake_internal(ob, kind, size, max(math.sqrt(sum((h - l) ** 2 for h, l in zip(hi, lo))), 1e-6))
     tris, bvh, lo, hi = _mesh_data(ob)
     diag = max(math.sqrt(sum((h - l) ** 2 for h, l in zip(hi, lo))), 1e-6)
     pos, nor, cur, mask = _rasterize(tris, size, diag * CURV_WIDTH)
@@ -286,7 +394,7 @@ class NODE_OT_glsl_meshmap_bake(Operator):
             for name, kind in params:
                 image = bake_image(ob, kind, int(self.size), "%s_%s" % (ob.name, kind))
                 node["img_" + name] = image
-        except (ValueError, ImportError) as ex:
+        except (ValueError, ImportError, RuntimeError) as ex:
             self.report({'ERROR'}, str(ex))
             return {'CANCELLED'}
         tree.interface_update(context)
