@@ -34,6 +34,8 @@
 #include "BLI_listbase.h"
 #include "BLI_utildefines.h"
 
+#include "BKE_global.h"
+
 #include "RNA_access.h"
 
 #include "bpy_rna.h"
@@ -256,6 +258,12 @@ static PyObject *GPU_export_shader(PyObject *UNUSED(self), PyObject *args, PyObj
 
 	material = (Material *)PyC_RNA_AsPointer(pymat, "Material");
 	if (material == NULL) {
+		return NULL;
+	}
+
+	if (G.background) {
+		/* No OpenGL without a window: building the material would crash. */
+		PyErr_SetString(PyExc_RuntimeError, "export_shader needs a window (OpenGL); it does not work in background mode (-b)");
 		return NULL;
 	}
 
