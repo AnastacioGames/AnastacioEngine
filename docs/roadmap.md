@@ -7,15 +7,16 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Nodes GLSL por arquivo
 
-- Feito 2026-11-11: cabeçalho `@input/@param/@output` no GLSL Script + Add > GLSL Library
-  ([shader-nodes.md](shader-nodes.md#arquivos-de-node-com-cabeçalho-2026-11-11)). Falta aceite com janela do menu.
-- Param `image` feito 2026-11-11 (escolha pela interface testada pelo controle).
-- Param `meshmap` feito 2026-11-11 (mapa assado escolhido no botão; sem bake automático).
-- `in_<nome>(uv)` em outra UV feito 2026-11-11 para Image Texture ligado direto (subgrafo qualquer: futuro).
-- `@shading` feito 2026-11-11 (pares de sockets Albedo/Normal/Roughness/Metallic/Emission/Alpha).
-- Reload do .glsl ao salvar feito 2026-11-11 (Text editado na engine não é sobrescrito).
-- Próximos: mais nós da biblioteca, conferir Web e runtime
-  (`node(Shade c)`), recarregar o .glsl externo ao salvar, mais nodes na biblioteca e build Web conferido.
+- Plano do formato concluído e aprovado com janela em 2026-11-11 ([shader-nodes.md](shader-nodes.md)): cabeçalho
+  `@input/@param/@output`, GLSL Library, params `image`/`meshmap`, `in_<nome>(uv)`, `@shading`, `@surface`,
+  reload do .glsl, `res()`, Node Groups e presets de material em .json, bake dos meshmaps (painel GLSL Mesh Maps,
+  curvatura por quinas; teste em `tools/debug/cenas/medir_meshmap_bake.py`). Runtime e Web conferidos.
+- Limites que ficaram (nenhum impede o uso):
+  - bake ignora modificadores (Bevel/Subdivision); próximo sugerido: assar a malha avaliada;
+  - bake em Python: 1-5 s por mapa de 256 px numa Suzanne; 1024 px em malha grande demora;
+  - imagens de Node Groups/presets .json guardadas só pelo nome (renomear quebra a ligação);
+  - bits de componente em `info.w` da spec não implementados (ninguém usa).
+- `in_<nome>(uv)` em subgrafo qualquer (hoje só Image Texture ligado direto): futuro.
 
 ## Mind Map
 
