@@ -68,6 +68,8 @@ extern "C" {
 #include "CM_RefCount.h"
 
 #include "GPU_glew.h"
+#include "GPU_material.h" // GPU_material_velocity_slot
+#include "RAS_MeshUser.h" // TAA motion: previous object matrices
 
 #include "KX_EngineProfiler.h"
 
@@ -427,6 +429,10 @@ void KX_RenderPipeline::Render()
 		}
 
 		RANGE_PROFILE_MARK_GPU(prof, "render.shadows");
+
+		/* TAA motion: before any pass that draws objects (probes too), so all of them read the
+		 * same previous matrices in this frame. */
+		RAS_MeshUser::NextRenderFrame();
 
 		// Probes, cube maps and the Probe Volume GI grids: their own GPU step in the profile.
 		m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_texturerenderers);
@@ -877,6 +883,17 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 		if (KX_EngineProfiler::Enabled()) {
 			static const int skyId = KX_EngineProfiler::Register("render.sky");
 			KX_EngineProfiler::GpuStamp(skyId);
+		}
+	}
+
+	/* TAA motion target, for every scene (an overlay must not read the motion of the scene
+	 * below): the clear and the sky wrote there too. Zero = no motion, camera reprojection. */
+	{
+		const int velocitySlot = GPU_material_velocity_slot(scene->GetBlenderScene());
+		RAS_OffScreen *bound = RAS_OffScreen::GetLastOffScreen();
+		if (velocitySlot && bound && velocitySlot < bound->GetNumColorSlot()) {
+			static const GLfloat zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			glClearBufferfv(GL_COLOR, velocitySlot, zero);
 		}
 	}
 

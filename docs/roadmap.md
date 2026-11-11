@@ -16,18 +16,16 @@ real e no APK.
 
 ## Track Tool (pistas e vias)
 
-- [Plano](plano-track-tool.md): traçado + perfil em faixas (asfalto, calçada, borda, talude, morro), sweep
-  próprio em blocos, decoração por regra, dado de pista no jogo (`project`, `pointAt`). Etapas F0-F6, nada
-  implementado; protótipo nos scripts `Tools/gerar_cenario_pista.py` e `ajustar_inclinacao_pista.py`
-  do RolimaRacer.
+- [Plano](plano-track-tool.md): F0-F5 implementadas (09718960: gerador por faixas, inclinação, terreno,
+  decoração, prédios e `Range.track` em C++ com testes em `tools/debug/track_tool/`). Faltam o aceite visual
+  com janela e a F6 (cruzamentos e bifurcações).
 - [Light Probe Volumes na pista](plano-track-probes.md): P1-P3 feitas; Pista_4 a 60 fps na RX 6800M. Em andamento:
   luz guardada em `<cena>.probes` (23 de 119 volumes), teste de PC fraco, aceite visual e `.probes` no pacote.
 
 ## Probe Volume GI (luz indireta por grade de sondas)
 
-- [Plano](plano-probe-volume-gi.md): grade automática de sondas num Empty-caixa, captura em rodízio
-  (faces por quadro), só difuso; reflexo continua nas sondas manuais. Etapas F1a, F1b, F2-F4, nada implementado;
-  revisado pelo Codex (C1-C7 aplicados), próximo passo F1a.
+- [Plano](plano-probe-volume-gi.md): F1a-F4 implementadas (2026-11-03, até ccf26bd9). Faltam aceite visual com
+  janela, iGPU real, Chebyshev no High, interruptor em Python, luz no `.cooked` e site.
 
 ## Água realista (estudo do water 0.99)
 
@@ -37,9 +35,11 @@ real e no APK.
 
 ## TAA e upscaling
 
-- [Plano](plano-taa.md). Etapa 1 (TAA com jitter e reprojeção da câmera) implementada em 2026-11-01 e testada
-  só no Linux com renderização por software: falta build Windows, GPU real, custo em ms e um jogo real.
-  Etapa 2 velocity buffer (objetos, GPU skinning, partículas); etapa 3 upscaling.
+- [Plano](plano-taa.md). Etapa 1 (TAA com jitter e reprojeção da câmera) implementada em 2026-11-01.
+  Etapa 2 (movimento por objeto) implementada em 2026-11-11 para objetos rígidos e opacos, medida em cena
+  controlada (`tools/debug/medir_taa_movimento.py`); falta o aceite visual com janela e um jogo real
+  (RolimaRacer com câmera atrás do carro). Ainda sem vetor: GPU skinning, instancing, partículas e
+  deformadores; ligar o TAA pelo Python numa cena que começou sem ele não cria o alvo. Etapa 3: upscaling.
 
 ## Efeitos pré-calculados
 

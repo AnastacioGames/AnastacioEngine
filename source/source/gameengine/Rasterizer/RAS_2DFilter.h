@@ -140,6 +140,7 @@ public:
 		GE_TAA_HISTORY_VIEWPROJ_UNIFORM,
 		GE_TAA_JITTER_UNIFORM,
 		GE_TAA_PARAMS_UNIFORM,
+		GE_TAA_VELOCITY_UNIFORM,
 
 		MAX_PREDEFINED_UNIFORM_TYPE
 	};
@@ -198,6 +199,8 @@ protected:
 	std::vector<std::string> m_allProperties;
 
 	int m_predefinedUniforms[MAX_PREDEFINED_UNIFORM_TYPE];
+	/// TAA: the attachment with the per object motion exists in the depth input (set in BindTextures).
+	bool m_taaVelocityReady = false;
 
 	std::vector<std::string> m_properties;
 	std::vector<unsigned int> m_propertiesLoc;

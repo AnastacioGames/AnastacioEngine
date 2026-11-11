@@ -208,6 +208,8 @@ typedef struct GPUPassStages {
 	bool shadow_pcss;                  /* Some lamp uses PCSS (SHADOW_PCSS) */
 	bool shadow_csm;                   /* Some sun uses cascades (SHADOW_CSM) */
 	bool probe_volume;                 /* Some Empty has a probe_volume (PROBE_VOLUME_GRID) */
+	int velocity_slot;                 /* TAA motion output (GPU_material_velocity_slot), 0 = none */
+	bool velocity_write;               /* Opaque surface: writes its motion, else leaves the buffer as is */
 } GPUPassStages;
 
 GPUPass *GPU_generate_pass(ListBase *nodes, struct GPUNodeLink *outlinks[8],

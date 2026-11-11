@@ -365,6 +365,11 @@ void GPU_material_set_foliage_reference_position(GPUMaterial *material, const fl
 struct Scene *GPU_material_scene(GPUMaterial *material);
 /* First native SSGI color slot, or 0 when disabled/unavailable. Four consecutive slots follow. */
 int GPU_material_ssgi_slot(struct Scene *scene);
+/* TAA motion attachment: world position last frame minus this frame (alpha 1 = valid), 0 = none. */
+int GPU_material_velocity_slot(struct Scene *scene);
+/* Launcher: slot the start scene needs (after user attachments and SSGI), then the one created. */
+int GPU_material_velocity_layout_slot(struct Scene *scene);
+void GPU_material_velocity_layout_set(int slot);
 /* Why Native SSGI was requested but cannot run, or NULL. */
 const char *GPU_material_ssgi_disabled_reason(struct Scene *scene);
 bool GPU_material_ssgi_approximate(struct Scene *scene);
@@ -603,6 +608,8 @@ void GPU_material_bind_probe_grid_atlas(GPUMaterial *material, struct GPUTexture
 void GPU_material_bind_planar(GPUMaterial *material, struct GPUTexture *tex, const float viewproj[16]);
 /* True when the linked shader consumes the Damage node's hit count. */
 bool GPU_material_use_damage(GPUMaterial *material);
+bool GPU_material_use_velocity(GPUMaterial *material);
+void GPU_material_bind_prev_object_matrix(GPUMaterial *material, const float prevobmat[4][4]);
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count);
 
 /* One slot of that same scene-light loop, with the values the fixed-function glLight* calls

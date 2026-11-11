@@ -425,6 +425,15 @@ void BL_BlenderShader::UpdateObjectMatrix(RAS_MeshUser *meshUser, short matPassI
 	GPU_material_bind_uniforms(m_gpuMat, (float (*)[4])mat, rasty->GetViewMatrix().Data(),
 			obcol, meshUser->GetLayer(), 1.0f, nullptr, objectInfo);
 
+	/* TAA motion: the object's matrix of the previous frame. Static batches (vertices already in
+	 * world space) and halo/billboard matrices get "no motion". */
+	if (GPU_material_use_velocity(m_gpuMat)) {
+		const bool own = !meshUser->GetBatchGroup() &&
+		                 memcmp(meshUser->GetMatrix().Data(), mat, sizeof(float) * 16) == 0;
+		GPU_material_bind_prev_object_matrix(m_gpuMat, own ? (const float (*)[4])meshUser->GetPreviousMatrix().Data() :
+		                                                     (const float (*)[4])mat);
+	}
+
 	// Materials without a live Damage uniform do not need a deformer lookup.
 	if (!GPU_material_use_damage(m_gpuMat)) {
 		return;

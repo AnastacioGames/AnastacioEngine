@@ -1260,7 +1260,7 @@ static void codegen_print_scripts(DynStr *ds, ListBase *nodes, ListBase *scripts
 }
 
 static char *code_generate_fragment(ListBase *nodes, const char *usercode, const GPUMatType type, GPUNodeLink *outputs[8],
-                                    bool shell_varying, ListBase *scripts)
+                                    bool shell_varying, ListBase *scripts, int velocity_slot, bool velocity_varying)
 {
 	DynStr *ds = BLI_dynstr_new();
 	char *code;
@@ -1291,6 +1291,13 @@ static char *code_generate_fragment(ListBase *nodes, const char *usercode, const
 				BLI_dynstr_appendf(ds, "layout(location = %d) out vec4 fragData%d;\n", i, i);
 			}
 		}
+		if (velocity_slot && !outputs[velocity_slot]) {
+			BLI_dynstr_appendf(ds, "layout(location = %d) out vec4 fragData%d;\n", velocity_slot, velocity_slot);
+		}
+	}
+	/* TAA motion (docs/plano-taa.md, etapa 2): world position last frame minus this frame. */
+	if (velocity_slot && velocity_varying) {
+		BLI_dynstr_appendf(ds, "%s vec3 varmotion;\n", GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "in" : "varying");
 	}
 
 	const bool use_shell_layer = codegen_uses_node(nodes, "node_shell_layer", GPU_NODE_STAGE_FRAGMENT);
@@ -1348,6 +1355,16 @@ static char *code_generate_fragment(ListBase *nodes, const char *usercode, const
 
 	codegen_declare_tmps(ds, nodes);
 	codegen_call_functions(ds, nodes, outputs);
+
+	if (velocity_slot && !outputs[velocity_slot]) {
+		/* Alpha 1 marks a valid motion. Surfaces without one write zero: alpha blending keeps
+		 * what the opaque surface behind left there. */
+		const char *value = velocity_varying ? "vec4(varmotion, 1.0)" : "vec4(0.0)";
+		if (GPU_CODEGEN_USE_MODERN_QUALIFIERS)
+			BLI_dynstr_appendf(ds, "\tfragData%d = %s;\n", velocity_slot, value);
+		else
+			BLI_dynstr_appendf(ds, "\tgl_FragData[%d] = %s;\n", velocity_slot, value);
+	}
 
 	BLI_dynstr_append(ds, "}\n");
 
@@ -3586,6 +3603,13 @@ GPUPass *GPU_generate_pass(
 		}
 	}
 
+	/* TAA motion output: the varying does not cross a generated geometry stage, so those
+	 * materials write "no motion" and the TAA falls back to the camera reprojection. */
+	const int velocity_slot = (mesh_stages && stages->velocity_slot > 0 && stages->velocity_slot < 8) ?
+	                          stages->velocity_slot : 0;
+	/* Instancing: the instance matrices of the last frame are not kept, so no motion either. */
+	const bool velocity_varying = velocity_slot && stages->velocity_write && !use_geometry && !use_instancing;
+
 	char *vertex_prefix = NULL;
 	GeomVarying *geom_varyings = NULL;
 	int geom_varyings_len = 0, geom_max_vertices = 0;
@@ -3593,10 +3617,13 @@ GPUPass *GPU_generate_pass(
 		geom_varyings = MEM_mallocN(sizeof(GeomVarying) * GEOM_MAX_VARYINGS, "GeomVarying");
 		geom_varyings_len = geom_collect_varyings(nodes, vertcode, use_instancing, geom_varyings);
 	}
-	if (use_geometry || vertex_offset) {
+	if (use_geometry || vertex_offset || velocity_varying) {
 		DynStr *ds = BLI_dynstr_new();
 		if (vertex_offset) {
 			BLI_dynstr_append(ds, "#define USE_VERTEX_NODES\n");
+		}
+		if (velocity_varying) {
+			BLI_dynstr_append(ds, "#define USE_VELOCITY\n");
 		}
 		if (use_geometry) {
 			char *prefix = geom_vertex_prefix(geom_varyings, geom_varyings_len);
@@ -3608,7 +3635,8 @@ GPUPass *GPU_generate_pass(
 	}
 
 	/* generate code and compile with opengl */
-	fragmentcode = code_generate_fragment(nodes, fragcode, type, outlinks, use_shells || use_strands, stages ? stages->scripts : NULL);
+	fragmentcode = code_generate_fragment(nodes, fragcode, type, outlinks, use_shells || use_strands, stages ? stages->scripts : NULL,
+	                                      velocity_slot, velocity_varying);
 	vertexcode = code_generate_vertex(nodes, vertcode, type, use_instancing, vertex_prefix, vertex_offset,
 	                                  stages ? stages->scripts : NULL);
 	if (use_geometry) {

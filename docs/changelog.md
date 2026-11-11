@@ -8,6 +8,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAA etapa 2: movimento por objeto
+
+- Objetos que andam junto com a câmera (carro visto de trás) não borram nem deixam rastro com TAA. Materiais
+  opacos escrevem num alvo extra (RGBA16F) o deslocamento no mundo desde o quadro anterior; o passe TAA soma
+  esse deslocamento à posição reconstruída pela profundidade antes de reprojetar. Detalhes e limites em
+  [plano-taa.md](plano-taa.md#como-ficou-a-etapa-2-2026-11-11).
+- Código: `gpu_codegen.c` (saída `varmotion`, `USE_VELOCITY`), `gpu_shader_vertex.glsl` (`unfprevobmat`),
+  `gpu_material.c` (`GPU_material_velocity_slot`, layout do launcher), `RAS_MeshUser` (matriz do quadro
+  anterior), `BL_BlenderShader`, `KX_RenderPipeline` (contador de quadro e limpeza do alvo), `LA_Launcher`
+  (attachment), `RAS_2DFilter*` e `RAS_TAA2DFilter.glsl` (`TAA_VELOCITY_SLOT`, `ge_TAAVelocity`).
+- Revisado pelo Codex: aceitos a string quebrada, o contador antes das sondas, o layout único para
+  overlays/LibLoad e a limpeza por cena; shaders Python próprios e ligar o TAA durante o jogo ficaram
+  documentados como limites.
+- Medido em cena controlada: pixels do carro que mudam entre parado e andando, 5,7-7,1% só com a câmera
+  contra 0,4% com o vetor (igual a sem TAA). A/B: `RANGE_TAA_VELOCITY_OFF=1`. Falta aceite com janela.
+
 ## 2026-11-11 — Organização dos mapas de código
 
 - Atualizadas as referências de linhas e tamanhos nos mapas de game engine e RNA Object com `tools/check_docs.py --fix`; a verificação passou sem erros ou avisos.

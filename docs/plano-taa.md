@@ -1,6 +1,7 @@
 # Plano: TAA (anti-aliasing temporal) e, depois, upscaling
 
-Estado: etapa 1 implementada (2026-11-01, ver changelog); etapas 2 e 3 abertas.
+Estado: etapa 1 implementada (2026-11-01); etapa 2 implementada para objetos rígidos (2026-11-11, ver
+changelog e "Como ficou a etapa 2"); etapa 3 aberta.
 Uso: Render > TAA no editor, ou `scene.filterManager.taaEnabled = True` / `taaSharpen` no Python.
 Teste: `tools/debug/teste_taa.py` (instruções no topo do arquivo).
 
@@ -58,6 +59,28 @@ cenários parados, carro ou personagem visto de câmera fixa lenta, e para teste
 
 Custo estimado: é a parte mais invasiva, porque mexe no gerador GLSL dos materiais (`gpu_codegen`) e no
 render da cena. Exige teste com materiais legados, nós de shader e instancing.
+
+### Como ficou a etapa 2 (2026-11-11)
+
+O desenho mudou do item 1 acima: em vez de velocidade em pixels, cada material de objeto opaco escreve
+**onde o ponto estava no mundo no quadro anterior, menos onde está agora** (RGBA16F, alpha 1 = válido).
+O TAA já reconstrói a posição no mundo pela profundidade; ele soma esse deslocamento antes de projetar
+com a câmera do histórico. Assim o tratamento de jitter da etapa 1 não mudou.
+
+- Slot: `GPU_material_velocity_slot`, depois dos attachments do usuário e dos 4 do SSGI; o launcher cria o
+  alvo a partir da cena inicial e todas as cenas usam esse layout (`GPU_material_velocity_layout_set`).
+  Desligado no Web/Android.
+- Matriz anterior: `RAS_MeshUser::GetPreviousMatrix`, com um contador por quadro de render
+  (`NextRenderFrame`, antes das sondas). Objeto que não foi desenhado no quadro anterior fica sem movimento.
+- Sem vetor (o TAA usa só a câmera nesses pixels): céu, transparentes, Static Batch, halo/billboard,
+  instancing, estágio de geometria (Fur Shells, Outline...), shaders Python próprios (`BL_Shader`). Skinning e
+  Vertex Offset entram só com o movimento do objeto.
+- O alvo é zerado no começo de cada cena, depois do céu.
+- A/B: `RANGE_TAA_VELOCITY_OFF=1` volta para a etapa 1.
+- Teste: `tools/debug/cenas/criar_cena_taa_movimento.py` + `tools/debug/medir_taa_movimento.py` (runtime no
+  desktop invisível). Pixels do carro que mudam entre parado e andando: sem TAA 0,4%, só câmera 5,7-7,1%,
+  com vetor 0,4%.
+- Limite: `filterManager.taaEnabled = True` numa cena que começou sem TAA não cria o alvo (fica na etapa 1).
 
 ## Etapa 3: upscaling
 

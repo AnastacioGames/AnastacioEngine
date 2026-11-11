@@ -206,7 +206,8 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_TAAHistory", // GE_TAA_HISTORY_UNIFORM
 	"ge_TAAHistoryViewProj", // GE_TAA_HISTORY_VIEWPROJ_UNIFORM
 	"ge_TAAJitter", // GE_TAA_JITTER_UNIFORM
-	"ge_TAAParams" // GE_TAA_PARAMS_UNIFORM
+	"ge_TAAParams", // GE_TAA_PARAMS_UNIFORM
+	"ge_TAAVelocity" // GE_TAA_VELOCITY_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
@@ -545,6 +546,8 @@ void RAS_2DFilter::BindTextures(RAS_OffScreen *depthofs, RAS_OffScreen *colorofs
 			depthofs->BindColorTexture(i, 9 + i);
 		}
 	}
+	m_taaVelocityReady = m_buildInFilters.taa_velocity_slot > 0 &&
+	                     m_buildInFilters.taa_velocity_slot < depthofs->GetNumColorSlot();
 
 	if (m_mipmap && m_predefinedUniforms[RENDERED_TEXTURE_UNIFORM] != -1) {
 		colorofs->MipmapTextures();
@@ -810,6 +813,9 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 		/* Weight of the current frame: still pixels / moving pixels. */
 		const float params[4] = {valid ? 1.0f : 0.0f, m_buildInFilters.taa_sharpen, 0.08f, 0.25f};
 		SetUniformfv(m_predefinedUniforms[GE_TAA_PARAMS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
+		if (m_predefinedUniforms[GE_TAA_VELOCITY_UNIFORM] != -1) {
+			SetUniform(m_predefinedUniforms[GE_TAA_VELOCITY_UNIFORM], m_taaVelocityReady ? 1.0f : 0.0f);
+		}
 	}
 
 	if (m_predefinedUniforms[GE_VFOG_DATA_UNIFORM] != -1) {

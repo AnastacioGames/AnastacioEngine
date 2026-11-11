@@ -67,6 +67,11 @@ private:
 	std::unique_ptr<RAS_Deformer> m_deformer;
 	/// Advances only when data packed into an instancing VBO changes.
 	uint64_t m_instancingVersion;
+	/// TAA motion: matrix drawn in the last rendered frame and the one before it.
+	mt::mat4 m_prevMatrix;
+	mt::mat4 m_lastDrawnMatrix;
+	/// Render frame of m_lastDrawnMatrix, 0 = never drawn.
+	uint64_t m_drawnFrame;
 
 public:
 	RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_Deformer *deformer);
@@ -85,6 +90,11 @@ public:
 	RAS_BatchGroup *GetBatchGroup() const;
 	RAS_Deformer *GetDeformer();
 	uint64_t GetInstancingVersion() const;
+	/** Object matrix of the previous rendered frame (TAA motion). The current matrix when the
+	 * object was not drawn in that frame (new, culled or hidden): no motion rather than a jump. */
+	const mt::mat4& GetPreviousMatrix();
+	/// Once per rendered frame, before the scenes are drawn.
+	static void NextRenderFrame();
 
 	void SetLayer(unsigned int layer);
 	void SetPassIndex(short index);

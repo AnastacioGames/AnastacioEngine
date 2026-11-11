@@ -655,6 +655,10 @@ RAS_2DFilter *RAS_2DFilterManager::EnsureTaaFilter(const BuildInFilters& filters
 	taaData.propertyNames = {};
 	taaData.buildInFilters = filters;
 	taaData.shaderText = datatoc_RAS_TAA2DFilter_glsl;
+	if (filters.taa_velocity_slot > 0) {
+		/* Per object motion (docs/plano-taa.md, etapa 2), read through bgl_DataTextures. */
+		taaData.shaderText = "#define TAA_VELOCITY_SLOT " + std::to_string(filters.taa_velocity_slot) + "\n" + taaData.shaderText;
+	}
 	filter = new RAS_2DFilter(taaData);
 	m_filters[taaData.filterPassIndex] = filter;
 	filter->SetEnabled(false);

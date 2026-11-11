@@ -165,6 +165,8 @@ struct GPUMaterial {
 	int planarteximgloc, planarviewprojloc, planarenabledloc, planarviewloc;
 	/* Damage node hits (unfdamagehits/unfdamagestrength/unfdamagecount), bound per object by GPU_material_bind_damage(). */
 	int damagehitsloc, damagestrengthloc, damagecountloc;
+	/* TAA motion (unfprevobmat), bound per object by GPU_material_bind_prev_object_matrix(). */
+	int prevobmatloc;
 
 	/* unflightsource[i].* (CORE profile only, see GPUSceneLight); -1 when not declared/used. */
 	struct {

@@ -37,6 +37,12 @@ uniform mat4 boneMatrices[MAX_BONES];
 uniform mat4 unfviewmat;
 uniform mat4 unfobmat;
 
+#ifdef USE_VELOCITY
+/* TAA motion (docs/plano-taa.md, etapa 2): object matrix of the last rendered frame. */
+uniform mat4 unfprevobmat;
+out vec3 varmotion;
+#endif
+
 #ifdef USE_CORE_PROFILE
 uniform mat4 unfprojmat;
 uniform mat3 unfnormalmat;
@@ -313,6 +319,12 @@ void main()
 		vertex_nodes(VERTEX, normal, vertex_offset);
 		VERTEX += vertex_offset;
 	}
+#endif
+
+#ifdef USE_VELOCITY
+	/* Rigid motion of the object only: skinning, instancing and vertex offsets use this frame's
+	 * shape in both terms. */
+	varmotion = (unfprevobmat * vec4(VERTEX, 1.0)).xyz - (unfobmat * vec4(VERTEX, 1.0)).xyz;
 #endif
 
 #ifdef USE_CORE_PROFILE

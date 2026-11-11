@@ -46,6 +46,24 @@ static uint64_t NextInstancingVersion()
 	return ++s_instancingVersion;
 }
 
+/// Render thread only. Starts at 1: m_drawnFrame 0 means never drawn.
+static uint64_t s_renderFrame = 1;
+
+void RAS_MeshUser::NextRenderFrame()
+{
+	++s_renderFrame;
+}
+
+const mt::mat4& RAS_MeshUser::GetPreviousMatrix()
+{
+	if (m_drawnFrame != s_renderFrame) {
+		m_prevMatrix = (m_drawnFrame + 1 == s_renderFrame) ? m_lastDrawnMatrix : m_matrix;
+		m_lastDrawnMatrix = m_matrix;
+		m_drawnFrame = s_renderFrame;
+	}
+	return m_prevMatrix;
+}
+
 RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_Deformer *deformer)
 	:m_layer((1 << 20) - 1),
 	m_passIndex(0),
@@ -57,7 +75,8 @@ RAS_MeshUser::RAS_MeshUser(void *clientobj, RAS_BoundingBox *boundingBox, RAS_De
 	m_clientObject(clientobj),
 	m_batchGroup(nullptr),
 	m_deformer(deformer),
-	m_instancingVersion(NextInstancingVersion())
+	m_instancingVersion(NextInstancingVersion()),
+	m_drawnFrame(0)
 {
 	BLI_assert(m_boundingBox);
 	m_boundingBox->AddUser();

@@ -39,6 +39,8 @@ typedef struct BuildInFilters {
 	/* TAA (temporal anti-aliasing, docs/plano-taa.md) */
 	bool useTaa;
 	float taa_sharpen;
+	/* Attachment with the per object motion (GPU_material_velocity_slot), 0 = camera only. */
+	int taa_velocity_slot;
 
 	/* Film Grain (camera lens pass) */
 	bool useGrain;

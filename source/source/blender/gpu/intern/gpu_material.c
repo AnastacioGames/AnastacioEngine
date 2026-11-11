@@ -338,6 +338,11 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 	stages.strand_curvature = material->strand_curvature;
 	stages.explode_factor = material->explode_factor;
 	stages.scripts = &material->scripts;
+	/* TAA motion: object materials of the game only (not the World, lamps or viewport passes). */
+	stages.velocity_slot = (material->ma && material->type == GPU_MATERIAL_TYPE_MESH) ?
+	                       GPU_material_velocity_slot(material->scene) : 0;
+	stages.velocity_write = stages.velocity_slot &&
+	                        ELEM(material->ma->game.alpha_blend, GEMAT_SOLID, GEMAT_CLIP, GEMAT_ALPHA_TO_COVERAGE);
 	{
 		const World *wo = material->scene ? material->scene->world : NULL;
 		const short q = wo ? wo->sky_quality : WO_SKY_QUALITY_AUTO;
@@ -453,6 +458,10 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		if (has_user_vertcode || material->use_vertex_stage) {
 			material->builtins |= GPU_VIEW_MATRIX | GPU_OBJECT_MATRIX;
 		}
+		/* The TAA motion reads unfobmat in the vertex stage. */
+		if (stages.velocity_write) {
+			material->builtins |= GPU_OBJECT_MATRIX;
+		}
 
 		gpu_material_set_attrib_id(material);
 
@@ -566,6 +575,7 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 		material->damagehitsloc = GPU_shader_get_uniform(shader, "unfdamagehits");
 		material->damagestrengthloc = GPU_shader_get_uniform(shader, "unfdamagestrength");
 		material->damagecountloc = GPU_shader_get_uniform(shader, "unfdamagecount");
+		material->prevobmatloc = GPU_shader_get_uniform(shader, "unfprevobmat");
 
 		material->iesinfoloc = GPU_shader_get_uniform(shader, "unfiesinfo");
 		material->iesaxesloc = GPU_shader_get_uniform(shader, "unfiesaxes");
@@ -1253,6 +1263,41 @@ int GPU_material_ssgi_slot(Scene *scene)
         if (scene->gm.attachments[i]) slot = i + 2;
     }
     return slot <= 4 ? slot : 0;
+#endif
+}
+
+/* Slot of the motion target in the game frame buffer, set by the launcher from the start scene:
+ * every scene (overlays, LibLoad) uses that layout, 0 outside the game and when it has none. */
+static int gpu_velocity_layout_slot = 0;
+
+void GPU_material_velocity_layout_set(int slot)
+{
+    gpu_velocity_layout_slot = slot;
+}
+
+int GPU_material_velocity_slot(Scene *scene)
+{
+    if (!scene || !scene->scenefx_settings.use_taa) return 0;
+    return gpu_velocity_layout_slot;
+}
+
+int GPU_material_velocity_layout_slot(Scene *scene)
+{
+#if defined(__EMSCRIPTEN__) || defined(__ANDROID__)
+    /* Web/Android: TAA keeps the camera only reprojection (no extra half float target). */
+    (void)scene;
+    return 0;
+#else
+    if (!scene || !scene->scenefx_settings.use_taa) return 0;
+    /* A/B test: TAA with the camera reprojection only (etapa 1). */
+    if (getenv("RANGE_TAA_VELOCITY_OFF")) return 0;
+    /* After the user attachments (holes kept, see LA_Launcher) and the 4 SSGI buffers. */
+    int slot = 1;
+    for (int i = 0; i < GAME_ATTACHMENT_COUNT; ++i) {
+        if (scene->gm.attachments[i]) slot = i + 2;
+    }
+    if (GPU_material_ssgi_slot(scene)) slot += 4;
+    return slot <= 7 ? slot : 0;
 #endif
 }
 
@@ -6614,6 +6659,19 @@ void GPU_material_bind_planar(GPUMaterial *material, GPUTexture *tex, const floa
 bool GPU_material_use_damage(GPUMaterial *material)
 {
 	return material->pass && material->damagecountloc != -1;
+}
+
+bool GPU_material_use_velocity(GPUMaterial *material)
+{
+	return material->pass && material->prevobmatloc != -1;
+}
+
+void GPU_material_bind_prev_object_matrix(GPUMaterial *material, const float prevobmat[4][4])
+{
+	GPUShader *shader = material->pass ? GPU_pass_shader(material->pass) : NULL;
+	if (shader && material->prevobmatloc != -1) {
+		GPU_shader_uniform_vector(shader, material->prevobmatloc, 16, 1, (const float *)prevobmat);
+	}
 }
 
 void GPU_material_bind_damage(GPUMaterial *material, const float (*hits)[4], const float *strength, int count)

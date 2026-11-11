@@ -345,6 +345,15 @@ void LA_Launcher::InitEngine()
 	RAS_OffScreen::AttachmentList attachments;
 	attachments.push_back({4, hdrTable[gm.hdr]});
 	const int ssgiSlot = GPU_material_ssgi_slot(m_startScene);
+	/* TAA motion target (GPU_material_velocity_slot): materials write there by index. */
+	GPU_material_velocity_layout_set(0);
+	const int velocitySlot = GPU_material_velocity_layout_slot(m_startScene);
+	int userSlots = 0;
+	for (unsigned short i = 0; i < 7; ++i) {
+		if (gm.attachments[i]) {
+			userSlots = i + 1;
+		}
+	}
 	if (const char *reason = GPU_material_ssgi_disabled_reason(m_startScene)) {
 		CM_Warning("Native SSGI is on but disabled: " << reason);
 	}
@@ -353,7 +362,7 @@ void LA_Launcher::InitEngine()
 		if (attach) {
 			attachments.push_back({(unsigned short)attach->size, hdrTable[attach->hdr]});
 		}
-        else if (ssgiSlot && i < ssgiSlot - 1) {
+        else if ((ssgiSlot || velocitySlot) && i < userSlots) {
             /* Keep shader output indices aligned when user attachment slots contain holes. */
             attachments.push_back({4, RAS_Rasterizer::RAS_HDR_HALF_FLOAT});
         }
@@ -366,6 +375,14 @@ void LA_Launcher::InitEngine()
         attachments.push_back({4, RAS_Rasterizer::RAS_HDR_HALF_FLOAT});
         attachments.push_back({4, RAS_Rasterizer::RAS_HDR_HALF_FLOAT});
     }
+	if (velocitySlot && (int)attachments.size() == velocitySlot) {
+		/* World space offset in half float, alpha 1 where a surface wrote its motion. */
+		attachments.push_back({4, RAS_Rasterizer::RAS_HDR_HALF_FLOAT});
+		GPU_material_velocity_layout_set(velocitySlot);
+	}
+	else if (velocitySlot) {
+		CM_Warning("TAA motion target skipped: attachment " << velocitySlot << " expected, " << attachments.size() << " present");
+	}
 
 	// Materiais com blend "Alpha Blend Hashed" (GPU_BLEND_ALPHA_TO_COVERAGE) caem para um
 	// dither por shader (gpu_material.c, shade_dither) quando gm.aasamples <= 1, em vez de
@@ -553,6 +570,9 @@ void LA_Launcher::InitEngine()
 
 void LA_Launcher::ExitEngine()
 {
+	// Editor materials compiled after the game must not write the TAA motion output.
+	GPU_material_velocity_layout_set(0);
+
 #ifdef WITH_PYTHON
 	Texture::FreeAllTextures(nullptr);
 #endif  // WITH_PYTHON

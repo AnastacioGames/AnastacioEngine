@@ -11,8 +11,11 @@
  *  - luma weighted blend (less flicker on small bright details);
  *  - optional sharpen of the current sample (ge_TAAParams.y).
  *
- * Camera motion only: objects moving with the camera (car seen from behind) blur or trail
- * until the velocity buffer (etapa 2). */
+ * Etapa 2: with TAA_VELOCITY_SLOT (RAS_2DFilterManager::EnsureTaaFilter), opaque object
+ * materials write where each pixel was last frame (world offset, alpha 1 = valid) into that
+ * attachment; it is added to the world position before the reprojection, so a car seen from
+ * behind stays sharp. Pixels without it (sky, transparent, instanced, batched, skinned shape)
+ * keep the camera only reprojection. */
 
 #ifdef USE_CORE_PROFILE
 in vec2 texCoordVarying;
@@ -32,6 +35,12 @@ uniform vec4 ge_TAAParams;
 
 uniform mat4 unfinvviewmat;
 uniform mat4 unfinvprojmat;
+
+#ifdef TAA_VELOCITY_SLOT
+uniform sampler2D bgl_DataTextures[7];
+/// 1 when the motion attachment exists in this frame buffer.
+uniform float ge_TAAVelocity;
+#endif
 
 vec3 RGBToYCoCg(vec3 c)
 {
@@ -139,6 +148,15 @@ void main()
 	vec4 view = unfinvprojmat * vec4(depthUV * 2.0 - 1.0, closestDepth * 2.0 - 1.0, 1.0);
 	view /= view.w;
 	vec4 world = unfinvviewmat * view;
+#ifdef TAA_VELOCITY_SLOT
+	if (ge_TAAVelocity > 0.5) {
+		/* MSAA resolve averages valid and empty samples: divide by the coverage. */
+		vec4 offset = texelFetch(bgl_DataTextures[TAA_VELOCITY_SLOT - 1], clamp(texel + closestOffset, ivec2(0), size - 1), 0);
+		if (offset.a > 0.01) {
+			world.xyz += offset.xyz / offset.a;
+		}
+	}
+#endif
 	vec4 prevClip = ge_TAAHistoryViewProj * world;
 	if (prevClip.w <= 0.0) {
 		gl_FragColor = vec4(YCoCgToRGB(current), currentFull.a);
