@@ -506,6 +506,10 @@ static bool BakeAll()
 
 std::string KX_TextureRendererManager::BakedPath() const
 {
+	// The editor's Bake Probes writes to its own file, the saved light stays as it was until the bake ends.
+	if (const char *file = getenv("RANGE_PROBE_VOLUME_FILE")) {
+		return file;
+	}
 	// By scene, next to the game: the Performance Report runs a temporary copy of the file.
 	const std::string& main = KX_GetMainPath();
 	const size_t slash = main.find_last_of("/\\");

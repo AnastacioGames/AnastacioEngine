@@ -98,7 +98,9 @@ Para guardar a luz de uma vez, use **Bake Probes** no painel Light Probe Volume 
 cena numa janelinha com `RANGE_PROBE_VOLUME_BAKE=all`: todos os volumes capturam juntos, sem o limite de 120 m, e o jogo
 fecha sozinho quando termina. O `<cena>.probes` vai para a pasta do projeto, e o export o leva no pacote. A barra de
 progresso conta os volumes prontos, e Esc cancela sem mexer no arquivo anterior. Na cena de teste, 5 volumes a 300 m
-um do outro ficaram prontos em 4 a 17 s.
+um do outro ficaram prontos em 4 a 17 s; a Pista_4 (119 volumes) em ~70 s. A cópia roda na pasta do projeto (scripts e
+LibLoad funcionam) e grava num arquivo temporário (`RANGE_PROBE_VOLUME_FILE`); só um bake completo troca o `.probes`. Sem
+progresso por 2 min, o bake para com erro.
 
 Também dá para guardar jogando: abra o editor com `RANGE_PROBE_VOLUME_BAKE=1` e jogue normalmente. A cada 10 s, os volumes prontos vão para
 `<cena>.probes`, ao lado do jogo. Cada volume recebe uma passada, e a rodada seguinte continua de onde parou. Sem a variável, os

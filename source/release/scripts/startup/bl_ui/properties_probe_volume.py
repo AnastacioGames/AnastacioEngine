@@ -3,6 +3,7 @@
 # edits those: files made by hand keep working and the panel shows them too.
 import math
 import os
+import time
 
 import bpy
 from bpy.types import Operator, Panel
@@ -237,25 +238,30 @@ class SCENE_OT_probe_volume_bake(Operator):
         if not os.path.isfile(runtime):
             self.report({'ERROR'}, "Game runtime not found: %s" % runtime)
             return {'CANCELLED'}
-        # The game runs a copy: unsaved changes are baked too, and it starts from no saved light.
+        # The game runs a copy: unsaved changes are baked too. The copy sits in the project folder, so
+        # scripts, LibLoad and sounds load as in the game. The light goes to a temporary file first.
         self._tempdir = tempfile.mkdtemp(prefix="anastacio_probes_")
-        copy = os.path.join(self._tempdir, "bake.range")
-        if 'FINISHED' not in bpy.ops.wm.save_as_mainfile(filepath=copy, copy=True, relative_remap=True, compress=False):
+        project = os.path.dirname(bpy.data.filepath)
+        self._copy = os.path.join(project, "_bake_probes_%d.range" % os.getpid())
+        if 'FINISHED' not in bpy.ops.wm.save_as_mainfile(filepath=self._copy, copy=True, relative_remap=True,
+                                                         compress=False):
             self._cleanup()
             self.report({'ERROR'}, "Could not save the temporary scene")
             return {'CANCELLED'}
         self._fresh = os.path.join(self._tempdir, context.scene.name + ".probes")
         self._target = probes_path(context.scene)
-        env = dict(os.environ, RANGE_PROBE_VOLUME_BAKE="all")
+        env = dict(os.environ, RANGE_PROBE_VOLUME_BAKE="all", RANGE_PROBE_VOLUME_FILE=self._fresh)
         try:
-            self._process = subprocess.Popen([runtime, "-w", "320", "180", copy], env=env, stdout=subprocess.DEVNULL,
-                                             stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+            self._process = subprocess.Popen([runtime, "-w", "320", "180", self._copy], env=env, cwd=project,
+                                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                             stdin=subprocess.DEVNULL)
         except OSError as ex:
             self._cleanup()
             self.report({'ERROR'}, "Bake Probes failed: %s" % ex)
             return {'CANCELLED'}
         # Progress: the game saves the finished volumes every second.
         self._ready = 0
+        self._progress_time = time.time()
         self._total = sum(1 for o in context.scene.objects if is_volume(o))
         wm = context.window_manager
         self._timer = wm.event_timer_add(0.25, context.window)
@@ -266,6 +272,10 @@ class SCENE_OT_probe_volume_bake(Operator):
     def _cleanup(self):
         import shutil
         shutil.rmtree(self._tempdir, ignore_errors=True)
+        try:
+            os.remove(self._copy)
+        except (OSError, AttributeError):
+            pass
 
     def _finish(self, context):
         wm = context.window_manager
@@ -283,7 +293,17 @@ class SCENE_OT_probe_volume_bake(Operator):
             return {'CANCELLED'}
         if event.type != 'TIMER':
             return {'PASS_THROUGH'}
-        self._ready = probes_count(self._fresh)
+        ready = probes_count(self._fresh)
+        if ready != self._ready:
+            self._ready = ready
+            self._progress_time = time.time()
+        elif self._process.poll() is None and time.time() - self._progress_time > 120.0:
+            # The game left the scene or can't capture (script switched scenes, crash dialog).
+            self._process.kill()
+            self._finish(context)
+            self.report({'ERROR'}, "Bake Probes: no volume finished in 2 minutes, stopped at %d of %d "
+                        "(the saved light was not changed)" % (self._ready, self._total))
+            return {'CANCELLED'}
         if self._total:
             context.window_manager.progress_update(100 * self._ready // self._total)
             if context.area:
@@ -292,7 +312,7 @@ class SCENE_OT_probe_volume_bake(Operator):
             return {'PASS_THROUGH'}
         import shutil
         ok = os.path.isfile(self._fresh) and self._total and self._ready == self._total
-        if os.path.isfile(self._fresh):
+        if ok:
             shutil.copy2(self._fresh, self._target + ".tmp")
             os.replace(self._target + ".tmp", self._target)
         self._finish(context)
