@@ -34,9 +34,9 @@ dt = 1.0 / max(bge.logic.getAverageFrameRate(), 1.0)
 for i, k in enumerate((ev.ONEKEY, ev.TWOKEY, ev.THREEKEY, ev.FOURKEY, ev.FIVEKEY, ev.SIXKEY)):
     if kb[k].activated:
         own.worldPosition = (i * %(sp)f - 7.0, -7.0, 1.7)
-        own['yaw'] = math.radians(-45.0)
+        own['yaw'] = math.radians(45.0)
         print('room', i + 1)
-yaw = own.get('yaw', math.radians(-45.0))
+yaw = own.get('yaw', math.radians(45.0))
 if down(ev.QKEY): yaw += 1.5 * dt
 if down(ev.EKEY): yaw -= 1.5 * dt
 own['yaw'] = yaw
@@ -48,7 +48,7 @@ if down(ev.SKEY): step -= fwd
 if down(ev.AKEY): step += left
 if down(ev.DKEY): step -= left
 own.worldPosition += step * 5.0 * dt
-own.worldOrientation = Vector((math.cos(yaw), math.sin(yaw), -0.15)).to_track_quat('-Z', 'Z').to_matrix()
+own.worldOrientation = Vector((math.cos(yaw), math.sin(yaw), -0.15)).to_track_quat('-Z', 'Y').to_matrix()
 ''' % {'sp': SPACING}
 
 
@@ -112,11 +112,11 @@ for i, (name, color) in enumerate(COLORS):
 bpy.ops.object.lamp_add(type='SUN', location=(0, 0, 40), rotation=(math.radians(35), 0, math.radians(180)))
 sun = bpy.context.object
 sun.name = 'Sun'
-sun.data.energy = 3.0
+sun.data.energy = 1.0
 bpy.ops.object.camera_add(location=(-7, -7, 1.7))
 cam = bpy.context.object
 cam.name = 'Player'
-cam.rotation_euler = (Vector((1, 1, -0.15))).to_track_quat('-Z', 'Z').to_euler()
+cam.rotation_euler = (Vector((1, 1, -0.15))).to_track_quat('-Z', 'Y').to_euler()
 scene.camera = cam
 text = bpy.data.texts.new('move.py')
 text.write(MOVE)
