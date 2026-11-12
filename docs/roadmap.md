@@ -33,12 +33,17 @@ real e no APK.
   decoração, prédios e `Range.track` em C++ com testes em `tools/debug/track_tool/`). Faltam o aceite visual
   com janela e a F6 (cruzamentos e bifurcações).
 - [Light Probe Volumes na pista](plano-track-probes.md): P1-P3 feitas; Pista_4 a 60 fps na RX 6800M. Em andamento:
-  luz guardada em `<cena>.probes` (23 de 119 volumes), teste de PC fraco, aceite visual e `.probes` no pacote.
+  luz guardada em `<cena>.probes` (23 de 119 volumes), teste de PC fraco e aceite visual. O export já leva o
+  `.probes` no pacote (2026-11-11); falta um botão de bake no editor que capture todos os volumes antes de exportar.
 
 ## Probe Volume GI (luz indireta por grade de sondas)
 
 - [Plano](plano-probe-volume-gi.md): F1a-F4 implementadas (2026-11-03, até ccf26bd9). Faltam aceite visual com
-  janela, iGPU real, Chebyshev no High, interruptor em Python, luz no `.cooked` e site.
+  janela, iGPU real, Chebyshev no High, interruptor em Python e site. A luz vai no pacote como `.probes`, ao lado
+  do jogo, em vez de ir no `.cooked`. Granulado do SSAO medido em 2026-11-11 com
+  `tools/debug/cenas/medir_ssao_granulado.py`: grão de 0,14-0,16% e piscar de 0-0,3% (menos de 1 nível de cor
+  em 8 bits). Achado menor: no chão liso o SSAO escurece cerca de 1,5% em faixas largas, visíveis só com a
+  diferença ampliada.
 
 ## Água realista (estudo do water 0.99)
 
