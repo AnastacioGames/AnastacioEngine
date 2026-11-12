@@ -1694,7 +1694,7 @@ RAS_Rasterizer::OverrideShaderType RAS_Rasterizer::BeginOverrideShaderSkinning(c
 
 	const OverrideShaderType previous = m_overrideShader;
 	SetOverrideShader(skinType);
-	GPU_shader_uniform_vector(shader, interface->boneMatricesLoc, 16, std::min(boneCount, GPU_MAX_SKINNING_BONES), boneMatrices);
+	GPU_shader_uniform_vector(shader, interface->boneMatricesLoc, 16, std::min(boneCount, GPU_max_skinning_bones()), boneMatrices);
 	return previous;
 }
 

@@ -323,9 +323,9 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 				}
 				return mats;
 			}();
-			GPU_material_bind_bone_matrices(m_gpuMat, identityPalette.data(), GPU_MAX_SKINNING_BONES);
+			GPU_material_bind_bone_matrices(m_gpuMat, identityPalette.data(), GPU_max_skinning_bones());
 			if (GPU_material_use_prev_bone_matrices(m_gpuMat)) {
-				GPU_material_bind_prev_bone_matrices(m_gpuMat, identityPalette.data(), GPU_MAX_SKINNING_BONES);
+				GPU_material_bind_prev_bone_matrices(m_gpuMat, identityPalette.data(), GPU_max_skinning_bones());
 			}
 
 			if (!m_skinningMismatchWarned) {

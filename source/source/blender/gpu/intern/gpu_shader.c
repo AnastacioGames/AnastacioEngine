@@ -424,7 +424,7 @@ static void gpu_shader_standard_defines(char defines[MAX_DEFINE_LENGTH],
 
 	if (use_skinning) {
 		strcat(defines, "#define USE_SKINNING\n");
-		BLI_snprintf(defines + strlen(defines), MAX_DEFINE_LENGTH - strlen(defines), "#define MAX_BONES %d\n", GPU_MAX_SKINNING_BONES);
+		BLI_snprintf(defines + strlen(defines), MAX_DEFINE_LENGTH - strlen(defines), "#define MAX_BONES %d\n", max_ii(GPU_max_skinning_bones(), 1));
 	}
 
 	if (use_foliage) {
@@ -1474,7 +1474,7 @@ void GPU_shader_bind_instancing_attrib(GPUShader *shader, void *matrixoffset, vo
 static GPUShader *gpu_shader_create_skinning_override(const char *vertexcode, const char *fragcode)
 {
 	char defines[64];
-	BLI_snprintf(defines, sizeof(defines), "#define USE_SKINNING\n#define MAX_BONES %d\n", GPU_MAX_SKINNING_BONES);
+	BLI_snprintf(defines, sizeof(defines), "#define USE_SKINNING\n#define MAX_BONES %d\n", max_ii(GPU_max_skinning_bones(), 1));
 	GPUShader *shader = GPU_shader_create(vertexcode, fragcode, NULL, NULL, defines, 0, 0, 0);
 	if (!shader) {
 		return NULL;

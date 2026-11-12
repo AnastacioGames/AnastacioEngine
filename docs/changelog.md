@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-12 — GPU Skinning: limite de ossos pelo aparelho (celular)
+
+- No celular (WebGL2, Adreno 660, 256 vetores de uniform no vertex shader) os shaders de sombra e de fundo preto do GPU Skinning não linkavam: `mat4 boneMatrices[64]` sozinho já ocupa 256 vetores.
+- `GPU_max_skinning_bones()` (gpu_extensions.c) calcula o limite na inicialização: (vetores − 64) / 8, até 64 (8 = duas paletas de mat4, atual e anterior do TAA). Desktop continua 64; celular com 256 vetores fica com 24. Na Web consulta `GL_MAX_VERTEX_UNIFORM_VECTORS`; no desktop usa componentes / 4 (evita GL_INVALID_ENUM em contexto antigo).
+- `MAX_BONES` dos shaders, o upload da paleta e o `BL_SkinDeformer` usam esse valor; rig acima do limite (ou limite 0) cai para skinning na CPU, com aviso.
+- Testado: `medir_taa_movimento.py --cinza` PASS no desktop (igual ao exe anterior); cena taa_skin e cena TAAU no Chrome do celular sem erro de shader. TAAU Balanced no celular a 67% com histórico em half float.
+
 ## 2026-11-11 — TAAU na Web conferido
 
 - Runtime Web release recompilado com o modo Upscaling; cena `taau_modo.range` empacotada em Off e Balanced (`package-web.py`), Chrome headless (ANGLE D3D11) a 960x540: sem erro de shader, `render.getRenderScale()` 0,67 em Balanced.

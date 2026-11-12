@@ -34,6 +34,7 @@
 #include "GPU_basic_shader.h"
 #include "GPU_draw.h"
 #include "GPU_extensions.h"
+#include "GPU_material.h"
 #include "GPU_glew.h"
 #include "GPU_texture.h"
 
@@ -79,7 +80,19 @@ static struct GPUGlobal {
 	float max_anisotropy;
 	/* Integrated or software renderer, from the GL renderer name (GPU_device_is_integrated). */
 	bool integrated;
+	/* Bone matrices that fit in the vertex uniforms (GPU_max_skinning_bones). */
+	int max_skinning_bones;
 } GG = {1, 0};
+
+/* Bones a skinning shader can hold on this GPU. Each mat4 takes 4 vertex uniform vectors and the
+ * material shader may carry two palettes (current + previous frame for TAA velocity), so budget 8
+ * vectors per bone after reserving 64 for the other matrices. Desktop GL (>= 1024 vectors) keeps
+ * GPU_MAX_SKINNING_BONES; WebGL/GLES phones with 256 vectors get 24, and a rig with more bones
+ * falls back to CPU skinning instead of failing to link. */
+int GPU_max_skinning_bones(void)
+{
+	return GG.max_skinning_bones;
+}
 
 bool GPU_device_is_integrated(void)
 {
@@ -136,6 +149,21 @@ void gpu_extensions_init(void)
 	/* ^-- maybe a bit extreme? */
 
 	glGetIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &GG.maxtextures);
+	{
+		GLint vectors = 0;
+#ifdef __EMSCRIPTEN__
+		/* GLES/WebGL only knows the vector limit; desktop GL always has the component one (and an
+		 * old context would flag the vector query as GL_INVALID_ENUM). */
+		glGetIntegerv(GL_MAX_VERTEX_UNIFORM_VECTORS, &vectors);
+#endif
+		if (vectors <= 0) {
+			GLint components = 0;
+			glGetIntegerv(GL_MAX_VERTEX_UNIFORM_COMPONENTS, &components);
+			vectors = components / 4;
+		}
+		int bones = (vectors > 0) ? (vectors - 64) / 8 : GPU_MAX_SKINNING_BONES;
+		GG.max_skinning_bones = (bones < 0) ? 0 : (bones > GPU_MAX_SKINNING_BONES ? GPU_MAX_SKINNING_BONES : bones);
+	}
 #ifdef __EMSCRIPTEN__
 	/* LEGACY_GL_EMULATION tracks only min(MAX_TEXTURE_IMAGE_UNITS, 28) units; glEnable() with a
 	 * higher active unit throws in its hook (e.g. the Principled shadow maps bound at the top

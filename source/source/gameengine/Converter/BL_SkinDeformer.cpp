@@ -45,6 +45,7 @@
 #include "RAS_MeshUser.h"
 #include "RAS_BoundingBox.h"
 #include "GPU_material.h"
+#include "GPU_extensions.h"
 #include "CM_Message.h"
 
 #include "DNA_armature_types.h"
@@ -290,9 +291,9 @@ bool BL_SkinDeformer::UseGPUSkinning()
 	if (m_gpuSkinState == GPUSkinState::UNCHECKED) {
 		EnsureDfnrToPCCache();
 		Object *armob = m_armobj->GetArmatureObject();
-		if (m_dfnrToPC.size() > GPU_MAX_SKINNING_BONES) {
+		if (GPU_max_skinning_bones() == 0 || m_dfnrToPC.size() > (size_t)GPU_max_skinning_bones()) {
 			CM_Warning("armature \"" << armob->id.name + 2 << "\" deforms mesh \"" << m_bmesh->id.name + 2 << "\" with " <<
-					m_dfnrToPC.size() << " vertex groups, exceeding the GPU skinning budget of " << GPU_MAX_SKINNING_BONES <<
+					m_dfnrToPC.size() << " vertex groups, exceeding the GPU skinning budget of " << GPU_max_skinning_bones() << " on this GPU" <<
 					"; falling back to CPU skinning (RanGE Optimized)");
 			m_gpuSkinState = GPUSkinState::FALLBACK;
 		}
