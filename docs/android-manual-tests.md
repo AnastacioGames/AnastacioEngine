@@ -54,7 +54,7 @@ por CDP, 5 s de aquecimento e 20 s medidos; `--walk` anda). 3 rodadas, mediana. 
 ## Pendente
 
 - O aceite anterior no Chrome foi no OPPO Reno14; estes testes usaram Find X3 Pro e Tab S6 Lite.
-- Perda de contexto WebGL, sessão longa no jogo real.
+- Sessão longa no jogo real. (Perda de contexto WebGL: aviso + Recarregar, aprovado 2026-11-12.)
 
 Apps que seguiam instalados no Find X3 Pro em 2026-09-24: "Pad teste" (`com.anastaciogames.pad`) e First Person
 (`com.anastaciogames.firstperson`).

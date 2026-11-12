@@ -943,6 +943,22 @@ __PERF_SCRIPT__
   el("play").addEventListener("click", tryStart);
   el("vr").addEventListener("click", enterVR);
   el("reload").addEventListener("click", function () { location.reload(); });
+  // Contexto WebGL perdido (GPU reiniciada, celular sem memoria): o runtime nao recria os objetos de GPU, entao
+  // o jogo morria em silencio (canvas com rosto triste, audio tocando). Avisa e oferece recarregar.
+  el("canvas").addEventListener("webglcontextlost", function () {
+    if (!started) return;
+    log("[event] contexto WebGL perdido");
+    el("progress").hidden = true;
+    el("play").hidden = true;
+    el("vr").hidden = true;
+    el("reload").hidden = false;
+    el("status").textContent = "A tela do jogo foi perdida (GPU reiniciada). Recarregue para continuar.";
+    el("overlay").hidden = false;
+    stopTouch();
+    // suspend, nao close: o runtime segue vivo e o audio dele quebrava com "AudioContext is closed".
+    var M = window.Module, ctx = M && ((M.rangeAudio && M.rangeAudio.ctx) || (M.SDL2 && M.SDL2.audioContext));
+    if (ctx && ctx.state === "running") ctx.suspend().catch(function () {});
+  }, false);
 
   // Pre-voo: eventos estruturados do runtime tem precedencia; o parser de console
   // permanece apenas para binarios antigos e caminhos que ainda nao emitem eventos.

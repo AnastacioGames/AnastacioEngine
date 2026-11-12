@@ -29,8 +29,8 @@ Rota nativa (NDK) abandonada em 2026-10-17.
   `targetSdk` exigido (API 36 em 2026-09-20) pela [política](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en).
 - Release 0.5.0 sem `web/android-template` no zip Windows e sem `web/` no tar Linux: corrigido no código; falta
   publicar e rodar o pacote Linux (ver roadmap).
-- Casos ainda sem registro em aparelho (modo avião e bloqueio de tela aprovados em 2026-11-12): perda de contexto
-  WebGL/renderer com recuperação controlada, sessão de 15 min no jogo real (só a cena padrão parada foi medida).
+- Casos ainda sem registro em aparelho (modo avião, bloqueio de tela e perda de contexto WebGL com aviso + Recarregar aprovados em
+  2026-11-12; o runtime não recria a GPU, então não há retomada sem recarregar): renderer com recuperação controlada, sessão de 15 min no jogo real (só a cena padrão parada foi medida).
 - O aceite antigo no Chrome foi no OPPO Reno14; as medidas usaram Find X3 Pro e Tab S6 Lite.
 - Frame do runtime acima de 16,7 ms no Find X3 Pro (custo de CPU por quadro, não WebView): otimização M4.
 - Gamepad físico no Web a reconferir após o patch SDL2.
