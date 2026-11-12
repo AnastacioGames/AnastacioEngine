@@ -134,12 +134,12 @@ int RAS_ICanvas::GetHeight() const
 
 int RAS_ICanvas::GetRenderWidth() const
 {
-	return std::max(1, (int)std::lround(GetWidth() * m_renderScale));
+	return m_fullResolutionOverride ? GetWidth() : std::max(1, (int)std::lround(GetWidth() * m_renderScale));
 }
 
 int RAS_ICanvas::GetRenderHeight() const
 {
-	return std::max(1, (int)std::lround(GetHeight() * m_renderScale));
+	return m_fullResolutionOverride ? GetHeight() : std::max(1, (int)std::lround(GetHeight() * m_renderScale));
 }
 
 int RAS_ICanvas::GetMaxX() const
@@ -318,6 +318,11 @@ void RAS_ICanvas::SetRenderScale(float scale)
 
 	m_renderScale = clampedScale;
 	UpdateOffScreens();
+}
+
+void RAS_ICanvas::SetFullResolutionOverride(bool full)
+{
+	m_fullResolutionOverride = full;
 }
 
 float RAS_ICanvas::GetRenderScale() const

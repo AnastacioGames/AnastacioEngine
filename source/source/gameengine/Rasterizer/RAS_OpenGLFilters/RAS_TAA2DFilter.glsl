@@ -148,8 +148,10 @@ void UpscaleMain()
 			ivec2 texel = base + ivec2(x, y);
 			ivec2 inside = clamp(texel, ivec2(0), size - 1);
 			vec3 c = FetchYCoCg(texel, size);
-			/* Gaussian close to a Blackman-Harris of radius 1 render texel. */
-			vec2 d = vec2(texel) + 0.5 - inPos;
+			/* Gaussian close to a Blackman-Harris of radius 1 window pixel: measured in window
+			 * pixels, so a render texel only counts near where it lands (the jitter moves it over
+			 * the frames and the history fills the rest). */
+			vec2 d = (vec2(texel) + 0.5 - inPos) * (outSize / inSize);
 			float w = exp(-2.29 * dot(d, d));
 			sum += c * w;
 			weightSum += w;

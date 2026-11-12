@@ -80,7 +80,7 @@ O vetor da etapa 2 é deslocamento **em espaço de mundo** (alpha = válido), n�
    `RAS_2DFilterManager::PrepareTaaHistory` para separar as duas resoluções, além de viewport, jitter (Halton com
    fase pela razão de escala) e coordenadas. Invalidar o histórico em resize, corte de câmera, troca de cena e
    mudança de escala.
-2. Definir onde ficam os filtros seguintes e a UI/texto (resolução cheia exige tratar o caminho de desenho deles).
+2. **Filtros seguintes em resolução cheia — feito 2026-11-11** (ver changelog; faltam cena de overlay/HUD e estéreo). Plano original: definir onde ficam os filtros seguintes e a UI/texto (resolução cheia exige tratar o caminho de desenho deles).
 3. Reconstrução com ideias do FSR 2: filtro Lanczos aproximado, dilatação de profundidade/vetor, lock de detalhe
    fino, RCAS no fim (já existe do FSR 1). Crédito MIT no topo dos shaders portados.
 4. Máscara reativa: decidir como produzi-la (transparentes e partículas não escrevem no MRT de velocidade).

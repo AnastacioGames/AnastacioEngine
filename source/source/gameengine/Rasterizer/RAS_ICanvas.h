@@ -191,6 +191,9 @@ public:
 	/// Change only the internal render-target scale; presentation, input and UI retain native canvas size.
 	void SetRenderScale(float scale);
 	float GetRenderScale() const;
+	/** While true, GetRenderWidth/Height report the window size: the 2D filters drawn after the
+	 * temporal upscaling (RAS_2DFilterManager) size their uniforms and buffers for it. */
+	void SetFullResolutionOverride(bool full);
 
 protected:
 	/// Swap interval value of each swap control mode.
@@ -215,6 +218,7 @@ protected:
 	RAS_Rect m_area;
 	int m_viewport[4];
 	float m_renderScale = 1.0f;
+	bool m_fullResolutionOverride = false;
 
 	/* "Smart mouse", responsible for disabling the set mouse position of the entire canvas.
 	Bitmask of RAS_MouseCursorRequester; cursor stays free while any bit is set. */

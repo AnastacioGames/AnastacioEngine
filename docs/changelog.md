@@ -8,6 +8,23 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAAU: efeitos depois dele em resolução cheia (sem exigir TAA como último passe)
+
+- Correção da entrada abaixo: lá o TAAU **não ativava** (um passe desligado depois do TAA quebrava a condição
+  "TAA é o último"); os números medidos eram de TAA reduzido + FSR 1.
+- Agora os passes depois do TAA (lens flare, camera lens, filtros próprios, compositor) rodam no tamanho da
+  janela num ping-pong próprio (`m_taauOfs`/`m_taauOfs2`); `RAS_ICanvas::SetFullResolutionOverride` faz
+  `GetRenderWidth/Height` devolverem o tamanho da janela enquanto isso. FXAA é pulado (o TAAU já suaviza).
+  Profundidade, `bgl_DataTextures` e `bgl_PreviousTexture` continuam na resolução reduzida: leia-as por
+  coordenada normalizada (`texture(uv)`), não por `texelFetch` com pixel da janela (os efeitos da engine já leem
+  assim).
+- Filtro de reconstrução medido em pixels da janela (antes, em texels reduzidos: imagem macia).
+- `RANGE_TAAU_PASSIVE=1`: escala reduzida com TAA comum + FSR 1, para comparar.
+- Medido (`tools/debug/medir_taau.py`, 67%, diferença para o nativo com TAA no retângulo do carro; parado /
+  andando): FSR 1 3,74 / 3,90; TAA + FSR 1 3,32 / 2,71; TAAU 3,07 / 2,32. GPU a 1080p: passe TAAU 1,45 ms
+  (TAA nativo 1,28 ms), mas sem o FSR 1 no fim (1,0 ms) e com a cena a 45% dos pixels.
+- Teste: filtro próprio depois do TAAU desenha linhas de 1 px da janela, e elas saem com 1 px.
+
 ## 2026-11-11 — Upscaling temporal (TAAU): prova de conceito com escala fixa
 
 - `RANGE_TAAU=<escala>` (1 = 67%) renderiza a cena reduzida; com TAA ligado e como último passe, o próprio

@@ -6,6 +6,7 @@ Cena: tools/debug/cenas/criar_cena_taa_movimento.py (carro listrado com a câmer
 listrado). Roda o AnastacioRuntime no desktop invisível do controle.py em três modos:
   nativo   resolução cheia com TAA (referência)
   fsr1     cena reduzida (RANGE_TAAU=<escala>) com TAA desligado: FSR 1 EASU+RCAS no fim
+  taa_fsr1 cena reduzida com TAA na resolução reduzida e FSR 1 no fim (RANGE_TAAU_PASSIVE=1)
   taau     cena reduzida com TAA: o passe TAA amplia com o histórico na resolução da janela
 Para cada modo tira um print parado e outro com o carro andando, e mede a diferença média
 (0-255) para o nativo na mesma situação, mais a fração de pixels com diferença > 40, só no
@@ -63,17 +64,18 @@ def rodar(nome, taa, env):
 modos = {
     'nativo': rodar('nativo', True, {}),
     'fsr1': rodar('fsr1', False, {'RANGE_TAAU': ESCALA}),
+    'taa_fsr1': rodar('taa_fsr1', True, {'RANGE_TAAU': ESCALA, 'RANGE_TAAU_PASSIVE': '1'}),
     'taau': rodar('taau', True, {'RANGE_TAAU': ESCALA}),
 }
-for nome in ('fsr1', 'taau'):
+for nome in ('fsr1', 'taa_fsr1', 'taau'):
     for caso in ('parado', 'andando'):
         ref = cinza(modos['nativo'][caso])
         img = cinza(modos[nome][caso])
         if img.shape != ref.shape:
-            print('TAAU %-6s %-7s tamanho diferente %s x %s' % (nome, caso, img.shape, ref.shape))
+            print('TAAU %-8s %-7s tamanho diferente %s x %s' % (nome, caso, img.shape, ref.shape))
             continue
         dif = np.abs(img - ref)
-        print('TAAU %-6s %-7s dif_media=%.2f pixels_errados=%.2f%%' % (nome, caso, dif.mean(), (dif > 40).mean() * 100))
+        print('TAAU %-8s %-7s dif_media=%.2f pixels_errados=%.2f%%' % (nome, caso, dif.mean(), (dif > 40).mean() * 100))
 print('TAAU prints em', SAIDA)
 
 
@@ -102,9 +104,10 @@ def gpu(nome, taa, env):
                 except ValueError:
                     pass
     partes = ' '.join('%s=%.3f' % (k, v) for k, v in sorted(soma.items()) if 'filter' in k or 'present' in k or 'cameras' in k)
-    print('TAAU GPU %-6s total=%.3f ms (%d médias) %s' % (nome, sum(soma.values()), len(avgs), partes))
+    print('TAAU GPU %-8s total=%.3f ms (%d médias) %s' % (nome, sum(soma.values()), len(avgs), partes))
 
 
 gpu('nativo', True, {})
 gpu('fsr1', False, {'RANGE_TAAU': ESCALA})
+gpu('taa_fsr1', True, {'RANGE_TAAU': ESCALA, 'RANGE_TAAU_PASSIVE': '1'})
 gpu('taau', True, {'RANGE_TAAU': ESCALA})

@@ -130,6 +130,7 @@ RAS_2DFilterManager::~RAS_2DFilterManager()
 	}
 	delete m_taaHistoryOfs;
 	delete m_taauOfs;
+	delete m_taauOfs2;
 }
 
 void RAS_2DFilterManager::SetFrameTime(float time)
@@ -607,18 +608,23 @@ void RAS_2DFilterManager::CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen 
 
 bool RAS_2DFilterManager::EnsureTaauOffScreen(int width, int height)
 {
-	if (m_taauOfs && (int)m_taauOfs->GetWidth() == width && (int)m_taauOfs->GetHeight() == height) {
+	if (m_taauOfs && m_taauOfs2 && (int)m_taauOfs->GetWidth() == width && (int)m_taauOfs->GetHeight() == height) {
 		return true;
 	}
 	delete m_taauOfs;
+	delete m_taauOfs2;
+	m_taauOfs = m_taauOfs2 = nullptr;
 	const RAS_Rasterizer::HdrType hdr = RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT :
 	                                                                      RAS_Rasterizer::RAS_HDR_NONE;
-	m_taauOfs = new RAS_OffScreen(width, height, 0, {{4, hdr}}, RAS_OffScreen::RAS_OFFSCREEN_CUSTOM);
-	if (!m_taauOfs->GetValid()) {
-		delete m_taauOfs;
-		m_taauOfs = nullptr;
-		CM_Warning("TAA upscaling buffer could not be created: plain upscale");
-		return false;
+	for (RAS_OffScreen **ofs : {&m_taauOfs, &m_taauOfs2}) {
+		*ofs = new RAS_OffScreen(width, height, 0, {{4, hdr}}, RAS_OffScreen::RAS_OFFSCREEN_CUSTOM);
+		if (!(*ofs)->GetValid()) {
+			delete m_taauOfs;
+			delete m_taauOfs2;
+			m_taauOfs = m_taauOfs2 = nullptr;
+			CM_Warning("TAA upscaling buffers could not be created: plain upscale");
+			return false;
+		}
 	}
 	m_taaValid = false;
 	return true;
@@ -849,12 +855,16 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	++m_frameInputs.frame;
 	bool usesPrevious = false;
 
-	/* Temporal upscaling (proof of concept, docs/plano-opensource.md item 3): TAA must be the
-	 * last pass, since the passes after it would run at the reduced size; the window size result
-	 * goes straight to the screen (KX_RenderPipeline -> RAS_Rasterizer::DrawOffScreen). */
+	/* Temporal upscaling (docs/plano-opensource.md item 3): the TAA pass draws at the window size,
+	 * the passes after it (lens flare, lens FX, custom filters, compositor) run at the window size
+	 * too, FXAA is skipped (TAA already smooths the edges); the result goes straight to the screen
+	 * (KX_RenderPipeline -> RAS_Rasterizer::DrawOffScreen). */
 	const float renderScale = canvas->GetRenderScale();
-	const bool taau = m_taauAllowed && m_taaAllowed && TaauScale() > 0.0f && renderScale < 0.999f &&
-	                  pend->first == FILTERPASS_TAA && pend->second->Ok() &&
+	RAS_PassTo2DFilter::const_iterator taaIt = m_filters.find(FILTERPASS_TAA);
+	// A/B (tools/debug/medir_taau.py): RANGE_TAAU_PASSIVE=1 keeps the reduced render with plain TAA + FSR 1.
+	static const bool taauPassive = getenv("RANGE_TAAU_PASSIVE") && getenv("RANGE_TAAU_PASSIVE")[0] == '1';
+	const bool taau = !taauPassive && m_taauAllowed && m_taaAllowed && TaauScale() > 0.0f && renderScale < 0.999f &&
+	                  taaIt != m_filters.end() && taaIt->second->Ok() &&
 	                  (canvas->GetRenderWidth() < canvas->GetWidth() || canvas->GetRenderHeight() < canvas->GetHeight());
 	/* Applied at the end: the cameras of this frame already used the current phase count. */
 	const int phases = taau ? std::min(64, std::max(8, (int)std::ceil(8.0f / (renderScale * renderScale)))) : 8;
@@ -888,8 +898,13 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	if (ProfilePassHook) {
 		ProfilePassHook(-1);
 	}
+	// Past the upscaling TAA pass: the passes draw into the window size ping pong.
+	bool fullRes = false;
 	for (auto it = ordered.begin(), end = ordered.end(); it != end; ++it) {
 		RAS_2DFilter *filter = it->second;
+		if (fullRes && it->first == FILTERPASS_FXAA) {
+			continue;
+		}
 		filter->SetFrameInputs(&m_frameInputs);
 
 		/* Assign the previous off screen to the input off screen. At the first render it's the
@@ -928,6 +943,9 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 				break;
 			}
 		}
+		if (fullRes) {
+			ftargetofs = (colorofs == m_taauOfs) ? m_taauOfs2 : m_taauOfs;
+		}
 
 		/* Get the output off screen of the filter, could be the same as the input off screen
 		 * if no modifications were made to the targeted off screen.
@@ -957,12 +975,14 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 				m_taaValid = false;
 			}
 		}
-		if (upscaling) {
+		if (upscaling && previousofs == m_taauOfs) {
+			// From here the canvas reports the window size and the viewport stays at it.
+			fullRes = true;
+			canvas->SetFullResolutionOverride(true);
+		}
+		else if (upscaling) {
 			rasty->SetViewport(0, 0, canvas->GetRenderWidth(), canvas->GetRenderHeight());
 			rasty->SetScissor(0, 0, canvas->GetRenderWidth(), canvas->GetRenderHeight());
-			if (previousofs == m_taauOfs) {
-				m_upscaledOutput = m_taauOfs;
-			}
 		}
 		if (ProfilePassHook) {
 			ProfilePassHook(it->first);
@@ -977,6 +997,13 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		{
 			UpdateCloudHistory(rasty, previousofs, depthofs, viewport);
 		}
+	}
+
+	if (fullRes) {
+		canvas->SetFullResolutionOverride(false);
+		rasty->SetViewport(0, 0, canvas->GetRenderWidth(), canvas->GetRenderHeight());
+		rasty->SetScissor(0, 0, canvas->GetRenderWidth(), canvas->GetRenderHeight());
+		m_upscaledOutput = previousofs;
 	}
 
 	// The last filter doesn't use its own off screen and didn't render to the targeted off screen ?

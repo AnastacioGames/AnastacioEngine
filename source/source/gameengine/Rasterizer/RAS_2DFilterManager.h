@@ -259,6 +259,8 @@ private:
 	bool m_taauAllowed = false;
 	/// Window size output of the upscaling TAA pass (also what the history copies).
 	RAS_OffScreen *m_taauOfs = nullptr;
+	/// Second window size off screen: ping pong for the passes after the upscaling.
+	RAS_OffScreen *m_taauOfs2 = nullptr;
 	RAS_OffScreen *m_upscaledOutput = nullptr;
 
 	/// Jitter of a frame number (Halton 2,3 over 8 frames), in pixels.
