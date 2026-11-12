@@ -1,12 +1,12 @@
 """Acceptance scene for Bake Probes (window test) and for the iGPU test.
 
-Six rooms 200 m apart (beyond the 120 m live-capture range), each with a colored wall, an opening
-in the ceiling and its own Light Probe Volume. Saves probe_bake_aceite.range in the folder given
-after "--".
+Six closed rooms 200 m apart (beyond the 120 m live-capture range). Sun enters only through a
+hole in the ceiling onto a colored rug; walls and ceiling are white and in shadow. Rooms 1, 3, 5 have a
+Light Probe Volume; 2, 4, 6 are the same room without one. Saves probe_bake_aceite.range after "--".
 
 In the game: WASD walks, mouse-free Q/E turn, 1-6 jump to a room, Esc quits.
-What to look for: the floor next to the colored wall takes that color (bounced light). After
-Bake Probes, every room is lit when you jump to it, with no capture "settling".
+What to look for: in 1, 3, 5 the shadowed white walls take the rug color; in 2, 4, 6 they stay gray.
+After Bake Probes the tint is there as soon as you jump to a room, with no capture settling.
 
   AnastacioEngine.exe -b -P criar_cena_probe_bake_aceite.py -- <out_dir>
 """
@@ -20,8 +20,8 @@ out_dir = sys.argv[sys.argv.index('--') + 1]
 os.makedirs(out_dir, exist_ok=True)
 
 SPACING = 200.0
-COLORS = [('Red', (0.8, 0.05, 0.05)), ('Green', (0.05, 0.7, 0.1)), ('Blue', (0.05, 0.15, 0.85)),
-          ('Yellow', (0.85, 0.75, 0.05)), ('Magenta', (0.75, 0.05, 0.7)), ('Cyan', (0.05, 0.7, 0.75))]
+COLORS = [('Red', (0.85, 0.05, 0.03)), ('RedB', (0.85, 0.05, 0.03)), ('Green', (0.05, 0.75, 0.1)),
+          ('GreenB', (0.05, 0.75, 0.1)), ('Blue', (0.05, 0.2, 0.9)), ('BlueB', (0.05, 0.2, 0.9))]
 
 MOVE = '''import bge, math
 from mathutils import Vector
@@ -48,7 +48,7 @@ if down(ev.SKEY): step -= fwd
 if down(ev.AKEY): step += left
 if down(ev.DKEY): step -= left
 own.worldPosition += step * 5.0 * dt
-own.worldOrientation = Vector((math.cos(yaw), math.sin(yaw), -0.15)).to_track_quat('-Z', 'Y').to_matrix()
+own.worldOrientation = Vector((math.cos(yaw), math.sin(yaw), 0.12)).to_track_quat('-Z', 'Y').to_matrix()
 ''' % {'sp': SPACING}
 
 
@@ -73,17 +73,19 @@ def box(name, loc, size, mat):
     ob.data.materials.append(mat)
 
 
-def room(i, white, tint):
+def room(i, white, tint, with_volume):
     x0 = i * SPACING
     box('Floor%d' % i, (x0, 0, -0.1), (10, 10, 0.1), white)
-    box('WallColor%d' % i, (x0, 10, 3), (10, 0.2, 3), tint)
-    box('WallBack%d' % i, (x0, -10, 3), (10, 0.2, 3), white)
-    box('WallL%d' % i, (x0 - 10, 0, 3), (0.2, 10, 3), white)
-    box('WallR%d' % i, (x0 + 10, 0, 3), (0.2, 10, 3), white)
-    # Ceiling with an opening so the sun reaches the colored wall side of the floor.
-    box('CeilA%d' % i, (x0, -5, 6.1), (10, 5, 0.1), white)
-    box('CeilB%d' % i, (x0 - 6, 5, 6.1), (4, 5, 0.1), white)
-    box('Block%d' % i, (x0 + 4, -4, 0.75), (0.75, 0.75, 0.75), white)
+    box('Rug%d' % i, (x0, 0, 0.01), (3.5, 3.5, 0.02), tint)
+    for name, loc, size in (('N', (0, 10, 3), (10, 0.2, 3)), ('S', (0, -10, 3), (10, 0.2, 3)),
+                            ('W', (-10, 0, 3), (0.2, 10, 3)), ('E', (10, 0, 3), (0.2, 10, 3))):
+        box('Wall%s%d' % (name, i), (x0 + loc[0], loc[1], loc[2]), size, white)
+    # Closed ceiling with a 6 x 6 m hole right above the rug: only the rug gets sun.
+    for name, loc, size in (('N', (0, 6.5, 6.1), (10, 3.5, 0.1)), ('S', (0, -6.5, 6.1), (10, 3.5, 0.1)),
+                            ('W', (-6.5, 0, 6.1), (3.5, 3, 0.1)), ('E', (6.5, 0, 6.1), (3.5, 3, 0.1))):
+        box('Ceil%s%d' % (name, i), (x0 + loc[0], loc[1], loc[2]), size, white)
+    if not with_volume:
+        return
     bpy.ops.object.add(type='EMPTY', location=(x0, 0, 3))
     vol = bpy.context.object
     vol.name = 'PV_Room%d' % (i + 1)
@@ -103,20 +105,21 @@ gs.use_shading_nodes = True
 gs.resolution_x, gs.resolution_y = 1280, 720
 w = bpy.data.worlds.new('Sky')
 scene.world = w
-w.horizon_color = (0.5, 0.65, 0.9)
-w.zenith_color = (0.2, 0.35, 0.8)
+w.horizon_color = (0.05, 0.06, 0.08)
+w.zenith_color = (0.03, 0.04, 0.07)
 w.mist_settings.use_mist = False
 white = material('White', (0.75, 0.75, 0.75))
 for i, (name, color) in enumerate(COLORS):
-    room(i, white, material(name, color))
-bpy.ops.object.lamp_add(type='SUN', location=(0, 0, 40), rotation=(math.radians(35), 0, math.radians(180)))
+    # Odd rooms (2, 4, 6) repeat the previous one without a volume: the A/B comparison.
+    room(i, white, material(name, color), with_volume=(i % 2 == 0))
+bpy.ops.object.lamp_add(type='SUN', location=(0, 0, 40), rotation=(math.radians(10), 0, 0))
 sun = bpy.context.object
 sun.name = 'Sun'
-sun.data.energy = 1.0
-bpy.ops.object.camera_add(location=(-7, -7, 1.7))
+sun.data.energy = 3.0
+bpy.ops.object.camera_add(location=(-8.5, -8.5, 1.7))
 cam = bpy.context.object
 cam.name = 'Player'
-cam.rotation_euler = (Vector((1, 1, -0.15))).to_track_quat('-Z', 'Y').to_euler()
+cam.rotation_euler = (Vector((1, 1, 0.12))).to_track_quat('-Z', 'Y').to_euler()
 scene.camera = cam
 text = bpy.data.texts.new('move.py')
 text.write(MOVE)
