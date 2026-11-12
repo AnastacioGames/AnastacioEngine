@@ -159,6 +159,7 @@ INDEX_TEMPLATE = """<!DOCTYPE html>
     <div id="status">Carregando...</div>
     <button id="play" disabled>Jogar</button>
     <button id="vr" disabled hidden>Entrar em VR</button>
+    <button id="reload" hidden>Recarregar pagina</button>
     <div id="error" hidden></div>
     <div id="gpu"></div>
   </div>
@@ -897,9 +898,14 @@ __PERF_SCRIPT__
       if (window.RangeAndroid && window.RangeAndroid.exit) { window.RangeAndroid.exit(); return; }
       el("progress").hidden = true;
       el("play").hidden = true;
-      el("status").textContent = "Jogo encerrado. Recarregue a pagina para jogar de novo.";
+      el("vr").hidden = true;
+      el("reload").hidden = false;
+      el("status").textContent = "Jogo encerrado.";
       el("overlay").hidden = false;
       stopTouch();
+      // O runtime parou, mas o Web Audio seguia tocando o ultimo som (ex.: chuva em loop).
+      var M = window.Module, ctx = M && ((M.rangeAudio && M.rangeAudio.ctx) || (M.SDL2 && M.SDL2.audioContext));
+      if (ctx && ctx.state !== "closed") ctx.close().catch(function () {});
     },
     onRuntimeInitialized: function () {
       if (pf) pf.runtimeInitialized = true;
@@ -936,6 +942,7 @@ __PERF_SCRIPT__
   }
   el("play").addEventListener("click", tryStart);
   el("vr").addEventListener("click", enterVR);
+  el("reload").addEventListener("click", function () { location.reload(); });
 
   // Pre-voo: eventos estruturados do runtime tem precedencia; o parser de console
   // permanece apenas para binarios antigos e caminhos que ainda nao emitem eventos.
