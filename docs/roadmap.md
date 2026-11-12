@@ -24,8 +24,8 @@ Versão 1 (etapas 1-6 de [plano-mind-map.md](plano-mind-map.md)) aguardando acei
 
 ## Microfone
 
-Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Desktop aprovado com microfone físico; Web testada em Chrome com microfone simulado. APK aprovado no Find X3 Pro
-em 2026-11-12 (permissão, gravar, tocar, efeitos); falta aceite no navegador real.
+Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Desktop aprovado com microfone físico; Web testada em Chrome com microfone simulado. APK e Chrome do celular
+aprovados no Find X3 Pro em 2026-11-12 (permissão, gravar, tocar, efeitos).
 
 ## Track Tool (pistas e vias)
 
