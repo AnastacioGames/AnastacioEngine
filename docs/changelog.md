@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAAU: transparências medidas, máscara reativa adiada
+
+- Cena `tools/debug/cenas/criar_cena_taau_transparente.py` (cubo vermelho Alpha Blend ~7 px/quadro) e medidor `tools/debug/medir_taau_transparente.py` (pixels de tinta fraca = rastro do histórico).
+- 960x540, média de 6 prints, rastro (px): alpha 0,5 — sem TAA 0, TAA 595, TAAU 790 (cubo ~50 mil px); alpha 0,2 — 652 / 616 / 848; partícula aditiva pequena sobre fundo preto — 0 / 70 / 214 (cubo ~3,6 mil px, é a borda suavizada). Sem rastro visível em nenhum caso: o corte do histórico pela caixa de variância já segura.
+- Máscara reativa (transparentes marcarem o pixel para o TAA usar menos histórico) fica adiada; refazer a medição se aparecer rastro em fumaça ou textura com UV animada.
+
 ## 2026-11-11 — TAAU: RCAS na apresentação
 
 - A imagem do TAAU (já no tamanho da janela) vai para a tela pelo RCAS do FSR 1, com a mesma força (`RANGE_FSR_SHARP`); `RANGE_TAAU_RCAS=0` desliga para A/B. Sem EASU: a ampliação já foi feita pelo TAA.
