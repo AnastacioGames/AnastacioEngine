@@ -1991,6 +1991,11 @@ typedef struct CutsceneSequence {
 	ListBase events;
 } CutsceneSequence;
 
+/* CutsceneSequence.flag */
+enum {
+	CUTSCENE_SEQUENCE_PLAY_ON_START = (1 << 0),
+};
+
 typedef struct CutsceneSettings {
 	ListBase sequences;
 	int active_sequence;

@@ -2863,7 +2863,11 @@ static void BL_ConvertCutscene(KX_Scene *kxscene, Scene *blenderscene, const BL_
 	}
 
 	KX_CutsceneManager::Sequences sequences;
+	int startIndex = -1;
 	LISTBASE_FOREACH (const CutsceneSequence *, blenderSequence, &settings->sequences) {
+		if (startIndex == -1 && (blenderSequence->flag & CUTSCENE_SEQUENCE_PLAY_ON_START)) {
+			startIndex = static_cast<int>(sequences.size());
+		}
 		KX_CutsceneManager::Sequence sequence;
 		sequence.m_name = blenderSequence->name;
 
@@ -2895,6 +2899,10 @@ static void BL_ConvertCutscene(KX_Scene *kxscene, Scene *blenderscene, const BL_
 	}
 
 	kxscene->SetCutsceneManager(std::unique_ptr<KX_CutsceneManager>(new KX_CutsceneManager(std::move(sequences))));
+	/* Play on Start: the first marked sequence starts with the scene, same as scene.play_cutscene(i). */
+	if (startIndex != -1) {
+		kxscene->GetCutsceneManager()->Start(startIndex);
+	}
 }
 
 /// Convert blender objects into ketsji gameobjects.

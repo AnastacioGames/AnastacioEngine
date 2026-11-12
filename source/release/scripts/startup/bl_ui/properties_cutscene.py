@@ -100,6 +100,9 @@ class CUTSCENE_PT_sequences(CutsceneButtonsPanel, Panel):
         move_down.index = sequence_index
         move_down.direction = 'DOWN'
 
+        if 0 <= sequence_index < len(settings.sequences):
+            layout.prop(settings.sequences[sequence_index], "play_on_start", icon='PLAY')
+
 
 class CUTSCENE_PT_events(CutsceneButtonsPanel, Panel):
     bl_label = "Cutscene Events"

@@ -22,7 +22,7 @@ A gravação não cria evento sozinha; o evento nasce do botão **Add to Cutscen
 3. Abra **Cutscene Sequences**. Esperado: existe uma sequência, e nela um evento Play Take com o nome do Take.
 4. Clique duas vezes no Take e renomeie para `Intro`. Esperado: o evento passa a usar `Intro`.
 5. Grave um segundo Take e use **Add to Cutscene** de novo. Esperado: o evento entra depois do primeiro.
-6. Toque a cutscene no jogo. Esperado: os atores repetem a gravação.
+6. Aperte `P`. Esperado: os atores repetem a gravação (Add to Cutscene liga **Play on Start** na sequência).
 
 ## 3. Pular e parar a cutscene
 

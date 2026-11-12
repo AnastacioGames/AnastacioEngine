@@ -125,8 +125,8 @@ class FILEBROWSER_HT_header(Header):
             if params:
                 row = layout.row(align=True)
                 row.scale_x = 1.5
-                for tab, text, icon in (('GROUP', "Scenery", 'GROUP'),
-                                        ('OBJECT', "Characters", 'OBJECT_DATA'),
+                for tab, text, icon in (('GROUP', "Scenery", 'WORLD'),
+                                        ('OBJECT', "Characters", 'POSE_HLT'),
                                         ('ACTION', "Actions", 'ACTION')):
                     row.operator("file.rec_studio_tab", text=text, icon=icon,
                                  depress=params.filter_id == {tab}).tab = tab

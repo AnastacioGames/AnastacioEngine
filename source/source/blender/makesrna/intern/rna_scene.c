@@ -7995,6 +7995,11 @@ static void rna_def_cutscene_sequence(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Cutscene ID", "Numeric ID grouping this sequence within the scene, matching the old addon's IDCutscene");
 	RNA_def_property_update(prop, NC_SCENE, NULL);
 
+	prop = RNA_def_property(srna, "play_on_start", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", CUTSCENE_SEQUENCE_PLAY_ON_START);
+	RNA_def_property_ui_text(prop, "Play on Start", "Play this sequence as soon as the game starts, without a script");
+	RNA_def_property_update(prop, NC_SCENE, NULL);
+
 	prop = RNA_def_property(srna, "events", PROP_COLLECTION, PROP_NONE);
 	RNA_def_property_collection_sdna(prop, NULL, "events", NULL);
 	RNA_def_property_struct_type(prop, "CutsceneEvent");

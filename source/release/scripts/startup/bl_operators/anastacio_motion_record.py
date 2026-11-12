@@ -110,6 +110,9 @@ class SCENE_OT_rec_take_to_cutscene(Operator):
         event.name = take.name
         event.take_name = take.name
         event.time = start
+        # Without a script nothing starts the sequence: the first take makes it play with the game.
+        if not any(seq.play_on_start for seq in settings.sequences):
+            sequence.play_on_start = True
         self.report({'INFO'}, "%s added to %s at %.1f s" % (take.name, sequence.name, start))
         return {'FINISHED'}
 
