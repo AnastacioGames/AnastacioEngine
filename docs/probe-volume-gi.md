@@ -108,7 +108,6 @@ volumes presentes no arquivo não capturam e ignoram World, sol e objetos movido
 
 - Mudou a caixa: aquele volume volta a capturar, com aviso. Mudou só o cenário: apague o arquivo e capture de novo.
 - A luz é fixa: não acompanha clima nem horário.
-- O arquivo ainda não entra no pacote exportado.
 
 ## Depuração
 
