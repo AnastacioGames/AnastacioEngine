@@ -1,6 +1,6 @@
 """Prova de conceito do upscaling temporal (docs/plano-opensource.md item 3) sem abrir janela na tela.
 
-    python tools/debug/medir_taau.py [cena.range] [escala]
+    python tools/debug/medir_taau.py [cena.range] [escala] [--hud]
 
 Cena: tools/debug/cenas/criar_cena_taa_movimento.py (carro listrado com a câmera presa atrás, chão
 listrado). Roda o AnastacioRuntime no desktop invisível do controle.py em três modos:
@@ -13,6 +13,8 @@ Para cada modo tira um print parado e outro com o carro andando, e mede a difere
 retângulo do carro (parado na tela; o chão anda e muda de fase conforme o instante do print).
 Depois mede o tempo de GPU por etapa (RANGE_PROFILE, ~10 s por modo, carro andando) e imprime a
 soma das etapas e as de filtro/apresentação.
+--hud (cena de tools/debug/cenas/criar_cena_taau_hud.py): mede também o retângulo do HUD (texto e
+moldura fina, cena overlay), que com o TAAU deve sair igual ao nativo; e pula a medição de GPU.
 Imprime "TAAU ..." por modo. Prints ao lado da cena.
 """
 
@@ -26,18 +28,23 @@ RAIZ = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(RAIZ / 'tools/testes_engine'))
 import controle  # noqa: E402
 
-CENA = Path(sys.argv[1] if len(sys.argv) > 1 else RAIZ / 'artifacts/testes/taau/taau.range').resolve()
-ESCALA = sys.argv[2] if len(sys.argv) > 2 else '0.67'
+HUD = '--hud' in sys.argv
+ARGS = [a for a in sys.argv[1:] if not a.startswith('--')]
+CENA = Path(ARGS[0] if ARGS else RAIZ / 'artifacts/testes/taau/taau.range').resolve()
+ESCALA = ARGS[1] if len(ARGS) > 1 else '0.67'
 SAIDA = CENA.parent
 
 
 CAIXA = (0.38, 0.32, 0.62, 0.80)  # carro, frações da janela (como medir_taa_movimento.py)
 
 
-def cinza(arquivo):
+CAIXA_HUD = (0.01, 0.02, 0.40, 0.09)  # texto do HUD, sobre o céu
+
+
+def cinza(arquivo, caixa=CAIXA):
     img = np.asarray(Image.open(arquivo).convert('L'), dtype=np.float32)
     h, w = img.shape
-    return img[int(CAIXA[1] * h):int(CAIXA[3] * h), int(CAIXA[0] * w):int(CAIXA[2] * w)]
+    return img[int(caixa[1] * h):int(caixa[3] * h), int(caixa[0] * w):int(caixa[2] * w)]
 
 
 def rodar(nome, taa, env):
@@ -76,7 +83,12 @@ for nome in ('fsr1', 'taa_fsr1', 'taau'):
             continue
         dif = np.abs(img - ref)
         print('TAAU %-8s %-7s dif_media=%.2f pixels_errados=%.2f%%' % (nome, caso, dif.mean(), (dif > 40).mean() * 100))
+        if HUD:
+            dh = np.abs(cinza(modos[nome][caso], CAIXA_HUD) - cinza(modos['nativo'][caso], CAIXA_HUD))
+            print('TAAU %-8s %-7s HUD dif_media=%.2f pixels_errados=%.2f%%' % (nome, caso, dh.mean(), (dh > 40).mean() * 100))
 print('TAAU prints em', SAIDA)
+if HUD:
+    sys.exit(0)
 
 
 def gpu(nome, taa, env):

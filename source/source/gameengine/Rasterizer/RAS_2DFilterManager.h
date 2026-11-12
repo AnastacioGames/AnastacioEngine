@@ -168,6 +168,8 @@ public:
 	 * the last pass, the TAA pass draws at the window size into its own off screen. Allowed only
 	 * for a single scene drawn once (no overlay scene, no per eye stereo): set by the pipeline. */
 	void SetTaauAllowed(bool allowed);
+	/// True when at least one pass would draw (RenderFilters() would not discard).
+	bool HasActiveFilters() const;
 	/** The window size result of the last RenderFilters() when it upscaled, else nullptr.
 	 * Valid until the next RenderFilters() of this manager. */
 	RAS_OffScreen *GetUpscaledOutput() const;

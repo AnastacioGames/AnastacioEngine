@@ -1276,7 +1276,9 @@ void KX_KetsjiEngine::GetSceneViewport(KX_Scene *scene, KX_Camera *cam, const RA
 		area = cam->UpdateViewport(displayArea);
 		/* A viewport set in window pixels (camera.setViewport) does not follow the render scale,
 		 * which renders into a smaller off screen; scale it so the camera keeps its window region. */
-		const float scale = m_canvas->GetRenderScale();
+		/* Render / window ratio, not the render scale: overlay scenes over the temporal upscaling
+		 * draw at the window size (RAS_ICanvas::SetFullResolutionOverride). */
+		const float scale = (m_canvas->GetWidth() > 0) ? (float)m_canvas->GetRenderWidth() / (float)m_canvas->GetWidth() : 1.0f;
 		if (!cam->GetCameraData()->m_useViewportRatios && scale < 1.0f) {
 			area = RAS_Rect((int)(area.GetLeft() * scale), (int)(area.GetRight() * scale),
 			                (int)(area.GetBottom() * scale), (int)(area.GetTop() * scale));

@@ -125,6 +125,12 @@ KX_RenderPipeline::KX_RenderPipeline(KX_KetsjiEngine *engine)
 {
 }
 
+KX_RenderPipeline::~KX_RenderPipeline()
+{
+	delete m_taauSceneOfs;
+	delete m_taauSceneResolve;
+}
+
 /* Volumetric Fog per frame data (layout in gpu_shader_vfog_lib.glsl): World settings, the sun,
  * the strongest Point/Spot lamps around the camera, up to 2 Spot shadow maps for the light
  * shafts and up to 4 Fog Volumes (objects with the game property "fog_volume"). */
@@ -474,6 +480,19 @@ void KX_RenderPipeline::Render()
 			// Clear off screen only before the first scene render.
 			rasterizer->Clear(RAS_Rasterizer::RAS_COLOR_BUFFER_BIT | RAS_Rasterizer::RAS_DEPTH_BUFFER_BIT);
 
+			/* Temporal upscaling (RANGE_TAAU) of the first scene: overlay scenes (HUD) are then drawn
+			 * over the window size image. Their own 2D filters would need the window size filter
+			 * buffers: with any active, the frame keeps the plain upscale. */
+			bool overlaysOk = !renderData.m_renderPerEye;
+			for (unsigned short i = 1; i < frameData.m_sceneDataList.size(); ++i) {
+				KX_2DFilterManager *overlayFilters = frameData.m_sceneDataList[i].m_scene->Get2DFilterManager();
+				if (overlayFilters && overlayFilters->HasActiveFilters()) {
+					overlaysOk = false;
+				}
+			}
+			// Set once the first scene upscaled: the next scenes draw at the window size.
+			bool windowSize = false;
+
 			// for each scene, call the proceed functions
 			for (unsigned short i = 0, size = frameData.m_sceneDataList.size(); i < size; ++i) {
 				const KX_SceneRenderData& sceneFrameData = frameData.m_sceneDataList[i];
@@ -481,6 +500,26 @@ void KX_RenderPipeline::Render()
 
 				const bool isfirstscene = (i == 0);
 				const bool islastscene = (i == (size - 1));
+
+				if (windowSize) {
+					scene->GetWorldInfo()->UpdateWorldSettings(rasterizer);
+					rasterizer->SetAuxilaryClientInfo(scene);
+					for (const KX_CameraRenderData& cameraFrameData : sceneFrameData.m_cameraDataList) {
+						// Area and viewport again, now from the window size (the canvas reports it).
+						KX_CameraRenderData windowData(cameraFrameData);
+						const RAS_Rect displayArea = rasterizer->GetRenderArea(canvas, windowData.m_stereoMode, windowData.m_eye);
+						m_engine->GetSceneViewport(scene, windowData.m_renderCamera, displayArea, windowData.m_area, windowData.m_viewport);
+						windowData.m_renderCamera->UpdateView(rasterizer, scene, windowData.m_stereoMode, windowData.m_eye,
+						                                      windowData.m_viewport, windowData.m_area);
+						RenderCamera(scene, windowData, m_taauSceneOfs, pass++, false);
+					}
+					RANGE_PROFILE_MARK_GPU(prof, "render.cameras");
+					/* No 2D filter here: one turned on during this frame (world clouds or lens flare,
+					 * Camera FX, set up in PostRenderScene) is skipped once, and the next frame sees
+					 * it in overlaysOk and keeps the plain upscale. Debug draw and Python post draw. */
+					PostRenderScene(scene, m_taauSceneOfs, m_taauSceneOfs, true);
+					continue;
+				}
 
 				// pass the scene's worldsettings to the rasterizer
 				scene->GetWorldInfo()->UpdateWorldSettings(rasterizer);
@@ -519,15 +558,50 @@ void KX_RenderPipeline::Render()
 				 * into the reduced image after it, and per eye stereo has two images. */
 				KX_2DFilterManager *sceneFilters = scene->Get2DFilterManager();
 				if (sceneFilters) {
-					sceneFilters->SetTaauAllowed(size == 1 && !renderData.m_renderPerEye);
+					sceneFilters->SetTaauAllowed(isfirstscene && !renderData.m_renderPerEye && (size == 1 || overlaysOk));
 				}
 				// Render filters and get output off screen.
 				offScreen = PostRenderScene(scene, offScreen, canvas->GetOffScreen(target));
 				frameData.m_ofsType = offScreen->GetType();
-				upscaled = (sceneFilters && islastscene && !renderData.m_renderPerEye) ? sceneFilters->GetUpscaledOutput() : nullptr;
+				upscaled = (sceneFilters && !renderData.m_renderPerEye) ? sceneFilters->GetUpscaledOutput() : nullptr;
+				if (upscaled && !islastscene) {
+					// Overlay scenes follow: copy the upscaled image into a window size scene buffer.
+					if (!m_taauSceneOfs || (int)m_taauSceneOfs->GetWidth() != canvas->GetWidth() ||
+					    (int)m_taauSceneOfs->GetHeight() != canvas->GetHeight())
+					{
+						delete m_taauSceneOfs;
+						delete m_taauSceneResolve;
+						m_taauSceneResolve = nullptr;
+						m_taauSceneOfs = canvas->NewWindowSizeOffScreen(true);
+						if (m_taauSceneOfs && m_taauSceneOfs->GetSamples() > 0) {
+							m_taauSceneResolve = canvas->NewWindowSizeOffScreen(false);
+							if (!m_taauSceneResolve) {
+								delete m_taauSceneOfs;
+								m_taauSceneOfs = nullptr;
+							}
+						}
+					}
+					if (m_taauSceneOfs) {
+						canvas->SetFullResolutionOverride(true);
+						rasterizer->SetViewport(0, 0, canvas->GetWidth(), canvas->GetHeight());
+						rasterizer->SetScissor(0, 0, canvas->GetWidth(), canvas->GetHeight());
+						m_taauSceneOfs->Bind();
+						rasterizer->DrawOffScreen(upscaled, m_taauSceneOfs);
+						rasterizer->Clear(RAS_Rasterizer::RAS_DEPTH_BUFFER_BIT);
+						upscaled = m_taauSceneOfs;
+						windowSize = true;
+					}
+					else {
+						upscaled = nullptr; // the overlays still draw into the reduced image
+					}
+				}
 
 				RANGE_PROFILE_MARK_GPU(prof, "render.filters");
 			}
+			if (windowSize && m_taauSceneResolve) {
+				upscaled = m_taauSceneOfs->Blit(m_taauSceneResolve, false, 1);
+			}
+			canvas->SetFullResolutionOverride(false);
 		}
 
 		canvas->SetViewPort(0, 0, width, height);
@@ -1006,7 +1080,7 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 /*
  * To run once per scene
  */
-RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs)
+RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, bool skipFilters)
 {
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_filters2d);
 
@@ -1296,7 +1370,7 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 		static const int setupId = KX_EngineProfiler::Register("filter.setup");
 		KX_EngineProfiler::GpuStamp(setupId);
 	}
-	RAS_OffScreen *offScreen = scene->Render2DFilters(rasterizer, canvas, inputofs, targetofs, sunPos);
+	RAS_OffScreen *offScreen = skipFilters ? inputofs : scene->Render2DFilters(rasterizer, canvas, inputofs, targetofs, sunPos);
 
 	m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_rasterizer);
 

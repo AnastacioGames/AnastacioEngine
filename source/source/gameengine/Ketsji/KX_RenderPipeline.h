@@ -124,6 +124,10 @@ class KX_RenderPipeline
 	/// Per-frame cache of visible objects already culled+LOD'd for a given (cullingcam, eye),
 	/// cleared at the start of every Render() call.
 	std::vector<std::pair<std::pair<KX_Camera *, RAS_Rasterizer::StereoEye>, std::vector<KX_GameObject *> > > m_visibleMeshCache;
+	/// Window size color + depth: overlay scenes drawn over the temporally upscaled image (RANGE_TAAU).
+	RAS_OffScreen *m_taauSceneOfs = nullptr;
+	/// Its resolve when it is multisampled (the HUD keeps the scene's anti-aliasing).
+	RAS_OffScreen *m_taauSceneResolve = nullptr;
 
 	/// Last swap control value actually pushed to the OS/driver (RAS_ICanvas::SWAP_CONTROL_MAX
 	/// means "never applied yet"). Plano 9, unidade 1: SetSwapControl() ends up in a real driver
@@ -137,7 +141,7 @@ class KX_RenderPipeline
 
 public:
 	explicit KX_RenderPipeline(KX_KetsjiEngine *engine);
-	~KX_RenderPipeline() = default;
+	~KX_RenderPipeline();
 
 	/// Render every scene/camera of the frame to the screen, if a render was requested.
 	void Render();
@@ -157,7 +161,8 @@ private:
 	void RenderCamera(KX_Scene *scene, const KX_CameraRenderData& cameraFrameData, RAS_OffScreen *offScreen,
 	                   unsigned short pass, bool isFirstScene);
 	/// 2D post-processing filters, run once per scene.
-	RAS_OffScreen *PostRenderScene(KX_Scene *scene, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs);
+	/// skipFilters: no 2D filter (an overlay over the temporal upscaling draws into the window size buffer).
+	RAS_OffScreen *PostRenderScene(KX_Scene *scene, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, bool skipFilters = false);
 };
 
 #endif  // __KX_RENDERPIPELINE_H__

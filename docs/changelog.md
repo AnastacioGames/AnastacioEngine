@@ -8,6 +8,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAAU com cena de overlay (HUD) no tamanho da janela
+
+- Quando a 1ª cena faz TAAU e há cenas de overlay sem filtros 2D ativos, o pipeline copia a imagem ampliada para
+  um buffer do tamanho da janela (com o MSAA da cena, resolvido no fim; `RAS_ICanvas::NewWindowSizeOffScreen`)
+  e desenha os overlays ali, com área/viewport das câmeras recalculadas no tamanho da janela. Texto e linhas
+  finas do HUD saem como na resolução cheia.
+- Overlay com filtro 2D ativo: o quadro todo volta ao FSR 1. Um filtro que liga no meio do quadro (clouds/flare
+  do World, Camera FX) é pulado nesse quadro (`PostRenderScene(..., skipFilters)`).
+- `GetSceneViewport` usa a razão render/janela (e não a escala) para `camera.setViewport` em pixels.
+- Medido (`tools/debug/cenas/criar_cena_taau_hud.py` + `medir_taau.py --hud`): moldura amarela de 1 px do HUD com
+  398 px amarelo puro no TAAU contra 392 no nativo e 10 no TAA + FSR 1.
+- Revisão do Codex: filtro ativado durante o quadro (aceito, pulado); projeção de câmera com viewport em pixels
+  calculada na área reduzida (parcial: mesma proporção a menos de arredondamento).
+
 ## 2026-11-11 — TAAU: efeitos depois dele em resolução cheia (sem exigir TAA como último passe)
 
 - Correção da entrada abaixo: lá o TAAU **não ativava** (um passe desligado depois do TAA quebrava a condição

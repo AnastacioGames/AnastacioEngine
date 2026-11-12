@@ -325,6 +325,23 @@ void RAS_ICanvas::SetFullResolutionOverride(bool full)
 	m_fullResolutionOverride = full;
 }
 
+RAS_OffScreen *RAS_ICanvas::NewWindowSizeOffScreen(bool multisample) const
+{
+	RAS_OffScreen *ofs = nullptr;
+	for (int samples = multisample ? m_samples : 0; samples >= 0 && !ofs; --samples) {
+		ofs = new RAS_OffScreen(GetWidth(), GetHeight(), samples, m_attachments, RAS_OffScreen::RAS_OFFSCREEN_CUSTOM);
+		if (!ofs->GetValid()) {
+			delete ofs;
+			ofs = nullptr;
+		}
+	}
+	RAS_OffScreen *lastOffScreen = RAS_OffScreen::GetLastOffScreen();
+	if (lastOffScreen) {
+		lastOffScreen->Bind();
+	}
+	return ofs;
+}
+
 float RAS_ICanvas::GetRenderScale() const
 {
 	return m_renderScale;

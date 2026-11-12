@@ -499,6 +499,16 @@ void RAS_2DFilterManager::SetTaauAllowed(bool allowed)
 	m_upscaledOutput = nullptr;
 }
 
+bool RAS_2DFilterManager::HasActiveFilters() const
+{
+	for (const auto &pair : m_filters) {
+		if (pair.second->Ok()) {
+			return true;
+		}
+	}
+	return false;
+}
+
 RAS_OffScreen *RAS_2DFilterManager::GetUpscaledOutput() const
 {
 	return m_upscaledOutput;

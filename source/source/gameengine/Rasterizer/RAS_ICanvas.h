@@ -194,6 +194,9 @@ public:
 	/** While true, GetRenderWidth/Height report the window size: the 2D filters drawn after the
 	 * temporal upscaling (RAS_2DFilterManager) size their uniforms and buffers for it. */
 	void SetFullResolutionOverride(bool full);
+	/// New off screen of the window size with the attachments of the scene off screens, with the
+	/// multisample of the scene off screens when asked (nullptr if none could be created).
+	RAS_OffScreen *NewWindowSizeOffScreen(bool multisample) const;
 
 protected:
 	/// Swap interval value of each swap control mode.
