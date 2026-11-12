@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAAU: RCAS na apresentação
+
+- A imagem do TAAU (já no tamanho da janela) vai para a tela pelo RCAS do FSR 1, com a mesma força (`RANGE_FSR_SHARP`); `RANGE_TAAU_RCAS=0` desliga para A/B. Sem EASU: a ampliação já foi feita pelo TAA.
+- Medido (taau_modo.range, Balanced, diferença média para o nativo da mesma cena): parado 3,18→3,17, andando 2,60→2,51. O HUD composto também passa pelo RCAS, como no FSR 1.
+
 ## 2026-11-11 — TAAU: modo Upscaling na cena (Off/Quality/Balanced/Performance)
 
 - Scene > Post-process > TAA > **Upscaling**: Off, Quality (77 %), Balanced (67 %), Performance (50 %). Gravado no arquivo (`SCENEFXSettings.taa_upscale`; arquivos antigos = Off).

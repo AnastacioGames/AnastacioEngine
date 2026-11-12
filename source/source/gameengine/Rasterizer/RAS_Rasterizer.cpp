@@ -480,7 +480,24 @@ void RAS_Rasterizer::DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen
 			rcasShader = nullptr;
 		}
 	}
-	if (easuShader) {
+	/* TAA upscaling: the image is already at the window size, only RCAS sharpens it onto the
+	 * screen (the TAA pass softens a little when it rebuilds; RANGE_TAAU_RCAS=0 skips it, A/B). */
+	static const bool taauRcas = !(getenv("RANGE_TAAU_RCAS") && getenv("RANGE_TAAU_RCAS")[0] == '0');
+	GPUShader *taauRcasShader = (upscaled && taauRcas && fsrMode == 2 && m_vrLensK <= 0.0f && m_vrVignette <= 0.0f) ?
+	                            GPU_shader_get_builtin_shader(GPU_SHADER_FSR_RCAS) : nullptr;
+	if (taauRcasShader && !easuShader) {
+		offScreen->BindColorTexture(0, 0);
+		GPU_shader_bind(taauRcasShader);
+		OverrideShaderFsrRcasInterface *rcas = (OverrideShaderFsrRcasInterface *)GPU_shader_get_interface(taauRcasShader);
+		GPU_shader_uniform_int(taauRcasShader, rcas->colorTexLoc, 0);
+		const float svp[4] = {(float)viewport[0], (float)viewport[1], (float)viewport[2], (float)viewport[3]};
+		GPU_shader_uniform_vector(taauRcasShader, rcas->viewportLoc, 4, 1, svp);
+		GPU_shader_uniform_float(taauRcasShader, rcas->sharpLoc, fsrSharp);
+		DrawOverlayPlane();
+		GPU_shader_unbind();
+		offScreen->UnbindColorTexture(0);
+	}
+	else if (easuShader) {
 		float vp[4] = {(float)viewport[0], (float)viewport[1], (float)viewport[2], (float)viewport[3]};
 		if (rcasShader) {
 			// EASU into the full size target, starting at its origin.
