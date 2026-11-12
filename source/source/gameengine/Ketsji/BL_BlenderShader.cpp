@@ -330,7 +330,7 @@ void BL_BlenderShader::Update(RAS_MeshUser *meshUser, short matPassIndex, RAS_Ra
 
 			if (!m_skinningMismatchWarned) {
 				CM_Warning("material \"" << m_mat->id.name + 2 << "\" has \"GPU Skinning\" enabled, but a user of it "
-						"has no GPU bone palette (its armature is not using the \"RanGE GPU Skinning\" deform mode); "
+						"has no GPU bone palette (armature not in the \"RanGE GPU Skinning\" deform mode, or too many bones for this GPU and skinned on the CPU); "
 						"binding identity matrices to avoid a collapsed mesh");
 				m_skinningMismatchWarned = true;
 			}
