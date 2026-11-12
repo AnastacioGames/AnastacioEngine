@@ -467,6 +467,7 @@ KX_Scene::KX_Scene(SCA_IInputDevice *inputDevice,
 	filters.fxaa_search_steps = settings.fxaa_search_steps;
 	filters.useTaa = settings.use_taa != 0;
 	filters.taa_sharpen = settings.taa_sharpen;
+	filters.taa_upscale = settings.taa_upscale;
 	filters.taa_velocity_slot = GPU_material_velocity_slot(scene);
 	filters.useGrain = settings.use_grain != 0;
 	filters.grain_strength = settings.grain_strength;

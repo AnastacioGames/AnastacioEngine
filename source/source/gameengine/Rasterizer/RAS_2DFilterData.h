@@ -41,6 +41,8 @@ typedef struct BuildInFilters {
 	float taa_sharpen;
 	/* Attachment with the per object motion (GPU_material_velocity_slot), 0 = camera only. */
 	int taa_velocity_slot;
+	/* Temporal upscaling mode (SCENE_FX_TAAU_*, 0 = off). */
+	int taa_upscale;
 
 	/* Film Grain (camera lens pass) */
 	bool useGrain;

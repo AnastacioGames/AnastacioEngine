@@ -8,6 +8,14 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAAU: modo Upscaling na cena (Off/Quality/Balanced/Performance)
+
+- Scene > Post-process > TAA > **Upscaling**: Off, Quality (77 %), Balanced (67 %), Performance (50 %). Gravado no arquivo (`SCENEFXSettings.taa_upscale`; arquivos antigos = Off).
+- Vale só com o TAA ligado: `filterManager.taaEnabled = False` volta à resolução cheia. Em jogo: `filterManager.taaUpscale = 0..3`.
+- A primeira cena decide a escala; com Dynamic Resolution ligada ela escolhe a escala (o painel avisa). `RANGE_TAAU` continua como sobreposição para testes.
+- Estéreo ou HUD com filtro 2D próprio caem para FSR 1 (dica no campo).
+- Medido (`artifacts/testes/taau`, carro parado, referência nativa da mesma cena): modo Balanced 3,07, igual ao caminho por `RANGE_TAAU` (3,08).
+
 ## 2026-11-11 — TAAU com cena de overlay (HUD) no tamanho da janela
 
 - Quando a 1ª cena faz TAAU e há cenas de overlay sem filtros 2D ativos, o pipeline copia a imagem ampliada para

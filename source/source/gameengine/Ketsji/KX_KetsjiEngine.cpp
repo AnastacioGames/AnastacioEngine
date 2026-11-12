@@ -618,8 +618,13 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 {
 	if (!m_dynamicResolutionEnabled) {
 		m_dynamicResolutionQueryPending = false;
-		// RANGE_TAAU (temporal upscaling proof of concept) renders at a fixed reduced scale.
-		const float taauScale = RAS_2DFilterManager::TaauScale();
+		/* Temporal upscaling (Scene > Post-process > TAA > Upscaling, or RANGE_TAAU) renders at a
+		 * fixed reduced scale; the first scene decides (overlay scenes are drawn at window size). */
+		float taauScale = RAS_2DFilterManager::TaauScale();
+		if (taauScale <= 0.0f && m_scenes->GetCount() > 0) {
+			KX_2DFilterManager *filters = m_scenes->GetFront()->Get2DFilterManager();
+			taauScale = filters ? filters->GetTaauScale() : 0.0f;
+		}
 		m_canvas->SetRenderScale(taauScale > 0.0f ? taauScale : 1.0f);
 		return;
 	}

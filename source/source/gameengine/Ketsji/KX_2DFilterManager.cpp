@@ -1188,6 +1188,7 @@ PyAttributeDef KX_2DFilterManager::Attributes[] = {
 	EXP_PYATTRIBUTE_RW_FUNCTION("fxaaSearchSteps", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("taaEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("taaSharpen", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
+	EXP_PYATTRIBUTE_RW_FUNCTION("taaUpscale", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("grainEnabled", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RW_FUNCTION("grainStrength", KX_2DFilterManager, pyattr_get_post, pyattr_set_post),
 	EXP_PYATTRIBUTE_RO_FUNCTION("compositor", KX_2DFilterManager, pyattr_get_compositor),
@@ -1217,6 +1218,9 @@ PyObject *KX_2DFilterManager::pyattr_get_post(EXP_PyObjectPlus *self_v, const EX
 		return PyFloat_FromDouble(self->m_grainStrength);
 	}
 
+	if (name == "taaUpscale") {
+		return PyLong_FromLong(self->GetTaauMode());
+	}
 	RAS_2DFilter *taa = self->GetFilterPass(FILTERPASS_TAA, true);
 	if (name == "taaEnabled") {
 		return PyBool_FromLong(taa && taa->GetEnabled());
@@ -1262,6 +1266,18 @@ int KX_2DFilterManager::pyattr_set_post(EXP_PyObjectPlus *self_v, const EXP_PYAT
 		else {
 			self->EnsureFxaaPass()->SetEnabled(enabled);
 		}
+		return PY_SET_ATTR_SUCCESS;
+	}
+
+	if (name == "taaUpscale") {
+		const long mode = PyLong_AsLong(value);
+		if ((mode == -1 && PyErr_Occurred()) || mode < 0 || mode > 3) {
+			PyErr_Clear();
+			PyErr_SetString(PyExc_ValueError, "filterManager.taaUpscale = int: KX_2DFilterManager, "
+			                "expected 0 (Off), 1 (Quality), 2 (Balanced) or 3 (Performance)");
+			return PY_SET_ATTR_FAIL;
+		}
+		self->SetTaauMode((int)mode);
 		return PY_SET_ATTR_SUCCESS;
 	}
 

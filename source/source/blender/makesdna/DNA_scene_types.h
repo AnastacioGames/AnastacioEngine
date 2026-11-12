@@ -909,6 +909,10 @@ typedef struct SCENEFXSettings {
 	char quality_preset;
 	/* TAA (temporal anti-aliasing) on/off. Was pad[0]: old files load with it off. */
 	char use_taa;
+	/* Temporal upscaling mode (SCENE_FX_TAAU_*): the game renders at a lower resolution and the
+	 * TAA pass rebuilds the window size image. 0 = Off, so old files keep the full resolution. */
+	char taa_upscale;
+	char pad_taau[7];
 
 	/* FXAA has no settings struct of its own, its values live here. */
 	float fxaa_edge_threshold;
@@ -928,6 +932,11 @@ typedef struct SCENEFXSettings {
 #define SCENE_FX_FXAA_SEARCH_STEPS        10
 /* The shaders need a constant loop bound, so the step count is capped. */
 #define SCENE_FX_FXAA_SEARCH_STEPS_MAX    32
+/* SCENEFXSettings.taa_upscale (render scale 77 %, 67 %, 50 %). */
+#define SCENE_FX_TAAU_OFF                 0
+#define SCENE_FX_TAAU_QUALITY             1
+#define SCENE_FX_TAAU_BALANCED            2
+#define SCENE_FX_TAAU_PERFORMANCE         3
 /* TAA default sharpen. */
 #define SCENE_FX_TAA_SHARPEN              0.25f
 /* Film Grain default strength. */

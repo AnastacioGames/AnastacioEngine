@@ -6047,6 +6047,23 @@ static void rna_def_scene_shaders_fx(BlenderRNA *brna)
 	                         "stable edges. Objects moving with the camera may blur (game only)");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
+	static EnumPropertyItem taa_upscale_items[] = {
+		{SCENE_FX_TAAU_OFF, "OFF", 0, "Off", "Render at the full window resolution"},
+		{SCENE_FX_TAAU_QUALITY, "QUALITY", 0, "Quality", "Render at 77% and rebuild the full image over time"},
+		{SCENE_FX_TAAU_BALANCED, "BALANCED", 0, "Balanced", "Render at 67% and rebuild the full image over time"},
+		{SCENE_FX_TAAU_PERFORMANCE, "PERFORMANCE", 0, "Performance",
+		 "Render at 50% and rebuild the full image over time (fastest, softest)"},
+		{0, NULL, 0, NULL, NULL}
+	};
+	prop = RNA_def_property(srna, "taa_upscale", PROP_ENUM, PROP_NONE);
+	RNA_def_property_enum_sdna(prop, NULL, "taa_upscale");
+	RNA_def_property_enum_items(prop, taa_upscale_items);
+	RNA_def_property_ui_text(prop, "Upscaling",
+	                         "Temporal upscaling: the game renders fewer pixels and TAA rebuilds the window "
+	                         "resolution from the previous frames. HUD scenes without 2D filters of their own stay sharp; "
+	                         "stereo or a HUD with 2D filters falls back to FSR 1 (game only)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
 	prop = RNA_def_property(srna, "show_expanded_taa", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "expand_flag", SCENE_FX_UI_TAA);
 	RNA_def_property_ui_text(prop, "Expanded", "Show the TAA settings");

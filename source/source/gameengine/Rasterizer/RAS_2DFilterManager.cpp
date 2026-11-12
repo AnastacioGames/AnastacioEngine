@@ -63,6 +63,7 @@ extern "C" {
 void (*RAS_2DFilterManager::ProfilePassHook)(int pass) = nullptr;
 
 RAS_2DFilterManager::RAS_2DFilterManager(BuildInFilters filters)
+	:m_taauMode(filters.taa_upscale)
 {
 	if (filters.useTonemap) {
 		RAS_2DFilterData tonemapData;
@@ -528,6 +529,35 @@ float RAS_2DFilterManager::TaauScale()
 	return scale;
 }
 
+void RAS_2DFilterManager::SetTaauMode(int mode)
+{
+	m_taauMode = std::max(0, std::min(3, mode));
+}
+
+int RAS_2DFilterManager::GetTaauMode() const
+{
+	return m_taauMode;
+}
+
+float RAS_2DFilterManager::GetTaauScale() const
+{
+	const float env = TaauScale();
+	if (env > 0.0f) {
+		return env;
+	}
+	if (m_taauMode <= 0) {
+		return 0.0f;
+	}
+	/* Only while TAA is on: without it there is no history to rebuild from, and the reduced
+	 * render would only be stretched (turning TAA off in game goes back to full resolution). */
+	RAS_PassTo2DFilter::const_iterator it = m_filters.find(FILTERPASS_TAA);
+	if (it == m_filters.end() || !it->second->GetEnabled()) {
+		return 0.0f;
+	}
+	static const float scales[4] = {1.0f, 0.77f, 0.67f, 0.5f};
+	return scales[std::min(3, m_taauMode)];
+}
+
 void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, int height, const int viewport[4])
 {
 	m_frameInputs.taaHistoryValid = false;
@@ -873,7 +903,7 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	RAS_PassTo2DFilter::const_iterator taaIt = m_filters.find(FILTERPASS_TAA);
 	// A/B (tools/debug/medir_taau.py): RANGE_TAAU_PASSIVE=1 keeps the reduced render with plain TAA + FSR 1.
 	static const bool taauPassive = getenv("RANGE_TAAU_PASSIVE") && getenv("RANGE_TAAU_PASSIVE")[0] == '1';
-	const bool taau = !taauPassive && m_taauAllowed && m_taaAllowed && TaauScale() > 0.0f && renderScale < 0.999f &&
+	const bool taau = !taauPassive && m_taauAllowed && m_taaAllowed && GetTaauScale() > 0.0f && renderScale < 0.999f &&
 	                  taaIt != m_filters.end() && taaIt->second->Ok() &&
 	                  (canvas->GetRenderWidth() < canvas->GetWidth() || canvas->GetRenderHeight() < canvas->GetHeight());
 	/* Applied at the end: the cameras of this frame already used the current phase count. */

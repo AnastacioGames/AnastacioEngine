@@ -693,6 +693,12 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
             sub = taa_box.box()
             sub.active = scenefx_settings.use_taa
             sub.prop(scenefx_settings, "taa_sharpen")
+            sub.prop(scenefx_settings, "taa_upscale")
+            if scenefx_settings.use_taa and scenefx_settings.taa_upscale != 'OFF':
+                if scene.game_settings.use_dynamic_resolution:
+                    sub.label(text="Dynamic Resolution picks the scale instead", icon='INFO')
+                elif scene.game_settings.stereo != 'NONE':
+                    sub.label(text="Stereo falls back to FSR 1 upscaling", icon='INFO')
             sub.label(text="Game only. Objects moving with the camera may blur", icon='INFO')
             if scenefx_settings.use_taa and scenefx_settings.use_fxaa:
                 warn = taa_box.box()

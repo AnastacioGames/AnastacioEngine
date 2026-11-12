@@ -173,8 +173,14 @@ public:
 	/** The window size result of the last RenderFilters() when it upscaled, else nullptr.
 	 * Valid until the next RenderFilters() of this manager. */
 	RAS_OffScreen *GetUpscaledOutput() const;
-	/// RANGE_TAAU as a render scale (0.25..1), 0 when off.
+	/// RANGE_TAAU as a render scale (0.25..1), 0 when off (tests: overrides the scene mode).
 	static float TaauScale();
+	/// Upscaling mode of the scene (SCENE_FX_TAAU_*, Scene > Post-process > TAA), 0 = off.
+	void SetTaauMode(int mode);
+	int GetTaauMode() const;
+	/** Render scale the game should use for temporal upscaling: RANGE_TAAU if set, else the
+	 * scene mode while TAA is on (77 %, 67 %, 50 %). 0 = full resolution. */
+	float GetTaauScale() const;
 
 	/** Enables a built-in post-processing effect, creating its filter pass if
 	 * needed. Multi-pass effects are implemented by KX_2DFilterManager.
@@ -186,6 +192,8 @@ public:
 
 protected:
 	RAS_PassTo2DFilter m_filters;
+	/// SCENE_FX_TAAU_* of the scene (or filterManager.taaUpscale).
+	int m_taauMode = 0;
 
 private:
 	/// bgl_Time, bgl_Frame, bgl_PreviousTexture... shared by all the filters.
