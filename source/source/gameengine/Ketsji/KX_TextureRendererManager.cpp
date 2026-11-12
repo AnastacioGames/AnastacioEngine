@@ -32,6 +32,7 @@
 #include "KX_PlanarReflector.h"
 #include "KX_LightProbe.h"
 #include "KX_ProbeVolume.h"
+#include "KX_KetsjiEngine.h"
 #include "KX_GameObject.h"
 #include "KX_LightObject.h"
 #include "KX_WorldInfo.h"
@@ -496,6 +497,13 @@ bool KX_TextureRendererManager::RenderRenderer(RAS_Rasterizer *rasty, KX_Texture
 
 static const char bakedMagic[4] = {'R', 'P', 'V', '1'};
 
+/// RANGE_PROBE_VOLUME_BAKE=all (editor's Bake Probes): every grid captures at once, far from the camera too.
+static bool BakeAll()
+{
+	const char *value = getenv("RANGE_PROBE_VOLUME_BAKE");
+	return value && strcmp(value, "all") == 0;
+}
+
 std::string KX_TextureRendererManager::BakedPath() const
 {
 	// By scene, next to the game: the Performance Report runs a temporary copy of the file.
@@ -552,11 +560,13 @@ void KX_TextureRendererManager::ReadBakedLight()
 
 void KX_TextureRendererManager::SaveBakedLight(double now)
 {
-	// Every 10 s: quitting the game at any moment loses little, the next run goes on from the file.
+	/* Every 10 s: quitting the game at any moment loses little, the next run goes on from the file.
+	 * The editor's Bake Probes (RANGE_PROBE_VOLUME_BAKE=all) saves every second and quits when done. */
+	static const bool bakeAll = BakeAll();
 	if (m_bakeSaved < 0.0) {
 		m_bakeSaved = now;
 	}
-	if (now - m_bakeSaved < 10.0 || m_bakeDone) {
+	if (now - m_bakeSaved < (bakeAll ? 1.0 : 10.0) || m_bakeDone) {
 		return;
 	}
 	m_bakeSaved = now;
@@ -599,6 +609,9 @@ void KX_TextureRendererManager::SaveBakedLight(double now)
 	m_bakeDone = ready == total;
 	if (m_bakeDone) {
 		CM_Message("probe volume: all the light is saved, nothing left to capture");
+		if (bakeAll && KX_GetActiveEngine()) {
+			KX_GetActiveEngine()->RequestExit(KX_ExitInfo::QUIT_GAME);
+		}
 	}
 }
 
@@ -641,8 +654,13 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		}
 		// A/B measurements only: every grid with its own budget, as before the shared one.
 		static const bool ownBudgets = getenv("RANGE_PROBE_VOLUME_OWN_BUDGET") != nullptr;
+		static const bool bakeAll = BakeAll();
 		if (ownBudgets) {
 			total = std::numeric_limits<int>::max() / 2;
+		}
+		else if (bakeAll) {
+			// Many faces per frame but the window still answers (~2 ms a face on a desktop GPU).
+			total = 96;
 		}
 		std::stable_sort(awake.begin(), awake.end(),
 		                 [](const std::pair<float, KX_ProbeVolume *>& a, const std::pair<float, KX_ProbeVolume *>& b) {
@@ -651,7 +669,7 @@ void KX_TextureRendererManager::RenderVolumes(RAS_Rasterizer *rasty, KX_Camera *
 		/* Several grids (a track): one probe per frame at most, during play the warm up budget would
 		 * cost more than the rest of the frame. The boxes near the camera go first; the far ones only
 		 * take the budget once the near ones are settled. */
-		if (awake.size() > 1 && !ownBudgets) {
+		if (awake.size() > 1 && !ownBudgets && !bakeAll) {
 			total = std::min(total, 6);
 			if (awake.front().first <= 120.0f) {
 				awake.erase(std::find_if(awake.begin(), awake.end(), [](const std::pair<float, KX_ProbeVolume *>& item) {

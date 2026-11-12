@@ -34,7 +34,8 @@ real e no APK.
   com janela e a F6 (cruzamentos e bifurcações).
 - [Light Probe Volumes na pista](plano-track-probes.md): P1-P3 feitas; Pista_4 a 60 fps na RX 6800M. Em andamento:
   luz guardada em `<cena>.probes` (23 de 119 volumes), teste de PC fraco e aceite visual. O export já leva o
-  `.probes` no pacote (2026-11-11); falta um botão de bake no editor que capture todos os volumes antes de exportar.
+  `.probes` no pacote, e o botão Bake Probes captura todos os volumes de uma vez (2026-11-11). Faltam o bake da
+  Pista_4 inteira e o aceite com janela.
 
 ## Probe Volume GI (luz indireta por grade de sondas)
 

@@ -94,7 +94,13 @@ Numa pista, em vez de uma caixa gigante (o espaçamento cresce e a luz fica borr
 Com vários volumes, a captura ao vivo usa no máximo uma sonda por quadro e os volumes a até 120 m da câmera vão primeiro. Numa GPU
 integrada, uma cena com vários volumes não captura ao vivo: usa só a luz guardada.
 
-Para guardar a luz, abra o editor com `RANGE_PROBE_VOLUME_BAKE=1` e jogue normalmente. A cada 10 s, os volumes prontos vão para
+Para guardar a luz de uma vez, use **Bake Probes** no painel Light Probe Volume (aba do Empty). O editor roda uma cópia da
+cena numa janelinha com `RANGE_PROBE_VOLUME_BAKE=all`: todos os volumes capturam juntos, sem o limite de 120 m, e o jogo
+fecha sozinho quando termina. O `<cena>.probes` vai para a pasta do projeto, e o export o leva no pacote. A barra de
+progresso conta os volumes prontos, e Esc cancela sem mexer no arquivo anterior. Na cena de teste, 5 volumes a 300 m
+um do outro ficaram prontos em 4 a 17 s.
+
+Também dá para guardar jogando: abra o editor com `RANGE_PROBE_VOLUME_BAKE=1` e jogue normalmente. A cada 10 s, os volumes prontos vão para
 `<cena>.probes`, ao lado do jogo. Cada volume recebe uma passada, e a rodada seguinte continua de onde parou. Sem a variável, os
 volumes presentes no arquivo não capturam e ignoram World, sol e objetos movidos; os que faltam capturam ao vivo.
 
