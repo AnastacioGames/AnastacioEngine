@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — TAAU na Web conferido
+
+- Runtime Web release recompilado com o modo Upscaling; cena `taau_modo.range` empacotada em Off e Balanced (`package-web.py`), Chrome headless (ANGLE D3D11) a 960x540: sem erro de shader, `render.getRenderScale()` 0,67 em Balanced.
+- Retângulo do carro: Balanced x Off na Web diferença média 1,61, nitidez igual (9,98 x 9,98); sem cair para o FSR 1. O caminho do TAAU usa só off screens e desenho (sem cópia de textura), por isso não precisou de ramo `__EMSCRIPTEN__`. Na Web o velocity por objeto continua desligado (só a câmera).
+
 ## 2026-11-11 — TAAU: transparências medidas, máscara reativa adiada
 
 - Cena `tools/debug/cenas/criar_cena_taau_transparente.py` (cubo vermelho Alpha Blend ~7 px/quadro) e medidor `tools/debug/medir_taau_transparente.py` (pixels de tinta fraca = rastro do histórico).

@@ -88,7 +88,7 @@ O vetor da etapa 2 é deslocamento **em espaço de mundo** (alpha = válido), n�
    CPU): fechar instancing e Static Batch antes do aceite.
 5. Depois: integrar com a resolução dinâmica, `filterManager.upscaleMode` (Off/Quality/Balanced/Performance),
    padrão Off.
-6. Web: conferir formatos renderizáveis/filtráveis, limites de MRT e de unidades de textura, cópia de
+6. **Feito 2026-11-11** (modo Upscaling, RCAS, transparências medidas, Web conferida no Chrome; ver changelog). Web: conferir formatos renderizáveis/filtráveis, limites de MRT e de unidades de textura, cópia de
    profundidade e precisão; o velocity hoje é desligado no Web/Android.
 7. Medição: `criar_cena_taa_movimento.py` + grade de cercas finas; tempo de GPU na RX 6800M e em iGPU física
    (`RANGE_WEAK_GPU` não substitui); comparar com escala simples + FSR 1.
