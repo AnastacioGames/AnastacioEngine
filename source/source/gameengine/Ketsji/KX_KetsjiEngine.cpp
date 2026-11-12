@@ -618,7 +618,9 @@ void KX_KetsjiEngine::UpdateDynamicResolution()
 {
 	if (!m_dynamicResolutionEnabled) {
 		m_dynamicResolutionQueryPending = false;
-		m_canvas->SetRenderScale(1.0f);
+		// RANGE_TAAU (temporal upscaling proof of concept) renders at a fixed reduced scale.
+		const float taauScale = RAS_2DFilterManager::TaauScale();
+		m_canvas->SetRenderScale(taauScale > 0.0f ? taauScale : 1.0f);
 		return;
 	}
 

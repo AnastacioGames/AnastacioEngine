@@ -164,6 +164,16 @@ public:
 	 * no jitter, and the pass only sharpens. Set by the render pipeline before drawing. */
 	void SetTaaAllowed(bool allowed);
 
+	/** Temporal upscaling (RANGE_TAAU, proof of concept): with a reduced render scale and TAA as
+	 * the last pass, the TAA pass draws at the window size into its own off screen. Allowed only
+	 * for a single scene drawn once (no overlay scene, no per eye stereo): set by the pipeline. */
+	void SetTaauAllowed(bool allowed);
+	/** The window size result of the last RenderFilters() when it upscaled, else nullptr.
+	 * Valid until the next RenderFilters() of this manager. */
+	RAS_OffScreen *GetUpscaledOutput() const;
+	/// RANGE_TAAU as a render scale (0.25..1), 0 when off.
+	static float TaauScale();
+
 	/** Enables a built-in post-processing effect, creating its filter pass if
 	 * needed. Multi-pass effects are implemented by KX_2DFilterManager.
 	 */
@@ -244,12 +254,19 @@ private:
 	/// -1 unknown, 0 not enough texture units / RANGE_TAA_OFF / no buffer, 1 available.
 	int m_taaSupported = -1;
 	bool m_taaAllowed = true;
+	/// Halton phases of the jitter: 8, more when upscaling (ceil(8 / scale^2), at most 64).
+	int m_taaPhases = 8;
+	bool m_taauAllowed = false;
+	/// Window size output of the upscaling TAA pass (also what the history copies).
+	RAS_OffScreen *m_taauOfs = nullptr;
+	RAS_OffScreen *m_upscaledOutput = nullptr;
 
 	/// Jitter of a frame number (Halton 2,3 over 8 frames), in pixels.
-	static void TaaJitterOfFrame(int frame, float jitter[2]);
+	static void TaaJitterOfFrame(int frame, int phases, float jitter[2]);
 	/// Before the TAA pass: (re)allocate the history and give it to the filter if still valid.
 	void PrepareTaaHistory(RAS_Rasterizer *rasty, int width, int height, const int viewport[4]);
 	/// After the TAA pass: copy its output into the history.
+	bool EnsureTaauOffScreen(int width, int height);
 	void CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen *outputofs, const int viewport[4]);
 
 	/** Creates a filter matching the given filter data. Returns nullptr if no

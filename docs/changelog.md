@@ -8,6 +8,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-11 — Upscaling temporal (TAAU): prova de conceito com escala fixa
+
+- `RANGE_TAAU=<escala>` (1 = 67%) renderiza a cena reduzida; com TAA ligado e como último passe, o próprio
+  passe TAA (`RAS_TAA2DFilter.glsl`, `UpscaleMain`) desenha no tamanho da janela num offscreen próprio
+  (`RAS_2DFilterManager::EnsureTaauOffScreen`), com histórico também no tamanho da janela; o pipeline entrega
+  essa imagem a `RAS_Rasterizer::DrawOffScreen` no lugar da reduzida (o FSR 1 fica de fora pelo tamanho).
+- Cada pixel da janela junta os 3x3 texels jitterados em volta, com peso pela distância (ideia do FSR 2, MIT);
+  o peso do quadro atual cai quando a amostra está longe. Jitter Halton com `ceil(8/escala²)` fases (máx. 64).
+- Só uma cena desenhada uma vez (sem overlay nem estéreo por olho). Sem TAA, `RANGE_TAAU` só reduz (FSR 1).
+- Medido (`tools/debug/medir_taau.py`, carro listrado, 960x540, 67%, diferença para o nativo com TAA no
+  retângulo do carro): FSR 1 3,66 parado / 4,19 andando; TAAU 2,90 / 2,91, sem rastro. GPU a 1080p (RX 6800M):
+  passe TAAU 0,56 ms contra 1,16 ms do TAA nativo.
+- Revisão do Codex aplicada: fases do jitter trocadas só no fim do quadro, cópia reduzida mantida para
+  `bgl_PreviousTexture`, texel mais próximo limitado à imagem.
+
 ## 2026-11-11 — Build HLOD: Method "Sloppy" (meshoptimizer)
 
 - `meshopt_simplifySloppy` pela nova `source/intern/ae_meshopt` (só no editor, por ctypes). Ignora topologia e

@@ -424,8 +424,13 @@ void RAS_Rasterizer::DrawOffScreen(RAS_OffScreen *srcOffScreen, RAS_OffScreen *d
 	}
 }
 
-void RAS_Rasterizer::DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen)
+void RAS_Rasterizer::DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen, RAS_OffScreen *upscaled)
 {
+	/* TAA upscaling already drew the window size image (RAS_2DFilterManager, RANGE_TAAU): it
+	 * replaces the reduced one, so FSR 1 EASU below is skipped by the size test. */
+	if (upscaled) {
+		offScreen = upscaled;
+	}
 	if (offScreen->GetSamples() > 0) {
 		offScreen = offScreen->Blit(canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_EYE_LEFT1), false);
 	}

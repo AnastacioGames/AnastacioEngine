@@ -75,7 +75,7 @@ Correções da revisão: `RAS_CANVAS_DIVISOR` é dos offscreens dos filtros 2D (
 reduz a cena. Quem reduz a cena é `RAS_ICanvas::SetRenderScale` (usado por `KX_KetsjiEngine::UpdateDynamicResolution`).
 O vetor da etapa 2 é deslocamento **em espaço de mundo** (alpha = válido), não vetor de tela.
 
-1. **Prova de conceito com escala fixa** (ex.: 67%): cor, profundidade e movimento na resolução interna; resolve
+1. **Prova de conceito com escala fixa** — feita 2026-11-11 (`RANGE_TAAU`, ver changelog; TAAU 2,9 x FSR 1 3,7-4,2 de diferença para o nativo, passe 0,56 ms a 1080p). Plano original: (ex.: 67%): cor, profundidade e movimento na resolução interna; resolve
    e histórico na resolução de saída. Ajustar `KX_RenderPipeline::PostRenderScene` e
    `RAS_2DFilterManager::PrepareTaaHistory` para separar as duas resoluções, além de viewport, jitter (Halton com
    fase pela razão de escala) e coordenadas. Invalidar o histórico em resize, corte de câmera, troca de cena e

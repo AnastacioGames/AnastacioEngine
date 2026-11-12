@@ -38,6 +38,8 @@
 
 #include <algorithm>
 #include <climits>
+#include <cmath>
+#include <cstdlib>
 
 extern "C" {
 	extern char datatoc_RAS_Blur2DFilter_glsl[];
@@ -127,6 +129,7 @@ RAS_2DFilterManager::~RAS_2DFilterManager()
 		glDeleteTextures(1, &history.depth);
 	}
 	delete m_taaHistoryOfs;
+	delete m_taauOfs;
 }
 
 void RAS_2DFilterManager::SetFrameTime(float time)
@@ -451,10 +454,11 @@ void RAS_2DFilterManager::RenderTemporalResolve(RAS_2DFilter *filter, RAS_Raster
 	m_frameInputs.temporalHistoryValid = false;
 }
 
-void RAS_2DFilterManager::TaaJitterOfFrame(int frame, float jitter[2])
+void RAS_2DFilterManager::TaaJitterOfFrame(int frame, int phases, float jitter[2])
 {
-	/* Halton (2, 3), 8 samples, index from 1 (0 would give a zero offset). */
-	const int index = (frame & 7) + 1;
+	/* Halton (2, 3), `phases` samples, index from 1 (0 would give a zero offset). Upscaling uses
+	 * more phases: each window pixel needs several render samples to land near it. */
+	const int index = (frame % std::max(1, phases)) + 1;
 	const int bases[2] = {2, 3};
 	for (int axis = 0; axis < 2; ++axis) {
 		float f = 1.0f;
@@ -478,13 +482,39 @@ bool RAS_2DFilterManager::GetTaaJitter(float jitter[2]) const
 		return false;
 	}
 	// RenderFilters() increments the frame before the filters: the frame being drawn is the next one.
-	TaaJitterOfFrame(m_frameInputs.frame + 1, jitter);
+	TaaJitterOfFrame(m_frameInputs.frame + 1, m_taaPhases, jitter);
 	return true;
 }
 
 void RAS_2DFilterManager::SetTaaAllowed(bool allowed)
 {
 	m_taaAllowed = allowed;
+}
+
+void RAS_2DFilterManager::SetTaauAllowed(bool allowed)
+{
+	m_taauAllowed = allowed;
+	// Forget last frame's result: RenderFilters() may not run (no active pass) this frame.
+	m_upscaledOutput = nullptr;
+}
+
+RAS_OffScreen *RAS_2DFilterManager::GetUpscaledOutput() const
+{
+	return m_upscaledOutput;
+}
+
+float RAS_2DFilterManager::TaauScale()
+{
+	static const float scale = []() {
+		const char *value = getenv("RANGE_TAAU");
+		if (!value || !value[0]) {
+			return 0.0f;
+		}
+		const float s = (float)atof(value);
+		/* RANGE_TAAU=1 means "on" at the default 67 %; a fraction is the scale itself. */
+		return (s >= 1.0f) ? 0.67f : (s > 0.0f) ? std::max(0.25f, s) : 0.0f;
+	}();
+	return scale;
 }
 
 void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, int height, const int viewport[4])
@@ -499,7 +529,7 @@ void RAS_2DFilterManager::PrepareTaaHistory(RAS_Rasterizer *rasty, int width, in
 		m_taaValid = false;
 		return;
 	}
-	TaaJitterOfFrame(m_frameInputs.frame, m_frameInputs.taaJitter);
+	TaaJitterOfFrame(m_frameInputs.frame, m_taaPhases, m_frameInputs.taaJitter);
 	m_frameInputs.taaJitter[2] = m_taaHistoryJitter[0];
 	m_frameInputs.taaJitter[3] = m_taaHistoryJitter[1];
 
@@ -573,6 +603,25 @@ void RAS_2DFilterManager::CommitTaaHistory(RAS_Rasterizer *rasty, RAS_OffScreen 
 	m_taaHistoryJitter[1] = m_frameInputs.taaJitter[1];
 	m_taaLastFrame = m_frameInputs.frame;
 	m_taaValid = true;
+}
+
+bool RAS_2DFilterManager::EnsureTaauOffScreen(int width, int height)
+{
+	if (m_taauOfs && (int)m_taauOfs->GetWidth() == width && (int)m_taauOfs->GetHeight() == height) {
+		return true;
+	}
+	delete m_taauOfs;
+	const RAS_Rasterizer::HdrType hdr = RAS_FloatRenderTargetSupported() ? RAS_Rasterizer::RAS_HDR_HALF_FLOAT :
+	                                                                      RAS_Rasterizer::RAS_HDR_NONE;
+	m_taauOfs = new RAS_OffScreen(width, height, 0, {{4, hdr}}, RAS_OffScreen::RAS_OFFSCREEN_CUSTOM);
+	if (!m_taauOfs->GetValid()) {
+		delete m_taauOfs;
+		m_taauOfs = nullptr;
+		CM_Warning("TAA upscaling buffer could not be created: plain upscale");
+		return false;
+	}
+	m_taaValid = false;
+	return true;
 }
 
 RAS_2DFilter *RAS_2DFilterManager::EnsureTonemapFilter(const BuildInFilters& filters)
@@ -732,6 +781,7 @@ RAS_2DFilter *RAS_2DFilterManager::GetFilterPass(unsigned int passIndex, bool us
 
 RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2])
 {
+	m_upscaledOutput = nullptr;
 	/* Camera FX passes stay built and are only toggled off, so the map is rarely empty.
 	 * When no pass would draw, skip the chain instead of copying the full screen every frame. */
 	bool anyActive = false;
@@ -798,6 +848,19 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 
 	++m_frameInputs.frame;
 	bool usesPrevious = false;
+
+	/* Temporal upscaling (proof of concept, docs/plano-opensource.md item 3): TAA must be the
+	 * last pass, since the passes after it would run at the reduced size; the window size result
+	 * goes straight to the screen (KX_RenderPipeline -> RAS_Rasterizer::DrawOffScreen). */
+	const float renderScale = canvas->GetRenderScale();
+	const bool taau = m_taauAllowed && m_taaAllowed && TaauScale() > 0.0f && renderScale < 0.999f &&
+	                  pend->first == FILTERPASS_TAA && pend->second->Ok() &&
+	                  (canvas->GetRenderWidth() < canvas->GetWidth() || canvas->GetRenderHeight() < canvas->GetHeight());
+	/* Applied at the end: the cameras of this frame already used the current phase count. */
+	const int phases = taau ? std::min(64, std::max(8, (int)std::ceil(8.0f / (renderScale * renderScale)))) : 8;
+	for (float &v : m_frameInputs.taaUpscale) {
+		v = 0.0f;
+	}
 
 	/* The clouds history only matches this render if it came from the same viewport (split
 	 * screen cameras share this manager) at the same size. */
@@ -869,16 +932,36 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 		/* Get the output off screen of the filter, could be the same as the input off screen
 		 * if no modifications were made to the targeted off screen.
 		 * This output off screen is used for the next filter as input off screen */
+		const bool upscaling = isTaa && taau && EnsureTaauOffScreen(canvas->GetWidth(), canvas->GetHeight());
+		if (upscaling) {
+			ftargetofs = m_taauOfs;
+			m_frameInputs.taaUpscale[0] = (float)colorofs->GetWidth();
+			m_frameInputs.taaUpscale[1] = (float)colorofs->GetHeight();
+			m_frameInputs.taaUpscale[2] = (float)m_taauOfs->GetWidth();
+			m_frameInputs.taaUpscale[3] = (float)m_taauOfs->GetHeight();
+		}
 		if (isTaa) {
 			PrepareTaaHistory(rasty, (int)ftargetofs->GetWidth(), (int)ftargetofs->GetHeight(), viewport);
+		}
+		if (upscaling) {
+			rasty->SetViewport(0, 0, m_taauOfs->GetWidth(), m_taauOfs->GetHeight());
+			rasty->SetScissor(0, 0, m_taauOfs->GetWidth(), m_taauOfs->GetHeight());
 		}
 		previousofs = filter->Render(rasty, canvas, depthofs, colorofs, ftargetofs, sun_screen_pos);
 		if (isTaa) {
 			if (previousofs != colorofs) {
+				// Copies at the current viewport: the window size one when upscaling.
 				CommitTaaHistory(rasty, previousofs, viewport);
 			}
 			else {
 				m_taaValid = false;
+			}
+		}
+		if (upscaling) {
+			rasty->SetViewport(0, 0, canvas->GetRenderWidth(), canvas->GetRenderHeight());
+			rasty->SetScissor(0, 0, canvas->GetRenderWidth(), canvas->GetRenderHeight());
+			if (previousofs == m_taauOfs) {
+				m_upscaledOutput = m_taauOfs;
 			}
 		}
 		if (ProfilePassHook) {
@@ -897,10 +980,18 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	}
 
 	// The last filter doesn't use its own off screen and didn't render to the targeted off screen ?
-	if (previousofs != targetofs) {
+	// (Not the upscaled output: it is larger than targetofs and is drawn to the screen itself.)
+	if (previousofs != targetofs && (!m_upscaledOutput || usesPrevious)) {
+		/* Upscaled: the window size image goes to the screen by itself; the reduced copy is only
+		 * made for bgl_PreviousTexture. */
 		// Render manually to the targeted off screen as the last filter didn't do it for us.
 		targetofs->Bind();
 		rasty->DrawOffScreen(previousofs, targetofs);
+	}
+
+	if (phases != m_taaPhases) {
+		m_taaPhases = phases;
+		m_taaValid = false;
 	}
 
 	// Opt-in: nothing is allocated or copied until a filter samples bgl_PreviousTexture.

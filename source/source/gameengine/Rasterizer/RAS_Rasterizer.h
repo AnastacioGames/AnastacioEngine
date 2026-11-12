@@ -451,7 +451,7 @@ public:
 	 * \param canvas The canvas containing the screen viewport.
 	 * \param index The off screen index to read from.
 	 */
-	void DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen);
+	void DrawOffScreen(RAS_ICanvas *canvas, RAS_OffScreen *offScreen, RAS_OffScreen *upscaled = nullptr);
 
 	/** Draw each stereo off screen to screen.
 	 * \param canvas The canvas containing the screen viewport.

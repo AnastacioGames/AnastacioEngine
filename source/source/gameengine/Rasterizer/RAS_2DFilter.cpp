@@ -207,7 +207,8 @@ static std::string predefinedUniformsName[RAS_2DFilter::MAX_PREDEFINED_UNIFORM_T
 	"ge_TAAHistoryViewProj", // GE_TAA_HISTORY_VIEWPROJ_UNIFORM
 	"ge_TAAJitter", // GE_TAA_JITTER_UNIFORM
 	"ge_TAAParams", // GE_TAA_PARAMS_UNIFORM
-	"ge_TAAVelocity" // GE_TAA_VELOCITY_UNIFORM
+	"ge_TAAVelocity", // GE_TAA_VELOCITY_UNIFORM
+	"ge_TAAUpscale" // GE_TAA_UPSCALE_UNIFORM
 };
 
 RAS_2DFilter::RAS_2DFilter(RAS_2DFilterData& data)
@@ -815,6 +816,11 @@ void RAS_2DFilter::BindUniforms(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, cons
 		SetUniformfv(m_predefinedUniforms[GE_TAA_PARAMS_UNIFORM], RAS_Uniform::UNI_FLOAT4, params, sizeof(float) * 4, 1);
 		if (m_predefinedUniforms[GE_TAA_VELOCITY_UNIFORM] != -1) {
 			SetUniform(m_predefinedUniforms[GE_TAA_VELOCITY_UNIFORM], m_taaVelocityReady ? 1.0f : 0.0f);
+		}
+		if (m_predefinedUniforms[GE_TAA_UPSCALE_UNIFORM] != -1) {
+			static const float noUpscale[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			SetUniformfv(m_predefinedUniforms[GE_TAA_UPSCALE_UNIFORM], RAS_Uniform::UNI_FLOAT4,
+			             m_frameInputs ? m_frameInputs->taaUpscale : noUpscale, sizeof(float) * 4, 1);
 		}
 	}
 

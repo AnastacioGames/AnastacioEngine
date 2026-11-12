@@ -463,6 +463,8 @@ void KX_RenderPipeline::Render()
 
 		// Used to detect when a camera is the first rendered an then doesn't request a depth clear.
 		unsigned short pass = 0;
+		// Window size image of the TAA upscaling (RANGE_TAAU), drawn instead of the reduced one.
+		RAS_OffScreen *upscaled = nullptr;
 
 		for (KX_FrameRenderData& frameData : renderData.m_frameDataList) {
 			// Current bound off screen.
@@ -513,9 +515,16 @@ void KX_RenderPipeline::Render()
 					target = RAS_OffScreen::NextRenderOffScreen(frameData.m_ofsType);
 				}
 
+				/* Temporal upscaling only for one scene drawn once: an overlay scene would be drawn
+				 * into the reduced image after it, and per eye stereo has two images. */
+				KX_2DFilterManager *sceneFilters = scene->Get2DFilterManager();
+				if (sceneFilters) {
+					sceneFilters->SetTaauAllowed(size == 1 && !renderData.m_renderPerEye);
+				}
 				// Render filters and get output off screen.
 				offScreen = PostRenderScene(scene, offScreen, canvas->GetOffScreen(target));
 				frameData.m_ofsType = offScreen->GetType();
+				upscaled = (sceneFilters && islastscene && !renderData.m_renderPerEye) ? sceneFilters->GetUpscaledOutput() : nullptr;
 
 				RANGE_PROFILE_MARK_GPU(prof, "render.filters");
 			}
@@ -541,7 +550,7 @@ void KX_RenderPipeline::Render()
 		}
 		// Else simply draw the off screen to screen.
 		else {
-			rasterizer->DrawOffScreen(canvas, canvas->GetOffScreen(renderData.m_frameDataList[0].m_ofsType));
+			rasterizer->DrawOffScreen(canvas, canvas->GetOffScreen(renderData.m_frameDataList[0].m_ofsType), upscaled);
 		}
 		RANGE_PROFILE_MARK_GPU(prof, "render.present");
 	}

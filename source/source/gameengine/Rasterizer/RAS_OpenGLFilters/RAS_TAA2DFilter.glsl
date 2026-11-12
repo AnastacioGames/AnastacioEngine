@@ -15,7 +15,13 @@
  * materials write where each pixel was last frame (world offset, alpha 1 = valid) into that
  * attachment; it is added to the world position before the reprojection, so a car seen from
  * behind stays sharp. Pixels without it (sky, transparent, instanced, batched, skinned shape)
- * keep the camera only reprojection. */
+ * keep the camera only reprojection.
+ *
+ * Etapa 3 (docs/plano-opensource.md item 3, proof of concept, RANGE_TAAU): with ge_TAAUpscale.zw
+ * set, this pass is the last one and draws at the window size from the reduced render. Each window
+ * pixel gathers the 3x3 jittered render texels around it, weighted by their distance to it
+ * (the jitter moves them over the frames), and blends into a window size history. Ideas from
+ * AMD FSR 2 (MIT): reconstruction weighted by the sample distance, closest depth for the motion. */
 
 #ifdef USE_CORE_PROFILE
 in vec2 texCoordVarying;
@@ -41,6 +47,9 @@ uniform sampler2D bgl_DataTextures[7];
 /// 1 when the motion attachment exists in this frame buffer.
 uniform float ge_TAAVelocity;
 #endif
+
+/// Temporal upscaling: xy render (input) size, zw window (output) size; zw zero when off.
+uniform vec4 ge_TAAUpscale;
 
 vec3 RGBToYCoCg(vec3 c)
 {
@@ -94,8 +103,113 @@ vec3 ClipToBox(vec3 history, vec3 boxMin, vec3 boxMax)
 	return (m > 1.0) ? center + offset / m : history;
 }
 
+/* World position of a render texel at the given depth (this frame's jittered projection), moved
+ * to where it was last frame by the motion attachment when there is one. */
+vec4 WorldOfTexel(ivec2 texel, float depth, vec2 texSize, ivec2 size)
+{
+	vec2 depthUV = (vec2(texel) + 0.5) / texSize;
+	vec4 view = unfinvprojmat * vec4(depthUV * 2.0 - 1.0, depth * 2.0 - 1.0, 1.0);
+	view /= view.w;
+	vec4 world = unfinvviewmat * view;
+#ifdef TAA_VELOCITY_SLOT
+	if (ge_TAAVelocity > 0.5) {
+		vec4 offset = texelFetch(bgl_DataTextures[TAA_VELOCITY_SLOT - 1], clamp(texel, ivec2(0), size - 1), 0);
+		if (offset.a > 0.01) {
+			world.xyz += offset.xyz / offset.a;
+		}
+	}
+#endif
+	return world;
+}
+
+void UpscaleMain()
+{
+	ivec2 size = textureSize(bgl_RenderedTexture, 0);
+	vec2 inSize = vec2(size);
+	vec2 outSize = ge_TAAUpscale.zw;
+	vec2 uv = gl_FragCoord.xy / outSize;
+	/* Where this window pixel falls among the render texels: texel k (center k + 0.5) holds the
+	 * scene at k + 0.5 - jitter, so the jittered position is the plain one plus the jitter. */
+	vec2 inPos = uv * inSize + ge_TAAJitter.xy;
+	ivec2 base = ivec2(floor(inPos));
+
+	vec3 sum = vec3(0.0);
+	float weightSum = 0.0;
+	float weightMax = 0.0;
+	vec3 m1 = vec3(0.0);
+	vec3 m2 = vec3(0.0);
+	vec3 boxMin = vec3(1e9);
+	vec3 boxMax = vec3(-1e9);
+	float closestDepth = 1.0;
+	ivec2 closestTexel = clamp(base, ivec2(0), size - 1);
+	float alpha0;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			ivec2 texel = base + ivec2(x, y);
+			ivec2 inside = clamp(texel, ivec2(0), size - 1);
+			vec3 c = FetchYCoCg(texel, size);
+			/* Gaussian close to a Blackman-Harris of radius 1 render texel. */
+			vec2 d = vec2(texel) + 0.5 - inPos;
+			float w = exp(-2.29 * dot(d, d));
+			sum += c * w;
+			weightSum += w;
+			weightMax = max(weightMax, w);
+			m1 += c;
+			m2 += c * c;
+			boxMin = min(boxMin, c);
+			boxMax = max(boxMax, c);
+			float depth = texelFetch(bgl_DepthTexture, inside, 0).x;
+			if (depth < closestDepth) {
+				closestDepth = depth;
+				closestTexel = inside;
+			}
+		}
+	}
+	alpha0 = texelFetch(bgl_RenderedTexture, clamp(base, ivec2(0), size - 1), 0).a;
+	vec3 current = sum / max(weightSum, 1e-5);
+
+	if (ge_TAAParams.x < 0.5) {
+		gl_FragColor = vec4(YCoCgToRGB(current), alpha0);
+		return;
+	}
+
+	vec4 prevClip = ge_TAAHistoryViewProj * WorldOfTexel(closestTexel, closestDepth, inSize, size);
+	if (prevClip.w <= 0.0) {
+		gl_FragColor = vec4(YCoCgToRGB(current), alpha0);
+		return;
+	}
+	/* Motion in render texels without the jitters, then the same fraction of the window. */
+	vec2 prevPixel = (prevClip.xy / prevClip.w * 0.5 + 0.5) * inSize - ge_TAAJitter.zw;
+	vec2 curPixel = (vec2(closestTexel) + 0.5) - ge_TAAJitter.xy;
+	vec2 motion = (prevPixel - curPixel) / inSize;
+	vec2 prevUV = uv + motion;
+	if (any(lessThan(prevUV, vec2(0.0))) || any(greaterThan(prevUV, vec2(1.0)))) {
+		gl_FragColor = vec4(YCoCgToRGB(current), alpha0);
+		return;
+	}
+
+	vec3 history = RGBToYCoCg(SampleHistory(prevUV, outSize));
+	vec3 mean = m1 / 9.0;
+	vec3 sigma = sqrt(max(m2 / 9.0 - mean * mean, vec3(0.0)));
+	history = ClipToBox(history, max(boxMin, mean - sigma), min(boxMax, mean + sigma));
+
+	/* A render sample landing right on this window pixel counts fully; one half a texel away
+	 * counts about a third: the history fills the window pixels between the samples. */
+	float speed = clamp(length(motion * outSize) / 4.0, 0.0, 1.0);
+	float alpha = mix(ge_TAAParams.z, ge_TAAParams.w, speed) * weightMax;
+
+	float wCurrent = alpha / (1.0 + current.x);
+	float wHistory = (1.0 - alpha) / (1.0 + history.x);
+	vec3 result = (current * wCurrent + history * wHistory) / max(wCurrent + wHistory, 1e-5);
+	gl_FragColor = vec4(max(YCoCgToRGB(result), vec3(0.0)), alpha0);
+}
+
 void main()
 {
+	if (ge_TAAUpscale.z > 0.5) {
+		UpscaleMain();
+		return;
+	}
 	ivec2 size = textureSize(bgl_RenderedTexture, 0);
 	ivec2 texel = ivec2(gl_FragCoord.xy);
 	vec2 texSize = vec2(size);

@@ -141,6 +141,7 @@ public:
 		GE_TAA_JITTER_UNIFORM,
 		GE_TAA_PARAMS_UNIFORM,
 		GE_TAA_VELOCITY_UNIFORM,
+		GE_TAA_UPSCALE_UNIFORM,
 
 		MAX_PREDEFINED_UNIFORM_TYPE
 	};
@@ -183,6 +184,9 @@ public:
 		bool taaHistoryValid = false;
 		mt::mat4 taaHistoryViewProjection = mt::mat4::Identity();
 		float taaJitter[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+		/// Temporal upscaling (RANGE_TAAU): input (render) size in xy, output (window) size in zw
+		/// when the TAA pass draws at the window size from the reduced render. Zero otherwise.
+		float taaUpscale[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 	};
 
 protected:
