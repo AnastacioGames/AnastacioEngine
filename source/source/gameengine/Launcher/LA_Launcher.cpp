@@ -787,7 +787,12 @@ KX_ExitInfo LA_Launcher::EngineNextFrame()
 	else if (BKE_motion_record_time_up()) {
 		exitInfo.m_code = KX_ExitInfo::BLENDER_ESC;
 	}
+	/* Na Web o navegador usa o ESC para sair da tela cheia (e o itch.io sugere isso): com o ESC como
+	 * tecla de saída o jogo encerrava junto. Lá o ESC não encerra; outra tecla escolhida pelo jogo sim. */
 	else if (m_inputDevice->GetInput(exitKey).Find(SCA_InputEvent::ACTIVE) &&
+#ifdef __EMSCRIPTEN__
+	    exitKey != SCA_IInputDevice::ESCKEY &&
+#endif
 	    !m_inputDevice->GetHookExitKey() && !(m_ketsjiEngine->GetFlags() & KX_KetsjiEngine::IGNORE_EXIT_KEY)) {
 		m_inputDevice->ConvertEvent(exitKey, 0, 0);
 		exitInfo.m_code = KX_ExitInfo::BLENDER_ESC;
@@ -855,7 +860,10 @@ KX_ExitInfo LA_Launcher::EngineMainLoop()
 				emscripten_cancel_main_loop();
 				/* Quit Game: avisa a página (index.html fecha o app no Android
 				 * ou mostra "jogo encerrado" no navegador). */
-				if (self->m_emscriptenExitInfo.m_code == KX_ExitInfo::QUIT_GAME) {
+				/* Qualquer saída que pare o laço (fim das cenas, Rec Play, janela) também avisa: antes só o
+				 * Quit Game avisava e o resto deixava a tela congelada no último quadro. */
+				if (self->m_emscriptenExitInfo.m_code != KX_ExitInfo::RESTART_GAME &&
+				    self->m_emscriptenExitInfo.m_code != KX_ExitInfo::START_OTHER_GAME) {
 					EM_ASM({ if (Module.onRangeQuit) Module.onRangeQuit(); });
 				}
 			}
