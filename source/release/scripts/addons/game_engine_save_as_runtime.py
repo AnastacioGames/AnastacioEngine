@@ -283,7 +283,8 @@ RUNTIME_MODULES = (
     "range_text_dialogue.py", "range_cutscene_runtime.py", "range_component_wizard.py",
     "anastacio_ragdoll_runtime.py",
 )
-PROJECT_EXTENSIONS = {".range", ".blend", ".rasec", ".py"}
+# .probes: saved light of the Light Probe Volumes, read next to the game (KX_TextureRendererManager::BakedPath).
+PROJECT_EXTENSIONS = {".range", ".blend", ".rasec", ".py", ".probes"}
 
 
 def copy_project_files(source_dir, runtime_dir, main_file):

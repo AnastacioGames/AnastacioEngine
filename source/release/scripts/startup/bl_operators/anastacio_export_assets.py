@@ -99,7 +99,7 @@ def build_export_tree(destination, protected_main=False, keep_debug_overlays=Fal
             path = os.path.join(folder, name)
             if os.path.islink(path):
                 raise ValueError('Export does not follow asset symlinks: ' + path)
-            if name in excluded or name.endswith(('.cooked', '.range1', '.blend1', '.rasec')):
+            if name in excluded or name.endswith(('.cooked', '.range1', '.blend1', '.rasec', '.probes.tmp')):
                 ignored.append(name)
         return ignored
     shutil.copytree(root, destination, ignore=ignore)
