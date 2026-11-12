@@ -15,6 +15,9 @@ Gradle 9.7.1, compileSdk 37, targetSdk 36, minSdk 24.
 
 ## Aprovado
 
+- 2026-11-12, Find X3 Pro: primeira abertura em modo avião (app recém-instalado), bloqueio e desbloqueio de tela
+  com o jogo rodando, volta do segundo plano após abrir outro app; layout `race` e alternância de controles
+  (demo `ToqueCelular`); microfone no APK e no Chrome; Quit Game na Web para o áudio e oferece recarregar.
 - Carga offline do APK (sem permissão `INTERNET`), WebGL 2, Python, cena `motion`; `bge.logic.motion` com
   inclinação e `calibrate()`.
 - Home e retorno sem recarregar; rotação `fullUser` sem deformar imagem nem girar a câmera.
@@ -51,8 +54,7 @@ por CDP, 5 s de aquecimento e 20 s medidos; `--walk` anda). 3 rodadas, mediana. 
 ## Pendente
 
 - O aceite anterior no Chrome foi no OPPO Reno14; estes testes usaram Find X3 Pro e Tab S6 Lite.
-- Layout `race` e botão de alternância de controles em celular real (ver plano de controles).
-- Modo avião na primeira abertura, bloqueio de tela, perda de contexto WebGL, sessão longa no jogo real.
+- Perda de contexto WebGL, sessão longa no jogo real.
 
 Apps que seguiam instalados no Find X3 Pro em 2026-09-24: "Pad teste" (`com.anastaciogames.pad`) e First Person
 (`com.anastaciogames.firstperson`).
