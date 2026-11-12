@@ -29,9 +29,10 @@ Exemplo para iniciante: template de componente `03_jogador_celular.py` (Text Edi
 ## Pendências
 
 - **T6, corrida (2026-10-09):** layout `race` (stick, setas ou inclinar, trocados por botão `switch`) só conferido
-  no Edge headless. Falta o celular e o jogo real (RolimaRacer).
-- **Alternância para menus (2026-10-14):** falta validar em celular real (menu, retorno à partida, rotação),
-  incluindo iframe do itch.io.
+  no Edge headless; aprovado no APK do Find X3 Pro em 2026-11-12 com a demo `source/release/demos/ToqueCelular`.
+  Falta o jogo real (RolimaRacer).
+- **Alternância para menus (2026-10-14):** aprovada no APK em 2026-11-12 (menu, retorno à partida, rotação);
+  falta o iframe do itch.io.
 - Fora do escopo por ora: `logic.touches` (dedos crus via `SDL_FINGER*` no GHOST), vibração, editor visual de
   layout, teclado do sistema para texto.
 

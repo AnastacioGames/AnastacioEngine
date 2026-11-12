@@ -24,8 +24,8 @@ Versão 1 (etapas 1-6 de [plano-mind-map.md](plano-mind-map.md)) aguardando acei
 
 ## Microfone
 
-Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Desktop aprovado com microfone físico; Web testada em Chrome com microfone simulado. Falta aceite no navegador
-real e no APK.
+Branch `feat/microfone`, plano em [plano-microfone-ui.md](plano-microfone-ui.md). Desktop aprovado com microfone físico; Web testada em Chrome com microfone simulado. APK aprovado no Find X3 Pro
+em 2026-11-12 (permissão, gravar, tocar, efeitos); falta aceite no navegador real.
 
 ## Track Tool (pistas e vias)
 
@@ -481,8 +481,8 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
 - **Release sem template Android (2026-10-13):** zip Windows da 0.5.0 sem `web/android-template` e tar Linux sem
   `web/`. Corrigido no código (`stage_release_web.py`, `android.template_dir()`); falta publicar a versão
   corrigida e rodar o pacote Linux com o script novo.
-- **Alternância manual de controles para menus (2026-10-14):** implementada no template Web/APK; falta validar em
-  celular real (menu, retorno à partida, rotação), incluindo iframe do itch.io.
+- **Alternância manual de controles para menus (2026-10-14):** layout `race` + alternância aprovados no APK do Find X3 Pro
+  em 2026-11-12 (menu, retorno, rotação; demo `demos/ToqueCelular`). Falta iframe do itch.io e o RolimaRacer real.
 
 ### Personagem automático (Fuse → armature base)
 
