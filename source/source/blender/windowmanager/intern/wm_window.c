@@ -877,6 +877,9 @@ wmWindow *WM_window_open_temp(bContext *C, int x, int y, int sizex, int sizey, i
 	else if (type == WM_WINDOW_ASSETS) {
 		ED_area_newspace(C, sa, SPACE_FILE, false);
 	}
+	else if (type == WM_WINDOW_TEXT) {
+		ED_area_newspace(C, sa, SPACE_TEXT, false);
+	}
 	else {
 		ED_area_newspace(C, sa, SPACE_USERPREF, false);
 	}

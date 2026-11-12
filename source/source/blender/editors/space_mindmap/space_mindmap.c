@@ -31,6 +31,7 @@
 
 #include "BLI_blenlib.h"
 #include "BLI_math_base.h"
+#include "BLI_math_matrix.h"
 #include "BLI_math_vector.h"
 #include "BLI_rect.h"
 #include "BLI_utildefines.h"
@@ -41,6 +42,7 @@
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 #include "DNA_text_types.h"
+#include "DNA_view3d_types.h"
 #include "DNA_userdef_types.h"
 #include "DNA_windowmanager_types.h"
 
@@ -856,6 +858,114 @@ static void mindmap_draw_hints(const ARegion *ar)
 	glDisable(GL_BLEND);
 }
 
+typedef struct MindMapToolButton {
+	const char *opname;
+	int icon;
+} MindMapToolButton;
+
+typedef struct MindMapToolGroup {
+	const char *label;
+	const MindMapToolButton *buttons;
+	int count;
+} MindMapToolGroup;
+
+/* Buttons grouped by category along the bottom of the map. The main region sits between the
+ * Tool Shelf (T) and the Sidebar (N), so neither ever covers them. Wraps to more rows when narrow. */
+static void mindmap_draw_toolbar(const bContext *C, ARegion *ar)
+{
+	static const MindMapToolButton map[] = {
+		{"MINDMAP_OT_new", ICON_NEW},
+	};
+	static const MindMapToolButton idea[] = {
+		{"MINDMAP_OT_add_child", ICON_ZOOMIN},
+		{"MINDMAP_OT_add_sibling", ICON_PLUS},
+		{"MINDMAP_OT_edit", ICON_FONT_DATA},
+		{"MINDMAP_OT_delete", ICON_X},
+		{"MINDMAP_OT_toggle_fold", ICON_TRIA_DOWN},
+	};
+	static const MindMapToolButton look[] = {
+		{"MINDMAP_OT_set_color", ICON_COLOR},
+		{"MINDMAP_OT_set_background", ICON_TPAINT_HLT},
+		{"MINDMAP_OT_set_shape", ICON_SNAP_FACE},
+		{"MINDMAP_OT_set_icon", ICON_SOLO_ON},
+		{"MINDMAP_OT_set_engine_icon", ICON_BLENDER},
+	};
+	static const MindMapToolButton marks[] = {
+		{"MINDMAP_OT_edit_note", ICON_TEXT},
+		{"MINDMAP_OT_cycle_task", ICON_CHECKBOX_HLT},
+	};
+	static const MindMapToolButton link[] = {
+		{"MINDMAP_OT_set_link", ICON_LINKED},
+		{"MINDMAP_OT_open_link", ICON_FORWARD},
+		{"MINDMAP_OT_clear_link", ICON_UNLINKED},
+	};
+	static const MindMapToolButton find[] = {
+		{"MINDMAP_OT_find", ICON_VIEWZOOM},
+		{"MINDMAP_OT_find_next", ICON_RIGHTARROW_THIN},
+		{"MINDMAP_OT_view_all", ICON_ZOOM_ALL},
+		{"MINDMAP_OT_quick_guide", ICON_QUESTION},
+	};
+	static const MindMapToolGroup groups[] = {
+		{N_("Map"), map, ARRAY_SIZE(map)},
+		{N_("Idea"), idea, ARRAY_SIZE(idea)},
+		{N_("Look"), look, ARRAY_SIZE(look)},
+		{N_("Marks"), marks, ARRAY_SIZE(marks)},
+		{N_("Link"), link, ARRAY_SIZE(link)},
+		{N_("Find"), find, ARRAY_SIZE(find)},
+	};
+	const uiFontStyle *fs = &UI_style_get()->widgetlabel;
+	const int pad = U.widget_unit / 4;
+	const int gap = U.widget_unit / 2;
+	const int bw = UI_UNIT_X, bh = UI_UNIT_Y;
+	const int x0 = pad * 2, xmax = ar->winx - pad * 2;
+	int widths[ARRAY_SIZE(groups)], label_w[ARRAY_SIZE(groups)];
+	int rows = 1, x = x0, y, i, j;
+	uiBlock *block;
+
+	if (xmax - x0 < bw * 4) {
+		return;
+	}
+	/* First pass: how many rows the groups need. */
+	for (i = 0; i < ARRAY_SIZE(groups); i++) {
+		label_w[i] = UI_fontstyle_string_width(fs, IFACE_(groups[i].label)) + pad * 2;
+		widths[i] = label_w[i] + groups[i].count * bw;
+		if (x > x0 && x + widths[i] > xmax) {
+			rows++;
+			x = x0;
+		}
+		x += widths[i] + gap;
+	}
+
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	glColor4f(0.0f, 0.0f, 0.0f, 0.45f);
+	glRecti(0, 0, ar->winx, rows * (bh + pad) + pad);
+	glDisable(GL_BLEND);
+
+	block = UI_block_begin(C, ar, "mindmap_toolbar", UI_EMBOSS);
+	x = x0;
+	y = (rows - 1) * (bh + pad) + pad;
+	for (i = 0; i < ARRAY_SIZE(groups); i++) {
+		if (x > x0 && x + widths[i] > xmax) {
+			x = x0;
+			y -= bh + pad;
+		}
+		uiDefBut(block, UI_BTYPE_LABEL, 0, IFACE_(groups[i].label), x, y, label_w[i], bh,
+		         NULL, 0, 0, 0, 0, "");
+		x += label_w[i];
+		UI_block_align_begin(block);
+		for (j = 0; j < groups[i].count; j++) {
+			uiDefIconButO(block, UI_BTYPE_BUT, groups[i].buttons[j].opname, WM_OP_INVOKE_REGION_WIN,
+			              groups[i].buttons[j].icon, x, y, bw, bh, NULL);
+			x += bw;
+		}
+		UI_block_align_end(block);
+		x += gap;
+	}
+	UI_block_end(C, block);
+	UI_block_draw(C, block);
+}
+
 static void mindmap_main_region_draw(const bContext *C, ARegion *ar)
 {
 	const SpaceMindMap *smm = (SpaceMindMap *)CTX_wm_space_data(C);
@@ -898,6 +1008,8 @@ static void mindmap_main_region_draw(const bContext *C, ARegion *ar)
 	if ((smm->flag & SPACE_MINDMAP_HINTS_OFF) == 0) {
 		mindmap_draw_hints(ar);
 	}
+
+	mindmap_draw_toolbar(C, ar);
 
 	if (cache->editing) {
 		mindmap_draw_edit_field(C, ar, cache);
@@ -1377,14 +1489,38 @@ static bool mindmap_open_link(bContext *C, ReportList *reports, const MMElem *no
 			}
 		}
 		if (base) {
+			ScrArea *sa;
+
+			if (scene != CTX_data_scene(C)) {
+				ED_screen_set_scene(C, screen, scene);
+			}
 			BKE_scene_base_deselect_all(scene);
 			BKE_scene_base_select(scene, base);
+			scene->basact = base;
+			/* Center every 3D View on the object, so opening the link shows it. */
+			for (sa = screen->areabase.first; sa; sa = sa->next) {
+				if (sa->spacetype == SPACE_VIEW3D) {
+					ARegion *ar;
+
+					for (ar = sa->regionbase.first; ar; ar = ar->next) {
+						if (ar->regiontype == RGN_TYPE_WINDOW && ar->regiondata) {
+							RegionView3D *rv3d = ar->regiondata;
+
+							negate_v3_v3(rv3d->ofs, ob->obmat[3]);
+							ED_region_tag_redraw(ar);
+						}
+					}
+				}
+			}
+			WM_event_add_notifier(C, NC_SCENE | ND_OB_ACTIVE, scene);
 			WM_event_add_notifier(C, NC_SCENE | ND_OB_SELECT, scene);
 			opened = true;
 		}
 	}
 	else if (id && GS(id->name) == ID_SCE) {
-		WM_event_add_notifier(C, NC_SCREEN | ND_SCENEBROWSE, id);
+		if ((Scene *)id != CTX_data_scene(C)) {
+			ED_screen_set_scene(C, screen, (Scene *)id);
+		}
 		opened = true;
 	}
 	else if (id && GS(id->name) == ID_TXT) {
@@ -1399,7 +1535,25 @@ static bool mindmap_open_link(bContext *C, ReportList *reports, const MMElem *no
 			}
 		}
 		if (!opened) {
-			BKE_report(reports, RPT_WARNING, "Open a Text Editor area to see this text");
+			/* No Text Editor in the layout: open the text in a window of its own. */
+			wmWindow *win = CTX_wm_window(C);
+			wmWindow *text_win = WM_window_open_temp(
+			        C, win->sizex / 2, win->sizey / 2, (int)(700 * UI_DPI_FAC), (int)(500 * UI_DPI_FAC),
+			        WM_WINDOW_TEXT);
+
+			if (text_win && text_win->screen) {
+				for (sa = text_win->screen->areabase.first; sa; sa = sa->next) {
+					if (sa->spacetype == SPACE_TEXT) {
+						((SpaceText *)sa->spacedata.first)->text = (Text *)id;
+						ED_area_tag_redraw(sa);
+						opened = true;
+						break;
+					}
+				}
+			}
+			if (!opened) {
+				BKE_report(reports, RPT_WARNING, "Open a Text Editor area to see this text");
+			}
 		}
 	}
 	if (id == NULL) {
@@ -1648,9 +1802,10 @@ static void MINDMAP_OT_set_color(wmOperatorType *ot)
 	ot->name = "Idea Color";
 	ot->idname = "MINDMAP_OT_set_color";
 	ot->description = "Change the text color of the selected idea";
+	ot->invoke = WM_menu_invoke;
 	ot->exec = mindmap_set_color_exec;
 	ot->poll = mindmap_edit_poll;
-	RNA_def_enum(ot->srna, "color", items, 0, "Color", "");
+	ot->prop = RNA_def_enum(ot->srna, "color", items, 0, "Color", "");
 }
 
 static const char *mindmap_background_values[] = {NULL, "#5c2b2b", "#5c3d1f", "#5a5320", "#284f2e", "#24425c", "#3d2e5c", "#d9d9d9"};
@@ -1692,9 +1847,10 @@ static void MINDMAP_OT_set_background(wmOperatorType *ot)
 	ot->name = "Box Color";
 	ot->idname = "MINDMAP_OT_set_background";
 	ot->description = "Change the fill color of the selected idea boxes";
+	ot->invoke = WM_menu_invoke;
 	ot->exec = mindmap_set_background_exec;
 	ot->poll = mindmap_edit_poll;
-	RNA_def_enum(ot->srna, "color", items, 0, "Color", "");
+	ot->prop = RNA_def_enum(ot->srna, "color", items, 0, "Color", "");
 }
 
 static int mindmap_set_shape_exec(bContext *C, wmOperator *op)
@@ -1728,9 +1884,10 @@ static void MINDMAP_OT_set_shape(wmOperatorType *ot)
 	ot->name = "Box Shape";
 	ot->idname = "MINDMAP_OT_set_shape";
 	ot->description = "Draw the selected ideas as a box or only with a line under the text";
+	ot->invoke = WM_menu_invoke;
 	ot->exec = mindmap_set_shape_exec;
 	ot->poll = mindmap_edit_poll;
-	RNA_def_enum(ot->srna, "shape", items, 0, "Shape", "");
+	ot->prop = RNA_def_enum(ot->srna, "shape", items, 0, "Shape", "");
 }
 
 static const char *mindmap_icon_values[] = {NULL, "idea", "help", "messagebox_warning", "button_ok", "button_cancel", "flag"};
@@ -1767,9 +1924,10 @@ static void MINDMAP_OT_set_icon(wmOperatorType *ot)
 	ot->name = "Idea Icon";
 	ot->idname = "MINDMAP_OT_set_icon";
 	ot->description = "Mark the selected idea with an icon";
+	ot->invoke = WM_menu_invoke;
 	ot->exec = mindmap_set_icon_exec;
 	ot->poll = mindmap_edit_poll;
-	RNA_def_enum(ot->srna, "icon", items, 0, "Icon", "");
+	ot->prop = RNA_def_enum(ot->srna, "icon", items, 0, "Icon", "");
 }
 
 static int mindmap_set_engine_icon_exec(bContext *C, wmOperator *op)
@@ -2396,27 +2554,27 @@ static int mindmap_context_menu_invoke(bContext *C, wmOperator *UNUSED(op), cons
 	pup = UI_popup_menu_begin(C, "Idea", ICON_NONE);
 	layout = UI_popup_menu_layout(pup);
 	uiLayoutSetOperatorContext(layout, WM_OP_EXEC_REGION_WIN);
-	uiItemO(layout, "Add Child", ICON_NONE, "MINDMAP_OT_add_child");
-	uiItemO(layout, "Add Sibling", ICON_NONE, "MINDMAP_OT_add_sibling");
-	uiItemO(layout, "Edit", ICON_NONE, "MINDMAP_OT_edit");
+	uiItemO(layout, "Add Child", ICON_ZOOMIN, "MINDMAP_OT_add_child");
+	uiItemO(layout, "Add Sibling", ICON_PLUS, "MINDMAP_OT_add_sibling");
+	uiItemO(layout, "Edit", ICON_FONT_DATA, "MINDMAP_OT_edit");
 	uiItemS(layout);
-	uiItemMenuEnumO(layout, C, "MINDMAP_OT_set_color", "color", "Color", ICON_NONE);
-	uiItemMenuEnumO(layout, C, "MINDMAP_OT_set_icon", "icon", "Icon", ICON_NONE);
+	uiItemMenuEnumO(layout, C, "MINDMAP_OT_set_color", "color", "Color", ICON_COLOR);
+	uiItemMenuEnumO(layout, C, "MINDMAP_OT_set_icon", "icon", "Icon", ICON_SOLO_ON);
 	uiLayoutSetOperatorContext(layout, WM_OP_INVOKE_REGION_WIN);
-	uiItemO(layout, "Note...", ICON_NONE, "MINDMAP_OT_edit_note");
-	uiItemO(layout, "Engine Icon...", ICON_NONE, "MINDMAP_OT_set_engine_icon");
-	uiItemO(layout, "Link...", ICON_NONE, "MINDMAP_OT_set_link");
+	uiItemO(layout, "Note...", ICON_TEXT, "MINDMAP_OT_edit_note");
+	uiItemO(layout, "Engine Icon...", ICON_BLENDER, "MINDMAP_OT_set_engine_icon");
+	uiItemO(layout, "Link...", ICON_LINKED, "MINDMAP_OT_set_link");
 	uiLayoutSetOperatorContext(layout, WM_OP_EXEC_REGION_WIN);
-	uiItemO(layout, "Open Link", ICON_NONE, "MINDMAP_OT_open_link");
-	uiItemO(layout, "Clear Link", ICON_NONE, "MINDMAP_OT_clear_link");
-	uiItemO(layout, "Task", ICON_NONE, "MINDMAP_OT_cycle_task");
+	uiItemO(layout, "Open Link", ICON_FORWARD, "MINDMAP_OT_open_link");
+	uiItemO(layout, "Clear Link", ICON_UNLINKED, "MINDMAP_OT_clear_link");
+	uiItemO(layout, "Task", ICON_CHECKBOX_HLT, "MINDMAP_OT_cycle_task");
 	uiItemS(layout);
-	uiItemO(layout, "Copy", ICON_NONE, "MINDMAP_OT_copy");
-	uiItemO(layout, "Cut", ICON_NONE, "MINDMAP_OT_cut");
-	uiItemO(layout, "Paste", ICON_NONE, "MINDMAP_OT_paste");
+	uiItemO(layout, "Copy", ICON_COPYDOWN, "MINDMAP_OT_copy");
+	uiItemO(layout, "Cut", ICON_CUT, "MINDMAP_OT_cut");
+	uiItemO(layout, "Paste", ICON_PASTEDOWN, "MINDMAP_OT_paste");
 	uiItemS(layout);
-	uiItemO(layout, "Fold or Unfold", ICON_NONE, "MINDMAP_OT_toggle_fold");
-	uiItemO(layout, "Delete", ICON_NONE, "MINDMAP_OT_delete");
+	uiItemO(layout, "Fold or Unfold", ICON_TRIA_DOWN, "MINDMAP_OT_toggle_fold");
+	uiItemO(layout, "Delete", ICON_X, "MINDMAP_OT_delete");
 	UI_popup_menu_end(C, pup);
 	return OPERATOR_INTERFACE;
 }
@@ -2714,20 +2872,20 @@ static void mindmap_panel_idea_draw(const bContext *C, Panel *pa)
 	mindmap_panel_field(layout, cache, cache->panel_note, note, PANEL_FIELD_NOTE, width);
 
 	uiItemS(layout);
-	uiItemMenuEnumO(layout, (bContext *)C, "MINDMAP_OT_set_color", "color", IFACE_("Color"), ICON_NONE);
-	uiItemMenuEnumO(layout, (bContext *)C, "MINDMAP_OT_set_icon", "icon", IFACE_("Icon"), ICON_NONE);
-	uiItemO(layout, IFACE_("Engine Icon..."), ICON_NONE, "MINDMAP_OT_set_engine_icon");
+	uiItemMenuEnumO(layout, (bContext *)C, "MINDMAP_OT_set_color", "color", IFACE_("Color"), ICON_COLOR);
+	uiItemMenuEnumO(layout, (bContext *)C, "MINDMAP_OT_set_icon", "icon", IFACE_("Icon"), ICON_SOLO_ON);
+	uiItemO(layout, IFACE_("Engine Icon..."), ICON_BLENDER, "MINDMAP_OT_set_engine_icon");
 
 	uiItemS(layout);
 	uiItemL(layout, IFACE_("Task:"), ICON_NONE);
-	uiItemO(layout, IFACE_(task_names[CLAMPIS(task, 0, 2)]), ICON_NONE, "MINDMAP_OT_cycle_task");
+	uiItemO(layout, IFACE_(task_names[CLAMPIS(task, 0, 2)]), ICON_CHECKBOX_HLT, "MINDMAP_OT_cycle_task");
 
 	uiItemS(layout);
 	uiItemL(layout, IFACE_("Link:"), ICON_NONE);
 	if (link && link[0]) {
 		uiItemL(layout, link + 2, ICON_LINKED);  /* skip the ID type prefix */
-		uiItemO(layout, IFACE_("Open Link"), ICON_NONE, "MINDMAP_OT_open_link");
-		uiItemO(layout, IFACE_("Clear Link"), ICON_NONE, "MINDMAP_OT_clear_link");
+		uiItemO(layout, IFACE_("Open Link"), ICON_FORWARD, "MINDMAP_OT_open_link");
+		uiItemO(layout, IFACE_("Clear Link"), ICON_UNLINKED, "MINDMAP_OT_clear_link");
 	}
 	else {
 		uiItemO(layout, IFACE_("Link..."), ICON_LINKED, "MINDMAP_OT_set_link");
@@ -2748,28 +2906,28 @@ static void mindmap_panel_tools_draw(const bContext *C, Panel *pa)
 		return;
 	}
 	uiItemO(col, IFACE_("Add Inside"), ICON_ZOOMIN, "MINDMAP_OT_add_child");
-	uiItemO(col, IFACE_("Add Next"), ICON_NONE, "MINDMAP_OT_add_sibling");
-	uiItemO(col, IFACE_("Rename"), ICON_NONE, "MINDMAP_OT_edit");
+	uiItemO(col, IFACE_("Add Next"), ICON_PLUS, "MINDMAP_OT_add_sibling");
+	uiItemO(col, IFACE_("Rename"), ICON_FONT_DATA, "MINDMAP_OT_edit");
 	uiItemO(col, IFACE_("Delete"), ICON_X, "MINDMAP_OT_delete");
 
 	uiItemL(pa->layout, IFACE_("Box Look:"), ICON_NONE);
 	col = uiLayoutColumn(pa->layout, true);
 	uiItemMenuEnumO(col, (bContext *)C, "MINDMAP_OT_set_background", "color", IFACE_("Box Color"), ICON_COLOR);
-	uiItemMenuEnumO(col, (bContext *)C, "MINDMAP_OT_set_color", "color", IFACE_("Text Color"), ICON_NONE);
-	uiItemMenuEnumO(col, (bContext *)C, "MINDMAP_OT_set_shape", "shape", IFACE_("Shape"), ICON_NONE);
+	uiItemMenuEnumO(col, (bContext *)C, "MINDMAP_OT_set_color", "color", IFACE_("Text Color"), ICON_COLOR);
+	uiItemMenuEnumO(col, (bContext *)C, "MINDMAP_OT_set_shape", "shape", IFACE_("Shape"), ICON_SNAP_FACE);
 
 	col = uiLayoutColumn(pa->layout, true);
-	uiItemO(col, IFACE_("Fold / Unfold"), ICON_NONE, "MINDMAP_OT_toggle_fold");
-	uiItemO(col, IFACE_("Show All"), ICON_NONE, "MINDMAP_OT_view_all");
+	uiItemO(col, IFACE_("Fold / Unfold"), ICON_TRIA_DOWN, "MINDMAP_OT_toggle_fold");
+	uiItemO(col, IFACE_("Show All"), ICON_ZOOM_ALL, "MINDMAP_OT_view_all");
 
 	col = uiLayoutColumn(pa->layout, true);
-	uiItemO(col, IFACE_("Cut"), ICON_NONE, "MINDMAP_OT_cut");
+	uiItemO(col, IFACE_("Cut"), ICON_CUT, "MINDMAP_OT_cut");
 	uiItemO(col, IFACE_("Copy"), ICON_COPYDOWN, "MINDMAP_OT_copy");
 	uiItemO(col, IFACE_("Paste"), ICON_PASTEDOWN, "MINDMAP_OT_paste");
 
 	col = uiLayoutColumn(pa->layout, true);
 	uiItemO(col, IFACE_("Find..."), ICON_VIEWZOOM, "MINDMAP_OT_find");
-	uiItemO(col, IFACE_("Find Next"), ICON_NONE, "MINDMAP_OT_find_next");
+	uiItemO(col, IFACE_("Find Next"), ICON_RIGHTARROW_THIN, "MINDMAP_OT_find_next");
 }
 
 /* only called once, from space/spacetypes.c */

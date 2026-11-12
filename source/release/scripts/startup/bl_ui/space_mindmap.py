@@ -87,12 +87,12 @@ class MINDMAP_MT_edit(MindMapMenu, Menu):
         layout.operator("ed.undo", icon='LOOP_BACK')
         layout.operator("ed.redo", icon='LOOP_FORWARDS')
         layout.separator()
-        layout.operator("mindmap.cut", icon='NONE')
+        layout.operator("mindmap.cut", icon='CUT')
         layout.operator("mindmap.copy", icon='COPYDOWN')
         layout.operator("mindmap.paste", icon='PASTEDOWN')
         layout.separator()
         layout.operator("mindmap.find", icon='VIEWZOOM')
-        layout.operator("mindmap.find_next")
+        layout.operator("mindmap.find_next", icon='RIGHTARROW_THIN')
 
 
 class MINDMAP_MT_idea(MindMapMenu, Menu):
@@ -101,21 +101,21 @@ class MINDMAP_MT_idea(MindMapMenu, Menu):
     def draw(self, context):
         layout = self.region_layout()
         layout.operator("mindmap.add_child", icon='ZOOMIN')
-        layout.operator("mindmap.add_sibling")
-        layout.operator("mindmap.edit", text="Rename")
+        layout.operator("mindmap.add_sibling", icon='PLUS')
+        layout.operator("mindmap.edit", text="Rename", icon='FONT_DATA')
         layout.operator("mindmap.delete", icon='X')
         layout.separator()
-        layout.operator_menu_enum("mindmap.set_color", "color", text="Color")
-        layout.operator_menu_enum("mindmap.set_background", "color", text="Box Color")
-        layout.operator_menu_enum("mindmap.set_shape", "shape", text="Shape")
-        layout.operator_menu_enum("mindmap.set_icon", "icon", text="Icon")
-        layout.operator("mindmap.set_engine_icon", text="Engine Icon...")
-        layout.operator("mindmap.edit_note", text="Note...")
-        layout.operator("mindmap.cycle_task")
+        layout.operator_menu_enum("mindmap.set_color", "color", text="Color", icon='COLOR')
+        layout.operator_menu_enum("mindmap.set_background", "color", text="Box Color", icon='TPAINT_HLT')
+        layout.operator_menu_enum("mindmap.set_shape", "shape", text="Shape", icon='SNAP_FACE')
+        layout.operator_menu_enum("mindmap.set_icon", "icon", text="Icon", icon='SOLO_ON')
+        layout.operator("mindmap.set_engine_icon", text="Engine Icon...", icon='BLENDER')
+        layout.operator("mindmap.edit_note", text="Note...", icon='TEXT')
+        layout.operator("mindmap.cycle_task", icon='CHECKBOX_HLT')
         layout.separator()
         layout.operator("mindmap.set_link", text="Link...", icon='LINKED')
-        layout.operator("mindmap.open_link")
-        layout.operator("mindmap.clear_link")
+        layout.operator("mindmap.open_link", icon='FORWARD')
+        layout.operator("mindmap.clear_link", icon='UNLINKED')
 
 
 class MINDMAP_MT_view(MindMapMenu, Menu):
@@ -123,11 +123,11 @@ class MINDMAP_MT_view(MindMapMenu, Menu):
 
     def draw(self, context):
         layout = self.region_layout()
-        layout.operator("mindmap.toolshelf")
-        layout.operator("mindmap.properties")
+        layout.operator("mindmap.toolshelf", icon='MENU_PANEL')
+        layout.operator("mindmap.properties", icon='UI')
         layout.separator()
-        layout.operator("mindmap.view_all")
-        layout.operator("mindmap.toggle_fold")
+        layout.operator("mindmap.view_all", icon='ZOOM_ALL')
+        layout.operator("mindmap.toggle_fold", icon='TRIA_DOWN')
 
 
 class MINDMAP_MT_help(MindMapMenu, Menu):
