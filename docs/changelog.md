@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-13 — Export Web: sons do World Sound e módulos de scripts/modules
+
+- `4e6dc03e`: os slots do World Sound (World > Sound) iam para o pacote com caminho absoluto do Windows, que não
+  existe no FS virtual: no celular, "[aud] file could not be decoded" e silêncio na chuva. `collect_bpy.world_sound_remap`
+  troca na cópia do jogo por `//relativo` (arquivo no projeto) ou copia como `ws_<sha24>.ext` ao lado do .range
+  (fora do projeto, ex.: efeitos de `datafiles/sounds/effects`); o original é restaurado. Worlds de biblioteca
+  ficam como estão. Vale para o APK (usa o mesmo export).
+- `make-runtime-manifest.py` passa a listar os módulos de `release/scripts/modules` (o build Web leva a pasta no
+  `.data`); antes o export de cenas com UI Tree era bloqueado (WEB-PKG-003 `range_ui_runtime`).
+- Teste: export em background + Chrome do Find X3 Pro por 75 s sem aviso, chuva tocando (aprovado pelo usuário).
+  Codex: World de biblioteca, colisão com a cópia e maiúsculas no Windows, aceitos.
+
 ## 2026-11-13 — Rec Play: blocos 3 e 4 aceitos com janela
 
 - Bloco 3 (pular/parar cutscene): `scene.stop_cutscene()` soltava a pose mas a ação do Take (Run) seguia tocando até o fim. `KX_Scene::EndCutsceneTakes` agora para as camadas dos clips já iniciados, a camada do Take antigo e o NLA (`Rec_`), no Stop e no Skip (1cd768d2e). Aceito com janela (teclas K/L por script).

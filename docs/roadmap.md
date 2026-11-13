@@ -488,6 +488,11 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   PC e celular, opção mobile + paisagem) em 2026-11-12; falta o RolimaRacer real.
 - **Web: reiniciar/trocar de jogo congela (2026-11-12):** `RESTART_GAME`/`START_OTHER_GAME` (atuador Game, Python)
   cancelam o laço do Emscripten e nada recomeça (o `set_main_loop` não retorna). ESC e demais saídas já avisam a página.
+- ~~**Web: sons do World Sound no pacote**~~ — feito 2026-11-13 (`4e6dc03e`): slots iam com caminho absoluto (silêncio
+  no celular); agora `//relativo` ou cópia `ws_<hash>` ao lado do .range. Manifesto lista `scripts/modules`
+  (export de cena com UI Tree era bloqueado por WEB-PKG-003). Chuva aprovada no Chrome do Find X3 Pro. Fica de fora:
+  World vindo de biblioteca vinculada.
+- **Próximos testes no celular:** RolimaRacer + sessão longa; aparelho sem half float (precisa de outro celular).
 
 ### Personagem automático (Fuse → armature base)
 
