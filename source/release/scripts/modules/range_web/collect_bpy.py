@@ -213,6 +213,41 @@ def collect_extra_files(scenes=None, stdlib=None):
     return sorted(p for p in paths if p.startswith(prefix))
 
 
+def world_sound_remap(root, scratch):
+    """Arquivos dos slots do World Sound (World > Sound) para o pacote Web. O runtime resolve o
+    caminho do slot a partir da pasta do .range, entao na copia do jogo ele precisa ser relativo:
+    dentro do projeto vira //caminho/relativo; fora dele (ex.: efeitos da engine em
+    datafiles/sounds/effects) o arquivo e copiado para `scratch` com nome por hash e vai ao lado
+    do .range. Retorna ({caminho absoluto: caminho // na copia}, [extras para o empacotador]).
+    Arquivo inexistente fica como esta (o runtime toca silencio e avisa)."""
+    import shutil
+    remap, extras = {}, []
+    prefix = os.path.normcase(root + os.sep) if root else None
+    folder = os.path.join(scratch, "world_sounds")  # longe da copia do jogo, tambem em scratch
+    for world in bpy.data.worlds:
+        if world.library:
+            continue  # o runtime resolve pela pasta da biblioteca; a copia principal nao a altera
+        for module in getattr(world, "sound_modules", ()):
+            for entry in module.sounds:
+                path = _abs(entry.filepath)
+                if not path or path in remap or not os.path.isfile(path):
+                    continue
+                if prefix and os.path.normcase(path).startswith(prefix):
+                    remap[path] = "//" + os.path.relpath(path, root).replace(os.sep, "/")
+                    extras.append(path)
+                    continue
+                with open(path, "rb") as f:
+                    digest = hashlib.sha256(f.read()).hexdigest()[:24]
+                name = "ws_" + digest + os.path.splitext(path)[1].lower()
+                os.makedirs(folder, exist_ok=True)
+                target = os.path.join(folder, name)
+                if not os.path.isfile(target):
+                    shutil.copy2(path, target)
+                    extras.append(target)
+                remap[path] = "//" + name
+    return remap, extras
+
+
 def _voice_files(root, scenes):
     """Falas da cutscene (evento Dialog, por caminho) e vozes dos Takes (sounds/take_*.wav)."""
     files = glob.glob(os.path.join(root, "sounds", "take_*.wav"))

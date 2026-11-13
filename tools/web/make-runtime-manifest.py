@@ -117,6 +117,21 @@ def stdlib_modules(zip_path):
     return tops
 
 
+def script_modules(modules_dir=REPO_ROOT / "source" / "release" / "scripts" / "modules"):
+    """Modulos de release/scripts/modules: o build Web leva release/scripts inteiro no .data
+    (--preload-file ...@/2.79/scripts) e o runtime importa de la (ex.: range_ui_runtime do UI Tree)."""
+    tops = set()
+    if not modules_dir.is_dir():
+        return tops
+    for entry in modules_dir.iterdir():
+        name = entry.stem if entry.suffix == ".py" else entry.name
+        if not name.isidentifier():
+            continue
+        if (entry.is_file() and entry.suffix == ".py") or (entry.is_dir() and (entry / "__init__.py").is_file()):
+            tops.add(name)
+    return tops
+
+
 def linked_c_modules(libpython):
     data = Path(libpython).read_bytes()
     return {m.decode() for m in re.findall(rb"PyInit_([A-Za-z0-9_]+)", data)}
@@ -146,7 +161,7 @@ def build(runtime_dir, python_root, evidence):
     build_dir = runtime_dir.parent
     modules = (stdlib_modules(root / "lib" / "python311.zip")
                | linked_c_modules(root / "lib" / "libpython3.11.a")
-               | set(CORE_BUILTINS) | engine_modules(build_dir))
+               | set(CORE_BUILTINS) | engine_modules(build_dir) | script_modules())
 
     caps = capabilities(build_dir)
     for item in evidence:

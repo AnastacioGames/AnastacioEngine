@@ -394,8 +394,9 @@ class SCENE_OT_range_web_validate(Operator):
         return {'FINISHED'}
 
 
-def _save_game_copy(game, game_copy):
-    """Copy of the saved .range for the package; prepared textures go in as KTX2 or DDS.
+def _save_game_copy(game, game_copy, sound_remap=None):
+    """Copy of the saved .range for the package; prepared textures go in as KTX2 or DDS, and
+    World Sound slots get the package-relative paths in `sound_remap` (restored afterwards).
 
     KTX2 (default) transcodes at load to what the GPU takes: BC on desktop browsers, ETC2 / ASTC
     on phones, RGBA otherwise. DDS uploads S3TC on desktop browsers and is decoded on phones.
@@ -405,13 +406,30 @@ def _save_game_copy(game, game_copy):
     import shutil
     from bl_operators import anastacio_prepare_textures as textures
     from bl_operators.anastacio_export_assets import _without_save_handlers
-    if not any(textures.KEY in image for image in bpy.data.images):
+    import contextlib
+    has_textures = any(textures.KEY in image for image in bpy.data.images)
+    entries = []
+    for world in bpy.data.worlds:
+        for module in getattr(world, "sound_modules", ()):
+            for entry in module.sounds:
+                new = (sound_remap or {}).get(os.path.normpath(bpy.path.abspath(entry.filepath))
+                                              if entry.filepath else "")
+                if new:
+                    entries.append((entry, entry.filepath, new))
+    if not has_textures and not entries:
         shutil.copy2(game, game_copy)
         return
     container = bpy.context.scene.range_web.texture_format
-    with textures.export_prepared_textures(container), _without_save_handlers():
-        saved = bpy.ops.wm.save_as_mainfile(filepath=game_copy, copy=True, relative_remap=False,
-                                            compress=False, check_existing=False)
+    prepared = textures.export_prepared_textures(container) if has_textures else contextlib.nullcontext()
+    try:
+        for entry, _old, new in entries:
+            entry.filepath = new
+        with prepared, _without_save_handlers():
+            saved = bpy.ops.wm.save_as_mainfile(filepath=game_copy, copy=True, relative_remap=False,
+                                                compress=False, check_existing=False)
+    finally:
+        for entry, old, _new in entries:
+            entry.filepath = old
     if 'FINISHED' not in saved:
         raise RuntimeError("could not save the game copy with the prepared textures")
 
@@ -457,7 +475,8 @@ class SCENE_OT_range_web_export(Operator):
             with tempfile.TemporaryDirectory() as scratch:
                 name = "pkg"
                 game_copy = os.path.join(scratch, os.path.splitext(os.path.basename(game))[0] + ".range")
-                _save_game_copy(game, game_copy)
+                sound_remap, sound_extras = collect_bpy.world_sound_remap(collect_bpy.project_root(), scratch)
+                _save_game_copy(game, game_copy, sound_remap)
                 cmd = [python, packager, "--game", game_copy, "--name", name,
                        "--runtime-dir", info.directory, "--out-dir", scratch]
                 # Versao unica por export: o ?v= impede o navegador de misturar runtime antigo em cache com o novo.
@@ -468,7 +487,7 @@ class SCENE_OT_range_web_export(Operator):
                     cmd.append("--debug-overlays")
                 if web_microphone_enabled(web):
                     cmd.append("--microphone")
-                for extra in extras:
+                for extra in sorted(set(extras) | set(sound_extras)):
                     cmd += ["--extra", extra]
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode != 0:
