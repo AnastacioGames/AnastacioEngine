@@ -202,14 +202,14 @@ static void imb_filterN(ImBuf *out, ImBuf *in)
 	if (in->rect && out->rect) {
 		for (int y = 0; y < in->y; y++) {
 			/* setup rows */
-			const char *row2 = (const char *)in->rect + y * channels * rowlen;
-			const char *row1 = (y == 0) ? row2 : row2 - channels * rowlen;
-			const char *row3 = (y == in->y - 1) ? row2 : row2 + channels * rowlen;
+			const unsigned char *row2 = (const unsigned char *)in->rect + y * channels * rowlen;
+			const unsigned char *row1 = (y == 0) ? row2 : row2 - channels * rowlen;
+			const unsigned char *row3 = (y == in->y - 1) ? row2 : row2 + channels * rowlen;
 
-			char *cp = (char *)out->rect + y * channels * rowlen;
+			unsigned char *cp = (unsigned char *)out->rect + y * channels * rowlen;
 
 			for (int x = 0; x < rowlen; x++) {
-				const char *r11, *r13, *r21, *r23, *r31, *r33;
+				const unsigned char *r11, *r13, *r21, *r23, *r31, *r33;
 
 				if (x == 0) {
 					r11 = row1;
