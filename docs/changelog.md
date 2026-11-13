@@ -8,6 +8,27 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-12 — Testes no celular (Find X3 Pro) e correções da página Web
+
+- **Aprovados no aparelho:** microfone no APK e no Chrome; layout de toque `race` com troca de controles no menu
+  e rotação (APK, Chrome e itch.io real em PC e celular); céu Sky Quality Very Low e UI Tree no toque; APK com
+  primeira abertura em modo avião, bloqueio de tela e volta do segundo plano.
+- **Demo ToqueCelular** (a1463fcda): `source/release/demos/ToqueCelular` (carro visto de cima, painel com cada
+  entrada do controle, menu de pausa no Start), gerada por `tools/debug/cenas/criar_cena_toque_race.py`, já com
+  Touch controls = Racing.
+- **Sair do jogo na Web** (eab493a64): o áudio seguia tocando com a tela preta e o "Entrar em VR" reaparecia.
+  Agora fecha o áudio, esconde o VR e mostra o botão Recarregar pagina.
+- **Contexto WebGL perdido** (8c1943cd3): o jogo morria em silêncio (rosto triste no canvas). O runtime não
+  recria a GPU, então a página avisa, suspende o áudio (fechar fazia o runtime lançar "AudioContext is closed")
+  e oferece recarregar. Forçado por `WEBGL_lose_context` no Chrome do celular.
+- **ESC na Web** (0be36a858, `LA_Launcher.cpp`): a tecla de saída cancelava o laço do Emscripten sem avisar a
+  página, e a tela congelava no último quadro (visto dentro de iframe). Na Web o ESC não encerra mais (o
+  navegador o usa para sair da tela cheia); outra tecla de saída escolhida pelo jogo segue valendo, e qualquer
+  saída do laço que não seja restart/troca de jogo mostra "Jogo encerrado". Restart/troca seguem congelando na
+  Web (roadmap). Editor, runtime e runtime Web compilados; revisado pelo Codex.
+- Ferramentas de teste usadas: DevTools do Chrome do celular por `adb forward localabstract:chrome_devtools_remote`
+  (console, toques, perda de contexto) e página local que imita o iframe do itch.io (outra origem).
+
 ## 2026-11-12 — Aceites com janela: Mind Map, Palette Atlas, Minimap, Track Tool, Rec Play
 
 - **Mind Map** (439fa61ee): barra de botões embaixo do mapa, por etapa do trabalho (Map com New, Idea, Look, Marks, Link, Find), entre os painéis T e N; ícones nos menus, no menu do botão direito e nos painéis. Open Link agora torna o objeto ativo e centraliza as 3D Views nele, troca a cena de verdade e abre o texto numa janela com Text Editor (`WM_WINDOW_TEXT` em `WM_window_open_temp`) quando o layout não tem um. Botões de cor, forma e ícone abrem a lista (`WM_menu_invoke`). Etapas 7-9 aceitas; falta só o FreeMind.
