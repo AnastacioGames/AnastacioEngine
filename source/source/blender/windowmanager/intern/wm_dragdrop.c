@@ -39,6 +39,7 @@
 
 #include "BKE_context.h"
 
+#include "IMB_imbuf.h"
 #include "IMB_imbuf_types.h"
 
 #include "UI_interface.h"
@@ -156,7 +157,11 @@ wmDrag *WM_event_start_drag(struct bContext *C, int icon, int type, void *poin, 
 
 void WM_event_drag_image(wmDrag *drag, ImBuf *imb, float scale, int sx, int sy)
 {
-	drag->imb = imb;
+	/* Own copy: the file browser may free its preview while the drag is still drawn. */
+	if (drag->imb) {
+		IMB_freeImBuf(drag->imb);
+	}
+	drag->imb = imb ? IMB_dupImBuf(imb) : NULL;
 	drag->scale = scale;
 	drag->sx = sx;
 	drag->sy = sy;
@@ -166,6 +171,9 @@ void WM_drag_free(wmDrag *drag)
 {
 	if ((drag->flags & WM_DRAG_FREE_DATA) && drag->poin) {
 		MEM_freeN(drag->poin);
+	}
+	if (drag->imb) {
+		IMB_freeImBuf(drag->imb);
 	}
 
 	MEM_freeN(drag);
