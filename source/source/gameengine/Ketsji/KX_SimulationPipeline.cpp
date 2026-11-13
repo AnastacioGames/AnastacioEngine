@@ -79,23 +79,6 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 
 		scene->UpdateObjectActivity();
 
-		// If we do not need Animations yet pass them.
-		if (m_engine->NeedsAnimation()) {
-
-			if (!scene->IsSuspended()) {
-				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations);
-				m_engine->UpdateAnimations(scene);
-				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations_deform);
-				/* A headless server (--server) keeps the poses (bone parents, logic) but skips the mesh
-				 * skinning: nobody sees the vertices and it was most of the idle server's CPU. */
-				if (deformAnimations || m_engine->IsServerMode()) {
-					// A restricted last pose pass can still have deformation pending from an
-					// earlier step. Servers discard that work instead of retaining it forever.
-					scene->UpdateAnimationDeformers(!m_engine->IsServerMode());
-				}
-			}
-		}
-
 		if (!scene->IsSuspended()) {
 			// Cutscene time advances by the scaled game step and only while the scene
 			// runs, so suspend and time scale pause/slow it with the rest (CLK-04). The scene retains
@@ -142,6 +125,30 @@ void KX_SimulationPipeline::Update(bool deformAnimations)
 			if (!scene->IsSuspended()) {
 				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_scenegraph_actuators);
 				scene->UpdateParents();
+			}
+		}
+
+		/* Animations after the logic, as in BGE/UPBGE: an action on delta_location must still move an
+		 * object whose script sets worldPosition every frame (the delta is applied on top of it).
+		 * If we do not need Animations yet pass them. */
+		if (m_engine->NeedsAnimation()) {
+
+			if (!scene->IsSuspended()) {
+				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations);
+				m_engine->UpdateAnimations(scene);
+				m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_animations_deform);
+				/* A headless server (--server) keeps the poses (bone parents, logic) but skips the mesh
+				 * skinning: nobody sees the vertices and it was most of the idle server's CPU. */
+				if (deformAnimations || m_engine->IsServerMode()) {
+					// A restricted last pose pass can still have deformation pending from an
+					// earlier step. Servers discard that work instead of retaining it forever.
+					scene->UpdateAnimationDeformers(!m_engine->IsServerMode());
+				}
+				// Kinematic bodies and bone parents need the animated matrices before the physics step.
+				if (m_engine->NeedsParents()) {
+					m_engine->GetLogger().StartLog(KX_KetsjiEngine::tc_scenegraph);
+					scene->UpdateParents();
+				}
 			}
 		}
 
