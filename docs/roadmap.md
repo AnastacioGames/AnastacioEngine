@@ -482,8 +482,8 @@ decisão do usuário. Plano em [android-export-plan.md](android-export-plan.md) 
   `web/`. Corrigido no código (`stage_release_web.py`, `android.template_dir()`); falta publicar a versão
   corrigida e rodar o pacote Linux com o script novo.
 - **Alternância manual de controles para menus (2026-10-14):** layout `race` + alternância aprovados no APK do Find X3 Pro
-  em 2026-11-12 (menu, retorno, rotação; demo `demos/ToqueCelular`). Iframe estilo itch.io conferido em simulação
-  local (outra origem, PC e celular) em 2026-11-12; falta o RolimaRacer real.
+  em 2026-11-12 (menu, retorno, rotação; demo `demos/ToqueCelular`). Aprovado no itch.io real (página em rascunho,
+  PC e celular, opção mobile + paisagem) em 2026-11-12; falta o RolimaRacer real.
 - **Web: reiniciar/trocar de jogo congela (2026-11-12):** `RESTART_GAME`/`START_OTHER_GAME` (atuador Game, Python)
   cancelam o laço do Emscripten e nada recomeça (o `set_main_loop` não retorna). ESC e demais saídas já avisam a página.
 
