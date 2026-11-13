@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-13 — Rec Play: blocos 3 e 4 aceitos com janela
+
+- Bloco 3 (pular/parar cutscene): `scene.stop_cutscene()` soltava a pose mas a ação do Take (Run) seguia tocando até o fim. `KX_Scene::EndCutsceneTakes` agora para as camadas dos clips já iniciados, a camada do Take antigo e o NLA (`Rec_`), no Stop e no Skip (1cd768d2e). Aceito com janela (teclas K/L por script).
+- Observação do teste: o WASD do Rec Studio só existe durante a gravação; no P o ator só responde se tiver lógica própria.
+- Bloco 4 (Generate Keyframes desligado/ligado): Watch toca corpo + ação; com a opção ligada aparece a Action `Rec_<ator>`. Aceito.
+
 ## 2026-11-12 — Testes no celular (Find X3 Pro) e correções da página Web
 
 - **Aprovados no aparelho:** microfone no APK e no Chrome; layout de toque `race` com troca de controles no menu

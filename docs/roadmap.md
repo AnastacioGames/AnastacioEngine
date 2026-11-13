@@ -357,7 +357,7 @@ Letterbox também feitos em 2026-11-01, aguardando teste no Windows.
 Plano escrito em 2026-11-06: botão próprio com ícone de gravação, captura ao vivo do personagem, saída em
 keyframes e em take próprio, gravação em camadas. Painel Motion Recording (só configuração) na aba Render em
 2026-11-06. Fases 1, 2 (captura e Action) e 2.5 (Takes, Max Duration, contador) feitas em 2026-11-06; 2.6 (Play Take no Cutscene), 3 (filhos e NLA) 4 (WASD e contagem), 5 (camadas, Watch, Rerecord), 6 (Movie) e 7 (Take em DNA, reprodução exata; pose por osso só reservada) também; próxima: Fase 8. Ver [plano](gravacao-de-movimento-plan.md).
-Blocos 1 e 2 do [roteiro](rec-play-roteiro-teste.md) aceitos com janela em 2026-11-12 (com Play on Start e o fix do arraste rápido); faltam os blocos 3-7.
+Blocos 1 e 2 do [roteiro](rec-play-roteiro-teste.md) aceitos com janela em 2026-11-12 (com Play on Start e o fix do arraste rápido); blocos 3 e 4 aceitos em 2026-11-13 (Stop/Skip agora desligam a animação do Take, 1cd768d2e); faltam os blocos 5-7.
 
 ### World Status
 
