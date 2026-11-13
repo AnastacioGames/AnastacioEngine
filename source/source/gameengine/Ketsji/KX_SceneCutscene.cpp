@@ -808,6 +808,17 @@ void KX_Scene::EndCutsceneTakes(bool finish)
 			replay.m_object->NodeUpdate();
 			replay.m_object->SynchronizeTransform();
 		}
+		/* The clips the take started would keep the actor walking where it stopped. */
+		const MotionTakeActor *actor = replay.m_actor;
+		for (int c = 0; c < replay.m_clip && c < actor->clips_num; c++) {
+			replay.m_object->StopAction(actor->clips[c].layer);
+		}
+		if (actor->samples_num < 2 && actor->action_name[0]) {
+			replay.m_object->StopAction(MOTION_TAKE_LAYER);
+		}
+		if (actor->track_prefix[0]) {
+			replay.m_object->StopNla();
+		}
 		if (replay.m_endsLogicHold) {
 			EndMotionHold(replay.m_object, m_physicsEnvironment);
 		}
