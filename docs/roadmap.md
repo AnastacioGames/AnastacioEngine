@@ -20,7 +20,7 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## Mind Map
 
-Versão 1 (etapas 1-6 de [plano-mind-map.md](plano-mind-map.md)) aguardando aceite com janela. Falta abrir um `.mm` real do FreeMind e abrir no FreeMind um arquivo exportado. Etapa 7 (vínculos com objeto, cena e texto, tarefas com progresso por ramo) implementada, aguardando aceite com janela.
+Etapas 1-9 de [plano-mind-map.md](plano-mind-map.md) aceitas com janela em 2026-11-12 (vínculos, tarefas, busca, área de transferência, grupo, PNG), com barra de botões por etapa e Open Link que mostra o alvo (439fa61ee). Falta só abrir um `.mm` real do FreeMind e abrir no FreeMind um arquivo exportado.
 
 ## Microfone
 
@@ -30,8 +30,9 @@ aprovados no Find X3 Pro em 2026-11-12 (permissão, gravar, tocar, efeitos).
 ## Track Tool (pistas e vias)
 
 - [Plano](plano-track-tool.md): F0-F5 implementadas (09718960: gerador por faixas, inclinação, terreno,
-  decoração, prédios e `Range.track` em C++ com testes em `tools/debug/track_tool/`). Faltam o aceite visual
-  com janela e a F6 (cruzamentos e bifurcações).
+  decoração, prédios e `Range.track` em C++ com testes em `tools/debug/track_tool/`). Aceite com janela em
+  2026-11-12 (Add > Track, Generate, inclinação pelo Bank and Points; o Tilt da curva é ignorado). Falta a F6
+  (cruzamentos e bifurcações).
 - [Light Probe Volumes na pista](plano-track-probes.md): P1-P3 feitas; Pista_4 a 60 fps na RX 6800M. Em andamento:
   luz guardada em `<cena>.probes` (23 de 119 volumes), teste de PC fraco e aceite visual. O export já leva o
   `.probes` no pacote, e o botão Bake Probes captura todos os volumes de uma vez (2026-11-11). Faltam o bake da
@@ -356,6 +357,7 @@ Letterbox também feitos em 2026-11-01, aguardando teste no Windows.
 Plano escrito em 2026-11-06: botão próprio com ícone de gravação, captura ao vivo do personagem, saída em
 keyframes e em take próprio, gravação em camadas. Painel Motion Recording (só configuração) na aba Render em
 2026-11-06. Fases 1, 2 (captura e Action) e 2.5 (Takes, Max Duration, contador) feitas em 2026-11-06; 2.6 (Play Take no Cutscene), 3 (filhos e NLA) 4 (WASD e contagem), 5 (camadas, Watch, Rerecord), 6 (Movie) e 7 (Take em DNA, reprodução exata; pose por osso só reservada) também; próxima: Fase 8. Ver [plano](gravacao-de-movimento-plan.md).
+Blocos 1 e 2 do [roteiro](rec-play-roteiro-teste.md) aceitos com janela em 2026-11-12 (com Play on Start e o fix do arraste rápido); faltam os blocos 3-7.
 
 ### World Status
 

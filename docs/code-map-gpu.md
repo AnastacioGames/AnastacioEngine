@@ -4,15 +4,15 @@ Guia de navegação para os arquivos de material e shader da GPU, que mais mudam
 engine (sombra, céu, Filmic, SSGI, nós de shader, sondas, lightmap). Não descreve arquitetura; é só um
 índice para achar a função certa sem ler 7 mil linhas.
 
-**Linhas conferidas em 2026-11-11 (`HEAD` `ea404e40`).** Os números envelhecem a cada edição: use-os como
+**Linhas conferidas em 2026-11-12 (`HEAD` `f830ce8e`).** Os números envelhecem a cada edição: use-os como
 ponto de partida e confirme com `grep -n "nome_da_funcao" arquivo`. `python tools/check_docs.py --fix`
 corrige os números deste mapa.
 
 Arquivos vizinhos:
 
-- [`GPU_material.h`](../source/source/blender/gpu/GPU_material.h) (659 linhas): API pública. Enums
+- [`GPU_material.h`](../source/source/blender/gpu/GPU_material.h) (660 linhas): API pública. Enums
   `GPUBuiltin` e `GPUDynamicType` (uniforms dinâmicos), `GPUShadeInput`/`GPUShadeResult`.
-- [`gpu_codegen.c`](../source/source/blender/gpu/intern/gpu_codegen.c) (3.798 linhas): monta o GLSL final
+- [`gpu_codegen.c`](../source/source/blender/gpu/intern/gpu_codegen.c) (4.038 linhas): monta o GLSL final
   a partir do grafo de nós; cola `gpu_shader_material.glsl` inteiro como biblioteca de funções.
 - Nós de shader do editor: `source/source/blender/nodes/shader/nodes/node_shader_*.c`. Cada um chama
   `GPU_stack_link(mat, "nome_glsl", in, out)`, que é o nome da função em `gpu_shader_material.glsl`.

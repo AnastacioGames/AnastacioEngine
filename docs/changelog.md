@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-12 — Aceites com janela: Mind Map, Palette Atlas, Minimap, Track Tool, Rec Play
+
+- **Mind Map** (439fa61ee): barra de botões embaixo do mapa, por etapa do trabalho (Map com New, Idea, Look, Marks, Link, Find), entre os painéis T e N; ícones nos menus, no menu do botão direito e nos painéis. Open Link agora torna o objeto ativo e centraliza as 3D Views nele, troca a cena de verdade e abre o texto numa janela com Text Editor (`WM_WINDOW_TEXT` em `WM_window_open_temp`) quando o layout não tem um. Botões de cor, forma e ícone abrem a lista (`WM_menu_invoke`). Etapas 7-9 aceitas; falta só o FreeMind.
+- **Palette Atlas**: Palette, Bake misto, jogo e Restore aceitos com janela.
+- **Minimap**: Add > Minimap, painel Show on Minimap com cor e jogo aceitos com janela.
+- **Track Tool**: F0-F5 aceitas com janela; a inclinação fica no painel Bank and Points (Auto ou Manual por ponto), o Tilt da curva é ignorado de propósito.
+- **Cutscene: Play on Start** (c7f3fd185): caixa por sequência (bit em `CutsceneSequence.flag`, sem mudar a struct); a primeira marcada começa com a cena, como `scene.play_cutscene(i)`. Add to Cutscene liga a caixa se nenhuma estiver marcada. Testado no runtime `--server` com e sem a caixa. Abas Scenery e Characters do Rec Studio com ícones WORLD e POSE_HLT.
+- **Arraste com miniatura** (f830ce8eb): `WM_event_drag_image` guarda cópia própria do ImBuf e `WM_drag_free` a libera. Antes, arrastar rápido no Rec Studio fechava a engine: a lista de arquivos liberava o preview enquanto `wm_drags_draw` ainda o desenhava (falha herdada do Blender).
+- **Rec Play**: blocos 1 e 2 do roteiro aceitos com janela. Só objetos marcados como ator (botão com o nome no painel do Rec Studio) entram no Take.
+
 ## 2026-11-12 — GPU Skinning: limite de ossos pelo aparelho (celular)
 
 - No celular (WebGL2, Adreno 660, 256 vetores de uniform no vertex shader) os shaders de sombra e de fundo preto do GPU Skinning não linkavam: `mat4 boneMatrices[64]` sozinho já ocupa 256 vetores.
