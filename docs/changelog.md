@@ -8,6 +8,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-13 — Animações depois da lógica (delta transform com script)
+
+- `8ca171412`: relato do musikai (`delta_anim.blend`): action em `delta_location` não movia a raquete quando um
+  script gravava `worldPosition` todo quadro; na UPBGE 0.2.5 e na Range 1.6 move. Causa: `KX_SimulationPipeline`
+  aplicava as animações antes de `LogicBeginFrame`, e o script apagava o resultado do `KX_IpoController`. O bloco
+  de animações (com deformadores) passou para depois de `LogicEndFrame` + `UpdateParents` dos actuators, seguido de
+  `UpdateParents` para kinematic e bone parents antes da física (ponto do Codex, aceito).
+- Efeitos: a action começa no mesmo passo em que o actuator dispara (antes, um passo depois); Animation Events
+  chegam à lógica um passo depois; o script lê objeto animado e filho de osso do mesmo passo (antes misturava).
+- Teste com câmera e capturas: antes parada (x 229→229), UPBGE 229→160, Range 1.6 229→132, corrigido 228→132.
+  Antes × depois: skinning CPU e GPU iguais (só um passo de fase), filho de osso OK, eventos sem perda/duplicação,
+  12/12 casos `jogo_`. `revisao_animacao_player.py` passou 9 de 11; uma falha foi 57 linhas no caso `normal` (o
+  script de teste roda um passo após `endGame()` no catch-up das travadas de 90 ms), a outra não teve o caso
+  registrado; não comparado com o binário antigo.
+
 ## 2026-11-13 — Export Web: sons do World Sound e módulos de scripts/modules
 
 - `4e6dc03e`: os slots do World Sound (World > Sound) iam para o pacote com caminho absoluto do Windows, que não
