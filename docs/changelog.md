@@ -129,6 +129,19 @@ ordem de estudo:
   cada passo só fica verdadeiro depois do anterior. Open Link e Quick Guide avançam pelo botão Próximo.
 - Sem cena inicial: funciona em qualquer arquivo. Falta o aceite com janela.
 
+## 2026-11-14 — Tutoriais 30 a 33 e presets de shader ligados sozinhos
+
+- `camera_foco`: câmera › aba da câmera › Focus & Tracking (Object = Cube, Look At) › Camera Effects ›
+  Depth of Field › P. `sombra_realista`: sol › aba da luz › setinha de Buffer & Quality › Look Realistic.
+  `shader_preset`: Node Editor › Shader › Use Nodes › faixa › Toon + Rim. `decimate_hq`: Monkey › Modifiers ›
+  Decimate › Ratio 0.3 › comparar High Quality (já vem marcado).
+- **Presets de shader (`node.shader_preset_add`)**: a saída Color do preset agora liga sozinha na entrada de cor
+  do shader que chega à saída do material ("Base Color"/"Color"), também no material antigo (Output +
+  Extended Material) e nos presets sem Alpha (Toon + Rim, Triplanar...). Antes ficavam soltos e o P não
+  mostrava nada. Só liga entrada livre e não mexe quando a saída vem de um Mix Shader.
+- Revisão do Codex: aceito usar a saída de material **ativa** (e não a primeira) no Color, no recorte por Alpha
+  e no Vertex Offset.
+
 ## 2026-11-14 — Tutoriais 27 a 29: Occlusion Culling, Video Player e microfone
 
 - `occlusion_culling`: aba Scene › Physics › Culling (Occlusion Culling já vem ligado) › Automatic Occluders › P.

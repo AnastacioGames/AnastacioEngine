@@ -1,0 +1,157 @@
+{
+  "titulo": {
+    "pt": "30. Câmera que foca e segue o cubo",
+    "en": "30. A camera that focuses on and follows the cube",
+    "es": "30. Cámara que enfoca y sigue el cubo"
+  },
+  "categoria": "Camera",
+  "resumo": {
+    "pt": "Foco no objeto com desfoque do fundo (Depth of Field) e a câmera girando para acompanhar.",
+    "en": "Focus on the object with a blurred background (Depth of Field) and the camera turning to follow it.",
+    "es": "Enfoque en el objeto con el fondo desenfocado (Depth of Field) y la cámara girando para seguirlo."
+  },
+  "abertura": {
+    "pt": "Vamos fazer a câmera focar no cubo, desfocar o resto e virar sozinha atrás dele.",
+    "en": "Let's make the camera focus on the cube, blur the rest and turn by itself to follow it.",
+    "es": "Vamos a hacer que la cámara enfoque el cubo, desenfoque el resto y gire sola tras él."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique com o botão direito na câmera.",
+        "en": "In the 3D View, right-click the camera.",
+        "es": "En la 3D View, haz clic derecho en la cámara."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'CAMERA'"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Ou clique no nome dele no Outliner, à esquerda.",
+        "en": "Or click its name in the Outliner, on the left.",
+        "es": "O haz clic en su nombre en el Outliner, a la izquierda."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba da câmera.",
+        "en": "In Properties, open the camera tab.",
+        "es": "En Properties, abre la pestaña de la cámara."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'DATA' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "É o ícone de câmera na coluna de abas.",
+        "en": "It is the camera icon in the tab column.",
+        "es": "Es el ícono de cámara en la columna de pestañas."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "NAVIGATION_BAR",
+        "botao": "prop:context=DATA"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Abra o painel Focus & Tracking e clique em Object.",
+        "en": "Open the Focus & Tracking panel and click Object.",
+        "es": "Abre el panel Focus & Tracking y haz clic en Object."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'CAMERA' and C.object.data.game_fx.focus_mode == 'OBJECT'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:focus_mode=OBJECT"
+      },
+      "dica": {
+        "pt": "Clique no título Focus & Tracking para abrir o painel.",
+        "en": "Click the Focus & Tracking title to open the panel.",
+        "es": "Haz clic en el título Focus & Tracking para abrir el panel."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No campo Object logo abaixo, escolha Cube.",
+        "en": "In the Object field right below, pick Cube.",
+        "es": "En el campo Object justo debajo, elige Cube."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'CAMERA' and C.object.data.dof_object is not None"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:dof_object"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Tracking, clique em Look At.",
+        "en": "In Tracking, click Look At.",
+        "es": "En Tracking, haz clic en Look At."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'CAMERA' and C.object.data.game_fx.track_mode == 'LOOK_AT'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "A câmera gira no próprio eixo para manter o cubo na tela.",
+        "en": "The camera turns on its own axis to keep the cube on screen.",
+        "es": "La cámara gira sobre su eje para mantener el cubo en pantalla."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:track_mode=LOOK_AT"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Abra o painel Camera Effects e marque Depth of Field.",
+        "en": "Open the Camera Effects panel and check Depth of Field.",
+        "es": "Abre el panel Camera Effects y marca Depth of Field."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'CAMERA' and C.object.data.game_fx.use_dof"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Camera Effects começa fechado: clique no título dele para abrir.",
+        "en": "Camera Effects starts closed: click its title to open it.",
+        "es": "Camera Effects empieza cerrado: haz clic en su título para abrirlo."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_dof"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P: o cubo nítido e o fundo desfocado. Esc sai.",
+        "en": "Mouse over the 3D View, press P: a sharp cube and a blurred background. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P: el cubo nítido y el fondo desenfocado. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Em Camera Effects também há Speed Blur, Directional Blur e Vignette.",
+    "en": "Done! Camera Effects also has Speed Blur, Directional Blur and Vignette.",
+    "es": "¡Listo! Camera Effects también tiene Speed Blur, Directional Blur y Vignette."
+  }
+}

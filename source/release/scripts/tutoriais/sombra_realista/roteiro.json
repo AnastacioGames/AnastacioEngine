@@ -1,0 +1,113 @@
+{
+  "titulo": {
+    "pt": "31. Sombra suave e realista",
+    "en": "31. Soft, realistic shadows",
+    "es": "31. Sombra suave y realista"
+  },
+  "categoria": "Render",
+  "resumo": {
+    "pt": "Look Realistic: a sombra fica nítida perto do objeto e borrada longe dele.",
+    "en": "Look Realistic: the shadow is sharp near the object and blurry far from it.",
+    "es": "Look Realistic: la sombra es nítida cerca del objeto y borrosa lejos de él."
+  },
+  "abertura": {
+    "pt": "Vamos trocar a sombra dura por uma que se espalha com a distância, como na vida real.",
+    "en": "Let's swap the hard shadow for one that spreads with distance, like in real life.",
+    "es": "Vamos a cambiar la sombra dura por una que se extiende con la distancia, como en la vida real."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique com o botão direito no sol (a luz).",
+        "en": "In the 3D View, right-click the sun (the light).",
+        "es": "En la 3D View, haz clic derecho en el sol (la luz)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'LAMP'"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "É o círculo com raios, no céu da cena.",
+        "en": "It is the circle with rays, in the scene sky.",
+        "es": "Es el círculo con rayos, en el cielo de la escena."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba da luz.",
+        "en": "In Properties, open the light tab.",
+        "es": "En Properties, abre la pestaña de la luz."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'DATA' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "NAVIGATION_BAR",
+        "botao": "prop:context=DATA"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Use Shadow, clique na setinha de Buffer & Quality.",
+        "en": "In Use Shadow, click the small arrow of Buffer & Quality.",
+        "es": "En Use Shadow, haz clic en la flechita de Buffer & Quality."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'LAMP' and C.object.data.show_expanded_lamp_shadow_buffer"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Use Shadow fica abaixo de Lamp: role a Properties.",
+        "en": "Use Shadow is below Lamp: scroll Properties.",
+        "es": "Use Shadow está debajo de Lamp: desplaza Properties."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:show_expanded_lamp_shadow_buffer"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Look, clique em Realistic.",
+        "en": "Under Look, click Realistic.",
+        "es": "En Look, haz clic en Realistic."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'LAMP' and C.object.data.shadow_filter == 'PCF_PENUMBRA'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Hard é a sombra dura; Soft borra por igual; Realistic muda com a distância.",
+        "en": "Hard is the hard shadow; Soft blurs evenly; Realistic changes with distance.",
+        "es": "Hard es la sombra dura; Soft desenfoca por igual; Realistic cambia con la distancia."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:shadow_filter=PCF_PENUMBRA"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e veja a ponta da sombra do cubo. Esc sai.",
+        "en": "Mouse over the 3D View, press P and look at the tip of the cube's shadow. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P y mira la punta de la sombra del cubo. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Em Low e Very Low a Realistic vira Hard sozinha, para não pesar em PC fraco.",
+    "en": "Done! On Low and Very Low, Realistic turns Hard by itself so it stays light on weak PCs.",
+    "es": "¡Listo! En Low y Very Low, Realistic pasa a Hard sola para no pesar en PC débiles."
+  }
+}

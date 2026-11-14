@@ -1,0 +1,125 @@
+{
+  "titulo": {
+    "pt": "33. Deixar um modelo mais leve (Decimate)",
+    "en": "33. Make a model lighter (Decimate)",
+    "es": "33. Hacer un modelo más liviano (Decimate)"
+  },
+  "categoria": "Optimization",
+  "resumo": {
+    "pt": "Menos triângulos sem estragar a forma, com o Decimate em High Quality.",
+    "en": "Fewer triangles without ruining the shape, with Decimate in High Quality.",
+    "es": "Menos triángulos sin estropear la forma, con Decimate en High Quality."
+  },
+  "abertura": {
+    "pt": "Vamos tirar triângulos de um modelo para o jogo rodar mais leve.",
+    "en": "Let's remove triangles from a model so the game runs lighter.",
+    "es": "Vamos a quitar triángulos de un modelo para que el juego corra más liviano."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, abra Add › Mesh › Monkey.",
+        "en": "In the 3D View, open Add › Mesh › Monkey.",
+        "es": "En la 3D View, abre Add › Mesh › Monkey."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'MESH' and C.object.name.startswith('Suzanne')"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Monkey fica dentro de Mesh, perto do fim da lista.",
+        "en": "Monkey is inside Mesh, near the end of the list.",
+        "es": "Monkey está dentro de Mesh, cerca del final de la lista."
+      },
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Monkey"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Modifiers (a chave inglesa).",
+        "en": "In Properties, open the Modifiers tab (the wrench).",
+        "es": "En Properties, abre la pestaña Modifiers (la llave inglesa)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'MODIFIER' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "NAVIGATION_BAR",
+        "botao": "prop:context=MODIFIER"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Modifier e escolha Decimate.",
+        "en": "Click Add Modifier and pick Decimate.",
+        "es": "Haz clic en Add Modifier y elige Decimate."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and any(m.type == 'DECIMATE' for m in C.object.modifiers)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Add Modifier",
+        "menu": "Decimate"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Troque Ratio para 0.3.",
+        "en": "Set Ratio to 0.3.",
+        "es": "Cambia Ratio a 0.3."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and any(m.type == 'DECIMATE' for m in C.object.modifiers) and any(m.type == 'DECIMATE' and m.ratio <= 0.5 for m in C.object.modifiers)"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "0.3 = fica 30% dos triângulos. Veja a contagem em Face Count, embaixo.",
+        "en": "0.3 = 30% of the triangles stay. See the count in Face Count, below.",
+        "es": "0.3 = queda el 30% de los triángulos. Mira la cuenta en Face Count, abajo."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ratio"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Desmarque High Quality e veja a forma piorar; depois marque de novo e clique em Next.",
+        "en": "Uncheck High Quality and watch the shape get worse; then check it again and click Next.",
+        "es": "Desmarca High Quality y mira cómo empeora la forma; luego márcalo otra vez y haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Com High Quality, olhos e orelhas mantêm a forma e as costuras de UV ficam no lugar.",
+        "en": "With High Quality, eyes and ears keep their shape and UV seams stay in place.",
+        "es": "Con High Quality, ojos y orejas mantienen la forma y las costuras de UV quedan en su lugar."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_collapse_quality"
+      }
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Para vários modelos de uma vez, use Performance › Optimize Scene › Generate LODs (tutorial 20).",
+    "en": "Done! For many models at once, use Performance › Optimize Scene › Generate LODs (tutorial 20).",
+    "es": "¡Listo! Para muchos modelos a la vez, usa Performance › Optimize Scene › Generate LODs (tutorial 20)."
+  }
+}

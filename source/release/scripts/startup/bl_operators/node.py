@@ -894,12 +894,17 @@ class NODE_OT_shader_preset_add(Operator):
                 space.tree_type == 'ShaderNodeTree' and space.edit_tree is not None)
 
     @staticmethod
+    def material_output(tree):
+        """The output the material uses: the active one (Material Output or the old Output), else the first."""
+        outputs = [n for n in tree.nodes if n.type in {'OUTPUT_MATERIAL', 'OUTPUT'}]
+        return next((n for n in outputs if getattr(n, "is_active_output", False)), outputs[0] if outputs else None)
+
+    @staticmethod
     def link_alpha(tree, node):
         """Wire the preset: Color to the shader on the output and Alpha as a cut-out
         (Mix Shader between a Transparent BSDF and that shader)."""
-        for output in tree.nodes:
-            if output.type != 'OUTPUT_MATERIAL' or "Surface" not in output.inputs:
-                continue
+        output = NODE_OT_shader_preset_add.material_output(tree)
+        if output is not None and output.type == 'OUTPUT_MATERIAL' and "Surface" in output.inputs:
             surface = output.inputs["Surface"]
             if not surface.is_linked:
                 return
@@ -924,6 +929,26 @@ class NODE_OT_shader_preset_add(Operator):
             tree.links.new(mix.outputs[0], surface)
             return
 
+    @staticmethod
+    def link_color(tree, node):
+        """Wire the preset Color to the color input of the shader on the output, when that input is free:
+        Base Color of a BSDF (PBR nodes) or Color of the node feeding the old Output (Extended Material)."""
+        output = NODE_OT_shader_preset_add.material_output(tree)
+        if "Color" not in node.outputs or output is None:
+            return
+        name = "Surface" if output.type == 'OUTPUT_MATERIAL' else "Color"
+        socket = output.inputs.get(name)
+        if socket is None or not socket.is_linked:
+            return
+        shader = socket.links[0].from_node
+        if shader == node or shader.type == 'MIX_SHADER':
+            return
+        for name in ("Base Color", "Color"):
+            if name in shader.inputs:
+                if not shader.inputs[name].is_linked:
+                    tree.links.new(node.outputs["Color"], shader.inputs[name])
+                break
+
     def execute(self, context):
         space = context.space_data
         tree = space.edit_tree
@@ -938,13 +963,11 @@ class NODE_OT_shader_preset_add(Operator):
         tree.nodes.active = node
 
         # Offset goes to the Material Output "Vertex Offset" when it is free.
-        if "Offset" in node.outputs:
-            for output in tree.nodes:
-                if output.type in {'OUTPUT_MATERIAL', 'OUTPUT'} and "Vertex Offset" in output.inputs:
-                    socket = output.inputs["Vertex Offset"]
-                    if not socket.is_linked:
-                        tree.links.new(node.outputs["Offset"], socket)
-                    break
+        output = self.material_output(tree)
+        if "Offset" in node.outputs and output is not None and "Vertex Offset" in output.inputs:
+            socket = output.inputs["Vertex Offset"]
+            if not socket.is_linked:
+                tree.links.new(node.outputs["Offset"], socket)
 
         # Presets with an Alpha cut pixels out: the material needs Alpha Clip.
         mat = getattr(space, "id", None)
@@ -952,6 +975,9 @@ class NODE_OT_shader_preset_add(Operator):
             if mat.game_settings.alpha_blend == 'OPAQUE':
                 mat.game_settings.alpha_blend = 'CLIP'
             self.link_alpha(tree, node)
+        # Without the PBR cut-out above (Color only, or the old Extended Material output) the Color still
+        # reaches the material; with it, link_color sees the Mix Shader and leaves the tree alone.
+        self.link_color(tree, node)
         return {'FINISHED'}
 
 

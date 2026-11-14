@@ -1,6 +1,6 @@
 # Plano: Tutoriais (dentro da engine + vídeo curto)
 
-Data: 2026-11-13. Status (2026-11-14): 32 tutoriais prontos, todos aguardando aceite com janela.
+Data: 2026-11-13. Status (2026-11-14): 36 tutoriais prontos, todos aguardando aceite com janela.
 
 ## Catálogo
 
@@ -41,6 +41,10 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | 27 | Optimization | Não desenhar o que está atrás das paredes (Occlusion Culling) | `occlusion_culling` |
 | 28 | Video | Vídeo tocando no jogo (Video Player) | `video_player` |
 | 29 | Sound | Fazer o cubo subir com a voz (Microphone) | `microfone_pular` |
+| 30 | Camera | Câmera que foca e segue o cubo (Focus & Tracking, Depth of Field) | `camera_foco` |
+| 31 | Render | Sombra suave e realista | `sombra_realista` |
+| 32 | Node Editor/Shader | Material pronto com nós (presets) | `shader_preset` |
+| 33 | Optimization | Deixar um modelo mais leve (Decimate) | `decimate_hq` |
 | — | Node Editor/UI Tree | Primeiro menu de jogo (piloto) | `ui_tree_menu` |
 | — | Node Editor/UI Tree | Os nós de HUD | `ui_tree_hud` |
 | — | Mind Map | A barra do Mind Map | `mind_map_barra` |
@@ -51,14 +55,16 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 |---|---|---|
 | Input | Mapear ações (teclado, gamepad, toque) na aba Input | fora por ora: estado difícil de conferir |
 | Locale | Jogo em vários idiomas (Range.locale, Language Button) | fora por ora: pede editar o CSV |
-| Camera FX | Efeitos de câmera (grão, Directional Blur) | reservado 2026-11-14 (sessão local, main) |
+| Camera FX | Foco, rastreio e Depth of Field | feito: 30 (`camera_foco`); Speed/Directional Blur e Camera Shake ficam para outro |
 | Render | Céu: Sky Layers, nuvens, Sky Quality | feito: 21 (`ceu_entardecer`); Sky Layers e Sky Quality ficam para outro |
 | Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | feito: 23 (`chuva_nevoa`, chuva + névoa); falta raios e fumaça/fogo |
 | Render | Compositing no jogo (faixa de efeitos e presets) | feito: 24 (`compositing_efeitos`) |
 | Render | Light Probe Volume e Bake Probes | feito: 25 (`probe_volume_luz`) |
 | Render | SSGI | feito: 26 (`ssgi_luz`) |
-| Render | Sombra colorida e PCSS (sombra suave) | reservado 2026-11-14 (sessão local, main) |
-| Shader | Nós de shader e Nodes GLSL por arquivo | reservado 2026-11-14 (sessão local, main) |
+| Render | Sombra suave (PCSS, Look Realistic) | feito: 31 (`sombra_realista`) |
+| Render | Sombra colorida | falta: pede material transparente montado antes |
+| Shader | Presets de shader | feito: 32 (`shader_preset`) |
+| Shader | Nodes GLSL por arquivo | falta |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player | feito: 28 (`video_player`); legendas e actuator Video ficam para outro |
 | Video | Screencast (gravar o jogo) | feito: 22 (`screencast_gravar`) |
@@ -72,7 +78,8 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Optimization | Static Batch | fora: ligado por padrão (Auto Static Batch), nada a ensinar |
 | Optimization | Simulador de PC fraco | feito dentro do 14 (`performance_medir`) |
 | Debug | Game Trace e Trace Doctor | fora: roda por launcher externo (`tools/debug/game_trace_launcher.py`) e pede trace gravado |
-| Textures | Prepare Textures (DDS/KTX2) e Decimate High Quality | reservado 2026-11-14 (sessão local, main) |
+| Textures | Decimate High Quality | feito: 33 (`decimate_hq`) |
+| Textures | Prepare Textures (DDS/KTX2) | falta: pede cena salva com texturas |
 
 ## Objetivo
 

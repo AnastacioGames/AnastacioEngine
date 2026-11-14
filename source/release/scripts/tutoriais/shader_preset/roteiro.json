@@ -1,0 +1,146 @@
+{
+  "titulo": {
+    "pt": "32. Material pronto com nós (Toon, Holograma, Água...)",
+    "en": "32. Ready-made node materials (Toon, Hologram, Water...)",
+    "es": "32. Materiales listos con nodos (Toon, Holograma, Agua...)"
+  },
+  "categoria": "Node Editor/Shader",
+  "resumo": {
+    "pt": "A faixa de presets do Shader: um clique e o cubo vira desenho animado, holograma ou pelo.",
+    "en": "The Shader preset strip: one click and the cube turns cartoon, hologram or fur.",
+    "es": "La franja de presets del Shader: un clic y el cubo se vuelve dibujo animado, holograma o pelo."
+  },
+  "abertura": {
+    "pt": "Vamos dar ao cubo um material especial sem montar nenhum nó à mão.",
+    "en": "Let's give the cube a special material without building any node by hand.",
+    "es": "Vamos a darle al cubo un material especial sin armar ningún nodo a mano."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique com o botão direito no cubo.",
+        "en": "In the 3D View, right-click the cube.",
+        "es": "En la 3D View, haz clic derecho en el cubo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'MESH' and C.object.select"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Ou clique no nome dele no Outliner, à esquerda.",
+        "en": "Or click its name in the Outliner, on the left.",
+        "es": "O haz clic en su nombre en el Outliner, a la izquierda."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Node Editor.",
+        "en": "Change the bottom area to Node Editor.",
+        "es": "Cambia el área de abajo a Node Editor."
+      },
+      "narracao": "",
+      "checagem": "node_editor",
+      "destaque": "BAIXO",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Node Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho, clique em Shader.",
+        "en": "In the header, click Shader.",
+        "es": "En el encabezado, haz clic en Shader."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'NODE_EDITOR' and a.spaces.active.tree_type == 'ShaderNodeTree' for a in C.screen.areas)"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "prop:tree_type=ShaderNodeTree"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Marque Use Nodes.",
+        "en": "Check Use Nodes.",
+        "es": "Marca Use Nodes."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.active_material is not None and C.object.active_material.use_nodes"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "prop:use_nodes"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No canto de baixo do Node Editor, clique no botão de imagem ao lado de Auto Arrange.",
+        "en": "At the bottom corner of the Node Editor, click the image button next to Auto Arrange.",
+        "es": "En la esquina de abajo del Node Editor, haz clic en el botón de imagen al lado de Auto Arrange."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(r.type == 'TOOL_PROPS' and r.width > 1 for a in C.screen.areas if a.type == 'NODE_EDITOR' for r in a.regions)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Ou abra View › Effects Shelf.",
+        "en": "Or open View › Effects Shelf.",
+        "es": "O abre View › Effects Shelf."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:NODE_OT_effects_shelf"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Na faixa, clique em Toon + Rim.",
+        "en": "In the strip, click Toon + Rim.",
+        "es": "En la franja, haz clic en Toon + Rim."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.active_material is not None and C.object.active_material.node_tree is not None and any(l.from_node.type == 'GROUP' for l in C.object.active_material.node_tree.links)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Qualquer preset serve: passe o mouse para ver o que cada um faz.",
+        "en": "Any preset works: hover to see what each one does.",
+        "es": "Cualquier preset sirve: pasa el ratón para ver qué hace cada uno."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "TOOL_PROPS",
+        "botao": "op:NODE_OT_shader_preset_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e veja o cubo. Esc sai.",
+        "en": "Mouse over the 3D View, press P and look at the cube. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P y mira el cubo. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! O preset vira um grupo de nós: dê Tab nele para editar por dentro.",
+    "en": "Done! The preset becomes a node group: press Tab on it to edit it inside.",
+    "es": "¡Listo! El preset se vuelve un grupo de nodos: pulsa Tab sobre él para editarlo por dentro."
+  }
+}
