@@ -129,6 +129,13 @@ ordem de estudo:
   cada passo só fica verdadeiro depois do anterior. Open Link e Quick Guide avançam pelo botão Próximo.
 - Sem cena inicial: funciona em qualquer arquivo. Falta o aceite com janela.
 
+## 2026-11-14 — Tutoriais 27 a 29: Occlusion Culling, Video Player e microfone
+
+- `occlusion_culling`: aba Scene › Physics › Culling (Occlusion Culling já vem ligado) › Automatic Occluders › P.
+- `video_player`: cubo › aba Object › Game › Add Video Player › pasta ao lado de File › P (vídeo no material).
+- `microfone_pular`: sensor Microphone + And + Motion (Z 0.05), ligados arrastando, no molde do tutorial 4.
+- Game Trace fica fora (launcher externo); Static Batch fora (já vem ligado).
+
 ## 2026-11-14 — Tutoriais 24 a 26: Compositing, Light Probe Volume e SSGI
 
 - `compositing_efeitos`: Node Editor › Compositing › Use Nodes › botão da faixa de efeitos (ao lado de

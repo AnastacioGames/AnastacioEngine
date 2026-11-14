@@ -1,0 +1,130 @@
+{
+  "titulo": {
+    "pt": "28. Vídeo tocando no jogo (Video Player)",
+    "en": "28. A video playing in the game (Video Player)",
+    "es": "28. Un video en el juego (Video Player)"
+  },
+  "categoria": "Video",
+  "resumo": {
+    "pt": "Um vídeo na face de um objeto ou em tela cheia, sem código.",
+    "en": "A video on an object's face or fullscreen, with no code.",
+    "es": "Un video en la cara de un objeto o en pantalla completa, sin código."
+  },
+  "abertura": {
+    "pt": "Vamos fazer um vídeo tocar na superfície do cubo.",
+    "en": "Let's make a video play on the cube's surface.",
+    "es": "Vamos a hacer que un video se reproduzca en la superficie del cubo."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique com o botão direito no cubo.",
+        "en": "In the 3D View, right-click the cube.",
+        "es": "En la 3D View, haz clic derecho en el cubo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'MESH' and C.object.select"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Ou clique no nome dele no Outliner, à esquerda.",
+        "en": "Or click its name in the Outliner, on the left.",
+        "es": "O haz clic en su nombre en el Outliner, a la izquierda."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Object.",
+        "en": "In Properties, open the Object tab.",
+        "es": "En Properties, abre la pestaña Object."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'OBJECT' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "NAVIGATION_BAR",
+        "botao": "prop:context=OBJECT"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo do painel, clique em Game.",
+        "en": "At the top of the panel, click Game.",
+        "es": "Arriba del panel, haz clic en Game."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.ae_object_panel_category == 'GAME'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_object_panel_category=GAME"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Video Player, clique em Add Video Player.",
+        "en": "In Video Player, click Add Video Player.",
+        "es": "En Video Player, haz clic en Add Video Player."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and any(c.module == 'anastacio_video' for c in C.object.game.components)"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Role a Properties até o painel Video Player.",
+        "en": "Scroll Properties to the Video Player panel.",
+        "es": "Desplaza Properties hasta el panel Video Player."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:OBJECT_OT_video_player_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique na pasta ao lado de File e escolha um vídeo seu.",
+        "en": "Click the folder next to File and pick one of your videos.",
+        "es": "Haz clic en la carpeta al lado de File y elige un video tuyo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and any(c.module == 'anastacio_video' for c in C.object.game.components) and any(c.module == 'anastacio_video' and c.properties['File'].value for c in C.object.game.components)"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Vale .mp4, .webm, .ogv e outros formatos comuns.",
+        "en": "Works with .mp4, .webm, .ogv and other common formats.",
+        "es": "Sirve .mp4, .webm, .ogv y otros formatos comunes."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:OBJECT_OT_video_player_file"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P: o vídeo toca no cubo. Esc sai.",
+        "en": "Mouse over the 3D View, press P: the video plays on the cube. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P: el video se reproduce en el cubo. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Fullscreen Cutscene toca em tela cheia; o painel também tem legendas (Subtitles).",
+    "en": "Done! Fullscreen Cutscene plays fullscreen; the panel also has subtitles (Subtitles).",
+    "es": "¡Listo! Fullscreen Cutscene lo reproduce a pantalla completa; el panel también tiene subtítulos (Subtitles)."
+  }
+}

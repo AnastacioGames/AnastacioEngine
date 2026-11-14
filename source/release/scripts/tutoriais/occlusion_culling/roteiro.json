@@ -1,0 +1,113 @@
+{
+  "titulo": {
+    "pt": "27. Não desenhar o que está atrás das paredes",
+    "en": "27. Skip drawing what is behind walls",
+    "es": "27. No dibujar lo que está detrás de las paredes"
+  },
+  "categoria": "Optimization",
+  "resumo": {
+    "pt": "Occlusion Culling com Automatic Occluders: a engine escolhe sozinha o que tampa a visão.",
+    "en": "Occlusion Culling with Automatic Occluders: the engine picks what blocks the view by itself.",
+    "es": "Occlusion Culling con Automatic Occluders: el motor elige solo lo que tapa la vista."
+  },
+  "abertura": {
+    "pt": "Em cidades e casas, muita coisa fica escondida atrás de paredes. Vamos parar de desenhar isso.",
+    "en": "In towns and houses, lots of things hide behind walls. Let's stop drawing them.",
+    "es": "En ciudades y casas, muchas cosas quedan detrás de paredes. Dejemos de dibujarlas."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Scene.",
+        "en": "In Properties, open the Scene tab.",
+        "es": "En Properties, abre la pestaña Scene."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'SCENE' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=SCENE"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Game Settings, clique em Physics para abrir.",
+        "en": "In Game Settings, click Physics to open it.",
+        "es": "En Game Settings, haz clic en Physics para abrirlo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.show_expanded_game_physics"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:show_expanded_game_physics"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Culling, confira que Occlusion Culling está marcado.",
+        "en": "In Culling, make sure Occlusion Culling is checked.",
+        "es": "En Culling, comprueba que Occlusion Culling esté marcado."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.game_settings.use_occlusion_culling"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Culling fica no fim de Physics: role a Properties.",
+        "en": "Culling is at the end of Physics: scroll Properties.",
+        "es": "Culling está al final de Physics: desplaza Properties."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_occlusion_culling"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Marque Automatic Occluders.",
+        "en": "Check Automatic Occluders.",
+        "es": "Marca Automatic Occluders."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.game_settings.use_auto_occlusion"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Sem ele, só tampam a visão os objetos marcados como Occluder na aba Physics.",
+        "en": "Without it, only objects set as Occluder in the Physics tab block the view.",
+        "es": "Sin él, solo tapan la vista los objetos marcados como Occluder en la pestaña Physics."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_auto_occlusion"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P. Esc sai.",
+        "en": "Mouse over the 3D View, press P. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Para ver o ganho, use Performance › Measure antes e depois (tutorial 14).",
+    "en": "Done! To see the gain, use Performance › Measure before and after (tutorial 14).",
+    "es": "¡Listo! Para ver la ganancia, usa Performance › Measure antes y después (tutorial 14)."
+  }
+}

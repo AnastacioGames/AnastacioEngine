@@ -1,6 +1,6 @@
 # Plano: Tutoriais (dentro da engine + vídeo curto)
 
-Data: 2026-11-13. Status (2026-11-14): 29 tutoriais prontos, todos aguardando aceite com janela.
+Data: 2026-11-13. Status (2026-11-14): 32 tutoriais prontos, todos aguardando aceite com janela.
 
 ## Catálogo
 
@@ -38,6 +38,9 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | 24 | Node Editor/Compositing | Efeitos de tela com o Compositing | `compositing_efeitos` |
 | 25 | Render | Luz rebatida com Light Probe Volume | `probe_volume_luz` |
 | 26 | Render | Luz rebatida na tela com SSGI | `ssgi_luz` |
+| 27 | Optimization | Não desenhar o que está atrás das paredes (Occlusion Culling) | `occlusion_culling` |
+| 28 | Video | Vídeo tocando no jogo (Video Player) | `video_player` |
+| 29 | Sound | Fazer o cubo subir com a voz (Microphone) | `microfone_pular` |
 | — | Node Editor/UI Tree | Primeiro menu de jogo (piloto) | `ui_tree_menu` |
 | — | Node Editor/UI Tree | Os nós de HUD | `ui_tree_hud` |
 | — | Mind Map | A barra do Mind Map | `mind_map_barra` |
@@ -57,16 +60,18 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Render | Sombra colorida e PCSS (sombra suave) | falta |
 | Shader | Nós de shader e Nodes GLSL por arquivo | falta |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
-| Video | Video Player e actuator Video (legendas, fade) | reservado 2026-11-14 (sessão local, main) |
+| Video | Video Player | feito: 28 (`video_player`); legendas e actuator Video ficam para outro |
 | Video | Screencast (gravar o jogo) | feito: 22 (`screencast_gravar`) |
-| Sound | Microfone e Tuner | reservado 2026-11-14 (sessão local, main) |
+| Sound | Microfone | feito: 29 (`microfone_pular`); falta o nó Tuner da UI Tree |
 | Character | Personagem automático (File › Import › Fuse Character) | falta |
 | Character | Postura do Character (abaixar, rastejar, pular) | falta |
 | Animation | NLA no jogo (playNLA) | falta |
 | Multiplayer | Jogo em rede local | falta |
-| Optimization | Scene Doctor, HLOD, Automatic Occluders, Static Batch | reservado 2026-11-14 (sessão local, main) |
+| Optimization | Automatic Occluders | feito: 27 (`occlusion_culling`); Scene Doctor já está no 14 |
+| Optimization | HLOD (Performance › Optimize Scene › Build HLOD) | falta: pede cena com muitos objetos |
+| Optimization | Static Batch | fora: ligado por padrão (Auto Static Batch), nada a ensinar |
 | Optimization | Simulador de PC fraco | feito dentro do 14 (`performance_medir`) |
-| Debug | Game Trace e Trace Doctor | reservado 2026-11-14 (sessão local, main) |
+| Debug | Game Trace e Trace Doctor | fora: roda por launcher externo (`tools/debug/game_trace_launcher.py`) e pede trace gravado |
 | Textures | Prepare Textures (DDS/KTX2) e Decimate High Quality | falta |
 
 ## Objetivo
