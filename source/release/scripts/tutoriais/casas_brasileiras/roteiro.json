@@ -5,6 +5,7 @@
     "es": "18. Casas y calles brasileñas listas"
   },
   "categoria": "Buildings",
+  "requer": "MESH_OT_brazilian_house_add",
   "resumo": {
     "pt": "Add › Mesh › Brazilian House e Brazilian Street Block: Seed, Style, Detail (LOD) e Houses.",
     "en": "Add › Mesh › Brazilian House and Brazilian Street Block: Seed, Style, Detail (LOD) and Houses.",

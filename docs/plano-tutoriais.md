@@ -29,7 +29,7 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | 15 | Animation | Rec Play | `rec_play_gravar` |
 | 16 | Track | Track Tool | `track_pista` |
 | 17 | Vehicle | Carro e Vehicle Lab | `veiculo_carro` |
-| 18 | Buildings | Casas e ruas brasileiras | `casas_brasileiras` |
+| 18 | Buildings | Casas e ruas brasileiras (só com o addon Anastacio Brazilian Buildings ligado) | `casas_brasileiras` |
 | 19 | Physics | Parede que quebra e bomba | `destruicao_bomba` |
 | 20 | Optimization | LOD automático | `lod_automatico` |
 | — | Node Editor/UI Tree | Primeiro menu de jogo (piloto) | `ui_tree_menu` |

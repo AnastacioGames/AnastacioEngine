@@ -26,6 +26,7 @@ roteiro.json:
   {..., "menu": "Node Editor"}                                   item a marcar no menu que o botão abre
   {"no": "Jogar"}                                                nó (texto do Button da UI Tree, nome ou label)
 Sem alvo, o contorno vai na área de "destaque" (tipo do editor, ou "BAIXO").
+"requer" do roteiro: "MESH_OT_x" de um addon; o tutorial só aparece com o addon ligado.
 "dica" do passo: aparece no cartão quando o usuário fica parado no passo (DICA_SEGUNDOS).
 
 Para criar um tutorial: Help > Tutorials > Record Tutorial, fazer os cliques e Stop Rec.  Cada
@@ -228,6 +229,10 @@ def tutoriais():
                 roteiro = _ler_roteiro(nome)
             except (OSError, ValueError):
                 continue  # roteiro quebrado não derruba o menu
+            # "requer": operador (nome C) de um addon; sem ele ligado o tutorial não aparece.
+            requer = roteiro.get("requer")
+            if requer and not hasattr(bpy.types, requer):
+                continue
             categoria = "/".join(c.strip() for c in _txt(roteiro.get("categoria")).split("/") if c.strip())
             _lista.append((nome, _txt(roteiro.get("titulo")) or nome, categoria, len(roteiro.get("passos", ()))))
         _lista.sort(key=lambda item: item[1].lower())

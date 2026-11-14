@@ -10,7 +10,10 @@
 """Add > Mesh > Brazilian House / Brazilian Street Block.
 
 Low poly houses from range_buildings: one shared atlas texture and one material, so a
-whole block is a single mesh and a single draw call. LOD1 is a far version (<= 40 tris)."""
+whole block is a single mesh and a single draw call. LOD1 is a far version (<= 40 tris).
+
+Addon desligado por padrão: as casas foram feitas para as pistas do Rolima Racer.  O Track Tool usa
+range_buildings direto e não depende deste addon.  O tutorial casas_brasileiras só aparece com ele ligado."""
 
 import math
 
@@ -18,6 +21,14 @@ import bpy
 from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
 from bpy.types import Operator
 from mathutils import Matrix
+
+bl_info = {
+    'name': 'Anastacio Brazilian Buildings', 'author': 'Anastacio Games',
+    'version': (1, 0, 0), 'blender': (2, 79, 0),
+    'location': 'View3D > Add > Mesh > Brazilian House / Brazilian Street Block',
+    'description': 'Low poly Brazilian houses and street blocks with one shared atlas material',
+    'category': 'Add Mesh',
+}
 
 
 def _style_items(self, context):
@@ -167,3 +178,26 @@ classes = (
     MESH_OT_brazilian_house_add,
     MESH_OT_brazilian_street_add,
 )
+
+
+def _tutorials_refresh():
+    """O tutorial das casas aparece ou some do menu About > Tutorials."""
+    try:
+        import range_tutorials
+        range_tutorials._atualizar_menus()
+    except Exception:
+        pass
+
+
+def register():
+    for cls in classes:
+        bpy.utils.register_class(cls)
+    register_props()
+    _tutorials_refresh()
+
+
+def unregister():
+    unregister_props()
+    for cls in reversed(classes):
+        bpy.utils.unregister_class(cls)
+    _tutorials_refresh()

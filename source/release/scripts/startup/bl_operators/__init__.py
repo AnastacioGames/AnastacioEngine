@@ -44,7 +44,6 @@ _modules = [
     "anastacio_lod_auto",
     "anastacio_fuse_character",
     "anastacio_hlod",
-    "anastacio_buildings",
     "anastacio_collision_proxy",
     "anastacio_explosive",
     "anastacio_lightmap",

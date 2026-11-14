@@ -129,6 +129,14 @@ ordem de estudo:
   cada passo só fica verdadeiro depois do anterior. Open Link e Quick Guide avançam pelo botão Próximo.
 - Sem cena inicial: funciona em qualquer arquivo. Falta o aceite com janela.
 
+## 2026-11-14 — Brazilian House/Street Block viram addon (desligado por padrão)
+
+- `anastacio_buildings.py` saiu de `startup/bl_operators/` para `addons/` ("Anastacio Brazilian Buildings",
+  categoria Add Mesh). Ligado em Preferences › Add-ons, volta Add › Mesh › Brazilian House / Street Block.
+- O Track Tool usa `range_buildings` direto e não depende do addon.
+- Tutoriais: campo `"requer"` no roteiro (operador C de um addon); `casas_brasileiras` só aparece com o
+  addon ligado. O addon atualiza o menu About › Tutorials ao ligar e desligar.
+
 ## 2026-11-13 — Animações depois da lógica (delta transform com script)
 
 - `8ca171412`: relato do musikai (`delta_anim.blend`): action em `delta_location` não movia a raquete quando um
