@@ -19,6 +19,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   com o `.cooked`: LibLoad 24 s → 1,8 s, 0 shaders novos. Arquivo com luz própria (aspirador_po: Hemi + 2 Point)
   muda o shader de todos os materiais da cena: na lista, só se a corrida também tiver essa luz.
 
+## 2026-11-14 — Tutoriais: cartão de concluído, idioma no cartão e check verde
+
+- Ao terminar, o cartão fica verde com "100% concluído", o encerramento do roteiro e os botões Restart e Close (antes sumia na hora).
+- Botões PT EN ES no cartão: idioma só dos tutoriais, guardado em `range_tutorials_idioma.txt` na pasta de configuração.
+- Check verde (círculo com check branco) no cartão e no menu de tutoriais concluídos (`tutoriais/concluido.png`). Aprovado com janela.
+
 ## 2026-11-14 — Tutoriais 34 e 35 (Character com postura, nó GLSL)
 
 - `personagem_postura`: preset Character (Posture) no Logic Editor, com cena inicial de cubo sem lógica (`tools/tutoriais/criar_inicio_cubo_limpo.py`).

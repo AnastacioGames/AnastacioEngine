@@ -34,6 +34,7 @@ clique vira um passo com o alvo já preenchido; os textos se ajustam no painel T
 (clique direito no tutorial > Edit Tutorial).
 """
 import json
+import math
 import os
 import re
 import shutil
@@ -62,8 +63,38 @@ _pendente = {}  # tutorial a começar depois de abrir a cena inicial
 
 # ---------------------------------------------------------------- textos e idiomas
 
+IDIOMAS = ("pt", "en", "es")  # os botões de idioma do cartão
+_escolhido = {}  # idioma escolhido no cartão (só para os tutoriais), lido do arquivo uma vez
+
+
+def _arquivo_idioma():
+    return os.path.join(bpy.utils.user_resource('CONFIG', create=True), "range_tutorials_idioma.txt")
+
+
+def _idioma_escolhido():
+    if "valor" not in _escolhido:
+        try:
+            with open(_arquivo_idioma(), encoding="utf-8") as f:
+                valor = f.read().strip()
+        except OSError:
+            valor = ""
+        _escolhido["valor"] = valor if valor in IDIOMAS else ""
+    return _escolhido["valor"]
+
+
+def _escolher_idioma(valor):
+    _escolhido["valor"] = valor
+    try:
+        with open(_arquivo_idioma(), "w", encoding="utf-8") as f:
+            f.write(valor)
+    except OSError:
+        pass  # sem pasta de configuração: vale só nesta sessão
+
+
 def _idioma():
-    """"pt", "en"... do idioma da interface."""
+    """"pt", "en"... escolhido no cartão do tutorial; sem escolha, o idioma da interface."""
+    if _idioma_escolhido():
+        return _idioma_escolhido()
     sistema = bpy.context.user_preferences.system
     lingua = sistema.language if getattr(sistema, "use_international_fonts", True) else "en_US"
     return "en" if lingua in ("DEFAULT", "") else lingua[:2]
@@ -72,6 +103,7 @@ def _idioma():
 # Botões do cartão ficam em inglês, como o resto da interface; o rótulo da dica segue o idioma.
 _PREFIXO_DICA = {"pt": "Dica", "en": "Tip", "es": "Consejo"}
 _FEITO = {"pt": "feito!", "en": "done!", "es": "¡hecho!"}
+_CONCLUIDO = {"pt": "100%  -  CONCLUÍDO!", "en": "100%  -  COMPLETED!", "es": "100%  -  ¡COMPLETADO!"}
 
 
 def _txt(valor):
@@ -247,10 +279,29 @@ def _id_submenu(caminho):
     return "INFO_MT_range_tut_%08x" % (zlib.crc32(caminho.encode("utf-8")) & 0xffffffff)
 
 
+_icones = {}  # previews com o check verde de concluído (o mesmo desenho do cartão final)
+
+
+def _icone_concluido():
+    """icon_value do check verde (tutoriais/concluido.png); 0 sem o arquivo."""
+    if "colecao" not in _icones:
+        import bpy.utils.previews
+        _icones["colecao"] = bpy.utils.previews.new()
+        caminho = os.path.join(PASTA, "concluido.png")
+        if os.path.isfile(caminho):
+            _icones["colecao"].load("concluido", caminho, 'IMAGE')
+    item = _icones["colecao"].get("concluido")
+    return item.icon_id if item else 0
+
+
 def _item_tutorial(layout, nome, titulo, total, progresso):
     p = progresso.get(nome, {})
     if p.get("feito"):
-        texto, icone = titulo, 'FILE_TICK'
+        icone_id = _icone_concluido()
+        if icone_id:
+            layout.operator("wm.range_tutorial_start", text=titulo, icon_value=icone_id).name = nome
+            return
+        texto, icone = titulo, 'CHECKBOX_HLT'
     elif p.get("passo", 0) > 0:
         texto, icone = "%s  (%d/%d)" % (titulo, p["passo"] + 1, total), 'PLAY'
     else:
@@ -355,8 +406,12 @@ def _ir(delta):
     # Voltando, a checagem já é verdadeira: o passo fica parado até o usuário clicar em Next.
     estado["manual"] = delta < 0
     if estado["passo"] >= len(estado["roteiro"]["passos"]):
+        # Cartão final (verde, com o encerramento) até o usuário fechar.
         _marcar_progresso(estado["nome"], passo=0, feito=True)
-        _parar()
+        estado["passo"] = len(estado["roteiro"]["passos"]) - 1
+        estado["fim"] = True
+        _quadro(None)
+        _redesenhar()
     else:
         estado["passo"] = max(0, estado["passo"])
         _marcar_progresso(estado["nome"], passo=estado["passo"])
@@ -488,6 +543,9 @@ def _desenhar():
 
 def _desenhar_tudo():
     tela = bpy.context.window.screen
+    if estado.get("fim"):
+        _desenhar_fim()
+        return
     passo = estado["roteiro"]["passos"][estado["passo"]]
     alvo = passo.get("alvo") or {}
     if "no" in alvo:
@@ -564,10 +622,93 @@ def _desenhar_cartao(tela, passo):
         botoes[nome] = (x, y_b, x + larg, y_b + alt_botao)
         return x
 
-    botao("fechar", "Close", x0 + margem)
+    x = botao("fechar", "Close", x0 + margem)
+    _botoes_idioma(botao, x + blf.dimensions(0, "Close")[0] + 34 * e, e)
     x = botao("proximo", avancar, x1 - margem, direita=True, forte=not automatico)
     if estado["passo"] > 0:
         botao("voltar", "Back", x - 6 * e, direita=True)
+    estado["botoes"] = botoes
+    bgl.glDisable(bgl.GL_BLEND)
+
+
+def _botoes_idioma(botao, x, e):
+    """PT EN ES: o escolhido fica laranja; vale só para os tutoriais."""
+    atual = _idioma()
+    for codigo in IDIOMAS:
+        x = botao("idioma_" + codigo, codigo.upper(), x, forte=codigo == atual)
+        x += blf.dimensions(0, codigo.upper())[0] + 22 * e
+
+
+def _icone_check(cx, cy, raio):
+    """Ícone de concluído: círculo verde cheio com um check branco grosso (a fonte não tem o caractere)."""
+    bgl.glEnable(bgl.GL_POLYGON_SMOOTH)
+    bgl.glColor4f(VERDE[0], VERDE[1], VERDE[2], 1.0)
+    bgl.glBegin(bgl.GL_TRIANGLE_FAN)
+    bgl.glVertex2f(cx, cy)
+    for i in range(41):
+        a = 2.0 * math.pi * i / 40
+        bgl.glVertex2f(cx + raio * math.cos(a), cy + raio * math.sin(a))
+    bgl.glEnd()
+    bgl.glDisable(bgl.GL_POLYGON_SMOOTH)
+    # Check em dois traços com quadriláteros (linhas grossas fazem quinas feias).
+    pontos = ((-0.48, 0.02), (-0.12, -0.36), (0.50, 0.34))
+    meia = raio * 0.13
+    bgl.glColor4f(1.0, 1.0, 1.0, 1.0)
+    for (ax, ay), (bx, by) in zip(pontos, pontos[1:]):
+        ax, ay, bx, by = cx + ax * raio, cy + ay * raio, cx + bx * raio, cy + by * raio
+        dx, dy = bx - ax, by - ay
+        n = math.hypot(dx, dy) or 1.0
+        nx, ny = -dy / n * meia, dx / n * meia
+        ex, ey = dx / n * meia, dy / n * meia  # estica as pontas para fechar a quina
+        bgl.glBegin(bgl.GL_QUADS)
+        for x, y in ((ax - ex + nx, ay - ey + ny), (ax - ex - nx, ay - ey - ny),
+                     (bx + ex - nx, by + ey - ny), (bx + ex + nx, by + ey + ny)):
+            bgl.glVertex2f(x, y)
+        bgl.glEnd()
+
+
+def _desenhar_fim():
+    """Cartão verde do fim: 100%, o encerramento do roteiro e os botões Restart e Close."""
+    janela = bpy.context.window
+    e = _escala()
+    roteiro = estado["roteiro"]
+    margem, alt_botao, alt_linha = 12 * e, 24 * e, 21 * e
+    largura = min(560 * e, janela.width - 24 * e)
+    blf.size(0, int(15 * e), 72)
+    linhas = _quebrar(_txt(roteiro.get("encerramento")) or _txt(roteiro.get("titulo")), largura - 2 * margem)
+    altura = margem + alt_botao + margem + len(linhas) * alt_linha + 26 * e + margem
+    x0 = (janela.width - largura) / 2
+    y0 = 34 * e
+    x1, y1 = x0 + largura, y0 + altura
+
+    bgl.glEnable(bgl.GL_BLEND)
+    _retangulo(x0, y0, x1, y1, (0.09, 0.09, 0.11), 0.94)
+    _retangulo(x0, y1 - 4 * e, x1, y1, VERDE)
+    y = y1 - margem - 15 * e
+    blf.size(0, int(14 * e), 72)
+    _icone_check(x0 + margem + 9 * e, y + 5 * e, 10 * e)
+    _texto(x0 + margem + 26 * e, y, _CONCLUIDO.get(_idioma(), _CONCLUIDO["en"]), VERDE)
+    blf.size(0, int(15 * e), 72)
+    for linha in linhas:
+        y -= alt_linha
+        _texto(x0 + margem, y, linha)
+
+    blf.size(0, int(12 * e), 72)
+    botoes = {}
+
+    def botao(nome, rotulo, x, direita=False, forte=False):
+        larg = blf.dimensions(0, rotulo)[0] + 20 * e
+        if direita:
+            x -= larg
+        y_b = y0 + margem
+        _retangulo(x, y_b, x + larg, y_b + alt_botao, (VERDE if nome == "fechar" else LARANJA) if forte else (0.25, 0.25, 0.28))
+        _texto(x + 10 * e, y_b + 8 * e, rotulo, (0.05, 0.05, 0.05) if forte else (0.9, 0.9, 0.9))
+        botoes[nome] = (x, y_b, x + larg, y_b + alt_botao)
+        return x
+
+    x = botao("reiniciar", "Restart", x0 + margem)
+    _botoes_idioma(botao, x + blf.dimensions(0, "Restart")[0] + 34 * e, e)
+    botao("fechar", "Close", x1 - margem, direita=True, forte=True)
     estado["botoes"] = botoes
     bgl.glDisable(bgl.GL_BLEND)
 
@@ -642,12 +783,23 @@ class RANGE_OT_tutorial_start(Operator):
                 if x0 <= event.mouse_x <= x1 and y0 <= event.mouse_y <= y1:
                     if nome == "fechar":
                         _parar()
+                    elif nome.startswith("idioma_"):
+                        _escolher_idioma(nome[len("idioma_"):])
+                        _redesenhar()
+                    elif nome == "reiniciar":
+                        nome_tut = estado["nome"]
+                        _parar()
+                        bpy.ops.wm.range_tutorial_start('INVOKE_DEFAULT', name=nome_tut, step=0)
+                        return {'FINISHED'}
                     else:
                         _ir(-1 if nome == "voltar" else 1)
                     return {'RUNNING_MODAL'} if estado else {'FINISHED'}
         return {'PASS_THROUGH'}
 
     def tique(self, context):
+        if estado.get("fim"):
+            _quadro(None)
+            return
         passo = estado["roteiro"]["passos"][estado["passo"]]
         # Pisca o alvo: aceso em dois tiques, apagado em um; com a dica na tela, pisca a cada tique.
         estado["tique"] = estado.get("tique", 0) + 1
@@ -1213,6 +1365,8 @@ def register():
 def unregister():
     if estado:
         _parar()
+    if "colecao" in _icones:
+        bpy.utils.previews.remove(_icones.pop("colecao"))
     if gravacao:
         bpy.types.WindowManager.draw_handler_remove(gravacao["handle"])
         gravacao.clear()
