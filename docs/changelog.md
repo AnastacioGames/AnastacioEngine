@@ -8,6 +8,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais 15 a 17 (Rec Play, Track Tool, carro e Vehicle Lab)
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `rec_play_gravar` | Animation | 8 | Render › System, Record "Cube", Max Duration 10, Rec Play, Watch, Add to Cutscene, P |
+| `track_pista` | Track | 7 | Add › Curve › Track, aba Track (N), Road, Live, mover um ponto da curva, Generate All |
+| `veiculo_carro` | Vehicle | 17 | Chão, chassi Rigid Body, Vehicle Enabled, 4 rodas No Collision, Add Wheel, Steering, AWD, Add Vehicle Component, Debug Mode › Vehicle Lab |
+
+- Já nascem em pt, en e es, com os nomes de botões e teclas em inglês.
+- Checagens: `ae_rec_actor`, `ae_rec_max_duration`, `ae_rec_takes`, evento `PLAY_TAKE` da cutscene;
+  `range_track.enabled`, a chave `range_track_part` (ROAD/TERRAIN) dos objetos gerados, `live_enabled` do
+  módulo do Track e os pontos Bezier fora da posição inicial; `game.is_vehicle`, `vehicle_wheels`
+  (objeto, `has_steering`, `has_drive`), o componente `VehiclePlayerComponent` e `show_debug_mode`.
+- Simulados passo a passo com dados falsos (cada checagem falsa antes da ação e verdadeira depois). Falta o
+  aceite com a janela da engine.
+
 ## 2026-11-14 — Tutoriais em português, inglês e espanhol
 
 - Os 17 roteiros de `source/release/scripts/tutoriais/` ganharam `es` em todos os textos, e `en` em `abertura` e

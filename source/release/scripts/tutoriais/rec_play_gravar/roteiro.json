@@ -1,0 +1,179 @@
+{
+  "titulo": {
+    "pt": "15. Rec Play: gravar um movimento jogando",
+    "en": "15. Rec Play: record a movement by playing",
+    "es": "15. Rec Play: grabar un movimiento jugando"
+  },
+  "categoria": "Animation",
+  "resumo": {
+    "pt": "Motion Recording na aba Render (System): marcar o ator, Rec Play, Watch e Add to Cutscene.",
+    "en": "Motion Recording in the Render tab (System): mark the actor, Rec Play, Watch and Add to Cutscene.",
+    "es": "Motion Recording en la pestaña Render (System): marcar el actor, Rec Play, Watch y Add to Cutscene."
+  },
+  "abertura": {
+    "pt": "Vamos gravar o cubo andando enquanto você joga, como num filme.",
+    "en": "Let's record the cube walking while you play, like a movie.",
+    "es": "Vamos a grabar el cubo caminando mientras juegas, como en una película."
+  },
+  "encerramento": {
+    "pt": "Pronto: você gravou um Take e ele toca sozinho quando o jogo começa.",
+    "en": "Done: you recorded a Take and it plays by itself when the game starts.",
+    "es": "Listo: grabaste un Take y se reproduce solo cuando empieza el juego."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique no cubo: ele será o personagem.",
+        "en": "In the 3D View, click the cube: it will be the character.",
+        "es": "En la 3D View, haz clic en el cubo: será el personaje."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Render e, no topo dela, clique em System.",
+        "en": "In Properties, open the Render tab and, at its top, click System.",
+        "es": "En Properties, abre la pestaña Render y, arriba, haz clic en System."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'RENDER' for a in C.screen.areas if a.type == 'PROPERTIES') and C.window_manager.ae_render_panel_category == 'SYSTEM'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=RENDER"
+      },
+      "dica": {
+        "pt": "Depois, desça até o painel Motion Recording (Experimental).",
+        "en": "Then scroll down to the Motion Recording (Experimental) panel.",
+        "es": "Después, baja hasta el panel Motion Recording (Experimental)."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em \"1. Choose the character\", clique em Record \"Cube\".",
+        "en": "Under \"1. Choose the character\", click Record \"Cube\".",
+        "es": "En \"1. Choose the character\", haz clic en Record \"Cube\"."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.ae_rec_actor"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_rec_actor"
+      },
+      "dica": {
+        "pt": "O botão fica marcado: só os objetos marcados são gravados.",
+        "en": "The button stays pressed: only marked objects are recorded.",
+        "es": "El botón queda marcado: solo se graban los objetos marcados."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Max Duration (s), escreva 10: a gravação para sozinha depois de 10 segundos.",
+        "en": "In Max Duration (s), type 10: recording stops by itself after 10 seconds.",
+        "es": "En Max Duration (s), escribe 10: la grabación se detiene sola a los 10 segundos."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.ae_rec_max_duration > 0"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_rec_max_duration"
+      },
+      "dica": {
+        "pt": "Com 0, ela só para quando você aperta F10.",
+        "en": "With 0, it only stops when you press F10.",
+        "es": "Con 0, solo se detiene cuando presionas F10."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Rec Play. Depois da contagem, ande com WASD ou as setas. F10 para antes do tempo.",
+        "en": "Click Rec Play. After the countdown, walk with WASD or the arrow keys. F10 stops early.",
+        "es": "Haz clic en Rec Play. Después de la cuenta, camina con WASD o las flechas. F10 detiene antes."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "len(C.scene.ae_rec_takes) > 0"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Rec Play"
+      },
+      "dica": {
+        "pt": "Sem lógica no cubo, WASD já anda com ele.",
+        "en": "With no logic on the cube, WASD already walks it.",
+        "es": "Sin lógica en el cubo, WASD ya lo mueve."
+      }
+    },
+    {
+      "texto": {
+        "pt": "A gravação virou um Take na lista Takes. Clique em Watch para ver de novo e depois clique em Next.",
+        "en": "The recording became a Take in the Takes list. Click Watch to see it again, then click Next.",
+        "es": "La grabación se volvió un Take en la lista Takes. Haz clic en Watch para verla de nuevo y luego en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Watch"
+      },
+      "dica": {
+        "pt": "Movie salva o mesmo em vídeo; Rerecord grava o Take de novo.",
+        "en": "Movie saves the same as a video; Rerecord records the Take again.",
+        "es": "Movie guarda lo mismo en video; Rerecord graba el Take otra vez."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add to Cutscene: o Take entra na cutscene e toca quando o jogo começa.",
+        "en": "Click Add to Cutscene: the Take goes into the cutscene and plays when the game starts.",
+        "es": "Haz clic en Add to Cutscene: el Take entra en la cutscene y se reproduce cuando empieza el juego."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(e.type == 'PLAY_TAKE' for s in C.scene.cutscene_settings.sequences for e in s.events)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SCENE_OT_rec_take_to_cutscene"
+      },
+      "dica": {
+        "pt": "O evento Play Take aparece na aba Cutscene (tutorial 11).",
+        "en": "The Play Take event shows up in the Cutscene tab (tutorial 11).",
+        "es": "El evento Play Take aparece en la pestaña Cutscene (tutorial 11)."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte P: o cubo repete o que você gravou. Esc sai. Depois, clique em Next.",
+        "en": "Press P: the cube repeats what you recorded. Esc quits. Then click Next.",
+        "es": "Presiona P: el cubo repite lo que grabaste. Esc sale. Después, haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null
+    }
+  ]
+}

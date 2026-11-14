@@ -1,0 +1,322 @@
+{
+  "titulo": {
+    "pt": "17. Um carro com Vehicle e o Vehicle Lab",
+    "en": "17. A car with Vehicle and the Vehicle Lab",
+    "es": "17. Un coche con Vehicle y el Vehicle Lab"
+  },
+  "categoria": "Vehicle",
+  "resumo": {
+    "pt": "Chão, chassi Rigid Body, 4 rodas No Collision, aba Vehicle, Add Vehicle Component e Vehicle Lab.",
+    "en": "Ground, Rigid Body chassis, 4 No Collision wheels, Vehicle tab, Add Vehicle Component and Vehicle Lab.",
+    "es": "Suelo, chasis Rigid Body, 4 ruedas No Collision, pestaña Vehicle, Add Vehicle Component y Vehicle Lab."
+  },
+  "abertura": {
+    "pt": "Vamos montar um carro simples com o cubo e quatro rodas, e ajustar ele com o jogo rodando.",
+    "en": "Let's build a simple car from the cube and four wheels, and tune it while the game runs.",
+    "es": "Vamos a armar un coche simple con el cubo y cuatro ruedas, y ajustarlo con el juego en marcha."
+  },
+  "encerramento": {
+    "pt": "Pronto: o carro anda e você ajusta motor e suspensão ao vivo no Vehicle Lab.",
+    "en": "Done: the car drives and you tune engine and suspension live in the Vehicle Lab.",
+    "es": "Listo: el coche anda y ajustas motor y suspensión en vivo en el Vehicle Lab."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Salve o arquivo (Ctrl+S): o script do carro fica ao lado do .range.",
+        "en": "Save the file (Ctrl+S): the car script goes next to the .range.",
+        "es": "Guarda el archivo (Ctrl+S): el script del coche queda junto al .range."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "bool(D.filepath)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "Faça o chão: Add › Mesh › Plane. Depois S, 30, Enter e G, Z, -2, Enter.",
+        "en": "Make the ground: Add › Mesh › Plane. Then S, 30, Enter and G, Z, -2, Enter.",
+        "es": "Haz el suelo: Add › Mesh › Plane. Después S, 30, Enter y G, Z, -2, Enter."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.type == 'MESH' and o.dimensions.x >= 20 and o.location.z < -1 for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no cubo (o chassi) e, no Properties, abra a aba Physics.",
+        "en": "Click the cube (the chassis) and, in Properties, open the Physics tab.",
+        "es": "Haz clic en el cubo (el chasis) y, en Properties, abre la pestaña Physics."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH' and C.active_object.dimensions.x < 5 and any(a.spaces.active.context == 'PHYSICS' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=PHYSICS"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Troque Physics Type para Rigid Body.",
+        "en": "Change Physics Type to Rigid Body.",
+        "es": "Cambia Physics Type a Rigid Body."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH' and C.active_object.dimensions.x < 5 and C.active_object.game.physics_type == 'RIGID_BODY'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:physics_type"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Abra a aba Vehicle e marque Enabled.",
+        "en": "Open the Vehicle tab and check Enabled.",
+        "es": "Abre la pestaña Vehicle y marca Enabled."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.game.is_vehicle for o in C.scene.objects)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=VEHICLE"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Faça uma roda: Add › Mesh › Cylinder. Depois R, Y, 90, Enter e S, 0.3, Enter.",
+        "en": "Make a wheel: Add › Mesh › Cylinder. Then R, Y, 90, Enter and S, 0.3, Enter.",
+        "es": "Haz una rueda: Add › Mesh › Cylinder. Después R, Y, 90, Enter y S, 0.3, Enter."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and (lambda o: o.type == 'MESH' and abs(abs(o.rotation_euler.y) - 1.5708) < 0.1 and max(o.dimensions) < 0.8)(C.active_object)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      },
+      "dica": {
+        "pt": "A roda fica de pé, com 0,3 m de raio: o mesmo Radius da roda no Vehicle.",
+        "en": "The wheel stands up with a 0.3 m radius: the same Radius as the wheel in Vehicle.",
+        "es": "La rueda queda de pie, con 0,3 m de radio: el mismo Radius de la rueda en Vehicle."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Na aba Physics, troque Physics Type para No Collision: a roda não pode bater no chassi.",
+        "en": "In the Physics tab, change Physics Type to No Collision: the wheel must not hit the chassis.",
+        "es": "En la pestaña Physics, cambia Physics Type a No Collision: la rueda no puede chocar con el chasis."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and (lambda o: o.type == 'MESH' and abs(abs(o.rotation_euler.y) - 1.5708) < 0.1 and max(o.dimensions) < 0.8)(C.active_object) and C.active_object.game.physics_type == 'NO_COLLISION'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=PHYSICS"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte N e, em Location, escreva X 1.2, Y 1 e Z -0.8: a roda da frente, à direita.",
+        "en": "Press N and, in Location, type X 1.2, Y 1 and Z -0.8: the front right wheel.",
+        "es": "Presiona N y, en Location, escribe X 1.2, Y 1 y Z -0.8: la rueda delantera derecha."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and (lambda o: o.type == 'MESH' and abs(abs(o.rotation_euler.y) - 1.5708) < 0.1 and max(o.dimensions) < 0.8)(C.active_object) and C.active_object.location.x > 0.8 and C.active_object.location.y > 0.5"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "UI",
+        "botao": "prop:location"
+      },
+      "dica": {
+        "pt": "A frente do carro é o Y positivo.",
+        "en": "The front of the car is positive Y.",
+        "es": "El frente del coche es la Y positiva."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Faça as outras 3 rodas com Shift+D e ponha cada uma num canto (X 1.2 ou -1.2, Y 1 ou -1).",
+        "en": "Make the other 3 wheels with Shift+D and put each in a corner (X 1.2 or -1.2, Y 1 or -1).",
+        "es": "Haz las otras 3 ruedas con Shift+D y pon cada una en una esquina (X 1.2 o -1.2, Y 1 o -1)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "len({(o.location.x > 0, o.location.y > 0) for o in C.scene.objects if o.type == 'MESH' and abs(abs(o.rotation_euler.y) - 1.5708) < 0.1 and max(o.dimensions) < 0.8 and o.game.physics_type == 'NO_COLLISION' and abs(o.location.x) > 0.8 and abs(o.location.y) > 0.5}) == 4"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "Shift+D, X, -2.4, Enter leva a cópia direto para o outro lado.",
+        "en": "Shift+D, X, -2.4, Enter takes the copy straight to the other side.",
+        "es": "Shift+D, X, -2.4, Enter lleva la copia directo al otro lado."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no cubo de novo, abra a aba Vehicle e clique 4 vezes em Add Wheel.",
+        "en": "Click the cube again, open the Vehicle tab and click Add Wheel 4 times.",
+        "es": "Haz clic en el cubo otra vez, abre la pestaña Vehicle y haz clic 4 veces en Add Wheel."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.game.is_vehicle and len(o.vehicle_wheels) >= 4 for o in C.scene.objects)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=VEHICLE"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Wheel 1 até Wheel 4, escolha um cilindro diferente em cada.",
+        "en": "In Wheel 1 to Wheel 4, pick a different cylinder in each.",
+        "es": "En Wheel 1 a Wheel 4, elige un cilindro distinto en cada una."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.game.is_vehicle and len(o.vehicle_wheels) >= 4 and all(w.object is not None for w in o.vehicle_wheels) and len({w.object.name for w in o.vehicle_wheels}) == len(o.vehicle_wheels) for o in C.scene.objects)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:object"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Nas duas rodas da frente (Y 1), ligue Steering: elas viram o carro.",
+        "en": "On the two front wheels (Y 1), turn on Steering: they turn the car.",
+        "es": "En las dos ruedas delanteras (Y 1), activa Steering: ellas giran el coche."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.game.is_vehicle and any(w.has_steering for w in o.vehicle_wheels) for o in C.scene.objects)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:has_steering"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Engine › Drive Type, clique em AWD: as 4 rodas puxam o carro.",
+        "en": "In Engine › Drive Type, click AWD: all 4 wheels pull the car.",
+        "es": "En Engine › Drive Type, haz clic en AWD: las 4 ruedas tiran del coche."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.game.is_vehicle and len(o.vehicle_wheels) > 0 and all(w.has_drive for w in o.vehicle_wheels) for o in C.scene.objects)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "AWD"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Player Component, clique em Add Vehicle Component: são os controles do carro.",
+        "en": "In Player Component, click Add Vehicle Component: these are the car controls.",
+        "es": "En Player Component, haz clic en Add Vehicle Component: son los controles del coche."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.game.is_vehicle and any(c.name == 'VehiclePlayerComponent' for c in o.game.components) for o in C.scene.objects)"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Add Vehicle Component"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte P: W acelera, S dá ré, A e D viram, Space freia. Esc sai. Depois, clique em Next.",
+        "en": "Press P: W speeds up, S reverses, A and D steer, Space brakes. Esc quits. Then click Next.",
+        "es": "Presiona P: W acelera, S da reversa, A y D giran, Space frena. Esc sale. Después, haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "A vista não segue o carro: afaste a 3D View antes (rodinha do mouse).",
+        "en": "The view does not follow the car: zoom the 3D View out first (mouse wheel).",
+        "es": "La vista no sigue al coche: aleja la 3D View antes (rueda del ratón)."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No menu Game › Debug, ligue Debug Mode.",
+        "en": "In the Game › Debug menu, turn on Debug Mode.",
+        "es": "En el menú Game › Debug, activa Debug Mode."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.game_settings.show_debug_mode"
+      },
+      "destaque": "INFO",
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "Game",
+        "menu": "Debug"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte P de novo. Na janela Options, marque Vehicle Lab e mude motor, marchas e suspensão com o carro andando. Depois, clique em Next.",
+        "en": "Press P again. In the Options window, check Vehicle Lab and change engine, gears and suspension while the car drives. Then click Next.",
+        "es": "Presiona P otra vez. En la ventana Options, marca Vehicle Lab y cambia motor, marchas y suspensión con el coche andando. Después, haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "Se o mouse não aparecer, aperte F1.",
+        "en": "If the mouse does not show up, press F1.",
+        "es": "Si el ratón no aparece, presiona F1."
+      }
+    }
+  ]
+}

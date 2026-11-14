@@ -167,11 +167,24 @@ Text Boxes (diálogos sem código) e World Sound.
   `performance_medir` (Optimization).
 - Pontos para o aceite: o destaque dentro do popover Performance; o + de eventos do Cutscene criando
   SPAWN_OBJECT antes da troca de Type; o Minimap pede o .range salvo para tirar a foto do mapa.
-- Ainda não feitos: Rec Play, Camera FX, Track Tool e Vehicle Lab.
+- Rec Play, Track Tool e Vehicle Lab viraram os tutoriais 15 a 17 (seção seguinte). Camera FX não foi achado
+  nos scripts com esse nome; fica para quando o usuário apontar o recurso.
+
+## Tutoriais 15 a 17 (2026-11-14, falta aceite com janela)
+
+- `rec_play_gravar` (Animation): aba Render › System, painel Motion Recording, Record "Cube", Max Duration,
+  Rec Play, Watch, Add to Cutscene, P.
+- `track_pista` (Track): Add › Curve › Track, aba Track do painel N, Road, Live, editar a curva, Generate All.
+- `veiculo_carro` (Vehicle): chão, chassi Rigid Body, aba Vehicle (Enabled), 4 cilindros No Collision nos
+  cantos, Add Wheel ×4, objetos das rodas, Steering na frente, AWD, Add Vehicle Component, P, Debug Mode e a
+  caixa Vehicle Lab na janela Options do jogo.
+- Pontos para o aceite: o painel Motion Recording fica no meio dos painéis de System (rolar); o Live do Track é
+  conferido pelo estado do módulo `bl_operators.anastacio_track`; o carro com as medidas do tutorial (rodas
+  em X ±1,2, Y ±1, Z -0,8, chão em Z -2) precisa andar sem capotar; a vista não segue o carro.
 
 ## Três idiomas (2026-11-14)
 
-- Os 17 tutoriais têm pt, en e es em `titulo`, `resumo`, `abertura`, `encerramento`, `texto` e `dica`.
+- Os tutoriais têm pt, en e es em `titulo`, `resumo`, `abertura`, `encerramento`, `texto` e `dica`.
 - Regra de escrita: nomes de botões, abas, menus, campos e teclas ficam como na engine (inglês), em todos os
   idiomas: "clique em Next", "Enter, Space". Rótulos que a engine mostra em português (Jogar, Girador,
   Velocidade) ficam como estão.
