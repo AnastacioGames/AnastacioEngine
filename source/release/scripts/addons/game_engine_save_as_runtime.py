@@ -173,6 +173,14 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
         shutil.copy2(cooked_src, cooked_dst)
     elif os.path.isfile(cooked_dst):
         os.remove(cooked_dst)
+    # Files the game LibLoads later, warmed up with the shaders on first start ("<blend>.warmup").
+    warmup_src = (os.path.splitext(bpy.data.filepath)[0] + ".warmup"
+                  if bpy.data.filepath else "")
+    warmup_dst = os.path.splitext(output_path)[0] + ".warmup"
+    if os.path.isfile(warmup_src):
+        shutil.copy2(warmup_src, warmup_dst)
+    elif os.path.isfile(warmup_dst):
+        os.remove(warmup_dst)
 
     # Make the runtime executable on Linux
     if os.name == 'posix':
