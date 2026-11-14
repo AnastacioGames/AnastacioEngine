@@ -100,9 +100,28 @@ Roteiro: `source/release/scripts/tutoriais/ui_tree_menu/roteiro.json` (7 passos,
   um editor de cada tipo).
 - Textos só em português; versão em inglês fica para decidir.
 
-## Depois do piloto
-Se o piloto for aprovado, entram 4 tutoriais seguindo o mesmo molde: Smart Wizard, Logic Tree,
-Text Boxes (diálogos sem código) e World Sound.
+## Depois do piloto (2026-11-14: feitos, falta aceite com janela)
+Os 4 tutoriais seguem o molde do piloto (uma ação por passo, quadro no botão, avanço automático):
+
+- `logic_tree_andar` (Node Editor/Logic Tree, 5 passos): + do Logic Editor › Node Editor › Logic › Add › Recipes › Walk WASD › P.
+- `smart_wizard_girador` (Logic/Smart Components, 5 passos): aba Game › receita Girador › Use Recipe › Create › P.
+- `text_box_dialogo` (3D View/Text, 4 passos): seleciona Fala (botão direito) › aba do texto › Setup Dialogue › P.
+- `world_sound_musica` (Properties/World Sound, 4 passos): aba World Sound › Add Sound Module › Music › Add Sounds › P.
+
+Cenas iniciais: `tools/tutoriais/criar_inicios.py` (cubo padrão sem o componente JogadorCelular, que já
+anda com WASD; cubo ativo, pois o arquivo salvo deixava o Auto World Sun ativo). A do Smart Wizard foi
+salva depois, no editor, com o painel Component Manager aberto.
+
+Achados no teste com o controle invisível (todos os passos avançaram):
+- `op:` no alvo usa o nome C (`LOGIC_OT_range_logic_tree_new`); o nome Python não casa.
+- Abas da Properties: as de objeto ficam na região `NAVIGATION_BAR`; as de cena/mundo, no `HEADER`.
+- O campo Logic Tree com + fica fora da tela no fim do cabeçalho do Node Editor; o do Logic Editor
+  aparece. Por isso o Node Editor que vira Logic Tree sem árvore abre sozinho a do objeto ativo
+  (`_show_object_tree`, uma vez por editor; esvaziar de propósito continua vazio).
+- O clique simulado no Outliner não seleciona (limitação do `event_simulate`); por isso o passo usa o
+  botão direito na 3D View.
+- Revisão do Codex: aceitos a checagem do Girador pelo módulo e preencher o editor uma vez só;
+  recusado trocar a árvore ao trocar o objeto ativo (fica como árvore fixa, de propósito).
 
 ## Revisão do Codex (2026-11-13)
 - **Aceito:** identificador certo é `RangeUITree`; checagens por nome em vez de Python no JSON;

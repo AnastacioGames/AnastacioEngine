@@ -1211,6 +1211,34 @@ def _auto_compile(_scene):
         print("[Logic Tree] Compilação falhou: %s" % exc)
 
 
+_filled_spaces = set()  # Node Editors já preenchidos por _show_object_tree (ponteiro do espaço)
+
+
+@bpy.app.handlers.persistent
+def _show_object_tree(_scene):
+    """Node Editor que acabou de virar Logic Tree, sem árvore: abre a do objeto ativo, uma vez.
+
+    Sem isso, quem cria a árvore pelo + do Logic Editor e depois abre o Node Editor vê o editor
+    vazio e precisa achar a árvore na lista.  Cada editor é preenchido uma só vez: quem esvazia
+    o editor de propósito não vê a árvore voltar, e trocar o objeto ativo não troca a árvore."""
+    wm = bpy.context.window_manager
+    if wm is None:
+        return
+    for win in wm.windows:
+        ob = win.screen.scene.objects.active
+        tree = getattr(ob, "logic_tree", None)
+        if tree is None:
+            continue
+        for area in win.screen.areas:
+            if area.type == "NODE_EDITOR":
+                space = area.spaces.active
+                if space.tree_type == TREE_ID and space.node_tree is None:
+                    chave = space.as_pointer()
+                    if chave not in _filled_spaces:
+                        _filled_spaces.add(chave)
+                        space.node_tree = tree
+
+
 # ---------------------------------------------------------------- receitas
 
 class _Builder:
@@ -1810,13 +1838,15 @@ def register():
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
         if _auto_compile not in handlers:
             handlers.append(_auto_compile)
-    for handlers, fn in ((bpy.app.handlers.game_pre, _trace_pre), (bpy.app.handlers.game_post, _trace_post)):
+    for handlers, fn in ((bpy.app.handlers.game_pre, _trace_pre), (bpy.app.handlers.game_post, _trace_post),
+                         (bpy.app.handlers.scene_update_post, _show_object_tree)):
         if fn not in handlers:
             handlers.append(fn)
 
 
 def unregister():
-    for handlers, fn in ((bpy.app.handlers.game_pre, _trace_pre), (bpy.app.handlers.game_post, _trace_post)):
+    for handlers, fn in ((bpy.app.handlers.game_pre, _trace_pre), (bpy.app.handlers.game_post, _trace_post),
+                         (bpy.app.handlers.scene_update_post, _show_object_tree)):
         if fn in handlers:
             handlers.remove(fn)
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):

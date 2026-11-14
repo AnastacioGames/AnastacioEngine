@@ -19,7 +19,8 @@ roteiro.json:
   Várias chaves no mesmo dicionário: todas valem.  Sem checagem: o usuário clica em Próximo.
 
 "alvo" do passo = onde clicar, com um quadro piscando:
-  {"area": "NODE_EDITOR", "regiao": "HEADER", "botao": "New"}   botão pelo texto, "op:..." ou "prop:..."
+  {"area": "NODE_EDITOR", "regiao": "HEADER", "botao": "New"}   botão pelo texto, "op:NODE_OT_x" (nome C),
+                                                                 "prop:nome", "prop:nome=VALOR" ou "tip:..."
   {"area": "BAIXO", ...}                                         a área de baixo, seja qual for o editor
   {..., "menu": "Node Editor"}                                   item a marcar no menu que o botão abre
   {"no": "Jogar"}                                                nó (texto do Button da UI Tree, nome ou label)

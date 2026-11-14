@@ -1,0 +1,46 @@
+{
+  "titulo": "Diálogo com páginas, sem código",
+  "categoria": "3D View/Text",
+  "resumo": "Um texto que aparece letra a letra e passa de página com Enter.",
+  "cena_inicial": "inicio.range",
+  "passos": [
+    {
+      "texto": "Na 3D View, clique com o botão direito no texto.",
+      "destaque": "VIEW_3D",
+      "checagem": {
+        "ativo": "Fala"
+      },
+      "dica": "Ou clique em Fala, na lista do Outliner à esquerda."
+    },
+    {
+      "texto": "Na Properties, clique na aba do texto (ícone F).",
+      "destaque": "PROPERTIES",
+      "checagem": {
+        "expr": "any(a.type == 'PROPERTIES' and a.spaces.active.context == 'DATA' for a in C.screen.areas)"
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "NAVIGATION_BAR",
+        "botao": "prop:context=DATA"
+      }
+    },
+    {
+      "texto": "Role a Properties até o painel Text Box e clique em Setup Dialogue.",
+      "destaque": "PROPERTIES",
+      "checagem": {
+        "expr": "'td_speed' in D.objects['Fala'].game.properties"
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:OBJECT_OT_range_text_dialogue_setup"
+      },
+      "dica": "Role com a roda do mouse em cima da Properties: Text Box fica perto do fim."
+    },
+    {
+      "texto": "Mouse na 3D View, aperte P. Enter passa a página; Esc sai.",
+      "destaque": "VIEW_3D",
+      "checagem": null
+    }
+  ]
+}
