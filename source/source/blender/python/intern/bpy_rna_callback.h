@@ -31,5 +31,7 @@ PyObject *pyrna_callback_remove(BPy_StructRNA *self, PyObject *args);
 
 PyObject *pyrna_callback_classmethod_add(PyObject *cls, PyObject *args);
 PyObject *pyrna_callback_classmethod_remove(PyObject *cls, PyObject *args);
+PyObject *pyrna_overlay_handler_add(PyObject *cls, PyObject *args);
+PyObject *pyrna_overlay_handler_remove(PyObject *cls, PyObject *args);
 
 #endif  /* __BPY_RNA_CALLBACK_H__ */

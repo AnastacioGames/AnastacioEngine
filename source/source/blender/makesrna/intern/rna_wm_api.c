@@ -107,6 +107,33 @@ static wmTimer *rna_event_timer_add(struct wmWindowManager *wm, float time_step,
 	return WM_event_add_timer(wm, win, 0x0110, time_step);
 }
 
+static void rna_ui_highlight_button(int space_type, int region_type, const char *name, const char *menu)
+{
+	UI_highlight_button_set(space_type, region_type, name, menu);
+}
+
+/* "number\tSPACE\tREGION\ttext\top\tprop\ttip\topens_menu" of one applied button (tutorial recorder),
+ * or "" when that click is no longer kept. */
+static void rna_ui_last_click(int index, char *result)
+{
+	int spacetype, regiontype, opens_menu;
+	const char *str, *op, *prop, *tip, *space_id = "", *region_id = "";
+
+	result[0] = 0;
+	if (UI_last_click_get(index, &spacetype, &regiontype, &str, &op, &prop, &tip, &opens_menu) < 0) {
+		return;
+	}
+	RNA_enum_identifier(rna_enum_space_type_items, spacetype, &space_id);
+	RNA_enum_identifier(rna_enum_region_type_items, regiontype, &region_id);
+	BLI_snprintf(result, 512, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%d", index ? index : UI_last_click_count(),
+	             space_id, region_id, str, op, prop, tip, opens_menu);
+}
+
+static int rna_ui_click_count(void)
+{
+	return UI_last_click_count();
+}
+
 static void rna_event_timer_remove(struct wmWindowManager *wm, wmTimer *timer)
 {
 	WM_event_remove_timer(wm, timer->win, timer);
@@ -523,6 +550,33 @@ void RNA_api_wm(StructRNA *srna)
 	func = RNA_def_function(srna, "event_timer_remove", "rna_event_timer_remove");
 	parm = RNA_def_pointer(func, "timer", "Timer", "", "");
 	RNA_def_parameter_flags(parm, PROP_NEVER_NULL, PARM_REQUIRED);
+
+	func = RNA_def_function(srna, "ui_highlight_button", "rna_ui_highlight_button");
+	RNA_def_function_ui_description(func, "Draw a frame around one button (used by the tutorials); empty name clears it");
+	RNA_def_function_flag(func, FUNC_NO_SELF);
+	parm = RNA_def_enum(func, "space_type", rna_enum_space_type_items, SPACE_VIEW3D, "Space Type", "");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_enum(func, "region_type", rna_enum_region_type_items, RGN_TYPE_WINDOW, "Region Type", "");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	parm = RNA_def_string(func, "name", NULL, 64, "Name",
+	                      "Button text, \"op:NODE_OT_xxx\" (operator) or \"prop:identifier\" (property)");
+	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+	RNA_def_string(func, "menu", NULL, 64, "Menu Item", "Item to frame inside an open popup menu (same forms as name)");
+
+	func = RNA_def_function(srna, "ui_click_count", "rna_ui_click_count");
+	RNA_def_function_ui_description(func, "How many buttons the user applied so far (tutorial recorder)");
+	RNA_def_function_flag(func, FUNC_NO_SELF);
+	RNA_def_function_return(func, RNA_def_int(func, "count", 0, 0, INT_MAX, "Count", "", 0, INT_MAX));
+
+	func = RNA_def_function(srna, "ui_last_click", "rna_ui_last_click");
+	RNA_def_function_ui_description(func, "One applied button, tab separated: number, space, region, text, "
+	                                "operator, property, tooltip, opens menu; \"\" when no longer kept "
+	                                "(the last 16 are; tutorial recorder)");
+	RNA_def_function_flag(func, FUNC_NO_SELF);
+	RNA_def_int(func, "index", 0, 0, INT_MAX, "Index", "Click number (0 = the last one)", 0, INT_MAX);
+	parm = RNA_def_string(func, "result", NULL, 512, "Result", "");
+	RNA_def_parameter_flags(parm, PROP_THICK_WRAP, 0);
+	RNA_def_function_output(func, parm);
 
 	/* Progress bar interface */
 	func = RNA_def_function(srna, "progress_begin", "rna_progress_begin");

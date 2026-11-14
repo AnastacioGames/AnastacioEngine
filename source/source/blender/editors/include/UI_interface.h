@@ -543,6 +543,12 @@ void UI_block_emboss_set(uiBlock *block, char dt);
 void UI_block_free(const struct bContext *C, uiBlock *block);
 void UI_blocklist_free(const struct bContext *C, struct ListBase *lb);
 void UI_blocklist_free_inactive(const struct bContext *C, struct ListBase *lb);
+void UI_highlight_button_set(int spacetype, int regiontype, const char *name, const char *menu);
+void UI_last_click_set(int spacetype, int regiontype, const uiBut *but, bool opens_menu);
+int UI_last_click_get(int index, int *spacetype, int *regiontype, const char **str, const char **op,
+                      const char **prop, const char **tip, int *opens_menu);
+int UI_last_click_count(void);
+void UI_highlight_button_draw(const struct ScrArea *sa, const struct ARegion *ar);
 void UI_screen_free_active_but(const struct bContext *C, struct bScreen *screen);
 
 void UI_block_region_set(uiBlock *block, struct ARegion *region);

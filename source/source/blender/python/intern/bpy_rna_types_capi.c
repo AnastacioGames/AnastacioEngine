@@ -58,6 +58,9 @@ static struct PyMethodDef pyrna_windowmanager_methods[] = {
      (PyCFunction)pyrna_callback_classmethod_remove,
      METH_VARARGS | METH_CLASS,
      ""},
+    /* Desenho por cima de toda janela, em pixels da janela (tutoriais). */
+    {"draw_handler_add", (PyCFunction)pyrna_overlay_handler_add, METH_VARARGS | METH_CLASS, ""},
+    {"draw_handler_remove", (PyCFunction)pyrna_overlay_handler_remove, METH_VARARGS | METH_CLASS, ""},
     {NULL, NULL, 0, NULL},
 };
 

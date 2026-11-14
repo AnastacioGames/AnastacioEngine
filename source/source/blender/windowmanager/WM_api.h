@@ -558,6 +558,9 @@ void        *WM_draw_cb_activate(
                     void(*draw)(const struct wmWindow *, void *),
                     void *customdata);
 void        WM_draw_cb_exit(struct wmWindow *win, void *handle);
+void       *WM_draw_overlay_cb_activate(void(*draw)(const struct wmWindow *, void *), void *customdata);
+void       *WM_draw_overlay_cb_exit(void *handle);
+void        WM_draw_overlay_cb_free_all(void);
 void		WM_redraw_windows(struct bContext *C);
 
 void        WM_main_playanim(int argc, const char **argv);

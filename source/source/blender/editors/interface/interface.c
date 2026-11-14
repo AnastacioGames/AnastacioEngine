@@ -52,6 +52,7 @@
 #include "BKE_unit.h"
 
 #include "BIF_gl.h"
+#include "BIF_glutil.h"
 
 #include "BLF_api.h"
 #include "BLT_translation.h"
@@ -149,6 +150,173 @@ void ui_block_to_window_rctf(const ARegion *ar, uiBlock *block, rctf *rct_dst, c
 	*rct_dst = *rct_src;
 	ui_block_to_window_fl(ar, block, &rct_dst->xmin, &rct_dst->ymin);
 	ui_block_to_window_fl(ar, block, &rct_dst->xmax, &rct_dst->ymax);
+}
+
+/* Tutorial highlight: a frame around one button of a region (see scripts/startup/range_tutorials.py).
+ * `name` is the button text, "op:NODE_OT_xxx" (operator), "prop:identifier" (RNA property)
+ * or "tip:Tooltip text" (for icon-only buttons). */
+static struct {
+	int spacetype, regiontype;
+	char name[64];
+	char menu[64];  /* item to frame inside an open popup menu */
+} ui_highlight = {0, 0, "", ""};
+
+/* Enum value of a row button (tabs, expanded enums), or NULL. */
+static const char *ui_but_enum_value_id(uiBut *but)
+{
+	const char *id = NULL;
+	if (but->type == UI_BTYPE_ROW && but->rnaprop && RNA_property_type(but->rnaprop) == PROP_ENUM) {
+		RNA_property_enum_identifier(NULL, &but->rnapoin, but->rnaprop, (int)but->hardmax, &id);
+	}
+	return id;
+}
+
+/* "identifier" or "identifier=ENUM_VALUE". */
+static bool ui_but_prop_match(uiBut *but, const char *name)
+{
+	const char *eq = strchr(name, '=');
+	const char *ident = RNA_property_identifier(but->rnaprop);
+	const char *value;
+	if (eq == NULL) {
+		return STREQ(ident, name);
+	}
+	if (strlen(ident) != (size_t)(eq - name) || !STREQLEN(ident, name, eq - name)) {
+		return false;
+	}
+	value = ui_but_enum_value_id(but);
+	return value && STREQ(value, eq + 1);
+}
+
+void UI_highlight_button_set(int spacetype, int regiontype, const char *name, const char *menu)
+{
+	BLI_strncpy(ui_highlight.menu, menu ? menu : "", sizeof(ui_highlight.menu));
+	ui_highlight.spacetype = spacetype;
+	ui_highlight.regiontype = regiontype;
+	BLI_strncpy(ui_highlight.name, name ? name : "", sizeof(ui_highlight.name));
+}
+
+/* Called at the end of the region drawing, in pixel space. */
+void UI_highlight_button_draw(const ScrArea *sa, const ARegion *ar)
+{
+	const char *name = ui_highlight.name;
+	uiBlock *block;
+	uiBut *but;
+
+	if (sa == NULL) {
+		/* Popup menus are temporary regions of the screen, without an area. */
+		if (ar->regiontype != RGN_TYPE_TEMPORARY) {
+			return;
+		}
+		name = ui_highlight.menu;
+	}
+	else if (sa->spacetype != ui_highlight.spacetype || ar->regiontype != ui_highlight.regiontype) {
+		return;
+	}
+	if (name[0] == 0) {
+		return;
+	}
+
+	for (block = ar->uiblocks.first; block; block = block->next) {
+		if (!block->active) {
+			continue;
+		}
+		for (but = block->buttons.first; but; but = but->next) {
+			bool found;
+			if (STREQLEN(name, "op:", 3)) {
+				found = but->optype && STREQ(but->optype->idname, name + 3);
+			}
+			else if (STREQLEN(name, "tip:", 4)) {
+				found = but->tip && STREQ(but->tip, name + 4);
+			}
+			else if (STREQLEN(name, "prop:", 5)) {
+				found = but->rnaprop && ui_but_prop_match(but, name + 5);
+			}
+			else {
+				found = (but->str && STREQ(but->str, name)) || STREQ(but->drawstr, name);
+			}
+			if (found) {
+				const float pad = 3.0f * U.pixelsize;
+				rctf r;
+				ui_block_to_window_rctf(ar, block, &r, &but->rect);
+				BLI_rctf_translate(&r, -ar->winrct.xmin, -ar->winrct.ymin);
+				/* Scrolled out of the region: keep looking, another button may match. */
+				if (r.xmax < 0.0f || r.ymax < 0.0f || r.xmin > ar->winx || r.ymin > ar->winy) {
+					continue;
+				}
+				glColor3f(1.0f, 0.6f, 0.2f);
+				glLineWidth(3.0f * U.pixelsize);
+				fdrawbox(r.xmin - pad, r.ymin - pad, r.xmax + pad, r.ymax + pad);
+				glLineWidth(1.0f);
+				return;
+			}
+		}
+	}
+}
+
+/* Tutorial recorder: the last buttons the user applied (see wm.range_tutorial_record).
+ * A small ring, because a menu item and the button that opened it arrive in the same event. */
+#define UI_LAST_CLICKS 16
+static struct {
+	int spacetype, regiontype, opens_menu;
+	char str[64], op[64], prop[64], tip[128];
+} ui_last_clicks[UI_LAST_CLICKS];
+static int ui_last_click_count = 0;
+
+void UI_last_click_set(int spacetype, int regiontype, const uiBut *but, bool opens_menu)
+{
+	ui_last_click_count++;
+	{
+		const int i = ui_last_click_count % UI_LAST_CLICKS;
+		ui_last_clicks[i].opens_menu = opens_menu;
+		ui_last_clicks[i].spacetype = spacetype;
+		ui_last_clicks[i].regiontype = regiontype;
+		BLI_strncpy(ui_last_clicks[i].str, but->str ? but->str : "", sizeof(ui_last_clicks[i].str));
+		BLI_strncpy(ui_last_clicks[i].op, but->optype ? but->optype->idname : "", sizeof(ui_last_clicks[i].op));
+		BLI_strncpy(ui_last_clicks[i].prop, but->rnaprop ? RNA_property_identifier(but->rnaprop) : "",
+		            sizeof(ui_last_clicks[i].prop));
+		BLI_strncpy(ui_last_clicks[i].tip, but->tip ? but->tip : "", sizeof(ui_last_clicks[i].tip));
+		{
+			/* Tab / expanded enum: which value ("prop=VALUE"), and its name when the button has no text. */
+			const char *value = ui_but_enum_value_id((uiBut *)but), *ui_name = NULL;
+			if (value) {
+				BLI_snprintf(ui_last_clicks[i].prop, sizeof(ui_last_clicks[i].prop), "%s=%s",
+				             RNA_property_identifier(but->rnaprop), value);
+				if (ui_last_clicks[i].tip[0] == 0 &&
+				    RNA_property_enum_name(NULL, (PointerRNA *)&but->rnapoin, but->rnaprop, (int)but->hardmax, &ui_name))
+				{
+					BLI_strncpy(ui_last_clicks[i].tip, ui_name, sizeof(ui_last_clicks[i].tip));
+				}
+			}
+		}
+	}
+}
+
+/* Click number `index` (1 = first ever; 0 = the last one). Returns the total count, or -1 when that
+ * click is no longer kept (or does not exist yet). */
+int UI_last_click_get(int index, int *spacetype, int *regiontype, const char **str, const char **op,
+                      const char **prop, const char **tip, int *opens_menu)
+{
+	int i;
+	if (index == 0) {
+		index = ui_last_click_count;
+	}
+	if (index <= 0 || index > ui_last_click_count || index <= ui_last_click_count - UI_LAST_CLICKS) {
+		return -1;
+	}
+	i = index % UI_LAST_CLICKS;
+	*opens_menu = ui_last_clicks[i].opens_menu;
+	*spacetype = ui_last_clicks[i].spacetype;
+	*regiontype = ui_last_clicks[i].regiontype;
+	*str = ui_last_clicks[i].str;
+	*op = ui_last_clicks[i].op;
+	*prop = ui_last_clicks[i].prop;
+	*tip = ui_last_clicks[i].tip;
+	return ui_last_click_count;
+}
+
+int UI_last_click_count(void)
+{
+	return ui_last_click_count;
 }
 
 /* for mouse cursor */

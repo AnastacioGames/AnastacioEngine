@@ -43,6 +43,8 @@
 
 #include "ED_space_api.h"
 
+#include "WM_api.h"
+
 /* use this to stop other capsules from being mis-used */
 #define RNA_CAPSULE_ID "RNA_HANDLE"
 #define RNA_CAPSULE_ID_INVALID "RNA_HANDLE_REMOVED"
@@ -74,6 +76,76 @@ static void cb_region_draw(const bContext *C, ARegion *UNUSED(ar), void *customd
 	}
 
 	bpy_context_clear((bContext *)C, &gilstate);
+}
+
+/* ---- WindowManager.draw_handler_add(func, args): desenho por cima de toda janela ---- */
+
+#ifdef WITH_BLENDER
+static void cb_window_draw(const struct wmWindow *UNUSED(win), void *customdata)
+{
+	bContext *C = BPy_GetContext();
+	PyGILState_STATE gilstate;
+	PyObject *result;
+
+	bpy_context_set(C, &gilstate);
+	result = PyObject_CallObject(PyTuple_GET_ITEM((PyObject *)customdata, 0),
+	                             PyTuple_GET_ITEM((PyObject *)customdata, 1));
+	if (result) {
+		Py_DECREF(result);
+	}
+	else {
+		PyErr_Print();
+		PyErr_Clear();
+	}
+	bpy_context_clear(C, &gilstate);
+}
+#endif
+
+PyObject *pyrna_overlay_handler_add(PyObject *UNUSED(self), PyObject *args)
+{
+	PyObject *cls, *cb_func, *cb_args;
+
+	if (!PyArg_ParseTuple(args, "OOO!:WindowManager.draw_handler_add", &cls, &cb_func, &PyTuple_Type, &cb_args)) {
+		return NULL;
+	}
+	if (!PyCallable_Check(cb_func)) {
+		PyErr_SetString(PyExc_TypeError, "first argument isn't callable");
+		return NULL;
+	}
+#ifdef WITH_BLENDER
+	{
+		PyObject *data = PyTuple_Pack(2, cb_func, cb_args);
+		void *handle = WM_draw_overlay_cb_activate(cb_window_draw, data);
+		return PyCapsule_New(handle, RNA_CAPSULE_ID, NULL);
+	}
+#else
+	UNUSED_VARS(cls);
+	PyErr_SetString(PyExc_NotImplementedError, "draw_handler_add(): not available in the player runtime");
+	return NULL;
+#endif
+}
+
+PyObject *pyrna_overlay_handler_remove(PyObject *UNUSED(self), PyObject *args)
+{
+	PyObject *cls, *py_handle;
+	void *handle;
+
+	if (!PyArg_ParseTuple(args, "OO!:WindowManager.draw_handler_remove", &cls, &PyCapsule_Type, &py_handle)) {
+		return NULL;
+	}
+	handle = PyCapsule_GetPointer(py_handle, RNA_CAPSULE_ID);
+	if (handle == NULL) {
+		PyErr_SetString(PyExc_ValueError, "draw_handler_remove(handler): invalid or already removed");
+		return NULL;
+	}
+#ifdef WITH_BLENDER
+	{
+		PyObject *data = WM_draw_overlay_cb_exit(handle);
+		Py_XDECREF(data);
+	}
+#endif
+	PyCapsule_SetName(py_handle, RNA_CAPSULE_ID_INVALID);
+	Py_RETURN_NONE;
 }
 
 #if 0

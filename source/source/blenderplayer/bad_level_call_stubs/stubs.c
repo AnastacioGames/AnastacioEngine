@@ -506,6 +506,8 @@ void        *WM_draw_cb_activate(
         void(*draw)(const struct wmWindow *, void *),
         void *customdata) RET_NULL
 void        WM_draw_cb_exit(struct wmWindow *win, void *handle) RET_NONE
+void       *WM_draw_overlay_cb_activate(void(*draw)(const struct wmWindow *, void *), void *customdata) RET_NULL
+void       *WM_draw_overlay_cb_exit(void *handle) RET_NULL
 struct wmDropBox	*WM_dropbox_add(
         ListBase *lb, const char *idname, bool (*poll)(struct bContext *, struct wmDrag *, const struct wmEvent *event),
         void (*copy)(struct wmDrag *, struct wmDropBox *)) RET_NULL

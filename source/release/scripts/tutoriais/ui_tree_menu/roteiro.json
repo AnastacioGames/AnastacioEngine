@@ -1,0 +1,92 @@
+{
+  "titulo": "Seu primeiro menu de jogo com a UI Tree",
+  "categoria": "Node Editor/UI Tree",
+  "resumo": "Crie um menu com botão Start sem escrever código.",
+  "cena_inicial": "inicio.range",
+  "abertura": "Olá! Neste tutorial, vamos criar o primeiro menu do seu jogo, com um botão Start, sem escrever nenhuma linha de código.",
+  "passos": [
+    {
+      "texto": "Troque a área de baixo para Node Editor.",
+      "narracao": "Primeiro, troque a área de baixo para o Node Editor. Depois, no cabeçalho, escolha o tipo UI.",
+      "destaque": "NODE_EDITOR",
+      "checagem": "node_editor",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Node Editor"
+      }
+    },
+    {
+      "texto": "No cabeçalho, clique em UI.",
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": "node_editor_ui_tree",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "UI (Experimental)"
+      }
+    },
+    {
+      "texto": "Clique em New.",
+      "narracao": "Agora clique em New. Isso cria uma árvore vazia, onde o menu vai ser montado.",
+      "destaque": "NODE_EDITOR",
+      "checagem": "arvore_criada",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "New"
+      }
+    },
+    {
+      "texto": "No painel UI Tree, à direita, clique em + Menu.",
+      "narracao": "No painel UI Tree, à direita, clique em mais Menu. A engine cria um menu pronto, com os botões Jogar, Opções e Sair.",
+      "destaque": "NODE_EDITOR",
+      "checagem": "menu_criado",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "Menu"
+      }
+    },
+    {
+      "texto": "Clique no bloco verde do Jogar.",
+      "narracao": "Cada bloco verde é um botão do menu. Clique no bloco ao lado de Jogar. No painel, role para baixo até Properties, e troque o campo Text para Start.",
+      "destaque": "NODE_EDITOR",
+      "checagem": "botao_ativo",
+      "alvo": {
+        "no": "Jogar"
+      }
+    },
+    {
+      "texto": "Role o painel até Properties e troque Text para Start.",
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": "botao_start",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "prop:text"
+      }
+    },
+    {
+      "texto": "No topo do painel, clique em Setup Game Logic.",
+      "narracao": "Agora volte ao topo do painel e clique em Setup Game Logic. Esse botão liga o menu na câmera da cena, sozinho.",
+      "destaque": "NODE_EDITOR",
+      "checagem": "logica_ligada",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "Setup Game Logic"
+      }
+    },
+    {
+      "texto": "Mouse na 3D View, aperte P e clique em Start. Esc sai do jogo.",
+      "narracao": "Pronto! Leve o mouse até a 3D View, aperte P e clique em Start. O seu primeiro menu está funcionando.",
+      "destaque": "VIEW_3D",
+      "checagem": null
+    }
+  ],
+  "encerramento": "É isso! No próximo tutorial, vamos colocar uma barra de vida na tela. Até lá!"
+}

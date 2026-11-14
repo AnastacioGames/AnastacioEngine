@@ -584,6 +584,7 @@ class INFO_MT_help(Menu):
         layout = self.layout
 
         layout.operator("wm.splash_about", text="Anastacio Engine About", icon_value=_cube_icon())
+        layout.menu("INFO_MT_range_tutorials", icon='PLAY')
         layout.separator()
 
         # Same links as the splash screen.

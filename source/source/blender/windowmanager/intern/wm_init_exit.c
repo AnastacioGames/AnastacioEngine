@@ -570,6 +570,7 @@ void WM_exit_ext(bContext *C, const bool do_python)
 	ED_gpencil_strokes_copybuf_free();
 	BKE_node_clipboard_clear();
 
+	WM_draw_overlay_cb_free_all();
 	BLF_exit();
 
 #ifdef WITH_INTERNATIONAL

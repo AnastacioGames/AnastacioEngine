@@ -2119,6 +2119,12 @@ static void ui_apply_but(bContext *C, uiBlock *block, uiBut *but, uiHandleButton
 
 	data->retval = 0;
 
+	/* Tutorial recorder: only the final apply of a button (not drags, not hover-leave). */
+	if (!data->cancel && !interactive && data->region) {
+		ScrArea *sa = CTX_wm_area(C);
+		UI_last_click_set(sa ? sa->spacetype : 0, data->region->regiontype, but, false);
+	}
+
 	/* if we cancel and have not applied yet, there is nothing to do,
 	 * otherwise we have to restore the original value again */
 	if (data->cancel) {
@@ -3737,6 +3743,12 @@ static void ui_block_open_begin(bContext *C, uiBut *but, uiHandleButtonData *dat
 	uiMenuCreateFunc menufunc = NULL;
 	uiMenuCreateFunc popoverfunc = NULL;
 	void *arg = NULL;
+
+	/* Tutorial recorder: the button that opens a menu is a step too (its item is chosen next). */
+	if (data->region) {
+		ScrArea *sa = CTX_wm_area(C);
+		UI_last_click_set(sa ? sa->spacetype : 0, data->region->regiontype, but, true);
+	}
 
 	switch (but->type) {
 		case UI_BTYPE_BLOCK:

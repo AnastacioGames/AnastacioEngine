@@ -188,10 +188,63 @@ void WM_draw_cb_exit(wmWindow *win, void *handle)
 	}
 }
 
+/* Desenhos por cima de toda janela (tutoriais): pixels da janela, depois das áreas e antes dos menus. */
+static ListBase wm_overlay_drawcalls = {NULL, NULL};
+static bool wm_overlay_drawing = false;  /* durante o desenho, remover só marca (draw = NULL) */
+
+void *WM_draw_overlay_cb_activate(void(*draw)(const struct wmWindow *, void *), void *customdata)
+{
+	WindowDrawCB *wdc = MEM_callocN(sizeof(*wdc), "WindowDrawCB overlay");
+
+	BLI_addtail(&wm_overlay_drawcalls, wdc);
+	wdc->draw = draw;
+	wdc->customdata = customdata;
+	return wdc;
+}
+
+/* Devolve o customdata (para quem o criou liberar), ou NULL se o handle não existe. */
+void *WM_draw_overlay_cb_exit(void *handle)
+{
+	for (WindowDrawCB *wdc = wm_overlay_drawcalls.first; wdc; wdc = wdc->next) {
+		if (wdc == (WindowDrawCB *)handle && wdc->draw) {
+			void *customdata = wdc->customdata;
+			if (wm_overlay_drawing) {
+				wdc->draw = NULL;  /* o laço de desenho libera depois */
+			}
+			else {
+				BLI_remlink(&wm_overlay_drawcalls, wdc);
+				MEM_freeN(wdc);
+			}
+			return customdata;
+		}
+	}
+	return NULL;
+}
+
+void WM_draw_overlay_cb_free_all(void)
+{
+	BLI_freelistN(&wm_overlay_drawcalls);
+}
+
 static void wm_draw_callbacks(wmWindow *win)
 {
 	for (WindowDrawCB *wdc = win->drawcalls.first; wdc; wdc = wdc->next) {
 		wdc->draw(win, wdc->customdata);
+	}
+	/* Um callback pode remover qualquer handler: a remoção fica marcada e é feita aqui no fim. */
+	wm_overlay_drawing = true;
+	for (WindowDrawCB *wdc = wm_overlay_drawcalls.first; wdc; wdc = wdc->next) {
+		if (wdc->draw) {
+			wdc->draw(win, wdc->customdata);
+		}
+	}
+	wm_overlay_drawing = false;
+	for (WindowDrawCB *wdc = wm_overlay_drawcalls.first, *next; wdc; wdc = next) {
+		next = wdc->next;
+		if (wdc->draw == NULL) {
+			BLI_remlink(&wm_overlay_drawcalls, wdc);
+			MEM_freeN(wdc);
+		}
 	}
 }
 

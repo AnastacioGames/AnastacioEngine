@@ -548,6 +548,8 @@ void ED_region_do_draw(bContext *C, ARegion *ar)
 
 	ED_region_draw_cb_draw(C, ar, REGION_DRAW_POST_PIXEL);
 
+	UI_highlight_button_draw(sa, ar);
+
 	region_draw_azones(sa, ar);
 
 	/* for debugging unneeded area redraws and partial redraw */
