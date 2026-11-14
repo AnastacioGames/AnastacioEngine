@@ -197,10 +197,6 @@ class INFO_MT_editor_menus(Menu):
 
         layout.menu("INFO_MT_window")
         layout.menu("INFO_MT_help")
-        wm = context.window_manager
-        if hasattr(wm, "range_help_on"):
-            # Liga o "i" nos painéis que têm explicação (startup/range_help.py).
-            layout.prop(wm, "range_help_on", text="Help", icon='INFO', toggle=True)
 
         # A popover looks different from the menus: it goes after them.
         if rd.use_game_engine:
@@ -589,6 +585,10 @@ class INFO_MT_help(Menu):
 
         layout.operator("wm.splash_about", text="Anastacio Engine About", icon_value=_cube_icon())
         layout.menu("INFO_MT_range_tutorials", icon='PLAY')
+        wm = context.window_manager
+        if hasattr(wm, "range_help_on"):
+            # Liga o "i" nos painéis que têm explicação (startup/range_help.py).
+            layout.prop(wm, "range_help_on", text="Help", icon='INFO')
         layout.separator()
 
         # Same links as the splash screen.

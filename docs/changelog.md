@@ -26,7 +26,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 ## 2026-11-14 — Botão Help: "i" nos painéis com explicação e tutorial
 
-- Botão Help no cabeçalho de cima, depois do About: liga um "i" no cabeçalho dos painéis com explicação (`startup/range_help.py`).
+- Help no menu About (caixinha), abaixo de Tutorials: liga um "i" no cabeçalho dos painéis com explicação (`startup/range_help.py`).
 - O "i" abre uma janela com o que é o painel e o botão do tutorial dele, no idioma escolhido nos tutoriais.
 - Explicações em `scripts/ajuda/paineis.json` (32 painéis, pt/en/es); o estado fica em `range_help.txt` na configuração.
 
