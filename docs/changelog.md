@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Versão 0.7.2 em preparo
+
+- Versão no executável (`BKE_blender_version.h`), About e scripts de release (Windows, Linux, RangeArmor).
+- Notas em [release-notes-0.7.2.md](release-notes-0.7.2.md); seção 0.7.2 em [releases.md](releases.md).
+
 ## 2026-11-14 — Aquecimento de shaders inclui arquivos de LibLoad (`<jogo>.warmup`)
 
 - Diagnóstico (RolimaRacer, veículos texturizados): carregar 20 veículos por LibLoad levava 24 s na 1ª vez;

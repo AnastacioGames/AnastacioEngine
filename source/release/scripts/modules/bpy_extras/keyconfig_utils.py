@@ -114,6 +114,8 @@ KM_HIERARCHY = [
         ('Text Generic', 'TEXT_EDITOR', 'WINDOW', []),
     ]),
     ('Console', 'CONSOLE', 'WINDOW', []),
+    ('Mind Map', 'MINDMAP_EDITOR', 'WINDOW', []),
+    ('Mind Map Sidebar', 'MINDMAP_EDITOR', 'WINDOW', []),
     ('Clip', 'CLIP_EDITOR', 'WINDOW', [
         ('Clip Editor', 'CLIP_EDITOR', 'WINDOW', []),
         ('Clip Graph Editor', 'CLIP_EDITOR', 'WINDOW', []),

@@ -27,6 +27,11 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
   zip Windows publicado da RangeArmor.
 - Abra janelas do jogo/editor só quando o usuário pedir; o resto valide em background.
 
+## 0.7.2
+
+Estado: **em preparo** (2026-11-14). Tutoriais e botão Help, Mind Map, Nodes GLSL por arquivo, TAAU, Bake Probes
+e aquecimento de LibLoad. Texto da página do GitHub: [release-notes-0.7.2.md](release-notes-0.7.2.md).
+
 ## 0.7.1
 
 Estado: **publicada completa em 2026-11-09** (tag `v0.7.1`), Windows e Linux. Correções da 0.7.0 (Export Web) e ajustes de luz/material no editor sem
