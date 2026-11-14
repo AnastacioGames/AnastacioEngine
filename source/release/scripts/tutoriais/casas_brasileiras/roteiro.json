@@ -1,0 +1,147 @@
+{
+  "titulo": {
+    "pt": "18. Casas e ruas brasileiras prontas",
+    "en": "18. Ready-made Brazilian houses and streets",
+    "es": "18. Casas y calles brasileñas listas"
+  },
+  "categoria": "Buildings",
+  "resumo": {
+    "pt": "Add › Mesh › Brazilian House e Brazilian Street Block: Seed, Style, Detail (LOD) e Houses.",
+    "en": "Add › Mesh › Brazilian House and Brazilian Street Block: Seed, Style, Detail (LOD) and Houses.",
+    "es": "Add › Mesh › Brazilian House y Brazilian Street Block: Seed, Style, Detail (LOD) y Houses."
+  },
+  "abertura": {
+    "pt": "Vamos montar um pedaço de bairro com casas low poly prontas.",
+    "en": "Let's build a piece of a neighborhood with ready-made low poly houses.",
+    "es": "Vamos a armar un pedazo de barrio con casas low poly listas."
+  },
+  "encerramento": {
+    "pt": "Pronto: casas e uma rua inteira, todas com um material só.",
+    "en": "Done: houses and a whole street, all with a single material.",
+    "es": "Listo: casas y una calle entera, todas con un solo material."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, abra Add › Mesh › Brazilian House.",
+        "en": "In the 3D View, open Add › Mesh › Brazilian House.",
+        "es": "En la 3D View, abre Add › Mesh › Brazilian House."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.get('range_buildings') for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      },
+      "dica": {
+        "pt": "A casa nasce no cursor 3D (o círculo vermelho e branco).",
+        "en": "The house appears at the 3D cursor (the red and white circle).",
+        "es": "La casa aparece en el cursor 3D (el círculo rojo y blanco)."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No painel Brazilian House (embaixo do Tool Shelf, ou F6), mude Seed para 1: outra casa do mesmo estilo.",
+        "en": "In the Brazilian House panel (bottom of the Tool Shelf, or F6), change Seed to 1: another house of the same style.",
+        "es": "En el panel Brazilian House (abajo del Tool Shelf, o F6), cambia Seed a 1: otra casa del mismo estilo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.get('range_buildings') and o['range_buildings'].split(':')[-1] != '0' for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "Se o Tool Shelf estiver fechado, aperte T.",
+        "en": "If the Tool Shelf is closed, press T.",
+        "es": "Si el Tool Shelf está cerrado, presiona T."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No mesmo painel, troque Style, por exemplo para Two-Storey with Balcony.",
+        "en": "In the same panel, change Style, for example to Two-Storey with Balcony.",
+        "es": "En el mismo panel, cambia Style, por ejemplo a Two-Storey with Balcony."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.get('range_buildings') and o['range_buildings'].split(':')[0] != 'terrea_colonial' for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "São 8 estilos: casa com telha, laje, sobrado, comércio, puxadinho, tijolo, predinho e muro alto.",
+        "en": "There are 8 styles: tile roof, flat slab, two-storey, shop, unfinished extension, brick, apartment block and high wall.",
+        "es": "Son 8 estilos: tejas, losa, dos pisos, comercio, ampliación sin terminar, ladrillo, edificio y muro alto."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Detail, escolha LOD0 + LOD1 Switch: de longe a casa troca por uma versão bem leve.",
+        "en": "In Detail, choose LOD0 + LOD1 Switch: from far away the house swaps to a very light version.",
+        "es": "En Detail, elige LOD0 + LOD1 Switch: de lejos la casa cambia a una versión muy liviana."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.get('range_buildings') and len(o.lod_levels) > 1 for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "Mova o cursor 3D para o lado (Shift + clique direito no chão) e abra Add › Mesh › Brazilian Street Block.",
+        "en": "Move the 3D cursor aside (Shift + right click on the ground) and open Add › Mesh › Brazilian Street Block.",
+        "es": "Mueve el cursor 3D a un lado (Shift + clic derecho en el suelo) y abre Add › Mesh › Brazilian Street Block."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.name.startswith('Rua_') for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      },
+      "dica": {
+        "pt": "A rua inteira é uma malha só, com calçada.",
+        "en": "The whole street is a single mesh, with a sidewalk.",
+        "es": "La calle entera es una sola malla, con vereda."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No painel Brazilian Street Block, mude Houses para 4 e Seed para 2. Depois, clique em Next.",
+        "en": "In the Brazilian Street Block panel, change Houses to 4 and Seed to 2. Then click Next.",
+        "es": "En el panel Brazilian Street Block, cambia Houses a 4 y Seed a 2. Después, haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "Aperte Numpad . para ver a rua. Todas as casas usam o material Casas_Atlas. Clique em Next.",
+        "en": "Press Numpad . to see the street. Every house uses the Casas_Atlas material. Click Next.",
+        "es": "Presiona Numpad . para ver la calle. Todas las casas usan el material Casas_Atlas. Haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "As casas vêm sem colisão (No Collision); troque na aba Physics se o jogador precisar bater nelas.",
+        "en": "Houses come with No Collision; change it in the Physics tab if the player must bump into them.",
+        "es": "Las casas vienen con No Collision; cámbialo en la pestaña Physics si el jugador debe chocar con ellas."
+      }
+    }
+  ]
+}

@@ -1,0 +1,115 @@
+{
+  "titulo": {
+    "pt": "20. LOD automático: modelos leves de longe",
+    "en": "20. Automatic LOD: light models from far away",
+    "es": "20. LOD automático: modelos livianos de lejos"
+  },
+  "categoria": "Optimization",
+  "resumo": {
+    "pt": "Performance › Optimize Scene › Generate LODs e o painel Levels of Detail - LOD da aba Object (Game).",
+    "en": "Performance › Optimize Scene › Generate LODs and the Levels of Detail - LOD panel of the Object tab (Game).",
+    "es": "Performance › Optimize Scene › Generate LODs y el panel Levels of Detail - LOD de la pestaña Object (Game)."
+  },
+  "abertura": {
+    "pt": "Vamos fazer um modelo pesado trocar sozinho por versões mais leves quando fica longe.",
+    "en": "Let's make a heavy model swap by itself to lighter versions when it is far away.",
+    "es": "Vamos a hacer que un modelo pesado cambie solo a versiones más livianas cuando está lejos."
+  },
+  "encerramento": {
+    "pt": "Pronto: o modelo tem níveis de detalhe com distâncias calculadas pelo tamanho dele.",
+    "en": "Done: the model has levels of detail with distances worked out from its size.",
+    "es": "Listo: el modelo tiene niveles de detalle con distancias calculadas por su tamaño."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, abra Add › Mesh › Monkey.",
+        "en": "In the 3D View, open Add › Mesh › Monkey.",
+        "es": "En la 3D View, abre Add › Mesh › Monkey."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and len(C.active_object.data.polygons) >= 500"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte Ctrl+2: o modificador Subdivision deixa o macaco liso e pesado.",
+        "en": "Press Ctrl+2: the Subdivision modifier makes the monkey smooth and heavy.",
+        "es": "Presiona Ctrl+2: el modificador Subdivision deja el mono liso y pesado."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and len(C.active_object.data.polygons) >= 500 and any(m.type == 'SUBSURF' for m in C.active_object.modifiers)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "Com o macaco selecionado, abra Performance › Optimize Scene › Generate LODs.",
+        "en": "With the monkey selected, open Performance › Optimize Scene › Generate LODs.",
+        "es": "Con el mono seleccionado, abre Performance › Optimize Scene › Generate LODs."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and len(C.active_object.data.polygons) >= 500 and len(C.active_object.lod_levels) > 1"
+      },
+      "destaque": "INFO",
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "Performance",
+        "menu": "Optimize Scene"
+      },
+      "dica": {
+        "pt": "Sem nada selecionado, ele faz LOD de toda malha com 50 mil triângulos ou mais.",
+        "en": "With nothing selected, it makes LODs for every mesh with 50 thousand triangles or more.",
+        "es": "Sin nada seleccionado, hace LOD de toda malla con 50 mil triángulos o más."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Object e, no topo, clique em Game: o painel Levels of Detail - LOD mostra os níveis e as distâncias. Clique em Next.",
+        "en": "In Properties, open the Object tab and, at its top, click Game: the Levels of Detail - LOD panel shows the levels and distances. Click Next.",
+        "es": "En Properties, abre la pestaña Object y, arriba, haz clic en Game: el panel Levels of Detail - LOD muestra los niveles y las distancias. Haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=OBJECT"
+      },
+      "dica": {
+        "pt": "As versões leves ficam escondidas na camada 20.",
+        "en": "The light versions are hidden on layer 20.",
+        "es": "Las versiones livianas quedan ocultas en la capa 20."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte P e afaste a vista com a rodinha do mouse: o macaco troca para as versões leves. Esc sai. Clique em Next.",
+        "en": "Press P and zoom out with the mouse wheel: the monkey swaps to the light versions. Esc quits. Click Next.",
+        "es": "Presiona P y aleja la vista con la rueda del ratón: el mono cambia a las versiones livianas. Esc sale. Haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "Para desfazer: Performance › Optimize Scene › Clear LODs.",
+        "en": "To undo it: Performance › Optimize Scene › Clear LODs.",
+        "es": "Para deshacerlo: Performance › Optimize Scene › Clear LODs."
+      }
+    }
+  ]
+}

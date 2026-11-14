@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais 18 a 20 (casas, destruição, LOD automático)
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `casas_brasileiras` | Buildings | 7 | Brazilian House (Seed, Style, Detail LOD0 + LOD1), Brazilian Street Block |
+| `destruicao_bomba` | Physics | 8 | Physics › Damage, Destruction + Generate Fragments, bomba Rigid Body com Explosive e Particle Explosion, P |
+| `lod_automatico` | Optimization | 5 | Monkey + Subdivision, Performance › Optimize Scene › Generate LODs, painel de LOD, P |
+
+- Em pt, en e es, com nomes de botões e teclas em inglês.
+- Checagens: chave `range_buildings` (estilo:seed), `lod_levels`, objeto `Rua_*`; `ae_physics_panel_category`,
+  `game.use_destruction`/`destruction.fragments`, `game.use_explosive`/`explosive.use_particle_explosion`;
+  modificador SUBSURF. Simulados com dados falsos; falta o aceite com a janela.
+
 ## 2026-11-14 — Tutoriais 15 a 17 (Rec Play, Track Tool, carro e Vehicle Lab)
 
 | Pasta | Categoria | Passos | Conteúdo |

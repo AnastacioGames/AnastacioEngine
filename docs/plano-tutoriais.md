@@ -182,6 +182,19 @@ Text Boxes (diálogos sem código) e World Sound.
   conferido pelo estado do módulo `bl_operators.anastacio_track`; o carro com as medidas do tutorial (rodas
   em X ±1,2, Y ±1, Z -0,8, chão em Z -2) precisa andar sem capotar; a vista não segue o carro.
 
+## Tutoriais 18 a 20 (2026-11-14, falta aceite com janela)
+
+- `casas_brasileiras` (Buildings): Add › Mesh › Brazilian House, Seed, Style e Detail no painel do operador
+  (Tool Shelf ou F6), Brazilian Street Block.
+- `destruicao_bomba` (Physics): aba Physics › Damage, Destruction com Generate Fragments, esfera Rigid Body
+  com Explosive e Particle Explosion caindo no cubo.
+- `lod_automatico` (Optimization): Monkey com Ctrl+2, Performance › Optimize Scene › Generate LODs, painel
+  Levels of Detail - LOD (aba Object › Game).
+- Pontos para o aceite: se a explosão padrão (raio 5, força 30) quebra o cubo com o Break Impulse padrão; o
+  destaque dentro do submenu Optimize Scene do popover Performance.
+- Ficaram de fora por ora: aba Input (estado em propriedades dinâmicas, difícil de conferir) e Locale (pede
+  editar a tabela CSV e um script para trocar o idioma no jogo).
+
 ## Três idiomas (2026-11-14)
 
 - Os tutoriais têm pt, en e es em `titulo`, `resumo`, `abertura`, `encerramento`, `texto` e `dica`.
