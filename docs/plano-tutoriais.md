@@ -51,14 +51,14 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 |---|---|---|
 | Input | Mapear ações (teclado, gamepad, toque) na aba Input | fora por ora: estado difícil de conferir |
 | Locale | Jogo em vários idiomas (Range.locale, Language Button) | fora por ora: pede editar o CSV |
-| Camera FX | Efeitos de câmera (grão, Directional Blur) | falta: achar o painel |
+| Camera FX | Efeitos de câmera (grão, Directional Blur) | reservado 2026-11-14 (sessão local, main) |
 | Render | Céu: Sky Layers, nuvens, Sky Quality | feito: 21 (`ceu_entardecer`); Sky Layers e Sky Quality ficam para outro |
 | Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | feito: 23 (`chuva_nevoa`, chuva + névoa); falta raios e fumaça/fogo |
 | Render | Compositing no jogo (faixa de efeitos e presets) | feito: 24 (`compositing_efeitos`) |
 | Render | Light Probe Volume e Bake Probes | feito: 25 (`probe_volume_luz`) |
 | Render | SSGI | feito: 26 (`ssgi_luz`) |
-| Render | Sombra colorida e PCSS (sombra suave) | falta |
-| Shader | Nós de shader e Nodes GLSL por arquivo | falta |
+| Render | Sombra colorida e PCSS (sombra suave) | reservado 2026-11-14 (sessão local, main) |
+| Shader | Nós de shader e Nodes GLSL por arquivo | reservado 2026-11-14 (sessão local, main) |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player | feito: 28 (`video_player`); legendas e actuator Video ficam para outro |
 | Video | Screencast (gravar o jogo) | feito: 22 (`screencast_gravar`) |
@@ -72,7 +72,7 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Optimization | Static Batch | fora: ligado por padrão (Auto Static Batch), nada a ensinar |
 | Optimization | Simulador de PC fraco | feito dentro do 14 (`performance_medir`) |
 | Debug | Game Trace e Trace Doctor | fora: roda por launcher externo (`tools/debug/game_trace_launcher.py`) e pede trace gravado |
-| Textures | Prepare Textures (DDS/KTX2) e Decimate High Quality | falta |
+| Textures | Prepare Textures (DDS/KTX2) e Decimate High Quality | reservado 2026-11-14 (sessão local, main) |
 
 ## Objetivo
 
