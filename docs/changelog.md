@@ -129,6 +129,16 @@ ordem de estudo:
   cada passo só fica verdadeiro depois do anterior. Open Link e Quick Guide avançam pelo botão Próximo.
 - Sem cena inicial: funciona em qualquer arquivo. Falta o aceite com janela.
 
+## 2026-11-14 — Tutoriais 21 a 23: céu, Screencast e chuva com névoa
+
+- `ceu_entardecer` (World): aba World › Sky › Hour 18 (horizonte laranja e primeiras estrelas; 19 já é noite)
+  › Stars › Atmosphere › Clouds - Procedural › P.
+- `screencast_gravar` (Video): Rec › P › botão vermelho Recording (à direita do título) › Play Last.
+- `chuva_nevoa` (World): World › Atmosphere › Rain › Fog - Volumetric › P. Lightning ficou fora: fica no fim
+  da seção Rain aberta, longe demais para um passo.
+- Testados com cliques reais no editor invisível. Revisão do Codex: aceito proteger as checagens com World
+  vazio; recusados o quadro na setinha do Rec (o botão do popover não tem nome) e gravação já ativa no início.
+
 ## 2026-11-14 — Brazilian House/Street Block viram addon (desligado por padrão)
 
 - `anastacio_buildings.py` saiu de `startup/bl_operators/` para `addons/` ("Anastacio Brazilian Buildings",

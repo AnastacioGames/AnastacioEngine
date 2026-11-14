@@ -1,0 +1,118 @@
+{
+  "titulo": {
+    "pt": "23. Chuva e névoa",
+    "en": "23. Rain and fog",
+    "es": "23. Lluvia y niebla"
+  },
+  "categoria": "World",
+  "resumo": {
+    "pt": "Liga chuva e névoa volumétrica na aba World, sem partículas nem código.",
+    "en": "Turn on rain and volumetric fog in the World tab, with no particles or code.",
+    "es": "Activa lluvia y niebla volumétrica en la pestaña World, sin partículas ni código."
+  },
+  "abertura": {
+    "pt": "Vamos deixar a cena com clima de tempestade só com caixas de marcar.",
+    "en": "Let's give the scene a stormy mood with only checkboxes.",
+    "es": "Vamos a darle a la escena un clima de tormenta solo con casillas."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba World.",
+        "en": "In Properties, open the World tab.",
+        "es": "En Properties, abre la pestaña World."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'WORLD' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "É o ícone de globo na fileira de abas. Sem World na cena? Clique em New.",
+        "en": "It is the globe icon in the row of tabs. No World in the scene? Click New.",
+        "es": "Es el ícono de globo en la fila de pestañas. ¿No hay World en la escena? Haz clic en New."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=WORLD"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo do painel, clique em Atmosphere.",
+        "en": "At the top of the panel, click Atmosphere.",
+        "es": "Arriba del panel, haz clic en Atmosphere."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.ae_world_panel_category == 'ATMOSPHERE'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_world_panel_category=ATMOSPHERE"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Weather, marque a caixa de Rain.",
+        "en": "In Weather, check the Rain box.",
+        "es": "En Weather, marca la casilla de Rain."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and C.scene.world.weather_settings.use_rain"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "É a caixinha à direita da linha Rain.",
+        "en": "It is the small box on the right of the Rain row.",
+        "es": "Es la casilla a la derecha de la fila Rain."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_rain"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Marque a caixa de Fog - Volumetric.",
+        "en": "Check the Fog - Volumetric box.",
+        "es": "Marca la casilla de Fog - Volumetric."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and C.scene.world.weather_settings.use_volumetric_fog"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Fog - Volumetric fica logo acima de Rain.",
+        "en": "Fog - Volumetric is right above Rain.",
+        "es": "Fog - Volumetric está justo encima de Rain."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_volumetric_fog"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e veja a tempestade. Esc sai.",
+        "en": "Mouse over the 3D View, press P and watch the storm. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P y mira la tormenta. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! A seta da linha Rain abre mais opções, como raios (Lightning) e poças. O som vem do World Sound (tutorial 9).",
+    "en": "Done! The Rain row arrow opens more options, like lightning and puddles. The sound comes from World Sound (tutorial 9).",
+    "es": "¡Listo! La flecha de la fila Rain abre más opciones, como rayos (Lightning) y charcos. El sonido viene de World Sound (tutorial 9)."
+  }
+}

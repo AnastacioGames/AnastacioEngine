@@ -1,6 +1,6 @@
 # Plano: Tutoriais (dentro da engine + vídeo curto)
 
-Data: 2026-11-13. Status (2026-11-14): 23 tutoriais prontos, todos aguardando aceite com janela.
+Data: 2026-11-13. Status (2026-11-14): 26 tutoriais prontos, todos aguardando aceite com janela.
 
 ## Catálogo
 
@@ -32,6 +32,9 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | 18 | Buildings | Casas e ruas brasileiras (só com o addon Anastacio Brazilian Buildings ligado) | `casas_brasileiras` |
 | 19 | Physics | Parede que quebra e bomba | `destruicao_bomba` |
 | 20 | Optimization | LOD automático | `lod_automatico` |
+| 21 | World | Céu de fim de tarde com nuvens e estrelas | `ceu_entardecer` |
+| 22 | Video | Gravar um vídeo do jogo (Screencast) | `screencast_gravar` |
+| 23 | World | Chuva e névoa | `chuva_nevoa` |
 | — | Node Editor/UI Tree | Primeiro menu de jogo (piloto) | `ui_tree_menu` |
 | — | Node Editor/UI Tree | Os nós de HUD | `ui_tree_hud` |
 | — | Mind Map | A barra do Mind Map | `mind_map_barra` |
@@ -43,15 +46,15 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Input | Mapear ações (teclado, gamepad, toque) na aba Input | fora por ora: estado difícil de conferir |
 | Locale | Jogo em vários idiomas (Range.locale, Language Button) | fora por ora: pede editar o CSV |
 | Camera FX | Efeitos de câmera (grão, Directional Blur) | falta: achar o painel |
-| Render | Céu: Sky Layers, nuvens, Sky Quality | reservado 2026-11-14 (sessão local, main) |
-| Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | reservado 2026-11-14 (sessão local, main): chuva, raios e névoa |
+| Render | Céu: Sky Layers, nuvens, Sky Quality | feito: 21 (`ceu_entardecer`); Sky Layers e Sky Quality ficam para outro |
+| Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | feito: 23 (`chuva_nevoa`, chuva + névoa); falta raios e fumaça/fogo |
 | Render | Compositing no jogo (faixa de efeitos e presets) | falta |
 | Render | Light Probe Volume e Bake Probes | falta |
 | Render | Sombra colorida, SSGI e PCSS | falta |
 | Shader | Nós de shader e Nodes GLSL por arquivo | falta |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player e actuator Video (legendas, fade) | falta |
-| Video | Screencast (gravar o jogo) | reservado 2026-11-14 (sessão local, main) |
+| Video | Screencast (gravar o jogo) | feito: 22 (`screencast_gravar`) |
 | Sound | Microfone e Tuner | falta |
 | Character | Personagem automático (File › Import › Fuse Character) | falta |
 | Character | Postura do Character (abaixar, rastejar, pular) | falta |

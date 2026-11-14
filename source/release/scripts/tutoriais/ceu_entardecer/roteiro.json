@@ -1,0 +1,157 @@
+{
+  "titulo": {
+    "pt": "21. Céu de fim de tarde com nuvens e estrelas",
+    "en": "21. Evening sky with clouds and stars",
+    "es": "21. Cielo de atardecer con nubes y estrellas"
+  },
+  "categoria": "World",
+  "resumo": {
+    "pt": "Hora do sol, estrelas e nuvens na aba World, sem textura de céu.",
+    "en": "Sun hour, stars and clouds in the World tab, with no sky texture.",
+    "es": "Hora del sol, estrellas y nubes en la pestaña World, sin textura de cielo."
+  },
+  "abertura": {
+    "pt": "Vamos montar um céu de fim de tarde só com os ajustes da aba World.",
+    "en": "Let's build an evening sky using only the World tab settings.",
+    "es": "Vamos a armar un cielo de atardecer solo con los ajustes de la pestaña World."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba World.",
+        "en": "In Properties, open the World tab.",
+        "es": "En Properties, abre la pestaña World."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'WORLD' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "É o ícone de globo na fileira de abas. Sem World na cena? Clique em New.",
+        "en": "It is the globe icon in the row of tabs. No World in the scene? Click New.",
+        "es": "Es el ícono de globo en la fila de pestañas. ¿No hay World en la escena? Haz clic en New."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=WORLD"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo do painel, clique em Sky.",
+        "en": "At the top of the panel, click Sky.",
+        "es": "Arriba del panel, haz clic en Sky."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.ae_world_panel_category == 'SKY'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_world_panel_category=SKY"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Sun, troque Hour para 18.",
+        "en": "In Sun, set Hour to 18.",
+        "es": "En Sun, cambia Hour a 18."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "17.5 <= C.scene.auto_world_sun_hour <= 19.0"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Dê dois cliques no campo, digite 18 e Enter. Hour é a hora do dia: 12 é meio-dia.",
+        "en": "Double-click the field, type 18 and press Enter. Hour is the time of day: 12 is noon.",
+        "es": "Haz doble clic en el campo, escribe 18 y Enter. Hour es la hora del día: 12 es mediodía."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:auto_world_sun_hour"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Night, marque Stars.",
+        "en": "In Night, check Stars.",
+        "es": "En Night, marca Stars."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and C.scene.world.use_sky_stars"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Night fica abaixo de Sun: role a Properties se não aparecer.",
+        "en": "Night is below Sun: scroll Properties if you can't see it.",
+        "es": "Night está debajo de Sun: desplaza Properties si no aparece."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_sky_stars"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo do painel, clique em Atmosphere.",
+        "en": "At the top of the panel, click Atmosphere.",
+        "es": "Arriba del panel, haz clic en Atmosphere."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.ae_world_panel_category == 'ATMOSPHERE'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_world_panel_category=ATMOSPHERE"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Weather, marque a caixa de Clouds - Procedural.",
+        "en": "In Weather, check the Clouds - Procedural box.",
+        "es": "En Weather, marca la casilla de Clouds - Procedural."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and C.scene.world.weather_settings.use_clouds"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "É a caixinha à direita da linha Clouds - Procedural.",
+        "en": "It is the small box on the right of the Clouds - Procedural row.",
+        "es": "Es la casilla a la derecha de la fila Clouds - Procedural."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_clouds"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e olhe o céu. Esc sai.",
+        "en": "Mouse over the 3D View, press P and look at the sky. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P y mira el cielo. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Mude Hour para ver o dia passar: o céu, o sol e as estrelas acompanham.",
+    "en": "Done! Change Hour to watch the day go by: sky, sun and stars follow it.",
+    "es": "¡Listo! Cambia Hour para ver pasar el día: el cielo, el sol y las estrellas lo siguen."
+  }
+}

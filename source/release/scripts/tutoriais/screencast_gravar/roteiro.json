@@ -1,0 +1,94 @@
+{
+  "titulo": {
+    "pt": "22. Gravar um vídeo do jogo (Screencast)",
+    "en": "22. Record a video of your game (Screencast)",
+    "es": "22. Grabar un video del juego (Screencast)"
+  },
+  "categoria": "Video",
+  "resumo": {
+    "pt": "Grave a tela com o botão Rec, jogue e assista o vídeo com Play Last.",
+    "en": "Record the screen with the Rec button, play and watch the video with Play Last.",
+    "es": "Graba la pantalla con el botón Rec, juega y mira el video con Play Last."
+  },
+  "abertura": {
+    "pt": "Vamos gravar um vídeo curto do jogo, sem programa de fora.",
+    "en": "Let's record a short video of the game, with no outside program.",
+    "es": "Vamos a grabar un video corto del juego, sin programa externo."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "No topo da janela, clique em Rec.",
+        "en": "At the top of the window, click Rec.",
+        "es": "Arriba de la ventana, haz clic en Rec."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.is_screencast_running"
+      },
+      "destaque": "INFO",
+      "dica": {
+        "pt": "Rec fica ao lado de Record, no cabeçalho de cima.",
+        "en": "Rec is next to Record, in the top header.",
+        "es": "Rec está al lado de Record, en el encabezado de arriba."
+      },
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "op:SCREEN_OT_screencast"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e jogue uns segundos. Esc sai do jogo.",
+        "en": "Mouse over the 3D View, press P and play for a few seconds. Esc quits the game.",
+        "es": "Ratón en la 3D View, pulsa P y juega unos segundos. Esc sale del juego."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "No topo, à direita, clique no botão vermelho Recording para parar.",
+        "en": "At the top right, click the red Recording button to stop.",
+        "es": "Arriba a la derecha, haz clic en el botón rojo Recording para parar."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "not C.window_manager.is_screencast_running"
+      },
+      "destaque": "INFO",
+      "dica": {
+        "pt": "Ou aperte Ctrl+Alt+F3.",
+        "en": "Or press Ctrl+Alt+F3.",
+        "es": "O pulsa Ctrl+Alt+F3."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Na setinha ao lado de Rec, clique em Play Last para ver o vídeo.",
+        "en": "In the small arrow next to Rec, click Play Last to watch the video.",
+        "es": "En la flechita al lado de Rec, haz clic en Play Last para ver el video."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "INFO",
+      "dica": {
+        "pt": "Open Folder, no mesmo lugar, abre a pasta dos vídeos.",
+        "en": "Open Folder, in the same place, opens the videos folder.",
+        "es": "Open Folder, en el mismo lugar, abre la carpeta de los videos."
+      },
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "menu": "Play Last"
+      }
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Na mesma setinha dá para escolher FPS, qualidade, som e gravar só a janela do jogo (Standalone).",
+    "en": "Done! The same arrow lets you pick FPS, quality, sound and record only the game window (Standalone).",
+    "es": "¡Listo! En la misma flechita puedes elegir FPS, calidad, sonido y grabar solo la ventana del juego (Standalone)."
+  }
+}
