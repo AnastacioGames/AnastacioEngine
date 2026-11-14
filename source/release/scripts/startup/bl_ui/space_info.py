@@ -197,6 +197,10 @@ class INFO_MT_editor_menus(Menu):
 
         layout.menu("INFO_MT_window")
         layout.menu("INFO_MT_help")
+        wm = context.window_manager
+        if hasattr(wm, "range_help_on"):
+            # Liga o "i" nos painéis que têm explicação (startup/range_help.py).
+            layout.prop(wm, "range_help_on", text="Help", icon='INFO', toggle=True)
 
         # A popover looks different from the menus: it goes after them.
         if rd.use_game_engine:

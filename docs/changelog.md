@@ -19,6 +19,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   com o `.cooked`: LibLoad 24 s → 1,8 s, 0 shaders novos. Arquivo com luz própria (aspirador_po: Hemi + 2 Point)
   muda o shader de todos os materiais da cena: na lista, só se a corrida também tiver essa luz.
 
+## 2026-11-14 — Botão Help: "i" nos painéis com explicação e tutorial
+
+- Botão Help no cabeçalho de cima, depois do About: liga um "i" no cabeçalho dos painéis com explicação (`startup/range_help.py`).
+- O "i" abre uma janela com o que é o painel e o botão do tutorial dele, no idioma escolhido nos tutoriais.
+- Explicações em `scripts/ajuda/paineis.json` (32 painéis, pt/en/es); o estado fica em `range_help.txt` na configuração.
+
 ## 2026-11-14 — Tutoriais: cartão de concluído, idioma no cartão e check verde
 
 - Ao terminar, o cartão fica verde com "100% concluído", o encerramento do roteiro e os botões Restart e Close (antes sumia na hora).

@@ -1,0 +1,409 @@
+{
+ "CUSTOM_PT_game_world": {
+  "titulo": {
+   "pt": "Céu",
+   "en": "Sky",
+   "es": "Cielo"
+  },
+  "texto": {
+   "pt": "Escolhe como o céu do jogo é desenhado: Flat (uma cor), Gradient (degradê), Procedural ou Atmospheric (céu realista que muda com a hora do sol). Sky Quality deixa o céu mais leve em PCs fracos e no celular.",
+   "en": "Chooses how the game sky is drawn: Flat (one color), Gradient, Procedural or Atmospheric (a realistic sky that changes with the sun hour). Sky Quality makes the sky lighter on weak PCs and phones.",
+   "es": "Elige cómo se dibuja el cielo del juego: Flat (un color), Gradient (degradado), Procedural o Atmospheric (cielo realista que cambia con la hora del sol). Sky Quality aligera el cielo en PCs débiles y en el móvil."
+  },
+  "tutorial": "ceu_entardecer"
+ },
+ "CUSTOM_PT_game_world_sun": {
+  "titulo": {
+   "pt": "Sol",
+   "en": "Sun",
+   "es": "Sol"
+  },
+  "texto": {
+   "pt": "O sol do céu. Com Auto Sun Position, Hour muda a hora do dia: o sol anda, a luz e o céu mudam de cor. Direction gira o sol em volta da cena e Disc Size é o tamanho do disco no céu.",
+   "en": "The sky sun. With Auto Sun Position, Hour changes the time of day: the sun moves, and the light and sky change color. Direction turns the sun around the scene and Disc Size is the size of the disc in the sky.",
+   "es": "El sol del cielo. Con Auto Sun Position, Hour cambia la hora del día: el sol se mueve, la luz y el cielo cambian de color. Direction gira el sol alrededor de la escena y Disc Size es el tamaño del disco en el cielo."
+  },
+  "tutorial": "ceu_entardecer"
+ },
+ "CUSTOM_PT_game_world_night": {
+  "titulo": {
+   "pt": "Noite",
+   "en": "Night",
+   "es": "Noche"
+  },
+  "texto": {
+   "pt": "Estrelas, lua e aurora para o céu de noite. Elas aparecem quando o sol está baixo (Hour perto do fim da tarde ou de madrugada).",
+   "en": "Stars, moon and aurora for the night sky. They show when the sun is low (Hour near the evening or before dawn).",
+   "es": "Estrellas, luna y aurora para el cielo de noche. Aparecen cuando el sol está bajo (Hour cerca del atardecer o de madrugada)."
+  },
+  "tutorial": "ceu_entardecer"
+ },
+ "CUSTOM_PT_game_weather": {
+  "titulo": {
+   "pt": "Clima",
+   "en": "Weather",
+   "es": "Clima"
+  },
+  "texto": {
+   "pt": "Chuva, neve, névoa e raios na cena, sem montar partículas. Cada efeito tem sua intensidade e pode vir com som.",
+   "en": "Rain, snow, fog and lightning in the scene, without setting up particles. Each effect has its own strength and can come with sound.",
+   "es": "Lluvia, nieve, niebla y rayos en la escena, sin armar partículas. Cada efecto tiene su intensidad y puede venir con sonido."
+  },
+  "tutorial": "chuva_nevoa"
+ },
+ "CUSTOM_PT_game_physics": {
+  "titulo": {
+   "pt": "Física",
+   "en": "Physics",
+   "es": "Física"
+  },
+  "texto": {
+   "pt": "Diz como o objeto se comporta no jogo: Static (parado, só colide), Dynamic (cai e é empurrado), Rigid Body (também gira), Character (personagem) e outros. Mass é o peso.",
+   "en": "Tells how the object behaves in the game: Static (still, only collides), Dynamic (falls and gets pushed), Rigid Body (also rotates), Character and others. Mass is the weight.",
+   "es": "Indica cómo se comporta el objeto en el juego: Static (quieto, solo choca), Dynamic (cae y es empujado), Rigid Body (también gira), Character (personaje) y otros. Mass es el peso."
+  },
+  "tutorial": "basico_primeiro_jogo"
+ },
+ "CUSTOM_PT_game_components": {
+  "titulo": {
+   "pt": "Componentes",
+   "en": "Components",
+   "es": "Componentes"
+  },
+  "texto": {
+   "pt": "Componentes são comportamentos prontos em Python que você liga num objeto (girar, andar, seguir...). O Smart Wizard cria um componente novo respondendo perguntas, sem escrever código.",
+   "en": "Components are ready-made Python behaviors you attach to an object (rotate, walk, follow...). The Smart Wizard creates a new component by answering questions, without writing code.",
+   "es": "Los componentes son comportamientos listos en Python que conectas a un objeto (girar, caminar, seguir...). El Smart Wizard crea un componente nuevo respondiendo preguntas, sin escribir código."
+  },
+  "tutorial": "smart_wizard_girador"
+ },
+ "OBJECT_PT_transform": {
+  "titulo": {
+   "pt": "Transformar",
+   "en": "Transform",
+   "es": "Transformar"
+  },
+  "texto": {
+   "pt": "Posição (Location), giro (Rotation) e tamanho (Scale) do objeto. Na 3D View, G move, R gira e S escala.",
+   "en": "Position (Location), turn (Rotation) and size (Scale) of the object. In the 3D View, G moves, R rotates and S scales.",
+   "es": "Posición (Location), giro (Rotation) y tamaño (Scale) del objeto. En la 3D View, G mueve, R gira y S escala."
+  },
+  "tutorial": "basico_transformar"
+ },
+ "DATA_PT_camera_game_focus": {
+  "titulo": {
+   "pt": "Foco e rastreio",
+   "en": "Focus & Tracking",
+   "es": "Foco y seguimiento"
+  },
+  "texto": {
+   "pt": "A câmera mira e foca um objeto sozinha durante o jogo. Junto com o Depth of Field, o que está longe do foco fica desfocado.",
+   "en": "The camera aims at and focuses on an object by itself during the game. With Depth of Field, what is far from the focus gets blurred.",
+   "es": "La cámara apunta y enfoca un objeto sola durante el juego. Con Depth of Field, lo que está lejos del foco se desenfoca."
+  },
+  "tutorial": "camera_foco"
+ },
+ "DATA_PT_camera_game_effects": {
+  "titulo": {
+   "pt": "Efeitos da câmera",
+   "en": "Camera Effects",
+   "es": "Efectos de cámara"
+  },
+  "texto": {
+   "pt": "Efeitos de lente da câmera no jogo, como desfoque de profundidade, desfoque de movimento e grão.",
+   "en": "Lens effects of the camera in the game, like depth blur, motion blur and grain.",
+   "es": "Efectos de lente de la cámara en el juego, como desenfoque de profundidad, desenfoque de movimiento y grano."
+  },
+  "tutorial": "camera_foco"
+ },
+ "DATA_PT_shadow_game": {
+  "titulo": {
+   "pt": "Sombra",
+   "en": "Shadow",
+   "es": "Sombra"
+  },
+  "texto": {
+   "pt": "Liga a sombra desta luz no jogo. Dá para deixar a borda suave e realista e escolher a qualidade do mapa de sombra.",
+   "en": "Turns on the shadow of this light in the game. You can make the edge soft and realistic and choose the shadow map quality.",
+   "es": "Activa la sombra de esta luz en el juego. Puedes hacer el borde suave y realista y elegir la calidad del mapa de sombra."
+  },
+  "tutorial": "sombra_realista"
+ },
+ "DATA_PT_probe_volume": {
+  "titulo": {
+   "pt": "Light Probe Volume",
+   "en": "Light Probe Volume",
+   "es": "Light Probe Volume"
+  },
+  "texto": {
+   "pt": "Uma caixa que guarda a luz rebatida (a luz que bate numa parede e clareia o resto). Depois de Bake Probes, o jogo usa essa luz sem custo alto.",
+   "en": "A box that stores bounced light (light that hits a wall and brightens the rest). After Bake Probes, the game uses this light at a low cost.",
+   "es": "Una caja que guarda la luz rebotada (la luz que pega en una pared e ilumina el resto). Tras Bake Probes, el juego usa esa luz con poco costo."
+  },
+  "tutorial": "probe_volume_luz"
+ },
+ "RENDER_PT_game_ssgi": {
+  "titulo": {
+   "pt": "SSGI",
+   "en": "SSGI",
+   "es": "SSGI"
+  },
+  "texto": {
+   "pt": "Luz rebatida calculada na tela a cada quadro: as cores das superfícies clareiam o que está perto. Não precisa de bake, mas pesa mais na placa de vídeo.",
+   "en": "Bounced light computed on the screen every frame: surface colors brighten what is nearby. It needs no bake, but costs more on the graphics card.",
+   "es": "Luz rebotada calculada en la pantalla en cada cuadro: los colores de las superficies iluminan lo cercano. No necesita bake, pero cuesta más a la tarjeta gráfica."
+  },
+  "tutorial": "ssgi_luz"
+ },
+ "DATA_PT_game_text_box": {
+  "titulo": {
+   "pt": "Caixa de texto",
+   "en": "Text Box",
+   "es": "Caja de texto"
+  },
+  "texto": {
+   "pt": "Faz o texto quebrar linha dentro de uma caixa e dividir em páginas, bom para diálogos. Os diálogos podem ser montados sem código.",
+   "en": "Makes the text wrap inside a box and split into pages, good for dialogues. Dialogues can be built without code.",
+   "es": "Hace que el texto salte de línea dentro de una caja y se divida en páginas, ideal para diálogos. Los diálogos se pueden armar sin código."
+  },
+  "tutorial": "texto_caixa_dialogo"
+ },
+ "MATERIAL_PT_anastacio_atlas": {
+  "titulo": {
+   "pt": "Material Atlas",
+   "en": "Material Atlas",
+   "es": "Material Atlas"
+  },
+  "texto": {
+   "pt": "Junta as cores e texturas de vários materiais numa imagem só (paleta). Com menos materiais, o jogo desenha mais rápido.",
+   "en": "Joins the colors and textures of many materials into a single image (palette). With fewer materials, the game draws faster.",
+   "es": "Une los colores y texturas de varios materiales en una sola imagen (paleta). Con menos materiales, el juego dibuja más rápido."
+  },
+  "tutorial": "material_atlas_paleta"
+ },
+ "OBJECT_PT_levels_of_detail": {
+  "titulo": {
+   "pt": "LOD",
+   "en": "LOD",
+   "es": "LOD"
+  },
+  "texto": {
+   "pt": "Níveis de detalhe: de longe o objeto troca por versões mais simples, que pesam menos. Dá para gerar os níveis sozinho.",
+   "en": "Levels of detail: far away, the object swaps to simpler versions that cost less. The levels can be generated automatically.",
+   "es": "Niveles de detalle: de lejos el objeto cambia por versiones más simples que pesan menos. Los niveles se pueden generar solos."
+  },
+  "tutorial": "lod_automatico"
+ },
+ "OBJECT_PT_video_player": {
+  "titulo": {
+   "pt": "Video Player",
+   "en": "Video Player",
+   "es": "Video Player"
+  },
+  "texto": {
+   "pt": "Toca um vídeo na superfície do objeto durante o jogo (uma TV, um telão), com som e legendas.",
+   "en": "Plays a video on the object surface during the game (a TV, a big screen), with sound and subtitles.",
+   "es": "Reproduce un video en la superficie del objeto durante el juego (una TV, una pantalla), con sonido y subtítulos."
+  },
+  "tutorial": "video_player"
+ },
+ "OBJECT_PT_range_minimap": {
+  "titulo": {
+   "pt": "Mini mapa",
+   "en": "Minimap",
+   "es": "Minimapa"
+  },
+  "texto": {
+   "pt": "Mostra este objeto no mini mapa do HUD, com um marcador e a cor que você escolher.",
+   "en": "Shows this object on the HUD minimap, with a marker and the color you choose.",
+   "es": "Muestra este objeto en el minimapa del HUD, con un marcador y el color que elijas."
+  },
+  "tutorial": "minimap_radar"
+ },
+ "SCENE_PT_range_web": {
+  "titulo": {
+   "pt": "Exportar para Web",
+   "en": "Web export",
+   "es": "Exportar a Web"
+  },
+  "texto": {
+   "pt": "Gera o jogo para rodar no navegador (itch.io, celular). As texturas podem ser comprimidas para carregar mais rápido.",
+   "en": "Builds the game to run in the browser (itch.io, phones). Textures can be compressed to load faster.",
+   "es": "Genera el juego para correr en el navegador (itch.io, móvil). Las texturas se pueden comprimir para cargar más rápido."
+  },
+  "tutorial": "exportar_web"
+ },
+ "WORLD_SOUND_PT_modules": {
+  "titulo": {
+   "pt": "World Sound",
+   "en": "World Sound",
+   "es": "World Sound"
+  },
+  "texto": {
+   "pt": "Música, som ambiente e efeitos da cena, ligados sem código. Cada módulo toca sozinho quando o jogo começa.",
+   "en": "Music, ambient sound and effects of the scene, set up without code. Each module plays by itself when the game starts.",
+   "es": "Música, sonido ambiente y efectos de la escena, sin código. Cada módulo suena solo cuando empieza el juego."
+  },
+  "tutorial": "som_world_sound"
+ },
+ "SCENE_PT_scene_doctor": {
+  "titulo": {
+   "pt": "Scene Doctor",
+   "en": "Scene Doctor",
+   "es": "Scene Doctor"
+  },
+  "texto": {
+   "pt": "Confere a cena e aponta o que pode deixar o jogo lento ou dar erro, com dicas de como arrumar.",
+   "en": "Checks the scene and points out what can make the game slow or break it, with tips on how to fix it.",
+   "es": "Revisa la escena y señala lo que puede volver lento el juego o dar error, con consejos para arreglarlo."
+  }
+ },
+ "RENDER_PT_render": {
+  "titulo": {
+   "pt": "Motor",
+   "en": "Engine",
+   "es": "Motor"
+  },
+  "texto": {
+   "pt": "Qual motor desenha a cena. Para fazer jogos, deixe em Range Engine.",
+   "en": "Which engine draws the scene. To make games, keep it on Range Engine.",
+   "es": "Qué motor dibuja la escena. Para hacer juegos, déjalo en Range Engine."
+  }
+ },
+ "RENDER_PT_game_cook": {
+  "titulo": {
+   "pt": "Cook",
+   "en": "Cook",
+   "es": "Cook"
+  },
+  "texto": {
+   "pt": "Calcula antes as formas de colisão e os shaders e guarda num arquivo .cooked ao lado do .range. O jogo abre mais rápido e trava menos no começo. Salve a cena antes de cozinhar.",
+   "en": "Computes the collision shapes and shaders ahead of time and saves them in a .cooked file next to the .range. The game opens faster and stutters less at the start. Save the scene before cooking.",
+   "es": "Calcula antes las formas de colisión y los shaders y los guarda en un archivo .cooked junto al .range. El juego abre más rápido y se traba menos al inicio. Guarda la escena antes de cocinar."
+  }
+ },
+ "RENDER_PT_embedded": {
+  "titulo": {
+   "pt": "Jogar",
+   "en": "Play Game",
+   "es": "Jugar"
+  },
+  "texto": {
+   "pt": "Começa o jogo dentro do editor (Embedded) ou numa janela própria (Standalone), com a resolução e a opção de tela cheia. O atalho P, com o mouse na 3D View, também joga.",
+   "en": "Starts the game inside the editor (Embedded) or in its own window (Standalone), with the resolution and the fullscreen option. P, with the mouse over the 3D View, also plays.",
+   "es": "Inicia el juego dentro del editor (Embedded) o en su propia ventana (Standalone), con la resolución y la opción de pantalla completa. P, con el ratón en la 3D View, también juega."
+  },
+  "tutorial": "basico_primeiro_jogo"
+ },
+ "RENDER_PT_game_motion_record": {
+  "titulo": {
+   "pt": "Gravar movimento",
+   "en": "Motion Recording",
+   "es": "Grabar movimiento"
+  },
+  "texto": {
+   "pt": "Rec Play: escolha um personagem, aperte Rec Play e mova ele jogando. O movimento fica gravado e repete sozinho, bom para figurantes e corridas.",
+   "en": "Rec Play: choose a character, press Rec Play and move it while playing. The movement is recorded and repeats by itself, good for extras and races.",
+   "es": "Rec Play: elige un personaje, pulsa Rec Play y muévelo jugando. El movimiento queda grabado y se repite solo, ideal para extras y carreras."
+  },
+  "tutorial": "rec_play_gravar"
+ },
+ "RENDER_PT_game_display": {
+  "titulo": {
+   "pt": "Tela",
+   "en": "Display",
+   "es": "Pantalla"
+  },
+  "texto": {
+   "pt": "Opções da imagem do jogo: Dynamic Resolution baixa a resolução sozinha para segurar o FPS, Vsync evita a imagem rasgada e AA Samples suaviza as bordas.",
+   "en": "Game image options: Dynamic Resolution lowers the resolution by itself to hold the FPS, Vsync avoids a torn image and AA Samples smooths the edges.",
+   "es": "Opciones de la imagen del juego: Dynamic Resolution baja la resolución sola para mantener los FPS, Vsync evita la imagen cortada y AA Samples suaviza los bordes."
+  },
+  "tutorial": "performance_medir"
+ },
+ "RENDER_PT_game_system": {
+  "titulo": {
+   "pt": "Sistema",
+   "en": "System",
+   "es": "Sistema"
+  },
+  "texto": {
+   "pt": "Regras gerais do jogo: limite de FPS (Use Frame Rate), a tecla que sai do jogo (Esc) e o cursor do mouse, que pode ser uma imagem sua.",
+   "en": "General game rules: the FPS limit (Use Frame Rate), the key that quits the game (Esc) and the mouse cursor, which can be your own image.",
+   "es": "Reglas generales del juego: límite de FPS (Use Frame Rate), la tecla que sale del juego (Esc) y el cursor del ratón, que puede ser una imagen tuya."
+  }
+ },
+ "RENDER_PT_game_animations": {
+  "titulo": {
+   "pt": "Animações",
+   "en": "Animations",
+   "es": "Animaciones"
+  },
+  "texto": {
+   "pt": "Velocidade das animações e da lógica. Logic Rate (Ticks) é quantas vezes por segundo a lógica roda. Restringir as atualizações deixa mais rápido, mas menos suave.",
+   "en": "Speed of animations and logic. Logic Rate (Ticks) is how many times per second the logic runs. Restricting updates makes it faster but less smooth.",
+   "es": "Velocidad de las animaciones y la lógica. Logic Rate (Ticks) es cuántas veces por segundo corre la lógica. Restringir las actualizaciones lo hace más rápido, pero menos suave."
+  }
+ },
+ "RENDER_PT_game_vr": {
+  "titulo": {
+   "pt": "VR",
+   "en": "VR",
+   "es": "VR"
+  },
+  "texto": {
+   "pt": "Opções para jogar com óculos de realidade virtual: distância dos olhos, rastreio da cabeça e correção da lente.",
+   "en": "Options to play with virtual reality headsets: eye distance, head tracking and lens correction.",
+   "es": "Opciones para jugar con gafas de realidad virtual: distancia de los ojos, seguimiento de la cabeza y corrección de la lente."
+  }
+ },
+ "LOGIC_PT_properties": {
+  "titulo": {
+   "pt": "Propriedades do jogo",
+   "en": "Game Properties",
+   "es": "Propiedades del juego"
+  },
+  "texto": {
+   "pt": "Variáveis do objeto para o jogo: vida, pontos, um nome. Os Logic Bricks e o Python leem e mudam esses valores.",
+   "en": "Object variables for the game: health, points, a name. Logic Bricks and Python read and change these values.",
+   "es": "Variables del objeto para el juego: vida, puntos, un nombre. Los Logic Bricks y Python leen y cambian estos valores."
+  },
+  "tutorial": "logica_andar"
+ },
+ "LOGIC_PT_brick_groups": {
+  "titulo": {
+   "pt": "Grupos de bricks",
+   "en": "Brick Groups",
+   "es": "Grupos de bricks"
+  },
+  "texto": {
+   "pt": "Junta sensores, controladores e atuadores em grupos com nome, para organizar objetos com muita lógica.",
+   "en": "Puts sensors, controllers and actuators into named groups, to organize objects with a lot of logic.",
+   "es": "Agrupa sensores, controladores y actuadores con nombre, para organizar objetos con mucha lógica."
+  }
+ },
+ "LOGIC_PT_states": {
+  "titulo": {
+   "pt": "Estados",
+   "en": "States",
+   "es": "Estados"
+  },
+  "texto": {
+   "pt": "Estados são camadas da lógica: só os bricks do estado ativo rodam. Initial marca com qual estado o objeto começa.",
+   "en": "States are layers of logic: only the bricks of the active state run. Initial marks which state the object starts with.",
+   "es": "Los estados son capas de la lógica: solo corren los bricks del estado activo. Initial marca con qué estado empieza el objeto."
+  }
+ },
+ "LOGIC_PT_brick_inspector": {
+  "titulo": {
+   "pt": "Brick Inspector",
+   "en": "Brick Inspector",
+   "es": "Brick Inspector"
+  },
+  "texto": {
+   "pt": "Confere os Logic Bricks sem rodar o jogo e mostra o que parece errado, como um sensor sem ligação.",
+   "en": "Checks the Logic Bricks without running the game and shows what looks wrong, like an unlinked sensor.",
+   "es": "Revisa los Logic Bricks sin correr el juego y muestra lo que parece mal, como un sensor sin conexión."
+  }
+ }
+}
