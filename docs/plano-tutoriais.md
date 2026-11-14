@@ -1,6 +1,66 @@
 # Plano: Tutoriais (dentro da engine + vídeo curto)
 
-Data: 2026-11-13. Status: teste piloto, com 1 tutorial.
+Data: 2026-11-13. Status (2026-11-14): 23 tutoriais prontos, todos aguardando aceite com janela.
+
+## Catálogo
+
+**Fonte única do que existe e do que falta.** Regra em `AGENTS.md`: antes de criar um tutorial, `git fetch`,
+marcar a linha como **reservado** (data + branch/sessão), commit e push; só então começar. Ao terminar,
+**feito** com a pasta. Status: feito · reservado · falta · fora (com o motivo).
+
+### Feitos (falta aceite com janela)
+
+| # | Área | Tutorial | Pasta |
+|---|---|---|---|
+| 1 | Basics | Conhecendo a interface | `basico_interface` |
+| 2 | Basics | Mover, girar e escalar | `basico_transformar` |
+| 3 | Basics | Primeiro jogo: um cubo que cai | `basico_primeiro_jogo` |
+| 4 | Logic Bricks | Objeto andar com Logic Bricks | `logica_andar` |
+| 5 | Export | Windows e Linux | `exportar_desktop` |
+| 6 | Export | Web (itch.io e celular) | `exportar_web` |
+| 7 | Components | Smart Component: objeto que gira | `smart_wizard_girador` |
+| 8 | Text | Caixa de texto e diálogo | `texto_caixa_dialogo` |
+| 9 | Sound | World Sound | `som_world_sound` |
+| 10 | Logic Tree | Objeto andar com a Logic Tree | `logica_arvore_andar` |
+| 11 | Cutscene | Cutscene de abertura | `cutscene_abertura` |
+| 12 | Node Editor/UI Tree | Mini mapa no HUD | `minimap_radar` |
+| 13 | Optimization | Material Atlas | `material_atlas_paleta` |
+| 14 | Optimization | Medir o desempenho | `performance_medir` |
+| 15 | Animation | Rec Play | `rec_play_gravar` |
+| 16 | Track | Track Tool | `track_pista` |
+| 17 | Vehicle | Carro e Vehicle Lab | `veiculo_carro` |
+| 18 | Buildings | Casas e ruas brasileiras | `casas_brasileiras` |
+| 19 | Physics | Parede que quebra e bomba | `destruicao_bomba` |
+| 20 | Optimization | LOD automático | `lod_automatico` |
+| — | Node Editor/UI Tree | Primeiro menu de jogo (piloto) | `ui_tree_menu` |
+| — | Node Editor/UI Tree | Os nós de HUD | `ui_tree_hud` |
+| — | Mind Map | A barra do Mind Map | `mind_map_barra` |
+
+### Falta (sugestões; reservar antes de começar)
+
+| Área | Tema | Status |
+|---|---|---|
+| Input | Mapear ações (teclado, gamepad, toque) na aba Input | fora por ora: estado difícil de conferir |
+| Locale | Jogo em vários idiomas (Range.locale, Language Button) | fora por ora: pede editar o CSV |
+| Camera FX | Efeitos de câmera (grão, Directional Blur) | falta: achar o painel |
+| Render | Céu: Sky Layers, nuvens, Sky Quality | falta |
+| Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | falta |
+| Render | Compositing no jogo (faixa de efeitos e presets) | falta |
+| Render | Light Probe Volume e Bake Probes | falta |
+| Render | Sombra colorida, SSGI e PCSS | falta |
+| Shader | Nós de shader e Nodes GLSL por arquivo | falta |
+| Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta |
+| Video | Video Player e actuator Video (legendas, fade) | falta |
+| Video | Screencast (gravar o jogo) | falta |
+| Sound | Microfone e Tuner | falta |
+| Character | Personagem automático (File › Import › Fuse Character) | falta |
+| Character | Postura do Character (abaixar, rastejar, pular) | falta |
+| Animation | NLA no jogo (playNLA) | falta |
+| Multiplayer | Jogo em rede local | falta |
+| Optimization | Scene Doctor, HLOD, Automatic Occluders, Static Batch | falta |
+| Optimization | Simulador de PC fraco | falta |
+| Debug | Game Trace e Trace Doctor | falta |
+| Textures | Prepare Textures (DDS/KTX2) e Decimate High Quality | falta |
 
 ## Objetivo
 

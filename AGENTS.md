@@ -150,3 +150,10 @@ Antes deles, use `docs/local-knowledge/index-<área>.md`: índice mecânico (arq
   antes de subir para o GitHub; se falhar, o Log de Eventos do Windows
   (`Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='SideBySide'}`) diz exatamente qual
   assembly está faltando — mais rápido e confiável que `sxstrace.exe`, que exige elevação de admin.
+- **Tutoriais (About › Tutorials): consulte o catálogo antes de criar.** A lista do que existe, do que está
+  reservado e do que falta fica em [docs/plano-tutoriais.md](docs/plano-tutoriais.md#catálogo). Antes de
+  começar um tutorial: `git fetch` e confira branches recentes (`git log --all --since=3.days --
+  source/release/scripts/tutoriais`); marque a linha do catálogo como **reservado** (com a data e a
+  branch/sessão), faça commit e push dessa marcação e só então crie a pasta. Ao terminar, troque para
+  **feito** com o nome da pasta. Trabalho de tutorial em sessão na nuvem precisa ser mesclado no `main`
+  logo ao fim, para não ficar invisível às outras sessões.
