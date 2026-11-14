@@ -8,6 +8,19 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutorial dos nós de HUD da UI Tree
+
+- Novo roteiro `source/release/scripts/tutoriais/ui_tree_hud/roteiro.json` (categoria **Node Editor/UI Tree**,
+  16 passos, pt e en). Parte de uma UI Tree nova com o template **+ HUD** e apresenta cada nó: Progress Bar (troca
+  a cor Fill), Label (Format com `{vida:.0f}`), Gauge (Anchor), Button A (Set Property em On Press/On Release) e
+  Dialogue Box (propriedade `dialogo`). Depois cria um Label pelo menu Add › HUD, põe dentro do quadro HUD com
+  `Pontos {pontos}`, liga o Setup Game Logic e testa com P.
+- Alvos: nós por nome (`Progress Bar`, `Label`, `Gauge`, `Dialogue Box`, `Label.002`) e Button pelo texto (`A`);
+  propriedades do painel por `prop:fill_color` e `prop:text_format`.
+- Checagens por `expr` sobre a UI Tree aberta (nó ativo e selecionado, cor, Format, número de Labels dentro do
+  quadro HUD). Conferidas fora da engine com a árvore do template simulada: cada passo só fica verdadeiro depois
+  do anterior. Falta o aceite com janela.
+
 ## 2026-11-14 — Tutorial da barra do Mind Map
 
 - Novo roteiro `source/release/scripts/tutoriais/mind_map_barra/roteiro.json` (categoria **Mind Map**, 11 passos,

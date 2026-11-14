@@ -141,3 +141,8 @@ Text Boxes (diálogos sem código) e World Sound.
 
 - `tutoriais/mind_map_barra/`: 11 passos, um por botão da barra (Map, Idea, Look, Marks, Link, Find), pt e en.
 - Alvos `op:MINDMAP_OT_*` na região `WINDOW`; checagens `expr` sobre o texto `.mm` do mapa aberto. Sem `inicio.range`.
+
+## Tutorial dos nós de HUD (2026-11-14, falta aceite com janela)
+
+- `tutoriais/ui_tree_hud/`: 16 passos a partir do template + HUD (Progress Bar, Label, Gauge, Button A, Dialogue
+  Box), um Label novo com `{pontos}`, Setup Game Logic e P. Supõe uma UI Tree nova, pelos nomes dos nós.

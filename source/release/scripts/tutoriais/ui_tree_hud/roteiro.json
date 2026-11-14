@@ -1,0 +1,286 @@
+{
+  "titulo": {
+    "pt": "Os nós de HUD da UI Tree",
+    "en": "The HUD nodes of the UI Tree"
+  },
+  "categoria": "Node Editor/UI Tree",
+  "resumo": {
+    "pt": "Barra de vida, texto, velocímetro, botões e diálogo na tela do jogo, sem código.",
+    "en": "Health bar, text, speedometer, buttons and dialogue on the game screen, no code."
+  },
+  "abertura": "Neste tutorial, vamos conhecer os nós de HUD: o que fica na tela enquanto o jogo roda.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Node Editor.",
+        "en": "Change the bottom area to Node Editor."
+      },
+      "narracao": "",
+      "destaque": "BAIXO",
+      "checagem": "node_editor",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Node Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho, clique em UI.",
+        "en": "In the header, click UI."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": "node_editor_ui_tree",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "UI (Experimental)"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em New para criar uma UI Tree.",
+        "en": "Click New to create a UI Tree."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": "arvore_criada",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "New"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No painel UI Tree, à direita, clique em + HUD.",
+        "en": "In the UI Tree panel, on the right, click + HUD."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n.bl_idname == 'RangeUIProgressBar' for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree'] for n in t.nodes)"
+      },
+      "dica": {
+        "pt": "Sem o painel? Aperte N com o mouse no Node Editor.",
+        "en": "No panel? Press N with the mouse over the Node Editor."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "HUD"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no bloco ao lado da barra verde: é a Progress Bar, que mostra a propriedade vida (0 a 100).",
+        "en": "Click the block next to the green bar: it is the Progress Bar, showing the vida (health) property (0 to 100)."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n is not None and n.select and n.bl_idname == 'RangeUIProgressBar' for n in [t.nodes.active for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree']])"
+      },
+      "dica": {
+        "pt": "Clique no quadradinho ao lado da barra: ele é a alça do nó.",
+        "en": "Click the small square next to the bar: it is the node handle."
+      },
+      "alvo": {
+        "no": "Progress Bar"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No painel, troque a cor Fill da barra.",
+        "en": "In the panel, change the bar Fill color."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n.bl_idname == 'RangeUIProgressBar' and abs(n.fill_color[0] - 0.25) + abs(n.fill_color[1] - 0.85) + abs(n.fill_color[2] - 0.35) > 0.05 for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree'] for n in t.nodes)"
+      },
+      "dica": {
+        "pt": "Low é a cor que a barra ganha quando a vida acaba.",
+        "en": "Low is the color the bar fades to as health runs out."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "prop:fill_color"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no bloco ao lado do texto Vida: é um Label.",
+        "en": "Click the block next to the text Vida: it is a Label."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n is not None and n.select and n.bl_idname == 'RangeUILabel' and '{vida' in n.text_format for n in [t.nodes.active for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree']])"
+      },
+      "alvo": {
+        "no": "Label"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Format, troque Vida por HP. O que fica entre chaves é a propriedade: {vida:.0f}.",
+        "en": "In Format, change Vida to HP. What is inside braces is the property: {vida:.0f}."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n.bl_idname == 'RangeUILabel' and '{vida' in n.text_format and not n.text_format.startswith('Vida') for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree'] for n in t.nodes)"
+      },
+      "dica": {
+        "pt": ":.0f mostra o número sem casas decimais.",
+        "en": ":.0f shows the number without decimals."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "prop:text_format"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no bloco do velocímetro: é o Gauge. Ele lê velocidade, e o Anchor BR o prende ao canto de baixo.",
+        "en": "Click the speedometer block: it is the Gauge. It reads velocidade, and Anchor BR pins it to the bottom corner."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n is not None and n.select and n.bl_idname == 'RangeUIGauge' for n in [t.nodes.active for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree']])"
+      },
+      "dica": {
+        "pt": "O Anchor diz a que canto da tela o widget fica preso quando a janela muda de tamanho.",
+        "en": "The Anchor says which screen corner the widget sticks to when the window changes size."
+      },
+      "alvo": {
+        "no": "Gauge"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no bloco do botão A. Enquanto ele está apertado, a propriedade botao_a fica True.",
+        "en": "Click the button A block. While it is held, the botao_a property is True."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n is not None and n.select and n.bl_idname == 'RangeUIButton' and n.text == 'A' for n in [t.nodes.active for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree']])"
+      },
+      "dica": {
+        "pt": "Os nós Set Property, à direita, fazem isso: On Press liga, On Release desliga.",
+        "en": "The Set Property nodes on the right do it: On Press turns it on, On Release turns it off."
+      },
+      "alvo": {
+        "no": "A"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no bloco da caixa de diálogo. Ela aparece quando a propriedade dialogo tem texto.",
+        "en": "Click the dialogue box block. It shows up when the dialogo property has text."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n is not None and n.select and n.bl_idname == 'RangeUIDialogue' for n in [t.nodes.active for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree']])"
+      },
+      "dica": {
+        "pt": "Use | no texto para começar outra página.",
+        "en": "Use | in the text to start a new page."
+      },
+      "alvo": {
+        "no": "Dialogue Box"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Agora crie um: menu Add › HUD › Label.",
+        "en": "Now make one: Add menu › HUD › Label."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "sum(1 for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree'] for n in t.nodes if n.bl_idname == 'RangeUILabel') >= 3"
+      },
+      "dica": {
+        "pt": "Atalho: Shift+A com o mouse no Node Editor.",
+        "en": "Shortcut: Shift+A with the mouse over the Node Editor."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "HUD"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Arraste o Label novo para dentro do quadro HUD.",
+        "en": "Drag the new Label into the HUD frame."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "sum(1 for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree'] for n in t.nodes if n.bl_idname == 'RangeUILabel' and n.parent is not None and getattr(n.parent, 'ui_hud', False)) >= 3"
+      },
+      "dica": {
+        "pt": "Fora do quadro, o widget não aparece no jogo.",
+        "en": "Outside the frame, the widget does not show in the game."
+      },
+      "alvo": {
+        "no": "Label.002"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Format, escreva: Pontos {pontos}",
+        "en": "In Format, type: Points {pontos}"
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": {
+        "expr": "any(n.bl_idname == 'RangeUILabel' and '{pontos' in n.text_format for t in [a.spaces.active.node_tree for a in C.screen.areas if a.type == 'NODE_EDITOR' and a.spaces.active.node_tree and a.spaces.active.node_tree.bl_idname == 'RangeUITree'] for n in t.nodes)"
+      },
+      "dica": {
+        "pt": "Enquanto a propriedade pontos não existe, aparece 0. Crie-a na câmera, no Logic Editor.",
+        "en": "While the pontos property does not exist, it shows 0. Add it to the camera in the Logic Editor."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "prop:text_format"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo do painel, clique em Setup Game Logic.",
+        "en": "At the top of the panel, click Setup Game Logic."
+      },
+      "narracao": "",
+      "destaque": "NODE_EDITOR",
+      "checagem": "logica_ligada",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "Setup Game Logic"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P para ver o HUD. Esc sai do jogo.",
+        "en": "Mouse over the 3D View, press P to see the HUD. Esc quits the game."
+      },
+      "narracao": "",
+      "destaque": "VIEW_3D",
+      "checagem": null
+    }
+  ],
+  "encerramento": "Pronto! Agora você sabe montar o HUD do seu jogo com nós."
+}
