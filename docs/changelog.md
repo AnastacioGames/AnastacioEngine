@@ -8,14 +8,6 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
-## 2026-11-14 — Tutoriais: Logic Tree, Smart Wizard, Text Boxes e World Sound
-
-- 4 tutoriais novos em `scripts/tutoriais/` (About › Tutorials), cenas por `tools/tutoriais/criar_inicios.py`.
-  Detalhes e achados em `docs/plano-tutoriais.md`.
-- Logic Tree: Node Editor no tipo Logic Tree e sem árvore abre a do objeto ativo (uma vez por editor),
-  porque o campo com + some no fim do cabeçalho do Node Editor.
-- Docstring de `range_tutorials.py`: `op:` do alvo usa o nome C do operador.
-
 ## 2026-11-13 — Animações depois da lógica (delta transform com script)
 
 - `8ca171412`: relato do musikai (`delta_anim.blend`): action em `delta_location` não movia a raquete quando um
