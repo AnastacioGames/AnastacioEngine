@@ -487,8 +487,12 @@ class SCENE_OT_range_web_export(Operator):
                     cmd.append("--debug-overlays")
                 if web_microphone_enabled(web):
                     cmd.append("--microphone")
-                for extra in sorted(set(extras) | set(sound_extras)):
-                    cmd += ["--extra", extra]
+                # Lista em arquivo: centenas de --extra estouram o limite da linha de comando
+                # do Windows (WinError 206 no RolimaRacer).
+                extra_list = os.path.join(scratch, "extras.txt")
+                with open(extra_list, "w", encoding="utf-8") as f:
+                    f.write("".join(e + "\n" for e in sorted(set(extras) | set(sound_extras))))
+                cmd += ["--extra-list", extra_list]
                 result = subprocess.run(cmd, capture_output=True, text=True)
                 if result.returncode != 0:
                     raise RuntimeError(result.stderr.strip() or "empacotador falhou")

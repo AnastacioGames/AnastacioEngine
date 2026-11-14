@@ -1229,6 +1229,8 @@ def main():
     ap.add_argument("--game", required=True, type=Path, help="arquivo .range do jogo")
     ap.add_argument("--extra", action="append", default=[], type=Path,
                     help="arquivo extra colocado ao lado do .range (ex.: modulo .py); repetivel")
+    ap.add_argument("--extra-list", type=Path,
+                    help="arquivo UTF-8 com um --extra por linha (jogos grandes estouram a linha de comando no Windows)")
     ap.add_argument("--extra-root", type=Path,
                     help="pasta base: extras dentro dela mantem o caminho relativo no FS virtual")
     ap.add_argument("--runtime-dir", type=Path, default=REPO_ROOT / "build-web" / "bin")
@@ -1257,6 +1259,9 @@ def main():
     ap.add_argument("--microphone", action="store_true",
                     help="o jogo usa o microfone: aviso de permissao na pagina e RECORD_AUDIO no APK gerado")
     args = ap.parse_args()
+    if args.extra_list:
+        lines = args.extra_list.read_text(encoding="utf-8").splitlines()
+        args.extra += [Path(line) for line in lines if line.strip()]
     if args.cardboard:
         args.touch_layout = "none"
 
