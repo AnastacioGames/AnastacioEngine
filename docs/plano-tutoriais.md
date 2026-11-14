@@ -57,16 +57,16 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Render | Sombra colorida e PCSS (sombra suave) | falta |
 | Shader | Nós de shader e Nodes GLSL por arquivo | falta |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
-| Video | Video Player e actuator Video (legendas, fade) | falta |
+| Video | Video Player e actuator Video (legendas, fade) | reservado 2026-11-14 (sessão local, main) |
 | Video | Screencast (gravar o jogo) | feito: 22 (`screencast_gravar`) |
-| Sound | Microfone e Tuner | falta |
+| Sound | Microfone e Tuner | reservado 2026-11-14 (sessão local, main) |
 | Character | Personagem automático (File › Import › Fuse Character) | falta |
 | Character | Postura do Character (abaixar, rastejar, pular) | falta |
 | Animation | NLA no jogo (playNLA) | falta |
 | Multiplayer | Jogo em rede local | falta |
-| Optimization | Scene Doctor, HLOD, Automatic Occluders, Static Batch | falta |
+| Optimization | Scene Doctor, HLOD, Automatic Occluders, Static Batch | reservado 2026-11-14 (sessão local, main) |
 | Optimization | Simulador de PC fraco | feito dentro do 14 (`performance_medir`) |
-| Debug | Game Trace e Trace Doctor | falta |
+| Debug | Game Trace e Trace Doctor | reservado 2026-11-14 (sessão local, main) |
 | Textures | Prepare Textures (DDS/KTX2) e Decimate High Quality | falta |
 
 ## Objetivo
