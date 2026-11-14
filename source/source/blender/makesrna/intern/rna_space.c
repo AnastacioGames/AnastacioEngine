@@ -37,6 +37,7 @@
 #include "DNA_object_types.h"
 #include "DNA_space_types.h"
 #include "DNA_sequence_types.h"
+#include "DNA_text_types.h"
 #include "DNA_mask_types.h"
 #include "DNA_view3d_types.h"
 
@@ -2025,6 +2026,48 @@ static int rna_SpaceFileBrowser_browse_mode_editable(PointerRNA *ptr, const char
 
 	/* A file dialog can not become an Asset Browser. */
 	return (sf->op == NULL) ? PROP_EDITABLE : 0;
+}
+
+/* Mind map: only list texts whose root element is <map> (FreeMind .mm),
+ * skipping blank lines, the <?xml ...?> declaration and <!-- --> comments.
+ * An empty text is accepted so a freshly created one can be picked. */
+static bool rna_SpaceMindMap_text_poll(PointerRNA *UNUSED(ptr), PointerRNA value)
+{
+	const Text *text = value.id.data;
+	const TextLine *tl;
+	bool in_comment = false, in_decl = false;
+	int lines = 0;
+
+	if (text == NULL) {
+		return false;
+	}
+	for (tl = text->lines.first; tl && lines < 64; tl = tl->next, lines++) {
+		const char *p = tl->line;
+		while (p && *p) {
+			if (in_comment) {
+				const char *e = strstr(p, "-->");
+				if (!e) { p = NULL; break; }
+				p = e + 3; in_comment = false; continue;
+			}
+			if (in_decl) {
+				const char *e = strstr(p, "?>");
+				if (!e) { p = NULL; break; }
+				p = e + 2; in_decl = false; continue;
+			}
+			if (*p == ' ' || *p == '\t' || *p == '\r' || (unsigned char)*p == 0xEF ||
+			    (unsigned char)*p == 0xBB || (unsigned char)*p == 0xBF)
+			{
+				p++; continue;
+			}
+			if (strncmp(p, "<?", 2) == 0) { in_decl = true; p += 2; continue; }
+			if (strncmp(p, "<!--", 4) == 0) { in_comment = true; p += 4; continue; }
+			return (strncmp(p, "<map", 4) == 0 &&
+			        (p[4] == '>' || p[4] == ' ' || p[4] == '\t' || p[4] == '/' || p[4] == '\0'));
+		}
+	}
+	/* only whitespace/declarations found: accept a blank text */
+	return !in_comment && !in_decl && text->lines.first &&
+	       ((TextLine *)text->lines.first)->next == NULL;
 }
 
 #else
@@ -4727,6 +4770,7 @@ static void rna_def_space_mindmap(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "text", PROP_POINTER, PROP_NONE);
 	RNA_def_property_struct_type(prop, "Text");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
+	RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_SpaceMindMap_text_poll");
 	RNA_def_property_ui_text(prop, "Text", "Text data-block holding the map");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
 
