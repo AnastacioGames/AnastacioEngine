@@ -1,0 +1,164 @@
+{
+  "titulo": {
+    "pt": "9. Música e sons do mundo (World Sound)",
+    "en": "9. Music and world sounds (World Sound)",
+    "es": "9. Música y sonidos del mundo (World Sound)"
+  },
+  "categoria": "Sound",
+  "resumo": {
+    "pt": "Módulos Music e Effects: trilha sonora tocando sozinha e sons de explosão e chuva.",
+    "en": "Music and Effects modules: a soundtrack that plays by itself and explosion and rain sounds.",
+    "es": "Módulos Music y Effects: banda sonora que suena sola y sonidos de explosión y lluvia."
+  },
+  "abertura": {
+    "pt": "Vamos colocar música no jogo sem nenhum Logic Brick, pela aba World Sound.",
+    "en": "Let's add music to the game without any Logic Brick, from the World Sound tab.",
+    "es": "Vamos a poner música en el juego sin ningún Logic Brick, desde la pestaña World Sound."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba World Sound.",
+        "en": "In Properties, open the World Sound tab.",
+        "es": "En Properties, abre la pestaña World Sound."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'WORLD_SOUND' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Sem World na cena? Crie um na aba World.",
+        "en": "No World in the scene? Create one in the World tab.",
+        "es": "¿No hay World en la escena? Crea uno en la pestaña World."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=WORLD_SOUND"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Sound Module e escolha Music.",
+        "en": "Click Add Sound Module and pick Music.",
+        "es": "Haz clic en Add Sound Module y elige Music."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and any(m.type == 'MUSIC' for m in [m for m in C.scene.world.sound_modules])"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Music toca uma faixa por vez; Ambient toca várias camadas juntas.",
+        "en": "Music plays one track at a time; Ambient plays several layers together.",
+        "es": "Music toca una pista a la vez; Ambient toca varias capas juntas."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Add Sound Module",
+        "menu": "Music"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Sounds e escolha um arquivo de música (.ogg, .wav ou .mp3).",
+        "en": "Click Add Sounds and pick a music file (.ogg, .wav or .mp3).",
+        "es": "Haz clic en Add Sounds y elige un archivo de música (.ogg, .wav o .mp3)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and any(m.type == 'MUSIC' and any(s.filepath for s in m.sounds) for m in [m for m in C.scene.world.sound_modules])"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Dá para escolher várias faixas de uma vez: viram uma playlist.",
+        "en": "You can pick several tracks at once: they become a playlist.",
+        "es": "Puedes elegir varias pistas a la vez: se vuelven una playlist."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:WORLD_OT_sound_entry_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Abaixe o Volume do módulo Music (por exemplo, 0.6).",
+        "en": "Lower the Volume of the Music module (for example, 0.6).",
+        "es": "Baja el Volume del módulo Music (por ejemplo, 0.6)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and any(m.type == 'MUSIC' and m.volume < 0.99 for m in [m for m in C.scene.world.sound_modules])"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Play on Start já vem ligado: a música começa com o jogo.",
+        "en": "Play on Start comes turned on: the music starts with the game.",
+        "es": "Play on Start ya viene activado: la música empieza con el juego."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Sound Module e escolha Effects: ele já vem com os sons da engine.",
+        "en": "Click Add Sound Module and pick Effects: it comes with the engine sounds.",
+        "es": "Haz clic en Add Sound Module y elige Effects: ya viene con los sonidos de la engine."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.world is not None and any(m.type == 'EFFECTS' and len(m.sounds) > 0 for m in [m for m in C.scene.world.sound_modules])"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Explosões, destruição, chuva e trovão tocam sozinhos pelo Event de cada som.",
+        "en": "Explosions, destruction, rain and thunder play by themselves through each sound Event.",
+        "es": "Explosiones, destrucción, lluvia y truenos suenan solos según el Event de cada sonido."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Add Sound Module",
+        "menu": "Effects"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Music, no topo da lista, para voltar à sua trilha.",
+        "en": "Click Music, at the top of the list, to go back to your soundtrack.",
+        "es": "Haz clic en Music, arriba de la lista, para volver a tu banda sonora."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.world_sound_filter == 'MUSIC'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:world_sound_filter=MUSIC"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P: a música toca. Esc sai. Depois, clique em Next.",
+        "en": "Mouse in the 3D View, press P: the music plays. Esc quits. Then click Next.",
+        "es": "Ratón en la 3D View, pulsa P: suena la música. Esc sale. Luego haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "A música continua tocando quando o jogo troca de cena.",
+        "en": "The music keeps playing when the game changes scene.",
+        "es": "La música sigue sonando cuando el juego cambia de escena."
+      }
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Salve o .range para os sons serem copiados para a pasta do projeto.",
+    "en": "Done! Save the .range so the sounds are copied into the project folder.",
+    "es": "¡Listo! Guarda el .range para que los sonidos se copien a la carpeta del proyecto."
+  }
+}

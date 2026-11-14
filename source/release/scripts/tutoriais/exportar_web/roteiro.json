@@ -1,0 +1,148 @@
+{
+  "titulo": {
+    "pt": "6. Exportar para a Web (itch.io e celular)",
+    "en": "6. Export for the Web (itch.io and phones)",
+    "es": "6. Exportar para la Web (itch.io y móvil)"
+  },
+  "categoria": "Export",
+  "resumo": {
+    "pt": "Validar, escolher os controles de toque, exportar e testar no navegador.",
+    "en": "Validate, pick the touch controls, export and test in the browser.",
+    "es": "Validar, elegir los controles táctiles, exportar y probar en el navegador."
+  },
+  "abertura": {
+    "pt": "Vamos colocar o seu jogo no navegador, para o PC e para o celular.",
+    "en": "Let's put your game in the browser, for PCs and phones.",
+    "es": "Vamos a poner tu juego en el navegador, para PC y para móvil."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Export Game.",
+        "en": "In Properties, open the Export Game tab.",
+        "es": "En Properties, abre la pestaña Export Game."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'EXPORT' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=EXPORT"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo da aba, clique em Web e abra o painel Web.",
+        "en": "At the top of the tab, click Web and open the Web panel.",
+        "es": "Arriba en la pestaña, haz clic en Web y abre el panel Web."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.ae_export_panel_category == 'WEB'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "O painel começa fechado: clique no título Web.",
+        "en": "The panel starts closed: click the Web title.",
+        "es": "El panel empieza cerrado: haz clic en el título Web."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_export_panel_category=WEB"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Touch Controls, escolha um layout de toque para o celular.",
+        "en": "Under Touch Controls, pick a touch layout for phones.",
+        "es": "En Touch Controls, elige un layout táctil para el móvil."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.range_web.touch_layout != 'NONE'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "No PC, os controles só aparecem com ?touch=1 no endereço.",
+        "en": "On a PC, the controls show only with ?touch=1 in the address.",
+        "es": "En PC, los controles solo aparecen con ?touch=1 en la dirección."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:touch_layout"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Validate Web: a engine procura o que não funciona no navegador.",
+        "en": "Click Validate Web: the engine looks for what does not work in the browser.",
+        "es": "Haz clic en Validate Web: la engine busca lo que no funciona en el navegador."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "__import__('sys').modules.get('bl_ui.properties_web') is not None and __import__('sys').modules.get('bl_ui.properties_web')._last_report is not None"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Erro em vermelho bloqueia o export; Locate mostra o objeto.",
+        "en": "Red errors block the export; Locate shows the object.",
+        "es": "Un error en rojo bloquea el export; Locate muestra el objeto."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SCENE_OT_range_web_validate"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Export Web e espere terminar. Depois, clique em Next.",
+        "en": "Click Export Web and wait for it to finish. Then click Next.",
+        "es": "Haz clic en Export Web y espera a que termine. Luego haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Liga Open after export para abrir o jogo no navegador sozinho.",
+        "en": "Turn on Open after export to open the game in the browser by itself.",
+        "es": "Activa Open after export para abrir el juego en el navegador automáticamente."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SCENE_OT_range_web_export"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Open in browser para jogar no navegador. Depois, clique em Next.",
+        "en": "Click Open in browser to play in the browser. Then click Next.",
+        "es": "Haz clic en Open in browser para jugar en el navegador. Luego haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Apertar P na engine não é um teste da Web.",
+        "en": "Pressing P in the engine is not a Web test.",
+        "es": "Pulsar P en la engine no es una prueba de la Web."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SCENE_OT_range_web_serve"
+      }
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Para publicar no itch.io, envie a pasta exportada num .zip.",
+    "en": "Done! To publish on itch.io, upload the exported folder as a .zip.",
+    "es": "¡Listo! Para publicar en itch.io, sube la carpeta exportada en un .zip."
+  }
+}

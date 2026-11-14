@@ -7,7 +7,8 @@ verdadeira e o tutorial avança sozinho.
 
 roteiro.json:
   "titulo", "categoria" ("Node Editor/UI Tree" = submenus), "passos": [...]
-  textos ("titulo", "texto", "dica") podem ser {"pt": "...", "en": "..."}: vale o idioma da interface.
+  textos ("titulo", "texto", "dica") podem ser {"pt": "...", "en": "...", "es": "..."}: vale o idioma da interface
+  (sem o idioma, vale "en").
 
 "checagem" do passo:
   "logica_ligada"                                nome em CHECAGENS (casos que pedem código)
@@ -16,7 +17,7 @@ roteiro.json:
   {"objeto": "Cube"} / {"ativo": "Cube"}         objeto existe / é o ativo
   {"expr": "len(D.objects) > 3"}                 Python (C = context, D = bpy.data, bpy); roda como
                                                  um script: só instale tutoriais de quem você confia
-  Várias chaves no mesmo dicionário: todas valem.  Sem checagem: o usuário clica em Próximo.
+  Várias chaves no mesmo dicionário: todas valem.  Sem checagem: o usuário clica em Next.
 
 "alvo" do passo = onde clicar, com um quadro piscando:
   {"area": "NODE_EDITOR", "regiao": "HEADER", "botao": "New"}   botão pelo texto, "op:NODE_OT_x" (nome C),
@@ -65,6 +66,11 @@ def _idioma():
     sistema = bpy.context.user_preferences.system
     lingua = sistema.language if getattr(sistema, "use_international_fonts", True) else "en_US"
     return "en" if lingua in ("DEFAULT", "") else lingua[:2]
+
+
+# Botões do cartão ficam em inglês, como o resto da interface; o rótulo da dica segue o idioma.
+_PREFIXO_DICA = {"pt": "Dica", "en": "Tip", "es": "Consejo"}
+_FEITO = {"pt": "feito!", "en": "done!", "es": "¡hecho!"}
 
 
 def _txt(valor):
@@ -341,7 +347,7 @@ def _ir(delta):
     estado["passo"] += delta
     estado["feito"] = None
     estado["inicio_passo"] = time.time()
-    # Voltando, a checagem já é verdadeira: o passo fica parado até o usuário clicar em Próximo.
+    # Voltando, a checagem já é verdadeira: o passo fica parado até o usuário clicar em Next.
     estado["manual"] = delta < 0
     if estado["passo"] >= len(estado["roteiro"]["passos"]):
         _marcar_progresso(estado["nome"], passo=0, feito=True)
@@ -508,7 +514,7 @@ def _desenhar_cartao(tela, passo):
     blf.size(0, int(15 * e), 72)
     linhas = _quebrar(_txt(passo.get("texto")), largura - 2 * margem)
     dica = _com_dica(passo)
-    linhas_dica = _quebrar("Dica: " + dica, largura - 2 * margem) if dica else []
+    linhas_dica = _quebrar(_PREFIXO_DICA.get(_idioma(), "Tip") + ": " + dica, largura - 2 * margem) if dica else []
     altura = margem + alt_botao + margem + (len(linhas) + len(linhas_dica)) * alt_linha + 20 * e + margem
     x0 = (janela.width - largura) / 2
     # Embaixo, a não ser que o passo aconteça na metade de baixo da janela: aí vai para cima.
@@ -527,7 +533,7 @@ def _desenhar_cartao(tela, passo):
 
     y = y1 - margem - 13 * e
     blf.size(0, int(11 * e), 72)
-    _texto(x0 + margem, y, "TUTORIAL  %d/%d%s" % (estado["passo"] + 1, len(passos), "  -  feito!" if feito else ""), cor)
+    _texto(x0 + margem, y, "TUTORIAL  %d/%d%s" % (estado["passo"] + 1, len(passos), "  -  " + _FEITO.get(_idioma(), "done!") if feito else ""), cor)
     blf.size(0, int(15 * e), 72)
     for linha in linhas:
         y -= alt_linha
@@ -540,7 +546,7 @@ def _desenhar_cartao(tela, passo):
     blf.size(0, int(12 * e), 72)
     ultimo = estado["passo"] == len(passos) - 1
     automatico = _checagem(passo) is not None and not estado["manual"]
-    avancar = "Concluir" if ultimo else ("Pular" if automatico else "Próximo")
+    avancar = "Finish" if ultimo else ("Skip" if automatico else "Next")
     botoes = {}
 
     def botao(nome, rotulo, x, direita=False, forte=False):
@@ -553,10 +559,10 @@ def _desenhar_cartao(tela, passo):
         botoes[nome] = (x, y_b, x + larg, y_b + alt_botao)
         return x
 
-    botao("fechar", "Fechar", x0 + margem)
+    botao("fechar", "Close", x0 + margem)
     x = botao("proximo", avancar, x1 - margem, direita=True, forte=not automatico)
     if estado["passo"] > 0:
-        botao("voltar", "Voltar", x - 6 * e, direita=True)
+        botao("voltar", "Back", x - 6 * e, direita=True)
     estado["botoes"] = botoes
     bgl.glDisable(bgl.GL_BLEND)
 

@@ -1,0 +1,165 @@
+{
+  "titulo": {
+    "pt": "12. Mini mapa no HUD",
+    "en": "12. Minimap on the HUD",
+    "es": "12. Minimapa en el HUD"
+  },
+  "categoria": "Node Editor/UI Tree",
+  "resumo": {
+    "pt": "Add › Minimap: foto do mapa, nó na UI Tree, marcadores de outros objetos.",
+    "en": "Add › Minimap: map picture, UI Tree node, markers for other objects.",
+    "es": "Add › Minimap: foto del mapa, nodo en la UI Tree, marcadores de otros objetos."
+  },
+  "abertura": {
+    "pt": "Vamos colocar um mini mapa no canto da tela, que segue o jogador.",
+    "en": "Let's put a minimap in the corner of the screen that follows the player.",
+    "es": "Vamos a poner un minimapa en la esquina de la pantalla, que sigue al jugador."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Salve o arquivo (Ctrl+S): a foto do mapa fica ao lado do .range.",
+        "en": "Save the file (Ctrl+S): the map picture is saved next to the .range.",
+        "es": "Guarda el archivo (Ctrl+S): la foto del mapa queda junto al .range."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "bool(D.filepath) and not D.is_dirty"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Na 3D View, clique no cubo: ele será o jogador.",
+        "en": "In the 3D View, click the cube: it will be the player.",
+        "es": "En la 3D View, haz clic en el cubo: será el jugador."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Abra Add › Minimap › Radar.",
+        "en": "Open Add › Minimap › Radar.",
+        "es": "Abre Add › Minimap › Radar."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(n.object_name == C.active_object.name for t in [t for t in D.node_groups if t.bl_idname == 'RangeUITree'] for n in t.nodes if n.bl_idname == 'RangeUIMinimap')"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "A engine tira uma foto da cena de cima e liga a lógica da UI sozinha.",
+        "en": "The engine takes a top-down picture of the scene and sets up the UI logic by itself.",
+        "es": "La engine saca una foto de la escena desde arriba y conecta la lógica de la UI sola."
+      },
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Minimap"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Crie outro objeto (Add › Mesh › Cube) e afaste ele com G.",
+        "en": "Create another object (Add › Mesh › Cube) and move it away with G.",
+        "es": "Crea otro objeto (Add › Mesh › Cube) y aléjalo con G."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH' and not any(n.object_name == C.active_object.name for t in [t for t in D.node_groups if t.bl_idname == 'RangeUITree'] for n in t.nodes if n.bl_idname == 'RangeUIMinimap') and C.active_object.location.length > 1.0"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aba Game › Game Properties: clique em Add Game Property e mude o nome para minimap.",
+        "en": "Game tab › Game Properties: click Add Game Property and rename it to minimap.",
+        "es": "Pestaña Game › Game Properties: haz clic en Add Game Property y cambia el nombre a minimap."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and 'minimap' in C.active_object.game.properties"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Todo objeto com a propriedade minimap vira um ponto no mapa.",
+        "en": "Every object with the minimap property becomes a dot on the map.",
+        "es": "Todo objeto con la propiedad minimap se vuelve un punto en el mapa."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Add Game Property"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Node Editor e clique em UI: lá está o nó Minimap.",
+        "en": "Change the bottom area to Node Editor and click UI: the Minimap node is there.",
+        "es": "Cambia el área de abajo a Node Editor y haz clic en UI: ahí está el nodo Minimap."
+      },
+      "narracao": "",
+      "checagem": "node_editor_ui_tree",
+      "destaque": "BAIXO",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Node Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Selecione o nó Minimap e, no painel N, troque Shape para Square.",
+        "en": "Select the Minimap node and, in the N panel, change Shape to Square.",
+        "es": "Selecciona el nodo Minimap y, en el panel N, cambia Shape a Square."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(n.shape == 'SQUARE' for t in [t for t in D.node_groups if t.bl_idname == 'RangeUITree'] for n in t.nodes if n.bl_idname == 'RangeUIMinimap')"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Mouse no Node Editor, aperte N para abrir o painel.",
+        "en": "Mouse in the Node Editor, press N to open the panel.",
+        "es": "Ratón en el Node Editor, pulsa N para abrir el panel."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "UI",
+        "botao": "prop:shape"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte P: o mini mapa aparece no canto, com o ponto do outro cubo. Esc sai. Depois, clique em Next.",
+        "en": "Press P: the minimap shows in the corner, with the other cube's dot. Esc quits. Then click Next.",
+        "es": "Pulsa P: el minimapa aparece en la esquina, con el punto del otro cubo. Esc sale. Luego haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Para o jogador andar, use o tutorial 4 ou o 10.",
+        "en": "To make the player move, use tutorial 4 or 10.",
+        "es": "Para que el jugador camine, usa el tutorial 4 o el 10."
+      }
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Quer o mapa inteiro parado? Use Add › Minimap › Whole Map.",
+    "en": "Done! Want the whole map, standing still? Use Add › Minimap › Whole Map.",
+    "es": "¡Listo! ¿Quieres el mapa entero quieto? Usa Add › Minimap › Whole Map."
+  }
+}

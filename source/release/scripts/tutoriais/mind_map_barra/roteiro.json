@@ -1,0 +1,254 @@
+{
+  "titulo": {
+    "pt": "A barra do Mind Map: organize as ideias do seu jogo",
+    "en": "The Mind Map bar: organize your game ideas",
+    "es": "La barra del Mind Map: organiza las ideas de tu juego"
+  },
+  "categoria": "Mind Map",
+  "resumo": {
+    "pt": "Crie um mapa de ideias e use cada grupo da barra: Map, Idea, Look, Marks, Link e Find.",
+    "en": "Create an idea map and use each group of the bar: Map, Idea, Look, Marks, Link and Find.",
+    "es": "Crea un mapa de ideas y usa cada grupo de la barra: Map, Idea, Look, Marks, Link y Find."
+  },
+  "abertura": {
+    "pt": "Neste tutorial, vamos montar o mapa de ideias do seu jogo usando a barra de botões do Mind Map.",
+    "en": "In this tutorial, we will build the idea map of your game with the Mind Map button bar.",
+    "es": "En este tutorial vamos a montar el mapa de ideas de tu juego con la barra de botones del Mind Map."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Mind Map.",
+        "en": "Change the bottom area to Mind Map.",
+        "es": "Cambia el área de abajo a Mind Map."
+      },
+      "dica": {
+        "pt": "Clique no ícone do tipo de editor, no canto esquerdo do cabeçalho de baixo.",
+        "en": "Click the editor type icon at the left of the bottom header.",
+        "es": "Haz clic en el icono del tipo de editor, en la esquina izquierda de la cabecera de abajo."
+      },
+      "destaque": "BAIXO",
+      "checagem": {
+        "area": "MINDMAP_EDITOR"
+      },
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Mind Map"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho, clique em New para criar um mapa.",
+        "en": "In the header, click New to create a map.",
+        "es": "En la cabecera, haz clic en New para crear un mapa."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any(True for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "HEADER",
+        "botao": "op:MINDMAP_OT_new"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Barra de baixo, grupo Idea: clique em Rename e dê o nome do seu jogo à ideia do meio.",
+        "en": "Bottom bar, Idea group: click Rename and type your game's name in the middle idea.",
+        "es": "Barra de abajo, grupo Idea: haz clic en Rename y ponle el nombre de tu juego a la idea central."
+      },
+      "dica": {
+        "pt": "Escreva o nome e aperte Enter. F2 também renomeia.",
+        "en": "Type the name and press Enter. F2 also renames.",
+        "es": "Escribe el nombre y pulsa Enter. F2 también renombra."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any('TEXT=\"New Map\"' not in s for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_edit"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Child Idea e escreva uma ideia, por exemplo Personagens.",
+        "en": "Click Add Child Idea and type an idea, for example Characters.",
+        "es": "Haz clic en Add Child Idea y escribe una idea, por ejemplo Personajes."
+      },
+      "dica": {
+        "pt": "Escreva e aperte Enter. Pelo teclado, é a tecla Insert.",
+        "en": "Type and press Enter. On the keyboard it is Insert.",
+        "es": "Escribe y pulsa Enter. Con el teclado, es la tecla Insert."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any(s.count('<node') >= 2 and 'TEXT=\"\"' not in s for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_add_child"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Sibling Idea e escreva outra ideia ao lado, por exemplo Fases.",
+        "en": "Click Add Sibling Idea and type another idea beside it, for example Levels.",
+        "es": "Haz clic en Add Sibling Idea y escribe otra idea al lado, por ejemplo Niveles."
+      },
+      "dica": {
+        "pt": "Pelo teclado, é a tecla Enter com a ideia selecionada.",
+        "en": "On the keyboard it is Enter with the idea selected.",
+        "es": "Con el teclado, es la tecla Enter con la idea seleccionada."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any(s.count('<node') >= 3 and 'TEXT=\"\"' not in s for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_add_sibling"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Grupo Look: clique na paleta e escolha uma cor para a ideia.",
+        "en": "Look group: click the palette and pick a color for the idea.",
+        "es": "Grupo Look: haz clic en la paleta y elige un color para la idea."
+      },
+      "dica": {
+        "pt": "Os outros botões do Look mudam a cor da caixa, a forma e o ícone.",
+        "en": "The other Look buttons change the box color, the shape and the icon.",
+        "es": "Los otros botones de Look cambian el color de la caja, la forma y el icono."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any('COLOR=\"' in s for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_set_color"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Grupo Marks: clique na caixinha para marcar a ideia como tarefa.",
+        "en": "Marks group: click the checkbox to turn the idea into a task.",
+        "es": "Grupo Marks: haz clic en la casilla para marcar la idea como tarea."
+      },
+      "dica": {
+        "pt": "Cada clique troca entre a fazer, feita e nada. Atalho: Shift+T.",
+        "en": "Each click cycles to do, done and none. Shortcut: Shift+T.",
+        "es": "Cada clic alterna entre pendiente, hecha y nada. Atajo: Shift+T."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any('ANASTACIO_TASK=' in s for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_cycle_task"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Ainda em Marks: clique em Note, escreva uma nota e confirme.",
+        "en": "Still in Marks: click Note, write a note and confirm.",
+        "es": "Todavía en Marks: haz clic en Note, escribe una nota y confirma."
+      },
+      "dica": {
+        "pt": "Atalho: Shift+N.",
+        "en": "Shortcut: Shift+N.",
+        "es": "Atajo: Shift+N."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any('TYPE=\"NOTE\"' in s for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_edit_note"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Grupo Link: clique em Link e escolha um objeto da cena.",
+        "en": "Link group: click Link and pick an object of the scene.",
+        "es": "Grupo Link: haz clic en Link y elige un objeto de la escena."
+      },
+      "dica": {
+        "pt": "A ideia pode apontar para um objeto, uma cena ou um texto. Atalho: L.",
+        "en": "An idea can point to an object, a scene or a text. Shortcut: L.",
+        "es": "La idea puede apuntar a un objeto, una escena o un texto. Atajo: L."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": {
+        "expr": "any('ANASTACIO_LINK=' in s for a in C.screen.areas if a.type == 'MINDMAP_EDITOR' and a.spaces.active.text for s in [a.spaces.active.text.as_string()])"
+      },
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_set_link"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Clique em Open Link: a engine seleciona o objeto e centraliza a 3D View nele. Depois, clique em Next.",
+        "en": "Click Open Link: the engine selects the object and centers the 3D View on it. Then click Next.",
+        "es": "Haz clic en Open Link: la engine selecciona el objeto y centra la 3D View en él. Luego haz clic en Next."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": null,
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_open_link"
+      },
+      "narracao": ""
+    },
+    {
+      "texto": {
+        "pt": "Grupo Find: clique em ? para ver todos os atalhos do Mind Map.",
+        "en": "Find group: click ? to see every Mind Map shortcut.",
+        "es": "Grupo Find: haz clic en ? para ver todos los atajos del Mind Map."
+      },
+      "dica": {
+        "pt": "Find procura ideias pelo nome (Ctrl+F) e View All mostra o mapa inteiro (Home).",
+        "en": "Find searches ideas by name (Ctrl+F) and View All shows the whole map (Home).",
+        "es": "Find busca ideas por nombre (Ctrl+F) y View All muestra el mapa entero (Home)."
+      },
+      "destaque": "MINDMAP_EDITOR",
+      "checagem": null,
+      "alvo": {
+        "area": "MINDMAP_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:MINDMAP_OT_quick_guide"
+      },
+      "narracao": ""
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! O mapa fica salvo dentro do arquivo .range e pode ser exportado como .mm ou PNG.",
+    "en": "Done! The map is saved inside the .range file and can be exported as .mm or PNG.",
+    "es": "¡Listo! El mapa queda guardado dentro del archivo .range y se puede exportar como .mm o PNG."
+  }
+}

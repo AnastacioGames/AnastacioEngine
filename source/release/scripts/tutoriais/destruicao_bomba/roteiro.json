@@ -1,0 +1,167 @@
+{
+  "titulo": {
+    "pt": "19. Uma parede que quebra e uma bomba",
+    "en": "19. A wall that breaks and a bomb",
+    "es": "19. Una pared que se rompe y una bomba"
+  },
+  "categoria": "Physics",
+  "resumo": {
+    "pt": "Aba Physics › Damage: Destruction com Generate Fragments e Explosive com Particle Explosion.",
+    "en": "Physics tab › Damage: Destruction with Generate Fragments and Explosive with Particle Explosion.",
+    "es": "Pestaña Physics › Damage: Destruction con Generate Fragments y Explosive con Particle Explosion."
+  },
+  "abertura": {
+    "pt": "Vamos fazer o cubo quebrar em pedaços quando uma bomba cair nele.",
+    "en": "Let's make the cube break into pieces when a bomb falls on it.",
+    "es": "Vamos a hacer que el cubo se rompa en pedazos cuando una bomba caiga sobre él."
+  },
+  "encerramento": {
+    "pt": "Pronto: a bomba explode ao bater e a parede vira pedaços.",
+    "en": "Done: the bomb explodes on impact and the wall turns into pieces.",
+    "es": "Listo: la bomba explota al chocar y la pared se vuelve pedazos."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique no cubo: ele será a parede.",
+        "en": "In the 3D View, click the cube: it will be the wall.",
+        "es": "En la 3D View, haz clic en el cubo: será la pared."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Physics e, no topo dela, clique em Damage.",
+        "en": "In Properties, open the Physics tab and, at its top, click Damage.",
+        "es": "En Properties, abre la pestaña Physics y, arriba, haz clic en Damage."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'PHYSICS' for a in C.screen.areas if a.type == 'PROPERTIES') and C.window_manager.ae_physics_panel_category == 'DAMAGE'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=PHYSICS"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Abra o painel Destruction, clique em Generate Fragments... e depois em OK.",
+        "en": "Open the Destruction panel, click Generate Fragments... and then OK.",
+        "es": "Abre el panel Destruction, haz clic en Generate Fragments... y luego en OK."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and C.active_object.game.use_destruction and C.active_object.game.destruction.fragments is not None"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Generate Fragments..."
+      },
+      "dica": {
+        "pt": "O painel começa fechado: clique no nome Destruction para abrir. Os pedaços vão para a camada 20, escondidos.",
+        "en": "The panel starts closed: click the name Destruction to open it. The pieces go to layer 20, hidden.",
+        "es": "El panel empieza cerrado: haz clic en el nombre Destruction para abrirlo. Los pedazos van a la capa 20, ocultos."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Faça a bomba: Add › Mesh › UV Sphere. Depois G, Z, 5, Enter: ela fica em cima do cubo.",
+        "en": "Make the bomb: Add › Mesh › UV Sphere. Then G, Z, 5, Enter: it sits above the cube.",
+        "es": "Haz la bomba: Add › Mesh › UV Sphere. Después G, Z, 5, Enter: queda encima del cubo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and C.active_object.location.z > 3 and not C.active_object.game.use_destruction"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo da aba Physics, clique em Physics e troque Physics Type para Rigid Body: a bomba vai cair.",
+        "en": "At the top of the Physics tab, click Physics and change Physics Type to Rigid Body: the bomb will fall.",
+        "es": "Arriba en la pestaña Physics, haz clic en Physics y cambia Physics Type a Rigid Body: la bomba caerá."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and C.active_object.location.z > 3 and C.active_object.game.physics_type in {'RIGID_BODY', 'DYNAMIC'}"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_physics_panel_category=PHYSICS"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Damage de novo, abra o painel Explosive e marque Enabled.",
+        "en": "Click Damage again, open the Explosive panel and check Enabled.",
+        "es": "Haz clic en Damage otra vez, abre el panel Explosive y marca Enabled."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and C.active_object.location.z > 3 and C.active_object.game.use_explosive"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_physics_panel_category=DAMAGE"
+      },
+      "dica": {
+        "pt": "Explode on Impact já vem ligado: a bomba explode quando bate em algo.",
+        "en": "Explode on Impact is already on: the bomb explodes when it hits something.",
+        "es": "Explode on Impact ya viene activado: la bomba explota cuando choca con algo."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No mesmo painel, marque Particle Explosion: fogo, fumaça e faíscas.",
+        "en": "In the same panel, check Particle Explosion: fire, smoke and sparks.",
+        "es": "En el mismo panel, marca Particle Explosion: fuego, humo y chispas."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and C.active_object.game.use_explosive and C.active_object.game.explosive.use_particle_explosion"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:use_particle_explosion"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte P: a bomba cai, explode e a parede quebra. Esc sai. Depois, clique em Next.",
+        "en": "Press P: the bomb falls, explodes and the wall breaks. Esc quits. Then click Next.",
+        "es": "Presiona P: la bomba cae, explota y la pared se rompe. Esc sale. Después, haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "Se a parede não quebrar, baixe Break Impulse no painel Destruction do cubo.",
+        "en": "If the wall does not break, lower Break Impulse in the cube's Destruction panel.",
+        "es": "Si la pared no se rompe, baja Break Impulse en el panel Destruction del cubo."
+      }
+    }
+  ]
+}

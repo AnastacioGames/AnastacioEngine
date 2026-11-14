@@ -1,0 +1,151 @@
+{
+  "titulo": {
+    "pt": "16. Track Tool: uma pista a partir de uma curva",
+    "en": "16. Track Tool: a track from a curve",
+    "es": "16. Track Tool: una pista a partir de una curva"
+  },
+  "categoria": "Track",
+  "resumo": {
+    "pt": "Add › Curve › Track, aba Track do painel N: Road, Live, editar a curva e Generate All.",
+    "en": "Add › Curve › Track, Track tab of the N panel: Road, Live, edit the curve and Generate All.",
+    "es": "Add › Curve › Track, pestaña Track del panel N: Road, Live, editar la curva y Generate All."
+  },
+  "abertura": {
+    "pt": "Vamos fazer uma estrada de corrida que segue uma curva.",
+    "en": "Let's make a racing road that follows a curve.",
+    "es": "Vamos a hacer una carretera de carreras que sigue una curva."
+  },
+  "encerramento": {
+    "pt": "Pronto: a pista tem estrada, terreno e decoração, e muda junto com a curva.",
+    "en": "Done: the track has road, terrain and decoration, and changes with the curve.",
+    "es": "Listo: la pista tiene carretera, terreno y decoración, y cambia junto con la curva."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, abra Add › Curve › Track.",
+        "en": "In the 3D View, open Add › Curve › Track.",
+        "es": "En la 3D View, abre Add › Curve › Track."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.type == 'CURVE' and o.range_track.enabled for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Curve"
+      },
+      "dica": {
+        "pt": "A pista começa com 300 m. Aperte Numpad . para ver ela inteira.",
+        "en": "The track starts 300 m long. Press Numpad . to see all of it.",
+        "es": "La pista empieza con 300 m. Presiona Numpad . para verla entera."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte N para abrir a barra lateral e clique na aba Track.",
+        "en": "Press N to open the sidebar and click the Track tab.",
+        "es": "Presiona N para abrir la barra lateral y haz clic en la pestaña Track."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(r.type == 'UI' and r.width > 1 for a in C.screen.areas if a.type == 'VIEW_3D' for r in a.regions)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "Clique em Road: a estrada aparece em volta da curva.",
+        "en": "Click Road: the road appears around the curve.",
+        "es": "Haz clic en Road: la carretera aparece alrededor de la curva."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.get('range_track_part') == 'ROAD' for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "UI",
+        "botao": "Road"
+      },
+      "dica": {
+        "pt": "Gerar de novo só troca o que a própria pista criou.",
+        "en": "Generating again only replaces what the track itself created.",
+        "es": "Generar de nuevo solo cambia lo que la propia pista creó."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Live: agora a estrada se refaz sozinha quando a curva muda.",
+        "en": "Click Live: now the road rebuilds by itself when the curve changes.",
+        "es": "Haz clic en Live: ahora la carretera se rehace sola cuando la curva cambia."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "__import__('sys').modules['bl_operators.anastacio_track'].live_enabled(C.active_object)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "UI",
+        "botao": "Live"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte Tab, clique num ponto da curva, mova com G e aperte Tab de novo.",
+        "en": "Press Tab, click a point of the curve, move it with G and press Tab again.",
+        "es": "Presiona Tab, haz clic en un punto de la curva, muévelo con G y presiona Tab otra vez."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.mode == 'OBJECT' and any(min(abs(p.co.x - x) + abs(p.co.y - y) for x, y in ((0, 0), (90, 0), (195, 45), (300, 45))) + abs(p.co.z) > 1.0 for o in C.scene.objects if o.type == 'CURVE' and o.range_track.enabled for s in o.data.splines for p in s.bezier_points)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "Com Live ligado, a estrada acompanha a curva logo depois de cada mudança.",
+        "en": "With Live on, the road follows the curve right after each change.",
+        "es": "Con Live activado, la carretera sigue la curva justo después de cada cambio."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Generate All: entram também o terreno e a decoração.",
+        "en": "Click Generate All: terrain and decoration come in too.",
+        "es": "Haz clic en Generate All: entran también el terreno y la decoración."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.get('range_track_part') == 'TERRAIN' for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "UI",
+        "botao": "Generate All"
+      },
+      "dica": {
+        "pt": "Pode demorar alguns segundos numa pista grande.",
+        "en": "It can take a few seconds on a big track.",
+        "es": "Puede tardar unos segundos en una pista grande."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte Numpad . para ver a pista inteira. Para dirigir nela, faça o tutorial 17. Clique em Next.",
+        "en": "Press Numpad . to see the whole track. To drive on it, do tutorial 17. Click Next.",
+        "es": "Presiona Numpad . para ver la pista entera. Para manejar en ella, haz el tutorial 17. Haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "alvo": null
+    }
+  ]
+}

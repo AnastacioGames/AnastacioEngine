@@ -8,6 +8,127 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais 18 a 20 (casas, destruição, LOD automático)
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `casas_brasileiras` | Buildings | 7 | Brazilian House (Seed, Style, Detail LOD0 + LOD1), Brazilian Street Block |
+| `destruicao_bomba` | Physics | 8 | Physics › Damage, Destruction + Generate Fragments, bomba Rigid Body com Explosive e Particle Explosion, P |
+| `lod_automatico` | Optimization | 5 | Monkey + Subdivision, Performance › Optimize Scene › Generate LODs, painel de LOD, P |
+
+- Em pt, en e es, com nomes de botões e teclas em inglês.
+- Checagens: chave `range_buildings` (estilo:seed), `lod_levels`, objeto `Rua_*`; `ae_physics_panel_category`,
+  `game.use_destruction`/`destruction.fragments`, `game.use_explosive`/`explosive.use_particle_explosion`;
+  modificador SUBSURF. Simulados com dados falsos; falta o aceite com a janela.
+
+## 2026-11-14 — Tutoriais 15 a 17 (Rec Play, Track Tool, carro e Vehicle Lab)
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `rec_play_gravar` | Animation | 8 | Render › System, Record "Cube", Max Duration 10, Rec Play, Watch, Add to Cutscene, P |
+| `track_pista` | Track | 7 | Add › Curve › Track, aba Track (N), Road, Live, mover um ponto da curva, Generate All |
+| `veiculo_carro` | Vehicle | 17 | Chão, chassi Rigid Body, Vehicle Enabled, 4 rodas No Collision, Add Wheel, Steering, AWD, Add Vehicle Component, Debug Mode › Vehicle Lab |
+
+- Já nascem em pt, en e es, com os nomes de botões e teclas em inglês.
+- Checagens: `ae_rec_actor`, `ae_rec_max_duration`, `ae_rec_takes`, evento `PLAY_TAKE` da cutscene;
+  `range_track.enabled`, a chave `range_track_part` (ROAD/TERRAIN) dos objetos gerados, `live_enabled` do
+  módulo do Track e os pontos Bezier fora da posição inicial; `game.is_vehicle`, `vehicle_wheels`
+  (objeto, `has_steering`, `has_drive`), o componente `VehiclePlayerComponent` e `show_debug_mode`.
+- Simulados passo a passo com dados falsos (cada checagem falsa antes da ação e verdadeira depois). Falta o
+  aceite com a janela da engine.
+
+## 2026-11-14 — Tutoriais em português, inglês e espanhol
+
+- Os 17 roteiros de `source/release/scripts/tutoriais/` ganharam `es` em todos os textos, e `en` em `abertura` e
+  `encerramento` (e no `ui_tree_menu`, que era só português). Nomes de botões, abas, menus e teclas ficam no
+  original em inglês nos três idiomas ("clique em Next", "Space", "aba Data").
+- `range_tutorials.py`: os botões do cartão passam a Close, Back, Next, Skip e Finish (antes Fechar, Voltar,
+  Próximo, Pular, Concluir). O prefixo da dica (Dica/Tip/Consejo) e o "feito!" seguem o idioma da interface.
+  O idioma `es` já era aceito por `_txt` (as duas primeiras letras de `language`).
+
+## 2026-11-14 — Tutoriais 11 a 14 (Cutscene, Minimap, Material Atlas, Performance)
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `cutscene_abertura` | Cutscene | 9 | Aba Cutscene, + sequência, Play on Start, evento Fade (From Black), evento Letterbox (Show Bars, Time 1), P |
+| `minimap_radar` | Node Editor/UI Tree | 8 | Salvar, jogador, Add › Minimap › Radar, outro objeto com a propriedade `minimap`, nó Minimap (Shape Square), P |
+| `material_atlas_paleta` | Optimization | 8 | Aba Material, segundo material, cor em Surface, Assign numa face, Setup › info do Material Atlas, Palette Atlas |
+| `performance_medir` | Optimization | 6 | Performance › Scene Doctor, Simulate Weak PC 8x, Measure, Open Last Report, Weak PC Off |
+
+- Checagens: `scene.cutscene_settings` (sequências e eventos), nós `RangeUIMinimap` das UI Trees
+  (`object_name`, `shape`), `material_slots`/`diffuse_color`/`material_index` e a chave `_anastacio_atlas_source`
+  da malha, `bl_operators.anastacio_scene_doctor._last_scene` e `WindowManager.range_weak_gpu`.
+- O popover Performance da barra de cima é uma região temporária: os itens dele usam `"menu"` no alvo.
+- Conferidos fora da engine: expressões compilam e as quatro sequências foram simuladas. Falta o aceite com janela.
+
+## 2026-11-14 — Tutoriais 7 a 10 (Smart Wizard, Text Box, World Sound, Logic Tree)
+
+Quatro roteiros novos em `source/release/scripts/tutoriais/`, pt e en, continuando a numeração dos básicos:
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `smart_wizard_girador` | Components | 9 | Aba Game › Component Manager, receita Girador, Use Recipe, campo Velocidade, Create Smart Component, Velocidade e Balancar no componente, P |
+| `texto_caixa_dialogo` | Text | 9 | Add › Text, frase longa, aba Data › Game Text › Text Box (Width, Height), Setup Dialogue, Letters per Second, At the End › Keep, P |
+| `som_world_sound` | Sound | 7 | Aba World Sound, módulo Music, Add Sounds, Volume, módulo Effects com os sons da engine, filtro Music, P |
+| `logica_arvore_andar` | Logic Tree | 10 | Node Editor › Logic, + New Logic Tree, Add › Triggers › Key, seta para cima, Add › Actions › Motion, Loc Y, ligação Pulse → Do, P |
+
+- Checagens por `expr`: `WindowManager.smart_wizard` e `game.components[].properties` (o nome do campo é a chave de
+  `args`); `data.body`, `text_boxes[0]` e as propriedades `td_speed`/`td_end` do diálogo; `world.sound_modules` e
+  `world_sound_filter`; `Object.logic_tree`, seus nós (`RangeLogicKey`, `RangeLogicMotion`) e links.
+- "Pause na UI Tree" ficou de fora: é o botão II do template + HUD (Screen Menu), já mostrado no tutorial do HUD.
+- Conferidos fora da engine: expressões compilam e as quatro sequências foram simuladas com objetos falsos (cada
+  passo só fica verdadeiro depois do anterior). Falta o aceite com janela.
+
+## 2026-11-14 — Tutoriais básicos (Basics, Logic Bricks, Export)
+
+Seis roteiros novos em `source/release/scripts/tutoriais/`, pt e en, numerados no título para aparecerem na
+ordem de estudo:
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `basico_interface` | Basics | 7 | Outliner, aba Object, seleção na 3D View, vistas 1/7/0 do teclado numérico, trocar a área para Logic Editor |
+| `basico_transformar` | Basics | 6 | G Z 2, R Z 45, S 2, Add › Mesh › Cube, X › Delete |
+| `basico_primeiro_jogo` | Basics | 7 | Chão (Add › Mesh › Plane, S 5), cubo no alto, aba Physics, Rigid Body, vista da câmera, P |
+| `logica_andar` | Logic Bricks | 10 | Keyboard (seta para cima), And, Motion Loc Y 0.1, as duas ligações e P |
+| `exportar_desktop` | Export | 6 | Aba Export Game › Export, Platforms, Product Name, salvar em data/, Export Game (1 Click) |
+| `exportar_web` | Export | 6 | Aba Export Game › Web, Touch Controls, Validate Web, Export Web, Open in browser |
+
+- Checagens por `expr`: objeto ativo e selecionado, transformações, `view_rotation`/`view_perspective` da 3D View,
+  aba do Properties, Logic Bricks do objeto ativo e suas ligações, campos de `rangearmor_export` e `range_web`, e
+  o último relatório do Validate Web (`bl_ui.properties_web._last_report`). Passos que só dependem de P ou de um
+  export terminar avançam pelo botão Próximo.
+- Alvos: abas do Properties por `prop:context=...`, categorias da aba Export Game por
+  `prop:ae_export_panel_category=...`, menus Add › Mesh e Add Sensor/Controller/Actuator com o item marcado.
+- A cena padrão (`startup.blend`) já tem Cube, Camera e Plane: o passo do chão confere o Plane **ativo** (o novo),
+  não a existência de um Plane.
+- Conferidos fora da engine: todas as expressões compilam, e as sequências de Logic Bricks e de transformação
+  foram simuladas (cada passo só fica verdadeiro depois do anterior). Falta o aceite com janela.
+
+## 2026-11-14 — Tutorial dos nós de HUD da UI Tree
+
+- Novo roteiro `source/release/scripts/tutoriais/ui_tree_hud/roteiro.json` (categoria **Node Editor/UI Tree**,
+  16 passos, pt e en). Parte de uma UI Tree nova com o template **+ HUD** e apresenta cada nó: Progress Bar (troca
+  a cor Fill), Label (Format com `{vida:.0f}`), Gauge (Anchor), Button A (Set Property em On Press/On Release) e
+  Dialogue Box (propriedade `dialogo`). Depois cria um Label pelo menu Add › HUD, põe dentro do quadro HUD com
+  `Pontos {pontos}`, liga o Setup Game Logic e testa com P.
+- Alvos: nós por nome (`Progress Bar`, `Label`, `Gauge`, `Dialogue Box`, `Label.002`) e Button pelo texto (`A`);
+  propriedades do painel por `prop:fill_color` e `prop:text_format`.
+- Checagens por `expr` sobre a UI Tree aberta (nó ativo e selecionado, cor, Format, número de Labels dentro do
+  quadro HUD). Conferidas fora da engine com a árvore do template simulada: cada passo só fica verdadeiro depois
+  do anterior. Falta o aceite com janela.
+
+## 2026-11-14 — Tutorial da barra do Mind Map
+
+- Novo roteiro `source/release/scripts/tutoriais/mind_map_barra/roteiro.json` (categoria **Mind Map**, 11 passos,
+  textos em pt e en): troca a área de baixo para Mind Map, cria o mapa com New e passa por cada grupo da barra
+  (Idea: Rename, Add Child, Add Sibling; Look: cor; Marks: tarefa e nota; Link: Link e Open Link; Find: Quick Guide).
+- Quadro piscando em cada botão por `op:MINDMAP_OT_*` na região `WINDOW` do `MINDMAP_EDITOR` (a barra é um
+  `uiBlock` da região principal, então `UI_highlight_button_draw` a encontra).
+- Checagens por `expr` sobre o texto `.mm` do mapa aberto (`<node`, `COLOR=`, `ANASTACIO_TASK=`, `TYPE="NOTE"`,
+  `ANASTACIO_LINK=`; ideia sem nome `TEXT=""` não conta). Conferidas fora da engine com uma sequência de mapas:
+  cada passo só fica verdadeiro depois do anterior. Open Link e Quick Guide avançam pelo botão Próximo.
+- Sem cena inicial: funciona em qualquer arquivo. Falta o aceite com janela.
+
 ## 2026-11-13 — Animações depois da lógica (delta transform com script)
 
 - `8ca171412`: relato do musikai (`delta_anim.blend`): action em `delta_location` não movia a raquete quando um

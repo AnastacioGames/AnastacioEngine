@@ -133,6 +133,73 @@ Text Boxes (diálogos sem código) e World Sound.
 - **Progresso:** fica em CONFIG/`range_tutorials.json`. O menu mostra ✓ nos concluídos e (n/total) nos começados, e continua de onde o usuário parou.
 - **Dica:** depois de 20 s parado no passo, mostra `"dica"` em amarelo, e o quadro pisca mais rápido.
 - **Busca:** Search Tutorials… no topo do menu.
-- **Idiomas:** `titulo`, `texto` e `dica` aceitam `{"pt":..,"en":..}`, conforme o idioma da interface.
+- **Idiomas:** `titulo`, `texto` e `dica` aceitam `{"pt":..,"en":..,"es":..}`, conforme o idioma da interface (sem o idioma, vale `en`).
 - **Exportar e importar .zip:** a importação recusa caminhos absolutos, `.`, `..` e nomes repetidos, e nunca sobrescreve tutorial existente.
 - **Revisão do Codex:** cinco pontos, todos aceitos (enum da busca estável, zip duplicado, `_pendente` limpo, Restart sem zerar antes da confirmação, salvar fecha a reprodução).
+
+## Tutorial da barra do Mind Map (2026-11-14, falta aceite com janela)
+
+- `tutoriais/mind_map_barra/`: 11 passos, um por botão da barra (Map, Idea, Look, Marks, Link, Find), pt e en.
+- Alvos `op:MINDMAP_OT_*` na região `WINDOW`; checagens `expr` sobre o texto `.mm` do mapa aberto. Sem `inicio.range`.
+
+## Tutorial dos nós de HUD (2026-11-14, falta aceite com janela)
+
+- `tutoriais/ui_tree_hud/`: 16 passos a partir do template + HUD (Progress Bar, Label, Gauge, Button A, Dialogue
+  Box), um Label novo com `{pontos}`, Setup Game Logic e P. Supõe uma UI Tree nova, pelos nomes dos nós.
+
+## Tutoriais básicos (2026-11-14, falta aceite com janela)
+
+- Basics: `basico_interface`, `basico_transformar`, `basico_primeiro_jogo` (primeiro jogo e física juntos).
+- Logic Bricks: `logica_andar`. Export: `exportar_desktop` (aba Export Game › Export), `exportar_web`.
+- Intermediários: ver as seções seguintes.
+
+## Tutoriais 7 a 10 (2026-11-14, falta aceite com janela)
+
+- `smart_wizard_girador` (Components), `texto_caixa_dialogo` (Text), `som_world_sound` (Sound),
+  `logica_arvore_andar` (Logic Tree).
+- Pause na UI Tree não virou tutorial próprio: é o botão II do template + HUD, já no tutorial do HUD.
+- Pontos para o aceite: o painel Component Manager começa fechado (o quadro só aparece depois de aberto); o
+  World Sound supõe que a cena tem World; o passo do texto pede sair da edição com Tab antes de conferir.
+
+## Tutoriais 11 a 14 (2026-11-14, falta aceite com janela)
+
+- `cutscene_abertura` (Cutscene), `minimap_radar` (Node Editor/UI Tree), `material_atlas_paleta` e
+  `performance_medir` (Optimization).
+- Pontos para o aceite: o destaque dentro do popover Performance; o + de eventos do Cutscene criando
+  SPAWN_OBJECT antes da troca de Type; o Minimap pede o .range salvo para tirar a foto do mapa.
+- Rec Play, Track Tool e Vehicle Lab viraram os tutoriais 15 a 17 (seção seguinte). Camera FX não foi achado
+  nos scripts com esse nome; fica para quando o usuário apontar o recurso.
+
+## Tutoriais 15 a 17 (2026-11-14, falta aceite com janela)
+
+- `rec_play_gravar` (Animation): aba Render › System, painel Motion Recording, Record "Cube", Max Duration,
+  Rec Play, Watch, Add to Cutscene, P.
+- `track_pista` (Track): Add › Curve › Track, aba Track do painel N, Road, Live, editar a curva, Generate All.
+- `veiculo_carro` (Vehicle): chão, chassi Rigid Body, aba Vehicle (Enabled), 4 cilindros No Collision nos
+  cantos, Add Wheel ×4, objetos das rodas, Steering na frente, AWD, Add Vehicle Component, P, Debug Mode e a
+  caixa Vehicle Lab na janela Options do jogo.
+- Pontos para o aceite: o painel Motion Recording fica no meio dos painéis de System (rolar); o Live do Track é
+  conferido pelo estado do módulo `bl_operators.anastacio_track`; o carro com as medidas do tutorial (rodas
+  em X ±1,2, Y ±1, Z -0,8, chão em Z -2) precisa andar sem capotar; a vista não segue o carro.
+
+## Tutoriais 18 a 20 (2026-11-14, falta aceite com janela)
+
+- `casas_brasileiras` (Buildings): Add › Mesh › Brazilian House, Seed, Style e Detail no painel do operador
+  (Tool Shelf ou F6), Brazilian Street Block.
+- `destruicao_bomba` (Physics): aba Physics › Damage, Destruction com Generate Fragments, esfera Rigid Body
+  com Explosive e Particle Explosion caindo no cubo.
+- `lod_automatico` (Optimization): Monkey com Ctrl+2, Performance › Optimize Scene › Generate LODs, painel
+  Levels of Detail - LOD (aba Object › Game).
+- Pontos para o aceite: se a explosão padrão (raio 5, força 30) quebra o cubo com o Break Impulse padrão; o
+  destaque dentro do submenu Optimize Scene do popover Performance.
+- Ficaram de fora por ora: aba Input (estado em propriedades dinâmicas, difícil de conferir) e Locale (pede
+  editar a tabela CSV e um script para trocar o idioma no jogo).
+
+## Três idiomas (2026-11-14)
+
+- Os tutoriais têm pt, en e es em `titulo`, `resumo`, `abertura`, `encerramento`, `texto` e `dica`.
+- Regra de escrita: nomes de botões, abas, menus, campos e teclas ficam como na engine (inglês), em todos os
+  idiomas: "clique em Next", "Enter, Space". Rótulos que a engine mostra em português (Jogar, Girador,
+  Velocidade) ficam como estão.
+- O cartão do tutorial usa Close, Back, Next, Skip e Finish; o rótulo "Dica:"/"Tip:"/"Consejo:" e o
+  "feito!" seguem o idioma da interface.
