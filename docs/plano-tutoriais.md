@@ -48,9 +48,9 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Camera FX | Efeitos de câmera (grão, Directional Blur) | falta: achar o painel |
 | Render | Céu: Sky Layers, nuvens, Sky Quality | feito: 21 (`ceu_entardecer`); Sky Layers e Sky Quality ficam para outro |
 | Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | feito: 23 (`chuva_nevoa`, chuva + névoa); falta raios e fumaça/fogo |
-| Render | Compositing no jogo (faixa de efeitos e presets) | falta |
-| Render | Light Probe Volume e Bake Probes | falta |
-| Render | Sombra colorida, SSGI e PCSS | falta |
+| Render | Compositing no jogo (faixa de efeitos e presets) | reservado 2026-11-14 (sessão local, main) |
+| Render | Light Probe Volume e Bake Probes | reservado 2026-11-14 (sessão local, main) |
+| Render | Sombra colorida, SSGI e PCSS | reservado 2026-11-14 (sessão local, main) |
 | Shader | Nós de shader e Nodes GLSL por arquivo | falta |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player e actuator Video (legendas, fade) | falta |
