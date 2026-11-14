@@ -86,10 +86,11 @@ def _instalar():
         cls = _classe_painel(nome)
         if cls is None or not getattr(cls, "is_registered", False):
             continue
-        original = cls.__dict__.get("draw_header")
+        original = cls.__dict__.get("draw_header")  # para devolver no _desinstalar
+        herdado = getattr(cls, "draw_header", None)  # o que desenha hoje, mesmo vindo da classe mãe
         try:
             bpy.utils.unregister_class(cls)
-            cls.draw_header = _com_info(nome, original)
+            cls.draw_header = _com_info(nome, herdado)
             bpy.utils.register_class(cls)
         except (RuntimeError, ValueError):
             continue
