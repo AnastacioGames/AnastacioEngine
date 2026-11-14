@@ -24,6 +24,7 @@
 
 #include <float.h>
 #include <limits.h>
+#include <stdlib.h>
 #include <math.h>
 #include <string.h>
 #include <ctype.h>
@@ -153,7 +154,8 @@ void ui_block_to_window_rctf(const ARegion *ar, uiBlock *block, rctf *rct_dst, c
 }
 
 /* Tutorial highlight: a frame around one button of a region (see scripts/startup/range_tutorials.py).
- * `name` is the button text, "op:NODE_OT_xxx" (operator), "prop:identifier" (RNA property)
+ * `name` is the button text, "op:NODE_OT_xxx" (operator), "prop:identifier" (RNA property, or
+ * "prop:identifier[i]" for one item of an array)
  * or "tip:Tooltip text" (for icon-only buttons). */
 static struct {
 	int spacetype, regiontype;
@@ -175,8 +177,14 @@ static const char *ui_but_enum_value_id(uiBut *but)
 static bool ui_but_prop_match(uiBut *but, const char *name)
 {
 	const char *eq = strchr(name, '=');
+	const char *colchete = strchr(name, '[');
 	const char *ident = RNA_property_identifier(but->rnaprop);
 	const char *value;
+	if (colchete != NULL && eq == NULL) {
+		/* "prop:offset_location[1]": one item of an array (the Y field). */
+		return strlen(ident) == (size_t)(colchete - name) && STREQLEN(ident, name, colchete - name) &&
+		       but->rnaindex == atoi(colchete + 1);
+	}
 	if (eq == NULL) {
 		return STREQ(ident, name);
 	}

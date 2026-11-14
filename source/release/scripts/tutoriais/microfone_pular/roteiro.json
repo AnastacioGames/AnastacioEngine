@@ -119,7 +119,7 @@
       "alvo": {
         "area": "LOGIC_EDITOR",
         "regiao": "WINDOW",
-        "botao": "prop:offset_location"
+        "botao": "prop:offset_location[2]"
       }
     },
     {
