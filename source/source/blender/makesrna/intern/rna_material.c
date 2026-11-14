@@ -79,6 +79,8 @@ const EnumPropertyItem rna_enum_ramp_blend_items[] = {
 #include "DNA_screen_types.h"
 #include "DNA_space_types.h"
 
+#include "BLI_string.h"
+
 #include "BKE_colorband.h"
 #include "BKE_context.h"
 #include "BKE_depsgraph.h"
@@ -463,6 +465,38 @@ static void rna_TexPaintSlot_uv_layer_set(PointerRNA *ptr, const char *value)
 	if (data->uvname != NULL) {
 		BLI_strncpy_utf8(data->uvname, value, 64);
 	}
+}
+
+/* Shader Sources: list only texts that can hold GLSL. A text is accepted when its name has
+ * a GLSL extension (.glsl .frag .vert .geom .fs .vs .gs .glslf .glslv .shader) or no
+ * extension at all ("Text", "Text.001"); scripts (.py), maps, data and docs are hidden. */
+static bool rna_Material_shader_text_poll(PointerRNA *UNUSED(ptr), PointerRNA value)
+{
+	static const char *glsl_ext[] = {
+	    "glsl", "frag", "vert", "geom", "fs", "vs", "gs", "glslf", "glslv", "shader", NULL};
+	const ID *id = value.id.data;
+	const char *name, *dot, *p;
+	int i;
+
+	if (id == NULL) {
+		return false;
+	}
+	name = id->name + 2;
+	dot = strrchr(name, '.');
+	if (dot == NULL || dot[1] == '\0') {
+		return true;
+	}
+	/* "Text.001": a numeric suffix is the duplicate counter, not an extension */
+	for (p = dot + 1; *p >= '0' && *p <= '9'; p++) {}
+	if (*p == '\0') {
+		return true;
+	}
+	for (i = 0; glsl_ext[i]; i++) {
+		if (BLI_strcasecmp(dot + 1, glsl_ext[i]) == 0) {
+			return true;
+		}
+	}
+	return false;
 }
 
 
@@ -2116,6 +2150,7 @@ void RNA_def_material(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "script_frag", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "fragcode");
+	RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_Material_shader_text_poll");
 	RNA_def_property_struct_type(prop, "Text");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Fragment Shader", "Material pixel shader");
@@ -2123,6 +2158,7 @@ void RNA_def_material(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "script_vert", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "vertcode");
+	RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_Material_shader_text_poll");
 	RNA_def_property_struct_type(prop, "Text");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Vertex Shader", "Define a vertex shader for this material");
@@ -2130,6 +2166,7 @@ void RNA_def_material(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "script_geom", PROP_POINTER, PROP_NONE);
 	RNA_def_property_pointer_sdna(prop, NULL, "geomcode");
+	RNA_def_property_pointer_funcs(prop, NULL, NULL, NULL, "rna_Material_shader_text_poll");
 	RNA_def_property_struct_type(prop, "Text");
 	RNA_def_property_flag(prop, PROP_EDITABLE);
 	RNA_def_property_ui_text(prop, "Geometry Shader",
