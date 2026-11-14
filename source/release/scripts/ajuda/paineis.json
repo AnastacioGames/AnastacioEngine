@@ -405,5 +405,345 @@
    "en": "Checks the Logic Bricks without running the game and shows what looks wrong, like an unlinked sensor.",
    "es": "Revisa los Logic Bricks sin correr el juego y muestra lo que parece mal, como un sensor sin conexión."
   }
+ },
+ "OBJECT_PT_relations": {
+  "titulo": {
+   "pt": "Relações",
+   "en": "Relations",
+   "es": "Relaciones"
+  },
+  "texto": {
+   "pt": "Mostra em quais camadas (Layers) o objeto está e quem é o pai dele (Parent). Um objeto filho acompanha o pai quando ele se move, gira ou escala.",
+   "en": "Shows which Layers the object is on and who its Parent is. A child object follows its parent when it moves, rotates or scales.",
+   "es": "Muestra en qué capas (Layers) está el objeto y quién es su padre (Parent). Un objeto hijo sigue al padre cuando se mueve, gira o escala."
+  }
+ },
+ "OBJECT_PT_groups": {
+  "titulo": {
+   "pt": "Grupos",
+   "en": "Groups",
+   "es": "Grupos"
+  },
+  "texto": {
+   "pt": "Coloca o objeto em grupos com Add to Group. Grupos servem para juntar peças e criar cópias delas de uma vez (instâncias), e Dupli Visibility escolhe quais camadas do grupo aparecem.",
+   "en": "Puts the object in groups with Add to Group. Groups gather parts so you can make copies of them all at once (instances), and Dupli Visibility picks which group layers show up.",
+   "es": "Pone el objeto en grupos con Add to Group. Los grupos juntan piezas para crear copias de todas a la vez (instancias), y Dupli Visibility elige qué capas del grupo aparecen."
+  }
+ },
+ "OBJECT_PT_game_object_tasks": {
+  "titulo": {
+   "pt": "Carregar com a cena",
+   "en": "Load with Scene",
+   "es": "Cargar con la escena"
+  },
+  "texto": {
+   "pt": "Decide se o objeto (e seus filhos) é criado quando a cena do jogo começa. Se ficar de fora, você pode criá-lo depois por script com scene.convertObject(), o que deixa o carregamento mais rápido.",
+   "en": "Decides whether the object (and its children) is created when the game scene starts. If left out, you can create it later from a script with scene.convertObject(), which makes loading faster.",
+   "es": "Decide si el objeto (y sus hijos) se crea cuando empieza la escena del juego. Si queda fuera, puedes crearlo después por script con scene.convertObject(), lo que acelera la carga."
+  }
+ },
+ "OBJECT_PT_activity_culling": {
+  "titulo": {
+   "pt": "Desligar de longe",
+   "en": "Activity Culling",
+   "es": "Desactivar de lejos"
+  },
+  "texto": {
+   "pt": "Desliga a física (Physics) e a lógica (Logic) do objeto quando ele está mais longe da câmera que o raio escolhido. Ajuda o jogo a rodar mais leve em cenas grandes.",
+   "en": "Turns off the object's Physics and Logic when it is farther from the camera than the chosen radius. Helps the game run lighter in big scenes.",
+   "es": "Apaga la física (Physics) y la lógica (Logic) del objeto cuando está más lejos de la cámara que el radio elegido. Ayuda a que el juego vaya más liviano en escenas grandes."
+  }
+ },
+ "PHYSICS_PT_game_destruction": {
+  "titulo": {
+   "pt": "Destruição",
+   "en": "Destruction",
+   "es": "Destrucción"
+  },
+  "texto": {
+   "pt": "Faz o objeto quebrar em pedaços quando leva uma batida forte. Generate Fragments cria os pedaços, Break Impulse diz a força necessária, e Debris controla a velocidade e quanto tempo os pedaços ficam.",
+   "en": "Makes the object break into pieces when it gets a strong hit. Generate Fragments creates the pieces, Break Impulse sets the force needed, and Debris controls how fast the pieces fly and how long they stay.",
+   "es": "Hace que el objeto se rompa en pedazos al recibir un golpe fuerte. Generate Fragments crea los pedazos, Break Impulse indica la fuerza necesaria y Debris controla su velocidad y cuánto duran."
+  },
+  "tutorial": "destruicao_bomba"
+ },
+ "PHYSICS_PT_game_explosive": {
+  "titulo": {
+   "pt": "Explosivo",
+   "en": "Explosive",
+   "es": "Explosivo"
+  },
+  "texto": {
+   "pt": "Transforma o objeto numa bomba: Radius e Force definem o tamanho do empurrão, Fuse é o tempo até explodir e Explode on Impact faz explodir ao bater. Dá para ligar efeito de fogo e fumaça, som, clarão e marca no chão.",
+   "en": "Turns the object into a bomb: Radius and Force set the size of the blast, Fuse is the time until it explodes and Explode on Impact makes it blow up on hit. You can add fire and smoke, sound, a light flash and a ground mark.",
+   "es": "Convierte el objeto en una bomba: Radius y Force definen el tamaño del empujón, Fuse es el tiempo hasta explotar y Explode on Impact hace que explote al chocar. Puedes añadir fuego y humo, sonido, destello y marca en el suelo."
+  },
+  "tutorial": "destruicao_bomba"
+ },
+ "PHYSICS_PT_game_obstacles": {
+  "titulo": {
+   "pt": "Criar obstáculo",
+   "en": "Create Obstacle",
+   "es": "Crear obstáculo"
+  },
+  "texto": {
+   "pt": "Faz o objeto abrir um buraco na malha de navegação com o raio escolhido, para que os personagens com IA desviem dele. Precisa de uma navmesh dinâmica na cena.",
+   "en": "Makes the object cut a hole in the navigation mesh with the chosen radius, so AI characters walk around it. Needs a dynamic navmesh in the scene.",
+   "es": "Hace que el objeto abra un hueco en la malla de navegación con el radio elegido, para que los personajes con IA lo esquiven. Necesita una navmesh dinámica en la escena."
+  }
+ },
+ "SCENE_PT_game_navmesh": {
+  "titulo": {
+   "pt": "Malha de navegação",
+   "en": "Navigation Mesh",
+   "es": "Malla de navegación"
+  },
+  "texto": {
+   "pt": "Cria o chão por onde os personagens com IA podem andar, com Build Navigation Mesh. Em Agent você diz a altura, o raio, a rampa máxima e o degrau que o personagem consegue subir.",
+   "en": "Creates the floor AI characters can walk on, with Build Navigation Mesh. Under Agent you set the character's height, radius, maximum slope and the step it can climb.",
+   "es": "Crea el suelo por donde pueden caminar los personajes con IA, con Build Navigation Mesh. En Agent indicas la altura, el radio, la pendiente máxima y el escalón que puede subir."
+  }
+ },
+ "SCENE_PT_physics": {
+  "titulo": {
+   "pt": "Gravidade",
+   "en": "Gravity",
+   "es": "Gravedad"
+  },
+  "texto": {
+   "pt": "Liga ou desliga a gravidade da cena e define sua direção e força. O padrão puxa para baixo no eixo Z, como na Terra.",
+   "en": "Turns the scene gravity on or off and sets its direction and strength. The default pulls down on the Z axis, like on Earth.",
+   "es": "Activa o desactiva la gravedad de la escena y define su dirección y fuerza. Por defecto tira hacia abajo en el eje Z, como en la Tierra."
+  }
+ },
+ "DATA_PT_camera": {
+  "titulo": {
+   "pt": "Câmera",
+   "en": "Camera",
+   "es": "Cámara"
+  },
+  "texto": {
+   "pt": "Ajusta a lente: Perspective (como o olho) ou Orthographic (sem profundidade), e o Focal Length (zoom). Clipping Start e End dizem a distância mínima e máxima que a câmera enxerga.",
+   "en": "Adjusts the lens: Perspective (like the eye) or Orthographic (no depth), and the Focal Length (zoom). Clipping Start and End set the nearest and farthest distance the camera sees.",
+   "es": "Ajusta la lente: Perspective (como el ojo) u Orthographic (sin profundidad), y el Focal Length (zoom). Clipping Start y End indican la distancia mínima y máxima que ve la cámara."
+  }
+ },
+ "DATA_PT_camera_game_shake": {
+  "titulo": {
+   "pt": "Tremor da câmera",
+   "en": "Camera Shake",
+   "es": "Temblor de cámara"
+  },
+  "texto": {
+   "pt": "Configura como a câmera treme quando o jogo chama camera.shake(): Amplitude é a força, Frequency a rapidez e Decay quanto tempo leva para parar. Bom para explosões e batidas.",
+   "en": "Sets how the camera shakes when the game calls camera.shake(): Amplitude is the strength, Frequency the speed and Decay how long it takes to stop. Good for explosions and crashes.",
+   "es": "Configura cómo tiembla la cámara cuando el juego llama a camera.shake(): Amplitude es la fuerza, Frequency la rapidez y Decay cuánto tarda en parar. Bueno para explosiones y choques."
+  }
+ },
+ "DATA_PT_camera_game_culling": {
+  "titulo": {
+   "pt": "Culling e LOD",
+   "en": "Culling & LOD",
+   "es": "Culling y LOD"
+  },
+  "texto": {
+   "pt": "Distance Factor muda a distância em que os modelos trocam para versões mais leves (LOD). Também liga o desligamento de objetos fora da visão e o Activity Culling a partir desta câmera.",
+   "en": "Distance Factor changes the distance at which models switch to lighter versions (LOD). It also turns on skipping objects out of view and Activity Culling based on this camera.",
+   "es": "Distance Factor cambia la distancia a la que los modelos pasan a versiones más livianas (LOD). También activa el descarte de objetos fuera de vista y el Activity Culling desde esta cámara."
+  }
+ },
+ "DATA_PT_lamp": {
+  "titulo": {
+   "pt": "Luz",
+   "en": "Lamp",
+   "es": "Luz"
+  },
+  "texto": {
+   "pt": "Escolhe o tipo de luz (Point, Sun, Spot, Hemi, Area), a cor e a força (Energy). Falloff e Distance controlam até onde a luz alcança.",
+   "en": "Chooses the light type (Point, Sun, Spot, Hemi, Area), its color and strength (Energy). Falloff and Distance control how far the light reaches.",
+   "es": "Elige el tipo de luz (Point, Sun, Spot, Hemi, Area), el color y la fuerza (Energy). Falloff y Distance controlan hasta dónde llega la luz."
+  }
+ },
+ "DATA_PT_shadow_csm_game": {
+  "titulo": {
+   "pt": "Sombra em cascatas",
+   "en": "Cascaded Shadow Mapping",
+   "es": "Sombra en cascadas"
+  },
+  "texto": {
+   "pt": "Divide a sombra do sol em faixas (cascatas), nítida perto da câmera e mais leve longe. Em Look escolha Hard, Soft ou Realistic, e use Size para mais detalhe.",
+   "en": "Splits the sun shadow into bands (cascades), sharp near the camera and lighter far away. Under Look pick Hard, Soft or Realistic, and use Size for more detail.",
+   "es": "Divide la sombra del sol en franjas (cascadas), nítida cerca de la cámara y más liviana lejos. En Look elige Hard, Soft o Realistic, y usa Size para más detalle."
+  },
+  "tutorial": "sombra_realista"
+ },
+ "DATA_PT_light_culling_game": {
+  "titulo": {
+   "pt": "Desligar luz de longe",
+   "en": "Distance Culling",
+   "es": "Apagar luz de lejos"
+  },
+  "texto": {
+   "pt": "Apaga a luz quando a câmera está mais longe que Cull Distance, deixando o jogo mais leve em cenas com muitas luzes.",
+   "en": "Turns the light off when the camera is farther than Cull Distance, making the game lighter in scenes with many lights.",
+   "es": "Apaga la luz cuando la cámara está más lejos que Cull Distance, haciendo el juego más liviano en escenas con muchas luces."
+  }
+ },
+ "DATA_PT_lightning": {
+  "titulo": {
+   "pt": "Raio",
+   "en": "Lightning",
+   "es": "Rayo"
+  },
+  "texto": {
+   "pt": "Faz este Empty soltar raios de tempestade: Where diz onde caem, When se é automático ou só quando chamado (obj.strikeLightning()), e Look a cor e a força. Pode tocar o som de trovão.",
+   "en": "Makes this Empty throw storm lightning: Where sets where it strikes, When whether it is automatic or only when called (obj.strikeLightning()), and Look its color and strength. It can play a thunder sound.",
+   "es": "Hace que este Empty lance rayos de tormenta: Where indica dónde caen, When si es automático o solo al llamarlo (obj.strikeLightning()), y Look el color y la fuerza. Puede sonar un trueno."
+  }
+ },
+ "DATA_PT_speaker": {
+  "titulo": {
+   "pt": "Som",
+   "en": "Sound",
+   "es": "Sonido"
+  },
+  "texto": {
+   "pt": "Ajusta o alto-falante: Volume, Pitch (tom), se começa sozinho e se o som é 3D, ficando mais baixo quando a câmera se afasta.",
+   "en": "Sets up the speaker: Volume, Pitch, whether it starts by itself and whether the sound is 3D, getting quieter as the camera moves away.",
+   "es": "Ajusta el altavoz: Volume, Pitch (tono), si empieza solo y si el sonido es 3D, bajando cuando la cámara se aleja."
+  }
+ },
+ "DATA_PT_reverb_area": {
+  "titulo": {
+   "pt": "Área de eco",
+   "en": "Reverb Area",
+   "es": "Área de eco"
+  },
+  "texto": {
+   "pt": "Cria uma área com eco, como caverna ou salão: escolha um Preset, a forma e o tamanho. Os sons 3D ganham esse eco enquanto a câmera estiver dentro.",
+   "en": "Creates an area with echo, like a cave or hall: pick a Preset, the shape and the size. 3D sounds get this echo while the camera is inside.",
+   "es": "Crea un área con eco, como una cueva o un salón: elige un Preset, la forma y el tamaño. Los sonidos 3D tienen ese eco mientras la cámara esté dentro."
+  }
+ },
+ "DATA_PT_game_text_translation": {
+  "titulo": {
+   "pt": "Tradução",
+   "en": "Translation",
+   "es": "Traducción"
+  },
+  "texto": {
+   "pt": "Liga este texto ao sistema de idiomas do jogo com Locale Key, para ele mudar sozinho quando o jogador troca o idioma. Make it a Language Button transforma o texto num botão de trocar idioma.",
+   "en": "Links this text to the game's language system with Locale Key, so it changes by itself when the player switches language. Make it a Language Button turns the text into a language switch button.",
+   "es": "Conecta este texto al sistema de idiomas del juego con Locale Key, para que cambie solo cuando el jugador cambia de idioma. Make it a Language Button convierte el texto en un botón para cambiar de idioma."
+  }
+ },
+ "DATA_PT_game_text_shadow": {
+  "titulo": {
+   "pt": "Sombra do texto",
+   "en": "Text Shadow",
+   "es": "Sombra del texto"
+  },
+  "texto": {
+   "pt": "Desenha uma sombra atrás do texto do jogo para ele ficar legível em qualquer fundo. Offset move a sombra e Color escolhe a cor.",
+   "en": "Draws a shadow behind the game text so it stays readable on any background. Offset moves the shadow and Color picks its color.",
+   "es": "Dibuja una sombra detrás del texto del juego para que se lea en cualquier fondo. Offset mueve la sombra y Color elige su color."
+  }
+ },
+ "MATERIAL_PT_game_settings": {
+  "titulo": {
+   "pt": "Ajustes de jogo",
+   "en": "Game Settings",
+   "es": "Ajustes de juego"
+  },
+  "texto": {
+   "pt": "Opções do material no jogo: Backface Culling esconde o lado de trás das faces, Invisible esconde o material, Physics liga a colisão e Face Orientation faz a face olhar para a câmera.",
+   "en": "Material options in the game: Backface Culling hides the back of faces, Invisible hides the material, Physics turns collision on and Face Orientation makes faces look at the camera.",
+   "es": "Opciones del material en el juego: Backface Culling oculta la cara trasera, Invisible oculta el material, Physics activa la colisión y Face Orientation hace que la cara mire a la cámara."
+  }
+ },
+ "MATERIAL_PT_transp_game": {
+  "titulo": {
+   "pt": "Transparência",
+   "en": "Transparency",
+   "es": "Transparencia"
+  },
+  "texto": {
+   "pt": "Deixa o material transparente: ligue Enabled, escolha o modo em Blend (Alpha Blend, Alpha Clip...) e ajuste Alpha. Use Z Transparency para objetos transparentes se sobreporem certo.",
+   "en": "Makes the material see-through: turn on Enabled, pick the mode in Blend (Alpha Blend, Alpha Clip...) and adjust Alpha. Use Z Transparency so transparent objects overlap correctly.",
+   "es": "Hace el material transparente: activa Enabled, elige el modo en Blend (Alpha Blend, Alpha Clip...) y ajusta Alpha. Usa Z Transparency para que los objetos transparentes se superpongan bien."
+  }
+ },
+ "MATERIAL_PT_recipes": {
+  "titulo": {
+   "pt": "Material rápido",
+   "en": "Quick Material",
+   "es": "Material rápido"
+  },
+  "texto": {
+   "pt": "Cria materiais com poucos cliques: a partir de um conjunto de texturas, um material pronto, camadas pintadas com máscara ou poças molhadas e brilhantes. Tiling muda a repetição da textura.",
+   "en": "Creates materials in a few clicks: from a texture set, a ready-made material, layers painted with a mask or wet shiny patches. Tiling changes how much the texture repeats.",
+   "es": "Crea materiales con pocos clics: desde un conjunto de texturas, un material listo, capas pintadas con máscara o charcos mojados y brillantes. Tiling cambia la repetición de la textura."
+  }
+ },
+ "MATERIAL_PT_game_foliage": {
+  "titulo": {
+   "pt": "Folhagem",
+   "en": "Foliage Shader",
+   "es": "Follaje"
+  },
+  "texto": {
+   "pt": "Faz plantas e grama balançarem com o vento: ajuste Strength e Turbulence. Stop Beyond Distance para o balanço longe da câmera para economizar.",
+   "en": "Makes plants and grass sway in the wind: adjust Strength and Turbulence. Stop Beyond Distance stops the sway far from the camera to save performance.",
+   "es": "Hace que plantas y césped se muevan con el viento: ajusta Strength y Turbulence. Stop Beyond Distance detiene el movimiento lejos de la cámara para ahorrar."
+  }
+ },
+ "MATERIAL_PT_convert_pbr": {
+  "titulo": {
+   "pt": "Converter material",
+   "en": "Convert Material",
+   "es": "Convertir material"
+  },
+  "texto": {
+   "pt": "Converte o material para nós no estilo PBR (mais realista) ou Classic, mantendo as texturas que ele já usa.",
+   "en": "Converts the material to nodes in PBR style (more realistic) or Classic, keeping the textures it already uses.",
+   "es": "Convierte el material a nodos en estilo PBR (más realista) o Classic, manteniendo las texturas que ya usa."
+  }
+ },
+ "SCENE_PT_rangearmor_export": {
+  "titulo": {
+   "pt": "Exportar para PC",
+   "en": "Export (RangeArmor)",
+   "es": "Exportar para PC"
+  },
+  "texto": {
+   "pt": "Gera o jogo para Windows e Linux. Preencha nome, versão e ícone em Package Info e clique em Export Game (1 Click); o arquivo precisa estar salvo na pasta data/ do projeto.",
+   "en": "Builds the game for Windows and Linux. Fill in name, version and icon under Package Info and click Export Game (1 Click); the file must be saved in the project's data/ folder.",
+   "es": "Genera el juego para Windows y Linux. Completa nombre, versión e icono en Package Info y haz clic en Export Game (1 Click); el archivo debe estar guardado en la carpeta data/ del proyecto."
+  },
+  "tutorial": "exportar_desktop"
+ },
+ "SCENE_PT_range_android": {
+  "titulo": {
+   "pt": "Android",
+   "en": "Android (Web)",
+   "es": "Android"
+  },
+  "texto": {
+   "pt": "Transforma o pacote Web do jogo num app Android (APK). Preencha nome, ID e ícone do app, crie a chave de assinatura e use Build e, com o celular conectado, Install.",
+   "en": "Turns the game's Web package into an Android app (APK). Fill in the app name, ID and icon, create the signing key and use Build and, with the phone connected, Install.",
+   "es": "Convierte el paquete Web del juego en una app Android (APK). Completa nombre, ID e icono de la app, crea la clave de firma y usa Build y, con el móvil conectado, Install."
+  }
+ },
+ "OBJECT_PT_game_network": {
+  "titulo": {
+   "pt": "Rede",
+   "en": "Network",
+   "es": "Red"
+  },
+  "texto": {
+   "pt": "Para jogos multiplayer: Replicate envia a posição e a velocidade deste objeto para os outros jogadores. As propriedades com Rep ligado também vão junto.",
+   "en": "For multiplayer games: Replicate sends this object's position and speed to the other players. Properties with Rep on are sent too.",
+   "es": "Para juegos multijugador: Replicate envía la posición y la velocidad de este objeto a los otros jugadores. Las propiedades con Rep activado también se envían."
+  }
  }
 }

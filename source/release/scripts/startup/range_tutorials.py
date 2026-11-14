@@ -84,7 +84,13 @@ def _idioma_escolhido():
 
 
 def _escolher_idioma(valor):
+    if _escolhido.get("valor") == valor:
+        return
     _escolhido["valor"] = valor
+    try:
+        _atualizar_menus()  # títulos e categorias do menu de Tutoriais no idioma novo
+    except Exception:
+        pass  # chamado antes do registro: os menus nascem no idioma certo
     try:
         with open(_arquivo_idioma(), "w", encoding="utf-8") as f:
             f.write(valor)

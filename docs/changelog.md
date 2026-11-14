@@ -28,7 +28,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 - Help no menu About (caixinha), abaixo de Tutorials: liga um "i" no cabeçalho dos painéis com explicação (`startup/range_help.py`).
 - O "i" abre uma janela com o que é o painel e o botão do tutorial dele, no idioma escolhido nos tutoriais.
-- Explicações em `scripts/ajuda/paineis.json` (32 painéis, pt/en/es); o estado fica em `range_help.txt` na configuração.
+- Explicações em `scripts/ajuda/paineis.json` (60 painéis, pt/en/es; botões PT EN ES na janela trocam o idioma dos tutoriais e do menu); o estado fica em `range_help.txt` na configuração.
 
 ## 2026-11-14 — Tutoriais: cartão de concluído, idioma no cartão e check verde
 

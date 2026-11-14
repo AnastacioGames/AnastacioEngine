@@ -17,6 +17,7 @@ ARQUIVO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 _dados = {}
 _originais = {}  # painel -> draw_header original (None quando não tinha)
+_LARGURA = 420
 _FAZER = {"pt": "Fazer o tutorial", "en": "Do the tutorial", "es": "Hacer el tutorial"}
 
 
@@ -123,30 +124,51 @@ class RANGE_OT_help_show(Operator):
     def invoke(self, context, event):
         if self.panel not in _ajuda():
             return {'CANCELLED'}
-        return self.execute(context)
+        # Janela de popup (o desenho refaz a cada mudança: trocar o idioma troca o texto ali mesmo).
+        # Some quando o mouse sai dela, como ao ir fazer o tutorial.
+        return context.window_manager.invoke_popup(self, width=_LARGURA)
 
     def execute(self, context):
-        # Popup de menu (não invoke_popup): fecha sozinho ao clicar no botão do tutorial.
+        return {'FINISHED'}
+
+    def draw(self, context):
         t = _tutoriais()
-        item = _ajuda().get(self.panel)
-        if item is None:
-            return {'CANCELLED'}
+        item = _ajuda()[self.panel]
+        layout = self.layout
+        layout.label(text=t._txt(item.get("titulo")), icon='INFO')
+        col = layout.column(align=True)
+        for linha in textwrap.wrap(t._txt(item.get("texto")), 62):
+            col.label(text=linha)
         nome = item.get("tutorial")
         titulo = next((tit for pasta, tit, _, _ in t.tutoriais() if pasta == nome), None) if nome else None
-        linhas = textwrap.wrap(t._txt(item.get("texto")), 62)
-        fazer = _FAZER.get(t._idioma(), _FAZER["en"])
+        if titulo:
+            layout.separator()
+            linha = layout.row()
+            linha.scale_y = 1.3
+            linha.operator("wm.range_tutorial_start", text="%s: %s" % (_FAZER.get(t._idioma(), _FAZER["en"]), titulo),
+                           icon='PLAY').name = nome
+        # Idioma: o mesmo dos tutoriais.
+        layout.separator()
+        linha = layout.row(align=True)
+        atual = t._idioma()
+        for codigo in t.IDIOMAS:
+            linha.operator(RANGE_OT_help_language.bl_idname, text=codigo.upper(),
+                           depress=codigo == atual).language = codigo
 
-        def desenhar(menu, context):
-            layout = menu.layout
-            col = layout.column(align=True)
-            for linha in linhas:
-                col.label(text=linha)
-            if titulo:
-                layout.separator()
-                layout.operator_context = 'INVOKE_DEFAULT'  # o popup de menu chama execute por padrão
-                layout.operator("wm.range_tutorial_start", text="%s: %s" % (fazer, titulo), icon='PLAY').name = nome
 
-        context.window_manager.popup_menu(desenhar, title=t._txt(item.get("titulo")), icon='INFO')
+class RANGE_OT_help_language(Operator):
+    """Language of the help and the tutorials"""
+    bl_idname = "wm.range_help_language"
+    bl_label = "Help Language"
+    bl_options = {'INTERNAL'}
+
+    language = StringProperty(options={'SKIP_SAVE'})
+
+    def execute(self, context):
+        t = _tutoriais()
+        if self.language in t.IDIOMAS:
+            t._escolher_idioma(self.language)
+            t._redesenhar()  # o cartão do tutorial, se estiver aberto
         return {'FINISHED'}
 
 
@@ -175,6 +197,7 @@ def _primeiro_tique(_):
 
 def register():
     bpy.utils.register_class(RANGE_OT_help_show)
+    bpy.utils.register_class(RANGE_OT_help_language)
     bpy.types.WindowManager.range_help_on = BoolProperty(
         name="Help", description="Show an \"i\" on panels: click it to see what the panel does and its tutorial",
         update=_ao_mudar)
@@ -188,4 +211,5 @@ def unregister():
     if _primeiro_tique in bpy.app.handlers.scene_update_post:
         bpy.app.handlers.scene_update_post.remove(_primeiro_tique)
     del bpy.types.WindowManager.range_help_on
+    bpy.utils.unregister_class(RANGE_OT_help_language)
     bpy.utils.unregister_class(RANGE_OT_help_show)
