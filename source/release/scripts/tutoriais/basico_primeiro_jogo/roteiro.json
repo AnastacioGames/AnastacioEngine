@@ -1,0 +1,122 @@
+{
+  "titulo": {
+    "pt": "3. Seu primeiro jogo: um cubo que cai",
+    "en": "3. Your first game: a falling cube"
+  },
+  "categoria": "Basics",
+  "resumo": {
+    "pt": "Chão, física Rigid Body e o jogo rodando com P.",
+    "en": "Floor, Rigid Body physics and the game running with P."
+  },
+  "abertura": "Vamos fazer o primeiro jogo: um cubo que cai e bate no chão.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "No cabeçalho da 3D View, abra Add › Mesh › Plane para criar o chão.",
+        "en": "In the 3D View header, open Add › Mesh › Plane to create the floor."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.name.startswith('Plane')"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Sua cena já tem um chão? Pode usar o novo assim mesmo.",
+        "en": "Your scene already has a floor? Use the new one anyway."
+      },
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aumente o chão: S, digite 5 e Enter.",
+        "en": "Make the floor bigger: S, type 5 and Enter."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.name.startswith('Plane') and min(C.active_object.scale[:2]) > 3"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Clique no cubo e suba ele: G, Z, 4 e Enter.",
+        "en": "Click the cube and raise it: G, Z, 4 and Enter."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH' and not C.active_object.name.startswith('Plane') and C.active_object.location.z > 2"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Se o chão estiver no meio do cubo, o cubo nasce preso nele.",
+        "en": "If the floor cuts the cube, it starts stuck in it."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Physics.",
+        "en": "In Properties, open the Physics tab."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'PHYSICS' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=PHYSICS"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Troque Physics Type para Rigid Body: agora o cubo tem peso e gira ao bater.",
+        "en": "Change Physics Type to Rigid Body: the cube now has weight and spins when it hits."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.game.physics_type == 'RIGID_BODY'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Static não se mexe (bom para o chão). Dynamic cai mas não gira.",
+        "en": "Static never moves (good for floors). Dynamic falls but does not spin."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:physics_type"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte 0 no teclado numérico para ver pela câmera.",
+        "en": "Press 0 on the numpad to look through the camera."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(r.view_perspective == 'CAMERA' for r in [a.spaces.active.region_3d for a in C.screen.areas if a.type == 'VIEW_3D'])"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P: o jogo roda e o cubo cai. Esc sai do jogo. Depois, clique em Próximo.",
+        "en": "Mouse in the 3D View, press P: the game runs and the cube falls. Esc quits. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "O cubo não aparece? Ele pode estar fora da câmera: G para trazê-lo.",
+        "en": "Cube not visible? It may be outside the camera: G to bring it in."
+      }
+    }
+  ],
+  "encerramento": "Pronto! Esse é o seu primeiro jogo. No próximo tutorial, o cubo anda com as setas."
+}

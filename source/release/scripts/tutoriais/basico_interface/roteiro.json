@@ -1,0 +1,123 @@
+{
+  "titulo": {
+    "pt": "1. Conhecendo a interface",
+    "en": "1. Getting to know the interface"
+  },
+  "categoria": "Basics",
+  "resumo": {
+    "pt": "Outliner, Properties, 3D View e como trocar o tipo de uma área.",
+    "en": "Outliner, Properties, 3D View and how to change an area type."
+  },
+  "abertura": "Bem-vindo à Anastacio Engine! Vamos conhecer as partes da tela.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Outliner (a lista de objetos, em cima à direita), clique na câmera.",
+        "en": "In the Outliner (the object list, top right), click the camera."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'CAMERA'"
+      },
+      "destaque": "OUTLINER",
+      "dica": {
+        "pt": "O Outliner mostra tudo o que existe na cena.",
+        "en": "The Outliner lists everything in the scene."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, clique na aba Object para ver a posição da câmera.",
+        "en": "In Properties, click the Object tab to see the camera position."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'OBJECT' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Cada aba do Properties mostra uma parte do objeto ou da cena.",
+        "en": "Each Properties tab shows one part of the object or the scene."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=OBJECT"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Agora, na 3D View, clique no cubo para selecioná-lo.",
+        "en": "Now, in the 3D View, click the cube to select it."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "O objeto selecionado fica com o contorno laranja.",
+        "en": "The selected object gets an orange outline."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View: aperte 1 no teclado numérico para olhar de frente.",
+        "en": "Mouse in the 3D View: press 1 on the numpad to look from the front."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(abs(abs(r.view_rotation[0]) - 0.7071) < 0.02 and abs(abs(r.view_rotation[1]) - 0.7071) < 0.02 for r in [a.spaces.active.region_3d for a in C.screen.areas if a.type == 'VIEW_3D'])"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Sem teclado numérico? Menu View › Front.",
+        "en": "No numpad? View menu › Front."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte 7 no teclado numérico para olhar de cima.",
+        "en": "Press 7 on the numpad to look from the top."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(abs(abs(r.view_rotation[0]) - 1.0) < 0.02 for r in [a.spaces.active.region_3d for a in C.screen.areas if a.type == 'VIEW_3D'])"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Botão do meio do mouse arrastado gira a vista; a rodinha dá zoom.",
+        "en": "Dragging with the middle mouse button orbits; the wheel zooms."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte 0 no teclado numérico para ver pela câmera, como no jogo.",
+        "en": "Press 0 on the numpad to look through the camera, like in the game."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(r.view_perspective == 'CAMERA' for r in [a.spaces.active.region_3d for a in C.screen.areas if a.type == 'VIEW_3D'])"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Logic Editor: é assim que se troca qualquer editor.",
+        "en": "Change the bottom area to Logic Editor: this is how you change any editor."
+      },
+      "narracao": "",
+      "checagem": {
+        "area": "LOGIC_EDITOR"
+      },
+      "destaque": "BAIXO",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Logic Editor"
+      }
+    }
+  ],
+  "encerramento": "Pronto! Agora você sabe andar pela interface."
+}

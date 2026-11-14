@@ -1,0 +1,107 @@
+{
+  "titulo": {
+    "pt": "2. Mover, girar e escalar objetos",
+    "en": "2. Move, rotate and scale objects"
+  },
+  "categoria": "Basics",
+  "resumo": {
+    "pt": "G, R e S com eixo e número, adicionar e apagar objetos.",
+    "en": "G, R and S with axis and number, add and delete objects."
+  },
+  "abertura": "Neste tutorial, vamos mexer nos objetos da cena com o teclado.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Clique no cubo na 3D View.",
+        "en": "Click the cube in the 3D View."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View: aperte G, depois Z, digite 2 e aperte Enter. O cubo sobe 2 metros.",
+        "en": "Mouse in the 3D View: press G, then Z, type 2 and press Enter. The cube goes up 2 meters."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.location.z > 1.5"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Aperte N na 3D View para ver os números em Transform.",
+        "en": "Press N in the 3D View to see the numbers under Transform."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Agora gire: R, depois Z, digite 45 e Enter.",
+        "en": "Now rotate: R, then Z, type 45 and Enter."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and abs(C.active_object.rotation_euler.z) > 0.6"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Sem o Z, o objeto gira de frente para a vista.",
+        "en": "Without Z, the object rotates facing the view."
+      }
+    },
+    {
+      "texto": {
+        "pt": "E escale: S, digite 2 e Enter. O cubo fica com o dobro do tamanho.",
+        "en": "And scale: S, type 2 and Enter. The cube doubles in size."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and min(C.active_object.scale) > 1.5"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Aperte N na 3D View para ver os números em Transform.",
+        "en": "Press N in the 3D View to see the numbers under Transform."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho da 3D View, abra Add › Mesh › Cube para criar outro cubo.",
+        "en": "In the 3D View header, open Add › Mesh › Cube to create another cube."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "'Cube.001' in C.scene.objects"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Atalho: Shift+A. O objeto novo nasce no cursor 3D.",
+        "en": "Shortcut: Shift+A. The new object appears at the 3D cursor."
+      },
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Mesh"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Apague o cubo novo: com ele selecionado, aperte X e confirme em Delete.",
+        "en": "Delete the new cube: with it selected, press X and confirm Delete."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "'Cube.001' not in C.scene.objects"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Errou? Ctrl+Z desfaz.",
+        "en": "Made a mistake? Ctrl+Z undoes it."
+      }
+    }
+  ],
+  "encerramento": "Pronto! G move, R gira, S escala, e Ctrl+Z desfaz qualquer coisa."
+}

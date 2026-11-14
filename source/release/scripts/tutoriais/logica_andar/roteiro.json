@@ -1,0 +1,169 @@
+{
+  "titulo": {
+    "pt": "4. Fazer um objeto andar com Logic Bricks",
+    "en": "4. Make an object walk with Logic Bricks"
+  },
+  "categoria": "Logic Bricks",
+  "resumo": {
+    "pt": "Sensor Keyboard, Controller And e Actuator Motion ligados.",
+    "en": "Keyboard sensor, And controller and Motion actuator linked."
+  },
+  "abertura": "Neste tutorial, o cubo vai andar quando você apertar a seta para cima.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Clique no cubo na 3D View.",
+        "en": "Click the cube in the 3D View."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Logic Editor.",
+        "en": "Change the bottom area to Logic Editor."
+      },
+      "narracao": "",
+      "checagem": {
+        "area": "LOGIC_EDITOR"
+      },
+      "destaque": "BAIXO",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Logic Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Sensor e escolha Keyboard.",
+        "en": "Click Add Sensor and choose Keyboard."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(s.type == 'KEYBOARD' for s in C.active_object.game.sensors)"
+      },
+      "destaque": "LOGIC_EDITOR",
+      "dica": {
+        "pt": "O sensor percebe algo: aqui, uma tecla.",
+        "en": "The sensor notices something: here, a key."
+      },
+      "alvo": {
+        "area": "LOGIC_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "Add Sensor",
+        "menu": "Keyboard"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no campo Key do sensor e aperte a seta para cima.",
+        "en": "Click the sensor Key field and press the Up Arrow."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(s.type == 'KEYBOARD' and s.key == 'UP_ARROW' for s in C.active_object.game.sensors)"
+      },
+      "destaque": "LOGIC_EDITOR",
+      "dica": {
+        "pt": "O campo espera a próxima tecla que você apertar.",
+        "en": "The field waits for the next key you press."
+      },
+      "alvo": {
+        "area": "LOGIC_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "prop:key"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Controller e escolha And.",
+        "en": "Click Add Controller and choose And."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(c.type == 'LOGIC_AND' for c in C.active_object.game.controllers)"
+      },
+      "destaque": "LOGIC_EDITOR",
+      "alvo": {
+        "area": "LOGIC_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "Add Controller",
+        "menu": "And"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Add Actuator e escolha Motion.",
+        "en": "Click Add Actuator and choose Motion."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(a.type == 'MOTION' for a in C.active_object.game.actuators)"
+      },
+      "destaque": "LOGIC_EDITOR",
+      "alvo": {
+        "area": "LOGIC_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "Add Actuator",
+        "menu": "Motion"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Motion, em Loc, ponha 0.1 no Y (o do meio).",
+        "en": "In Motion, under Loc, set Y (the middle one) to 0.1."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(a.type == 'MOTION' and abs(a.offset_location[1]) > 0.001 for a in C.active_object.game.actuators)"
+      },
+      "destaque": "LOGIC_EDITOR",
+      "dica": {
+        "pt": "0.1 é quanto ele anda a cada quadro, uns 6 metros por segundo.",
+        "en": "0.1 is how far it moves each frame, about 6 meters per second."
+      },
+      "alvo": {
+        "area": "LOGIC_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "prop:offset_location"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Ligue o Sensor ao Controller: arraste da bolinha do sensor até a bolinha do controller.",
+        "en": "Link the Sensor to the Controller: drag from the sensor dot to the controller dot."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(c.type == 'LOGIC_AND' for s in C.active_object.game.sensors for c in s.controllers)"
+      },
+      "destaque": "LOGIC_EDITOR"
+    },
+    {
+      "texto": {
+        "pt": "Ligue o Controller ao Actuator do mesmo jeito.",
+        "en": "Link the Controller to the Actuator the same way."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(a.type == 'MOTION' for c in C.active_object.game.controllers for a in c.actuators)"
+      },
+      "destaque": "LOGIC_EDITOR"
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e segure a seta para cima. Esc sai. Depois, clique em Próximo.",
+        "en": "Mouse in the 3D View, press P and hold the Up Arrow. Esc quits. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": "Pronto! Sensor percebe, Controller decide e Actuator faz. Toda lógica de Logic Bricks segue esse caminho."
+}

@@ -146,3 +146,10 @@ Text Boxes (diálogos sem código) e World Sound.
 
 - `tutoriais/ui_tree_hud/`: 16 passos a partir do template + HUD (Progress Bar, Label, Gauge, Button A, Dialogue
   Box), um Label novo com `{pontos}`, Setup Game Logic e P. Supõe uma UI Tree nova, pelos nomes dos nós.
+
+## Tutoriais básicos (2026-11-14, falta aceite com janela)
+
+- Basics: `basico_interface`, `basico_transformar`, `basico_primeiro_jogo` (primeiro jogo e física juntos).
+- Logic Bricks: `logica_andar`. Export: `exportar_desktop` (aba Export Game › Export), `exportar_web`.
+- Ainda não feitos: Smart Wizard, Logic Tree, Text Boxes, World Sound, Pause na UI Tree e os intermediários
+  (Cutscene, Rec Play, Camera FX, Minimap, Track Tool, Vehicle Lab, Material Atlas, Performance Report).

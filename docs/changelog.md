@@ -8,6 +8,31 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais básicos (Basics, Logic Bricks, Export)
+
+Seis roteiros novos em `source/release/scripts/tutoriais/`, pt e en, numerados no título para aparecerem na
+ordem de estudo:
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `basico_interface` | Basics | 7 | Outliner, aba Object, seleção na 3D View, vistas 1/7/0 do teclado numérico, trocar a área para Logic Editor |
+| `basico_transformar` | Basics | 6 | G Z 2, R Z 45, S 2, Add › Mesh › Cube, X › Delete |
+| `basico_primeiro_jogo` | Basics | 7 | Chão (Add › Mesh › Plane, S 5), cubo no alto, aba Physics, Rigid Body, vista da câmera, P |
+| `logica_andar` | Logic Bricks | 10 | Keyboard (seta para cima), And, Motion Loc Y 0.1, as duas ligações e P |
+| `exportar_desktop` | Export | 6 | Aba Export Game › Export, Platforms, Product Name, salvar em data/, Export Game (1 Click) |
+| `exportar_web` | Export | 6 | Aba Export Game › Web, Touch Controls, Validate Web, Export Web, Open in browser |
+
+- Checagens por `expr`: objeto ativo e selecionado, transformações, `view_rotation`/`view_perspective` da 3D View,
+  aba do Properties, Logic Bricks do objeto ativo e suas ligações, campos de `rangearmor_export` e `range_web`, e
+  o último relatório do Validate Web (`bl_ui.properties_web._last_report`). Passos que só dependem de P ou de um
+  export terminar avançam pelo botão Próximo.
+- Alvos: abas do Properties por `prop:context=...`, categorias da aba Export Game por
+  `prop:ae_export_panel_category=...`, menus Add › Mesh e Add Sensor/Controller/Actuator com o item marcado.
+- A cena padrão (`startup.blend`) já tem Cube, Camera e Plane: o passo do chão confere o Plane **ativo** (o novo),
+  não a existência de um Plane.
+- Conferidos fora da engine: todas as expressões compilam, e as sequências de Logic Bricks e de transformação
+  foram simuladas (cada passo só fica verdadeiro depois do anterior). Falta o aceite com janela.
+
 ## 2026-11-14 — Tutorial dos nós de HUD da UI Tree
 
 - Novo roteiro `source/release/scripts/tutoriais/ui_tree_hud/roteiro.json` (categoria **Node Editor/UI Tree**,
