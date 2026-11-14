@@ -139,7 +139,12 @@ void LA_BlenderLauncher::InitCamera()
 		}
 	}
 
-	if (rv3d->persp != RV3D_CAMOB) {
+	/* The viewport view only belongs to scenes of the file open in the editor. A scene loaded
+	 * by startGame()/restartGame() from another file uses its own camera, as in the player;
+	 * otherwise its scripts move a camera that never draws (e.g. Museu opened from the menu). */
+	const bool sceneFromEditor = (m_maggie == CTX_data_main(m_context));
+
+	if (rv3d->persp != RV3D_CAMOB && sceneFromEditor) {
 		CameraParams params;
 		BKE_camera_params_init(&params);
 		BKE_camera_params_from_view3d(&params, m_view3d, rv3d);
@@ -165,7 +170,9 @@ void LA_BlenderLauncher::InitEngine()
 	m_savedBlenderData.sceneLayer = m_startScene->lay;
 	m_savedBlenderData.camera = m_startScene->camera;
 
-	if (m_view3d->scenelock == 0) {
+	/* Viewport layers/camera only apply to the file open in the editor; a file loaded by
+	 * startGame() would get a camera from another Main and draw nothing but overlays. */
+	if (m_view3d->scenelock == 0 && m_maggie == CTX_data_main(m_context)) {
 		m_startScene->lay = m_view3d->lay;
 		m_startScene->camera = m_view3d->camera;
 	}
