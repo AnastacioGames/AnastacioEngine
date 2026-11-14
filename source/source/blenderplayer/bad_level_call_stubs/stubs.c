@@ -901,6 +901,12 @@ void ED_render_engine_changed(struct Main *bmain) RET_NONE
 #ifndef WITH_BLENDER /* redesenho de material no editor (rna_material/rna_texture) */
 void ED_render_material_draw_changed(struct Main *bmain, struct Material *ma) RET_NONE
 #endif
+#ifndef WITH_BLENDER /* destaque de botao e ultimos cliques da ajuda (rna_wm) */
+void UI_highlight_button_set(int spacetype, int regiontype, const char *name, const char *menu) RET_NONE
+int UI_last_click_get(int index, int *spacetype, int *regiontype, const char **str, const char **op,
+                      const char **prop, const char **tip, int *opens_menu) RET_ZERO
+int UI_last_click_count(void) RET_ZERO
+#endif
 
 #ifndef WITH_BLENDER /* duplicate: real impl now linked (ED_file_read_bookmarks) */
 void ED_file_read_bookmarks(void) RET_NONE
