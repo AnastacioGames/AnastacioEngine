@@ -3,6 +3,9 @@
 Versão focada em aprender a engine por dentro dela: tutoriais interativos em português, inglês e espanhol, botão
 Help nos painéis, o novo editor Mind Map e várias melhorias de shader, TAA, Web e carregamento.
 
+**Para começar:** abra **About > Tutorials** e escolha o idioma no cartão. Ligue o botão **Help** (cabeçalho de
+cima) para ver um "i" nos painéis com a explicação e o tutorial de cada um.
+
 ## Novidades
 
 ### Tutoriais e ajuda
@@ -34,7 +37,16 @@ Help nos painéis, o novo editor Mind Map e várias melhorias de shader, TAA, We
 
 - Microfone com reconhecimento de notas (YIN) e Tuner na UI Tree; eventos clicáveis na UI Tree.
 - Animações rodam depois da lógica, como na BGE/UPBGE.
-- Constantes `KX_MOUSESENSORMODE_*` no Python.
+- Constantes `KX_MOUSESENSORMODE_*` no Python; arquivos da BGE original convertem os modos do sensor de mouse.
+- Physics: **Legacy Capsule Height** para arquivos da Range; Rotation fica em vermelho quando diferente de 0.
+
+### Editor
+
+- **Performance Report** mostra VRAM e uso 3D da GPU.
+- Themes: setas de abrir/fechar e botão de piscar em todos os boxes, em duas colunas.
+- Seletores de Shader Sources listam só textos GLSL; o do Mind Map, só mapas.
+- **Brazilian House / Street Block** viraram addon (Brazilian Buildings), desligado por padrão: ligue em
+  Preferences > Add-ons se usar.
 
 ### Carregamento
 
@@ -50,7 +62,11 @@ Help nos painéis, o novo editor Mind Map e várias melhorias de shader, TAA, We
 
 ## Correções
 
-- Mipmaps com cores erradas na Web.
+- Web: mipmaps com cores erradas; Sair do jogo fecha o áudio e mostra Recarregar página.
+- `delta_location` com script que muda `worldPosition` volta a mover o objeto.
+- Texto do jogo não mostra mais letras como retângulos brancos depois que o cache do atlas de fonte é liberado.
+- Bake Probes roda na pasta do projeto (scripts carregam) e desiste se ficar 2 min sem progresso.
+- Meshmap bake: dilatação não dá a volta na borda e usa a malha atual no Edit Mode.
 - Cutscene: Stop e Skip desligam a animação que o Take começou.
 - Crash ao arrastar miniatura rápido no Rec Studio.
 - P no editor: jogo aberto por `startGame` usa a própria câmera.
