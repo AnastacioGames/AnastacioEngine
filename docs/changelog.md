@@ -129,6 +129,15 @@ ordem de estudo:
   cada passo só fica verdadeiro depois do anterior. Open Link e Quick Guide avançam pelo botão Próximo.
 - Sem cena inicial: funciona em qualquer arquivo. Falta o aceite com janela.
 
+## 2026-11-14 — Tutoriais 24 a 26: Compositing, Light Probe Volume e SSGI
+
+- `compositing_efeitos`: Node Editor › Compositing › Use Nodes › botão da faixa de efeitos (ao lado de
+  Auto Arrange) › Vignette › P.
+- `probe_volume_luz`: Add › Light Probe Volume › aba de dados do Empty › salvar › Bake Probes (confere o
+  `<cena>.probes` ao lado do projeto) › P.
+- `ssgi_luz`: aba Render › Graphics › Use in Game › Enable (PBR, quando pede) › Check Scene › P.
+- Testados com cliques reais no editor invisível; o Bake rodou e gravou o `.probes`.
+
 ## 2026-11-14 — Tutoriais 21 a 23: céu, Screencast e chuva com névoa
 
 - `ceu_entardecer` (World): aba World › Sky › Hour 18 (horizonte laranja e primeiras estrelas; 19 já é noite)

@@ -1,0 +1,134 @@
+{
+  "titulo": {
+    "pt": "24. Efeitos de tela com o Compositing",
+    "en": "24. Screen effects with Compositing",
+    "es": "24. Efectos de pantalla con Compositing"
+  },
+  "categoria": "Node Editor/Compositing",
+  "resumo": {
+    "pt": "Vinheta, bloom, pixel art e outros efeitos prontos que também rodam no jogo.",
+    "en": "Vignette, bloom, pixel art and other ready-made effects that also run in the game.",
+    "es": "Viñeta, bloom, pixel art y otros efectos listos que también funcionan en el juego."
+  },
+  "abertura": {
+    "pt": "Vamos pôr um efeito de câmera no jogo com um clique, pelo Compositing.",
+    "en": "Let's add a camera effect to the game with one click, from Compositing.",
+    "es": "Vamos a poner un efecto de cámara en el juego con un clic, desde Compositing."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Node Editor.",
+        "en": "Change the bottom area to Node Editor.",
+        "es": "Cambia el área de abajo a Node Editor."
+      },
+      "narracao": "",
+      "checagem": "node_editor",
+      "destaque": "BAIXO",
+      "dica": {
+        "pt": "Clique no ícone no canto esquerdo do cabeçalho de baixo.",
+        "en": "Click the icon at the left corner of the bottom header.",
+        "es": "Haz clic en el ícono en la esquina izquierda del encabezado de abajo."
+      },
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Node Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho, clique em Compositing.",
+        "en": "In the header, click Compositing.",
+        "es": "En el encabezado, haz clic en Compositing."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'NODE_EDITOR' and a.spaces.active.tree_type == 'CompositorNodeTree' for a in C.screen.areas)"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "prop:tree_type=CompositorNodeTree"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Marque Use Nodes.",
+        "en": "Check Use Nodes.",
+        "es": "Marca Use Nodes."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.use_nodes"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "prop:use_nodes"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No canto de baixo do Node Editor, clique no botão de imagem ao lado de Auto Arrange.",
+        "en": "At the bottom corner of the Node Editor, click the image button next to Auto Arrange.",
+        "es": "En la esquina de abajo del Node Editor, haz clic en el botón de imagen al lado de Auto Arrange."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(r.type == 'TOOL_PROPS' and r.width > 1 for a in C.screen.areas if a.type == 'NODE_EDITOR' for r in a.regions)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Ou abra View › Effects Shelf.",
+        "en": "Or open View › Effects Shelf.",
+        "es": "O abre View › Effects Shelf."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "op:NODE_OT_effects_shelf"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Na faixa de efeitos, clique em Vignette.",
+        "en": "In the effects strip, click Vignette.",
+        "es": "En la franja de efectos, haz clic en Vignette."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.node_tree is not None and any(n.type == 'FRAME' for n in C.scene.node_tree.nodes)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Qualquer efeito serve: passe o mouse para ver o que cada um faz.",
+        "en": "Any effect works: hover to see what each one does.",
+        "es": "Cualquier efecto sirve: pasa el ratón para ver qué hace cada uno."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "TOOL_PROPS",
+        "botao": "op:NODE_OT_effect_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e veja o efeito. Esc sai.",
+        "en": "Mouse over the 3D View, press P and see the effect. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P y mira el efecto. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Cada efeito fica num quadro com o nome dele: apague o quadro e os nós para tirar.",
+    "en": "Done! Each effect sits in a frame with its name: delete the frame and its nodes to remove it.",
+    "es": "¡Listo! Cada efecto queda en un marco con su nombre: borra el marco y sus nodos para quitarlo."
+  }
+}

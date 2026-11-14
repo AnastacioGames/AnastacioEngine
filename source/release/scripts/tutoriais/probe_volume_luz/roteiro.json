@@ -1,0 +1,125 @@
+{
+  "titulo": {
+    "pt": "25. Luz rebatida com Light Probe Volume",
+    "en": "25. Bounced light with Light Probe Volume",
+    "es": "25. Luz rebotada con Light Probe Volume"
+  },
+  "categoria": "Render",
+  "resumo": {
+    "pt": "Uma caixa que ilumina o que está dentro com a luz que bate no chão e nas paredes.",
+    "en": "A box that lights what is inside it with the light bouncing off floor and walls.",
+    "es": "Una caja que ilumina lo que está dentro con la luz que rebota en el suelo y las paredes."
+  },
+  "abertura": {
+    "pt": "Vamos dar luz rebatida a uma área da cena e guardar essa luz para o jogo abrir pronto.",
+    "en": "Let's give an area of the scene bounced light and save it so the game opens ready.",
+    "es": "Vamos a darle luz rebotada a un área de la escena y guardarla para que el juego abra listo."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, abra Add › Light Probe Volume.",
+        "en": "In the 3D View, open Add › Light Probe Volume.",
+        "es": "En la 3D View, abre Add › Light Probe Volume."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(o.type == 'EMPTY' and 'probe_volume' in o.game.properties for o in C.scene.objects)"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "A caixa nasce no cursor 3D, com 10 × 10 × 4 m. Escale com S para cobrir a área.",
+        "en": "The box appears at the 3D cursor, 10 × 10 × 4 m. Scale it with S to cover the area.",
+        "es": "La caja aparece en el cursor 3D, de 10 × 10 × 4 m. Escálala con S para cubrir el área."
+      },
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Light Probe Volume"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba de dados do Empty.",
+        "en": "In Properties, open the Empty data tab.",
+        "es": "En Properties, abre la pestaña de datos del Empty."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'DATA' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "É o ícone de eixos na coluna de abas, com a caixa selecionada.",
+        "en": "It is the axes icon in the tab column, with the box selected.",
+        "es": "Es el ícono de ejes en la columna de pestañas, con la caja seleccionada."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "NAVIGATION_BAR",
+        "botao": "prop:context=DATA"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Salve o projeto: File › Save (Ctrl+S).",
+        "en": "Save the project: File › Save (Ctrl+S).",
+        "es": "Guarda el proyecto: File › Save (Ctrl+S)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "bool(bpy.data.filepath)"
+      },
+      "destaque": "INFO",
+      "dica": {
+        "pt": "A luz guardada fica num arquivo .probes ao lado do projeto.",
+        "en": "The saved light goes into a .probes file next to the project.",
+        "es": "La luz guardada queda en un archivo .probes al lado del proyecto."
+      },
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "File",
+        "menu": "Save"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Light Probe Volume, clique em Bake Probes e espere terminar.",
+        "en": "In Light Probe Volume, click Bake Probes and wait until it finishes.",
+        "es": "En Light Probe Volume, haz clic en Bake Probes y espera a que termine."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "bool(bpy.data.filepath) and __import__('os').path.isfile(__import__('os').path.join(__import__('os').path.dirname(bpy.data.filepath), C.scene.name + '.probes'))"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Bake Probes fica no fim do painel: role a Properties. Esc cancela.",
+        "en": "Bake Probes is at the end of the panel: scroll Properties. Esc cancels.",
+        "es": "Bake Probes está al final del panel: desplaza Properties. Esc cancela."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SCENE_OT_probe_volume_bake"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P: a área já abre com a luz pronta. Esc sai.",
+        "en": "Mouse over the 3D View, press P: the area opens with the light ready. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P: el área abre con la luz lista. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Mudou paredes ou luzes? Clique em Bake Probes de novo. Sem bake, o jogo captura a luz enquanto roda.",
+    "en": "Done! Changed walls or lights? Click Bake Probes again. Without a bake, the game captures the light while it runs.",
+    "es": "¡Listo! ¿Cambiaste paredes o luces? Haz clic en Bake Probes otra vez. Sin bake, el juego captura la luz mientras corre."
+  }
+}

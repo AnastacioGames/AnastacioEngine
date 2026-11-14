@@ -1,6 +1,6 @@
 # Plano: Tutoriais (dentro da engine + vídeo curto)
 
-Data: 2026-11-13. Status (2026-11-14): 26 tutoriais prontos, todos aguardando aceite com janela.
+Data: 2026-11-13. Status (2026-11-14): 29 tutoriais prontos, todos aguardando aceite com janela.
 
 ## Catálogo
 
@@ -35,6 +35,9 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | 21 | World | Céu de fim de tarde com nuvens e estrelas | `ceu_entardecer` |
 | 22 | Video | Gravar um vídeo do jogo (Screencast) | `screencast_gravar` |
 | 23 | World | Chuva e névoa | `chuva_nevoa` |
+| 24 | Node Editor/Compositing | Efeitos de tela com o Compositing | `compositing_efeitos` |
+| 25 | Render | Luz rebatida com Light Probe Volume | `probe_volume_luz` |
+| 26 | Render | Luz rebatida na tela com SSGI | `ssgi_luz` |
 | — | Node Editor/UI Tree | Primeiro menu de jogo (piloto) | `ui_tree_menu` |
 | — | Node Editor/UI Tree | Os nós de HUD | `ui_tree_hud` |
 | — | Mind Map | A barra do Mind Map | `mind_map_barra` |
@@ -48,9 +51,10 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Camera FX | Efeitos de câmera (grão, Directional Blur) | falta: achar o painel |
 | Render | Céu: Sky Layers, nuvens, Sky Quality | feito: 21 (`ceu_entardecer`); Sky Layers e Sky Quality ficam para outro |
 | Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | feito: 23 (`chuva_nevoa`, chuva + névoa); falta raios e fumaça/fogo |
-| Render | Compositing no jogo (faixa de efeitos e presets) | reservado 2026-11-14 (sessão local, main) |
-| Render | Light Probe Volume e Bake Probes | reservado 2026-11-14 (sessão local, main) |
-| Render | Sombra colorida, SSGI e PCSS | reservado 2026-11-14 (sessão local, main) |
+| Render | Compositing no jogo (faixa de efeitos e presets) | feito: 24 (`compositing_efeitos`) |
+| Render | Light Probe Volume e Bake Probes | feito: 25 (`probe_volume_luz`) |
+| Render | SSGI | feito: 26 (`ssgi_luz`) |
+| Render | Sombra colorida e PCSS (sombra suave) | falta |
 | Shader | Nós de shader e Nodes GLSL por arquivo | falta |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player e actuator Video (legendas, fade) | falta |

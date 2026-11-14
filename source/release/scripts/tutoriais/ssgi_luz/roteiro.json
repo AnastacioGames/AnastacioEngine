@@ -1,0 +1,140 @@
+{
+  "titulo": {
+    "pt": "26. Luz rebatida na tela com SSGI",
+    "en": "26. Screen bounced light with SSGI",
+    "es": "26. Luz rebotada en pantalla con SSGI"
+  },
+  "categoria": "Render",
+  "resumo": {
+    "pt": "As cores das paredes e do chão tingem o que está perto, ao vivo, sem bake.",
+    "en": "Wall and floor colors tint what is nearby, live, with no bake.",
+    "es": "Los colores de paredes y suelo tiñen lo cercano, en vivo, sin bake."
+  },
+  "abertura": {
+    "pt": "Vamos ligar o SSGI: luz que rebate nas superfícies que aparecem na tela.",
+    "en": "Let's turn on SSGI: light that bounces off the surfaces on screen.",
+    "es": "Vamos a activar SSGI: luz que rebota en las superficies que aparecen en pantalla."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Render.",
+        "en": "In Properties, open the Render tab.",
+        "es": "En Properties, abre la pestaña Render."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'RENDER' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "É o ícone de câmera, o primeiro da fileira de abas.",
+        "en": "It is the camera icon, the first in the row of tabs.",
+        "es": "Es el ícono de cámara, el primero de la fila de pestañas."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=RENDER"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No topo do painel, clique em Graphics.",
+        "en": "At the top of the panel, click Graphics.",
+        "es": "Arriba del panel, haz clic en Graphics."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.ae_render_panel_category == 'GRAPHICS'"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_render_panel_category=GRAPHICS"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Native SSGI, marque Use in Game.",
+        "en": "In Native SSGI, check Use in Game.",
+        "es": "En Native SSGI, marca Use in Game."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.ae_ssgi_use"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Role a Properties até o painel Native SSGI (Experimental).",
+        "en": "Scroll Properties to the Native SSGI (Experimental) panel.",
+        "es": "Desplaza Properties hasta el panel Native SSGI (Experimental)."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_ssgi_use"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Se aparecer PBR Shading Nodes is off, clique em Enable.",
+        "en": "If PBR Shading Nodes is off shows up, click Enable.",
+        "es": "Si aparece PBR Shading Nodes is off, haz clic en Enable."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.scene.game_settings.use_shading_nodes"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "O SSGI precisa dos materiais PBR (nós). Se o aviso não aparece, já está ligado.",
+        "en": "SSGI needs PBR materials (nodes). If the warning does not show, it is already on.",
+        "es": "SSGI necesita materiales PBR (nodos). Si el aviso no aparece, ya está activo."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SCENE_OT_anastacio_ssgi_enable_nodes"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Check Scene para ver quais objetos recebem a luz.",
+        "en": "Click Check Scene to see which objects get the light.",
+        "es": "Haz clic en Check Scene para ver qué objetos reciben la luz."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "__import__('bl_operators.anastacio_ssgi', fromlist=['check_result']).check_result is not None"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "full = luz completa; approx. = aproximada; excluded = fica de fora, com o motivo.",
+        "en": "full = complete light; approx. = approximate; excluded = left out, with the reason.",
+        "es": "full = luz completa; approx. = aproximada; excluded = queda fuera, con el motivo."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SCENE_OT_anastacio_ssgi_check"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e compare os cantos e o chão. Esc sai.",
+        "en": "Mouse over the 3D View, press P and look at the corners and floor. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P y mira las esquinas y el suelo. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Quality troca o custo: Low para PC fraco, High para PC forte. Na Web e no Android o SSGI fica desligado.",
+    "en": "Done! Quality trades cost: Low for weak PCs, High for strong ones. On Web and Android SSGI stays off.",
+    "es": "¡Listo! Quality cambia el costo: Low para PC débil, High para PC potente. En Web y Android SSGI queda apagado."
+  }
+}
