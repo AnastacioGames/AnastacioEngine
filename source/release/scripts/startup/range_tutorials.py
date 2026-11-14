@@ -741,6 +741,13 @@ class RANGE_OT_tutorial_start(Operator):
         return self.comecar(context)
 
     def execute(self, context):
+        if not os.path.isfile(os.path.join(PASTA, self.name, CENA)):
+            # Chamado sem invoke (Python, popup de menu): sem cena inicial, só começa.
+            if _pasta_valida(self.name) is None:
+                self.report({'ERROR'}, "Tutorial not found: " + self.name)
+                return {'CANCELLED'}
+            self.step = max(self.step, 0)
+            return self.comecar(context)
         # Uma cópia temporária da cena: salvar no tutorial não estraga o original.
         copia = os.path.join(bpy.app.tempdir, "tutorial_" + CENA)
         shutil.copyfile(os.path.join(PASTA, self.name, CENA), copia)

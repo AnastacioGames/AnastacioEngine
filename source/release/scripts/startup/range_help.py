@@ -17,7 +17,6 @@ ARQUIVO = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__)
 
 _dados = {}
 _originais = {}  # painel -> draw_header original (None quando não tinha)
-_LARGURA = 420
 _FAZER = {"pt": "Fazer o tutorial", "en": "Do the tutorial", "es": "Hacer el tutorial"}
 
 
@@ -124,27 +123,31 @@ class RANGE_OT_help_show(Operator):
     def invoke(self, context, event):
         if self.panel not in _ajuda():
             return {'CANCELLED'}
-        return context.window_manager.invoke_popup(self, width=_LARGURA)
+        return self.execute(context)
 
     def execute(self, context):
-        return {'FINISHED'}
-
-    def draw(self, context):
+        # Popup de menu (não invoke_popup): fecha sozinho ao clicar no botão do tutorial.
         t = _tutoriais()
-        item = _ajuda()[self.panel]
-        layout = self.layout
-        layout.label(text=t._txt(item.get("titulo")), icon='INFO')
-        col = layout.column(align=True)
-        for linha in textwrap.wrap(t._txt(item.get("texto")), 62):
-            col.label(text=linha)
+        item = _ajuda().get(self.panel)
+        if item is None:
+            return {'CANCELLED'}
         nome = item.get("tutorial")
         titulo = next((tit for pasta, tit, _, _ in t.tutoriais() if pasta == nome), None) if nome else None
-        if titulo:
-            layout.separator()
-            linha = layout.row()
-            linha.scale_y = 1.3
-            linha.operator("wm.range_tutorial_start", text="%s: %s" % (_FAZER.get(t._idioma(), _FAZER["en"]), titulo),
-                           icon='PLAY').name = nome
+        linhas = textwrap.wrap(t._txt(item.get("texto")), 62)
+        fazer = _FAZER.get(t._idioma(), _FAZER["en"])
+
+        def desenhar(menu, context):
+            layout = menu.layout
+            col = layout.column(align=True)
+            for linha in linhas:
+                col.label(text=linha)
+            if titulo:
+                layout.separator()
+                layout.operator_context = 'INVOKE_DEFAULT'  # o popup de menu chama execute por padrão
+                layout.operator("wm.range_tutorial_start", text="%s: %s" % (fazer, titulo), icon='PLAY').name = nome
+
+        context.window_manager.popup_menu(desenhar, title=t._txt(item.get("titulo")), icon='INFO')
+        return {'FINISHED'}
 
 
 @persistent
