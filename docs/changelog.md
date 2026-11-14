@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais 34 e 35 (Character com postura, nó GLSL)
+
+- `personagem_postura`: preset Character (Posture) no Logic Editor, com cena inicial de cubo sem lógica (`tools/tutoriais/criar_inicio_cubo_limpo.py`).
+- `glsl_node`: GLSL Library › Checker Tint ligado ao Extended Material.
+- Testados no editor oculto (controle.py): todos os passos avançam. NLA e Multiplayer ficaram fora do catálogo.
+
 ## 2026-11-14 — Tutoriais 18 a 20 (casas, destruição, LOD automático)
 
 | Pasta | Categoria | Passos | Conteúdo |

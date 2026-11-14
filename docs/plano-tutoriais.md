@@ -1,6 +1,6 @@
 # Plano: Tutoriais (dentro da engine + vídeo curto)
 
-Data: 2026-11-13. Status (2026-11-14): 36 tutoriais prontos, todos aguardando aceite com janela.
+Data: 2026-11-13. Status (2026-11-14): 38 tutoriais prontos, todos aguardando aceite com janela.
 
 ## Catálogo
 
@@ -45,6 +45,8 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | 31 | Render | Sombra suave e realista | `sombra_realista` |
 | 32 | Node Editor/Shader | Material pronto com nós (presets) | `shader_preset` |
 | 33 | Optimization | Deixar um modelo mais leve (Decimate) | `decimate_hq` |
+| 34 | Logic Bricks | Personagem que anda, corre, abaixa e rasteja (preset Character) | `personagem_postura` |
+| 35 | Node Editor/Shader | Nó GLSL da biblioteca (xadrez no cubo) | `glsl_node` |
 | — | Node Editor/UI Tree | Primeiro menu de jogo (piloto) | `ui_tree_menu` |
 | — | Node Editor/UI Tree | Os nós de HUD | `ui_tree_hud` |
 | — | Mind Map | A barra do Mind Map | `mind_map_barra` |
@@ -64,15 +66,13 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Render | Sombra suave (PCSS, Look Realistic) | feito: 31 (`sombra_realista`) |
 | Render | Sombra colorida | falta: pede material transparente montado antes |
 | Shader | Presets de shader | feito: 32 (`shader_preset`) |
-| Shader | Nodes GLSL por arquivo | reservado 2026-11-14 (sessão local, main) |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player | feito: 28 (`video_player`); legendas e actuator Video ficam para outro |
 | Video | Screencast (gravar o jogo) | feito: 22 (`screencast_gravar`) |
 | Sound | Microfone | feito: 29 (`microfone_pular`); falta o nó Tuner da UI Tree |
 | Character | Personagem automático (File › Import › Fuse Character) | falta |
-| Character | Postura do Character (abaixar, rastejar, pular) | reservado 2026-11-14 (sessão local, main) |
-| Animation | NLA no jogo (playNLA) | reservado 2026-11-14 (sessão local, main) |
-| Multiplayer | Jogo em rede local | reservado 2026-11-14 (sessão local, main) |
+| Animation | NLA no jogo (playNLA) | fora: só por Python (playNLA), sem passo no editor |
+| Multiplayer | Jogo em rede local | fora: precisa de servidor e cliente rodando ao mesmo tempo |
 | Optimization | Automatic Occluders | feito: 27 (`occlusion_culling`); Scene Doctor já está no 14 |
 | Optimization | HLOD (Performance › Optimize Scene › Build HLOD) | falta: pede cena com muitos objetos |
 | Optimization | Static Batch | fora: ligado por padrão (Auto Static Batch), nada a ensinar |

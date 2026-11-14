@@ -1,0 +1,82 @@
+{
+  "titulo": {
+    "pt": "34. Personagem que anda, corre, abaixa e rasteja",
+    "en": "34. A character that walks, runs, crouches and crawls",
+    "es": "34. Personaje que camina, corre, se agacha y se arrastra"
+  },
+  "categoria": "Logic Bricks",
+  "resumo": {
+    "pt": "O preset Character (Posture) monta física e teclas de um personagem em terceira pessoa.",
+    "en": "The Character (Posture) preset sets up physics and keys for a third person character.",
+    "es": "El preset Character (Posture) arma la física y las teclas de un personaje en tercera persona."
+  },
+  "abertura": {
+    "pt": "Vamos transformar o cubo num personagem jogável com um clique.",
+    "en": "Let's turn the cube into a playable character with one click.",
+    "es": "Vamos a convertir el cubo en un personaje jugable con un clic."
+  },
+  "cena_inicial": "inicio.range",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Com o cubo selecionado, olhe o Logic Editor, embaixo.",
+        "en": "With the cube selected, look at the Logic Editor, at the bottom.",
+        "es": "Con el cubo seleccionado, mira el Logic Editor, abajo."
+      },
+      "narracao": "",
+      "checagem": {
+        "area": "LOGIC_EDITOR"
+      },
+      "destaque": "BAIXO",
+      "dica": {
+        "pt": "Se embaixo não estiver o Logic Editor, troque pelo ícone no canto esquerdo.",
+        "en": "If the bottom is not the Logic Editor, switch it with the icon at the left corner.",
+        "es": "Si abajo no está el Logic Editor, cámbialo con el ícono de la esquina izquierda."
+      },
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Logic Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho do Logic Editor, abra Add › Preset › Character (Posture).",
+        "en": "In the Logic Editor header, open Add › Preset › Character (Posture).",
+        "es": "En el encabezado del Logic Editor, abre Add › Preset › Character (Posture)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.game.physics_type == 'CHARACTER' and len(C.active_object.game.sensors) > 0"
+      },
+      "destaque": "LOGIC_EDITOR",
+      "dica": {
+        "pt": "Preset fica no fim do menu Add; passe o mouse para abrir a lista.",
+        "en": "Preset is at the end of the Add menu; hover it to open the list.",
+        "es": "Preset está al final del menú Add; pasa el ratón para abrir la lista."
+      },
+      "alvo": {
+        "area": "LOGIC_EDITOR",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Character (Posture)"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P. W A S D andam, Shift corre, C abaixa, Z rasteja, Espaço pula. Esc sai.",
+        "en": "Mouse over the 3D View, press P. W A S D walk, Shift runs, C crouches, Z crawls, Space jumps. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P. W A S D caminan, Shift corre, C se agacha, Z se arrastra, Espacio salta. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Alturas e velocidades de cada postura ficam na aba Physics, em Posture.",
+    "en": "Done! Heights and speeds of each posture are in the Physics tab, under Posture.",
+    "es": "¡Listo! Alturas y velocidades de cada postura están en la pestaña Physics, en Posture."
+  }
+}

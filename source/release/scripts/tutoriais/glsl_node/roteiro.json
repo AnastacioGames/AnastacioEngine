@@ -1,0 +1,137 @@
+{
+  "titulo": {
+    "pt": "35. Nó GLSL da biblioteca (xadrez no cubo)",
+    "en": "35. A GLSL node from the library (checker on the cube)",
+    "es": "35. Nodo GLSL de la biblioteca (ajedrez en el cubo)"
+  },
+  "categoria": "Node Editor/Shader",
+  "resumo": {
+    "pt": "Nós escritos em GLSL, prontos na GLSL Library, ligados ao material como qualquer nó.",
+    "en": "Nodes written in GLSL, ready in the GLSL Library, linked to the material like any node.",
+    "es": "Nodos escritos en GLSL, listos en la GLSL Library, conectados al material como cualquier nodo."
+  },
+  "abertura": {
+    "pt": "Vamos pintar o cubo de xadrez com um nó GLSL pronto.",
+    "en": "Let's paint the cube with a checker using a ready-made GLSL node.",
+    "es": "Vamos a pintar el cubo de ajedrez con un nodo GLSL listo."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique com o botão direito no cubo.",
+        "en": "In the 3D View, right-click the cube.",
+        "es": "En la 3D View, haz clic derecho en el cubo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.type == 'MESH' and C.object.select"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Ou clique no nome dele no Outliner, à esquerda.",
+        "en": "Or click its name in the Outliner, on the left.",
+        "es": "O haz clic en su nombre en el Outliner, a la izquierda."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Node Editor.",
+        "en": "Change the bottom area to Node Editor.",
+        "es": "Cambia el área de abajo a Node Editor."
+      },
+      "narracao": "",
+      "checagem": "node_editor",
+      "destaque": "BAIXO",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Node Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho, clique em Shader.",
+        "en": "In the header, click Shader.",
+        "es": "En el encabezado, haz clic en Shader."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'NODE_EDITOR' and a.spaces.active.tree_type == 'ShaderNodeTree' for a in C.screen.areas)"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "prop:tree_type=ShaderNodeTree"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Marque Use Nodes.",
+        "en": "Check Use Nodes.",
+        "es": "Marca Use Nodes."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.active_material is not None and C.object.active_material.use_nodes"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "prop:use_nodes"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Na barra de nós, abra GLSL Library, clique em Checker Tint (grupo Patterns) e clique no canvas para soltar.",
+        "en": "In the node bar, open GLSL Library, click Checker Tint (Patterns group) and click the canvas to drop it.",
+        "es": "En la barra de nodos, abre GLSL Library, haz clic en Checker Tint (grupo Patterns) y haz clic en el lienzo para soltarlo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.active_material is not None and C.object.active_material.node_tree is not None and any(n.bl_idname == 'ShaderNodeGLSLScript' for n in C.object.active_material.node_tree.nodes)"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "WINDOW",
+        "botao": "GLSL Library",
+        "menu": "Checker Tint"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Ligue a saída do Checker Tint na entrada Color do Extended Material: arraste de bolinha a bolinha.",
+        "en": "Link the Checker Tint output to the Extended Material Color input: drag from dot to dot.",
+        "es": "Conecta la salida de Checker Tint a la entrada Color del Extended Material: arrastra de punto a punto."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.object is not None and C.object.active_material is not None and C.object.active_material.node_tree is not None and any(l.from_node.bl_idname == 'ShaderNodeGLSLScript' for l in C.object.active_material.node_tree.links)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "A bolinha da saída fica do lado direito do nó; a entrada Color, do lado esquerdo do Extended Material.",
+        "en": "The output dot is on the right of the node; the Color input is on the left of Extended Material.",
+        "es": "El punto de salida está a la derecha del nodo; la entrada Color, a la izquierda del Extended Material."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P: o cubo de xadrez. Esc sai.",
+        "en": "Mouse over the 3D View, press P: a checkered cube. Esc quits.",
+        "es": "Ratón en la 3D View, pulsa P: un cubo de ajedrez. Esc sale."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Scale e as cores ficam no próprio nó. Os .glsl da biblioteca ficam em presets/glsl_nodes.",
+    "en": "Done! Scale and the colors are on the node itself. The library .glsl files are in presets/glsl_nodes.",
+    "es": "¡Listo! Scale y los colores están en el mismo nodo. Los .glsl de la biblioteca están en presets/glsl_nodes."
+  }
+}
