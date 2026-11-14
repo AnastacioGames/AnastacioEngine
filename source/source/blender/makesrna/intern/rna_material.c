@@ -1165,7 +1165,7 @@ static void rna_def_material_diffuse(StructRNA *srna)
 	prop = RNA_def_property(srna, "roughness", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_range(prop, 0.0f, 3.14f);
 	RNA_def_property_ui_text(prop, "Roughness", "Oren-Nayar Roughness");
-	RNA_def_property_update(prop, 0, "rna_Material_update");
+	RNA_def_property_update(prop, 0, "rna_Material_value_update");
 
 	prop = RNA_def_property(srna, "diffuse_toon_size", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "param[0]");
@@ -1682,7 +1682,7 @@ static void rna_def_material_sss(BlenderRNA *brna)
 	RNA_def_property_range(prop, 0.001, FLT_MAX);
 	RNA_def_property_ui_range(prop, 0.001, 10000, 1, 3);
 	RNA_def_property_ui_text(prop, "Radius", "Mean red/green/blue scattering path length");
-	RNA_def_property_update(prop, 0, "rna_Material_update");
+	RNA_def_property_update(prop, 0, "rna_Material_value_update");
 
 	/* Same data as "radius", without length units: in the game engine it is a unitless factor. */
 	prop = RNA_def_property(srna, "game_radius", PROP_FLOAT, PROP_COLOR);
@@ -1692,24 +1692,24 @@ static void rna_def_material_sss(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Radius",
 	                         "Red/green/blue scattering strength and spread (game engine, unitless; "
 	                         "the tint comes from the Diffuse color)");
-	RNA_def_property_update(prop, 0, "rna_Material_update");
+	RNA_def_property_update(prop, 0, "rna_Material_value_update");
 
 	prop = RNA_def_property(srna, "color", PROP_FLOAT, PROP_COLOR);
 	RNA_def_property_float_sdna(prop, NULL, "sss_col");
 	RNA_def_property_ui_text(prop, "Color", "Scattering color");
-	RNA_def_property_update(prop, 0, "rna_Material_update");
+	RNA_def_property_update(prop, 0, "rna_Material_value_update");
 
 	prop = RNA_def_property(srna, "error_threshold", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "sss_error");
 	RNA_def_property_ui_range(prop, 0.0001, 10, 1, 3);
 	RNA_def_property_ui_text(prop, "Error Tolerance", "Error tolerance (low values are slower and higher quality)");
-	RNA_def_property_update(prop, 0, "rna_Material_update");
+	RNA_def_property_update(prop, 0, "rna_Material_value_update");
 
 	prop = RNA_def_property(srna, "scale", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "sss_scale");
 	RNA_def_property_ui_range(prop, 0.001, 1000, 1, 3);
 	RNA_def_property_ui_text(prop, "Scale", "Object scale factor");
-	RNA_def_property_update(prop, 0, "rna_Material_update");
+	RNA_def_property_update(prop, 0, "rna_Material_value_update");
 
 	prop = RNA_def_property(srna, "ior", PROP_FLOAT, PROP_NONE);
 	RNA_def_property_float_sdna(prop, NULL, "sss_ior");
@@ -1788,7 +1788,7 @@ static void rna_def_material_specularity(StructRNA *srna)
 	RNA_def_property_float_sdna(prop, NULL, "refrac");
 	RNA_def_property_range(prop, 1.0f, 10.0f);
 	RNA_def_property_ui_text(prop, "Specular IOR", "Specular index of refraction");
-	RNA_def_property_update(prop, 0, "rna_Material_update");
+	RNA_def_property_update(prop, 0, "rna_Material_value_update");
 
 	prop = RNA_def_property(srna, "specular_roughness_bsdf", PROP_FLOAT, PROP_FACTOR);
 	RNA_def_property_float_sdna(prop, NULL, "roughness_bsdf");

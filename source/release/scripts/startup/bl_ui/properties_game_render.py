@@ -684,13 +684,12 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
             subcol.prop(scenefx_settings, "fxaa_search_steps")
 
         # TAA runs only in the game (no viewport toggle): it needs the jittered camera of the game render.
-        taa_box = layout.box()
-        row = taa_box.row(align=True)
+        row = layout.row(align=True)
         row.prop(scenefx_settings, "show_expanded_taa", text="TAA (Temporal Anti-Aliasing)", emboss=True)
         row.prop(scenefx_settings, "use_taa", text="")
 
         if scenefx_settings.show_expanded_taa:
-            sub = taa_box.box()
+            sub = layout.column(align=True)
             sub.active = scenefx_settings.use_taa
             sub.prop(scenefx_settings, "taa_sharpen")
             sub.prop(scenefx_settings, "taa_upscale")
@@ -701,7 +700,7 @@ class RENDER_PT_game_post_process_shaders(RenderButtonsPanel, Panel):
                     sub.label(text="Stereo falls back to FSR 1 upscaling", icon='INFO')
             sub.label(text="Game only. Objects moving with the camera may blur", icon='INFO')
             if scenefx_settings.use_taa and scenefx_settings.use_fxaa:
-                warn = taa_box.box()
+                warn = layout.box()
                 warn.label(text="FXAA on top of TAA softens the image more", icon='ERROR')
 
         row = layout.row(align=True)

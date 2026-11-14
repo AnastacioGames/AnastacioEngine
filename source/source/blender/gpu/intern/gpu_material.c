@@ -2559,8 +2559,8 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 			if (GPU_link_changed(shi->translucency) || ma->translucency != 0.0f ||
 				GPU_link_changed(shi->alpha) || ma->alpha != 1.0f || !gpu_constant_material(ma)) {
 
-				GPU_link(mat, "shade_translucent", is, vn, lv, view, shi->roughness_bsdf, GPU_uniform(&ma->roughness),
-											shi->translucency, shi->alpha, GPU_uniform(&ma->refrac), &is);
+				GPU_link(mat, "shade_translucent", is, vn, lv, view, shi->roughness_bsdf, GPU_select_uniform(&ma->roughness, GPU_DYNAMIC_MAT_TURBIDITY, ma, ma),
+											shi->translucency, shi->alpha, GPU_select_uniform(&ma->refrac, GPU_DYNAMIC_MAT_IOR, ma, ma), &is);
 			}
 		}
 	}
@@ -2828,7 +2828,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 	if (ma->sss_flag && !(lamp->mode & LA_NO_DIFF)) {
 		float lamptype = (lamp->type == LA_SUN) ? 0.0f : 1.0f;
 		GPU_link(mat, "set_sss", energy, visifac, col,
-			GPU_uniform(&ma->sss_scale), GPU_uniform((float *)&ma->sss_radius),
+			GPU_select_uniform(&ma->sss_scale, GPU_DYNAMIC_MAT_SSS_SCALE, ma, ma), GPU_select_uniform((float *)&ma->sss_radius, GPU_DYNAMIC_MAT_SSS_RADIUS, ma, ma),
 			GPU_uniform(&lamptype), shi->rgb, shadfac, view, lv, vn, shr->diff, &shr->diff);
 	}
 			
@@ -2848,7 +2848,7 @@ static void shade_one_light(GPUShadeInput *shi, GPUShadeResult *shr, GPULamp *la
 	GPU_link(mat, "shade_mul_value", nonmetal, shr->diff, &shr->diff);
 
 	GPUNodeLink *specf0;
-	GPU_link(mat, "fresnel_refl", shi->view, shi->vn, shi->spec, GPU_uniform(&ma->refrac), shi->roughness_bsdf, &specf0);
+	GPU_link(mat, "fresnel_refl", shi->view, shi->vn, shi->spec, GPU_select_uniform(&ma->refrac, GPU_DYNAMIC_MAT_IOR, ma, ma), shi->roughness_bsdf, &specf0);
 
 	if (mat->scene->gm.flag & GAME_GLSL_NO_SHADERS) {
 		/* pass */
@@ -4013,7 +4013,7 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 			GPU_material_builtin(mat, GPU_OBJECT_MATRIX),
 			shi->rgb, shi->specrgb, shi->emitrgb,
 			shi->roughness_bsdf, shi->metallic_bsdf, shi->refl, shi->spec, shi->amb,
-			GPU_material_builtin(mat, GPU_TIME), GPU_uniform(&ma->refrac), shi->emit, shi->alpha,
+			GPU_material_builtin(mat, GPU_TIME), GPU_select_uniform(&ma->refrac, GPU_DYNAMIC_MAT_IOR, ma, ma), shi->emit, shi->alpha,
 			GPU_select_uniform(&GPUWorld.miststart, GPU_DYNAMIC_MIST_START, NULL, ma),
 			GPU_select_uniform(&GPUWorld.mistdistance, GPU_DYNAMIC_MIST_DISTANCE, NULL, ma),
 			GPU_select_uniform(&GPUWorld.mistype, GPU_DYNAMIC_MIST_TYPE, NULL, ma),
@@ -4120,7 +4120,7 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 
 				GPUNodeLink *wn, *wv, *wr;
 				GPU_link(mat, "shade_world_vectors", shi->view, shi->vn,
-					GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), GPU_uniform(&ma->refrac), &wv, &wn, &wr);
+					GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), GPU_select_uniform(&ma->refrac, GPU_DYNAMIC_MAT_IOR, ma, ma), &wv, &wn, &wr);
 
 				if (world->aocolor == WO_AOSKYCOL) {
 					if (!(is_zero_v3(&world->horr) & is_zero_v3(&world->zenr)) || !(ma->constflag & MA_CONSTANT_WORLD)) {
@@ -4175,19 +4175,19 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 
 						if (tex->type == TEX_IMAGE) {
 							if (mtex->texco == TEXCO_ANGMAP) {
-								GPU_link(mat, "env_angular_tex", shi->roughness_bsdf, GPU_uniform(&ma->roughness), GPU_image(tex->ima, &tex->iuser, false),
+								GPU_link(mat, "env_angular_tex", shi->roughness_bsdf, GPU_select_uniform(&ma->roughness, GPU_DYNAMIC_MAT_TURBIDITY, ma, ma), GPU_image(tex->ima, &tex->iuser, false),
 									wv, wn, wr, &mirror, &radiosity, &transmit);
 								gpu_world_sh9_link(mat, tex, WORLD_SH_ANGULAR, wn, &radiosity);
 							}
 							else { //if (mtex->texco == TEXCO_EQUIRECTMAP) {
-								GPU_link(mat, "env_equirect_tex", shi->roughness_bsdf, GPU_uniform(&ma->roughness), GPU_image(tex->ima, &tex->iuser, false),
+								GPU_link(mat, "env_equirect_tex", shi->roughness_bsdf, GPU_select_uniform(&ma->roughness, GPU_DYNAMIC_MAT_TURBIDITY, ma, ma), GPU_image(tex->ima, &tex->iuser, false),
 									wv, wn, wr, &mirror, &radiosity, &transmit);
 								gpu_world_sh9_link(mat, tex, WORLD_SH_EQUIRECT, wn, &radiosity);
 							}
 						}
 						else {
 							if (tex->type == TEX_ENVMAP) {
-								GPU_link(mat, "env_cube_tex", shi->roughness_bsdf, GPU_uniform(&ma->roughness), GPU_cube_map(tex->ima, &tex->iuser, false),
+								GPU_link(mat, "env_cube_tex", shi->roughness_bsdf, GPU_select_uniform(&ma->roughness, GPU_DYNAMIC_MAT_TURBIDITY, ma, ma), GPU_cube_map(tex->ima, &tex->iuser, false),
 									wv, wn, wr, &mirror, &radiosity, &transmit);
 								gpu_world_sh9_link(mat, tex, WORLD_SH_CUBE, wn, &radiosity);
 							}
@@ -4211,7 +4211,7 @@ void GPU_shaderesult_set(GPUShadeInput *shi, GPUShadeResult *shr)
 				opacity = GPU_uniform(&one);
 			}
 
-			GPU_link(mat, "fresnel_refl", shi->view, shi->vn, shi->spec, GPU_uniform(&ma->refrac), shi->roughness_bsdf, &specf0);
+			GPU_link(mat, "fresnel_refl", shi->view, shi->vn, shi->spec, GPU_select_uniform(&ma->refrac, GPU_DYNAMIC_MAT_IOR, ma, ma), shi->roughness_bsdf, &specf0);
 
 			if (GPU_link_changed(shi->refcol))
 				GPU_link(mat, "shade_add_mirror", shi->mir, shi->refcol, mirror, &mirror);
@@ -4846,21 +4846,20 @@ bool GPU_material_world_env(GPUMaterial *mat, GPUNodeLink *view, GPUNodeLink *vn
 
 	if (use_tex) {
 		Tex *tex = mtex->tex;
-		float turbid = ma->roughness;
 		if (tex->type == TEX_IMAGE) {
 			if (mtex->texco == TEXCO_ANGMAP) {
-				GPU_link(mat, "env_angular_tex", rough, GPU_uniform(&turbid), GPU_image(tex->ima, &tex->iuser, false),
+				GPU_link(mat, "env_angular_tex", rough, GPU_select_uniform(&ma->roughness, GPU_DYNAMIC_MAT_TURBIDITY, ma, ma), GPU_image(tex->ima, &tex->iuser, false),
 				         wv, wn, wr, &mirror, &diffibl, &transmit);
 				gpu_world_sh9_link(mat, tex, WORLD_SH_ANGULAR, wn, &diffibl);
 			}
 			else {
-				GPU_link(mat, "env_equirect_tex", rough, GPU_uniform(&turbid), GPU_image(tex->ima, &tex->iuser, false),
+				GPU_link(mat, "env_equirect_tex", rough, GPU_select_uniform(&ma->roughness, GPU_DYNAMIC_MAT_TURBIDITY, ma, ma), GPU_image(tex->ima, &tex->iuser, false),
 				         wv, wn, wr, &mirror, &diffibl, &transmit);
 				gpu_world_sh9_link(mat, tex, WORLD_SH_EQUIRECT, wn, &diffibl);
 			}
 		}
 		else if (tex->type == TEX_ENVMAP) {
-			GPU_link(mat, "env_cube_tex", rough, GPU_uniform(&turbid), GPU_cube_map(tex->ima, &tex->iuser, false),
+			GPU_link(mat, "env_cube_tex", rough, GPU_select_uniform(&ma->roughness, GPU_DYNAMIC_MAT_TURBIDITY, ma, ma), GPU_cube_map(tex->ima, &tex->iuser, false),
 			         wv, wn, wr, &mirror, &diffibl, &transmit);
 			gpu_world_sh9_link(mat, tex, WORLD_SH_CUBE, wn, &diffibl);
 		}
