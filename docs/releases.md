@@ -32,6 +32,25 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 Estado: **em preparo** (2026-11-14). Tutoriais e botão Help, Mind Map, Nodes GLSL por arquivo, TAAU, Bake Probes
 e aquecimento de LibLoad. Texto da página do GitHub: [release-notes-0.7.2.md](release-notes-0.7.2.md).
 
+### Linux (2026-11-14, notebook Linux, `main` em `9df47539`)
+
+Pacotes no rascunho `v0.7.2` com `SHA256SUMS-linux.txt` (o Windows sobe o zip e publica):
+
+- `AnastacioEngine-0.7.2-linux-x86_64.tar.xz` (275 MiB) sha256 `5df9ec9a6dde28f864d4c566b247187f0dbe38ec3919275d39be070c3ab1daf4`
+- `RangeArmor-0.7.2-linux-x86_64.tar.xz` (7,1 MiB) sha256 `27c8575b978c2bdfb9b07a800f584c8ae1786d498a03493ac4b2dcdfaeb5944c`
+
+1. Runtime Web (`web-runtime-release-linux`): não linkava (`UI_highlight_button_set`, `UI_last_click_get`,
+   `UI_last_click_count` da ajuda sem stub no player); stubs em `f8aeaec8`. Manifesto com 283 módulos.
+2. Container, build limpo (mudou `DNA_space_types.h`): o install parava sem `libae_meshopt.so`, que não
+   entrava nos alvos `RangeEngine`/`RangeRuntime`. Corrigido em `9df47539`: `ae_meshopt` vira dependência do
+   `RangeEngine` e só é configurado com `WITH_BLENDER`. O comando do passo a passo foi trocado por
+   `tools/linux/container-build.sh` (a imagem `anastacio-linux-builder` não existe).
+3. `testar-release.sh 0.7.2`: **23/23 OK**. No pacote: `2.79/scripts/ajuda/paineis.json`,
+   `startup/range_help.py`, 39 tutoriais, `libae_meshopt.so` carrega por ctypes, editor `-b` sem erro de Python.
+4. Export Web (`validate-web.py --export`) do pacote extraído: projeto com LibLoad de `3rd person.range` e
+   `fase #2.range` (os dois em `game/` e no manifesto), Destruction e ImGui_example; sem achados.
+5. RangeArmor sem mudança desde a 0.7.1: mesmo conteúdo com a pasta renomeada para 0.7.2.
+
 ## 0.7.1
 
 Estado: **publicada completa em 2026-11-09** (tag `v0.7.1`), Windows e Linux. Correções da 0.7.0 (Export Web) e ajustes de luz/material no editor sem
