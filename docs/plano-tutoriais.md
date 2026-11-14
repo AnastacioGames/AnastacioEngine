@@ -64,15 +64,15 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Render | Sombra suave (PCSS, Look Realistic) | feito: 31 (`sombra_realista`) |
 | Render | Sombra colorida | falta: pede material transparente montado antes |
 | Shader | Presets de shader | feito: 32 (`shader_preset`) |
-| Shader | Nodes GLSL por arquivo | falta |
+| Shader | Nodes GLSL por arquivo | reservado 2026-11-14 (sessão local, main) |
 | Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player | feito: 28 (`video_player`); legendas e actuator Video ficam para outro |
 | Video | Screencast (gravar o jogo) | feito: 22 (`screencast_gravar`) |
 | Sound | Microfone | feito: 29 (`microfone_pular`); falta o nó Tuner da UI Tree |
 | Character | Personagem automático (File › Import › Fuse Character) | falta |
-| Character | Postura do Character (abaixar, rastejar, pular) | falta |
-| Animation | NLA no jogo (playNLA) | falta |
-| Multiplayer | Jogo em rede local | falta |
+| Character | Postura do Character (abaixar, rastejar, pular) | reservado 2026-11-14 (sessão local, main) |
+| Animation | NLA no jogo (playNLA) | reservado 2026-11-14 (sessão local, main) |
+| Multiplayer | Jogo em rede local | reservado 2026-11-14 (sessão local, main) |
 | Optimization | Automatic Occluders | feito: 27 (`occlusion_culling`); Scene Doctor já está no 14 |
 | Optimization | HLOD (Performance › Optimize Scene › Build HLOD) | falta: pede cena com muitos objetos |
 | Optimization | Static Batch | fora: ligado por padrão (Auto Static Batch), nada a ensinar |
