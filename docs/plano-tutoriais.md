@@ -44,12 +44,12 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Locale | Jogo em vários idiomas (Range.locale, Language Button) | fora por ora: pede editar o CSV |
 | Camera FX | Efeitos de câmera (grão, Directional Blur) | falta: achar o painel |
 | Render | Céu: Sky Layers, nuvens, Sky Quality | reservado 2026-11-14 (sessão local, main) |
-| Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | falta |
+| Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | reservado 2026-11-14 (sessão local, main): chuva, raios e névoa |
 | Render | Compositing no jogo (faixa de efeitos e presets) | falta |
 | Render | Light Probe Volume e Bake Probes | falta |
 | Render | Sombra colorida, SSGI e PCSS | falta |
 | Shader | Nós de shader e Nodes GLSL por arquivo | falta |
-| Smart Modules | Smart 2D Filter (efeito de tela sem código) | reservado 2026-11-14 (sessão local, main) |
+| Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta: ~10 passos com fios arrastados no Logic Editor; pede cena inicial pronta |
 | Video | Video Player e actuator Video (legendas, fade) | falta |
 | Video | Screencast (gravar o jogo) | reservado 2026-11-14 (sessão local, main) |
 | Sound | Microfone e Tuner | falta |
@@ -58,7 +58,7 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Animation | NLA no jogo (playNLA) | falta |
 | Multiplayer | Jogo em rede local | falta |
 | Optimization | Scene Doctor, HLOD, Automatic Occluders, Static Batch | falta |
-| Optimization | Simulador de PC fraco | falta |
+| Optimization | Simulador de PC fraco | feito dentro do 14 (`performance_medir`) |
 | Debug | Game Trace e Trace Doctor | falta |
 | Textures | Prepare Textures (DDS/KTX2) e Decimate High Quality | falta |
 
