@@ -22,7 +22,7 @@ os pacotes Linux para o rascunho. Leia antes [AGENTS.md](../AGENTS.md), a seçã
    `cmake --build --preset web-runtime-release-linux`. Se não linkar por função do editor sem stub no player,
    adicione o stub (como em `507b7006` na 0.7.1).
 3. **Container**: 
-   `podman run --rm -e VERSION=0.7.2 -e WEB_RUNTIME_DIR=/work/build-web-release/bin -v $PWD:/work:Z localhost/anastacio-linux-builder:ubuntu22.04`
+   `VERSION=0.7.2 WEB_RUNTIME_DIR=/work/build-web-release/bin bash tools/linux/container-build.sh`
    Saída: `build-linux/dist/AnastacioEngine-0.7.2-linux-x86_64.tar.xz` + `.sha256`.
 4. **Testes**: `bash tools/linux/testar-release.sh 0.7.2` (pacote extraído em pasta limpa). Esperado: tudo OK
    (23/23 na 0.7.1). Depois, Export Web do pacote extraído com um projeto que tenha `3rd person.range` e

@@ -74,7 +74,7 @@ if(WITH_CYCLES)
 	add_subdirectory(ae_uvatlas)
 endif()
 
-if(WITH_GAMEENGINE AND NOT EMSCRIPTEN)
+if(WITH_BLENDER AND WITH_GAMEENGINE AND NOT EMSCRIPTEN)
 	add_subdirectory(ae_meshopt)
 endif()
 

@@ -326,7 +326,7 @@ endif()
 
 # The bake helpers are loaded by Python rather than linked into the exe, so a targeted
 # RangeEngine build must depend on them explicitly or install will not find them.
-foreach(_ae_bake_helper ae_denoise ae_uvatlas)
+foreach(_ae_bake_helper ae_denoise ae_uvatlas ae_meshopt)
 	if(TARGET ${_ae_bake_helper})
 		add_dependencies(RangeEngine ${_ae_bake_helper})
 	endif()
