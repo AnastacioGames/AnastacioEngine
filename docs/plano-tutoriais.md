@@ -136,3 +136,8 @@ Text Boxes (diálogos sem código) e World Sound.
 - **Idiomas:** `titulo`, `texto` e `dica` aceitam `{"pt":..,"en":..}`, conforme o idioma da interface.
 - **Exportar e importar .zip:** a importação recusa caminhos absolutos, `.`, `..` e nomes repetidos, e nunca sobrescreve tutorial existente.
 - **Revisão do Codex:** cinco pontos, todos aceitos (enum da busca estável, zip duplicado, `_pendente` limpo, Restart sem zerar antes da confirmação, salvar fecha a reprodução).
+
+## Tutorial da barra do Mind Map (2026-11-14, falta aceite com janela)
+
+- `tutoriais/mind_map_barra/`: 11 passos, um por botão da barra (Map, Idea, Look, Marks, Link, Find), pt e en.
+- Alvos `op:MINDMAP_OT_*` na região `WINDOW`; checagens `expr` sobre o texto `.mm` do mapa aberto. Sem `inicio.range`.

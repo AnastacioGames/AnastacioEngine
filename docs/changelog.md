@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutorial da barra do Mind Map
+
+- Novo roteiro `source/release/scripts/tutoriais/mind_map_barra/roteiro.json` (categoria **Mind Map**, 11 passos,
+  textos em pt e en): troca a área de baixo para Mind Map, cria o mapa com New e passa por cada grupo da barra
+  (Idea: Rename, Add Child, Add Sibling; Look: cor; Marks: tarefa e nota; Link: Link e Open Link; Find: Quick Guide).
+- Quadro piscando em cada botão por `op:MINDMAP_OT_*` na região `WINDOW` do `MINDMAP_EDITOR` (a barra é um
+  `uiBlock` da região principal, então `UI_highlight_button_draw` a encontra).
+- Checagens por `expr` sobre o texto `.mm` do mapa aberto (`<node`, `COLOR=`, `ANASTACIO_TASK=`, `TYPE="NOTE"`,
+  `ANASTACIO_LINK=`; ideia sem nome `TEXT=""` não conta). Conferidas fora da engine com uma sequência de mapas:
+  cada passo só fica verdadeiro depois do anterior. Open Link e Quick Guide avançam pelo botão Próximo.
+- Sem cena inicial: funciona em qualquer arquivo. Falta o aceite com janela.
+
 ## 2026-11-13 — Animações depois da lógica (delta transform com script)
 
 - `8ca171412`: relato do musikai (`delta_anim.blend`): action em `delta_location` não movia a raquete quando um
