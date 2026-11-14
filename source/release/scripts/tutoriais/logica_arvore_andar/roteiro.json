@@ -1,0 +1,169 @@
+{
+  "titulo": {
+    "pt": "10. Fazer um objeto andar com a Logic Tree",
+    "en": "10. Make an object walk with the Logic Tree"
+  },
+  "categoria": "Logic Tree",
+  "resumo": {
+    "pt": "A mesma lógica dos Logic Bricks, desenhada com nós: Key → Motion.",
+    "en": "The same logic as Logic Bricks, drawn with nodes: Key → Motion."
+  },
+  "abertura": "Vamos fazer o cubo andar com a seta para cima, agora com nós.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique no cubo.",
+        "en": "In the 3D View, click the cube."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Node Editor.",
+        "en": "Change the bottom area to Node Editor."
+      },
+      "narracao": "",
+      "checagem": "node_editor",
+      "destaque": "BAIXO",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Node Editor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No cabeçalho, clique em Logic.",
+        "en": "In the header, click Logic."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.tree_type == 'RangeLogicTree' for a in C.screen.areas if a.type == 'NODE_EDITOR')"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "Logic (Experimental)"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no + ao lado do campo Logic Tree: cria a árvore do cubo.",
+        "en": "Click the + next to the Logic Tree field: it creates the cube tree."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.logic_tree is not None and True"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Vários objetos podem usar a mesma árvore.",
+        "en": "Several objects can share the same tree."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "op:LOGIC_OT_range_logic_tree_new"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse no Node Editor: Add › Triggers › Key.",
+        "en": "Mouse in the Node Editor: Add › Triggers › Key."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.logic_tree is not None and any(n.bl_idname == 'RangeLogicKey' for n in C.active_object.logic_tree.nodes)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Também abre com Shift+A.",
+        "en": "Shift+A opens it too."
+      },
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Triggers"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No nó Key, escolha a tecla: clique no campo e aperte a seta para cima.",
+        "en": "In the Key node, pick the key: click the field and press the up arrow."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.logic_tree is not None and any(n.bl_idname == 'RangeLogicKey' and n.key == 'UP_ARROW' for n in C.active_object.logic_tree.nodes)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Liga Use Pulse True Level para andar enquanto segura a tecla.",
+        "en": "Turn on Use Pulse True Level to keep walking while you hold the key."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Add › Actions › Motion.",
+        "en": "Add › Actions › Motion."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.logic_tree is not None and any(n.bl_idname == 'RangeLogicMotion' for n in C.active_object.logic_tree.nodes)"
+      },
+      "destaque": "NODE_EDITOR",
+      "alvo": {
+        "area": "NODE_EDITOR",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Actions"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No nó Motion, coloque 0.1 no Y de Loc (Offset Location).",
+        "en": "In the Motion node, set Loc Y (Offset Location) to 0.1."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.logic_tree is not None and any(n.bl_idname == 'RangeLogicMotion' and abs(n.offset_location[1]) > 0.0 for n in C.active_object.logic_tree.nodes)"
+      },
+      "destaque": "NODE_EDITOR"
+    },
+    {
+      "texto": {
+        "pt": "Arraste da saída Pulse do Key até a entrada Do do Motion.",
+        "en": "Drag from the Key Pulse output to the Motion Do input."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.logic_tree is not None and any(l.from_node.bl_idname == 'RangeLogicKey' and l.to_node.bl_idname == 'RangeLogicMotion' for l in C.active_object.logic_tree.links)"
+      },
+      "destaque": "NODE_EDITOR",
+      "dica": {
+        "pt": "Para juntar duas teclas, ponha um nó And (Add › Logic) no meio.",
+        "en": "To combine two keys, put an And node (Add › Logic) in between."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e segure a seta para cima. Esc sai. Depois, clique em Próximo.",
+        "en": "Mouse in the 3D View, press P and hold the up arrow. Esc quits. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Os nós que estão disparando acendem enquanto o jogo roda (Highlight Active).",
+        "en": "Firing nodes light up while the game runs (Highlight Active)."
+      }
+    }
+  ],
+  "encerramento": "Pronto! Os nós viram Logic Bricks sozinhos ao apertar P e ao salvar."
+}

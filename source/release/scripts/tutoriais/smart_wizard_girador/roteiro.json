@@ -1,0 +1,156 @@
+{
+  "titulo": {
+    "pt": "7. Smart Component sem código: um objeto que gira",
+    "en": "7. Smart Component without code: a spinning object"
+  },
+  "categoria": "Components",
+  "resumo": {
+    "pt": "Smart Component Wizard: receita pronta, campos e o componente no objeto.",
+    "en": "Smart Component Wizard: a ready recipe, fields and the component on the object."
+  },
+  "abertura": "Vamos criar um componente Python sem escrever código, com o Smart Component Wizard.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique no cubo.",
+        "en": "In the 3D View, click the cube."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Game.",
+        "en": "In Properties, open the Game tab."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'GAME' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=GAME"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Abra o painel Component Manager e, na lista de receitas, escolha Girador.",
+        "en": "Open the Component Manager panel and pick Girador in the recipe list."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.smart_wizard.recipe == 'ROTATOR'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "O painel começa fechado: clique no título Component Manager.",
+        "en": "The panel starts closed: click the Component Manager title."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:recipe"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Use Recipe: os campos da receita entram na lista.",
+        "en": "Click Use Recipe: the recipe fields go into the list."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.smart_wizard.loaded_recipe == 'ROTATOR'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Se a lista já tinha campos, confirme a troca.",
+        "en": "If the list already had fields, confirm the swap."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SMART_WIZARD_OT_load_recipe"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Na lista Fields, clique no campo Velocidade para ver o mínimo, o máximo e a dica dele.",
+        "en": "In the Fields list, click the Velocidade field to see its min, max and tip."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "0 <= C.window_manager.smart_wizard.index < len(C.window_manager.smart_wizard.fields) and C.window_manager.smart_wizard.fields[C.window_manager.smart_wizard.index].name == 'Velocidade'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Cada campo vira um valor que você muda no objeto, sem mexer no código.",
+        "en": "Each field becomes a value you change on the object, without touching the code."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Create Smart Component: o código é criado e o componente entra no cubo.",
+        "en": "Click Create Smart Component: the code is written and the component goes on the cube."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and any(c.module == C.window_manager.smart_wizard.module for c in C.active_object.game.components)"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Mensagem de erro em vermelho? Ela diz o campo que falta.",
+        "en": "A red error message? It names the missing field."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:SMART_WIZARD_OT_create"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No quadro do componente, mude Velocidade (por exemplo, 360).",
+        "en": "In the component box, change Velocidade (for example, 360)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(p.name.lower() == 'velocidade' and abs(p.value - 90.0) > 0.5 for p in [p for c in C.active_object.game.components for p in c.properties])"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Número negativo gira para o outro lado.",
+        "en": "A negative number spins the other way."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Ligue Balancar: o campo Angulo aparece, porque só faz sentido balançando.",
+        "en": "Turn on Balancar: the Angulo field shows up, because it only matters when swinging."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(p.name.lower() == 'balancar' and p.value for p in [p for c in C.active_object.game.components for p in c.properties])"
+      },
+      "destaque": "PROPERTIES"
+    },
+    {
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P: o cubo balança. Esc sai. Depois, clique em Próximo.",
+        "en": "Mouse in the 3D View, press P: the cube swings. Esc quits. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "O código ficou num Text do arquivo: abra no Text Editor para estudar.",
+        "en": "The code is in a Text of the file: open it in the Text Editor to study it."
+      }
+    }
+  ],
+  "encerramento": "Pronto! Teste as outras receitas: Perseguidor, Patrulha, Coletável, Porta..."
+}

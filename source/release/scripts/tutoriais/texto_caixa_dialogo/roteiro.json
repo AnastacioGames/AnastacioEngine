@@ -1,0 +1,163 @@
+{
+  "titulo": {
+    "pt": "8. Caixa de texto e diálogo sem código",
+    "en": "8. Text box and dialogue without code"
+  },
+  "categoria": "Text",
+  "resumo": {
+    "pt": "Texto com quebra de linha, páginas e efeito máquina de escrever.",
+    "en": "Text with word wrap, pages and a typewriter effect."
+  },
+  "abertura": "Vamos fazer uma caixa de diálogo: o texto aparece letra por letra e passa de página com Enter.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, abra Add › Text.",
+        "en": "In the 3D View, open Add › Text."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'FONT'"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": {
+        "area": "VIEW_3D",
+        "regiao": "HEADER",
+        "botao": "Add",
+        "menu": "Text"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte Tab, apague a palavra Text e escreva uma frase longa, com umas 20 palavras. Aperte Tab de novo.",
+        "en": "Press Tab, delete the word Text and type a long sentence, about 20 words. Press Tab again."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'FONT' and C.active_object.mode == 'OBJECT' and len(C.active_object.data.body) >= 60"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "O texto só é salvo quando você sai da edição com Tab.",
+        "en": "The text is only kept when you leave editing with Tab."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba de dados do texto (o ícone F).",
+        "en": "In Properties, open the text data tab (the F icon)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'DATA' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=DATA"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No painel Text Box, aumente Width (por exemplo, 6): as linhas quebram nessa largura.",
+        "en": "In the Text Box panel, raise Width (for example, 6): lines wrap at that width."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'FONT' and C.active_object.data.text_boxes[0].width > 0"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "No topo da aba, Game Text tem que estar escolhido.",
+        "en": "At the top of the tab, Game Text must be selected."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:width"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aumente Height (por exemplo, 1.5): o texto vira páginas de poucas linhas.",
+        "en": "Raise Height (for example, 1.5): the text becomes pages of a few lines."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'FONT' and C.active_object.data.text_boxes[0].height > 0"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Embaixo aparece quantas linhas cabem em cada página.",
+        "en": "Below, it shows how many lines fit on each page."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:height"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Setup Dialogue: liga a máquina de escrever, sem código.",
+        "en": "Click Setup Dialogue: it turns on the typewriter, without code."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'FONT' and 'td_speed' in C.active_object.game.properties"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:OBJECT_OT_range_text_dialogue_setup"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Mude Letters per Second (por exemplo, 15) para as letras surgirem mais devagar.",
+        "en": "Change Letters per Second (for example, 15) so the letters show up slower."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'FONT' and 'td_speed' in C.active_object.game.properties and abs(C.active_object.game.properties['td_speed'].value - 40.0) > 0.5"
+      },
+      "destaque": "PROPERTIES"
+    },
+    {
+      "texto": {
+        "pt": "Em At the End, clique em Keep: o texto fica na tela quando acaba.",
+        "en": "Under At the End, click Keep: the text stays on screen when it ends."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.type == 'FONT' and 'td_end' in C.active_object.game.properties and C.active_object.game.properties['td_end'].value == 'KEEP'"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Hide some com o texto; Restart começa de novo.",
+        "en": "Hide removes the text; Restart starts over."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "Keep"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte 0 no teclado numérico, depois P. Enter, Espaço ou clique passam a página. Esc sai. Depois, clique em Próximo.",
+        "en": "Press 0 on the numpad, then P. Enter, Space or a click turn the page. Esc quits. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Não vê o texto pela câmera? Gire o texto para ela: R, X, 90 e Enter.",
+        "en": "Can't see the text from the camera? Turn it to face it: R, X, 90 and Enter."
+      }
+    }
+  ],
+  "encerramento": "Pronto! Mudar a propriedade Text pelo jogo começa um diálogo novo."
+}

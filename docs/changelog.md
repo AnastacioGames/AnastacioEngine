@@ -8,6 +8,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais 7 a 10 (Smart Wizard, Text Box, World Sound, Logic Tree)
+
+Quatro roteiros novos em `source/release/scripts/tutoriais/`, pt e en, continuando a numeração dos básicos:
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `smart_wizard_girador` | Components | 9 | Aba Game › Component Manager, receita Girador, Use Recipe, campo Velocidade, Create Smart Component, Velocidade e Balancar no componente, P |
+| `texto_caixa_dialogo` | Text | 9 | Add › Text, frase longa, aba Data › Game Text › Text Box (Width, Height), Setup Dialogue, Letters per Second, At the End › Keep, P |
+| `som_world_sound` | Sound | 7 | Aba World Sound, módulo Music, Add Sounds, Volume, módulo Effects com os sons da engine, filtro Music, P |
+| `logica_arvore_andar` | Logic Tree | 10 | Node Editor › Logic, + New Logic Tree, Add › Triggers › Key, seta para cima, Add › Actions › Motion, Loc Y, ligação Pulse → Do, P |
+
+- Checagens por `expr`: `WindowManager.smart_wizard` e `game.components[].properties` (o nome do campo é a chave de
+  `args`); `data.body`, `text_boxes[0]` e as propriedades `td_speed`/`td_end` do diálogo; `world.sound_modules` e
+  `world_sound_filter`; `Object.logic_tree`, seus nós (`RangeLogicKey`, `RangeLogicMotion`) e links.
+- "Pause na UI Tree" ficou de fora: é o botão II do template + HUD (Screen Menu), já mostrado no tutorial do HUD.
+- Conferidos fora da engine: expressões compilam e as quatro sequências foram simuladas com objetos falsos (cada
+  passo só fica verdadeiro depois do anterior). Falta o aceite com janela.
+
 ## 2026-11-14 — Tutoriais básicos (Basics, Logic Bricks, Export)
 
 Seis roteiros novos em `source/release/scripts/tutoriais/`, pt e en, numerados no título para aparecerem na

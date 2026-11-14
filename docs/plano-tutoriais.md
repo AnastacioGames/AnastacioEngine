@@ -151,5 +151,13 @@ Text Boxes (diálogos sem código) e World Sound.
 
 - Basics: `basico_interface`, `basico_transformar`, `basico_primeiro_jogo` (primeiro jogo e física juntos).
 - Logic Bricks: `logica_andar`. Export: `exportar_desktop` (aba Export Game › Export), `exportar_web`.
-- Ainda não feitos: Smart Wizard, Logic Tree, Text Boxes, World Sound, Pause na UI Tree e os intermediários
-  (Cutscene, Rec Play, Camera FX, Minimap, Track Tool, Vehicle Lab, Material Atlas, Performance Report).
+- Ainda não feitos: os intermediários (Cutscene, Rec Play, Camera FX, Minimap, Track Tool, Vehicle Lab,
+  Material Atlas, Performance Report).
+
+## Tutoriais 7 a 10 (2026-11-14, falta aceite com janela)
+
+- `smart_wizard_girador` (Components), `texto_caixa_dialogo` (Text), `som_world_sound` (Sound),
+  `logica_arvore_andar` (Logic Tree).
+- Pause na UI Tree não virou tutorial próprio: é o botão II do template + HUD, já no tutorial do HUD.
+- Pontos para o aceite: o painel Component Manager começa fechado (o quadro só aparece depois de aberto); o
+  World Sound supõe que a cena tem World; o passo do texto pede sair da edição com Tab antes de conferir.
