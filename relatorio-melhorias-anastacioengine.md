@@ -53,7 +53,9 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
   Quick Material, conversão PBR ↔ Classic, Fresnel/Shadows Only, sombra colorida, CSM por câmera ou luz,
   Volumetric Clouds e Sky Layers, fog volumetric, SSGI experimental, Baked Lighting moderno (AO e luz estática).
 - **Carregamento:** cache e biblioteca GLSL enxuta, LibLoad assíncrono com progresso, arquivo `.cooked`
-  (hull, shaders, malhas, tangentes, BVH), Load Mode por objeto, texturas DDS, preparar áudio, aquecimento de shaders.
+  (hull, shaders, malhas, tangentes, BVH), Load Mode por objeto, texturas DDS, preparar áudio, aquecimento de shaders
+  (inclui arquivos de LibLoad listados em `<jogo>.warmup`: `Cena[, Cena2]: //caminho/*.range` por linha; entram na
+  cena indicada porque as luzes dela definem o shader; arquivo com luz própria muda o shader dos outros).
 - **Performance:** Static Batch (empate com a ThunderPlayer), auditoria de trabalho repetido por frame (~100 itens),
   caches de luz/probe/camada, resolução dinâmica, Game Trace e Performance Report, Scene Doctor.
 - **Lógica:** Logic Bricks → Python completo (F1–F12), Logic Bricks 2.0, Highlight Active, Logic Tree (F1–F6),

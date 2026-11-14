@@ -246,6 +246,13 @@ public:
 	 */
 	void RemoveScene(KX_Scene *scene);
 
+	/** Cook / shader warm-up: the files the game LibLoads later into this scene, listed in "<game>.warmup"
+	 * next to the main file ("Scene[, Scene2]: //path/*.range" per line), are loaded into it so their
+	 * shaders are compiled with this scene's lights and go to the cache. Returns the libraries loaded;
+	 * the caller frees them with FreeWarmUpLibraries() after removing the scene. */
+	std::vector<Main *> WarmUpLibraries(KX_Scene *scene);
+	void FreeWarmUpLibraries(const std::vector<Main *>& libraries);
+
 	/// Convert the Custom Mouse Cursor.
 	void ConvertCustomMouseCursor(KX_Scene *start_scene, const char *filepath);
 

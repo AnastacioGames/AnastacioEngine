@@ -8,6 +8,17 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Aquecimento de shaders inclui arquivos de LibLoad (`<jogo>.warmup`)
+
+- Diagnóstico (RolimaRacer, veículos texturizados): carregar 20 veículos por LibLoad levava 24 s na 1ª vez;
+  texturas 0,8 s, shaders 22,6 s. O Cook e o aquecimento do jogo exportado só viam as cenas do arquivo principal.
+- `BL_Converter::WarmUpLibraries()` / `FreeWarmUpLibraries()`; chamado em `LA_Launcher` no laço do Cook/aquecimento:
+  cada cena convertida recebe os arquivos da lista `<jogo>.warmup` (`Cena[, Cena2]: caminho`, `//` relativo,
+  `*`/`?` por pasta, `#` comentário), compila com as luzes dela e libera tudo com a cena.
+- Medido em cena controlada (`D:\ProjetoRolimaRacer\Tools\veiculos\medir_carga_veiculos.py`), 20 veículos, só
+  com o `.cooked`: LibLoad 24 s → 1,8 s, 0 shaders novos. Arquivo com luz própria (aspirador_po: Hemi + 2 Point)
+  muda o shader de todos os materiais da cena: na lista, só se a corrida também tiver essa luz.
+
 ## 2026-11-14 — Tutoriais 34 e 35 (Character com postura, nó GLSL)
 
 - `personagem_postura`: preset Character (Posture) no Logic Editor, com cena inicial de cubo sem lógica (`tools/tutoriais/criar_inicio_cubo_limpo.py`).

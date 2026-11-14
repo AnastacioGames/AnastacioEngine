@@ -89,6 +89,8 @@ extern "C" {
 #  include "DNA_texture_types.h"
 #  include "BLI_blenlib.h"
 #  include "BLI_linklist.h"
+#  include "BLI_fnmatch.h"
+#  include "BLI_fileops_types.h"
 #  include "BLO_readfile.h"
 #  include "BKE_global.h"
 #  include "BKE_library.h"
@@ -1801,6 +1803,154 @@ bool BL_Converter::FreeBlendFile(const std::string& path)
 	// Delay library free in ProcessScheduledLibraries.
 	m_freeQueue.push_back(maggie);
 	return true;
+}
+
+/// Files matching a path with * or ? in any part (each part matched inside one folder), sorted.
+static void warmup_glob(const std::string& dir, const std::vector<std::string>& parts, size_t index,
+                        std::vector<std::string>& out)
+{
+	const std::string& part = parts[index];
+	const bool last = (index + 1 == parts.size());
+	if (part.find_first_of("*?") == std::string::npos) {
+		const std::string path = dir + SEP_STR + part;
+		if (last) {
+			if (BLI_is_file(path.c_str())) {
+				out.push_back(path);
+			}
+		}
+		else if (BLI_is_dir(path.c_str())) {
+			warmup_glob(path, parts, index + 1, out);
+		}
+		return;
+	}
+	struct direntry *entries = nullptr;
+	const unsigned int count = BLI_filelist_dir_contents(dir.c_str(), &entries);
+	std::vector<std::string> names;
+	for (unsigned int i = 0; i < count; ++i) {
+		const char *name = entries[i].relname;
+		if (STREQ(name, ".") || STREQ(name, "..") || fnmatch(part.c_str(), name, FNM_CASEFOLD) != 0) {
+			continue;
+		}
+		if (last ? !S_ISDIR(entries[i].type) : S_ISDIR(entries[i].type)) {
+			names.push_back(name);
+		}
+	}
+	BLI_filelist_free(entries, count);
+	std::sort(names.begin(), names.end());
+	for (const std::string& name : names) {
+		const std::string path = dir + SEP_STR + name;
+		if (last) {
+			out.push_back(path);
+		}
+		else {
+			warmup_glob(path, parts, index + 1, out);
+		}
+	}
+}
+
+/// "<game>.warmup": per line "Scene[, Scene2]: path" (// = folder of the game, * and ? allowed), # comments.
+static std::vector<std::string> warmup_files(const char *mainFile, const std::string& sceneName)
+{
+	std::vector<std::string> files;
+	char listPath[FILE_MAX];
+	BLI_strncpy(listPath, mainFile, sizeof(listPath));
+	if (!BLI_path_extension_replace(listPath, sizeof(listPath), ".warmup")) {
+		return files;
+	}
+	FILE *file = BLI_fopen(listPath, "r");
+	if (!file) {
+		return files;
+	}
+	char line[2048];
+	while (fgets(line, sizeof(line), file)) {
+		std::string text(line);
+		const size_t hash = text.find('#');
+		if (hash != std::string::npos) {
+			text.erase(hash);
+		}
+		const size_t colon = text.find(": ");
+		if (colon == std::string::npos) {
+			continue;
+		}
+		bool match = false;
+		std::stringstream scenes(text.substr(0, colon));
+		std::string name;
+		while (std::getline(scenes, name, ',')) {
+			const size_t b = name.find_first_not_of(" \t"), e = name.find_last_not_of(" \t");
+			if (b != std::string::npos && name.substr(b, e - b + 1) == sceneName) {
+				match = true;
+			}
+		}
+		std::string pattern = text.substr(colon + 2);
+		const size_t b = pattern.find_first_not_of(" \t"), e = pattern.find_last_not_of(" \t\r\n");
+		if (!match || b == std::string::npos) {
+			continue;
+		}
+		pattern = pattern.substr(b, e - b + 1);
+
+		// Without "//" and not absolute: still relative to the game folder, never to the working directory.
+		const bool absolute = pattern[0] == '/' || pattern[0] == '\\' || (pattern.size() > 1 && pattern[1] == ':');
+		if (!absolute) {
+			pattern = "//" + pattern;
+		}
+		char abs[FILE_MAX];
+		BLI_strncpy(abs, pattern.c_str(), sizeof(abs));
+		BLI_path_abs(abs, mainFile);
+		BLI_path_native_slash(abs);
+		// Fixed root (up to the first part with a wildcard), then the parts matched folder by folder.
+		std::vector<std::string> parts;
+		std::stringstream split(abs);
+		std::string part;
+		while (std::getline(split, part, SEP)) {
+			parts.push_back(part);
+		}
+		if (parts.size() < 2) {
+			continue;
+		}
+		std::string root = parts[0];
+		size_t first = 1;
+		while (first + 1 < parts.size() && parts[first].find_first_of("*?") == std::string::npos) {
+			root += SEP_STR + parts[first++];
+		}
+		std::vector<std::string> rest(parts.begin() + first, parts.end());
+		warmup_glob(root, rest, 0, files);
+	}
+	fclose(file);
+	return files;
+}
+
+std::vector<Main *> BL_Converter::WarmUpLibraries(KX_Scene *scene)
+{
+	std::vector<Main *> libraries;
+	const std::vector<std::string> files = warmup_files(m_maggie->name, scene->GetName());
+	if (files.empty()) {
+		return libraries;
+	}
+	const double start = PIL_check_seconds_timer();
+	char group[] = "Scene";
+	for (const std::string& path : files) {
+		char *err = nullptr;
+		KX_LibLoadStatus *status = LinkBlendFilePath(path.c_str(), group, scene, &err, 0);
+		if (!status) {
+			CM_Warning("[Cooked] warm-up \"" << path << "\": " << (err ? err : "not loaded"));
+			continue;
+		}
+		libraries.push_back(GetLibraryPath(path));
+	}
+	CM_Message("[Cooked] warm-up of \"" << scene->GetName() << "\": " << libraries.size() << " of " << files.size()
+	           << " files from the .warmup list, " << load_ms(PIL_check_seconds_timer() - start) << "ms");
+	return libraries;
+}
+
+void BL_Converter::FreeWarmUpLibraries(const std::vector<Main *>& libraries)
+{
+	// Their objects went away with the scene (RemoveScene()): only the Blender data is left.
+	for (Main *maggie : libraries) {
+		if (maggie) {
+			m_libloadStatus.erase(maggie);
+			FreeBlendFile(maggie);
+		}
+	}
 }
 
 void BL_Converter::MergeSceneData(KX_Scene *to, const BL_SceneConverter& converter)

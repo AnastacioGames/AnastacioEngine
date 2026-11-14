@@ -528,13 +528,19 @@ void LA_Launcher::InitEngine()
 	/* Cook button: every other scene is converted once too (with all its objects, see BL_ObjectConverted())
 	 * so their shapes go to the cooked file; EngineNextFrame() then draws one frame (shaders) and quits: no logic runs. */
 	if (BL_CookAll()) {
+		/* Files the game LibLoads later (<game>.warmup) join their scene here so their shaders are
+		 * compiled with its lights. The start scene goes last and keeps them until the quit/restart that
+		 * follows: a file is opened once at a time, so the other scenes load and free theirs first. */
 		for (Scene *sce = (Scene *)m_maggie->scene.first; sce; sce = (Scene *)sce->id.next) {
 			if (sce != m_startScene) {
 				KX_Scene *kxscene = m_ketsjiEngine->CreateScene(sce);
 				m_converter->ConvertScene(kxscene);
+				const std::vector<Main *> libraries = m_converter->WarmUpLibraries(kxscene);
 				m_converter->RemoveScene(kxscene);
+				m_converter->FreeWarmUpLibraries(libraries);
 			}
 		}
+		m_converter->WarmUpLibraries(m_kxStartScene);
 		KX_SetActiveScene(m_kxStartScene);
 		m_kxStartScene->Suspend();
 	}

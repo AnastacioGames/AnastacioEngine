@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-12 (`HEAD` `f830ce8e`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-14 (`HEAD` `ef47fda9`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -180,15 +180,15 @@ Laço do jogo: tempo, frames lógicos/físicos, cenas. O desenho em si fica em `
 | Câmeras e visibilidade | `GetCameraRenderData` 703, `GetRenderData` 749, `GetVisibleMeshes` 847, `RenderCamera` 892 |
 | Pós-render | `PostRenderScene` 1083 (2D filters, offscreen final) |
 
-## `Converter/BL_Converter.cpp` (2.000 linhas)
+## `Converter/BL_Converter.cpp` (2.145 linhas)
 
 Conversão de cenas e LibLoad (síncrono e assíncrono). A conversão objeto a objeto fica em
 `BL_BlenderDataConversion.cpp` (acima).
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
-| Cena | `ConvertScene` 688, `CompileSceneShaders` 727, `ConvertScene` 938, `PostConvertScene` 1045, `RemoveScene` 1050 |
-| Objetos sob demanda | `FindOrConvertMainObject` 253, `FindSceneObject` 298, `ConvertSceneObject` 310, `FreeUnconvertedData` 470 |
-| LibLoad | `LinkBlendFileMemory` 1448, `LinkBlendFilePath` 1456, **`LinkBlendFile`** 1485, `FreeBlendFileData` 1652, `FreeBlendFile` 1775 |
-| Merge e assíncrono | `StepMerge` 1168, `StepReloads` 1295, `ProcessScheduledLibraries` 1336, `FinalizeAsyncLoads` 1377, `AsyncConvertTask` 1408, `MergeSceneData` 1806, `MergeScene` 1820 |
-| Shaders e malhas | `ReloadShaders` 1854, `ConvertMeshSpecial` 1892 |
+| Cena | `ConvertScene` 690, `CompileSceneShaders` 729, `ConvertScene` 940, `PostConvertScene` 1047, `RemoveScene` 1052 |
+| Objetos sob demanda | `FindOrConvertMainObject` 255, `FindSceneObject` 300, `ConvertSceneObject` 312, `FreeUnconvertedData` 472 |
+| LibLoad | `LinkBlendFileMemory` 1450, `LinkBlendFilePath` 1458, **`LinkBlendFile`** 1487, `FreeBlendFileData` 1654, `FreeBlendFile` 1777 |
+| Merge e assíncrono | `StepMerge` 1170, `StepReloads` 1297, `ProcessScheduledLibraries` 1338, `FinalizeAsyncLoads` 1379, `AsyncConvertTask` 1410, `MergeSceneData` 1951, `MergeScene` 1965 |
+| Shaders e malhas | `ReloadShaders` 1999, `ConvertMeshSpecial` 2037 |
