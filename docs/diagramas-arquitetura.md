@@ -127,8 +127,8 @@ flowchart LR
         direction TB
         S0["Rede: BeginTick<br/>(só com sessão multiplayer)"]
         S1["Atividade dos objetos"]
-        S2["Animações e deformação"]
-        S3["Cutscene e eventos"]
+        S2["Cutscene e eventos"]
+        S3["Animações e deformação<br/>(depois dos atuadores)"]
         S4["Lógica: sensores e controladores"]
         S5["Atuadores"]
         S6["Terremoto e física Bullet"]
@@ -136,7 +136,7 @@ flowchart LR
         S8["UpdateParents e Game FX da câmera"]
         S9["Partículas GPU, chuva, raios,<br/>flicker das luzes"]
         S10["Rede: EndTick (servidor envia)"]
-        S0 --> S1 --> S2 --> S3 --> S4 --> S5 --> S6 --> S7 --> S8 --> S9 --> S10
+        S0 --> S1 --> S2 --> S4 --> S5 --> S3 --> S6 --> S7 --> S8 --> S9 --> S10
     end
     subgraph RD["3 · KX_RenderPipeline::Render()"]
         direction TB
