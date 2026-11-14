@@ -151,8 +151,7 @@ Text Boxes (diálogos sem código) e World Sound.
 
 - Basics: `basico_interface`, `basico_transformar`, `basico_primeiro_jogo` (primeiro jogo e física juntos).
 - Logic Bricks: `logica_andar`. Export: `exportar_desktop` (aba Export Game › Export), `exportar_web`.
-- Ainda não feitos: os intermediários (Cutscene, Rec Play, Camera FX, Minimap, Track Tool, Vehicle Lab,
-  Material Atlas, Performance Report).
+- Intermediários: ver as seções seguintes.
 
 ## Tutoriais 7 a 10 (2026-11-14, falta aceite com janela)
 
@@ -161,3 +160,11 @@ Text Boxes (diálogos sem código) e World Sound.
 - Pause na UI Tree não virou tutorial próprio: é o botão II do template + HUD, já no tutorial do HUD.
 - Pontos para o aceite: o painel Component Manager começa fechado (o quadro só aparece depois de aberto); o
   World Sound supõe que a cena tem World; o passo do texto pede sair da edição com Tab antes de conferir.
+
+## Tutoriais 11 a 14 (2026-11-14, falta aceite com janela)
+
+- `cutscene_abertura` (Cutscene), `minimap_radar` (Node Editor/UI Tree), `material_atlas_paleta` e
+  `performance_medir` (Optimization).
+- Pontos para o aceite: o destaque dentro do popover Performance; o + de eventos do Cutscene criando
+  SPAWN_OBJECT antes da troca de Type; o Minimap pede o .range salvo para tirar a foto do mapa.
+- Ainda não feitos: Rec Play, Camera FX, Track Tool e Vehicle Lab.

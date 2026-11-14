@@ -1,0 +1,163 @@
+{
+  "titulo": {
+    "pt": "11. Cutscene de abertura: fade e barras de cinema",
+    "en": "11. Opening cutscene: fade and cinema bars"
+  },
+  "categoria": "Cutscene",
+  "resumo": {
+    "pt": "Sequência que toca ao começar o jogo, com eventos no tempo: Fade e Letterbox.",
+    "en": "A sequence that plays when the game starts, with timed events: Fade and Letterbox."
+  },
+  "abertura": "Vamos fazer uma abertura de cinema: a tela começa preta, clareia e aparecem as barras pretas.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Cutscene.",
+        "en": "In Properties, open the Cutscene tab."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'CUTSCENE' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "O Cutscene ainda está em desenvolvimento: alguns eventos podem mudar.",
+        "en": "Cutscene is still in development: some events may change."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=CUTSCENE"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Cutscene Sequences, clique no + para criar uma sequência.",
+        "en": "Under Cutscene Sequences, click + to create a sequence."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "len(C.scene.cutscene_settings.sequences) > 0"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:CUTSCENE_OT_sequence_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Ligue Play on Start: a sequência toca sozinha quando o jogo começa.",
+        "en": "Turn on Play on Start: the sequence plays by itself when the game starts."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(q.play_on_start for q in C.scene.cutscene_settings.sequences)"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Sem Play on Start, um script ou um gatilho toca a sequência.",
+        "en": "Without Play on Start, a script or a trigger plays the sequence."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:play_on_start"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Em Cutscene Events, clique no + para criar o primeiro evento.",
+        "en": "Under Cutscene Events, click + to create the first event."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "len([e for q in C.scene.cutscene_settings.sequences for e in q.events]) > 0"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:CUTSCENE_OT_event_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "No painel Event, troque Type para Fade.",
+        "en": "In the Event panel, change Type to Fade."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(e.type == 'FADE' for e in [e for q in C.scene.cutscene_settings.sequences for e in q.events])"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:type"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Escolha From Black: a tela começa preta e clareia.",
+        "en": "Pick From Black: the screen starts black and fades in."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(e.type == 'FADE' and e.fade_mode == 'IN' for e in [e for q in C.scene.cutscene_settings.sequences for e in q.events])"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Fade Duration é quanto tempo, em segundos, o efeito leva.",
+        "en": "Fade Duration is how many seconds the effect takes."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:fade_mode=IN"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no + de novo e troque o Type do evento novo para Letterbox.",
+        "en": "Click + again and change the new event Type to Letterbox."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(e.type == 'LETTERBOX' for e in [e for q in C.scene.cutscene_settings.sequences for e in q.events])"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:CUTSCENE_OT_event_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Ligue Show Bars e coloque Time em 1: as barras entram 1 segundo depois do início.",
+        "en": "Turn on Show Bars and set Time to 1: the bars come in 1 second after the start."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(e.type == 'LETTERBOX' and e.letterbox_show and e.time > 0.0 for e in [e for q in C.scene.cutscene_settings.sequences for e in q.events])"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Time é o segundo em que o evento acontece.",
+        "en": "Time is the second when the event happens."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte 0 no teclado numérico, depois P para ver a abertura. Esc sai. Depois, clique em Próximo.",
+        "en": "Press 0 on the numpad, then P to watch the opening. Esc quits. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "VIEW_3D"
+    }
+  ],
+  "encerramento": "Pronto! Os outros eventos (Dialog, Camera Shot, Camera Path...) entram na mesma lista."
+}

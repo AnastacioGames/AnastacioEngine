@@ -1,0 +1,142 @@
+{
+  "titulo": {
+    "pt": "13. Material Atlas: várias cores, um material só",
+    "en": "13. Material Atlas: many colors, a single material"
+  },
+  "categoria": "Optimization",
+  "resumo": {
+    "pt": "Juntar materiais de cor lisa numa paleta compartilhada (menos draw calls).",
+    "en": "Merge flat-color materials into a shared palette (fewer draw calls)."
+  },
+  "abertura": "Cada material a mais é um desenho a mais por quadro. Vamos juntar as cores do cubo numa paleta.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na 3D View, clique no cubo.",
+        "en": "In the 3D View, click the cube."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.type == 'MESH'"
+      },
+      "destaque": "VIEW_3D"
+    },
+    {
+      "texto": {
+        "pt": "No Properties, abra a aba Material.",
+        "en": "In Properties, open the Material tab."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.spaces.active.context == 'MATERIAL' for a in C.screen.areas if a.type == 'PROPERTIES')"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "HEADER",
+        "botao": "prop:context=MATERIAL"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no + ao lado da lista de slots e depois em New: o cubo fica com dois materiais.",
+        "en": "Click + next to the slot list, then New: the cube now has two materials."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and len(set(m.name for m in [s.material for s in C.active_object.material_slots if s.material])) >= 2"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "O cubo não tinha material? Clique em New duas vezes, com um + no meio.",
+        "en": "The cube had no material? Click New twice, with a + in between."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:OBJECT_OT_material_slot_add"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Surface, no topo da aba, e troque a cor do material novo.",
+        "en": "Click Surface, at the top of the tab, and change the color of the new material."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and len(set(tuple(round(c, 3) for c in m.diffuse_color) for m in [s.material for s in C.active_object.material_slots if s.material])) >= 2"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_material_panel_category=SURFACE"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte Tab, selecione uma face de cima, clique em Assign e aperte Tab de novo.",
+        "en": "Press Tab, select a top face, click Assign and press Tab again."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.select and C.active_object.mode == 'OBJECT' and len(set(p.material_index for p in C.active_object.data.polygons)) >= 2"
+      },
+      "destaque": "VIEW_3D",
+      "dica": {
+        "pt": "Assign fica embaixo da lista de slots, só em Edit Mode.",
+        "en": "Assign is below the slot list, only in Edit Mode."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Setup, no topo da aba, e ligue o i do Material Atlas para ver a contagem.",
+        "en": "Click Setup, at the top of the tab, and turn on the Material Atlas i to see the count."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.ae_material_panel_category == 'SETUP' and C.window_manager.ae_atlas_show_info"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "Auto usa Palette quando todos os materiais são cor lisa.",
+        "en": "Auto uses Palette when every material is a flat color."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:ae_atlas_show_info"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Palette Atlas: as cores viram quadrados de uma imagem só.",
+        "en": "Click Palette Atlas: the colors become squares of a single image."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.data.get('_anastacio_atlas_source') is not None"
+      },
+      "destaque": "PROPERTIES",
+      "dica": {
+        "pt": "A malha original fica guardada.",
+        "en": "The original mesh is kept."
+      },
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "op:MATERIAL_OT_anastacio_atlas_auto"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Veja a lista de slots: agora o cubo tem um material só, com a mesma aparência. Clique em Próximo.",
+        "en": "Look at the slot list: the cube now has a single material and looks the same. Click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "PROPERTIES"
+    }
+  ],
+  "encerramento": "Pronto! Restore Original Materials desfaz a conversão quando você quiser."
+}

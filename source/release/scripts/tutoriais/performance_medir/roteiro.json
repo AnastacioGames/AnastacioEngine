@@ -1,0 +1,111 @@
+{
+  "titulo": {
+    "pt": "14. Medir o desempenho do jogo",
+    "en": "14. Measure the game performance"
+  },
+  "categoria": "Optimization",
+  "resumo": {
+    "pt": "Scene Doctor, simular PC fraco, Measure e o relatório no navegador.",
+    "en": "Scene Doctor, simulate a weak PC, Measure and the report in the browser."
+  },
+  "abertura": "Vamos descobrir o que deixa o jogo lento, antes que o jogador descubra.",
+  "passos": [
+    {
+      "texto": {
+        "pt": "Na barra de cima, abra Performance e clique em Scene Doctor.",
+        "en": "In the top bar, open Performance and click Scene Doctor."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "__import__('sys').modules.get('bl_operators.anastacio_scene_doctor') is not None and __import__('sys').modules.get('bl_operators.anastacio_scene_doctor')._last_scene == C.scene.name"
+      },
+      "destaque": "INFO",
+      "dica": {
+        "pt": "Performance só aparece com o motor Blender Game.",
+        "en": "Performance only shows with the Blender Game engine."
+      },
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "Performance",
+        "menu": "Scene Doctor"
+      }
+    },
+    {
+      "texto": {
+        "pt": "O Properties foi para a aba Scene: leia os problemas. Muitos têm um botão Fix. Depois, clique em Próximo.",
+        "en": "Properties went to the Scene tab: read the issues. Many have a Fix button. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "PROPERTIES"
+    },
+    {
+      "texto": {
+        "pt": "Abra Performance › Simulate Weak PC e escolha 8x Slower GPU (um notebook antigo).",
+        "en": "Open Performance › Simulate Weak PC and pick 8x Slower GPU (an old notebook)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.range_weak_gpu == '8'"
+      },
+      "destaque": "INFO",
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "Performance",
+        "menu": "Simulate Weak PC"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em Measure (Play StandAlone). Jogue um pouco e feche o jogo: o relatório abre no navegador. Depois, clique em Próximo.",
+        "en": "Click Measure (Play StandAlone). Play a bit and close the game: the report opens in the browser. Then click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "INFO",
+      "dica": {
+        "pt": "O relatório mostra tempo de quadro, picos e o que nunca foi desenhado.",
+        "en": "The report shows frame time, spikes and what was never drawn."
+      },
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "Performance"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Para rever depois: Performance › Reports › Open Last Report. Clique em Próximo.",
+        "en": "To see it again later: Performance › Reports › Open Last Report. Click Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "INFO",
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "Performance"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Volte Simulate Weak PC para Off, para medir no seu PC de verdade.",
+        "en": "Set Simulate Weak PC back to Off, to measure on your real PC."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.window_manager.range_weak_gpu == '1'"
+      },
+      "destaque": "INFO",
+      "alvo": {
+        "area": "INFO",
+        "regiao": "HEADER",
+        "botao": "Performance",
+        "menu": "Simulate Weak PC"
+      }
+    }
+  ],
+  "encerramento": "Pronto! Meça de novo depois de cada correção para ver se melhorou."
+}

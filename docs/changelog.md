@@ -8,6 +8,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais 11 a 14 (Cutscene, Minimap, Material Atlas, Performance)
+
+| Pasta | Categoria | Passos | Conteúdo |
+|---|---|---|---|
+| `cutscene_abertura` | Cutscene | 9 | Aba Cutscene, + sequência, Play on Start, evento Fade (From Black), evento Letterbox (Show Bars, Time 1), P |
+| `minimap_radar` | Node Editor/UI Tree | 8 | Salvar, jogador, Add › Minimap › Radar, outro objeto com a propriedade `minimap`, nó Minimap (Shape Square), P |
+| `material_atlas_paleta` | Optimization | 8 | Aba Material, segundo material, cor em Surface, Assign numa face, Setup › info do Material Atlas, Palette Atlas |
+| `performance_medir` | Optimization | 6 | Performance › Scene Doctor, Simulate Weak PC 8x, Measure, Open Last Report, Weak PC Off |
+
+- Checagens: `scene.cutscene_settings` (sequências e eventos), nós `RangeUIMinimap` das UI Trees
+  (`object_name`, `shape`), `material_slots`/`diffuse_color`/`material_index` e a chave `_anastacio_atlas_source`
+  da malha, `bl_operators.anastacio_scene_doctor._last_scene` e `WindowManager.range_weak_gpu`.
+- O popover Performance da barra de cima é uma região temporária: os itens dele usam `"menu"` no alvo.
+- Conferidos fora da engine: expressões compilam e as quatro sequências foram simuladas. Falta o aceite com janela.
+
 ## 2026-11-14 — Tutoriais 7 a 10 (Smart Wizard, Text Box, World Sound, Logic Tree)
 
 Quatro roteiros novos em `source/release/scripts/tutoriais/`, pt e en, continuando a numeração dos básicos:
