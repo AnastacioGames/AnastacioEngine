@@ -43,15 +43,15 @@ marcar a linha como **reservado** (data + branch/sessão), commit e push; só en
 | Input | Mapear ações (teclado, gamepad, toque) na aba Input | fora por ora: estado difícil de conferir |
 | Locale | Jogo em vários idiomas (Range.locale, Language Button) | fora por ora: pede editar o CSV |
 | Camera FX | Efeitos de câmera (grão, Directional Blur) | falta: achar o painel |
-| Render | Céu: Sky Layers, nuvens, Sky Quality | falta |
+| Render | Céu: Sky Layers, nuvens, Sky Quality | reservado 2026-11-14 (sessão local, main) |
 | Render | Névoa volumétrica, chuva e partículas de fumaça/fogo | falta |
 | Render | Compositing no jogo (faixa de efeitos e presets) | falta |
 | Render | Light Probe Volume e Bake Probes | falta |
 | Render | Sombra colorida, SSGI e PCSS | falta |
 | Shader | Nós de shader e Nodes GLSL por arquivo | falta |
-| Smart Modules | Smart 2D Filter (efeito de tela sem código) | falta |
+| Smart Modules | Smart 2D Filter (efeito de tela sem código) | reservado 2026-11-14 (sessão local, main) |
 | Video | Video Player e actuator Video (legendas, fade) | falta |
-| Video | Screencast (gravar o jogo) | falta |
+| Video | Screencast (gravar o jogo) | reservado 2026-11-14 (sessão local, main) |
 | Sound | Microfone e Tuner | falta |
 | Character | Personagem automático (File › Import › Fuse Character) | falta |
 | Character | Postura do Character (abaixar, rastejar, pular) | falta |
