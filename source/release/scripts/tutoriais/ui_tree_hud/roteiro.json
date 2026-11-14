@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "Os nós de HUD da UI Tree",
-    "en": "The HUD nodes of the UI Tree"
+    "en": "The HUD nodes of the UI Tree",
+    "es": "Los nodos de HUD de la UI Tree"
   },
   "categoria": "Node Editor/UI Tree",
   "resumo": {
     "pt": "Barra de vida, texto, velocímetro, botões e diálogo na tela do jogo, sem código.",
-    "en": "Health bar, text, speedometer, buttons and dialogue on the game screen, no code."
+    "en": "Health bar, text, speedometer, buttons and dialogue on the game screen, no code.",
+    "es": "Barra de vida, texto, velocímetro, botones y diálogo en la pantalla del juego, sin código."
   },
-  "abertura": "Neste tutorial, vamos conhecer os nós de HUD: o que fica na tela enquanto o jogo roda.",
+  "abertura": {
+    "pt": "Neste tutorial, vamos conhecer os nós de HUD: o que fica na tela enquanto o jogo roda.",
+    "en": "In this tutorial, we will meet the HUD nodes: what stays on screen while the game runs.",
+    "es": "En este tutorial vamos a conocer los nodos de HUD: lo que queda en pantalla mientras el juego corre."
+  },
   "passos": [
     {
       "texto": {
         "pt": "Troque a área de baixo para Node Editor.",
-        "en": "Change the bottom area to Node Editor."
+        "en": "Change the bottom area to Node Editor.",
+        "es": "Cambia el área de abajo a Node Editor."
       },
       "narracao": "",
       "destaque": "BAIXO",
@@ -28,7 +35,8 @@
     {
       "texto": {
         "pt": "No cabeçalho, clique em UI.",
-        "en": "In the header, click UI."
+        "en": "In the header, click UI.",
+        "es": "En la cabecera, haz clic en UI."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -42,7 +50,8 @@
     {
       "texto": {
         "pt": "Clique em New para criar uma UI Tree.",
-        "en": "Click New to create a UI Tree."
+        "en": "Click New to create a UI Tree.",
+        "es": "Haz clic en New para crear una UI Tree."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -56,7 +65,8 @@
     {
       "texto": {
         "pt": "No painel UI Tree, à direita, clique em + HUD.",
-        "en": "In the UI Tree panel, on the right, click + HUD."
+        "en": "In the UI Tree panel, on the right, click + HUD.",
+        "es": "En el panel UI Tree, a la derecha, haz clic en + HUD."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -65,7 +75,8 @@
       },
       "dica": {
         "pt": "Sem o painel? Aperte N com o mouse no Node Editor.",
-        "en": "No panel? Press N with the mouse over the Node Editor."
+        "en": "No panel? Press N with the mouse over the Node Editor.",
+        "es": "¿No ves el panel? Pulsa N con el ratón en el Node Editor."
       },
       "alvo": {
         "area": "NODE_EDITOR",
@@ -76,7 +87,8 @@
     {
       "texto": {
         "pt": "Clique no bloco ao lado da barra verde: é a Progress Bar, que mostra a propriedade vida (0 a 100).",
-        "en": "Click the block next to the green bar: it is the Progress Bar, showing the vida (health) property (0 to 100)."
+        "en": "Click the block next to the green bar: it is the Progress Bar, showing the vida (health) property (0 to 100).",
+        "es": "Haz clic en el bloque junto a la barra verde: es la Progress Bar, que muestra la propiedad vida (0 a 100)."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -85,7 +97,8 @@
       },
       "dica": {
         "pt": "Clique no quadradinho ao lado da barra: ele é a alça do nó.",
-        "en": "Click the small square next to the bar: it is the node handle."
+        "en": "Click the small square next to the bar: it is the node handle.",
+        "es": "Haz clic en el cuadradito junto a la barra: es el asa del nodo."
       },
       "alvo": {
         "no": "Progress Bar"
@@ -94,7 +107,8 @@
     {
       "texto": {
         "pt": "No painel, troque a cor Fill da barra.",
-        "en": "In the panel, change the bar Fill color."
+        "en": "In the panel, change the bar Fill color.",
+        "es": "En el panel, cambia el color Fill de la barra."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -103,7 +117,8 @@
       },
       "dica": {
         "pt": "Low é a cor que a barra ganha quando a vida acaba.",
-        "en": "Low is the color the bar fades to as health runs out."
+        "en": "Low is the color the bar fades to as health runs out.",
+        "es": "Low es el color que toma la barra cuando se acaba la vida."
       },
       "alvo": {
         "area": "NODE_EDITOR",
@@ -114,7 +129,8 @@
     {
       "texto": {
         "pt": "Clique no bloco ao lado do texto Vida: é um Label.",
-        "en": "Click the block next to the text Vida: it is a Label."
+        "en": "Click the block next to the text Vida: it is a Label.",
+        "es": "Haz clic en el bloque junto al texto Vida: es un Label."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -128,7 +144,8 @@
     {
       "texto": {
         "pt": "Em Format, troque Vida por HP. O que fica entre chaves é a propriedade: {vida:.0f}.",
-        "en": "In Format, change Vida to HP. What is inside braces is the property: {vida:.0f}."
+        "en": "In Format, change Vida to HP. What is inside braces is the property: {vida:.0f}.",
+        "es": "En Format, cambia Vida por HP. Lo que va entre llaves es la propiedad: {vida:.0f}."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -137,7 +154,8 @@
       },
       "dica": {
         "pt": ":.0f mostra o número sem casas decimais.",
-        "en": ":.0f shows the number without decimals."
+        "en": ":.0f shows the number without decimals.",
+        "es": ":.0f muestra el número sin decimales."
       },
       "alvo": {
         "area": "NODE_EDITOR",
@@ -148,7 +166,8 @@
     {
       "texto": {
         "pt": "Clique no bloco do velocímetro: é o Gauge. Ele lê velocidade, e o Anchor BR o prende ao canto de baixo.",
-        "en": "Click the speedometer block: it is the Gauge. It reads velocidade, and Anchor BR pins it to the bottom corner."
+        "en": "Click the speedometer block: it is the Gauge. It reads velocidade, and Anchor BR pins it to the bottom corner.",
+        "es": "Haz clic en el bloque del velocímetro: es el Gauge. Lee velocidade, y el Anchor BR lo sujeta a la esquina de abajo."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -157,7 +176,8 @@
       },
       "dica": {
         "pt": "O Anchor diz a que canto da tela o widget fica preso quando a janela muda de tamanho.",
-        "en": "The Anchor says which screen corner the widget sticks to when the window changes size."
+        "en": "The Anchor says which screen corner the widget sticks to when the window changes size.",
+        "es": "El Anchor indica a qué esquina de la pantalla queda sujeto el widget cuando la ventana cambia de tamaño."
       },
       "alvo": {
         "no": "Gauge"
@@ -166,7 +186,8 @@
     {
       "texto": {
         "pt": "Clique no bloco do botão A. Enquanto ele está apertado, a propriedade botao_a fica True.",
-        "en": "Click the button A block. While it is held, the botao_a property is True."
+        "en": "Click the button A block. While it is held, the botao_a property is True.",
+        "es": "Haz clic en el bloque del botón A. Mientras está pulsado, la propiedad botao_a vale True."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -175,7 +196,8 @@
       },
       "dica": {
         "pt": "Os nós Set Property, à direita, fazem isso: On Press liga, On Release desliga.",
-        "en": "The Set Property nodes on the right do it: On Press turns it on, On Release turns it off."
+        "en": "The Set Property nodes on the right do it: On Press turns it on, On Release turns it off.",
+        "es": "Los nodos Set Property, a la derecha, hacen eso: On Press activa, On Release desactiva."
       },
       "alvo": {
         "no": "A"
@@ -184,7 +206,8 @@
     {
       "texto": {
         "pt": "Clique no bloco da caixa de diálogo. Ela aparece quando a propriedade dialogo tem texto.",
-        "en": "Click the dialogue box block. It shows up when the dialogo property has text."
+        "en": "Click the dialogue box block. It shows up when the dialogo property has text.",
+        "es": "Haz clic en el bloque de la caja de diálogo. Aparece cuando la propiedad dialogo tiene texto."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -193,7 +216,8 @@
       },
       "dica": {
         "pt": "Use | no texto para começar outra página.",
-        "en": "Use | in the text to start a new page."
+        "en": "Use | in the text to start a new page.",
+        "es": "Usa | en el texto para empezar otra página."
       },
       "alvo": {
         "no": "Dialogue Box"
@@ -202,7 +226,8 @@
     {
       "texto": {
         "pt": "Agora crie um: menu Add › HUD › Label.",
-        "en": "Now make one: Add menu › HUD › Label."
+        "en": "Now make one: Add menu › HUD › Label.",
+        "es": "Ahora crea uno: menú Add › HUD › Label."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -211,7 +236,8 @@
       },
       "dica": {
         "pt": "Atalho: Shift+A com o mouse no Node Editor.",
-        "en": "Shortcut: Shift+A with the mouse over the Node Editor."
+        "en": "Shortcut: Shift+A with the mouse over the Node Editor.",
+        "es": "Atajo: Shift+A con el ratón en el Node Editor."
       },
       "alvo": {
         "area": "NODE_EDITOR",
@@ -223,7 +249,8 @@
     {
       "texto": {
         "pt": "Arraste o Label novo para dentro do quadro HUD.",
-        "en": "Drag the new Label into the HUD frame."
+        "en": "Drag the new Label into the HUD frame.",
+        "es": "Arrastra el Label nuevo dentro del marco HUD."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -232,7 +259,8 @@
       },
       "dica": {
         "pt": "Fora do quadro, o widget não aparece no jogo.",
-        "en": "Outside the frame, the widget does not show in the game."
+        "en": "Outside the frame, the widget does not show in the game.",
+        "es": "Fuera del marco, el widget no aparece en el juego."
       },
       "alvo": {
         "no": "Label.002"
@@ -241,7 +269,8 @@
     {
       "texto": {
         "pt": "Em Format, escreva: Pontos {pontos}",
-        "en": "In Format, type: Points {pontos}"
+        "en": "In Format, type: Points {pontos}",
+        "es": "En Format, escribe: Pontos {pontos}"
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -250,7 +279,8 @@
       },
       "dica": {
         "pt": "Enquanto a propriedade pontos não existe, aparece 0. Crie-a na câmera, no Logic Editor.",
-        "en": "While the pontos property does not exist, it shows 0. Add it to the camera in the Logic Editor."
+        "en": "While the pontos property does not exist, it shows 0. Add it to the camera in the Logic Editor.",
+        "es": "Mientras la propiedad pontos no exista, aparece 0. Créala en la cámara, en el Logic Editor."
       },
       "alvo": {
         "area": "NODE_EDITOR",
@@ -261,7 +291,8 @@
     {
       "texto": {
         "pt": "No topo do painel, clique em Setup Game Logic.",
-        "en": "At the top of the panel, click Setup Game Logic."
+        "en": "At the top of the panel, click Setup Game Logic.",
+        "es": "Arriba en el panel, haz clic en Setup Game Logic."
       },
       "narracao": "",
       "destaque": "NODE_EDITOR",
@@ -275,12 +306,17 @@
     {
       "texto": {
         "pt": "Mouse na 3D View, aperte P para ver o HUD. Esc sai do jogo.",
-        "en": "Mouse over the 3D View, press P to see the HUD. Esc quits the game."
+        "en": "Mouse over the 3D View, press P to see the HUD. Esc quits the game.",
+        "es": "Ratón en la 3D View, pulsa P para ver el HUD. Esc sale del juego."
       },
       "narracao": "",
       "destaque": "VIEW_3D",
       "checagem": null
     }
   ],
-  "encerramento": "Pronto! Agora você sabe montar o HUD do seu jogo com nós."
+  "encerramento": {
+    "pt": "Pronto! Agora você sabe montar o HUD do seu jogo com nós.",
+    "en": "Done! Now you know how to build your game HUD with nodes.",
+    "es": "¡Listo! Ahora sabes montar el HUD de tu juego con nodos."
+  }
 }

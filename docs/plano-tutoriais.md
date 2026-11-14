@@ -133,7 +133,7 @@ Text Boxes (diálogos sem código) e World Sound.
 - **Progresso:** fica em CONFIG/`range_tutorials.json`. O menu mostra ✓ nos concluídos e (n/total) nos começados, e continua de onde o usuário parou.
 - **Dica:** depois de 20 s parado no passo, mostra `"dica"` em amarelo, e o quadro pisca mais rápido.
 - **Busca:** Search Tutorials… no topo do menu.
-- **Idiomas:** `titulo`, `texto` e `dica` aceitam `{"pt":..,"en":..}`, conforme o idioma da interface.
+- **Idiomas:** `titulo`, `texto` e `dica` aceitam `{"pt":..,"en":..,"es":..}`, conforme o idioma da interface (sem o idioma, vale `en`).
 - **Exportar e importar .zip:** a importação recusa caminhos absolutos, `.`, `..` e nomes repetidos, e nunca sobrescreve tutorial existente.
 - **Revisão do Codex:** cinco pontos, todos aceitos (enum da busca estável, zip duplicado, `_pendente` limpo, Restart sem zerar antes da confirmação, salvar fecha a reprodução).
 
@@ -168,3 +168,12 @@ Text Boxes (diálogos sem código) e World Sound.
 - Pontos para o aceite: o destaque dentro do popover Performance; o + de eventos do Cutscene criando
   SPAWN_OBJECT antes da troca de Type; o Minimap pede o .range salvo para tirar a foto do mapa.
 - Ainda não feitos: Rec Play, Camera FX, Track Tool e Vehicle Lab.
+
+## Três idiomas (2026-11-14)
+
+- Os 17 tutoriais têm pt, en e es em `titulo`, `resumo`, `abertura`, `encerramento`, `texto` e `dica`.
+- Regra de escrita: nomes de botões, abas, menus, campos e teclas ficam como na engine (inglês), em todos os
+  idiomas: "clique em Next", "Enter, Space". Rótulos que a engine mostra em português (Jogar, Girador,
+  Velocidade) ficam como estão.
+- O cartão do tutorial usa Close, Back, Next, Skip e Finish; o rótulo "Dica:"/"Tip:"/"Consejo:" e o
+  "feito!" seguem o idioma da interface.

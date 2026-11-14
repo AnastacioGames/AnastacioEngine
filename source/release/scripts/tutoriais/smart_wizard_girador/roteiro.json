@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "7. Smart Component sem código: um objeto que gira",
-    "en": "7. Smart Component without code: a spinning object"
+    "en": "7. Smart Component without code: a spinning object",
+    "es": "7. Smart Component sin código: un objeto que gira"
   },
   "categoria": "Components",
   "resumo": {
     "pt": "Smart Component Wizard: receita pronta, campos e o componente no objeto.",
-    "en": "Smart Component Wizard: a ready recipe, fields and the component on the object."
+    "en": "Smart Component Wizard: a ready recipe, fields and the component on the object.",
+    "es": "Smart Component Wizard: receta lista, campos y el componente en el objeto."
   },
-  "abertura": "Vamos criar um componente Python sem escrever código, com o Smart Component Wizard.",
+  "abertura": {
+    "pt": "Vamos criar um componente Python sem escrever código, com o Smart Component Wizard.",
+    "en": "Let's create a Python component without writing code, with the Smart Component Wizard.",
+    "es": "Vamos a crear un componente Python sin escribir código, con el Smart Component Wizard."
+  },
   "passos": [
     {
       "texto": {
         "pt": "Na 3D View, clique no cubo.",
-        "en": "In the 3D View, click the cube."
+        "en": "In the 3D View, click the cube.",
+        "es": "En la 3D View, haz clic en el cubo."
       },
       "narracao": "",
       "checagem": {
@@ -24,7 +31,8 @@
     {
       "texto": {
         "pt": "No Properties, abra a aba Game.",
-        "en": "In Properties, open the Game tab."
+        "en": "In Properties, open the Game tab.",
+        "es": "En Properties, abre la pestaña Game."
       },
       "narracao": "",
       "checagem": {
@@ -40,7 +48,8 @@
     {
       "texto": {
         "pt": "Abra o painel Component Manager e, na lista de receitas, escolha Girador.",
-        "en": "Open the Component Manager panel and pick Girador in the recipe list."
+        "en": "Open the Component Manager panel and pick Girador in the recipe list.",
+        "es": "Abre el panel Component Manager y, en la lista de recetas, elige Girador."
       },
       "narracao": "",
       "checagem": {
@@ -49,7 +58,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "O painel começa fechado: clique no título Component Manager.",
-        "en": "The panel starts closed: click the Component Manager title."
+        "en": "The panel starts closed: click the Component Manager title.",
+        "es": "El panel empieza cerrado: haz clic en el título Component Manager."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -60,7 +70,8 @@
     {
       "texto": {
         "pt": "Clique em Use Recipe: os campos da receita entram na lista.",
-        "en": "Click Use Recipe: the recipe fields go into the list."
+        "en": "Click Use Recipe: the recipe fields go into the list.",
+        "es": "Haz clic en Use Recipe: los campos de la receta entran en la lista."
       },
       "narracao": "",
       "checagem": {
@@ -69,7 +80,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Se a lista já tinha campos, confirme a troca.",
-        "en": "If the list already had fields, confirm the swap."
+        "en": "If the list already had fields, confirm the swap.",
+        "es": "Si la lista ya tenía campos, confirma el cambio."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -80,7 +92,8 @@
     {
       "texto": {
         "pt": "Na lista Fields, clique no campo Velocidade para ver o mínimo, o máximo e a dica dele.",
-        "en": "In the Fields list, click the Velocidade field to see its min, max and tip."
+        "en": "In the Fields list, click the Velocidade field to see its min, max and tip.",
+        "es": "En la lista Fields, haz clic en el campo Velocidade para ver su mínimo, máximo y consejo."
       },
       "narracao": "",
       "checagem": {
@@ -89,13 +102,15 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Cada campo vira um valor que você muda no objeto, sem mexer no código.",
-        "en": "Each field becomes a value you change on the object, without touching the code."
+        "en": "Each field becomes a value you change on the object, without touching the code.",
+        "es": "Cada campo se vuelve un valor que cambias en el objeto, sin tocar el código."
       }
     },
     {
       "texto": {
         "pt": "Clique em Create Smart Component: o código é criado e o componente entra no cubo.",
-        "en": "Click Create Smart Component: the code is written and the component goes on the cube."
+        "en": "Click Create Smart Component: the code is written and the component goes on the cube.",
+        "es": "Haz clic en Create Smart Component: se crea el código y el componente entra en el cubo."
       },
       "narracao": "",
       "checagem": {
@@ -104,7 +119,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Mensagem de erro em vermelho? Ela diz o campo que falta.",
-        "en": "A red error message? It names the missing field."
+        "en": "A red error message? It names the missing field.",
+        "es": "¿Mensaje de error en rojo? Indica el campo que falta."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -115,7 +131,8 @@
     {
       "texto": {
         "pt": "No quadro do componente, mude Velocidade (por exemplo, 360).",
-        "en": "In the component box, change Velocidade (for example, 360)."
+        "en": "In the component box, change Velocidade (for example, 360).",
+        "es": "En el cuadro del componente, cambia Velocidade (por ejemplo, 360)."
       },
       "narracao": "",
       "checagem": {
@@ -124,13 +141,15 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Número negativo gira para o outro lado.",
-        "en": "A negative number spins the other way."
+        "en": "A negative number spins the other way.",
+        "es": "Un número negativo gira hacia el otro lado."
       }
     },
     {
       "texto": {
         "pt": "Ligue Balancar: o campo Angulo aparece, porque só faz sentido balançando.",
-        "en": "Turn on Balancar: the Angulo field shows up, because it only matters when swinging."
+        "en": "Turn on Balancar: the Angulo field shows up, because it only matters when swinging.",
+        "es": "Activa Balancar: aparece el campo Angulo, porque solo tiene sentido al balancearse."
       },
       "narracao": "",
       "checagem": {
@@ -140,17 +159,23 @@
     },
     {
       "texto": {
-        "pt": "Mouse na 3D View, aperte P: o cubo balança. Esc sai. Depois, clique em Próximo.",
-        "en": "Mouse in the 3D View, press P: the cube swings. Esc quits. Then click Next."
+        "pt": "Mouse na 3D View, aperte P: o cubo balança. Esc sai. Depois, clique em Next.",
+        "en": "Mouse in the 3D View, press P: the cube swings. Esc quits. Then click Next.",
+        "es": "Ratón en la 3D View, pulsa P: el cubo se balancea. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "O código ficou num Text do arquivo: abra no Text Editor para estudar.",
-        "en": "The code is in a Text of the file: open it in the Text Editor to study it."
+        "en": "The code is in a Text of the file: open it in the Text Editor to study it.",
+        "es": "El código quedó en un Text del archivo: ábrelo en el Text Editor para estudiarlo."
       }
     }
   ],
-  "encerramento": "Pronto! Teste as outras receitas: Perseguidor, Patrulha, Coletável, Porta..."
+  "encerramento": {
+    "pt": "Pronto! Teste as outras receitas: Perseguidor, Patrulha, Coletável, Porta...",
+    "en": "Done! Try the other recipes: Perseguidor, Patrulha, Coletável, Porta...",
+    "es": "¡Listo! Prueba las otras recetas: Perseguidor, Patrulha, Coletável, Porta..."
+  }
 }

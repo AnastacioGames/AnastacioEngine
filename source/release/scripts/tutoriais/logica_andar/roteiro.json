@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "4. Fazer um objeto andar com Logic Bricks",
-    "en": "4. Make an object walk with Logic Bricks"
+    "en": "4. Make an object walk with Logic Bricks",
+    "es": "4. Hacer que un objeto camine con Logic Bricks"
   },
   "categoria": "Logic Bricks",
   "resumo": {
     "pt": "Sensor Keyboard, Controller And e Actuator Motion ligados.",
-    "en": "Keyboard sensor, And controller and Motion actuator linked."
+    "en": "Keyboard sensor, And controller and Motion actuator linked.",
+    "es": "Sensor Keyboard, Controller And y Actuator Motion conectados."
   },
-  "abertura": "Neste tutorial, o cubo vai andar quando você apertar a seta para cima.",
+  "abertura": {
+    "pt": "Neste tutorial, o cubo vai andar quando você apertar a seta para cima.",
+    "en": "In this tutorial, the cube will walk when you press the up arrow.",
+    "es": "En este tutorial, el cubo va a caminar cuando pulses la flecha arriba."
+  },
   "passos": [
     {
       "texto": {
         "pt": "Clique no cubo na 3D View.",
-        "en": "Click the cube in the 3D View."
+        "en": "Click the cube in the 3D View.",
+        "es": "Haz clic en el cubo en la 3D View."
       },
       "narracao": "",
       "checagem": {
@@ -24,7 +31,8 @@
     {
       "texto": {
         "pt": "Troque a área de baixo para Logic Editor.",
-        "en": "Change the bottom area to Logic Editor."
+        "en": "Change the bottom area to Logic Editor.",
+        "es": "Cambia el área de abajo a Logic Editor."
       },
       "narracao": "",
       "checagem": {
@@ -41,7 +49,8 @@
     {
       "texto": {
         "pt": "Clique em Add Sensor e escolha Keyboard.",
-        "en": "Click Add Sensor and choose Keyboard."
+        "en": "Click Add Sensor and choose Keyboard.",
+        "es": "Haz clic en Add Sensor y elige Keyboard."
       },
       "narracao": "",
       "checagem": {
@@ -50,7 +59,8 @@
       "destaque": "LOGIC_EDITOR",
       "dica": {
         "pt": "O sensor percebe algo: aqui, uma tecla.",
-        "en": "The sensor notices something: here, a key."
+        "en": "The sensor notices something: here, a key.",
+        "es": "El sensor percibe algo: aquí, una tecla."
       },
       "alvo": {
         "area": "LOGIC_EDITOR",
@@ -62,7 +72,8 @@
     {
       "texto": {
         "pt": "Clique no campo Key do sensor e aperte a seta para cima.",
-        "en": "Click the sensor Key field and press the Up Arrow."
+        "en": "Click the sensor Key field and press the Up Arrow.",
+        "es": "Haz clic en el campo Key del sensor y pulsa la flecha arriba."
       },
       "narracao": "",
       "checagem": {
@@ -71,7 +82,8 @@
       "destaque": "LOGIC_EDITOR",
       "dica": {
         "pt": "O campo espera a próxima tecla que você apertar.",
-        "en": "The field waits for the next key you press."
+        "en": "The field waits for the next key you press.",
+        "es": "El campo espera la próxima tecla que pulses."
       },
       "alvo": {
         "area": "LOGIC_EDITOR",
@@ -82,7 +94,8 @@
     {
       "texto": {
         "pt": "Clique em Add Controller e escolha And.",
-        "en": "Click Add Controller and choose And."
+        "en": "Click Add Controller and choose And.",
+        "es": "Haz clic en Add Controller y elige And."
       },
       "narracao": "",
       "checagem": {
@@ -99,7 +112,8 @@
     {
       "texto": {
         "pt": "Clique em Add Actuator e escolha Motion.",
-        "en": "Click Add Actuator and choose Motion."
+        "en": "Click Add Actuator and choose Motion.",
+        "es": "Haz clic en Add Actuator y elige Motion."
       },
       "narracao": "",
       "checagem": {
@@ -116,7 +130,8 @@
     {
       "texto": {
         "pt": "No Motion, em Loc, ponha 0.1 no Y (o do meio).",
-        "en": "In Motion, under Loc, set Y (the middle one) to 0.1."
+        "en": "In Motion, under Loc, set Y (the middle one) to 0.1.",
+        "es": "En el Motion, en Loc, pon 0.1 en la Y (la del medio)."
       },
       "narracao": "",
       "checagem": {
@@ -125,7 +140,8 @@
       "destaque": "LOGIC_EDITOR",
       "dica": {
         "pt": "0.1 é quanto ele anda a cada quadro, uns 6 metros por segundo.",
-        "en": "0.1 is how far it moves each frame, about 6 meters per second."
+        "en": "0.1 is how far it moves each frame, about 6 meters per second.",
+        "es": "0.1 es cuánto avanza en cada fotograma, unos 6 metros por segundo."
       },
       "alvo": {
         "area": "LOGIC_EDITOR",
@@ -136,7 +152,8 @@
     {
       "texto": {
         "pt": "Ligue o Sensor ao Controller: arraste da bolinha do sensor até a bolinha do controller.",
-        "en": "Link the Sensor to the Controller: drag from the sensor dot to the controller dot."
+        "en": "Link the Sensor to the Controller: drag from the sensor dot to the controller dot.",
+        "es": "Conecta el Sensor al Controller: arrastra desde el punto del sensor hasta el punto del controller."
       },
       "narracao": "",
       "checagem": {
@@ -147,7 +164,8 @@
     {
       "texto": {
         "pt": "Ligue o Controller ao Actuator do mesmo jeito.",
-        "en": "Link the Controller to the Actuator the same way."
+        "en": "Link the Controller to the Actuator the same way.",
+        "es": "Conecta el Controller al Actuator de la misma forma."
       },
       "narracao": "",
       "checagem": {
@@ -157,13 +175,18 @@
     },
     {
       "texto": {
-        "pt": "Mouse na 3D View, aperte P e segure a seta para cima. Esc sai. Depois, clique em Próximo.",
-        "en": "Mouse in the 3D View, press P and hold the Up Arrow. Esc quits. Then click Next."
+        "pt": "Mouse na 3D View, aperte P e segure a seta para cima. Esc sai. Depois, clique em Next.",
+        "en": "Mouse in the 3D View, press P and hold the Up Arrow. Esc quits. Then click Next.",
+        "es": "Ratón en la 3D View, pulsa P y mantén la flecha arriba. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
       "destaque": "VIEW_3D"
     }
   ],
-  "encerramento": "Pronto! Sensor percebe, Controller decide e Actuator faz. Toda lógica de Logic Bricks segue esse caminho."
+  "encerramento": {
+    "pt": "Pronto! Sensor percebe, Controller decide e Actuator faz. Toda lógica de Logic Bricks segue esse caminho.",
+    "en": "Done! The Sensor notices, the Controller decides and the Actuator acts. All Logic Bricks logic follows this path.",
+    "es": "¡Listo! El Sensor percibe, el Controller decide y el Actuator hace. Toda la lógica de Logic Bricks sigue ese camino."
+  }
 }

@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "14. Medir o desempenho do jogo",
-    "en": "14. Measure the game performance"
+    "en": "14. Measure the game performance",
+    "es": "14. Medir el rendimiento del juego"
   },
   "categoria": "Optimization",
   "resumo": {
     "pt": "Scene Doctor, simular PC fraco, Measure e o relatório no navegador.",
-    "en": "Scene Doctor, simulate a weak PC, Measure and the report in the browser."
+    "en": "Scene Doctor, simulate a weak PC, Measure and the report in the browser.",
+    "es": "Scene Doctor, simular un PC débil, Measure y el informe en el navegador."
   },
-  "abertura": "Vamos descobrir o que deixa o jogo lento, antes que o jogador descubra.",
+  "abertura": {
+    "pt": "Vamos descobrir o que deixa o jogo lento, antes que o jogador descubra.",
+    "en": "Let's find out what makes the game slow, before the player does.",
+    "es": "Vamos a descubrir qué hace lento el juego, antes de que lo descubra el jugador."
+  },
   "passos": [
     {
       "texto": {
         "pt": "Na barra de cima, abra Performance e clique em Scene Doctor.",
-        "en": "In the top bar, open Performance and click Scene Doctor."
+        "en": "In the top bar, open Performance and click Scene Doctor.",
+        "es": "En la barra de arriba, abre Performance y haz clic en Scene Doctor."
       },
       "narracao": "",
       "checagem": {
@@ -22,7 +29,8 @@
       "destaque": "INFO",
       "dica": {
         "pt": "Performance só aparece com o motor Blender Game.",
-        "en": "Performance only shows with the Blender Game engine."
+        "en": "Performance only shows with the Blender Game engine.",
+        "es": "Performance solo aparece con el motor Blender Game."
       },
       "alvo": {
         "area": "INFO",
@@ -33,8 +41,9 @@
     },
     {
       "texto": {
-        "pt": "O Properties foi para a aba Scene: leia os problemas. Muitos têm um botão Fix. Depois, clique em Próximo.",
-        "en": "Properties went to the Scene tab: read the issues. Many have a Fix button. Then click Next."
+        "pt": "O Properties foi para a aba Scene: leia os problemas. Muitos têm um botão Fix. Depois, clique em Next.",
+        "en": "Properties went to the Scene tab: read the issues. Many have a Fix button. Then click Next.",
+        "es": "Properties pasó a la pestaña Scene: lee los problemas. Muchos tienen un botón Fix. Luego haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
@@ -43,7 +52,8 @@
     {
       "texto": {
         "pt": "Abra Performance › Simulate Weak PC e escolha 8x Slower GPU (um notebook antigo).",
-        "en": "Open Performance › Simulate Weak PC and pick 8x Slower GPU (an old notebook)."
+        "en": "Open Performance › Simulate Weak PC and pick 8x Slower GPU (an old notebook).",
+        "es": "Abre Performance › Simulate Weak PC y elige 8x Slower GPU (un portátil antiguo)."
       },
       "narracao": "",
       "checagem": {
@@ -59,15 +69,17 @@
     },
     {
       "texto": {
-        "pt": "Clique em Measure (Play StandAlone). Jogue um pouco e feche o jogo: o relatório abre no navegador. Depois, clique em Próximo.",
-        "en": "Click Measure (Play StandAlone). Play a bit and close the game: the report opens in the browser. Then click Next."
+        "pt": "Clique em Measure (Play StandAlone). Jogue um pouco e feche o jogo: o relatório abre no navegador. Depois, clique em Next.",
+        "en": "Click Measure (Play StandAlone). Play a bit and close the game: the report opens in the browser. Then click Next.",
+        "es": "Haz clic en Measure (Play StandAlone). Juega un poco y cierra el juego: el informe se abre en el navegador. Luego haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
       "destaque": "INFO",
       "dica": {
         "pt": "O relatório mostra tempo de quadro, picos e o que nunca foi desenhado.",
-        "en": "The report shows frame time, spikes and what was never drawn."
+        "en": "The report shows frame time, spikes and what was never drawn.",
+        "es": "El informe muestra el tiempo de fotograma, los picos y lo que nunca se dibujó."
       },
       "alvo": {
         "area": "INFO",
@@ -77,8 +89,9 @@
     },
     {
       "texto": {
-        "pt": "Para rever depois: Performance › Reports › Open Last Report. Clique em Próximo.",
-        "en": "To see it again later: Performance › Reports › Open Last Report. Click Next."
+        "pt": "Para rever depois: Performance › Reports › Open Last Report. Clique em Next.",
+        "en": "To see it again later: Performance › Reports › Open Last Report. Click Next.",
+        "es": "Para verlo después: Performance › Reports › Open Last Report. Haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
@@ -92,7 +105,8 @@
     {
       "texto": {
         "pt": "Volte Simulate Weak PC para Off, para medir no seu PC de verdade.",
-        "en": "Set Simulate Weak PC back to Off, to measure on your real PC."
+        "en": "Set Simulate Weak PC back to Off, to measure on your real PC.",
+        "es": "Vuelve Simulate Weak PC a Off, para medir en tu PC real."
       },
       "narracao": "",
       "checagem": {
@@ -107,5 +121,9 @@
       }
     }
   ],
-  "encerramento": "Pronto! Meça de novo depois de cada correção para ver se melhorou."
+  "encerramento": {
+    "pt": "Pronto! Meça de novo depois de cada correção para ver se melhorou.",
+    "en": "Done! Measure again after each fix to see if it got better.",
+    "es": "¡Listo! Vuelve a medir después de cada corrección para ver si mejoró."
+  }
 }

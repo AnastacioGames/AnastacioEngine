@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "8. Caixa de texto e diálogo sem código",
-    "en": "8. Text box and dialogue without code"
+    "en": "8. Text box and dialogue without code",
+    "es": "8. Caja de texto y diálogo sin código"
   },
   "categoria": "Text",
   "resumo": {
     "pt": "Texto com quebra de linha, páginas e efeito máquina de escrever.",
-    "en": "Text with word wrap, pages and a typewriter effect."
+    "en": "Text with word wrap, pages and a typewriter effect.",
+    "es": "Texto con salto de línea, páginas y efecto máquina de escribir."
   },
-  "abertura": "Vamos fazer uma caixa de diálogo: o texto aparece letra por letra e passa de página com Enter.",
+  "abertura": {
+    "pt": "Vamos fazer uma caixa de diálogo: o texto aparece letra por letra e passa de página com Enter.",
+    "en": "Let's make a dialogue box: the text shows letter by letter and turns the page with Enter.",
+    "es": "Vamos a hacer una caja de diálogo: el texto aparece letra por letra y pasa de página con Enter."
+  },
   "passos": [
     {
       "texto": {
         "pt": "Na 3D View, abra Add › Text.",
-        "en": "In the 3D View, open Add › Text."
+        "en": "In the 3D View, open Add › Text.",
+        "es": "En la 3D View, abre Add › Text."
       },
       "narracao": "",
       "checagem": {
@@ -30,7 +37,8 @@
     {
       "texto": {
         "pt": "Aperte Tab, apague a palavra Text e escreva uma frase longa, com umas 20 palavras. Aperte Tab de novo.",
-        "en": "Press Tab, delete the word Text and type a long sentence, about 20 words. Press Tab again."
+        "en": "Press Tab, delete the word Text and type a long sentence, about 20 words. Press Tab again.",
+        "es": "Pulsa Tab, borra la palabra Text y escribe una frase larga, de unas 20 palabras. Pulsa Tab otra vez."
       },
       "narracao": "",
       "checagem": {
@@ -39,13 +47,15 @@
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "O texto só é salvo quando você sai da edição com Tab.",
-        "en": "The text is only kept when you leave editing with Tab."
+        "en": "The text is only kept when you leave editing with Tab.",
+        "es": "El texto solo se guarda cuando sales de la edición con Tab."
       }
     },
     {
       "texto": {
-        "pt": "No Properties, abra a aba de dados do texto (o ícone F).",
-        "en": "In Properties, open the text data tab (the F icon)."
+        "pt": "No Properties, abra a aba Data do texto (o ícone F).",
+        "en": "In Properties, open the text data tab (the F icon).",
+        "es": "En Properties, abre la pestaña Data del texto (el icono F)."
       },
       "narracao": "",
       "checagem": {
@@ -61,7 +71,8 @@
     {
       "texto": {
         "pt": "No painel Text Box, aumente Width (por exemplo, 6): as linhas quebram nessa largura.",
-        "en": "In the Text Box panel, raise Width (for example, 6): lines wrap at that width."
+        "en": "In the Text Box panel, raise Width (for example, 6): lines wrap at that width.",
+        "es": "En el panel Text Box, aumenta Width (por ejemplo, 6): las líneas se cortan en ese ancho."
       },
       "narracao": "",
       "checagem": {
@@ -70,7 +81,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "No topo da aba, Game Text tem que estar escolhido.",
-        "en": "At the top of the tab, Game Text must be selected."
+        "en": "At the top of the tab, Game Text must be selected.",
+        "es": "Arriba en la pestaña, Game Text tiene que estar elegido."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -81,7 +93,8 @@
     {
       "texto": {
         "pt": "Aumente Height (por exemplo, 1.5): o texto vira páginas de poucas linhas.",
-        "en": "Raise Height (for example, 1.5): the text becomes pages of a few lines."
+        "en": "Raise Height (for example, 1.5): the text becomes pages of a few lines.",
+        "es": "Aumenta Height (por ejemplo, 1.5): el texto se divide en páginas de pocas líneas."
       },
       "narracao": "",
       "checagem": {
@@ -90,7 +103,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Embaixo aparece quantas linhas cabem em cada página.",
-        "en": "Below, it shows how many lines fit on each page."
+        "en": "Below, it shows how many lines fit on each page.",
+        "es": "Debajo aparece cuántas líneas caben en cada página."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -101,7 +115,8 @@
     {
       "texto": {
         "pt": "Clique em Setup Dialogue: liga a máquina de escrever, sem código.",
-        "en": "Click Setup Dialogue: it turns on the typewriter, without code."
+        "en": "Click Setup Dialogue: it turns on the typewriter, without code.",
+        "es": "Haz clic en Setup Dialogue: activa la máquina de escribir, sin código."
       },
       "narracao": "",
       "checagem": {
@@ -117,7 +132,8 @@
     {
       "texto": {
         "pt": "Mude Letters per Second (por exemplo, 15) para as letras surgirem mais devagar.",
-        "en": "Change Letters per Second (for example, 15) so the letters show up slower."
+        "en": "Change Letters per Second (for example, 15) so the letters show up slower.",
+        "es": "Cambia Letters per Second (por ejemplo, 15) para que las letras salgan más despacio."
       },
       "narracao": "",
       "checagem": {
@@ -128,7 +144,8 @@
     {
       "texto": {
         "pt": "Em At the End, clique em Keep: o texto fica na tela quando acaba.",
-        "en": "Under At the End, click Keep: the text stays on screen when it ends."
+        "en": "Under At the End, click Keep: the text stays on screen when it ends.",
+        "es": "En At the End, haz clic en Keep: el texto se queda en pantalla al terminar."
       },
       "narracao": "",
       "checagem": {
@@ -137,7 +154,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Hide some com o texto; Restart começa de novo.",
-        "en": "Hide removes the text; Restart starts over."
+        "en": "Hide removes the text; Restart starts over.",
+        "es": "Hide hace desaparecer el texto; Restart empieza de nuevo."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -147,17 +165,23 @@
     },
     {
       "texto": {
-        "pt": "Aperte 0 no teclado numérico, depois P. Enter, Espaço ou clique passam a página. Esc sai. Depois, clique em Próximo.",
-        "en": "Press 0 on the numpad, then P. Enter, Space or a click turn the page. Esc quits. Then click Next."
+        "pt": "Aperte 0 no teclado numérico, depois P. Enter, Space ou um clique passam a página. Esc sai. Depois, clique em Next.",
+        "en": "Press 0 on the numpad, then P. Enter, Space or a click turn the page. Esc quits. Then click Next.",
+        "es": "Pulsa 0 en el teclado numérico y luego P. Enter, Space o un clic pasan la página. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Não vê o texto pela câmera? Gire o texto para ela: R, X, 90 e Enter.",
-        "en": "Can't see the text from the camera? Turn it to face it: R, X, 90 and Enter."
+        "en": "Can't see the text from the camera? Turn it to face it: R, X, 90 and Enter.",
+        "es": "¿No ves el texto desde la cámara? Gíralo hacia ella: R, X, 90 y Enter."
       }
     }
   ],
-  "encerramento": "Pronto! Mudar a propriedade Text pelo jogo começa um diálogo novo."
+  "encerramento": {
+    "pt": "Pronto! Mudar a propriedade Text pelo jogo começa um diálogo novo.",
+    "en": "Done! Changing the Text property in the game starts a new dialogue.",
+    "es": "¡Listo! Cambiar la propiedad Text durante el juego empieza un diálogo nuevo."
+  }
 }

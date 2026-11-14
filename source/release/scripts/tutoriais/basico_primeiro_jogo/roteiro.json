@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "3. Seu primeiro jogo: um cubo que cai",
-    "en": "3. Your first game: a falling cube"
+    "en": "3. Your first game: a falling cube",
+    "es": "3. Tu primer juego: un cubo que cae"
   },
   "categoria": "Basics",
   "resumo": {
     "pt": "Chão, física Rigid Body e o jogo rodando com P.",
-    "en": "Floor, Rigid Body physics and the game running with P."
+    "en": "Floor, Rigid Body physics and the game running with P.",
+    "es": "Suelo, física Rigid Body y el juego funcionando con P."
   },
-  "abertura": "Vamos fazer o primeiro jogo: um cubo que cai e bate no chão.",
+  "abertura": {
+    "pt": "Vamos fazer o primeiro jogo: um cubo que cai e bate no chão.",
+    "en": "Let's make the first game: a cube that falls and hits the floor.",
+    "es": "Vamos a hacer el primer juego: un cubo que cae y choca con el suelo."
+  },
   "passos": [
     {
       "texto": {
         "pt": "No cabeçalho da 3D View, abra Add › Mesh › Plane para criar o chão.",
-        "en": "In the 3D View header, open Add › Mesh › Plane to create the floor."
+        "en": "In the 3D View header, open Add › Mesh › Plane to create the floor.",
+        "es": "En la cabecera de la 3D View, abre Add › Mesh › Plane para crear el suelo."
       },
       "narracao": "",
       "checagem": {
@@ -22,7 +29,8 @@
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Sua cena já tem um chão? Pode usar o novo assim mesmo.",
-        "en": "Your scene already has a floor? Use the new one anyway."
+        "en": "Your scene already has a floor? Use the new one anyway.",
+        "es": "¿Tu escena ya tiene suelo? Puedes usar el nuevo igualmente."
       },
       "alvo": {
         "area": "VIEW_3D",
@@ -34,7 +42,8 @@
     {
       "texto": {
         "pt": "Aumente o chão: S, digite 5 e Enter.",
-        "en": "Make the floor bigger: S, type 5 and Enter."
+        "en": "Make the floor bigger: S, type 5 and Enter.",
+        "es": "Agranda el suelo: S, escribe 5 y Enter."
       },
       "narracao": "",
       "checagem": {
@@ -45,7 +54,8 @@
     {
       "texto": {
         "pt": "Clique no cubo e suba ele: G, Z, 4 e Enter.",
-        "en": "Click the cube and raise it: G, Z, 4 and Enter."
+        "en": "Click the cube and raise it: G, Z, 4 and Enter.",
+        "es": "Haz clic en el cubo y súbelo: G, Z, 4 y Enter."
       },
       "narracao": "",
       "checagem": {
@@ -54,13 +64,15 @@
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Se o chão estiver no meio do cubo, o cubo nasce preso nele.",
-        "en": "If the floor cuts the cube, it starts stuck in it."
+        "en": "If the floor cuts the cube, it starts stuck in it.",
+        "es": "Si el suelo queda en medio del cubo, el cubo empieza atrapado en él."
       }
     },
     {
       "texto": {
         "pt": "No Properties, abra a aba Physics.",
-        "en": "In Properties, open the Physics tab."
+        "en": "In Properties, open the Physics tab.",
+        "es": "En Properties, abre la pestaña Physics."
       },
       "narracao": "",
       "checagem": {
@@ -76,7 +88,8 @@
     {
       "texto": {
         "pt": "Troque Physics Type para Rigid Body: agora o cubo tem peso e gira ao bater.",
-        "en": "Change Physics Type to Rigid Body: the cube now has weight and spins when it hits."
+        "en": "Change Physics Type to Rigid Body: the cube now has weight and spins when it hits.",
+        "es": "Cambia Physics Type a Rigid Body: ahora el cubo tiene peso y gira al chocar."
       },
       "narracao": "",
       "checagem": {
@@ -85,7 +98,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Static não se mexe (bom para o chão). Dynamic cai mas não gira.",
-        "en": "Static never moves (good for floors). Dynamic falls but does not spin."
+        "en": "Static never moves (good for floors). Dynamic falls but does not spin.",
+        "es": "Static no se mueve (bueno para el suelo). Dynamic cae pero no gira."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -96,7 +110,8 @@
     {
       "texto": {
         "pt": "Aperte 0 no teclado numérico para ver pela câmera.",
-        "en": "Press 0 on the numpad to look through the camera."
+        "en": "Press 0 on the numpad to look through the camera.",
+        "es": "Pulsa 0 en el teclado numérico para ver por la cámara."
       },
       "narracao": "",
       "checagem": {
@@ -106,17 +121,23 @@
     },
     {
       "texto": {
-        "pt": "Mouse na 3D View, aperte P: o jogo roda e o cubo cai. Esc sai do jogo. Depois, clique em Próximo.",
-        "en": "Mouse in the 3D View, press P: the game runs and the cube falls. Esc quits. Then click Next."
+        "pt": "Mouse na 3D View, aperte P: o jogo roda e o cubo cai. Esc sai do jogo. Depois, clique em Next.",
+        "en": "Mouse in the 3D View, press P: the game runs and the cube falls. Esc quits. Then click Next.",
+        "es": "Ratón en la 3D View, pulsa P: el juego arranca y el cubo cae. Esc sale del juego. Luego haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "O cubo não aparece? Ele pode estar fora da câmera: G para trazê-lo.",
-        "en": "Cube not visible? It may be outside the camera: G to bring it in."
+        "en": "Cube not visible? It may be outside the camera: G to bring it in.",
+        "es": "¿El cubo no aparece? Puede estar fuera de la cámara: usa G para traerlo."
       }
     }
   ],
-  "encerramento": "Pronto! Esse é o seu primeiro jogo. No próximo tutorial, o cubo anda com as setas."
+  "encerramento": {
+    "pt": "Pronto! Esse é o seu primeiro jogo. No próximo tutorial, o cubo anda com as setas.",
+    "en": "Done! This is your first game. In the next tutorial, the cube walks with the arrow keys.",
+    "es": "¡Listo! Este es tu primer juego. En el próximo tutorial, el cubo anda con las flechas."
+  }
 }

@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-14 — Tutoriais em português, inglês e espanhol
+
+- Os 17 roteiros de `source/release/scripts/tutoriais/` ganharam `es` em todos os textos, e `en` em `abertura` e
+  `encerramento` (e no `ui_tree_menu`, que era só português). Nomes de botões, abas, menus e teclas ficam no
+  original em inglês nos três idiomas ("clique em Next", "Space", "aba Data").
+- `range_tutorials.py`: os botões do cartão passam a Close, Back, Next, Skip e Finish (antes Fechar, Voltar,
+  Próximo, Pular, Concluir). O prefixo da dica (Dica/Tip/Consejo) e o "feito!" seguem o idioma da interface.
+  O idioma `es` já era aceito por `_txt` (as duas primeiras letras de `language`).
+
 ## 2026-11-14 — Tutoriais 11 a 14 (Cutscene, Minimap, Material Atlas, Performance)
 
 | Pasta | Categoria | Passos | Conteúdo |

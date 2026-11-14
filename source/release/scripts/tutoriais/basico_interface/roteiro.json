@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "1. Conhecendo a interface",
-    "en": "1. Getting to know the interface"
+    "en": "1. Getting to know the interface",
+    "es": "1. Conociendo la interfaz"
   },
   "categoria": "Basics",
   "resumo": {
     "pt": "Outliner, Properties, 3D View e como trocar o tipo de uma área.",
-    "en": "Outliner, Properties, 3D View and how to change an area type."
+    "en": "Outliner, Properties, 3D View and how to change an area type.",
+    "es": "Outliner, Properties, 3D View y cómo cambiar el tipo de un área."
   },
-  "abertura": "Bem-vindo à Anastacio Engine! Vamos conhecer as partes da tela.",
+  "abertura": {
+    "pt": "Bem-vindo à Anastacio Engine! Vamos conhecer as partes da tela.",
+    "en": "Welcome to Anastacio Engine! Let's get to know the parts of the screen.",
+    "es": "¡Bienvenido a Anastacio Engine! Vamos a conocer las partes de la pantalla."
+  },
   "passos": [
     {
       "texto": {
         "pt": "No Outliner (a lista de objetos, em cima à direita), clique na câmera.",
-        "en": "In the Outliner (the object list, top right), click the camera."
+        "en": "In the Outliner (the object list, top right), click the camera.",
+        "es": "En el Outliner (la lista de objetos, arriba a la derecha), haz clic en la cámara."
       },
       "narracao": "",
       "checagem": {
@@ -22,13 +29,15 @@
       "destaque": "OUTLINER",
       "dica": {
         "pt": "O Outliner mostra tudo o que existe na cena.",
-        "en": "The Outliner lists everything in the scene."
+        "en": "The Outliner lists everything in the scene.",
+        "es": "El Outliner muestra todo lo que existe en la escena."
       }
     },
     {
       "texto": {
         "pt": "No Properties, clique na aba Object para ver a posição da câmera.",
-        "en": "In Properties, click the Object tab to see the camera position."
+        "en": "In Properties, click the Object tab to see the camera position.",
+        "es": "En Properties, haz clic en la pestaña Object para ver la posición de la cámara."
       },
       "narracao": "",
       "checagem": {
@@ -37,7 +46,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Cada aba do Properties mostra uma parte do objeto ou da cena.",
-        "en": "Each Properties tab shows one part of the object or the scene."
+        "en": "Each Properties tab shows one part of the object or the scene.",
+        "es": "Cada pestaña de Properties muestra una parte del objeto o de la escena."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -48,7 +58,8 @@
     {
       "texto": {
         "pt": "Agora, na 3D View, clique no cubo para selecioná-lo.",
-        "en": "Now, in the 3D View, click the cube to select it."
+        "en": "Now, in the 3D View, click the cube to select it.",
+        "es": "Ahora, en la 3D View, haz clic en el cubo para seleccionarlo."
       },
       "narracao": "",
       "checagem": {
@@ -57,13 +68,15 @@
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "O objeto selecionado fica com o contorno laranja.",
-        "en": "The selected object gets an orange outline."
+        "en": "The selected object gets an orange outline.",
+        "es": "El objeto seleccionado queda con el contorno naranja."
       }
     },
     {
       "texto": {
         "pt": "Mouse na 3D View: aperte 1 no teclado numérico para olhar de frente.",
-        "en": "Mouse in the 3D View: press 1 on the numpad to look from the front."
+        "en": "Mouse in the 3D View: press 1 on the numpad to look from the front.",
+        "es": "Ratón en la 3D View: pulsa 1 en el teclado numérico para mirar de frente."
       },
       "narracao": "",
       "checagem": {
@@ -72,13 +85,15 @@
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Sem teclado numérico? Menu View › Front.",
-        "en": "No numpad? View menu › Front."
+        "en": "No numpad? View menu › Front.",
+        "es": "¿Sin teclado numérico? Menú View › Front."
       }
     },
     {
       "texto": {
         "pt": "Aperte 7 no teclado numérico para olhar de cima.",
-        "en": "Press 7 on the numpad to look from the top."
+        "en": "Press 7 on the numpad to look from the top.",
+        "es": "Pulsa 7 en el teclado numérico para mirar desde arriba."
       },
       "narracao": "",
       "checagem": {
@@ -87,13 +102,15 @@
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Botão do meio do mouse arrastado gira a vista; a rodinha dá zoom.",
-        "en": "Dragging with the middle mouse button orbits; the wheel zooms."
+        "en": "Dragging with the middle mouse button orbits; the wheel zooms.",
+        "es": "Arrastrar con el botón central del ratón gira la vista; la rueda hace zoom."
       }
     },
     {
       "texto": {
         "pt": "Aperte 0 no teclado numérico para ver pela câmera, como no jogo.",
-        "en": "Press 0 on the numpad to look through the camera, like in the game."
+        "en": "Press 0 on the numpad to look through the camera, like in the game.",
+        "es": "Pulsa 0 en el teclado numérico para ver por la cámara, como en el juego."
       },
       "narracao": "",
       "checagem": {
@@ -104,7 +121,8 @@
     {
       "texto": {
         "pt": "Troque a área de baixo para Logic Editor: é assim que se troca qualquer editor.",
-        "en": "Change the bottom area to Logic Editor: this is how you change any editor."
+        "en": "Change the bottom area to Logic Editor: this is how you change any editor.",
+        "es": "Cambia el área de abajo a Logic Editor: así se cambia cualquier editor."
       },
       "narracao": "",
       "checagem": {
@@ -119,5 +137,9 @@
       }
     }
   ],
-  "encerramento": "Pronto! Agora você sabe andar pela interface."
+  "encerramento": {
+    "pt": "Pronto! Agora você sabe andar pela interface.",
+    "en": "Done! Now you know your way around the interface.",
+    "es": "¡Listo! Ahora sabes moverte por la interfaz."
+  }
 }

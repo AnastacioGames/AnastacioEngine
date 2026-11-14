@@ -1,13 +1,33 @@
 {
-  "titulo": "Seu primeiro menu de jogo com a UI Tree",
+  "titulo": {
+    "pt": "Seu primeiro menu de jogo com a UI Tree",
+    "en": "Your first game menu with the UI Tree",
+    "es": "Tu primer menú de juego con la UI Tree"
+  },
   "categoria": "Node Editor/UI Tree",
-  "resumo": "Crie um menu com botão Start sem escrever código.",
+  "resumo": {
+    "pt": "Crie um menu com botão Start sem escrever código.",
+    "en": "Create a menu with a Start button without writing code.",
+    "es": "Crea un menú con botón Start sin escribir código."
+  },
   "cena_inicial": "inicio.range",
-  "abertura": "Olá! Neste tutorial, vamos criar o primeiro menu do seu jogo, com um botão Start, sem escrever nenhuma linha de código.",
+  "abertura": {
+    "pt": "Olá! Neste tutorial, vamos criar o primeiro menu do seu jogo, com um botão Start, sem escrever nenhuma linha de código.",
+    "en": "Hello! In this tutorial, we will create the first menu of your game, with a Start button, without writing a single line of code.",
+    "es": "¡Hola! En este tutorial vamos a crear el primer menú de tu juego, con un botón Start, sin escribir ni una línea de código."
+  },
   "passos": [
     {
-      "texto": "Troque a área de baixo para Node Editor.",
-      "narracao": "Primeiro, troque a área de baixo para o Node Editor. Depois, no cabeçalho, escolha o tipo UI.",
+      "texto": {
+        "pt": "Troque a área de baixo para Node Editor.",
+        "en": "Change the bottom area to Node Editor.",
+        "es": "Cambia el área de abajo a Node Editor."
+      },
+      "narracao": {
+        "pt": "Primeiro, troque a área de baixo para o Node Editor. Depois, no cabeçalho, escolha o tipo UI.",
+        "en": "First, change the bottom area to the Node Editor. Then, in the header, pick the UI type.",
+        "es": "Primero, cambia el área de abajo al Node Editor. Luego, en la cabecera, elige el tipo UI."
+      },
       "destaque": "NODE_EDITOR",
       "checagem": "node_editor",
       "alvo": {
@@ -18,7 +38,11 @@
       }
     },
     {
-      "texto": "No cabeçalho, clique em UI.",
+      "texto": {
+        "pt": "No cabeçalho, clique em UI.",
+        "en": "In the header, click UI.",
+        "es": "En la cabecera, haz clic en UI."
+      },
       "narracao": "",
       "destaque": "NODE_EDITOR",
       "checagem": "node_editor_ui_tree",
@@ -29,8 +53,16 @@
       }
     },
     {
-      "texto": "Clique em New.",
-      "narracao": "Agora clique em New. Isso cria uma árvore vazia, onde o menu vai ser montado.",
+      "texto": {
+        "pt": "Clique em New.",
+        "en": "Click New.",
+        "es": "Haz clic en New."
+      },
+      "narracao": {
+        "pt": "Agora clique em New. Isso cria uma árvore vazia, onde o menu vai ser montado.",
+        "en": "Now click New. This creates an empty tree, where the menu will be built.",
+        "es": "Ahora haz clic en New. Esto crea un árbol vacío, donde se va a montar el menú."
+      },
       "destaque": "NODE_EDITOR",
       "checagem": "arvore_criada",
       "alvo": {
@@ -40,8 +72,16 @@
       }
     },
     {
-      "texto": "No painel UI Tree, à direita, clique em + Menu.",
-      "narracao": "No painel UI Tree, à direita, clique em mais Menu. A engine cria um menu pronto, com os botões Jogar, Opções e Sair.",
+      "texto": {
+        "pt": "No painel UI Tree, à direita, clique em + Menu.",
+        "en": "In the UI Tree panel, on the right, click + Menu.",
+        "es": "En el panel UI Tree, a la derecha, haz clic en + Menu."
+      },
+      "narracao": {
+        "pt": "No painel UI Tree, à direita, clique em mais Menu. A engine cria um menu pronto, com os botões Jogar, Opções e Sair.",
+        "en": "In the UI Tree panel, on the right, click plus Menu. The engine creates a ready menu, with the Jogar, Opções and Sair buttons.",
+        "es": "En el panel UI Tree, a la derecha, haz clic en más Menu. La engine crea un menú listo, con los botones Jogar, Opções y Sair."
+      },
       "destaque": "NODE_EDITOR",
       "checagem": "menu_criado",
       "alvo": {
@@ -51,8 +91,16 @@
       }
     },
     {
-      "texto": "Clique no bloco verde do Jogar.",
-      "narracao": "Cada bloco verde é um botão do menu. Clique no bloco ao lado de Jogar. No painel, role para baixo até Properties, e troque o campo Text para Start.",
+      "texto": {
+        "pt": "Clique no bloco verde do Jogar.",
+        "en": "Click the green block of Jogar.",
+        "es": "Haz clic en el bloque verde de Jogar."
+      },
+      "narracao": {
+        "pt": "Cada bloco verde é um botão do menu. Clique no bloco ao lado de Jogar. No painel, role para baixo até Properties, e troque o campo Text para Start.",
+        "en": "Each green block is a menu button. Click the block next to Jogar. In the panel, scroll down to Properties and change the Text field to Start.",
+        "es": "Cada bloque verde es un botón del menú. Haz clic en el bloque junto a Jogar. En el panel, baja hasta Properties y cambia el campo Text a Start."
+      },
       "destaque": "NODE_EDITOR",
       "checagem": "botao_ativo",
       "alvo": {
@@ -60,7 +108,11 @@
       }
     },
     {
-      "texto": "Role o painel até Properties e troque Text para Start.",
+      "texto": {
+        "pt": "Role o painel até Properties e troque Text para Start.",
+        "en": "Scroll the panel down to Properties and change Text to Start.",
+        "es": "Desplaza el panel hasta Properties y cambia Text a Start."
+      },
       "narracao": "",
       "destaque": "NODE_EDITOR",
       "checagem": "botao_start",
@@ -71,8 +123,16 @@
       }
     },
     {
-      "texto": "No topo do painel, clique em Setup Game Logic.",
-      "narracao": "Agora volte ao topo do painel e clique em Setup Game Logic. Esse botão liga o menu na câmera da cena, sozinho.",
+      "texto": {
+        "pt": "No topo do painel, clique em Setup Game Logic.",
+        "en": "At the top of the panel, click Setup Game Logic.",
+        "es": "Arriba en el panel, haz clic en Setup Game Logic."
+      },
+      "narracao": {
+        "pt": "Agora volte ao topo do painel e clique em Setup Game Logic. Esse botão liga o menu na câmera da cena, sozinho.",
+        "en": "Now go back to the top of the panel and click Setup Game Logic. This button hooks the menu to the scene camera by itself.",
+        "es": "Ahora vuelve arriba en el panel y haz clic en Setup Game Logic. Ese botón conecta el menú a la cámara de la escena, solo."
+      },
       "destaque": "NODE_EDITOR",
       "checagem": "logica_ligada",
       "alvo": {
@@ -82,11 +142,23 @@
       }
     },
     {
-      "texto": "Mouse na 3D View, aperte P e clique em Start. Esc sai do jogo.",
-      "narracao": "Pronto! Leve o mouse até a 3D View, aperte P e clique em Start. O seu primeiro menu está funcionando.",
+      "texto": {
+        "pt": "Mouse na 3D View, aperte P e clique em Start. Esc sai do jogo.",
+        "en": "Mouse in the 3D View, press P and click Start. Esc quits the game.",
+        "es": "Ratón en la 3D View, pulsa P y haz clic en Start. Esc sale del juego."
+      },
+      "narracao": {
+        "pt": "Pronto! Leve o mouse até a 3D View, aperte P e clique em Start. O seu primeiro menu está funcionando.",
+        "en": "Done! Move the mouse to the 3D View, press P and click Start. Your first menu is working.",
+        "es": "¡Listo! Lleva el ratón a la 3D View, pulsa P y haz clic en Start. Tu primer menú está funcionando."
+      },
       "destaque": "VIEW_3D",
       "checagem": null
     }
   ],
-  "encerramento": "É isso! No próximo tutorial, vamos colocar uma barra de vida na tela. Até lá!"
+  "encerramento": {
+    "pt": "É isso! No próximo tutorial, vamos colocar uma barra de vida na tela. Até lá!",
+    "en": "That's it! In the next tutorial, we will put a health bar on the screen. See you!",
+    "es": "¡Eso es todo! En el próximo tutorial vamos a poner una barra de vida en la pantalla. ¡Hasta luego!"
+  }
 }

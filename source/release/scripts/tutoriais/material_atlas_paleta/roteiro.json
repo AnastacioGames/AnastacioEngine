@@ -1,19 +1,26 @@
 {
   "titulo": {
     "pt": "13. Material Atlas: várias cores, um material só",
-    "en": "13. Material Atlas: many colors, a single material"
+    "en": "13. Material Atlas: many colors, a single material",
+    "es": "13. Material Atlas: varios colores, un solo material"
   },
   "categoria": "Optimization",
   "resumo": {
     "pt": "Juntar materiais de cor lisa numa paleta compartilhada (menos draw calls).",
-    "en": "Merge flat-color materials into a shared palette (fewer draw calls)."
+    "en": "Merge flat-color materials into a shared palette (fewer draw calls).",
+    "es": "Juntar materiales de color liso en una paleta compartida (menos draw calls)."
   },
-  "abertura": "Cada material a mais é um desenho a mais por quadro. Vamos juntar as cores do cubo numa paleta.",
+  "abertura": {
+    "pt": "Cada material a mais é um desenho a mais por quadro. Vamos juntar as cores do cubo numa paleta.",
+    "en": "Every extra material is one more draw per frame. Let's merge the cube colors into a palette.",
+    "es": "Cada material de más es un dibujo de más por fotograma. Vamos a juntar los colores del cubo en una paleta."
+  },
   "passos": [
     {
       "texto": {
         "pt": "Na 3D View, clique no cubo.",
-        "en": "In the 3D View, click the cube."
+        "en": "In the 3D View, click the cube.",
+        "es": "En la 3D View, haz clic en el cubo."
       },
       "narracao": "",
       "checagem": {
@@ -24,7 +31,8 @@
     {
       "texto": {
         "pt": "No Properties, abra a aba Material.",
-        "en": "In Properties, open the Material tab."
+        "en": "In Properties, open the Material tab.",
+        "es": "En Properties, abre la pestaña Material."
       },
       "narracao": "",
       "checagem": {
@@ -40,7 +48,8 @@
     {
       "texto": {
         "pt": "Clique no + ao lado da lista de slots e depois em New: o cubo fica com dois materiais.",
-        "en": "Click + next to the slot list, then New: the cube now has two materials."
+        "en": "Click + next to the slot list, then New: the cube now has two materials.",
+        "es": "Haz clic en el + junto a la lista de slots y luego en New: el cubo queda con dos materiales."
       },
       "narracao": "",
       "checagem": {
@@ -49,7 +58,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "O cubo não tinha material? Clique em New duas vezes, com um + no meio.",
-        "en": "The cube had no material? Click New twice, with a + in between."
+        "en": "The cube had no material? Click New twice, with a + in between.",
+        "es": "¿El cubo no tenía material? Haz clic en New dos veces, con un + en medio."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -60,7 +70,8 @@
     {
       "texto": {
         "pt": "Clique em Surface, no topo da aba, e troque a cor do material novo.",
-        "en": "Click Surface, at the top of the tab, and change the color of the new material."
+        "en": "Click Surface, at the top of the tab, and change the color of the new material.",
+        "es": "Haz clic en Surface, arriba en la pestaña, y cambia el color del material nuevo."
       },
       "narracao": "",
       "checagem": {
@@ -76,7 +87,8 @@
     {
       "texto": {
         "pt": "Aperte Tab, selecione uma face de cima, clique em Assign e aperte Tab de novo.",
-        "en": "Press Tab, select a top face, click Assign and press Tab again."
+        "en": "Press Tab, select a top face, click Assign and press Tab again.",
+        "es": "Pulsa Tab, selecciona una cara de arriba, haz clic en Assign y pulsa Tab otra vez."
       },
       "narracao": "",
       "checagem": {
@@ -85,13 +97,15 @@
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Assign fica embaixo da lista de slots, só em Edit Mode.",
-        "en": "Assign is below the slot list, only in Edit Mode."
+        "en": "Assign is below the slot list, only in Edit Mode.",
+        "es": "Assign está debajo de la lista de slots, solo en Edit Mode."
       }
     },
     {
       "texto": {
-        "pt": "Clique em Setup, no topo da aba, e ligue o i do Material Atlas para ver a contagem.",
-        "en": "Click Setup, at the top of the tab, and turn on the Material Atlas i to see the count."
+        "pt": "Clique em Setup, no topo da aba, e ligue o botão i (Show Info) do Material Atlas para ver a contagem.",
+        "en": "Click Setup, at the top of the tab, and turn on the Material Atlas i to see the count.",
+        "es": "Haz clic en Setup, arriba en la pestaña, y activa el botón i (Show Info) del Material Atlas para ver el recuento."
       },
       "narracao": "",
       "checagem": {
@@ -100,7 +114,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Auto usa Palette quando todos os materiais são cor lisa.",
-        "en": "Auto uses Palette when every material is a flat color."
+        "en": "Auto uses Palette when every material is a flat color.",
+        "es": "Auto usa Palette cuando todos los materiales son de color liso."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -111,7 +126,8 @@
     {
       "texto": {
         "pt": "Clique em Palette Atlas: as cores viram quadrados de uma imagem só.",
-        "en": "Click Palette Atlas: the colors become squares of a single image."
+        "en": "Click Palette Atlas: the colors become squares of a single image.",
+        "es": "Haz clic en Palette Atlas: los colores se vuelven cuadrados de una sola imagen."
       },
       "narracao": "",
       "checagem": {
@@ -120,7 +136,8 @@
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "A malha original fica guardada.",
-        "en": "The original mesh is kept."
+        "en": "The original mesh is kept.",
+        "es": "La malla original queda guardada."
       },
       "alvo": {
         "area": "PROPERTIES",
@@ -130,13 +147,18 @@
     },
     {
       "texto": {
-        "pt": "Veja a lista de slots: agora o cubo tem um material só, com a mesma aparência. Clique em Próximo.",
-        "en": "Look at the slot list: the cube now has a single material and looks the same. Click Next."
+        "pt": "Veja a lista de slots: agora o cubo tem um material só, com a mesma aparência. Clique em Next.",
+        "en": "Look at the slot list: the cube now has a single material and looks the same. Click Next.",
+        "es": "Mira la lista de slots: ahora el cubo tiene un solo material, con el mismo aspecto. Haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
       "destaque": "PROPERTIES"
     }
   ],
-  "encerramento": "Pronto! Restore Original Materials desfaz a conversão quando você quiser."
+  "encerramento": {
+    "pt": "Pronto! Restore Original Materials desfaz a conversão quando você quiser.",
+    "en": "Done! Restore Original Materials undoes the conversion whenever you want.",
+    "es": "¡Listo! Restore Original Materials deshace la conversión cuando quieras."
+  }
 }
