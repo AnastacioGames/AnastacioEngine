@@ -304,6 +304,8 @@ def rodar_testes(porta, token):
              [o['nome'] for o in p['cena'] if o['ativo']] == [outro_obj] and
              [o['nome'] for o in p['cena'] if o['selecionado']] == [outro_obj])
 
+    testes_viewport(ws)
+
     # Frame sem máscara -> close 1002
     ruim = WS(porta, token)
     ruim.envia({'cmd': 'paineis'}, mascarar=False)
@@ -322,6 +324,93 @@ def rodar_testes(porta, token):
     ws.envia({'cmd': 'sair'})
     r = ws.ate(lambda m: m.get('tipo') in ('ok', 'erro'))
     conferir('sair (--teste)', r['tipo'] == 'ok')
+
+
+def retrato(ws):
+    """Pede 'malhas' e junta as partes até a que tem fim=True."""
+    ws.envia({'cmd': 'malhas'})
+    malhas, ultima, partes = {}, None, 0
+    while True:
+        m = ws.ate(lambda m: m.get('tipo') == 'malhas' and m.get('completo'))
+        malhas.update(m['malhas'])
+        partes += 1
+        if m.get('fim'):
+            return malhas, m, partes
+
+
+def resposta(ws):
+    return ws.ate(lambda m: m.get('tipo') in ('ok', 'erro'))
+
+
+def testes_viewport(ws):
+    import struct
+    malhas, fim, partes = retrato(ws)
+    objs = {o['nome']: o for o in fim['objetos']}
+    cubo = objs.get('Cube')
+    conferir('malhas: retrato com objetos e malhas (%d objetos, %d malhas, %d parte(s))' % (len(objs), len(malhas), partes),
+             cubo is not None and cubo['malha_id'] in malhas)
+    mc = malhas[cubo['malha_id']]
+    nidx = len(base64.b64decode(mc['i'])) // 4
+    nv = len(base64.b64decode(mc['v'])) // 12
+    idx = struct.unpack('<%dI' % nidx, base64.b64decode(mc['i']))
+    conferir('Cube com 12 triângulos (%d índices, %d vértices)' % (nidx, nv),
+             mc['tri'] == 12 and nidx == 36 and max(idx) < nv and len(base64.b64decode(mc['n'])) == nv * 12)
+    conferir('matriz 4x4 com 16 números e cor RGB', len(cubo['matriz']) == 16 and len(cubo['cor']) == 3)
+    sem = [o for o in fim['objetos'] if o['tipo'] in ('LAMP', 'CAMERA', 'EMPTY')]
+    conferir('lâmpada/câmera sem malha (%s)' % ', '.join(o['nome'] for o in sem),
+             sem and all(o['malha_id'] is None for o in sem))
+    hashes = {k: m['h'] for k, m in malhas.items()}
+    time.sleep(1.2)  # passa por 2 ciclos de detecção
+    ws.envia({'cmd': 'paineis'})
+    vistos = []
+    ws.ate(lambda m: vistos.append(m.get('tipo')) or m.get('tipo') == 'paineis')
+    malhas2, _, _ = retrato(ws)
+    conferir('hash estável (nada reenviado sem mudança)', 'malhas' not in vistos and 'transformacoes' not in vistos
+             and {k: m['h'] for k, m in malhas2.items()} == hashes, vistos)
+
+    # escrever location -> só 'transformacoes' (leve), não 'malhas'
+    rna = {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'location'}
+    ws.envia({'cmd': 'escrever', 'rna': rna, 'valor': [1.0, 2.0, 3.0]})
+    r = resposta(ws)
+    m = ws.ate(lambda m: m.get('tipo') in ('malhas', 'transformacoes'))
+    t = next((o for o in m.get('objetos', []) if o['nome'] == 'Cube'), None)
+    conferir('escrever location -> transformacoes leve com a matriz nova',
+             r['tipo'] == 'ok' and m['tipo'] == 'transformacoes' and t and [round(x - y - z, 5) for x, y, z in zip(t['matriz'][12:15], cubo['matriz'][12:15], [1.0, 2.0, 3.0])] == [0, 0, 0]
+             and 'malhas' not in m, (m.get('tipo'), t and t['matriz'][12:15], cubo['loc']))
+
+    # selecionar com adicionar (Shift+clique)
+    def sel(nome, adicionar=False):
+        ws.envia({'cmd': 'selecionar', 'nome': nome, 'adicionar': adicionar})
+        r = resposta(ws)
+        p = ws.ate(lambda m: m.get('tipo') == 'paineis')
+        return r, sorted(o['nome'] for o in p['cena'] if o['selecionado']), p['objeto']
+    r, s, a = sel('Cube')
+    conferir('selecionar Cube', r['tipo'] == 'ok' and s == ['Cube'] and a == 'Cube', (s, a))
+    r, s, a = sel('Camera', True)
+    conferir('selecionar Camera com adicionar: Cube+Camera, ativo Camera', s == ['Camera', 'Cube'] and a == 'Camera', (s, a))
+    r, s, a = sel('Camera', True)
+    conferir('Shift+clique no ativo tira da seleção', s == ['Cube'], s)
+    r, s, a = sel(None)
+    conferir('clique no vazio limpa a seleção', r['tipo'] == 'ok' and s == [], s)
+    ws.envia({'cmd': 'selecionar', 'nome': 'Cube', 'adicionar': 'sim'})
+    conferir('selecionar com adicionar não-bool -> erro', resposta(ws)['tipo'] == 'erro')
+
+    # Arrasto do gizmo: escritas sem_undo + final com undo_push = um passo só de undo
+    sel('Cube')
+    pushes = []
+    for x in (1.5, 2.0, 2.5):
+        ws.envia({'cmd': 'escrever', 'rna': rna, 'valor': x, 'indice': 0, 'sem_undo': True})
+        pushes.append(resposta(ws).get('undo_push'))
+    ws.envia({'cmd': 'escrever', 'rna': rna, 'valor': 3.0, 'indice': 0})
+    final = resposta(ws)
+    conferir('arrasto: meio sem undo_push, final com', pushes == [False] * 3 and final.get('undo_push') is True,
+             (pushes, final.get('undo_push')))
+    ws.envia({'cmd': 'operador', 'op': 'ed.undo'})
+    r = resposta(ws)
+    _, fim, _ = retrato(ws)
+    loc = next(o['loc'] for o in fim['objetos'] if o['nome'] == 'Cube')
+    conferir('um ed.undo desfaz o arrasto inteiro (location volta a [1,2,3])', r['tipo'] == 'ok' and loc == [1.0, 2.0, 3.0],
+             (r.get('erro'), loc))
 
 
 if __name__ == '__main__':

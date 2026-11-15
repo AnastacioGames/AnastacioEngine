@@ -5,12 +5,17 @@ AnastacioEngine -b [arquivo.range] --factory-startup --python tools/editor_web/p
 
 Um só porto em 127.0.0.1 serve a página (GET /?t=TOKEN) e o WebSocket (/ws?t=TOKEN).
 Só stdlib: socket + select, handshake RFC 6455 manual. Comandos JSON restritos
-(paineis — com a lista 'cena' do Outliner —, escrever, operador, ativar; sair só com --teste); nada de eval/exec.
-O loop roda no thread principal (bpy não é thread-safe).
+(paineis — com a lista 'cena' do Outliner —, malhas, escrever [sem_undo], operador, ativar, selecionar;
+sair só com --teste); nada de eval/exec. O loop roda no thread principal (bpy não é thread-safe).
+
+Viewport: {tipo:'malhas'} leva os objetos (matriz coluna-major, cor, loc/rot/esc) e as malhas novas ou
+mudadas (v/n Float32 e i Uint32 little-endian, base64); só matriz mudou -> {tipo:'transformacoes'} leve.
+--exportar-malhas ARQ grava o retrato completo em JSON e sai (o montar.py do editor Web usa offline).
 """
 import base64, hashlib, hmac, json, math, os, re, select, socket, sys, time
 
 import bpy
+import numpy as np
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import layout_espiao as le
@@ -18,7 +23,11 @@ import layout_espiao as le
 GUID = b'258EAFA5-E914-47DA-95CA-C5AB0DC85B11'
 LIM_HANDSHAKE = 8 * 1024
 LIM_MENSAGEM = 1024 * 1024
-LIM_SAIDA = 64 * 1024 * 1024
+LIM_SAIDA = 256 * 1024 * 1024
+LIM_TRI_MALHA = 2000000      # malha maior é pulada com aviso
+LIM_TRI_TOTAL = 20000000     # orçamento da cena inteira
+LIM_PARTE = 8 * 1024 * 1024  # retrato grande vai em várias mensagens 'malhas'
+GEOMETRIA = {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META'}
 INTERVALO_HASH = 0.5
 OPERADORES = {'ed.undo', 'ed.redo', 'object.select_all', 'object.location_clear',
               'object.rotation_clear', 'object.scale_clear'}
@@ -149,6 +158,9 @@ def validar_escrita(rna, valor, indice):
 
 
 def cmd_escrever(m):
+    sem_undo = m.get('sem_undo', False)
+    if not isinstance(sem_undo, bool):
+        raise ValueError('sem_undo deve ser bool')
     valor, indice = validar_escrita(m.get('rna'), m.get('valor'), m.get('indice'))
     novo = le.escrever(m['rna'], valor, indice)
     if hasattr(novo, 'to_list'):
@@ -158,7 +170,8 @@ def cmd_escrever(m):
     elif hasattr(novo, '__len__') and not isinstance(novo, str):
         novo = list(novo)
     desfazer = False
-    if bpy.ops.ed.undo_push.poll():
+    # Arrasto do gizmo: as escritas do meio vão com sem_undo e só a final empilha (um passo de undo).
+    if not sem_undo and bpy.ops.ed.undo_push.poll():
         bpy.ops.ed.undo_push(message='Web: ' + m['rna']['caminho'])
         desfazer = True
     return {'valor': novo, 'undo_push': desfazer}
@@ -202,6 +215,255 @@ def cmd_ativar(m):
     return {'objeto': obj.name}
 
 
+def cmd_selecionar(m):
+    """Clique na viewport. nome None limpa a seleção; adicionar=True é o Shift+clique do Blender
+    (não selecionado ou não ativo -> seleciona e ativa; já ativo e selecionado -> tira da seleção)."""
+    nome, adicionar = m.get('nome'), m.get('adicionar', False)
+    if not isinstance(adicionar, bool):
+        raise ValueError('adicionar deve ser bool')
+    cena = bpy.context.scene
+    if nome is None:
+        if not adicionar:
+            for o in cena.objects:
+                o.select = False
+        return {'objeto': None}
+    if not isinstance(nome, str) or cena.objects.get(nome) is None:
+        raise ValueError('objeto não está na cena: %r' % (nome,))
+    if not adicionar:
+        return cmd_ativar({'objeto': nome})
+    obj = cena.objects[nome]
+    if obj.select and cena.objects.active is obj:
+        obj.select = False
+    else:
+        obj.select = True
+        cena.objects.active = obj
+    return {'objeto': obj.name, 'selecionado': bool(obj.select)}
+
+
+# ---------------------------------------------------------------- malhas da viewport
+
+def _b64(a):
+    return base64.b64encode(np.ascontiguousarray(a, dtype=a.dtype.newbyteorder('<')).tobytes()).decode('ascii')
+
+
+def _matriz(m):
+    """4x4 em coluna-major (como o WebGL espera), sem NaN."""
+    return [float(m[r][c]) if math.isfinite(m[r][c]) else 0.0 for c in range(4) for r in range(4)]
+
+
+def _ler(colecao, attr, n, tipo, largura):
+    a = np.empty(n * largura, tipo)
+    if n:
+        colecao.foreach_get(attr, a)
+    return a.reshape(-1, largura) if largura > 1 else a
+
+
+def geometria(obj, cena, orcamento):
+    """Triangula a malha avaliada (modificadores em PREVIEW). Faces smooth usam a normal do vértice;
+    faces flat duplicam os cantos com a normal da face. Devolve dict, {'pulada': n} ou None (vazia)."""
+    me = obj.to_mesh(cena, True, 'PREVIEW')
+    if me is None:
+        return None
+    try:
+        me.calc_tessface()
+        nv, nf = len(me.vertices), len(me.tessfaces)
+        if not nf:
+            return None
+        fv = _ler(me.tessfaces, 'vertices_raw', nf, np.int32, 4)
+        quad = fv[:, 3] != 0   # convenção MFace: v4 == 0 marca triângulo
+        ntri = nf + int(quad.sum())
+        if ntri > min(LIM_TRI_MALHA, orcamento):
+            return {'pulada': ntri}
+        co = _ler(me.vertices, 'co', nv, np.float32, 3)
+        vn = _ler(me.vertices, 'normal', nv, np.float32, 3)
+        fn = _ler(me.tessfaces, 'normal', nf, np.float32, 3)
+        sm = _ler(me.tessfaces, 'use_smooth', nf, np.int32, 1).astype(bool)
+        idx = np.arange(nf)
+        tri = np.concatenate([fv[:, :3], fv[quad][:, [0, 2, 3]]])
+        face = np.concatenate([idx, idx[quad]])
+        liso = sm[face]
+        plano = ~liso
+        base = nv if liso.any() else 0
+        tp = tri[plano]
+        v = np.concatenate([co[:base], co[tp].reshape(-1, 3)])
+        n = np.concatenate([vn[:base], np.repeat(fn[face[plano]], 3, axis=0)])
+        i = np.empty((ntri, 3), np.uint32)
+        i[liso] = tri[liso]
+        i[plano] = base + np.arange(len(tp) * 3, dtype=np.uint32).reshape(-1, 3)
+        v = np.nan_to_num(v, posinf=0.0, neginf=0.0).astype(np.float32)
+        n = np.nan_to_num(n, posinf=0.0, neginf=0.0).astype(np.float32)
+        return {'v': v, 'n': n, 'i': i.reshape(-1), 'tri': ntri}
+    finally:
+        bpy.data.meshes.remove(me)
+
+
+def _assinatura_mods(obj):
+    """Valores simples de todos os modificadores (mudar o nível do Subsurf etc. invalida o cache)."""
+    out = []
+    for md in obj.modifiers:
+        for p in md.bl_rna.properties:
+            if p.identifier == 'rna_type':
+                continue
+            v = getattr(md, p.identifier, None)
+            if p.type in {'BOOLEAN', 'INT', 'FLOAT', 'ENUM', 'STRING'}:
+                out.append((p.identifier, tuple(v) if hasattr(v, '__len__') and not isinstance(v, str) else v))
+            elif isinstance(v, bpy.types.Object):
+                out.append((p.identifier, v.name, _matriz(v.matrix_world)))
+    return repr(out).encode('utf-8')
+
+
+def chave_malha(obj, memo=None):
+    """(id, assinatura barata). Mesh sem modificador é compartilhada pelo datablock ('m:'); com modificador
+    ou outro tipo de geometria é por objeto ('o:'). A assinatura (coordenadas + topologia + smooth +
+    modificadores) evita refazer to_mesh a cada ciclo; None = refazer sempre."""
+    d = obj.data
+    if obj.type != 'MESH' or d.shape_keys is not None:
+        return 'o:' + obj.name, None   # shape keys: valores por objeto, refaz sempre
+    memo = {} if memo is None else memo
+    dado = memo.get(d.name)   # mesh compartilhada: lê as coordenadas uma vez por ciclo
+    if dado is None:
+        h = hashlib.md5()
+        nv, nfc, nl = len(d.vertices), len(d.polygons), len(d.loops)
+        h.update(('%d/%d/%d/%s' % (nv, nfc, nl, d.shape_keys is not None)).encode())
+        h.update(_ler(d.vertices, 'co', nv, np.float32, 3).tobytes())
+        h.update(_ler(d.loops, 'vertex_index', nl, np.int32, 1).tobytes())
+        h.update(_ler(d.polygons, 'loop_total', nfc, np.int32, 1).tobytes())
+        h.update(_ler(d.polygons, 'use_smooth', nfc, np.int32, 1).tobytes())
+        dado = memo[d.name] = h.hexdigest()
+    if obj.modifiers:
+        return 'o:' + obj.name, hashlib.md5(dado.encode() + _assinatura_mods(obj)).hexdigest()
+    return 'm:' + d.name, dado
+
+
+def cor_objeto(obj):
+    mat = obj.active_material
+    c = list(mat.diffuse_color) if mat else [0.8, 0.8, 0.8]
+    return [round(x, 4) if math.isfinite(x) else 0.8 for x in c[:3]]
+
+
+def matriz_mundo(o, memo):
+    """matrix_world montada de matrix_basis (que o 2.79 calcula na hora de loc/rot/esc) e da cadeia de pais.
+    Pai por osso/vértice ou constraints: cai no matrix_world guardado (pode estar atrasado em -b)."""
+    m = memo.get(o.name)
+    if m is None:
+        if o.constraints or (o.parent and o.parent_type != 'OBJECT'):
+            m = o.matrix_world.copy()
+        elif o.parent:
+            m = matriz_mundo(o.parent, memo) * o.matrix_parent_inverse * o.matrix_basis
+        else:
+            m = o.matrix_basis.copy()
+        memo[o.name] = m
+    return m
+
+
+class Malhas:
+    """Cache e diferenças da viewport: malha compartilhada vai uma vez; só reenvia a que mudou."""
+
+    def __init__(self):
+        self.cache = {}       # id -> {'barata', 'hash', 'dados', 'tri'}
+        self.enviadas = {}    # id -> hash que os clientes já têm
+        self.estrutura = None
+        self.matrizes = None
+        self.objetos = []
+        self.avisos = []
+        self.rev = 0
+        self.ms = 0.0
+
+    def coletar(self):
+        cena = bpy.context.scene
+        t0 = time.perf_counter()
+        # Sem cena.update(): em -b ele deixa o to_mesh() seguinte ~9x mais lento (45 ms vs 5 ms por Suzanne
+        # subdividida); a matriz sai de matriz_mundo(), que segue loc/rot/esc na hora.
+        memo, memo_dados = {}, {}
+        objetos, atuais, orcamento, avisos = [], {}, LIM_TRI_TOTAL, []
+        for o in cena.objects:
+            if o.hide:
+                continue
+            mid = None
+            if o.type in GEOMETRIA:
+                mid, barata = chave_malha(o, memo_dados)
+                c = atuais.get(mid)
+                if c is None:
+                    c = self.cache.get(mid)
+                    if c is None or barata is None or c['barata'] != barata:
+                        g = geometria(o, cena, orcamento)
+                        if g is None or 'pulada' in g:
+                            if g:
+                                avisos.append('%s: %d triângulos, pulada (limite %d)'
+                                              % (o.name, g['pulada'], min(LIM_TRI_MALHA, orcamento)))
+                            # Pulada só pelo orçamento da cena: sem assinatura, tenta de novo no próximo ciclo.
+                            pelo_limite = g and g['pulada'] > LIM_TRI_MALHA
+                            c = {'barata': barata if (g is None or pelo_limite) else None, 'hash': None, 'dados': None, 'tri': 0}
+                        else:
+                            h = hashlib.md5()
+                            for k in ('v', 'n', 'i'):
+                                h.update(g[k].tobytes())
+                            c = {'barata': barata, 'hash': h.hexdigest(), 'tri': g['tri'],
+                                 'dados': {'v': _b64(g['v']), 'n': _b64(g['n']), 'i': _b64(g['i']), 'tri': g['tri'],
+                                           'h': h.hexdigest()[:12]}}
+                        self.cache[mid] = c
+                    atuais[mid] = c
+                    orcamento -= c['tri']
+                if c['dados'] is None:
+                    mid = None
+            rot = {'QUATERNION': o.rotation_quaternion, 'AXIS_ANGLE': o.rotation_axis_angle}.get(o.rotation_mode, o.rotation_euler)
+            objetos.append({'nome': o.name, 'tipo': o.type,
+                            'sub': o.data.type if o.type == 'LAMP' else None,
+                            'malha_id': mid, 'cor': cor_objeto(o), 'matriz': _matriz(matriz_mundo(o, memo)),
+                            'loc': list(o.location), 'rot': list(rot), 'esc': list(o.scale),
+                            'modo_rot': o.rotation_mode, 'pai': o.parent.name if o.parent else None})
+        for mid in [k for k in self.cache if k not in atuais]:
+            del self.cache[mid]
+        if avisos and avisos != self.avisos:
+            for a in avisos:
+                log('aviso malhas:', a)
+        self.objetos = _limpo(objetos)
+        self.avisos = avisos
+        self.ms = (time.perf_counter() - t0) * 1000
+        return atuais
+
+    @staticmethod
+    def _partes(itens, rev, completo):
+        msgs, atual, tam = [], {}, 0
+        for k, d in itens:
+            n = len(d['v']) + len(d['n']) + len(d['i'])
+            if atual and tam + n > LIM_PARTE:
+                msgs.append({'tipo': 'malhas', 'rev': rev, 'completo': completo, 'malhas': atual, 'remover': []})
+                atual, tam = {}, 0
+            atual[k] = d
+            tam += n
+        msgs.append({'tipo': 'malhas', 'rev': rev, 'completo': completo, 'malhas': atual, 'remover': []})
+        return msgs
+
+    def retrato(self):
+        """Tudo (cliente novo e --exportar-malhas), em partes de até LIM_PARTE; a última leva os objetos."""
+        msgs = self._partes([(k, c['dados']) for k, c in self.cache.items() if c['dados']], self.rev, True)
+        msgs[-1].update(objetos=self.objetos, avisos=self.avisos, fim=True)
+        return msgs
+
+    def diferenca(self):
+        """Coleta e devolve as mensagens para os clientes que já têm o retrato (lista, talvez vazia)."""
+        atuais = self.coletar()
+        novas = [(k, c['dados']) for k, c in atuais.items() if c['dados'] and self.enviadas.get(k) != c['hash']]
+        remover = [k for k in self.enviadas if k not in atuais or not atuais[k]['dados']]
+        estrutura = [(o['nome'], o['tipo'], o['sub'], o['malha_id'], o['cor'], o['modo_rot'], o['pai'])
+                     for o in self.objetos]
+        matrizes = [{k: o[k] for k in ('nome', 'matriz', 'loc', 'rot', 'esc')} for o in self.objetos]
+        self.enviadas = {k: c['hash'] for k, c in atuais.items() if c['dados']}
+        if novas or remover or estrutura != self.estrutura:
+            self.estrutura, self.matrizes = estrutura, matrizes
+            self.rev += 1
+            msgs = self._partes(novas, self.rev, False)
+            msgs[-1].update(remover=remover, objetos=self.objetos, avisos=self.avisos, fim=True)
+            return msgs
+        if matrizes != self.matrizes:
+            mudou = [m for m, a in zip(matrizes, self.matrizes) if m != a]
+            self.matrizes = matrizes
+            self.rev += 1
+            return [{'tipo': 'transformacoes', 'rev': self.rev, 'objetos': mudou}]
+        return []
+
+
 # ---------------------------------------------------------------- WebSocket
 
 class Cliente:
@@ -213,6 +475,7 @@ class Cliente:
         self.ws = False
         self.fechar_apos = False   # fecha quando a saída esvaziar
         self.fragmentos = None     # bytearray durante mensagem fragmentada
+        self.tem_malhas = False    # já recebeu o retrato completo -> recebe as diferenças
 
     def envia_bytes(self, b):
         self.saida += b
@@ -263,6 +526,7 @@ class Ponte:
         self.ultimo_hash = 0.0
         self.rodando = True
         self.estado = None
+        self.malhas = Malhas()
 
     # --- painéis e revisão
     def atualizar(self, forcar=False):
@@ -287,6 +551,23 @@ class Ponte:
         for c in list(self.clientes.values()):
             if c.ws and not c.fechar_apos:
                 self._seguro(c, c.envia_frame, 1, dados)
+
+    def difundir_malhas(self):
+        """Só coleta se alguém pediu malhas (ou forçado pelo teste de desempenho)."""
+        alvos = [c for c in self.clientes.values() if c.ws and c.tem_malhas and not c.fechar_apos]
+        if not alvos:
+            return
+        for m in self.malhas.diferenca():
+            dados = para_json(m).encode('utf-8')
+            for c in alvos:
+                self._seguro(c, c.envia_frame, 1, dados)
+
+    def enviar_retrato(self, c):
+        if not c.tem_malhas and not any(x.tem_malhas for x in self.clientes.values()):
+            self.malhas.diferenca()   # primeiro cliente: coleta agora e marca tudo como enviado
+        c.tem_malhas = True
+        for m in self.malhas.retrato():
+            c.envia_json(m)
 
     def _seguro(self, c, f, *a):
         try:
@@ -443,6 +724,11 @@ class Ponte:
             if cmd == 'paineis':
                 c.envia_json(self.msg_paineis())
                 return
+            elif cmd == 'malhas':
+                self.enviar_retrato(c)
+                return
+            elif cmd == 'selecionar':
+                resp.update(cmd_selecionar(m))
             elif cmd == 'escrever':
                 resp.update(cmd_escrever(m))
             elif cmd == 'operador':
@@ -463,6 +749,7 @@ class Ponte:
         c.envia_json(resp)
         self.atualizar(forcar=True)
         self.difundir()
+        self.difundir_malhas()
 
     # --- loop
     def remover(self, c):
@@ -528,6 +815,7 @@ class Ponte:
             self.ultimo_hash = agora
             if self.atualizar():
                 self.difundir()
+            self.difundir_malhas()
 
     def rodar(self):
         t = time.perf_counter()
@@ -571,6 +859,31 @@ def abrir_janela_app(url):
     log('Edge/Chrome não encontrado; abra a URL acima no navegador')
 
 
+def exportar_malhas(arq):
+    """Retrato completo num JSON só (offline) + medidas de tempo e tamanho no log."""
+    mal = Malhas()
+    t = time.perf_counter()
+    mal.diferenca()
+    frio = (time.perf_counter() - t) * 1000
+    t = time.perf_counter()
+    mal.diferenca()
+    quente = (time.perf_counter() - t) * 1000
+    t = time.perf_counter()
+    msgs = mal.retrato()
+    tam = sum(len(para_json(m)) for m in msgs)
+    serial = (time.perf_counter() - t) * 1000
+    junto = {'tipo': 'malhas', 'rev': 1, 'completo': True, 'malhas': {}, 'remover': [], 'fim': True,
+             'objetos': mal.objetos, 'avisos': mal.avisos, 'cena': lista_cena(bpy.context.scene)}
+    for m in msgs:
+        junto['malhas'].update(m['malhas'])
+    with open(arq, 'w', encoding='utf-8') as f:
+        f.write(para_json(junto))
+    tri = sum(c['tri'] for c in mal.cache.values())
+    log('MEDIDA malhas: %d objetos, %d malhas, %d tri; 1a coleta %.1f ms, ciclo sem mudança %.1f ms, '
+        'JSON %.1f ms, %d KB em %d mensagem(ns)' % (len(mal.objetos), len(junto['malhas']), tri, frio, quente,
+                                                     serial, tam // 1024, len(msgs)))
+
+
 def main():
     args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
     porta, modelo, teste, abrir = 8765, None, False, False
@@ -585,6 +898,9 @@ def main():
             teste = True
         elif a == '--abrir':
             abrir = True
+        elif a == '--exportar-malhas':
+            exportar_malhas(args[i + 1])
+            return
         i += 1
     if modelo is None:
         modelo = os.path.join('D:' + os.sep, 'AnastacioEditorWeb', 'prototipo', 'modelo.html')
