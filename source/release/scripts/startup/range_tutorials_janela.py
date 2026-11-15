@@ -51,6 +51,11 @@ TEXTOS = {
              "en": "Tip: the tutorial moves on by itself when you do what the step asks.  Esc closes this window.",
              "es": "Consejo: el tutorial avanza solo cuando haces lo que pide el paso.  Esc cierra esta ventana."},
     "vazio": {"pt": "Nenhum tutorial instalado.", "en": "No tutorials installed.", "es": "Ningún tutorial instalado."},
+    "nada_filtro": {"pt": "Nenhum tutorial neste filtro.", "en": "No tutorials in this filter.",
+                    "es": "Ningún tutorial en este filtro."},
+    "f_todos": {"pt": "Todos", "en": "All", "es": "Todos"},
+    "f_fazer": {"pt": "A fazer", "en": "To do", "es": "Pendientes"},
+    "f_feitos": {"pt": "Concluídos", "en": "Completed", "es": "Completados"},
 }
 
 # Temas da janela: fundos, textos e o destaque.  O texto escuro sobre o destaque (ESCURO) não muda.
@@ -405,6 +410,10 @@ def _desenhar_tudo():
 
     # ---- detalhes à direita
     nome_cat, itens = cats[janela["cat"]]
+    filtro = janela.get("filtro", "todos")
+    if filtro != "todos":
+        quer_feito = filtro == "feitos"
+        itens = [it for it in itens if (_estado_item(progresso, it[0], it[3])[0] == "feito") == quer_feito]
     _ret(x1 - lado, m0, x1, m1, PAINEL)
     _ret(x1 - lado, m0, x1 - lado + 1, m1, BORDA)
     escolhido = next((it for it in itens if it[0] == janela.get("tut")), itens[0] if itens else None)
@@ -417,10 +426,20 @@ def _desenhar_tudo():
     gx0, gx1 = x0 + nav + 24 * e, x1 - lado - 24 * e
     gy1 = m1 - 24 * e
     _txt(gx0, gy1 - 20 * e, nome_cat, TEXTO, 20)
+    # Filtro (Todos / A fazer / Concluídos): botões juntos à direita do título.
+    x = gx1
+    for chave in ("feitos", "fazer", "todos"):
+        rotulo = _t("f_" + chave)
+        r = (x - _largura(rotulo, 12) - 24 * e, gy1 - 28 * e, x, gy1 - 2 * e)
+        ativo = chave == filtro
+        _ret(*r, cor=DOURADO if ativo else (BORDA if sobre(r) else LATERAL), raio=13 * e)
+        _txt(r[0] + 12 * e, r[1] + 9 * e, rotulo, ESCURO if ativo else TEXTO_2, 12)
+        alvos.append((r, "filtro", chave))
+        x = r[0] - 6 * e
     gy1 -= 40 * e
     janela["regioes"]["grade"] = (gx0 - 4 * e, m0, gx1 + 4 * e, gy1)
     if not itens:
-        _txt(gx0, gy1 - 30 * e, _t("vazio"), TEXTO_2, 14)
+        _txt(gx0, gy1 - 30 * e, _t("nada_filtro" if filtro != "todos" else "vazio"), TEXTO_2, 14)
     colunas, vao = 3, 16 * e
     larg_c = (gx1 - gx0 - vao * (colunas - 1)) / colunas
     alt_c = 168 * e
@@ -574,6 +593,9 @@ class RANGE_OT_tutorials_window(Operator):
             return {'FINISHED'}
         if acao == "categoria":
             janela["cat"], janela["tut"] = valor, None
+            janela["rolagem"]["grade"] = 0.0
+        elif acao == "filtro":
+            janela["filtro"], janela["tut"] = valor, None
             janela["rolagem"]["grade"] = 0.0
         elif acao == "tutorial":
             janela["tut"] = valor
