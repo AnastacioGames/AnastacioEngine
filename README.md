@@ -29,6 +29,30 @@ No Linux não é preciso instalar bibliotecas: o pacote já traz
 as que usa em `lib/` e depende só do que qualquer desktop tem (driver de vídeo, X11/Wayland, som). Para pôr o
 ícone no menu e na dock, rode `./install-desktop.sh` dentro da pasta.
 
+## Novidades da 0.7.2
+
+- **Tutoriais dentro da engine** (About > Tutorials): 38 tutoriais interativos em português, inglês e espanhol, do
+  básico (interface, primeiro jogo, Logic Bricks, export) a Cutscene, Compositing, Light Probe Volume, SSGI,
+  microfone, Character e Nodes GLSL.
+- **Botão Help:** liga um "i" nos painéis com a explicação de cada um e o botão do tutorial dele.
+- **Mind Map:** área nova para mapas mentais (`.mm`), com vínculos, tarefas, busca e exportar PNG.
+- **Nodes GLSL por arquivo:** `@input/@param/@output`, `@shading`, `@surface` (triplanar), Node Groups e presets como
+  `.json`, e bake de meshmaps (AO, curvatura, espessura, normal, posição).
+- **TAAU** (upscaling temporal) com modos Quality/Balanced/Performance, e TAA com movimento por objeto e GPU Skinning.
+- **Bake Probes:** captura a luz de todos os Light Probe Volumes de uma vez e leva o `.probes` no jogo exportado.
+- **Carregamento mais rápido:** o aquecimento de shaders inclui os arquivos de LibLoad listados em `<jogo>.warmup`.
+- **Web e celular:** sons do World Sound no export, aviso quando o WebGL cai e correção das cores dos mipmaps.
+
+Lista completa nas [notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.7.2).
+
+## Novidades da 0.7.1
+
+- **Export Web** volta a funcionar com nomes de arquivo com espaço, acento, `#` e `%`, e o navegador não mistura
+  arquivos de exports antigos.
+- **Ajustar luz e material no editor** ficou instantâneo: só redesenha, sem recompilar shaders.
+
+Lista completa nas [notas do release](https://github.com/AnastacioGames/AnastacioEngine/releases/tag/v0.7.1).
+
 ## Novidades da 0.7.0
 
 - **Microfone e gravação de voz:** microfone no jogo, no editor, na Web e no Android. API `Range.audio`, sensor
