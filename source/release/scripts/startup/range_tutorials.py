@@ -186,6 +186,13 @@ def _marcar_progresso(nome, passo=None, feito=None):
         pass  # sem pasta de configuração: só não lembra
 
 
+# ---------------------------------------------------------------- miniaturas (janela de tutoriais)
+
+def miniatura(nome):
+    """Imagem do cartão: o desenho miniatura.png da pasta do tutorial."""
+    return os.path.join(PASTA, nome, "miniatura.png")
+
+
 # ---------------------------------------------------------------- checagens
 
 def _arvores_ui(context):
