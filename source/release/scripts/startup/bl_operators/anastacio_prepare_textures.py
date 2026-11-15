@@ -547,5 +547,85 @@ class GAME_OT_revert_prepared_textures(Operator):
         return {'FINISHED'}
 
 
+class GAME_OT_prepare_texture_image(Operator):
+    """Convert this image to a desktop DDS copy (BC1/BC3/BC5 + mipmaps); the original stays editable"""
+    bl_idname = 'game.prepare_texture_image'
+    bl_label = 'Optimize Image (DDS)'
+    image_name: StringProperty(options={'HIDDEN'})
+    max_size: EnumProperty(name='Maximum size', items=SIZE_ITEMS, default='2048')
+    quality: EnumProperty(name='Quality', items=QUALITY_ITEMS, default='10')
+
+    @classmethod
+    def poll(cls, context):
+        return bool(bpy.data.filepath)
+
+    def invoke(self, context, event):
+        image = bpy.data.images.get(self.image_name)
+        record = _record(image) if image else {}
+        options = record.get('options') or {}
+        if options.get('max_size') is not None:
+            self.max_size = str(options['max_size'])
+        if options.get('quality') is not None:
+            self.quality = str(options['quality'])
+        return context.window_manager.invoke_props_dialog(self)
+
+    def execute(self, context):
+        image = bpy.data.images.get(self.image_name)
+        if image is None:
+            self.report({'ERROR'}, tip_('Image not found'))
+            return {'CANCELLED'}
+        try:
+            w, h, fmt, size = prepare_image(image, int(self.max_size), int(self.quality))
+        except Exception as error:
+            self.report({'ERROR'}, str(error))
+            return {'CANCELLED'}
+        self.report({'INFO'}, tip_('%s: %d x %d %s, %.2f MiB. Save the project to keep it.') % (
+            image.name, w, h, fmt, size / 1048576))
+        return {'FINISHED'}
+
+
+class GAME_OT_revert_prepared_texture_image(Operator):
+    """Stop using the prepared DDS copy of this image in future exports"""
+    bl_idname = 'game.revert_prepared_texture_image'
+    bl_label = 'Revert Optimized Image'
+    image_name: StringProperty(options={'HIDDEN'})
+
+    def execute(self, context):
+        image = bpy.data.images.get(self.image_name)
+        if image is not None and not image.library and KEY in image:
+            del image[KEY]
+        return {'FINISHED'}
+
+
+def draw_image_optimize(layout, image):
+    """Compact 'Optimize' box for texture/image panels."""
+    if image is None or image.source != 'FILE':
+        return
+    box = layout.box()
+    row = box.row(align=True)
+    row.label(text='Optimize (Desktop DDS):', icon='MOD_DECIM')
+    record = _record(image)
+    if record:
+        options = record.get('options') or {}
+        row = box.row(align=True)
+        row.label(text='%s, max %s' % (record.get('format', '?'), options.get('max_size') or 'Original'),
+                  icon='FILE_TICK')
+        op = row.operator('game.prepare_texture_image', text='', icon='FILE_REFRESH')
+        op.image_name = image.name
+        op = row.operator('game.revert_prepared_texture_image', text='', icon='X')
+        op.image_name = image.name
+    else:
+        row = box.row()
+        row.enabled = bool(bpy.data.filepath) and not image.library
+        op = row.operator('game.prepare_texture_image', text='Convert to DDS', icon='IMAGE_DATA')
+        op.image_name = image.name
+        if not bpy.data.filepath:
+            box.label(text='Save the project first', icon='INFO')
+    if KTX2_HIGH_QUALITY in image:
+        box.prop(image, '["%s"]' % KTX2_HIGH_QUALITY, text='KTX2 HQ (Web/Android)')
+    box.operator('game.prepare_textures', text='All Textures...', icon='TEXTURE')
+
+
 classes = (AnastacioTextureEntry, ANASTACIO_UL_prepared_textures,
-           GAME_OT_prepare_textures, GAME_OT_revert_prepared_textures)
+           GAME_OT_prepare_textures, GAME_OT_revert_prepared_textures,
+           GAME_OT_prepare_texture_image, GAME_OT_revert_prepared_texture_image)

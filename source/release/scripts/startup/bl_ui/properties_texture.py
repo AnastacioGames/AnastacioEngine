@@ -535,6 +535,8 @@ class TEXTURE_PT_image(TextureTypePanel, Panel):
         box = layout.box()
         box.label(text="Image:", icon="IMAGE_DATA")
         box.template_image(tex, "image", tex.image_user)
+        from bl_operators.anastacio_prepare_textures import draw_image_optimize
+        draw_image_optimize(layout, tex.image)
 
 
 def texture_filter_common(tex, layout):
