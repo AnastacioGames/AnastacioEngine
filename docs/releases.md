@@ -29,8 +29,21 @@ Uma seção por versão: notas para o usuário, como foi montada e o que ficou a
 
 ## 0.7.2
 
-Estado: **em preparo** (2026-11-14). Tutoriais e botão Help, Mind Map, Nodes GLSL por arquivo, TAAU, Bake Probes
-e aquecimento de LibLoad. Texto da página do GitHub: [release-notes-0.7.2.md](release-notes-0.7.2.md).
+Estado: **publicada completa em 2026-11-14** (tag `v0.7.2`), Windows e Linux. Tutoriais e botão Help, Mind Map,
+Nodes GLSL por arquivo, TAAU, Bake Probes e aquecimento de LibLoad. Texto da página do GitHub:
+[release-notes-0.7.2.md](release-notes-0.7.2.md).
+
+### Windows (2026-11-14, `main` em `91ff89b0`)
+
+- `AnastacioEngine-0.7.2-windows-x64.zip` (215,8 MiB) sha256 `0dcfc678a4c5308da44bacb8ece8695fbf5e5fe032edf6f12246db8f751f173e`
+- `RangeArmor-0.7.2-windows-x64.zip` (25,5 MiB) sha256 `dc26be960245e6f3b4ee565c83727712dcbc6a417d5480bef737fd8e060b71c6`
+
+`pre_release.bat` OK (ctest 16/16; a 1ª rodada achou os keymaps do Mind Map fora do `keyconfig_utils`). Runtime
+Web recompilado no mesmo commit (283 módulos). O `aud_pitch_tests.exe` entrava no zip: `stage_release_windows.py`
+agora exclui `*_tests.exe`. Zip extraído em pasta limpa: `blender.crt/`, `web/`, `ae_meshopt.dll`, ajuda e
+tutoriais presentes; editor `-b` sem erro de Python; runtime `--server` rodou 10 s. Export Web pelo
+`validate-web.py --export` do pacote: projeto com LibLoad de `3rd person.range` e `fase #2 ação%.range` (os dois
+em `game/`) e First_Person_destruction OK. RangeArmor sem mudança: mesmo conteúdo da 0.7.1.
 
 ### Linux (2026-11-14, notebook Linux, `main` em `9df47539`)
 

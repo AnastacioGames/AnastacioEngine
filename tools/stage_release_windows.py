@@ -34,7 +34,7 @@ EXCLUDE_FILE_NAMES = {
 EXCLUDE_FILE_PREFIXES = ("datatoc", "makesdna", "makesrna", "msgfmt")
 
 # Variantes de benchmark do runtime (layer-cache-*, probe-cache-*) e o AnastacioEngine_BakeTest: nao fazem parte do pacote.
-EXCLUDE_EXE_SUBSTRINGS = ("layer-cache-", "probe-cache-", "_baketest")
+EXCLUDE_EXE_SUBSTRINGS = ("layer-cache-", "probe-cache-", "_baketest", "_tests.exe")
 
 
 def should_skip(path: Path) -> bool:
