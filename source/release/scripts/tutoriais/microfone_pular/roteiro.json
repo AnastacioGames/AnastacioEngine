@@ -153,7 +153,7 @@
         "es": "Ratón en la 3D View, pulsa P y habla cerca del micrófono. Esc sale."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Nada acontece? Diminua Threshold no sensor, ou escolha o microfone em Record › Select Microphone.",

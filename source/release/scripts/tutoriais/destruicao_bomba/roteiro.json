@@ -154,7 +154,7 @@
         "es": "Presiona P: la bomba cae, explota y la pared se rompe. Esc sale. Después, haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "alvo": null,
       "dica": {

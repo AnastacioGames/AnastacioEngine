@@ -170,7 +170,7 @@
         "es": "Pulsa 0 en el teclado numérico y luego P. Enter, Space o un clic pasan la página. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Não vê o texto pela câmera? Gire o texto para ela: R, X, 90 e Enter.",

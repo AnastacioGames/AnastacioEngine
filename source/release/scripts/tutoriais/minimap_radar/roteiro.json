@@ -148,7 +148,7 @@
         "es": "Pulsa P: el minimapa aparece en la esquina, con el punto del otro cubo. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "Para o jogador andar, use o tutorial 4 ou o 10.",

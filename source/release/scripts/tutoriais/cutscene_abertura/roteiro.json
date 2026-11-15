@@ -174,7 +174,7 @@
         "es": "Pulsa 0 en el teclado numérico y luego P para ver la apertura. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D"
     }
   ],

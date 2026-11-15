@@ -205,6 +205,14 @@ def _logica_ligada(context):
         for c in camera.game.controllers)
 
 
+_jogos = [0]  # quantas vezes o jogo rodou e voltou ao editor nesta sessão
+
+
+@persistent
+def _ao_sair_do_jogo(_scene):
+    _jogos[0] += 1
+
+
 def _botao_ativo(context):
     for arvore in _arvores_ui(context):
         no = arvore.nodes.active if arvore is not None else None
@@ -221,6 +229,8 @@ CHECAGENS = {
     "menu_criado": lambda c: bool(_botoes_ui(c)),
     "botao_start": lambda c: any(n.text.strip().lower() == "start" for n in _botoes_ui(c)),
     "logica_ligada": _logica_ligada,
+    # P apertado e jogo fechado depois que o passo começou (o editor não roda nada durante o jogo).
+    "jogo_rodou": lambda c: _jogos[0] > estado.get("jogos_inicio", _jogos[0]),
 }
 
 
@@ -410,6 +420,7 @@ def _ir(delta):
     estado["passo"] += delta
     estado["feito"] = None
     estado["inicio_passo"] = time.time()
+    estado["jogos_inicio"] = _jogos[0]
     # Voltando, a checagem já é verdadeira: o passo fica parado até o usuário clicar em Next.
     estado["manual"] = delta < 0
     if estado["passo"] >= len(estado["roteiro"]["passos"]):
@@ -788,7 +799,7 @@ class RANGE_OT_tutorial_start(Operator):
         passo = max(0, min(self.step, len(roteiro["passos"]) - 1))
         handle = bpy.types.WindowManager.draw_handler_add(_desenhar, ())
         estado.update(nome=self.name, roteiro=roteiro, passo=passo, feito=None, manual=False, botoes={},
-                      handle=handle, chave=self.chave, pisca=True, inicio_passo=time.time(),
+                      handle=handle, chave=self.chave, pisca=True, inicio_passo=time.time(), jogos_inicio=_jogos[0],
                       wm=context.window_manager.as_pointer(), janela=context.window.as_pointer(),
                       timer=context.window_manager.event_timer_add(0.3, context.window))
         _marcar_progresso(self.name, passo=passo, feito=False)
@@ -1384,6 +1395,7 @@ def register():
     wm.range_tutorial_category = StringProperty(name="Category", description="Submenus, like \"Node Editor/UI Tree\"")
     wm.range_tutorial_steps = CollectionProperty(type=RangeTutorialStep)
     bpy.app.handlers.load_post.append(_ao_carregar)
+    bpy.app.handlers.game_post.append(_ao_sair_do_jogo)
     bpy.types.INFO_HT_header.append(_cabecalho)
     bpy.types.WM_MT_button_context.append(_menu_direito)
     _atualizar_menus()
@@ -1398,6 +1410,7 @@ def unregister():
         bpy.types.WindowManager.draw_handler_remove(gravacao["handle"])
         gravacao.clear()
     bpy.app.handlers.load_post.remove(_ao_carregar)
+    bpy.app.handlers.game_post.remove(_ao_sair_do_jogo)
     bpy.types.INFO_HT_header.remove(_cabecalho)
     bpy.types.WM_MT_button_context.remove(_menu_direito)
     for cls in _submenus:

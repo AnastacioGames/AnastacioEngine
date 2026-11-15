@@ -72,7 +72,7 @@
         "es": "En la flechita al lado de Rec, haz clic en Play Last para ver el video."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "INFO",
       "dica": {
         "pt": "Open Folder, no mesmo lugar, abre a pasta dos vídeos.",

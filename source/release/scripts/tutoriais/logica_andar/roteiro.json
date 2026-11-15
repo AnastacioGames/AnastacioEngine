@@ -180,7 +180,7 @@
         "es": "Ratón en la 3D View, pulsa P y mantén la flecha arriba. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D"
     }
   ],

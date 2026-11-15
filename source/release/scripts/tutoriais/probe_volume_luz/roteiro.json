@@ -113,7 +113,7 @@
         "es": "Ratón en la 3D View, pulsa P: el área abre con la luz lista. Esc sale."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D"
     }
   ],

@@ -102,7 +102,7 @@
         "es": "Presiona P y aleja la vista con la rueda del ratón: el mono cambia a las versiones livianas. Esc sale. Haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "alvo": null,
       "dica": {

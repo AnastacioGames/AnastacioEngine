@@ -153,7 +153,7 @@
         "es": "¡Listo! Lleva el ratón a la 3D View, pulsa P y haz clic en Start. Tu primer menú está funcionando."
       },
       "destaque": "VIEW_3D",
-      "checagem": null
+      "checagem": "jogo_rodou"
     }
   ],
   "encerramento": {

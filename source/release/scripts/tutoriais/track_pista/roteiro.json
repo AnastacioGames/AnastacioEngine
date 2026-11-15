@@ -143,7 +143,7 @@
         "es": "Presiona Numpad . para ver la pista entera. Para manejar en ella, haz el tutorial 17. Haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "alvo": null
     }

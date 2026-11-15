@@ -134,7 +134,7 @@
         "es": "Ratón en la 3D View, pulsa P y mira el cubo. Esc sale."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D"
     }
   ],

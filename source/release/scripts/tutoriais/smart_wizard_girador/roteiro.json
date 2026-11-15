@@ -164,7 +164,7 @@
         "es": "Ratón en la 3D View, pulsa P: el cubo se balancea. Esc sale. Luego haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "O código ficou num Text do arquivo: abra no Text Editor para estudar.",

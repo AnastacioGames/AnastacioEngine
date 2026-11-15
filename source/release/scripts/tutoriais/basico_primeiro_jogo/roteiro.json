@@ -126,7 +126,7 @@
         "es": "Ratón en la 3D View, pulsa P: el juego arranca y el cubo cae. Esc sale del juego. Luego haz clic en Next."
       },
       "narracao": "",
-      "checagem": null,
+      "checagem": "jogo_rodou",
       "destaque": "VIEW_3D",
       "dica": {
         "pt": "O cubo não aparece? Ele pode estar fora da câmera: G para trazê-lo.",
