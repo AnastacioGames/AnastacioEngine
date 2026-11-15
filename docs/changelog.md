@@ -8,6 +8,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-15 — Peças que balançam no veículo (`anastacio_balanco.PecaBalanco`)
+
+- Pedido do RolimaRacer (carros texturizados): abas da caixa de papelão mexendo e bolsa de soro da cama de
+  hospital pendurada balançando com o movimento.
+- Novo Smart Component `scripts/modules/anastacio_balanco.py`: a ponta da peça é uma massa numa haste presa
+  na origem do objeto, simulada no referencial que acompanha o pivô (Verlet). Sente gravidade, aceleração do
+  pai como força fictícia (velocidade constante não deixa a peça arrastada), mola de volta para a pose do
+  editor, amortecimento só do movimento relativo, limite de ângulo e vento (arrasto + tremor com a velocidade).
+  Dobradiça opcional em X/Y/Z prende o giro num eixo (abas, portas). Para longe da câmera (`Distancia Maxima`),
+  recomeça parado em teleporte (> 5 m num quadro) e não reescreve `localOrientation` quando nada mudou.
+- Copiado pelo Save As Runtime (`RUNTIME_MODULES`). Valores sugeridos por tipo de peça no docstring do módulo.
+- Testado fora do jogo (`tools/debug/teste_balanco.py`, mathutils): repouso, arrancada (~atan(a/g)), volta ao
+  prumo em velocidade constante, freada, dobradiça, limite, tremor, respawn, rampa e componente com objeto falso.
+  Falta ver no jogo real.
+
 ## 2026-11-15 — Tutoriais: áreas vazias ou piscando no Linux com o cartão ligado
 
 - Diagnóstico: o desenho do cartão (`_desenhar` em `startup/range_tutorials.py`) terminava com

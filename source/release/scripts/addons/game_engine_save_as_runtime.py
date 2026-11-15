@@ -289,7 +289,7 @@ def WriteRuntime(player_path, output_path, copy_python, overwrite_lib, copy_dlls
 RUNTIME_MODULES = (
     "range_args.py", "range_locale.py", "range_language.py", "range_ui_runtime.py", "range_ui_draw.py",
     "range_text_dialogue.py", "range_cutscene_runtime.py", "range_component_wizard.py",
-    "anastacio_ragdoll_runtime.py",
+    "anastacio_ragdoll_runtime.py", "anastacio_balanco.py",
 )
 # .probes: saved light of the Light Probe Volumes, read next to the game (KX_TextureRendererManager::BakedPath).
 PROJECT_EXTENSIONS = {".range", ".blend", ".rasec", ".py", ".probes"}

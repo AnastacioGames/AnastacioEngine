@@ -149,6 +149,9 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
   estado mudam essa property.
 - World Sound fica só com Music e Ambient; efeitos e fala continuam nos objetos (Speaker / Sound actuator).
 - Ragdoll é addon + componentes Python; C++ novo só por limitação demonstrada.
+- Peças que balançam com o veículo (soro, abas, antenas) usam o componente Python `anastacio_balanco.PecaBalanco`
+  (pêndulo com mola no referencial do pai, sem física Bullet); só gira o objeto em volta da origem e não
+  reescreve a orientação quando parado. Teste fora do jogo: `tools/debug/teste_balanco.py`.
 
 ### Web e Android
 

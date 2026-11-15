@@ -429,6 +429,8 @@ na V1: preparação com Undo/Redo e avaliação com janela; V0–V4 não estão 
 Início V2: controlador arcade com LUT de direção do RolimaRacer, comandos externos
 e botão próprio; editor e player força/torque PASS. Drift, boost, roll e
 estabilização ainda pendentes; jogo original preservado.
+Peças que balançam (`anastacio_balanco.PecaBalanco`, 2026-11-15): teste fora do jogo PASS;
+falta ajustar no RolimaRacer real (abas da caixa de papelão, soro da cama de hospital).
 
 ### Destruição e explosões
 
