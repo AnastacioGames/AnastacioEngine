@@ -179,6 +179,7 @@ def rodar_testes(porta, token):
         corpo += d
     conferir('GET / com token -> 200 e painéis injetados', corpo.startswith(b'HTTP/1.1 200') and b'OBJECT_PT_transform' in corpo,
              '%d bytes' % len(corpo))
+    conferir('GET / injeta a lista da cena', b'/*CENA*/' not in corpo and b'"nome": "Cube"' in corpo)
     s = socket.create_connection(('127.0.0.1', porta), timeout=10)
     s.sendall(('GET /?t=x HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n\r\n' % porta).encode())
     conferir('GET / sem token -> 403', s.recv(100).startswith(b'HTTP/1.1 403'))
@@ -210,6 +211,19 @@ def rodar_testes(porta, token):
     conferir('paineis: %d painéis, objeto %s, rev %d (%.0f ms)' % (len(p['paineis']), p['objeto'], p['rev'], ms),
              'OBJECT_PT_transform' in p['paineis'] and p['objeto'] == 'Cube')
     rev0 = p['rev']
+    cena = p.get('cena') or []
+    conferir('cena: lista de objetos com campos do Outliner (%d)' % len(cena),
+             cena and all(set(o) >= {'nome', 'tipo', 'pai', 'ativo', 'selecionado'} for o in cena))
+    conferir('cena: mesmos objetos que "objetos"', sorted(o['nome'] for o in cena) == sorted(p['objetos']))
+    vistos = set()
+    ordem_ok = True
+    for o in cena:
+        ordem_ok &= o['pai'] is None or o['pai'] in vistos
+        vistos.add(o['nome'])
+    conferir('cena: ordem hierárquica (pai antes do filho)', ordem_ok)
+    conferir('cena: só Cube ativo e selecionado',
+             [o['nome'] for o in cena if o['ativo']] == ['Cube'] and [o['nome'] for o in cena if o['selecionado']] == ['Cube'])
+    conferir('cena: tipo MESH no Cube', any(o['nome'] == 'Cube' and o['tipo'] == 'MESH' for o in cena))
     conferir('location inicial', valor(p, 'OBJECT_PT_transform', 'location') == [0.0, 0.0, 0.0],
              valor(p, 'OBJECT_PT_transform', 'location'))
     rna = achar(p['paineis']['OBJECT_PT_transform']['arvore'], 'location')['rna']
@@ -286,6 +300,9 @@ def rodar_testes(porta, token):
     r = ws.ate(lambda m: m.get('tipo') in ('ok', 'erro'))
     p = ws.ate(lambda m: m.get('tipo') == 'paineis')
     conferir('ativar %s troca painéis (%d)' % (outro_obj, len(p['paineis'])), r['tipo'] == 'ok' and p['objeto'] == outro_obj)
+    conferir('cena acompanha ativar (ativo/selecionado = %s)' % outro_obj,
+             [o['nome'] for o in p['cena'] if o['ativo']] == [outro_obj] and
+             [o['nome'] for o in p['cena'] if o['selecionado']] == [outro_obj])
 
     # Frame sem máscara -> close 1002
     ruim = WS(porta, token)

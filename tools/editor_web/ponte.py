@@ -5,7 +5,7 @@ AnastacioEngine -b [arquivo.range] --factory-startup --python tools/editor_web/p
 
 Um só porto em 127.0.0.1 serve a página (GET /?t=TOKEN) e o WebSocket (/ws?t=TOKEN).
 Só stdlib: socket + select, handshake RFC 6455 manual. Comandos JSON restritos
-(paineis, escrever, operador, ativar; sair só com --teste); nada de eval/exec.
+(paineis — com a lista 'cena' do Outliner —, escrever, operador, ativar; sair só com --teste); nada de eval/exec.
 O loop roda no thread principal (bpy não é thread-safe).
 """
 import base64, hashlib, hmac, json, math, os, re, select, socket, sys, time
@@ -53,11 +53,31 @@ def objeto_ativo():
     return bpy.context.scene.objects.active
 
 
+def lista_cena(cena):
+    """Objetos da cena em ordem hierárquica (pai antes dos filhos, irmãos por nome) para o Outliner."""
+    ativo = cena.objects.active
+    nomes = {o.name for o in cena.objects}
+    filhos = {}
+    for o in cena.objects:
+        pai = o.parent.name if o.parent and o.parent.name in nomes else None
+        filhos.setdefault(pai, []).append(o)
+    saida = []
+
+    def descer(pai, nivel):
+        for o in sorted(filhos.get(pai, []), key=lambda x: x.name):
+            saida.append({'nome': o.name, 'tipo': o.type, 'pai': pai, 'nivel': nivel,
+                          'ativo': o is ativo, 'selecionado': bool(o.select)})
+            descer(o.name, nivel + 1)
+    descer(None, 0)
+    return saida
+
+
 def estado_paineis():
     cena = bpy.context.scene
     obj = cena.objects.active
     return {'objeto': obj.name if obj else None,
             'objetos': sorted(o.name for o in cena.objects),
+            'cena': lista_cena(cena),
             'paineis': le.exportar_paineis(obj, cena)}
 
 
@@ -327,6 +347,7 @@ class Ponte:
             with open(self.modelo, encoding='utf-8') as f:
                 html = f.read()
             html = html.replace('/*PAINEIS*/{}', para_json(self.estado['paineis']).replace('</', '<\\/'), 1)
+            html = html.replace('/*CENA*/[]', para_json(self.estado['cena']).replace('</', '<\\/'), 1)
             c.envia_bytes(resposta_http('200 OK', html.encode('utf-8'), 'text/html; charset=utf-8',
                                         "Content-Security-Policy: default-src 'self' 'unsafe-inline'; "
                                         "connect-src ws://127.0.0.1:%d\r\n" % self.porta))
