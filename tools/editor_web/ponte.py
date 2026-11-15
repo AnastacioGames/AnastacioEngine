@@ -30,8 +30,12 @@ LIM_PARTE = 8 * 1024 * 1024  # retrato grande vai em várias mensagens 'malhas'
 GEOMETRIA = {'MESH', 'CURVE', 'SURFACE', 'FONT', 'META'}
 INTERVALO_HASH = 0.5
 OPERADORES = {'ed.undo', 'ed.redo', 'object.select_all', 'object.location_clear',
-              'object.rotation_clear', 'object.scale_clear'}
-RE_CAMINHO = re.compile(r'^[A-Za-z_]\w*(\[\d+\]|\["[^"\\]*"\])?(\.[A-Za-z_]\w*(\[\d+\]|\["[^"\\]*"\])?)*$')
+              'object.rotation_clear', 'object.scale_clear',
+              # Botão "+" do template_ID: só criam um bloco novo com nome padrão (desfazível).
+              # Fora de propósito: *.open (lê arquivo do disco) e *.unlink (apaga ligação).
+              'material.new', 'world.new', 'texture.new', 'particle.new', 'palette.new', 'text.new'}
+SCRIPTS_EMBUTIDOS = ('widgets_templates.js',)
+RE_CAMINHO =re.compile(r'^[A-Za-z_]\w*(\[\d+\]|\["[^"\\]*"\])?(\.[A-Za-z_]\w*(\[\d+\]|\["[^"\\]*"\])?)*$')
 
 
 def log(*a):
@@ -627,6 +631,13 @@ class Ponte:
                 return self.recusar(c, '403 Forbidden', 'token')
             with open(self.modelo, encoding='utf-8') as f:
                 html = f.read()
+            # Scripts auxiliares (só os desta lista, vizinhos de modelo.html) vão embutidos: sem rota de arquivos.
+            for nome_js in SCRIPTS_EMBUTIDOS:
+                arq_js = os.path.join(os.path.dirname(self.modelo), nome_js)
+                if os.path.isfile(arq_js):
+                    with open(arq_js, encoding='utf-8') as f:
+                        corpo_js = f.read().replace('</script', '<\\/script')
+                    html = html.replace('<script src="%s"></script>' % nome_js, '<script>\n%s\n</script>' % corpo_js, 1)
             html = html.replace('/*PAINEIS*/{}', para_json(self.estado['paineis']).replace('</', '<\\/'), 1)
             html = html.replace('/*CENA*/[]', para_json(self.estado['cena']).replace('</', '<\\/'), 1)
             c.envia_bytes(resposta_http('200 OK', html.encode('utf-8'), 'text/html; charset=utf-8',

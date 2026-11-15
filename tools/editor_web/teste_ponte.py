@@ -124,6 +124,10 @@ def checar_js():
         f.write_text(js, encoding='utf-8')
         r = subprocess.run(['node', '--check', str(f)], capture_output=True, text=True)
     conferir('node --check do script de modelo.html', r.returncode == 0, r.stderr.strip()[:300])
+    wt = Path(MODELO).parent / 'widgets_templates.js'
+    if wt.is_file():
+        r = subprocess.run(['node', '--check', str(wt)], capture_output=True, text=True)
+        conferir('node --check de widgets_templates.js', r.returncode == 0, r.stderr.strip()[:300])
 
 
 def main():
@@ -179,6 +183,8 @@ def rodar_testes(porta, token):
         corpo += d
     conferir('GET / com token -> 200 e painéis injetados', corpo.startswith(b'HTTP/1.1 200') and b'OBJECT_PT_transform' in corpo,
              '%d bytes' % len(corpo))
+    if (Path(MODELO).parent / 'widgets_templates.js').is_file():
+        conferir('GET / embute widgets_templates.js', b'WidgetsTemplates' in corpo and b'src="widgets_templates.js"></script>' not in corpo)
     conferir('GET / injeta a lista da cena', b'/*CENA*/' not in corpo and b'"nome": "Cube"' in corpo)
     s = socket.create_connection(('127.0.0.1', porta), timeout=10)
     s.sendall(('GET /?t=x HTTP/1.1\r\nHost: 127.0.0.1:%d\r\n\r\n' % porta).encode())
@@ -251,6 +257,15 @@ def rodar_testes(porta, token):
 
     erro({'cmd': 'operador', 'op': 'wm.quit_blender'}, 'operador fora da whitelist', 'fora da lista')
     erro({'cmd': 'operador', 'op': 'ed.undo_push'}, 'operador parecido fora da whitelist', 'fora da lista')
+    erro({'cmd': 'operador', 'op': 'image.open'}, 'template_ID open fora da whitelist', 'fora da lista')
+    erro({'cmd': 'operador', 'op': 'font.unlink'}, 'template_ID unlink fora da whitelist', 'fora da lista')
+    erro({'cmd': 'operador', 'op': 'material.new', 'props': {'x': [1]}}, 'props não escalares recusadas', 'props')
+    for op_novo in ('material.new', 'world.new', 'texture.new'):
+        ws.envia({'cmd': 'operador', 'op': op_novo})
+        r = ws.ate(lambda m: m.get('tipo') in ('ok', 'erro'))
+        conferir('template_ID %s aceito' % op_novo, r.get('tipo') == 'ok', r.get('erro'))
+        if r.get('tipo') == 'ok':
+            ws.ate(lambda m: m.get('tipo') == 'paineis')
     erro({'cmd': 'escrever', 'rna': rna, 'valor': 'abc', 'indice': 0}, 'valor string em FLOAT', 'tipo errado')
     erro({'cmd': 'escrever', 'rna': rna, 'valor': True, 'indice': 0}, 'valor bool em FLOAT', 'tipo errado')
     erro({'cmd': 'escrever', 'rna': rna, 'valor': 1.0, 'indice': 3}, 'índice fora', 'fora do array')
