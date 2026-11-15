@@ -75,13 +75,13 @@
     },
     {
       "texto": {
-        "pt": "Faça a bomba: Add › Mesh › UV Sphere. Depois G, Z, 5, Enter: ela fica em cima do cubo.",
-        "en": "Make the bomb: Add › Mesh › UV Sphere. Then G, Z, 5, Enter: it sits above the cube.",
-        "es": "Haz la bomba: Add › Mesh › UV Sphere. Después G, Z, 5, Enter: queda encima del cubo."
+        "pt": "Faça a bomba: Add › Mesh › UV Sphere. Depois G, Z, 12, Enter: ela fica bem alta, em cima do cubo.",
+        "en": "Make the bomb: Add › Mesh › UV Sphere. Then G, Z, 12, Enter: it sits high above the cube.",
+        "es": "Haz la bomba: Add › Mesh › UV Sphere. Después G, Z, 12, Enter: queda bien alta, encima del cubo."
       },
       "narracao": "",
       "checagem": {
-        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and C.active_object.location.z > 3 and not C.active_object.game.use_destruction"
+        "expr": "C.active_object is not None and C.active_object.type == 'MESH' and C.active_object.location.z > 8 and not C.active_object.game.use_destruction"
       },
       "destaque": "VIEW_3D",
       "alvo": {
@@ -132,6 +132,28 @@
     },
     {
       "texto": {
+        "pt": "Ainda no Explosive, em Trigger, baixe Impact Impulse para 5: é a força da batida que faz a bomba explodir. Menor = explode mais fácil.",
+        "en": "Still in Explosive, under Trigger, lower Impact Impulse to 5: it is how hard the hit must be for the bomb to explode. Lower = explodes more easily.",
+        "es": "Aún en Explosive, en Trigger, baja Impact Impulse a 5: es la fuerza del golpe que hace explotar la bomba. Menor = explota más fácil."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "C.active_object is not None and C.active_object.game.use_explosive and C.active_object.game.explosive.impact_impulse <= 6"
+      },
+      "destaque": "PROPERTIES",
+      "alvo": {
+        "area": "PROPERTIES",
+        "regiao": "WINDOW",
+        "botao": "prop:impact_impulse"
+      },
+      "dica": {
+        "pt": "Com a bomba mais alta ela cai mais rápido e bate mais forte. Se Impact Impulse ficar alto demais, ela só quica e não explode.",
+        "en": "Higher up, the bomb falls faster and hits harder. If Impact Impulse is too high, it just bounces and does not explode.",
+        "es": "Más alta, la bomba cae más rápido y golpea más fuerte. Si Impact Impulse es demasiado alto, solo rebota y no explota."
+      }
+    },
+    {
+      "texto": {
         "pt": "No mesmo painel, marque Particle Explosion: fogo, fumaça e faíscas.",
         "en": "In the same panel, check Particle Explosion: fire, smoke and sparks.",
         "es": "En el mismo panel, marca Particle Explosion: fuego, humo y chispas."
@@ -158,9 +180,9 @@
       "destaque": "VIEW_3D",
       "alvo": null,
       "dica": {
-        "pt": "Se a parede não quebrar, baixe Break Impulse no painel Destruction do cubo.",
-        "en": "If the wall does not break, lower Break Impulse in the cube's Destruction panel.",
-        "es": "Si la pared no se rompe, baja Break Impulse en el panel Destruction del cubo."
+        "pt": "Se a parede não quebrar, baixe Break Impulse no painel Destruction do cubo. Se a bomba não explodir, baixe Impact Impulse no painel Explosive dela.",
+        "en": "If the wall does not break, lower Break Impulse in the cube's Destruction panel. If the bomb does not explode, lower Impact Impulse in its Explosive panel.",
+        "es": "Si la pared no se rompe, baja Break Impulse en el panel Destruction del cubo. Si la bomba no explota, baja Impact Impulse en su panel Explosive."
       }
     }
   ]

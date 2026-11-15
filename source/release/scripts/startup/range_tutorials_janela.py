@@ -6,6 +6,7 @@ detalhes do tutorial escolhido à direita.  O operador modal segura os eventos e
 aberta; Esc ou o X fecham.  A lista, o progresso e o idioma vêm de range_tutorials.
 """
 import math
+import os
 import re
 
 import bgl
@@ -15,7 +16,7 @@ from bpy.types import Operator
 
 import range_tutorials as rt
 
-# Cores do protótipo (tema escuro, destaque dourado do cubo do logo).
+# Cores do tema atual (o escuro do protótipo); _aplicar_tema troca estes nomes pelos de TEMAS.
 FUNDO = (0.086, 0.098, 0.122)
 PAINEL = (0.114, 0.129, 0.161)
 LATERAL = (0.098, 0.110, 0.137)
@@ -51,6 +52,46 @@ TEXTOS = {
              "es": "Consejo: el tutorial avanza solo cuando haces lo que pide el paso.  Esc cierra esta ventana."},
     "vazio": {"pt": "Nenhum tutorial instalado.", "en": "No tutorials installed.", "es": "Ningún tutorial instalado."},
 }
+
+# Temas da janela: fundos, textos e o destaque.  O texto escuro sobre o destaque (ESCURO) não muda.
+TEMAS = {
+    "escuro": {"FUNDO": FUNDO, "PAINEL": PAINEL, "LATERAL": LATERAL, "BORDA": BORDA, "TEXTO": TEXTO,
+               "TEXTO_2": TEXTO_2, "TEXTO_3": TEXTO_3, "DOURADO": DOURADO, "VERDE": VERDE},
+    "claro": {"FUNDO": (0.957, 0.953, 0.937), "PAINEL": (1.0, 1.0, 1.0), "LATERAL": (0.925, 0.918, 0.898),
+              "BORDA": (0.835, 0.824, 0.796), "TEXTO": (0.110, 0.110, 0.122), "TEXTO_2": (0.290, 0.290, 0.310),
+              "TEXTO_3": (0.400, 0.400, 0.420), "DOURADO": (0.851, 0.600, 0.110), "VERDE": (0.435, 0.812, 0.592)},
+    "azul": {"FUNDO": (0.059, 0.090, 0.165), "PAINEL": (0.082, 0.122, 0.212), "LATERAL": (0.067, 0.102, 0.184),
+             "BORDA": (0.141, 0.200, 0.318), "TEXTO": (0.906, 0.933, 0.976), "TEXTO_2": (0.643, 0.706, 0.808),
+             "TEXTO_3": (0.533, 0.596, 0.702), "DOURADO": (0.369, 0.682, 0.961), "VERDE": (0.435, 0.812, 0.592)},
+}
+NOMES_TEMA = {"escuro": {"pt": "Escuro", "en": "Dark", "es": "Oscuro"},
+              "claro": {"pt": "Claro", "en": "Light", "es": "Claro"},
+              "azul": {"pt": "Azul", "en": "Blue", "es": "Azul"}}
+_tema = {}
+
+
+def _arquivo_tema():
+    return os.path.join(bpy.utils.user_resource('CONFIG', create=True), "range_tutorials_tema.txt")
+
+
+def _aplicar_tema(nome=None, gravar=False):
+    """Troca as cores da janela; sem nome, o tema guardado (ou o claro)."""
+    if nome is None:
+        try:
+            with open(_arquivo_tema(), encoding="utf-8") as f:
+                nome = f.read().strip()
+        except OSError:
+            nome = ""
+    nome = nome if nome in TEMAS else "claro"
+    globals().update(TEMAS[nome])
+    _tema["nome"] = nome
+    if gravar:
+        try:
+            with open(_arquivo_tema(), "w", encoding="utf-8") as f:
+                f.write(nome)
+        except OSError:
+            pass  # sem pasta de configuração: vale só nesta sessão
+
 
 janela = {}  # vazio = fechada
 
@@ -173,6 +214,50 @@ def _icone_cubo(cx, cy, r, cor):
     bgl.glLineWidth(1.0)
 
 
+_sem_imagem = set()  # caminhos que não carregaram (não tenta de novo a cada desenho)
+
+
+def _imagem(x0, y0, x1, y1, caminho=None, cobrir=False):
+    """Desenha um PNG (o cubo dourado do logo, por padrão); False sem o arquivo.
+    cobrir: preenche o retângulo cortando as sobras, como object-fit: cover."""
+    caminho = caminho or os.path.join(rt.PASTA, "cubo.png")
+    nome = "range_tutoriais_%08x" % (hash(caminho) & 0xffffffff)
+    img = bpy.data.images.get(nome)
+    if img is None:
+        if caminho in _sem_imagem or not os.path.isfile(caminho):
+            return False
+        try:
+            img = bpy.data.images.load(caminho)
+        except RuntimeError:
+            _sem_imagem.add(caminho)
+            return False
+        img.name = nome
+    if img.gl_load(filter=bgl.GL_LINEAR, mag=bgl.GL_LINEAR):
+        _sem_imagem.add(caminho)
+        return False
+    u0, v0, u1, v1 = 0.0, 0.0, 1.0, 1.0
+    w, h = img.size
+    if cobrir and w and h and x1 > x0 and y1 > y0:
+        caixa, foto = (x1 - x0) / (y1 - y0), w / h
+        if foto > caixa:
+            u0 = (1 - caixa / foto) / 2
+            u1 = 1 - u0
+        else:
+            v0 = (1 - foto / caixa) / 2
+            v1 = 1 - v0
+    bgl.glEnable(bgl.GL_TEXTURE_2D)
+    bgl.glBindTexture(bgl.GL_TEXTURE_2D, img.bindcode[0])
+    bgl.glColor4f(1.0, 1.0, 1.0, 1.0)
+    bgl.glBegin(bgl.GL_QUADS)
+    for (u, v), (x, y) in zip(((u0, v0), (u1, v0), (u1, v1), (u0, v1)), ((x0, y0), (x1, y0), (x1, y1), (x0, y1))):
+        bgl.glTexCoord2f(u, v)
+        bgl.glVertex2f(x, y)
+    bgl.glEnd()
+    bgl.glBindTexture(bgl.GL_TEXTURE_2D, 0)
+    bgl.glDisable(bgl.GL_TEXTURE_2D)
+    return True
+
+
 def _icone_play(cx, cy, r, cor):
     bgl.glColor4f(cor[0], cor[1], cor[2], 1.0)
     bgl.glBegin(bgl.GL_TRIANGLES)
@@ -238,8 +323,8 @@ def _desenhar_tudo():
     _ret(x0, m1, x1, m1 + 12 * e, PAINEL)
     _ret(x0, m1, x1, m1 + 1, BORDA)
     cy = m1 + topo / 2
-    _ret(x0 + 32 * e, cy - 28 * e, x0 + 88 * e, cy + 28 * e, DOURADO, raio=12 * e)
-    _icone_cubo(x0 + 60 * e, cy, 16 * e, FUNDO)
+    if not _imagem(x0 + 28 * e, cy - 34 * e, x0 + 96 * e, cy + 34 * e):
+        _icone_cubo(x0 + 60 * e, cy, 22 * e, DOURADO)
     _txt(x0 + 112 * e, cy + 4 * e, _t("titulo"), TEXTO, 28)
     _txt(x0 + 112 * e, cy - 20 * e, _t("sub"), TEXTO_2, 13)
     total = len(cats[0][1])
@@ -272,6 +357,22 @@ def _desenhar_tudo():
         _txt(r[0] + 11 * e, r[1] + 7 * e, codigo.upper(), ESCURO if escolhido else TEXTO_2, 11)
         alvos.append((r, "idioma", codigo))
         x -= 46 * e
+    # Temas: uma bolinha com a cor de cada um (o escolhido com anel do destaque) e o nome do atual.
+    x -= 16 * e
+    cy_t = y0 + rodape / 2
+    for nome in reversed(list(TEMAS)):
+        cores = TEMAS[nome]
+        r = (x - 24 * e, cy_t - 12 * e, x, cy_t + 12 * e)
+        if nome == _tema.get("nome"):
+            _ret(*r, cor=DOURADO, raio=12 * e)
+        elif sobre(r):
+            _ret(*r, cor=TEXTO_3, raio=12 * e)
+        _ret(r[0] + 3 * e, r[1] + 3 * e, r[2] - 3 * e, r[3] - 3 * e, cores["PAINEL"], raio=9 * e)
+        _ret(r[0] + 8 * e, r[1] + 8 * e, r[2] - 8 * e, r[3] - 8 * e, cores["DOURADO"], raio=4 * e)
+        alvos.append((r, "tema", nome))
+        x -= 30 * e
+    rotulo = rt._txt(NOMES_TEMA[_tema.get("nome", "claro")])
+    _txt(x - _largura(rotulo, 12) + 2 * e, y0 + 14 * e, rotulo, TEXTO_3, 12)
 
     # ---- categorias (rolam se não couberem)
     _ret(x0, m0, x0 + nav, m1, LATERAL)
@@ -295,7 +396,7 @@ def _desenhar_tudo():
             _ret(*r, cor=BORDA, alfa=1.0 if ativo else 0.6, raio=8 * e)
         if ativo:
             _ret(r[0], r[1] + 8 * e, r[0] + 3 * e, r[3] - 8 * e, DOURADO)
-        _txt(r[0] + 14 * e, r[1] + 14 * e, _cortar(nome, nav - 90 * e, 14), (1, 1, 1) if ativo else TEXTO_2, 14)
+        _txt(r[0] + 14 * e, r[1] + 14 * e, _cortar(nome, nav - 90 * e, 14), TEXTO if ativo else TEXTO_2, 14)
         n = str(len(itens))
         _txt(r[2] - 12 * e - _largura(n, 12), r[1] + 14 * e, n, TEXTO_3, 12)
         if sobre(janela["regioes"]["nav"]):
@@ -355,8 +456,9 @@ def _desenhar_cartao(item, indice, r, progresso, escolhido, sobre):
     _moldura(*r, cor=borda, raio=10 * e, espessura=2 * e)
     m = 10 * e
     t0, t1 = r[3] - m - 92 * e, r[3] - m
-    _ret(r[0] + m, t0, r[2] - m, t1, MINIATURAS[indice % len(MINIATURAS)], raio=6 * e)
-    _icone_play((r[0] + r[2]) / 2, (t0 + t1) / 2, 14 * e, (1, 1, 1))
+    if not _imagem(r[0] + m, t0, r[2] - m, t1, rt.miniatura(nome), cobrir=True):
+        _ret(r[0] + m, t0, r[2] - m, t1, MINIATURAS[indice % len(MINIATURAS)], raio=6 * e)
+        _icone_play((r[0] + r[2]) / 2, (t0 + t1) / 2, 14 * e, (1, 1, 1))
     if situacao == "feito":
         selo, cor = _t("concluido"), VERDE
     elif situacao == "andando":
@@ -375,8 +477,9 @@ def _desenhar_detalhes(item, nome_cat, progresso, x0, y0, x1, y1, alvos, sobre):
     e = rt._escala()
     nome, titulo, _, total, categoria = item
     situacao, passo = _estado_item(progresso, nome, total)
-    _ret(x0, y1 - 150 * e, x1, y1, MINIATURAS[0], raio=8 * e)
-    _icone_play((x0 + x1) / 2, y1 - 75 * e, 24 * e, (1, 1, 1))
+    if not _imagem(x0, y1 - 150 * e, x1, y1, rt.miniatura(nome), cobrir=True):
+        _ret(x0, y1 - 150 * e, x1, y1, MINIATURAS[0], raio=8 * e)
+        _icone_play((x0 + x1) / 2, y1 - 75 * e, 24 * e, (1, 1, 1))
     y = y1 - 150 * e - 34 * e
     for linha in _quebrar(titulo, x1 - x0, 20)[:3]:
         _txt(x0, y, linha, TEXTO, 20)
@@ -385,7 +488,7 @@ def _desenhar_detalhes(item, nome_cat, progresso, x0, y0, x1, y1, alvos, sobre):
     _txt(x0, y, _cortar(meta, x1 - x0, 13), TEXTO_2, 13)
     y -= 30 * e
     for linha in _quebrar(_resumo(nome), x1 - x0, 14)[:8]:
-        _txt(x0, y, linha, (0.773, 0.792, 0.824), 14)
+        _txt(x0, y, linha, TEXTO, 14)
         y -= 21 * e
 
     # Botões embaixo: o principal sempre; "do início" só para quem parou no meio.
@@ -403,7 +506,7 @@ def _desenhar_detalhes(item, nome_cat, progresso, x0, y0, x1, y1, alvos, sobre):
         alvos.append((r2, "comecar", (nome, 0)))
         yb += 48 * e
     r = (x0, yb, x1, yb + 48 * e)
-    _ret(*r, cor=(1.0, 0.8, 0.42) if sobre(r) else DOURADO, raio=8 * e)
+    _ret(*r, cor=DOURADO, alfa=0.85 if sobre(r) else 1.0, raio=8 * e)
     _txt((x0 + x1 - _largura(rotulo, 15)) / 2, yb + 18 * e, rotulo, ESCURO, 15)
     alvos.append((r, "comecar", (nome, passo_ini)))
 
@@ -428,6 +531,7 @@ class RANGE_OT_tutorials_window(Operator):
         if rt.estado:
             rt._parar()  # o cartão do tutorial por baixo da janela confundiria
         self.chave = object()
+        _aplicar_tema()
         janela.update(chave=self.chave, janela=context.window.as_pointer(), cat=0, tut=None, alvos=[],
                       rolagem={"nav": 0.0, "grade": 0.0}, rolagem_max={"nav": 0.0, "grade": 0.0},
                       regioes={}, mouse=(event.mouse_x, event.mouse_y),
@@ -473,6 +577,8 @@ class RANGE_OT_tutorials_window(Operator):
             janela["rolagem"]["grade"] = 0.0
         elif acao == "tutorial":
             janela["tut"] = valor
+        elif acao == "tema":
+            _aplicar_tema(valor, gravar=True)
         elif acao == "idioma":
             rt._escolher_idioma(valor)
         rt._redesenhar()
