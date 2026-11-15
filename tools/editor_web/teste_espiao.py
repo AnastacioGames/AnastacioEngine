@@ -18,19 +18,7 @@ cubo = bpy.data.objects['Cube']
 cena.objects.active = cubo
 
 
-def ctx_para(obj):
-    cena.objects.active = obj
-    return le.ContextoFalso(
-        object=obj, active_object=obj, scene=cena, world=cena.world,
-        mesh=obj.data if obj.type == 'MESH' else None,
-        lamp=obj.data if obj.type == 'LAMP' else None,
-        camera=obj.data if obj.type == 'CAMERA' else None,
-        material=obj.active_material, material_slot=None,
-        texture=None, texture_slot=None, bone=None, edit_bone=None,
-        pose_bone=None, armature=None, curve=None, meta_ball=None, lattice=None,
-        speaker=None, particle_system=None, particle_settings=None,
-        render_layer=cena.render.layers.active, space_data=le.EspacoPropriedades(),
-        area=None, region=None, user_preferences=bpy.context.user_preferences)
+ctx_para = le.contexto_para
 
 
 # Teste 1: Transform do cubo.
@@ -59,8 +47,7 @@ print('TESTE1 props XYZ:', props(js))
 print('TESTE1 props QUAT:', props(js_q))
 
 # Teste 3: todos os painéis de Properties com cubo, lâmpada e câmera.
-paineis = [c for c in bpy.types.Panel.__subclasses__()
-           if getattr(c, 'bl_space_type', '') == 'PROPERTIES']
+paineis = le.paineis_properties()
 objetos = [cubo] + [next(o for o in bpy.data.objects if o.type == t) for t in ('LAMP', 'CAMERA')
                     if any(o.type == t for o in bpy.data.objects)]
 resultado = {}

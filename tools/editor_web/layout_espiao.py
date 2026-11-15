@@ -195,6 +195,19 @@ class SelfFalso:
 
 def desenhar(cls, ctx, cabecalho=True):
     """Roda poll + draw_header + draw de um painel. Devolve (json, contagem, erro)."""
+    wm = bpy.context.window_manager
+    antes = getattr(wm, 'ae_object_panel_category', None)
+    try:
+        return _desenhar(cls, ctx, cabecalho)
+    finally:
+        if antes is not None:
+            try:
+                wm.ae_object_panel_category = antes
+            except Exception:
+                pass
+
+
+def _desenhar(cls, ctx, cabecalho):
     reg = {}
     raiz = LayoutFalso('painel', reg, id=cls.__name__, rotulo=getattr(cls, 'bl_label', ''))
     # Abas de categoria do editor (Object Physics, etc.): a UI Web escolhe a aba.
@@ -246,3 +259,41 @@ def escrever(rna, valor, indice=None):
     else:
         getattr(alvo, prop)[indice] = valor
     return getattr(alvo, prop)
+
+
+def contexto_para(obj, cena=None):
+    """ContextoFalso de Properties para `obj` (pode ser None); torna-o ativo."""
+    cena = cena or bpy.context.scene
+    if obj is not None:
+        cena.objects.active = obj
+    dado = obj.data if obj is not None else None
+    tipo = obj.type if obj is not None else None
+    return ContextoFalso(
+        object=obj, active_object=obj, scene=cena, world=cena.world,
+        mesh=dado if tipo == 'MESH' else None,
+        lamp=dado if tipo == 'LAMP' else None,
+        camera=dado if tipo == 'CAMERA' else None,
+        material=obj.active_material if obj is not None else None, material_slot=None,
+        texture=None, texture_slot=None, bone=None, edit_bone=None,
+        pose_bone=None, armature=None, curve=None, meta_ball=None, lattice=None,
+        speaker=None, particle_system=None, particle_settings=None,
+        render_layer=cena.render.layers.active, space_data=EspacoPropriedades(),
+        area=None, region=None, user_preferences=bpy.context.user_preferences)
+
+
+def paineis_properties():
+    """Classes de painel do editor Properties, na ordem de registro."""
+    return [c for c in bpy.types.Panel.__subclasses__()
+            if getattr(c, 'bl_space_type', '') == 'PROPERTIES']
+
+
+def exportar_paineis(obj, cena=None):
+    """Todos os painéis desenháveis para `obj`: {nome: {aba, ordem, arvore}}."""
+    ctx = contexto_para(obj, cena)
+    saida = {}
+    for c in paineis_properties():
+        js, _reg, erro = desenhar(c, ctx)
+        if js is None or erro:
+            continue
+        saida[c.__name__] = {'aba': getattr(c, 'bl_context', ''), 'ordem': len(saida), 'arvore': js}
+    return saida
