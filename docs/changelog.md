@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-15 — Tutoriais: áreas vazias ou piscando no Linux com o cartão ligado
+
+- Diagnóstico: o desenho do cartão (`_desenhar` em `startup/range_tutorials.py`) terminava com
+  `glDisable(GL_SCISSOR_TEST)`. Cada região limpa a tela com `glClear` dentro do recorte; sem ele, o
+  `glClear` seguinte apagava a janela inteira e só a área redesenhada aparecia (o resto vinha vazio da cópia
+  do triple buffer), mesmo depois de fechar o cartão.
+- No Windows não aparecia porque `wm_window_swap_buffers` religa o recorte a cada troca de buffer (só em `WIN32`).
+- Correção: o cartão guarda o recorte (ligado e caixa) antes de desenhar e devolve igual no fim; o contorno de
+  nó também devolve o recorte em vez de desligar.
+
 ## 2026-11-14 — Versão 0.7.2 em preparo
 
 - Versão no executável (`BKE_blender_version.h`), About e scripts de release (Windows, Linux, RangeArmor).

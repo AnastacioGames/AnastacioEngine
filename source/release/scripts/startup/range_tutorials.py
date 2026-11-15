@@ -539,13 +539,26 @@ def _com_dica(passo):
 def _desenhar():
     if _fora():
         return
+    # O recorte (scissor) é da engine: cada região limpa a tela com glClear dentro dele. Desligado,
+    # o próximo glClear apaga a janela inteira e as áreas não marcadas somem ou piscam. Guarda e devolve.
+    caixa = bgl.Buffer(bgl.GL_INT, 4)
+    bgl.glGetIntegerv(bgl.GL_SCISSOR_BOX, caixa)
+    _recorte[:] = [bgl.glIsEnabled(bgl.GL_SCISSOR_TEST), list(caixa)]
     try:
         _desenhar_tudo()
     finally:
-        # Os menus e outros desenhos vêm depois: não deixa estado de GL para eles.
-        bgl.glDisable(bgl.GL_SCISSOR_TEST)
+        _devolver_recorte()
         bgl.glDisable(bgl.GL_BLEND)
         bgl.glLineWidth(1.0)
+
+
+_recorte = []
+
+
+def _devolver_recorte():
+    ligado, caixa = _recorte
+    bgl.glScissor(*caixa)
+    (bgl.glEnable if ligado else bgl.glDisable)(bgl.GL_SCISSOR_TEST)
 
 
 def _desenhar_tudo():
@@ -563,7 +576,7 @@ def _desenhar_tudo():
             bgl.glEnable(bgl.GL_SCISSOR_TEST)
             bgl.glScissor(r.x, r.y, r.width, r.height)
             _contorno(*quadro[:4])
-            bgl.glDisable(bgl.GL_SCISSOR_TEST)
+            _devolver_recorte()
     elif "botao" not in alvo and passo.get("destaque"):
         tipo = _tipo_area(tela, passo["destaque"])
         for a in tela.areas:
