@@ -535,6 +535,8 @@ class Ponte:
         log('exportar painéis + hash: %.1f ms, %d painéis, %d KB' % (
             (time.perf_counter() - t) * 1000, len(self.estado['paineis']), len(para_json(self.estado)) // 1024))
         log('PRONTO %s/?t=%s' % (self.origem, self.token))
+        if self.abrir:
+            abrir_janela_app('%s/?t=%s' % (self.origem, self.token))
         try:
             while self.rodando:
                 self.passo()
@@ -551,9 +553,27 @@ class Ponte:
             log('encerrada')
 
 
+def abrir_janela_app(url):
+    """Abre a página numa janela de app (Edge/Chrome --app): sem abas nem barra de endereço,
+    maximizada sem cobrir a barra do Windows."""
+    import shutil, subprocess
+    candidatos = [shutil.which('msedge'), shutil.which('chrome')]
+    for base in (os.environ.get('ProgramFiles(x86)'), os.environ.get('ProgramFiles'),
+                 os.environ.get('LOCALAPPDATA')):
+        if base:
+            candidatos += [os.path.join(base, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+                           os.path.join(base, 'Google', 'Chrome', 'Application', 'chrome.exe')]
+    for exe in candidatos:
+        if exe and os.path.isfile(exe):
+            subprocess.Popen([exe, '--app=' + url, '--start-maximized'])
+            log('janela de app aberta:', os.path.basename(exe))
+            return
+    log('Edge/Chrome não encontrado; abra a URL acima no navegador')
+
+
 def main():
     args = sys.argv[sys.argv.index('--') + 1:] if '--' in sys.argv else []
-    porta, modelo, teste = 8765, None, False
+    porta, modelo, teste, abrir = 8765, None, False, False
     i = 0
     while i < len(args):
         a = args[i]
@@ -563,13 +583,17 @@ def main():
             modelo = args[i + 1]; i += 1
         elif a == '--teste':
             teste = True
+        elif a == '--abrir':
+            abrir = True
         i += 1
     if modelo is None:
         modelo = os.path.join('D:' + os.sep, 'AnastacioEditorWeb', 'prototipo', 'modelo.html')
     if not os.path.isfile(modelo):
         log('modelo.html não encontrado:', modelo)
         return
-    Ponte(porta, modelo, teste).rodar()
+    p = Ponte(porta, modelo, teste)
+    p.abrir = abrir
+    p.rodar()
 
 
 main()
