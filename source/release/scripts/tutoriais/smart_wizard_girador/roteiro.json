@@ -5,6 +5,7 @@
     "es": "7. Smart Component sin código: un objeto que gira"
   },
   "categoria": "Components",
+  "cena_inicial": "inicio.range",
   "resumo": {
     "pt": "Smart Component Wizard: receita pronta, campos e o componente no objeto.",
     "en": "Smart Component Wizard: a ready recipe, fields and the component on the object.",

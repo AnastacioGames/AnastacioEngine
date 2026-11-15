@@ -5,6 +5,7 @@
     "es": "29. Hacer subir el cubo con la voz"
   },
   "categoria": "Sound",
+  "cena_inicial": "inicio.range",
   "resumo": {
     "pt": "Sensor Microphone: o cubo sobe enquanto você fala ou faz barulho.",
     "en": "Microphone sensor: the cube rises while you speak or make noise.",

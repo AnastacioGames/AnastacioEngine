@@ -102,26 +102,19 @@
     },
     {
       "texto": {
-        "pt": "Clique em Add Sound Module e escolha Effects: ele já vem com os sons da engine.",
-        "en": "Click Add Sound Module and pick Effects: it comes with the engine sounds.",
-        "es": "Haz clic en Add Sound Module y elige Effects: ya viene con los sonidos de la engine."
+        "pt": "Veja o módulo Effects na lista: ele já vem em toda cena, com os sons da engine (explosão, chuva, trovão...). Clique em Next.",
+        "en": "Look at the Effects module in the list: every scene already has it, with the engine sounds (explosion, rain, thunder...). Click Next.",
+        "es": "Mira el módulo Effects en la lista: ya viene en toda escena, con los sonidos del motor (explosión, lluvia, trueno...). Haz clic en Next."
       },
       "narracao": "",
-      "checagem": {
-        "expr": "C.scene.world is not None and any(m.type == 'EFFECTS' and len(m.sounds) > 0 for m in [m for m in C.scene.world.sound_modules])"
-      },
+      "checagem": null,
       "destaque": "PROPERTIES",
       "dica": {
         "pt": "Explosões, destruição, chuva e trovão tocam sozinhos pelo Event de cada som.",
         "en": "Explosions, destruction, rain and thunder play by themselves through each sound Event.",
         "es": "Explosiones, destrucción, lluvia y truenos suenan solos según el Event de cada sonido."
       },
-      "alvo": {
-        "area": "PROPERTIES",
-        "regiao": "WINDOW",
-        "botao": "Add Sound Module",
-        "menu": "Effects"
-      }
+      "alvo": null
     },
     {
       "texto": {

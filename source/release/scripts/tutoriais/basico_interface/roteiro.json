@@ -5,6 +5,7 @@
     "es": "1. Conociendo la interfaz"
   },
   "categoria": "Basics",
+  "cena_inicial": "inicio.range",
   "resumo": {
     "pt": "Outliner, Properties, 3D View e como trocar o tipo de uma área.",
     "en": "Outliner, Properties, 3D View and how to change an area type.",

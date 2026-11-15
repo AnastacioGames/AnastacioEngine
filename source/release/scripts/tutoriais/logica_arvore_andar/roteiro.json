@@ -5,6 +5,7 @@
     "es": "10. Hacer que un objeto camine con la Logic Tree"
   },
   "categoria": "Logic Tree",
+  "cena_inicial": "inicio.range",
   "resumo": {
     "pt": "A mesma lógica dos Logic Bricks, desenhada com nós: Key → Motion.",
     "en": "The same logic as Logic Bricks, drawn with nodes: Key → Motion.",

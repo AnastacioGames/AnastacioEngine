@@ -228,7 +228,27 @@ def _botao_ativo(context):
     return False
 
 
+def _vistas_3d(context):
+    return [tuple(round(v, 4) for v in a.spaces.active.region_3d.view_location) + (round(a.spaces.active.region_3d.view_distance, 4),)
+            for a in context.screen.areas if a.type == 'VIEW_3D']
+
+
+def _mira_no_centro(context):
+    """Shift+C: a mira (cursor 3D) no centro do mundo E a vista mudou neste passo.
+
+    Só "mira no centro" passaria sozinho quando ela já começa lá; exigir a mudança da vista
+    (Shift+C também enquadra a cena) faz o aluno apertar o atalho de verdade."""
+    marca = estado.get("inicio_passo")
+    foto = estado.get("mira_foto")
+    if foto is None or foto[0] != marca:
+        estado["mira_foto"] = foto = (marca, _vistas_3d(context), tuple(context.scene.cursor_location))
+    no_centro = context.scene.cursor_location.length < 1e-3
+    mudou = _vistas_3d(context) != foto[1] or foto[2] != tuple(context.scene.cursor_location)
+    return no_centro and mudou
+
+
 CHECAGENS = {
+    "mira_no_centro": _mira_no_centro,
     "node_editor": lambda c: any(a.type == "NODE_EDITOR" for a in c.screen.areas),
     "botao_ativo": _botao_ativo,
     "node_editor_ui_tree": lambda c: any(True for _ in _arvores_ui(c)),
