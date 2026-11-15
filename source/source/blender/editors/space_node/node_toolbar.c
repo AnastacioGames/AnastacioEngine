@@ -108,7 +108,15 @@ ARegion *node_has_effects_region(ScrArea *sa)
 static int node_effects_toggle_exec(bContext *C, wmOperator *UNUSED(op))
 {
 	ARegion *ar = node_has_effects_region(CTX_wm_area(C));
-	if (ar) {
+	if (ar == NULL) {
+		return OPERATOR_FINISHED;
+	}
+	if (!(ar->flag & RGN_FLAG_HIDDEN) && (ar->winx <= 1 || ar->winy <= 1)) {
+		/* Created after the area was laid out: "visible" but 1x1 px.  Toggling would hide it and
+		 * the first click would do nothing on screen; lay the area out again so it shows up. */
+		ED_region_visibility_change_update(C, ar);
+	}
+	else {
 		ED_region_toggle_hidden(C, ar);
 	}
 	return OPERATOR_FINISHED;
