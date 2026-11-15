@@ -152,8 +152,7 @@ static void userpref_navigation_region_draw(const bContext *C, ARegion *ar)
 }
 
 static void userpref_main_region_listener(
-        wmWindow *UNUSED(win), ScrArea *UNUSED(sa), ARegion *UNUSED(ar),
-        wmNotifier *UNUSED(wmn), const Scene *UNUSED(scene))
+        bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *UNUSED(ar), wmNotifier *UNUSED(wmn))
 {
 	/* context changes */
 }
@@ -170,8 +169,7 @@ static void userpref_header_listener(bScreen *UNUSED(sc), ScrArea *UNUSED(sa), A
 }
 
 static void userpref_navigation_region_listener(
-        wmWindow *UNUSED(win), ScrArea *UNUSED(sa), ARegion *UNUSED(ar),
-        wmNotifier *UNUSED(wmn), const Scene *UNUSED(scene))
+        bScreen *UNUSED(sc), ScrArea *UNUSED(sa), ARegion *UNUSED(ar), wmNotifier *UNUSED(wmn))
 {
 	/* context changes */
 }

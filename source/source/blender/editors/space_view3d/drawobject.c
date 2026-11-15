@@ -801,7 +801,7 @@ static void draw_empty_image(Object *ob, const short dflag, const unsigned char 
 /* The matrix is calculated from the position of the camera (taken from the view matrix),
 /* the position of the object/plane and the direction vector from the object to the camera. */
 static void calculate_icon_lookAt(float view[4][4], float objPos[3], float *billboardrot) {
-	float *viewmat = view;
+	float *viewmat = &view[0][0];
 
 	// Extract camera position from viewmat matrix
 	float camPos[3] = { -viewmat[12], -viewmat[13], -viewmat[14] };

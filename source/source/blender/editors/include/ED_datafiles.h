@@ -65,8 +65,8 @@ extern char datatoc_inter_medium_ttf[];
 extern int datatoc_roboto_mono_medium_ttf_size;
 extern char datatoc_roboto_mono_medium_ttf[];
 
-extern int datatoc_forkawesome_icon_font_ttf;
-extern char datatoc_forkawesome_icon_font_ttf_size[];
+extern int datatoc_forkawesome_icon_font_ttf_size;
+extern char datatoc_forkawesome_icon_font_ttf[];
 
 /* Brush icon datafiles */
 /* TODO: this could be simplified by putting all
