@@ -5,6 +5,7 @@
     "es": "13. Material Atlas: varios colores, un solo material"
   },
   "categoria": "Optimization",
+  "cena_inicial": "inicio.range",
   "resumo": {
     "pt": "Juntar materiais de cor lisa numa paleta compartilhada (menos draw calls).",
     "en": "Merge flat-color materials into a shared palette (fewer draw calls).",
@@ -75,7 +76,7 @@
       },
       "narracao": "",
       "checagem": {
-        "expr": "C.active_object is not None and C.active_object.select and len(set(tuple(round(c, 3) for c in m.diffuse_color) for m in [s.material for s in C.active_object.material_slots if s.material])) >= 2"
+        "expr": "C.active_object is not None and C.active_object.select and any(s.material and tuple(round(v, 2) for v in s.material.diffuse_color) not in ((0.8, 0.8, 0.8), (1.0, 1.0, 1.0)) for s in C.active_object.material_slots[1:])"
       },
       "destaque": "PROPERTIES",
       "alvo": {

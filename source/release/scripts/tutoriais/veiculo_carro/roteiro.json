@@ -5,6 +5,7 @@
     "es": "17. Un coche con Vehicle y el Vehicle Lab"
   },
   "categoria": "Vehicle",
+  "cena_inicial": "inicio.range",
   "resumo": {
     "pt": "Chão, chassi Rigid Body, 4 rodas No Collision, aba Vehicle, Add Vehicle Component e Vehicle Lab.",
     "en": "Ground, Rigid Body chassis, 4 No Collision wheels, Vehicle tab, Add Vehicle Component and Vehicle Lab.",
@@ -23,16 +24,32 @@
   "passos": [
     {
       "texto": {
-        "pt": "Salve o arquivo (Ctrl+S): o script do carro fica ao lado do .range.",
-        "en": "Save the file (Ctrl+S): the car script goes next to the .range.",
-        "es": "Guarda el archivo (Ctrl+S): el script del coche queda junto al .range."
+        "pt": "Salve o projeto numa pasta sua: File › Save As (Shift+Ctrl+S). O script do carro fica ao lado do .range.",
+        "en": "Save the project in a folder of yours: File › Save As (Shift+Ctrl+S). The car script goes next to the .range.",
+        "es": "Guarda el proyecto en una carpeta tuya: File › Save As (Shift+Ctrl+S). El script del coche queda junto al .range."
       },
       "narracao": "",
       "checagem": {
-        "expr": "bool(D.filepath)"
+        "expr": "bool(D.filepath) and not D.is_dirty and not __import__('os').path.normcase(D.filepath).startswith(__import__('os').path.normcase(bpy.app.tempdir))"
       },
       "destaque": "VIEW_3D",
       "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "Antes de criar, com o mouse na 3D View aperte Shift+C: a mira (cursor 3D) volta ao centro do mundo e o objeto novo nasce lá.",
+        "en": "Before adding, with the mouse over the 3D View press Shift+C: the 3D cursor goes back to the world center, so the new object is born there.",
+        "es": "Antes de crear, con el ratón en la 3D View presiona Shift+C: el cursor 3D vuelve al centro del mundo y el objeto nuevo nace allí."
+      },
+      "narracao": "",
+      "checagem": "mira_no_centro",
+      "destaque": "VIEW_3D",
+      "alvo": null,
+      "dica": {
+        "pt": "O objeto novo sempre nasce onde está a mira (o círculo listrado). Shift+C também enquadra a cena inteira na vista.",
+        "en": "A new object is always born where the 3D cursor (the striped circle) is. Shift+C also frames the whole scene in the view.",
+        "es": "El objeto nuevo siempre nace donde está el cursor 3D (el círculo rayado). Shift+C también encuadra toda la escena."
+      }
     },
     {
       "texto": {

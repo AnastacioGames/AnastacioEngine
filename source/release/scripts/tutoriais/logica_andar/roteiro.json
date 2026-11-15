@@ -5,6 +5,7 @@
     "es": "4. Hacer que un objeto camine con Logic Bricks"
   },
   "categoria": "Logic Bricks",
+  "cena_inicial": "inicio.range",
   "resumo": {
     "pt": "Sensor Keyboard, Controller And e Actuator Motion ligados.",
     "en": "Keyboard sensor, And controller and Motion actuator linked.",

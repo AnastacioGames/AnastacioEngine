@@ -67,12 +67,12 @@
     },
     {
       "texto": {
-        "pt": "Na setinha ao lado de Rec, clique em Play Last para ver o vídeo.",
-        "en": "In the small arrow next to Rec, click Play Last to watch the video.",
-        "es": "En la flechita al lado de Rec, haz clic en Play Last para ver el video."
+        "pt": "Na setinha ao lado de Rec, clique em Play Last para ver o vídeo. Depois, clique em Next.",
+        "en": "In the small arrow next to Rec, click Play Last to watch the video. Then click Next.",
+        "es": "En la flechita al lado de Rec, haz clic en Play Last para ver el video. Después, haz clic en Next."
       },
       "narracao": "",
-      "checagem": "jogo_rodou",
+      "checagem": null,
       "destaque": "INFO",
       "dica": {
         "pt": "Open Folder, no mesmo lugar, abre a pasta dos vídeos.",
