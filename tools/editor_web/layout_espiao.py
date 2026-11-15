@@ -6,11 +6,13 @@ editor na Web (repo AnastacioEditorWeb) e pelos testes em tools/editor_web.
 import bpy
 
 # Métodos que só criam um sub-layout.
-CONTAINERS = {'row', 'column', 'split', 'box', 'column_flow'}
+CONTAINERS = {'row', 'column', 'split', 'box', 'column_flow', 'grid_flow'}
 # Itens simples entendidos pela UI Web.
 ITENS = {'prop', 'label', 'operator', 'separator', 'menu', 'prop_enum',
          'props_enum', 'prop_menu_enum', 'operator_menu_enum', 'operator_enum',
          'prop_search', 'context_pointer_set'}
+# Templates com dados próprios (ver _template).
+TEMPLATES = {'template_list', 'template_ID', 'template_preview'}
 # Estado herdado que o painel pode ajustar no layout.
 ESTADO = {'active', 'enabled', 'alert', 'alignment', 'scale_x', 'scale_y',
           'operator_context', 'use_property_split'}
@@ -98,6 +100,15 @@ class LayoutFalso:
             no = {'tipo': nome}
             if nome in ITENS:
                 no.update(_item(nome, args, kw))
+            elif nome in TEMPLATES:
+                try:
+                    no.update(_template(nome, args, kw))
+                except Exception as e:
+                    no['sem_suporte'] = True
+                    no['erro'] = '%s: %s' % (type(e).__name__, e)
+                    no['args'] = _simples(args, kw)
+                self._no['itens'].append(no)
+                return None
             else:
                 # template_*, UIList etc.: sem suporte, só registra.
                 no['sem_suporte'] = True
@@ -147,6 +158,86 @@ def _item(nome, args, kw):
     for k, v in kw.items():
         no[k] = _simples((v,), {})['pos'][0]
     return no
+
+
+def colecao_do_tipo(nome_tipo):
+    """Nome da coleção de bpy.data cujos itens são do tipo RNA `nome_tipo` (ex.: 'Material')."""
+    for p in bpy.data.bl_rna.properties:
+        if p.type == 'COLLECTION' and p.fixed_type and p.fixed_type.identifier == nome_tipo:
+            return p.identifier
+    return None
+
+
+def _args(nomes, args, kw):
+    v = dict(zip(nomes, args))
+    v.update({k: kw[k] for k in nomes if k in kw})
+    return v
+
+
+LIMITE_LISTA = 500
+
+
+def _texto_item(listtype, item, dado, ativo_dado, ativo_prop, i):
+    """Nome e ícone de um item pelo draw_item da UIList, se simples; senão item.name."""
+    nome = getattr(item, 'name', None)
+    icone = None
+    cls = getattr(bpy.types, listtype, None) if listtype else None
+    if cls is not None and 'draw_item' in cls.__dict__:
+        try:
+            lay = LayoutFalso('item', {})
+            cls.draw_item(SelfFalso(cls, lay), bpy.context, lay, dado, item, 0, ativo_dado, ativo_prop, i)
+            pilha = [lay._no]
+            while pilha:
+                n = pilha.pop(0)
+                if n['tipo'] in {'prop', 'label'}:
+                    t = n.get('text')
+                    if not t and n['tipo'] == 'prop' and isinstance(n.get('valor'), str):
+                        t = n['valor']
+                    if t:
+                        nome = t
+                        icone = n.get('icon')
+                        break
+                pilha.extend(n.get('itens', []))
+        except Exception:
+            pass
+    return nome, icone
+
+
+def _template(nome, args, kw):
+    if nome == 'template_list':
+        a = _args(['listtype', 'list_id', 'dataptr', 'propname', 'active_dataptr', 'active_propname'], args, kw)
+        dado, prop = a['dataptr'], a['propname']
+        adado, aprop = a['active_dataptr'], a['active_propname']
+        col = getattr(dado, prop) if dado is not None else []  # ex.: malha sem shape keys
+        itens = []
+        for i, item in enumerate(col):
+            if i >= LIMITE_LISTA:
+                break
+            n, ic = _texto_item(a.get('listtype'), item, dado, adado, aprop, i)
+            d = {'nome': n, 'indice': i}
+            if ic:
+                d['icone'] = ic
+            itens.append(d)
+        return {'listtype': a.get('listtype'), 'list_id': a.get('list_id'),
+                'rna': caminho_rna(dado, prop) if dado is not None else None, 'itens_lista': itens, 'total': len(col),
+                'ativo': {'rna': caminho_rna(adado, aprop), 'valor': getattr(adado, aprop)},
+                'rows': kw.get('rows')}
+    if nome == 'template_ID':
+        a = _args(['data', 'property'], args, kw)
+        dado, prop = a['data'], a['property']
+        p = dado.bl_rna.properties[prop]
+        v = getattr(dado, prop)
+        colecao = colecao_do_tipo(p.fixed_type.identifier) if p.fixed_type else None
+        opcoes = [b.name for b in getattr(bpy.data, colecao)][:LIMITE_LISTA] if colecao else []
+        return {'rna': caminho_rna(dado, prop), 'tipo_rna': 'POINTER', 'rotulo': p.name,
+                'valor': getattr(v, 'name', None) if v is not None else None,
+                'colecao': colecao, 'opcoes': opcoes, 'editavel': not p.is_readonly,
+                'op_novo': kw.get('new') or None, 'op_abrir': kw.get('open') or None,
+                'op_desvincular': kw.get('unlink') or None}
+    # template_preview(id, show_buttons, parent, slot, preview_id)
+    bloco = args[0] if args else kw.get('id')
+    return {'id': {'id_tipo': type(bloco).__name__, 'id': getattr(bloco, 'name', None)} if bloco is not None else None,
+            'mostrar_botoes': kw.get('show_buttons', True)}
 
 
 class ContextoFalso:
@@ -244,6 +335,14 @@ COLECOES = {'Object': 'objects', 'Mesh': 'meshes', 'Material': 'materials', 'Sce
             'World': 'worlds', 'Lamp': 'lamps', 'Camera': 'cameras', 'Texture': 'textures'}
 
 
+# Tipos de bloco aceitos como valor de ponteiro (por nome, na coleção do tipo).
+POINTER_TIPOS = {'Material', 'World', 'Texture', 'Image', 'Mesh', 'Camera', 'Lamp', 'Object',
+                 'Group', 'Action', 'Text', 'ParticleSettings', 'NodeTree', 'Sound'}
+# Índice ativo de lista -> coleção irmã que ele indexa (validação de faixa).
+LISTAS_INDICE = {'active_material_index': 'material_slots', 'active_texture_index': 'texture_slots',
+                 'active_particle_system_index': 'particle_systems'}
+
+
 def escrever(rna, valor, indice=None):
     """Escreve de volta um caminho vindo da UI Web, sem eval: só bloco ID conhecido + path_resolve."""
     colecao = COLECOES.get(rna['id_tipo'])
@@ -254,6 +353,33 @@ def escrever(rna, valor, indice=None):
     alvo = dono.path_resolve(base) if base else dono
     if prop not in alvo.bl_rna.properties or alvo.bl_rna.properties[prop].is_readonly:
         raise ValueError('propriedade não editável: %r' % prop)
+    p = alvo.bl_rna.properties[prop]
+    if p.type == 'POINTER':
+        # Só por nome, dentro da coleção de bpy.data do tipo fixo da prop.
+        if indice is not None:
+            raise ValueError('ponteiro não tem índice')
+        tipo = p.fixed_type.identifier if p.fixed_type else None
+        if tipo not in POINTER_TIPOS:
+            raise ValueError('ponteiro de tipo não permitido: %r' % tipo)
+        colecao = colecao_do_tipo(tipo)
+        if valor is None:
+            if p.is_never_none:
+                raise ValueError('ponteiro não pode ficar vazio: %r' % prop)
+            setattr(alvo, prop, None)
+        else:
+            if not isinstance(valor, str):
+                raise ValueError('ponteiro espera nome (str)')
+            setattr(alvo, prop, getattr(bpy.data, colecao)[valor])  # KeyError se não existe
+        v = getattr(alvo, prop)
+        return getattr(v, 'name', None) if v is not None else None
+    if p.type == 'INT' and indice is None and p.array_length == 0:
+        if isinstance(valor, bool) or not isinstance(valor, int):
+            raise ValueError('inteiro esperado')
+        if not (p.hard_min <= valor <= p.hard_max):
+            raise ValueError('fora do intervalo: %r' % valor)
+        lista = LISTAS_INDICE.get(prop)
+        if lista and hasattr(alvo, lista) and not (0 <= valor < len(getattr(alvo, lista))):
+            raise ValueError('índice fora da lista %s: %r' % (lista, valor))
     if indice is None:
         setattr(alvo, prop, valor)
     else:

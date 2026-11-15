@@ -66,7 +66,8 @@ for c in paineis:  # ordem de registro = ordem no editor
         resultado[c.__name__] = {'estado': 'poll falso em todos'}
         continue
     nome_obj, js, reg, erro = melhor
-    faltando = sorted(k for k in reg if k not in le.CONTAINERS and k not in le.ITENS)
+    faltando = sorted(k for k in reg if k not in le.CONTAINERS and k not in le.ITENS and k not in le.TEMPLATES)
+    faltando += sorted({n['tipo'] for n in (_todos(js) if js else []) if n.get('sem_suporte') and n['tipo'] in le.TEMPLATES})
     for k, n in reg.items():
         metodos[k] += n
     for k in faltando:
@@ -93,3 +94,42 @@ print('TESTE3 sem suporte (painéis):', sem_suporte.most_common(15))
 for n, v in resultado.items():
     if v['estado'] == 'erro':
         print('ERRO', n, v['erro'])
+
+# Teste 4: templates com dados e escrita de ponteiro/índice.
+falhas4 = []
+
+
+def conf(nome, cond, extra=''):
+    print(('OK4 ' if cond else 'FALHOU4 ') + nome, extra)
+    if not cond:
+        falhas4.append(nome)
+
+
+js_m, _, _ = le.desenhar(bpy.types.MATERIAL_PT_context_material, ctx_para(cubo))
+nos = list(_todos(js_m)) if js_m else []
+tl = [n for n in nos if n['tipo'] == 'template_list']
+conf('template_list com itens', tl and not tl[0].get('sem_suporte') and tl[0]['itens_lista'], tl[:1])
+conf('template_list ativo', tl and tl[0]['ativo']['rna']['caminho'] == 'active_material_index')
+tid = [n for n in nos if n['tipo'] == 'template_ID']
+conf('template_ID material', tid and tid[0].get('valor') == 'Material' and 'Material' in tid[0]['opcoes'], tid[:1])
+mat2 = bpy.data.materials.new('Mat2')
+rna_slot = {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'material_slots[0].material'}
+conf('pointer material', le.escrever(rna_slot, 'Mat2') == 'Mat2' and cubo.material_slots[0].material == mat2)
+le.escrever(rna_slot, 'Material')
+for nome, rna, v in [('pointer inexistente', rna_slot, 'NaoExiste'),
+                     ('pointer tipo errado', rna_slot, 3),
+                     ('world com material', {'id_tipo': 'Scene', 'id': cena.name, 'caminho': 'world'}, 'Mat2'),
+                     ('indice fora', {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'active_material_index'}, 5),
+                     ('indice bool', {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'active_material_index'}, True)]:
+    try:
+        le.escrever(rna, v)
+        conf(nome + ' recusado', False)
+    except (ValueError, KeyError, TypeError):
+        conf(nome + ' recusado', True)
+conf('indice ok', le.escrever({'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'active_material_index'}, 0) == 0)
+if cena.world:
+    w2 = bpy.data.worlds.new('W2')
+    antigo = cena.world.name
+    conf('world da cena', le.escrever({'id_tipo': 'Scene', 'id': cena.name, 'caminho': 'world'}, 'W2') == 'W2')
+    le.escrever({'id_tipo': 'Scene', 'id': cena.name, 'caminho': 'world'}, antigo)
+print('TESTE4', 'falhas=', falhas4)
