@@ -72,6 +72,8 @@ cima) para ver um "i" nos painéis com a explicação e o tutorial de cada um.
 - P no editor: jogo aberto por `startGame` usa a própria câmera.
 - `gpu.export_shader` sem janela dá erro claro em vez de crash.
 - Lightmap UV: n-gon côncavo não cai mais sobre outras ilhas.
+- Linux: com um tutorial ligado, as áreas do editor ficavam vazias ou piscando, mesmo depois de fechar o
+  cartão. Pacote Linux substituído em 15/11 com a correção; se baixou antes, baixe de novo.
 
 ## Downloads
 
