@@ -64,9 +64,10 @@ paineis = [c for c in bpy.types.Panel.__subclasses__()
 objetos = [cubo] + [next(o for o in bpy.data.objects if o.type == t) for t in ('LAMP', 'CAMERA')
                     if any(o.type == t for o in bpy.data.objects)]
 resultado = {}
+arvores = {}
 metodos = Counter()
 sem_suporte = Counter()
-for c in sorted(paineis, key=lambda c: c.__name__):
+for c in paineis:  # ordem de registro = ordem no editor
     melhor = None
     for obj in objetos:
         js, reg, erro = le.desenhar(c, ctx_para(obj))
@@ -89,9 +90,13 @@ for c in sorted(paineis, key=lambda c: c.__name__):
         estado = 'parcial'
     else:
         estado = 'ok'
+    if estado != 'erro':
+        arvores[c.__name__] = {'aba': getattr(c, 'bl_context', ''), 'ordem': len(arvores), 'arvore': js}
     resultado[c.__name__] = {'estado': estado, 'obj': nome_obj, 'erro': erro,
                              'sem_suporte': faltando, 'contexto': getattr(c, 'bl_context', '')}
 
+with open(os.path.join(saida, 'paineis.json'), 'w', encoding='utf-8') as f:
+    json.dump(arvores, f, ensure_ascii=False)
 resumo = Counter(v['estado'] for v in resultado.values())
 with open(os.path.join(saida, 'contagem.json'), 'w', encoding='utf-8') as f:
     json.dump({'resumo': resumo, 'sem_suporte_por_painel': sem_suporte.most_common(),
