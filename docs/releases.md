@@ -64,6 +64,15 @@ Pacotes no rascunho `v0.7.2` com `SHA256SUMS-linux.txt` (o Windows sobe o zip e 
    `fase #2.range` (os dois em `game/` e no manifesto), Destruction e ImGui_example; sem achados.
 5. RangeArmor sem mudança desde a 0.7.1: mesmo conteúdo com a pasta renomeada para 0.7.2.
 
+### Linux: pacote substituído (2026-11-15)
+
+Relato de usuário: com um tutorial ligado, as áreas do editor ficavam vazias ou piscando (só no Linux).
+O `AnastacioEngine-0.7.2-linux-x86_64.tar.xz` da release foi trocado pelo mesmo pacote com
+`startup/range_tutorials.py` atualizado (commit `268333ae`); binários e runtime Web sem mudança.
+Novo sha256 `ffb377333d1a5f69aa42febdd708fb81ac39c33860577daf32fd7edc3ea39115` (256 MiB, `xz -9`), já em
+`SHA256SUMS-linux.txt` e `SHA256SUMS.txt` da release; conferido baixando de volta.
+`testar-release.sh 0.7.2`: tudo OK. O pacote Windows não foi trocado (lá o swap religa o recorte e o erro não aparece).
+
 ## 0.7.1
 
 Estado: **publicada completa em 2026-11-09** (tag `v0.7.1`), Windows e Linux. Correções da 0.7.0 (Export Web) e ajustes de luz/material no editor sem
