@@ -410,7 +410,9 @@ def contexto_para(obj, cena=None):
 def paineis_properties():
     """Classes de painel do editor Properties, na ordem de registro."""
     return [c for c in bpy.types.Panel.__subclasses__()
-            if getattr(c, 'bl_space_type', '') == 'PROPERTIES']
+            if getattr(c, 'bl_space_type', '') == 'PROPERTIES'
+            # a barra de abas (NAVIGATION_BAR) a página Web desenha sozinha
+            and getattr(c, 'bl_region_type', '') != 'NAVIGATION_BAR']
 
 
 def exportar_paineis(obj, cena=None):
