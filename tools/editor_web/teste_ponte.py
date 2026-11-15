@@ -130,10 +130,10 @@ def checar_js():
         conferir('node --check de widgets_templates.js', r.returncode == 0, r.stderr.strip()[:300])
 
 
-def main():
-    checar_js()
+def subir(arquivo=None):
     porta = livre()
-    proc = subprocess.Popen([str(EXE), '-b', '--factory-startup', '--python', str(AQUI / 'ponte.py'), '--',
+    proc = subprocess.Popen([str(EXE), '-b'] + ([str(arquivo)] if arquivo else []) +
+                            ['--factory-startup', '--python', str(AQUI / 'ponte.py'), '--',
                              '--porta', str(porta), '--modelo', MODELO, '--teste'],
                             stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True, encoding='utf-8', errors='replace')
     linhas = []
@@ -149,16 +149,28 @@ def main():
                 pronto.set()
     threading.Thread(target=ler, daemon=True).start()
     t0 = time.time()
-    if not pronto.wait(60):
+    if not pronto.wait(90):
         proc.kill()
         print('\n'.join(linhas[-30:]))
         sys.exit('ponte não subiu')
     print('ponte no ar em %.1f s: %s' % (time.time() - t0, url['u']))
-    token = url['u'].split('?t=')[1]
+    return proc, porta, url['u'].split('?t=')[1], linhas
 
+
+def main():
+    checar_js()
+    proc, porta, token, linhas = subir()
     try:
         rodar_testes(porta, token)
     finally:
+        fechar(proc, linhas)
+    fase_arquivo()
+    print('\n%d falha(s)' % len(falhas), falhas)
+    sys.exit(1 if falhas else 0)
+
+
+def fechar(proc, linhas):
+    if True:
         try:
             proc.wait(15)
         except subprocess.TimeoutExpired:
@@ -167,8 +179,6 @@ def main():
         conferir('engine saiu (código %s)' % proc.returncode, proc.returncode == 0)
         print('--- log da engine (ponte) ---')
         print('\n'.join(l for l in linhas if '[ponte]' in l or 'Error' in l or 'Traceback' in l))
-    print('\n%d falha(s)' % len(falhas), falhas)
-    sys.exit(1 if falhas else 0)
 
 
 def rodar_testes(porta, token):
@@ -259,13 +269,9 @@ def rodar_testes(porta, token):
     erro({'cmd': 'operador', 'op': 'ed.undo_push'}, 'operador parecido fora da whitelist', 'fora da lista')
     erro({'cmd': 'operador', 'op': 'image.open'}, 'template_ID open fora da whitelist', 'fora da lista')
     erro({'cmd': 'operador', 'op': 'font.unlink'}, 'template_ID unlink fora da whitelist', 'fora da lista')
-    erro({'cmd': 'operador', 'op': 'material.new', 'props': {'x': [1]}}, 'props não escalares recusadas', 'props')
+    erro({'cmd': 'operador', 'op': 'text.new', 'props': {'x': [1]}}, 'props não escalares recusadas', 'props')
     for op_novo in ('material.new', 'world.new', 'texture.new'):
-        ws.envia({'cmd': 'operador', 'op': op_novo})
-        r = ws.ate(lambda m: m.get('tipo') in ('ok', 'erro'))
-        conferir('template_ID %s aceito' % op_novo, r.get('tipo') == 'ok', r.get('erro'))
-        if r.get('tipo') == 'ok':
-            ws.ate(lambda m: m.get('tipo') == 'paineis')
+        erro({'cmd': 'operador', 'op': op_novo}, '%s solto (sem dono) fora da whitelist' % op_novo, 'fora da lista')
     erro({'cmd': 'escrever', 'rna': rna, 'valor': 'abc', 'indice': 0}, 'valor string em FLOAT', 'tipo errado')
     erro({'cmd': 'escrever', 'rna': rna, 'valor': True, 'indice': 0}, 'valor bool em FLOAT', 'tipo errado')
     erro({'cmd': 'escrever', 'rna': rna, 'valor': 1.0, 'indice': 3}, 'índice fora', 'fora do array')
@@ -320,6 +326,7 @@ def rodar_testes(porta, token):
              [o['nome'] for o in p['cena'] if o['selecionado']] == [outro_obj])
 
     testes_viewport(ws)
+    testes_editor(ws)
 
     # Frame sem máscara -> close 1002
     ruim = WS(porta, token)
@@ -339,6 +346,153 @@ def rodar_testes(porta, token):
     ws.envia({'cmd': 'sair'})
     r = ws.ate(lambda m: m.get('tipo') in ('ok', 'erro'))
     conferir('sair (--teste)', r['tipo'] == 'ok')
+
+
+def pedir(ws, msg):
+    """Envia e devolve (resposta, painéis seguintes ou None)."""
+    ws.envia(msg)
+    r = resposta(ws)
+    return r, (ws.ate(lambda m: m.get('tipo') == 'paineis') if r.get('tipo') == 'ok' else None)
+
+
+def no_cena(p, nome):
+    return next((o for o in p['cena'] if o['nome'] == nome), None)
+
+
+def testes_editor(ws):
+    # 1. "+" do seletor liga o bloco novo ao dono
+    r, p = pedir(ws, {'cmd': 'ativar', 'objeto': 'Cube'})
+    rna_mat = {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'active_material'}
+    r, p = pedir(ws, {'cmd': 'novo_bloco', 'op': 'material.new', 'rna': rna_mat})
+    tid = p and achar(p['paineis']['MATERIAL_PT_context_material']['arvore'], 'active_material')
+    conferir('novo_bloco material.new liga no slot ativo do Cube (%s)' % r.get('bloco'),
+             r.get('tipo') == 'ok' and r.get('valor') == r.get('bloco') and tid and tid.get('valor') == r.get('bloco'),
+             (r.get('erro'), tid and tid.get('valor')))
+    mat_novo = r.get('bloco')
+    rna_tex = {'id_tipo': 'Material', 'id': mat_novo or 'Material', 'caminho': 'active_texture'}
+    r, p = pedir(ws, {'cmd': 'novo_bloco', 'op': 'texture.new', 'rna': rna_tex})
+    conferir('novo_bloco texture.new liga na textura ativa do material (%s)' % r.get('bloco'),
+             r.get('tipo') == 'ok' and r.get('valor') == r.get('bloco'), r.get('erro'))
+    r, p = pedir(ws, {'cmd': 'novo_bloco', 'op': 'world.new', 'rna': {'id_tipo': 'Scene', 'id': 'Scene', 'caminho': 'world'}})
+    tw = p and achar(p['paineis'].get('WORLD_PT_game_context_world', {}).get('arvore'), 'world')
+    conferir('novo_bloco world.new liga na cena (%s)' % r.get('bloco'),
+             r.get('tipo') == 'ok' and r.get('valor') == r.get('bloco') and (tw is None or tw.get('valor') == r.get('bloco')),
+             (r.get('erro'), tw and tw.get('valor')))
+    r, p = pedir(ws, {'cmd': 'operador', 'op': 'ed.undo'})
+    tw = p and achar(p['paineis'].get('WORLD_PT_game_context_world', {}).get('arvore'), 'world')
+    conferir('ed.undo desfaz o world.new inteiro (volta ao World)', r.get('tipo') == 'ok' and (tw is None or tw.get('valor') == 'World'),
+             tw and tw.get('valor'))
+
+    def erro(msg, nome, trecho=''):
+        ws.envia(msg)
+        r = resposta(ws)
+        conferir(nome, r.get('tipo') == 'erro' and trecho in r.get('erro', ''), r.get('erro'))
+    erro({'cmd': 'novo_bloco', 'op': 'material.new', 'rna': dict(rna_mat, caminho='name')}, 'novo_bloco: caminho livre recusado', 'não permitido')
+    erro({'cmd': 'novo_bloco', 'op': 'material.new', 'rna': dict(rna_mat, caminho='data.materials[0]')},
+         'novo_bloco: caminho parecido recusado', 'não permitido')
+    erro({'cmd': 'novo_bloco', 'op': 'world.new', 'rna': rna_mat}, 'novo_bloco: world num objeto recusado', 'não permitido')
+    erro({'cmd': 'novo_bloco', 'op': 'image.new', 'rna': rna_mat}, 'novo_bloco: operador fora da lista', 'fora da lista')
+    erro({'cmd': 'novo_bloco', 'op': 'material.new', 'rna': dict(rna_mat, id='Nada')}, 'novo_bloco: dono inexistente', 'não existe')
+    erro({'cmd': 'novo_bloco', 'op': 'material.new', 'rna': 'Cube'}, 'novo_bloco: rna não-objeto', 'inválido')
+    erro({'cmd': 'novo_bloco', 'op': 'material.new', 'rna': dict(rna_mat, caminho='material_slots[9].material')},
+         'novo_bloco: slot inexistente', 'não resolve')
+
+    # 2. Lista de grupos de vértices (Cube sem grupos aqui: o caminho resolve e a faixa é conferida)
+    erro({'cmd': 'escrever', 'rna': {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'vertex_groups.active_index'}, 'valor': 0},
+         'vertex_groups.active_index sem grupos -> índice fora', 'fora da lista')
+
+    # 3. Outliner: hide e renomear
+    ws.envia({'cmd': 'paineis'})
+    p = ws.ate(lambda m: m.get('tipo') == 'paineis')
+    conferir('cena: campo oculto em todos', all('oculto' in o for o in p['cena']))
+    r, p = pedir(ws, {'cmd': 'escrever', 'rna': {'id_tipo': 'Object', 'id': 'Camera', 'caminho': 'hide'}, 'valor': True})
+    conferir('olho: esconder Camera', r.get('tipo') == 'ok' and no_cena(p, 'Camera')['oculto'] is True, r.get('erro'))
+    _, fim, _ = retrato(ws)
+    conferir('Camera escondida sai da viewport', all(o['nome'] != 'Camera' for o in fim['objetos']))
+    r, p = pedir(ws, {'cmd': 'escrever', 'rna': {'id_tipo': 'Object', 'id': 'Camera', 'caminho': 'hide'}, 'valor': False})
+    conferir('olho: mostrar Camera', r.get('tipo') == 'ok' and no_cena(p, 'Camera')['oculto'] is False)
+    r, p = pedir(ws, {'cmd': 'escrever', 'rna': {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'name'}, 'valor': '  Caixa Ação  '})
+    conferir('renomear Cube -> "Caixa Ação" (espaços aparados)', r.get('tipo') == 'ok' and r.get('valor') == 'Caixa Ação'
+             and no_cena(p, 'Caixa Ação') and not no_cena(p, 'Cube') and p['objeto'] == 'Caixa Ação', (r, p and p['objeto']))
+    r, p = pedir(ws, {'cmd': 'escrever', 'rna': {'id_tipo': 'Object', 'id': 'Caixa Ação', 'caminho': 'name'}, 'valor': 'Camera'})
+    conferir('renomear para nome existente: engine dá sufixo (Camera.001)', r.get('tipo') == 'ok' and r.get('valor') == 'Camera.001'
+             and no_cena(p, 'Camera') and no_cena(p, 'Camera.001'), r)
+    r, p = pedir(ws, {'cmd': 'escrever', 'rna': {'id_tipo': 'Object', 'id': 'Camera.001', 'caminho': 'name'}, 'valor': 'Cube'})
+    conferir('renomear de volta para Cube', r.get('tipo') == 'ok' and r.get('valor') == 'Cube')
+    rn = {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'name'}
+    erro({'cmd': 'escrever', 'rna': rn, 'valor': '   '}, 'renomear: nome vazio recusado', 'nome inválido')
+    erro({'cmd': 'escrever', 'rna': rn, 'valor': 'a' * 64}, 'renomear: nome > 63 bytes recusado', 'nome inválido')
+    erro({'cmd': 'escrever', 'rna': rn, 'valor': 'ç' * 32}, 'renomear: 64 bytes UTF-8 recusado', 'nome inválido')
+    erro({'cmd': 'escrever', 'rna': rn, 'valor': 'a\nb'}, 'renomear: caractere de controle recusado', 'nome inválido')
+    erro({'cmd': 'escrever', 'rna': rn, 'valor': 5}, 'renomear: não-texto recusado', 'texto')
+
+    # 4. File > Salvar sem caminho
+    erro({'cmd': 'salvar'}, 'salvar sem caminho recusado', 'sem caminho')
+    ws.envia({'cmd': 'paineis'})
+    p = ws.ate(lambda m: m.get('tipo') == 'paineis')
+    conferir('painéis avisam arquivo sem caminho (arquivo=None)', 'arquivo' in p and p['arquivo'] is None)
+
+
+def fase_arquivo():
+    """Fase 2: .range temporário com grupos de vértices: lista ativa e File > Salvar."""
+    import tempfile
+    pasta = Path(tempfile.mkdtemp(prefix='teste_ponte_'))
+    arq = pasta / 'cena_teste.range'
+    cria = subprocess.run([str(EXE), '-b', '--factory-startup', '--python-expr',
+                           'import bpy\no=bpy.data.objects["Cube"]\nfor n in ("G1","G2","G3"): o.vertex_groups.new(n)\n'
+                           'o.vertex_groups.active_index=0\nbpy.ops.wm.save_as_mainfile(filepath=r"%s")' % arq],
+                          capture_output=True, text=True, encoding='utf-8', errors='replace')
+    if not arq.is_file():
+        conferir('fase 2: .range temporário criado', False, cria.stdout[-300:])
+        return
+    proc, porta, token, linhas = subir(arq)
+    try:
+        ws = WS(porta, token)
+        r, p = pedir(ws, {'cmd': 'ativar', 'objeto': 'Cube'})
+        conferir('fase 2: painéis trazem o nome do arquivo', p and p.get('arquivo') == 'cena_teste.range', p and p.get('arquivo'))
+        tl = None
+        for painel in p['paineis'].values():
+            pilha = [painel['arvore']]
+            while pilha and not tl:
+                n = pilha.pop()
+                if isinstance(n, dict):
+                    if n.get('tipo') == 'template_list' and n.get('listtype') == 'MESH_UL_vgroups':
+                        tl = n
+                    pilha += n.get('itens', []) + ([n['cabecalho']] if 'cabecalho' in n else [])
+        rna_vg = tl and tl.get('ativo', {}).get('rna')
+        conferir('vertex groups: lista com G1..G3 e rna do ativo', tl and [i['nome'] for i in tl['itens_lista']] == ['G1', 'G2', 'G3']
+                 and rna_vg == {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'vertex_groups.active_index'}, rna_vg)
+        if rna_vg:
+            r, p = pedir(ws, {'cmd': 'escrever', 'rna': rna_vg, 'valor': 2, 'indice': None})
+            tl2 = None
+            for painel in p['paineis'].values() if p else []:
+                pilha = [painel['arvore']]
+                while pilha and not tl2:
+                    n = pilha.pop()
+                    if isinstance(n, dict):
+                        if n.get('tipo') == 'template_list' and n.get('listtype') == 'MESH_UL_vgroups':
+                            tl2 = n
+                        pilha += n.get('itens', []) + ([n['cabecalho']] if 'cabecalho' in n else [])
+            conferir('vertex groups: clique muda o índice ativo na engine (2)', r.get('tipo') == 'ok' and r.get('valor') == 2
+                     and tl2 and tl2['ativo']['valor'] == 2, (r.get('erro'), tl2 and tl2['ativo']['valor']))
+            ws.envia({'cmd': 'escrever', 'rna': rna_vg, 'valor': 3})
+            r = resposta(ws)
+            conferir('vertex groups: índice 3 (fora) recusado', r.get('tipo') == 'erro', r.get('erro'))
+        antes = arq.stat().st_mtime_ns
+        time.sleep(0.05)
+        r, p = pedir(ws, {'cmd': 'salvar'})
+        conferir('File > Salvar grava o arquivo (wm.save_mainfile)', r.get('tipo') == 'ok' and r.get('arquivo') == 'cena_teste.range'
+                 and arq.stat().st_mtime_ns > antes, r)
+        ws.envia({'cmd': 'sair'})
+        resposta(ws)
+    finally:
+        fechar(proc, linhas)
+    verif = subprocess.run([str(EXE), '-b', str(arq), '--factory-startup', '--python-expr',
+                            'import bpy\nprint("VG_ATIVO", bpy.data.objects["Cube"].vertex_groups.active_index)'],
+                           capture_output=True, text=True, encoding='utf-8', errors='replace')
+    conferir('arquivo salvo guarda o índice ativo 2', 'VG_ATIVO 2' in verif.stdout, verif.stdout[-200:])
+    import shutil
+    shutil.rmtree(pasta, ignore_errors=True)
 
 
 def retrato(ws):

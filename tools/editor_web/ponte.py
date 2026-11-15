@@ -5,7 +5,8 @@ AnastacioEngine -b [arquivo.range] --factory-startup --python tools/editor_web/p
 
 Um só porto em 127.0.0.1 serve a página (GET /?t=TOKEN) e o WebSocket (/ws?t=TOKEN).
 Só stdlib: socket + select, handshake RFC 6455 manual. Comandos JSON restritos
-(paineis — com a lista 'cena' do Outliner —, malhas, escrever [sem_undo], operador, ativar, selecionar;
+(paineis — com a lista 'cena' do Outliner —, malhas, escrever [sem_undo], operador, novo_bloco, salvar,
+ativar, selecionar;
 sair só com --teste); nada de eval/exec. O loop roda no thread principal (bpy não é thread-safe).
 
 Viewport: {tipo:'malhas'} leva os objetos (matriz coluna-major, cor, loc/rot/esc) e as malhas novas ou
@@ -33,7 +34,15 @@ OPERADORES = {'ed.undo', 'ed.redo', 'object.select_all', 'object.location_clear'
               'object.rotation_clear', 'object.scale_clear',
               # Botão "+" do template_ID: só criam um bloco novo com nome padrão (desfazível).
               # Fora de propósito: *.open (lê arquivo do disco) e *.unlink (apaga ligação).
-              'material.new', 'world.new', 'texture.new', 'particle.new', 'palette.new', 'text.new'}
+              # material/world/texture.new vão por 'novo_bloco', que liga o bloco novo ao dono.
+              'particle.new', 'palette.new', 'text.new'}
+# "+" do template_ID que liga ao dono: operador -> (tipo do bloco, coleção, [(id_tipo, regex do caminho)]).
+NOVO_BLOCO = {
+    'material.new': ('Material', 'materials', [('Object', r'active_material|material_slots\[\d+\]\.material')]),
+    'world.new': ('World', 'worlds', [('Scene', r'world')]),
+    'texture.new': ('Texture', 'textures', [('Material', r'active_texture|texture_slots\[\d+\]\.texture'),
+                                            ('World', r'active_texture|texture_slots\[\d+\]\.texture')]),
+}
 SCRIPTS_EMBUTIDOS = ('widgets_templates.js',)
 RE_CAMINHO =re.compile(r'^[A-Za-z_]\w*(\[\d+\]|\["[^"\\]*"\])?(\.[A-Za-z_]\w*(\[\d+\]|\["[^"\\]*"\])?)*$')
 
@@ -79,7 +88,7 @@ def lista_cena(cena):
     def descer(pai, nivel):
         for o in sorted(filhos.get(pai, []), key=lambda x: x.name):
             saida.append({'nome': o.name, 'tipo': o.type, 'pai': pai, 'nivel': nivel,
-                          'ativo': o is ativo, 'selecionado': bool(o.select)})
+                          'ativo': o is ativo, 'selecionado': bool(o.select), 'oculto': bool(o.hide)})
             descer(o.name, nivel + 1)
     descer(None, 0)
     return saida
@@ -88,7 +97,9 @@ def lista_cena(cena):
 def estado_paineis():
     cena = bpy.context.scene
     obj = cena.objects.active
+    caminho = bpy.data.filepath
     return {'objeto': obj.name if obj else None,
+            'arquivo': os.path.basename(caminho) if caminho else None,
             'objetos': sorted(o.name for o in cena.objects),
             'cena': lista_cena(cena),
             'paineis': le.exportar_paineis(obj, cena)}
@@ -145,8 +156,18 @@ def validar_escrita(rna, valor, indice):
     if not hasattr(alvo, 'bl_rna') or nome not in alvo.bl_rna.properties:
         raise ValueError('propriedade desconhecida: %r' % nome)
     p = alvo.bl_rna.properties[nome]
-    if p.is_readonly or alvo.is_property_readonly(nome):
+    # Coleção com propriedades próprias (vertex_groups.active_index) não tem is_property_readonly.
+    ro = getattr(alvo, 'is_property_readonly', None)
+    if p.is_readonly or (ro is not None and ro(nome)):
         raise ValueError('propriedade só leitura: %r' % nome)
+    if nome == 'name' and base == '':
+        # Renomear bloco (Outliner): texto curto, sem caracteres de controle.
+        if not isinstance(valor, str) or indice is not None:
+            raise ValueError('nome deve ser texto')
+        valor = valor.strip()
+        if not valor or len(valor.encode('utf-8')) > 63 or any(ord(ch) < 32 or ord(ch) == 127 for ch in valor):
+            raise ValueError('nome inválido (1 a 63 bytes, sem caracteres de controle)')
+        return valor, None
     n = p.array_length if p.type in {'BOOLEAN', 'INT', 'FLOAT'} else 0
     if indice is not None:
         if n == 0:
@@ -202,6 +223,83 @@ def cmd_operador(m):
     if not nome.startswith('ed.') and bpy.ops.ed.undo_push.poll():
         bpy.ops.ed.undo_push(message='Web: ' + nome)
     return {'resultado': sorted(r)}
+
+
+def _alvo_ponteiro(rna, tipo, permitidos):
+    """Confere o caminho do seletor (template_ID) contra a lista do operador. Devolve o dono."""
+    if not isinstance(rna, dict) or not all(isinstance(rna.get(k), str) for k in ('id_tipo', 'id', 'caminho')):
+        raise ValueError('rna do seletor inválido')
+    if not any(rna['id_tipo'] == t and re.fullmatch(rx, rna['caminho']) for t, rx in permitidos):
+        raise ValueError('caminho não permitido para este "+": %s.%s' % (rna['id_tipo'], rna['caminho']))
+    dono = getattr(bpy.data, le.COLECOES[rna['id_tipo']]).get(rna['id'])
+    if dono is None:
+        raise ValueError('bloco não existe: %r' % rna['id'])
+    base, _, nome = rna['caminho'].rpartition('.')
+    try:
+        alvo = dono.path_resolve(base) if base else dono
+    except Exception:
+        raise ValueError('caminho não resolve: %r' % rna['caminho'])
+    if alvo is None:
+        raise ValueError('slot vazio: %r' % rna['caminho'])
+    p = alvo.bl_rna.properties.get(nome)
+    ro = getattr(alvo, 'is_property_readonly', None)
+    if (p is None or p.type != 'POINTER' or not p.fixed_type or p.fixed_type.identifier != tipo or p.is_readonly
+            or (ro is not None and ro(nome)) or getattr(dono, 'library', None) is not None):
+        raise ValueError('não é um ponteiro de %s editável: %r' % (tipo, rna['caminho']))
+    return dono
+
+
+def cmd_novo_bloco(m):
+    """"+" do seletor: cria o bloco pelo operador e liga ao dono pelo caminho do seletor (le.escrever)."""
+    op = m.get('op')
+    if op not in NOVO_BLOCO:
+        raise ValueError('operador fora da lista: %r' % (op,))
+    tipo, colecao, permitidos = NOVO_BLOCO[op]
+    rna = m.get('rna')
+    dono = _alvo_ponteiro(rna, tipo, permitidos)
+    sem_slot = rna['id_tipo'] == 'Object' and rna['caminho'] == 'active_material' and not dono.material_slots
+    if sem_slot and (dono.type not in GEOMETRIA or dono.data is None):
+        raise ValueError('objeto sem materiais: %s' % dono.type)
+    antes = set(b.as_pointer() for b in getattr(bpy.data, colecao))
+    grupo, nome = op.split('.')
+    f = getattr(getattr(bpy.ops, grupo), nome)
+    if not f.poll():
+        raise ValueError('poll falso para %s' % op)
+    try:
+        r = f()
+    except Exception as e:
+        raise ValueError('%s: %s' % (op, e))
+    novos = [b for b in getattr(bpy.data, colecao) if b.as_pointer() not in antes]
+    if 'FINISHED' not in r or len(novos) != 1:
+        raise ValueError('%s não criou um bloco (%s)' % (op, sorted(r)))
+    bloco = novos[0]
+    try:
+        if sem_slot:
+            dono.data.materials.append(bloco)   # sem slot: cria o primeiro, como o Blender faz
+            ligado = bloco.name
+        else:
+            ligado = le.escrever(rna, bloco.name)
+    except Exception as e:
+        # Não deixa bloco órfão sem undo quando a ligação falha.
+        if bloco.users == 0:
+            getattr(bpy.data, colecao).remove(bloco)
+        raise ValueError('%s: não ligou ao dono: %s' % (op, e))
+    if bpy.ops.ed.undo_push.poll():
+        bpy.ops.ed.undo_push(message='Web: ' + op)
+    return {'bloco': bloco.name, 'valor': ligado}
+
+
+def cmd_salvar(m):
+    """File > Salvar: só sobrescreve o arquivo que já tem caminho (sem Salvar Como pela Web)."""
+    if not bpy.data.filepath:
+        raise ValueError('arquivo sem caminho: use Salvar Como na engine')
+    try:
+        r = bpy.ops.wm.save_mainfile()
+    except Exception as e:
+        raise ValueError('wm.save_mainfile: %s' % e)
+    if 'FINISHED' not in r:
+        raise ValueError('wm.save_mainfile terminou com %s' % sorted(r))
+    return {'arquivo': os.path.basename(bpy.data.filepath)}
 
 
 def cmd_ativar(m):
@@ -746,6 +844,10 @@ class Ponte:
                 resp.update(cmd_operador(m))
             elif cmd == 'ativar':
                 resp.update(cmd_ativar(m))
+            elif cmd == 'novo_bloco':
+                resp.update(cmd_novo_bloco(m))
+            elif cmd == 'salvar':
+                resp.update(cmd_salvar(m))
             elif cmd == 'sair' and self.teste:
                 c.envia_json(dict(resp, tipo='ok'))
                 self.rodando = False

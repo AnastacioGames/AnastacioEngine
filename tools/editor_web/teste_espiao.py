@@ -132,4 +132,20 @@ if cena.world:
     antigo = cena.world.name
     conf('world da cena', le.escrever({'id_tipo': 'Scene', 'id': cena.name, 'caminho': 'world'}, 'W2') == 'W2')
     le.escrever({'id_tipo': 'Scene', 'id': cena.name, 'caminho': 'world'}, antigo)
+# Lista de grupos de vértices: rna do índice ativo e escrita.
+for nome_g in ('G1', 'G2'):
+    if nome_g not in cubo.vertex_groups:
+        cubo.vertex_groups.new(nome_g)
+js_v, _, _ = le.desenhar(bpy.types.DATA_PT_vertex_groups, ctx_para(cubo))
+tl_v = [n for n in _todos(js_v) if n['tipo'] == 'template_list'] if js_v else []
+rna_vg = tl_v and tl_v[0]['ativo']['rna']
+conf('vertex groups: rna do ativo', rna_vg == {'id_tipo': 'Object', 'id': 'Cube', 'caminho': 'vertex_groups.active_index'}, rna_vg)
+conf('vertex groups: lista com itens', tl_v and [i['nome'] for i in tl_v[0]['itens_lista']][-2:] == ['G1', 'G2'], tl_v[:1])
+if rna_vg:
+    conf('vertex groups: escreve índice ativo', le.escrever(rna_vg, 0) == 0 and cubo.vertex_groups.active_index == 0)
+    try:
+        le.escrever(rna_vg, len(cubo.vertex_groups))
+        conf('vertex groups: índice fora recusado', False)
+    except ValueError:
+        conf('vertex groups: índice fora recusado', True)
 print('TESTE4', 'falhas=', falhas4)

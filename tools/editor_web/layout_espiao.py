@@ -22,9 +22,22 @@ def caminho_rna(dado, prop=None):
     """Caminho estável para escrever de volta: bloco ID + caminho dentro dele."""
     try:
         dono = dado.id_data
-        base = dado.path_from_id() if dado != dono else ''
     except Exception:
         return None
+    try:
+        base = dado.path_from_id() if dado != dono else ''
+    except Exception:
+        # Coleção sem caminho próprio (ex.: ob.vertex_groups em alguns contextos): dono.<identificador>.
+        dono_col = getattr(dado, 'data', None)
+        ident = getattr(getattr(dado, 'bl_rna', None), 'identifier', None)
+        base = None
+        if dono_col is not None and dono_col == dono and ident:
+            for pp in dono.bl_rna.properties:
+                if pp.type == 'COLLECTION' and pp.srna and pp.srna.identifier == ident:
+                    base = pp.identifier
+                    break
+        if base is None:
+            return None
     if dono is None:
         return None
     caminho = base + ('.' if base and prop else '') + (prop or '')
@@ -380,6 +393,9 @@ def escrever(rna, valor, indice=None):
         lista = LISTAS_INDICE.get(prop)
         if lista and hasattr(alvo, lista) and not (0 <= valor < len(getattr(alvo, lista))):
             raise ValueError('índice fora da lista %s: %r' % (lista, valor))
+        # Índice ativo da própria coleção (vertex_groups.active_index, uv_textures.active_index...).
+        if prop == 'active_index' and isinstance(alvo, bpy.types.bpy_prop_collection) and not (0 <= valor < len(alvo)):
+            raise ValueError('índice fora da lista: %r' % valor)
     if indice is None:
         setattr(alvo, prop, valor)
     else:
