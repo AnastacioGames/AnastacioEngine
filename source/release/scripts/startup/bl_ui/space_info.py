@@ -601,13 +601,6 @@ class INFO_MT_help(Menu):
         url.url = "https://www.patreon.com/cw/AnastacioEngine"
 
         layout.separator()
-        layout.label(text="Range Engine")
-        layout.operator("wm.url_open", text="Range Website", icon='URL').url = "https://rangeengine.tech"
-        url = layout.operator("wm.url_open", text="Range Python API", icon='HELP')
-        url.url = "https://rangeengine.tech/RangeDoc_Build/html/"
-        layout.operator("wm.url_open", text="Patreon Range", icon='PATREON').url = "https://www.patreon.com/rangeengine"
-
-        layout.separator()
         layout.operator("wm.sysinfo", icon='TEXT')
 
         '''layout.operator("wm.splash", icon='BLENDER')'''
