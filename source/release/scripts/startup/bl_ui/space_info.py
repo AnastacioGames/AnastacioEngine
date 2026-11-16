@@ -609,8 +609,6 @@ class INFO_MT_help(Menu):
         url = layout.operator("wm.url_open", text="Patreon Anastacio", icon='PATREON')
         url.url = "https://www.patreon.com/cw/AnastacioEngine"
 
-        layout.separator()
-        layout.operator("wm.sysinfo", icon='TEXT')
 
         '''layout.operator("wm.splash", icon='BLENDER')'''
 
