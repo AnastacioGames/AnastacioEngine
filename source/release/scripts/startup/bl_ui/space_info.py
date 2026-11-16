@@ -35,6 +35,15 @@ def _cube_icon():
     return _header_icons["cube"].icon_id
 
 
+def _web_editor_icon():
+    # Golden cube with the blue globe: link to the online editor in the Help menu.
+    global _header_icons
+    _cube_icon()
+    if "web" not in _header_icons:
+        _header_icons.load("web", os.path.join(os.path.dirname(__file__), "icons", "web_editor.png"), 'IMAGE')
+    return _header_icons["web"].icon_id
+
+
 class INFO_HT_header(Header):
     bl_space_type = 'INFO'
 
@@ -594,7 +603,7 @@ class INFO_MT_help(Menu):
         # Same links as the splash screen.
         url = layout.operator("wm.url_open", text="Python API", icon='FILE_SCRIPT')
         url.url = "https://anastaciogames.github.io/anastacio-docs/"
-        layout.operator("wm.url_open", text="Anastacio Engine Web Editor (Try it online!)", icon='URL').url = "https://anastaciogames.github.io/anastacio-editor-web/"
+        layout.operator("wm.url_open", text="Anastacio Engine Web Editor (Try it online!)", icon_value=_web_editor_icon()).url = "https://anastaciogames.github.io/anastacio-editor-web/"
         layout.operator("wm.url_open", text="GitHub", icon='URL').url = "https://github.com/AnastacioGames"
         layout.operator("wm.url_open", text="Discord", icon='DISCORD').url = "https://discord.gg/AsbjKgh4E"
         url = layout.operator("wm.url_open", text="Patreon Anastacio", icon='PATREON')
