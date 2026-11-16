@@ -709,7 +709,8 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                     sub.prop(weather, prefix + "min_up")
                     if effect == "ripple":
                         sub.prop(weather, "rain_shelter_ground", slider=True)
-                    sub.label(text="Only objects with \"%s\" (all when none has it)" % prop_name, icon='INFO')
+                    sub.label(text="Only objects with \"%s\" set to True" % prop_name, icon='INFO')
+                    sub.label(text="(all when none has it)")
 
             box = _rain_section(col, weather, "show_expanded_rain_puddles", "Puddles", "use_rain_puddles")
             if weather.show_expanded_rain_puddles:
@@ -722,7 +723,8 @@ class CUSTOM_PT_game_weather(CustomWorldButtonsPanel, Panel):
                 sub.prop(weather, "use_rain_puddle_ssr", text="Screen Space Reflection")
                 sub.prop(weather, "rain_puddle_distance", text="Puddle Distance")
                 sub.prop(weather, "rain_puddle_min_up", text="Upward Surface")
-                sub.label(text="Only objects with \"puddles_effect\" (all when none has it)", icon='INFO')
+                sub.label(text="Only objects with \"puddles_effect\" set to True", icon='INFO')
+                sub.label(text="(all when none has it)")
 
             box = _rain_section(col, weather, "show_expanded_rain_wet", "Wet Surfaces", "use_rain_wet")
             if weather.show_expanded_rain_wet:

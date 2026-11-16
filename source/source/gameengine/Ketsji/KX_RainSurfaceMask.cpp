@@ -68,7 +68,8 @@ static const char *kFragmentSource =
 	"out vec4 fragColor;\n"
 	"uniform float u_flags;\n"
 	"void main() {\n"
-	"	fragColor = vec4(u_flags, v_depth, 0.0, 0.0);\n"
+	/* Alpha 1: a GL_ALPHA_TEST left on by other passes (physics debug draw) would discard alpha 0. */
+	"	fragColor = vec4(u_flags, v_depth, 0.0, 1.0);\n"
 	"}\n";
 
 KX_RainSurfaceMask::KX_RainSurfaceMask()
