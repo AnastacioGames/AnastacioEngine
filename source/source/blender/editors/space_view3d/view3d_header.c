@@ -507,11 +507,13 @@ void view3d_header_tool_controls(uiLayout *row, bContext *C)
 		RNA_property_enum_items(C, &v3dptr, prop, &items, NULL, &free);
 		for (it = items; it->identifier; it++) {
 			if (it->value == OB_MATERIAL) {
-				/* Texture não tem botão próprio: mostra o de Material aceso nesse modo.
-				 * Com PBR (nós de shading) ligado, o ícone vira o de nós. */
+				/* Com PBR (nós de shading) ligado, o ícone vira o de nós.
+				 * O botão sempre leva a Material: aceso também no modo Texture ele
+				 * regravava Texture a cada clique e não havia como sair desse modo, que
+				 * não roda o shader do jogo (desenha só a imagem ativa pela UV). Texture
+				 * e Bounding Box ficam no seletor do popover de shading. */
 				const bool pbr = scene && (scene->gm.flag & GAME_USE_SHADING_NODES);
-				const char *ident = (v3d->drawtype == OB_TEXTURE) ? "TEXTURED" : it->identifier;
-				uiItemEnumR_string(row, &v3dptr, "viewport_shade", ident, "",
+				uiItemEnumR_string(row, &v3dptr, "viewport_shade", it->identifier, "",
 				                   pbr ? ICON_MATERIAL_NODES : it->icon);
 			}
 			else if (ELEM(it->value, OB_WIRE, OB_SOLID, OB_RENDER)) {

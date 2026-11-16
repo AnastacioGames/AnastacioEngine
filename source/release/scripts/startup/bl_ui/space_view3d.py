@@ -3790,6 +3790,8 @@ class VIEW3D_PT_shading(Panel):
 
         # Seções como no Blender 5, com o conteúdo do jogo.
         layout.label(text="Viewport Shading")
+        # Todos os modos, inclusive Texture e Bounding Box, que não têm botão na barra.
+        layout.prop(view, "viewport_shade", text="")
         col = layout.column()
         col.label(text="Lighting")
         col.prop(view, "show_world")

@@ -993,13 +993,11 @@ def build_pbr_from_legacy(mat, ob=None):
     # Metallic/Roughness BSDF só valem com os shaders GGX/Lambert Custom. Todo material
     # nasce com metallic_bsdf = 0.5 (BKE_material_init), então copiar sem checar deixava
     # o cubo padrão meio metálico: escuro e espelhado.
-    if mat.specular_shader == 'GGX' or mat.diffuse_shader == 'LAMBERT_CUSTOM':
-        metallic = mat.specular_metallic_bsdf
-        roughness = mat.specular_roughness_bsdf
-    else:
-        # Hardness do Phong/CookTorr para roughness (aprox. Blinn-Phong <-> Beckmann).
-        metallic = 0.0
-        roughness = math.sqrt(2.0 / (mat.specular_hardness + 2.0))
+    # No GLSL clássico (gpu_material.c) metallic_bsdf/roughness_bsdf valem para QUALQUER
+    # shader: o difuso é multiplicado por (1 - metallic), o specular e o ambiente usam os
+    # dois. O cubo inicial (CookTorr, metallic 0.95, roughness 0.01) depende disso.
+    metallic = mat.specular_metallic_bsdf
+    roughness = mat.specular_roughness_bsdf
     bsdf.inputs["Metallic"].default_value = metallic
     bsdf.inputs["Roughness"].default_value = max(roughness, 0.02)
     bsdf.inputs["Specular"].default_value = min(mat.specular_intensity, 1.0)
@@ -1153,8 +1151,14 @@ def build_pbr_from_legacy(mat, ob=None):
                 # Sem "Normal Map" marcado na textura o BI usa a imagem como altura (bump),
                 # mesmo que ela seja um normal map: vira nó Bump, não Normal Map.
                 bp = b.add("ShaderNodeBump", -550, y - 150, label="Bump")
-                bp.invert = slot.normal_factor < 0.0
-                bp.inputs["Strength"].default_value = min(abs(slot.normal_factor), 1.0)
+                # Mesma conta do GLSL clássico (gpu_material.c, bump ntap): a altura entra
+                # com hScale = -0.1 * Normal sobre a normal negada do BI. No node_bump isso
+                # é Distance = 0.1 * |Normal|, invertido quando o fator é positivo, com
+                # Strength cheio. Strength = fator e Distance = 1 deixava o relevo 100x
+                # mais forte e virado ao contrário.
+                bp.invert = slot.normal_factor > 0.0
+                bp.inputs["Strength"].default_value = 1.0
+                bp.inputs["Distance"].default_value = 0.1 * abs(slot.normal_factor)
                 b.link(img_color, bp.inputs["Height"])
                 b.link(bp.outputs["Normal"], bsdf.inputs["Normal"])
             elif role == "normal":
