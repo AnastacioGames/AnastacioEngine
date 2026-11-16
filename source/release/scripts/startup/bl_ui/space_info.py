@@ -594,6 +594,7 @@ class INFO_MT_help(Menu):
         # Same links as the splash screen.
         url = layout.operator("wm.url_open", text="Python API", icon='FILE_SCRIPT')
         url.url = "https://anastaciogames.github.io/anastacio-docs/"
+        layout.operator("wm.url_open", text="Web Editor", icon='URL').url = "https://anastaciogames.github.io/anastacio-editor-web/"
         layout.operator("wm.url_open", text="GitHub", icon='URL').url = "https://github.com/AnastacioGames"
         layout.operator("wm.url_open", text="Discord", icon='DISCORD').url = "https://discord.gg/AsbjKgh4E"
         url = layout.operator("wm.url_open", text="Patreon Anastacio", icon='PATREON')
