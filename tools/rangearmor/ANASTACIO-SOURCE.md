@@ -1,5 +1,10 @@
 # Fonte local do RangeArmor
 
+> **Painel aposentado em 2026-11-16.** O editor exporta pela janela Export to Desktop; scripts, ícones e
+> Resource Hacker foram para `source/release/scripts/export_desktop/`. Daqui ainda vêm o fonte do launcher do
+> jogo (`source/launcher/`) e o `Launcher.exe` compilado (`release/launcher/`, fora do git). O painel Rust
+> (`source/gui-rs/`) fica só como histórico; os comandos abaixo valem para o launcher.
+
 Recuperado em 2026-10-08 do commit `69df19d9`, caminho original
 `tools/RangeArmor-master/RangeArmor-master/`. Esta pasta mantém o fonte fora do caminho
 ignorado `tools/RangeArmor-master/`, permitindo revisar e versionar novas alterações.

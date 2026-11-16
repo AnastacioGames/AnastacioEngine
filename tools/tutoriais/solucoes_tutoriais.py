@@ -113,11 +113,9 @@ SOLUCOES = {
         JOGO,
     ],
     "exportar_desktop": [
-        "aba('EXPORT')",
-        "C.window_manager.ae_export_panel_category = 'RANGEARMOR'",
+        "aba('EXPORT'); C.window_manager.ae_export_panel_category = 'RANGEARMOR'",
         "C.scene.rangearmor_export.export_windows64 = True",
-        "C.scene.rangearmor_export.product_name = 'Meu Jogo'",
-        "salvar()",
+        "C.scene.range_game_info.name = 'Meu Jogo'",
         NADA,
     ],
     "exportar_web": [

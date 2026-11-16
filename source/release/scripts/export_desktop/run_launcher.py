@@ -36,7 +36,7 @@ def main():
                 # existing launcher. Custom launchers retain priority.
                 import hashlib
                 import json
-                templates = _Path(__file__).resolve().parents[1] / 'launcher'
+                templates = _common.TEMPLATES / 'launcher'
                 manifest = templates / 'legacy-template-sha256.json'
                 if manifest.is_file():
                     known = json.loads(manifest.read_text(encoding='utf-8')).get(args.get('--engine'), [])

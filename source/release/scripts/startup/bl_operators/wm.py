@@ -2794,17 +2794,17 @@ def _rangearmor_write_export_preset(context):
             return False
         return True
 
-    if export_settings.product_name:
-        config_data["GameName"] = export_settings.product_name
-    if export_settings.product_version:
-        config_data["Version"] = export_settings.product_version
+    from bl_ui.properties_scene import game_name, game_version, game_icon, migrate_game_info
+    migrate_game_info(context.scene)
+    config_data["GameName"] = game_name(context.scene)
+    config_data["Version"] = game_version(context.scene)
     if export_settings.company_name:
         config_data["CompanyName"] = export_settings.company_name
-    if export_settings.icon_path:
-        config_data["IconPath"] = bpy.path.abspath(export_settings.icon_path)
+    config_data["IconPath"] = _export_icon_ico(project_dir, game_icon(context.scene))
     config_data["ExportWindows64"] = export_settings.export_windows64
     config_data["ExportLinux64"] = export_settings.export_linux64
     config_data["CompileScripts"] = export_settings.compile_scripts
+    config_data["ExportCompress"] = export_settings.make_archive
 
     try:
         with open(config_path, "w", encoding="utf-8") as config_file:
@@ -2813,6 +2813,65 @@ def _rangearmor_write_export_preset(context):
     except OSError:
         return False
     return True
+
+
+def _export_icon_ico(project_dir, icon):
+    """.ico for the Windows executables: an .ico is used as is; a PNG becomes
+    <project>/icons/game-icon.ico (256, 48, 32 and 16 px, stored as PNG inside the .ico,
+    which Windows reads since Vista). Returns "" when there is no usable icon."""
+    import struct
+    import tempfile
+
+    if not icon or not os.path.isfile(icon):
+        return ""
+    if icon.lower().endswith(".ico"):
+        return icon
+    if not icon.lower().endswith(".png"):
+        print("Export: the game icon must be a PNG or ICO file:", icon)
+        return ""
+    target = os.path.join(project_dir, "icons", "game-icon.ico")
+    if os.path.isfile(target) and os.path.getmtime(target) >= os.path.getmtime(icon):
+        return target
+    sizes = (256, 48, 32, 16)
+    images = []
+    try:
+        source = bpy.data.images.load(icon, check_existing=False)
+    except RuntimeError as error:
+        print("Export: could not read the game icon:", error)
+        return ""
+    try:
+        with tempfile.TemporaryDirectory(prefix="anastacio-icon-") as work:
+            for size in sizes:
+                copy = source.copy()
+                try:
+                    copy.scale(size, size)
+                    copy.filepath_raw = os.path.join(work, "%d.png" % size)
+                    copy.file_format = 'PNG'
+                    copy.save()
+                    with open(copy.filepath_raw, "rb") as stream:
+                        images.append((size, stream.read()))
+                finally:
+                    bpy.data.images.remove(copy)
+    except (OSError, RuntimeError) as error:
+        print("Export: could not convert the game icon:", error)
+        return ""
+    finally:
+        bpy.data.images.remove(source)
+    header = struct.pack("<HHH", 0, 1, len(images))
+    offset = len(header) + 16 * len(images)
+    entries, blobs = b"", b""
+    for size, blob in images:
+        side = 0 if size >= 256 else size  # 0 = 256 no formato .ico
+        entries += struct.pack("<BBBBHHII", side, side, 0, 0, 1, 32, len(blob), offset + len(blobs))
+        blobs += blob
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        with open(target, "wb") as stream:
+            stream.write(header + entries + blobs)
+    except OSError as error:
+        print("Export: could not write the game icon:", error)
+        return ""
+    return target
 
 
 _RANGEARMOR_DEFAULT_FIELDS = {
@@ -2841,61 +2900,41 @@ _RANGEARMOR_DEFAULT_FIELDS = {
 }
 
 
-def _rangearmor_ensure_launcher_template_fresh(template_dir):
-    # type: (str) -> None
-    """Auto-rebuild the Launcher(.exe) template if it's older than its own
-    Rust source (source/launcher/src/main.rs).
+def export_desktop_dirs():
+    # type: () -> tuple[str, str] | None
+    """(modelos, scripts) do Export to Desktop, ou None.
 
-    tools/RangeArmor-master/.../release/launcher/Launcher.exe is a
-    prebuilt binary, not versioned in git. If it's ever stale (e.g. the
-    launcher's tools/RangeArmor-master folder gets reinstalled/reset
-    from an older source snapshot), every scaffolded project ships a
-    broken launcher that panics on startup ("abre e fecha"). Rather than
-    surface that as an export error, rebuild automatically here whenever
-    a fresher main.rs is available and cargo is on PATH; best-effort and
-    silent on any failure, since the shipped template still works most
-    of the time and export shouldn't be blocked by this.
+    Agora vem com a engine em 2.79/scripts/export_desktop/ (launcher/, icons/, tools/ e os scripts
+    na mesma pasta). Instalações antigas tinham o painel RangeArmor ao lado do executável, com os
+    modelos em rangearmor/release/ e os scripts em rangearmor/release/scripts/.
     """
-    import subprocess
-    import sys
+    new = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                       "export_desktop")
+    if os.path.isfile(os.path.join(new, "build_release.py")):
+        return new, new
+    old = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "release")
+    if os.path.isfile(os.path.join(old, "scripts", "build_release.py")):
+        return old, os.path.join(old, "scripts")
+    return None
 
-    launcher_ext = ".exe" if sys.platform == "win32" else ""
-    template_launcher_bin = os.path.join(template_dir, "launcher", "Launcher" + launcher_ext)
 
-    # tools/RangeArmor-master/RangeArmor-master/release -> .../source/launcher
-    rangearmor_root = os.path.dirname(template_dir)
-    launcher_src_dir = os.path.join(rangearmor_root, "source", "launcher")
-    main_rs = os.path.join(launcher_src_dir, "src", "main.rs")
-    if not os.path.isfile(main_rs):
-        return
-
-    if os.path.isfile(template_launcher_bin):
-        if os.path.getmtime(template_launcher_bin) >= os.path.getmtime(main_rs):
-            return
-
-    if not shutil.which("cargo"):
-        return
-
-    target = "x86_64-pc-windows-msvc" if sys.platform == "win32" else "x86_64-unknown-linux-gnu"
-    try:
-        result = subprocess.run(
-            ["cargo", "build", "--release", "--target", target],
-            cwd=launcher_src_dir, capture_output=True, text=True, timeout=300,
-        )
-    except Exception:
-        return
-    if result.returncode != 0:
-        return
-
-    built_bin = os.path.join(launcher_src_dir, "target", target, "release", "rangearmor" + launcher_ext)
-    if not os.path.isfile(built_bin):
-        return
-
-    try:
-        os.makedirs(os.path.dirname(template_launcher_bin), exist_ok=True)
-        shutil.copy2(built_bin, template_launcher_bin)
-    except OSError:
-        pass
+def export_desktop_build_args(export_settings, available=None):
+    """Options of build_release.py from Scene.rangearmor_export (None = everything, as before).
+    available: platforms with a runtime (the window passes it so a missing one is left out)."""
+    if export_settings is None:
+        return ["--target", "All", "--compress", "--universal"]
+    windows, linux = export_settings.export_windows64, export_settings.export_linux64
+    if available is not None:
+        windows, linux = windows and "Windows64" in available, linux and "Linux64" in available
+    if windows and linux:
+        args = ["--target", "All", "--universal"]
+    else:
+        args = ["--target", "Windows64" if windows else "Linux64"]
+    if export_settings.make_archive:
+        args.append("--compress")
+    if not export_settings.cook_before_export:
+        args.append("--no-cook")
+    return args
 
 
 def _rangearmor_scaffold_project(project_dir):
@@ -2912,10 +2951,10 @@ def _rangearmor_scaffold_project(project_dir):
     """
     import sys
 
-    rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
-    template_dir = os.path.join(rangearmor_dir, "release")
-    if not os.path.isdir(template_dir):
-        return "RangeArmor Panel template files not found at %s" % template_dir
+    dirs = export_desktop_dirs()
+    if dirs is None:
+        return "Export to Desktop files not found (2.79/scripts/export_desktop)"
+    template_dir = dirs[0]
 
     for folder in ("data", "engine", "engine/Linux64", "engine/Windows64", "launcher", "icons"):
         try:
@@ -2931,16 +2970,12 @@ def _rangearmor_scaffold_project(project_dir):
         except OSError as e:
             return "Could not create launcher/config.json: %s" % e
 
-    # O binário template (tools/RangeArmor-master/.../release/launcher/Launcher.exe) não é
-    # versionado em git e pode ficar desatualizado (ex.: reinstalação do tools/RangeArmor-master
-    # a partir de uma fonte externa), causando um launcher que panica ao abrir ("abre e fecha").
-    # _rangearmor_ensure_launcher_template_fresh recompila automaticamente com cargo quando
-    # detecta que o binário é mais antigo que o source Rust, antes de copiá-lo para o projeto.
-    _rangearmor_ensure_launcher_template_fresh(template_dir)
-
-    launcher_ext = ".exe" if sys.platform == "win32" else ""
-    launcher_bin = os.path.join(project_dir, "launcher", "Launcher" + launcher_ext)
-    if not os.path.isfile(launcher_bin):
+    # Os dois launchers que a engine trouxer: um projeto feito no Windows também exporta para Linux.
+    host_ext = ".exe" if sys.platform == "win32" else ""
+    for launcher_ext in (".exe", ""):
+        launcher_bin = os.path.join(project_dir, "launcher", "Launcher" + launcher_ext)
+        if os.path.isfile(launcher_bin):
+            continue
         template_launcher_bin = os.path.join(template_dir, "launcher", "Launcher" + launcher_ext)
         if os.path.isfile(template_launcher_bin):
             try:
@@ -2949,6 +2984,8 @@ def _rangearmor_scaffold_project(project_dir):
                     os.chmod(launcher_bin, os.stat(launcher_bin).st_mode | 0o111)
             except OSError as e:
                 return "Could not copy Launcher%s: %s" % (launcher_ext, e)
+        elif launcher_ext == host_ext:
+            return "Game launcher not found in the engine (%s)" % template_launcher_bin
 
     for icon_name in ("icon-engine.ico", "icon-launcher.ico"):
         icon_path = os.path.join(project_dir, "icons", icon_name)
@@ -2989,8 +3026,8 @@ def _rangearmor_ensure_launcher_script(context):
     if os.path.isfile(launcher_script) or not os.path.isdir(launcher_dir):
         return
 
-    rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
-    template_script = os.path.join(rangearmor_dir, "release", "launcher", "launcher.py")
+    dirs = export_desktop_dirs()
+    template_script = os.path.join(dirs[0], "launcher", "launcher.py") if dirs else ""
     if not os.path.isfile(template_script):
         return
 
@@ -3001,35 +3038,19 @@ def _rangearmor_ensure_launcher_script(context):
 
 
 class WM_OT_export_with_rangearmor(Operator):
-    """Open RANGEARMOR to export you game"""
+    """Open the Export to Desktop window (the old RangeArmor Panel was replaced by it)"""
     bl_idname = "wm.export_with_rangearmor"
-    bl_label = ""
+    bl_label = "Export to Desktop"
     bl_options = {'INTERNAL'}
 
     def execute(self, context):
-        import os, sys, subprocess
-
-        filepath = bpy.data.filepath
-        if filepath and os.path.basename(os.path.dirname(filepath)) == 'data':
-            config_path = os.path.join(os.path.dirname(os.path.dirname(filepath)), 'launcher', 'config.json')
-            if os.path.isfile(config_path) and not _rangearmor_write_export_preset(context):
-                self.report({'ERROR'}, "Could not prepare the protected game snapshot or config.json")
-                return {'CANCELLED'}
-        _rangearmor_ensure_launcher_script(context)
-
-        if sys.platform == "win32":
-            os.startfile(os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "RangeArmor Panel.exe"))
-            return {'FINISHED'}
-
-        exe_path = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor", "RangeArmor Panel")
-        subprocess.run([exe_path])
-        return {'FINISHED'}
+        return bpy.ops.wm.export_to_desktop('INVOKE_DEFAULT')
 
 
 class WM_OT_one_click_export_rangearmor(Operator):
-    """Export the game straight to the release folder, without opening RangeArmor Panel"""
+    """Export the game again with the last settings, straight to the release folder"""
     bl_idname = "wm.one_click_export_rangearmor"
-    bl_label = "Export Game (1 Click)"
+    bl_label = "Export Now"
     bl_options = {'INTERNAL'}
 
     def _resolve_python(self, project_dir, config_data):
@@ -3111,18 +3132,18 @@ class WM_OT_one_click_export_rangearmor(Operator):
                 self.report({'ERROR'}, "Could not read config.json: %s" % e)
                 return {'CANCELLED'}
 
-            rangearmor_dir = os.path.join(os.path.dirname(bpy.app.binary_path), "rangearmor")
-            build_script = os.path.join(rangearmor_dir, "release", "scripts", "build_release.py")
-            if not os.path.isfile(build_script):
-                self.report({'ERROR'}, "build_release.py not found next to RangeArmor Panel (expected %s)" % build_script)
+            dirs = export_desktop_dirs()
+            if dirs is None:
+                self.report({'ERROR'}, "Export to Desktop files not found (2.79/scripts/export_desktop)")
                 return {'CANCELLED'}
+            build_script = os.path.join(dirs[1], "build_release.py")
 
             python_exe = self._resolve_python(project_dir, config_data)
             if not python_exe:
-                self.report({'ERROR'}, "Could not find a Python interpreter for the export. Open RangeArmor Panel and click 'Get RanGE' once, then try again.")
+                self.report({'ERROR'}, "Could not find the engine's Python interpreter for the export")
                 return {'CANCELLED'}
 
-            get_range_script = os.path.join(rangearmor_dir, "release", "scripts", "get_rangeengine_currentplatform.py")
+            get_range_script = os.path.join(dirs[1], "get_rangeengine_currentplatform.py")
             engine_windows = os.path.join(project_dir, "engine", "Windows64", "AnastacioRuntime.exe")
             engine_windows_legacy = os.path.join(project_dir, "engine", "Windows64", "RangeRuntime.exe")
             engine_linux = os.path.join(project_dir, "engine", "Linux64", "AnastacioRuntime")
@@ -3134,10 +3155,8 @@ class WM_OT_one_click_export_rangearmor(Operator):
                 )
             wm.progress_update(3)
 
-            args = [python_exe, build_script, "--project", config_path, "--target", "All", "--compress", "--universal"]
             export_settings = getattr(context.scene, 'rangearmor_export', None)
-            if export_settings is not None and not export_settings.cook_before_export:
-                args.append('--no-cook')
+            args = [python_exe, build_script, "--project", config_path] + export_desktop_build_args(export_settings)
             try:
                 from .anastacio_cook import _runtime_path
                 cook_runtime = _runtime_path()

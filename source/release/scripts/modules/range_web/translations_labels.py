@@ -1741,8 +1741,27 @@ MESSAGES = (
      "Объект должен быть камерой."),
 )
 
-# Caixas e dicas dos paineis da aba Export Game (RangeArmor, Web, Android).
+# Caixas e dicas dos paineis da aba Export Game (Desktop, Web, Android).
 EXPORT_PANELS = (
+    ("Export to Desktop", "Exportar para PC", "Exportar para PC", "Экспорт для ПК"),
+    ("Export to Desktop...", "Exportar para PC...", "Exportar para PC...", "Экспорт для ПК..."),
+    ("Export Now (last settings)", "Exportar agora (últimas opções)", "Exportar ahora (últimas opciones)",
+     "Экспортировать сейчас (последние настройки)"),
+    ("Export Now", "Exportar agora", "Exportar ahora", "Экспортировать сейчас"),
+    ("Game name", "Nome do jogo", "Nombre del juego", "Название игры"),
+    ("Make .zip to share", "Gerar .zip para compartilhar", "Generar .zip para compartir",
+     "Создать .zip для распространения"),
+    ("Options:", "Opções:", "Opciones:", "Параметры:"),
+    ("Game files ship protected (.rasec, basic protection)",
+     "Os arquivos do jogo saem protegidos (.rasec, proteção básica)",
+     "Los archivos del juego salen protegidos (.rasec, protección básica)",
+     "Файлы игры защищены (.rasec, базовая защита)"),
+    ("The window sets up the project folder for you",
+     "A janela monta a pasta do projeto para você",
+     "La ventana arma la carpeta del proyecto por ti",
+     "Окно само создаст папку проекта"),
+    ("Windows and Linux game, ready to share", "Jogo para Windows e Linux, pronto para compartilhar",
+     "Juego para Windows y Linux, listo para compartir", "Игра для Windows и Linux, готовая к распространению"),
     ("Desktop builds", "Builds para desktop", "Builds de escritorio", "Сборки для ПК"),
     ("Empty fields keep the RangeArmor Panel defaults",
      "Campos vazios mantêm o padrão do RangeArmor Panel",

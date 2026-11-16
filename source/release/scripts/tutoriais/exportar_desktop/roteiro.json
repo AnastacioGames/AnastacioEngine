@@ -6,9 +6,9 @@
   },
   "categoria": "Export",
   "resumo": {
-    "pt": "Aba Export Game: plataformas, nome do jogo e Export Game (1 Click).",
-    "en": "Export Game tab: platforms, game name and Export Game (1 Click).",
-    "es": "Pestaña Export Game: plataformas, nombre del juego y Export Game (1 Click)."
+    "pt": "Aba Export Game: nome do jogo, plataformas e a janela Exportar para PC.",
+    "en": "Export Game tab: game name, platforms and the Export to Desktop window.",
+    "es": "Pestaña Export Game: nombre del juego, plataformas y la ventana Exportar para PC."
   },
   "abertura": {
     "pt": "Vamos transformar o seu arquivo num jogo que abre sem a engine.",
@@ -18,36 +18,19 @@
   "passos": [
     {
       "texto": {
-        "pt": "No Properties, abra a aba Export Game.",
-        "en": "In Properties, open the Export Game tab.",
-        "es": "En Properties, abre la pestaña Export Game."
+        "pt": "No Properties, abra a aba Export Game. Se o topo não estiver em Desktop, clique em Desktop.",
+        "en": "In Properties, open the Export Game tab. If the top is not on Desktop, click Desktop.",
+        "es": "En Properties, abre la pestaña Export Game. Si arriba no está en Desktop, haz clic en Desktop."
       },
       "narracao": "",
       "checagem": {
-        "expr": "any(a.spaces.active.context == 'EXPORT' for a in C.screen.areas if a.type == 'PROPERTIES')"
+        "expr": "any(a.spaces.active.context == 'EXPORT' for a in C.screen.areas if a.type == 'PROPERTIES') and C.window_manager.ae_export_panel_category == 'RANGEARMOR'"
       },
       "destaque": "PROPERTIES",
       "alvo": {
         "area": "PROPERTIES",
         "regiao": "HEADER",
         "botao": "prop:context=EXPORT"
-      }
-    },
-    {
-      "texto": {
-        "pt": "No topo da aba, clique em Export.",
-        "en": "At the top of the tab, click Export.",
-        "es": "Arriba en la pestaña, haz clic en Export."
-      },
-      "narracao": "",
-      "checagem": {
-        "expr": "C.window_manager.ae_export_panel_category == 'RANGEARMOR'"
-      },
-      "destaque": "PROPERTIES",
-      "alvo": {
-        "area": "PROPERTIES",
-        "regiao": "WINDOW",
-        "botao": "prop:ae_export_panel_category=RANGEARMOR"
       }
     },
     {
@@ -69,13 +52,13 @@
     },
     {
       "texto": {
-        "pt": "Em Product Name, escreva o nome do seu jogo.",
-        "en": "In Product Name, type your game's name.",
-        "es": "En Product Name, escribe el nombre de tu juego."
+        "pt": "No bloco Game, em Name, escreva o nome do seu jogo.",
+        "en": "In the Game box, type your game's name in Name.",
+        "es": "En el bloque Game, escribe el nombre de tu juego en Name."
       },
       "narracao": "",
       "checagem": {
-        "expr": "C.scene.rangearmor_export.product_name.strip() != ''"
+        "expr": "C.scene.range_game_info.name.strip() != ''"
       },
       "destaque": "PROPERTIES",
       "dica": {
@@ -86,44 +69,27 @@
       "alvo": {
         "area": "PROPERTIES",
         "regiao": "WINDOW",
-        "botao": "prop:product_name"
+        "botao": "prop:name"
       }
     },
     {
       "texto": {
-        "pt": "Salve o arquivo (Ctrl+S) dentro da pasta data/ do projeto.",
-        "en": "Save the file (Ctrl+S) inside the project's data/ folder.",
-        "es": "Guarda el archivo (Ctrl+S) dentro de la carpeta data/ del proyecto."
-      },
-      "narracao": "",
-      "checagem": {
-        "expr": "bool(D.filepath) and not D.is_dirty"
-      },
-      "destaque": "PROPERTIES",
-      "dica": {
-        "pt": "O export pede o .range salvo na pasta data/ do projeto.",
-        "en": "The export needs the .range saved in the project's data/ folder.",
-        "es": "El export necesita el .range guardado en la carpeta data/ del proyecto."
-      }
-    },
-    {
-      "texto": {
-        "pt": "Clique em Export Game (1 Click) e espere a mensagem de fim. Depois, clique em Next.",
-        "en": "Click Export Game (1 Click) and wait for the done message. Then click Next.",
-        "es": "Haz clic en Export Game (1 Click) y espera el mensaje final. Luego haz clic en Next."
+        "pt": "Clique em Exportar para PC... e siga a janela até o fim. Depois, clique em Next.",
+        "en": "Click Export to Desktop... and follow the window to the end. Then click Next.",
+        "es": "Haz clic en Exportar para PC... y sigue la ventana hasta el final. Luego haz clic en Next."
       },
       "narracao": "",
       "checagem": null,
       "destaque": "PROPERTIES",
       "dica": {
-        "pt": "Para um executável simples, também há File › Export › Save As Game Engine Runtime.",
-        "en": "For a simple executable there is also File › Export › Save As Game Engine Runtime.",
-        "es": "Para un ejecutable simple, también está File › Export › Save As Game Engine Runtime."
+        "pt": "Se o arquivo ainda não estiver numa pasta de projeto, a janela cria uma para você.",
+        "en": "If the file is not in a project folder yet, the window creates one for you.",
+        "es": "Si el archivo aún no está en una carpeta de proyecto, la ventana crea una por ti."
       },
       "alvo": {
         "area": "PROPERTIES",
         "regiao": "WINDOW",
-        "botao": "Export Game (1 Click)"
+        "botao": "Export to Desktop..."
       }
     }
   ],

@@ -285,6 +285,7 @@ def register():
     from . import properties_scene
 
     Scene.rangearmor_export = PointerProperty(type=properties_scene.RangeArmorExportSettings)
+    Scene.range_game_info = PointerProperty(type=properties_scene.RangeGameInfo)
     ########### End RangeArmor Export Presets ###########
 
     ########### Range Web Profile ###########
@@ -333,6 +334,8 @@ def unregister():
 
     if hasattr(Scene, "rangearmor_export"):
         del Scene.rangearmor_export
+    if hasattr(Scene, "range_game_info"):
+        del Scene.range_game_info
 
     from . import properties_input
     if properties_input.input_sync_handler in bpy.app.handlers.scene_update_post:

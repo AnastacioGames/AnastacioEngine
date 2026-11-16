@@ -709,10 +709,138 @@ class RangeArmorExportSettings(bpy.types.PropertyGroup):
                     "as saved in the scene. Off: the published game never shows them",
         default=False,
     )
+    make_archive: bpy.props.BoolProperty(
+        name="Make .zip to share",
+        description="Also packs each exported folder in one file (.zip; .tar.xz for Linux), ready to upload",
+        default=True,
+    )
+
+
+class RangeGameInfo(bpy.types.PropertyGroup):
+    """Name, version and icon of the game, shared by the Desktop, Web and Android exports."""
+
+    name: bpy.props.StringProperty(
+        name="Game name",
+        description="Name shown to players: executable, window and app name",
+        default="",
+    )
+    version: bpy.props.StringProperty(
+        name="Version",
+        description="Version of the game, for example 1.0.0",
+        default="1.0.0",
+    )
+    icon: bpy.props.StringProperty(
+        name="Icon",
+        description="Square PNG image (512x512 recommended) used as the game icon; "
+                    "the Windows .ico is made from it on export",
+        default="",
+        subtype='FILE_PATH',
+    )
+
+
+def _old_game_info(scene):
+    """(name, version, icon) from before the Game box: the old Desktop fields of the scene, then the
+    project's launcher/config.json written by the RangeArmor Panel. Empty strings when unknown."""
+    import json
+    import os
+    old = getattr(scene, "rangearmor_export", None)
+    name = old.product_name.strip() if old else ""
+    version = old.product_version.strip() if old and old.product_version.strip() != "1.0.0" else ""
+    icon = old.icon_path if old else ""
+    project = desktop_project_dir()
+    if project and not (name and version and icon):
+        try:
+            with open(os.path.join(project, "launcher", "config.json"), encoding="utf-8") as stream:
+                config = json.load(stream)
+        except (OSError, ValueError):
+            config = {}
+        if not name and config.get("GameName") not in (None, "", "Game"):
+            name = str(config["GameName"])
+        if not version and config.get("Version") not in (None, "", "1.0.0"):
+            version = str(config["Version"])
+        if not icon and config.get("IconPath"):
+            icon = str(config["IconPath"])
+    return name, version, icon
+
+
+def migrate_game_info(scene):
+    """Fills an empty Game box once from the old settings, so nothing set before is lost and later
+    edits (including going back to 1.0.0) are kept as typed."""
+    info = getattr(scene, "range_game_info", None)
+    if info is None or info.name.strip():
+        return
+    name, version, icon = _old_game_info(scene)
+    if name:
+        info.name = name
+    if version:
+        info.version = version
+    if icon and not info.icon:
+        info.icon = icon
+
+
+def game_name(scene):
+    """Game name of the Game box; before it is filled, the old settings, then the file name."""
+    import os
+    info = getattr(scene, "range_game_info", None)
+    name = info.name.strip() if info else ""
+    if not name:
+        name = _old_game_info(scene)[0]
+    return name or os.path.splitext(os.path.basename(bpy.data.filepath))[0]
+
+
+def game_version(scene):
+    info = getattr(scene, "range_game_info", None)
+    if info is not None and not info.name.strip():
+        old = _old_game_info(scene)[1]
+        if old:
+            return old
+    version = info.version.strip() if info else ""
+    return version or "1.0.0"
+
+
+def game_icon(scene):
+    """Absolute path of the game icon (PNG or ICO), or ""."""
+    info = getattr(scene, "range_game_info", None)
+    icon = info.icon if info and info.icon else ""
+    if not icon and (info is None or not info.name.strip()):
+        icon = _old_game_info(scene)[2]
+    return bpy.path.abspath(icon) if icon else ""
+
+
+def desktop_project_dir():
+    """<project> when the open file is <project>/data/*.range, else None."""
+    import os
+    path = bpy.data.filepath
+    if path and os.path.basename(os.path.dirname(path)) == "data":
+        return os.path.dirname(os.path.dirname(path))
+    return None
+
+
+class SCENE_PT_game_info(SceneButtonsPanel, Panel):
+    bl_label = "Game"
+    bl_context = "export"
+    COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return (context.scene and context.scene.render.engine in cls.COMPAT_ENGINES and
+                context.window_manager.ae_export_panel_category in {'RANGEARMOR', 'WEB', 'ANDROID'})
+
+    def draw_header(self, context):
+        self.layout.label(text="", icon='GAME')
+
+    def draw(self, context):
+        layout = self.layout
+        info = context.scene.range_game_info
+        layout.prop(info, "name", text="Name")
+        layout.prop(info, "version")
+        layout.prop(info, "icon")
+        if not info.name.strip():
+            layout.label(text="Empty name uses: %s" % game_name(context.scene), icon='INFO')
 
 
 class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
-    bl_label = "Export (RangeArmor)"
+    bl_label = "Export to Desktop"
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_RENDER', 'BLENDER_GAME'}
 
@@ -730,29 +858,29 @@ class SCENE_PT_rangearmor_export(SceneButtonsPanel, Panel):
 
         export = context.scene.rangearmor_export
 
+        col = layout.column()
+        col.scale_y = 1.6
+        col.operator("wm.export_to_desktop", text="Export to Desktop...", icon='EXPORT')
+
         box = layout.box()
-        box.label(text="Platforms:", icon="EXPORT")
+        box.label(text="Platforms:", icon="DESKTOP")
         row = box.row(align=True)
         row.prop(export, "export_windows64", toggle=True)
         row.prop(export, "export_linux64", toggle=True)
-        box.label(text="Desktop builds", icon='INFO')
 
         box = layout.box()
-        box.label(text="Package Info:", icon="FILE_TEXT")
-        box.prop(export, "product_name")
-        box.prop(export, "product_version")
-        box.prop(export, "company_name")
-        box.prop(export, "icon_path")
-        box.label(text="Empty fields keep the RangeArmor Panel defaults", icon='INFO')
-
-        box = layout.box()
-        box.label(text="Export:", icon="EXPORT")
+        box.label(text="Options:", icon="PREFERENCES")
         box.prop(export, "cook_before_export")
-        box.prop(export, "keep_debug_overlays")
         box.prop(export, "compile_scripts")
-        box.operator("wm.one_click_export_rangearmor", text="Export Game (1 Click)", icon='EXPORT')
-        box.operator("wm.export_with_rangearmor", text="Open RangeArmor Panel", icon='RANGEARMOR')
-        box.label(text="The file must be saved in the project's data/ folder", icon='INFO')
+        box.prop(export, "keep_debug_overlays")
+        box.prop(export, "make_archive")
+        box.label(text="Game files ship protected (.rasec, basic protection)", icon='LOCKED')
+
+        row = layout.row()
+        row.enabled = desktop_project_dir() is not None
+        row.operator("wm.one_click_export_rangearmor", text="Export Now (last settings)", icon='FILE_REFRESH')
+        if desktop_project_dir() is None:
+            layout.label(text="The window sets up the project folder for you", icon='INFO')
 
 
 # ---------------------------------------------------------------------------
@@ -902,6 +1030,8 @@ classes = (
     SCENE_PT_overview,
     # SCENE_PT_custom_props,  # disabled: Custom Properties panel unused
     RangeArmorExportSettings,
+    RangeGameInfo,
+    SCENE_PT_game_info,
     SCENE_PT_rangearmor_export,
 )
 

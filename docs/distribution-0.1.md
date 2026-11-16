@@ -64,6 +64,9 @@ build/dist/
   Rust/eframe, com Godot preservado como backup) roda no Windows e, desde a 0.5.3, também no Linux:
   `RangeArmor-<versao>-linux-x86_64.tar.xz`, montado por `tools/linux/stage_rangearmor_linux.sh`
   (ver [releases.md](releases.md#053)).
+- **A partir da release seguinte à 0.7.2** o asset RangeArmor deixa de ser publicado: o exportador é a janela
+  Export to Desktop do editor, com scripts e launcher em `2.79/scripts/export_desktop/` dentro do zip da engine.
+  O `stage_release_windows.py` confere a pasta e copia `Launcher.exe` de `tools/rangearmor/release/launcher/`.
 - `SHA256SUMS.txt`: hashes SHA-256 de todos os artefatos da release (Windows e Linux); publicar junto dos
   arquivos para permitir verificação de integridade por quem baixar.
 

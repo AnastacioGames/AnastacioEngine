@@ -13,10 +13,10 @@ from unittest import mock
 
 class RuntimeCopy(unittest.TestCase):
     def test_portable_installation_is_found_without_environment_overrides(self):
-        source_scripts = Path(__file__).resolve().parents[1] / 'rangearmor/release/scripts'
+        source_scripts = Path(__file__).resolve().parents[2] / 'source/release/scripts/export_desktop'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            scripts = root / 'installation/rangearmor/release/scripts'
+            scripts = root / 'installation/2.79/scripts/export_desktop'
             scripts.mkdir(parents=True)
             for name in ('common.py', 'get_rangeengine_currentplatform.py'):
                 shutil.copy2(source_scripts / name, scripts / name)
@@ -33,7 +33,7 @@ class RuntimeCopy(unittest.TestCase):
             self.assertEqual((project / 'engine/Windows64/AnastacioRuntime.exe').read_bytes(), b'portable runtime')
 
     def test_cli_missing_runtime_returns_error_and_keeps_previous(self):
-        script = Path(__file__).resolve().parents[1] / 'rangearmor/release/scripts/get_rangeengine_currentplatform.py'
+        script = Path(__file__).resolve().parents[2] / 'source/release/scripts/export_desktop/get_rangeengine_currentplatform.py'
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             (root / 'launcher').mkdir()
@@ -57,7 +57,7 @@ class RuntimeCopy(unittest.TestCase):
             self.assertIn('Unsupported runtime platform', invalid.stdout)
 
     def test_copy_keeps_runtime_crt_and_python_without_editors(self):
-        script = Path(__file__).resolve().parents[1] / 'rangearmor/release/scripts/get_rangeengine_currentplatform.py'
+        script = Path(__file__).resolve().parents[2] / 'source/release/scripts/export_desktop/get_rangeengine_currentplatform.py'
         common = mock.Mock()
         common.getArgs.return_value = {}
         common.getProjectData.return_value = {}

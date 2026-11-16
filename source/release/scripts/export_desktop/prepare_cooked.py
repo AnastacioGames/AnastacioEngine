@@ -6,7 +6,7 @@ import shutil
 import subprocess
 import tempfile
 from pathlib import Path
-from common import resolve_runtime
+from common import resolve_runtime, ENGINE_DIR
 
 
 def prepare(data):
@@ -21,7 +21,7 @@ def prepare(data):
     name = 'AnastacioRuntime.exe' if host == 'Windows64' else 'AnastacioRuntime'
     configured = os.environ.get('RANGEARMOR_COOK_RUNTIME')
     candidates = [Path(configured)] if configured else []
-    candidates += [Path(__file__).resolve().parents[3] / name,
+    candidates += [ENGINE_DIR / name,
                    Path(data['EngineExecutables'].get(host, project / 'engine' / host / name))]
     runtime = next((resolve_runtime(p).resolve() for p in candidates if resolve_runtime(p).is_file()), None)
     if runtime is None:

@@ -293,7 +293,7 @@ atraso falso). O resto é igual à 0.4.2.
 - **World, clima e iluminação:** clima direto na cena e sombras CSM ajustáveis pelo editor.
 - **Veículos:** transforme um Rigid Body em veículo e ajuste a física em tempo real pelo Vehicle Lab.
 - **GPU Skinning:** escolha **RanGE GPU Skinning** no painel da Armature e ligue **GPU Skinning** no material.
-- **RangeArmor:** crie projetos e prepare distribuições pelo RangeArmor Panel.
+- **Export to Desktop:** File › Export to Desktop... monta o jogo para Windows e Linux em quatro passos, sem programa à parte.
 - **Render Cycles:** CPU, NVIDIA (CUDA) e AMD (OpenCL).
 
 ## Plataformas

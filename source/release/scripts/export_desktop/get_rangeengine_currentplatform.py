@@ -78,16 +78,33 @@ def copy_runtime(source, target_name):
         previous = target.with_name(target.name + ".previous-" + uuid.uuid4().hex)
         had_previous = target.exists()
         if had_previous:
-            target.rename(previous)
+            _rename(target, previous)
         try:
-            staged.rename(target)
+            _rename(staged, target)
         except Exception:
             if had_previous:
-                previous.rename(target)
+                _rename(previous, target)
             raise
-        if had_previous:
+        if had_previous and args.get("--drop-previous"):
+            # Export to Desktop recopia a engine quando ela muda; guardar cada cópia velha enche o disco.
+            shutil.rmtree(str(previous), ignore_errors=True)
+            print("> Previous runtime removed")
+        elif had_previous:
             print("> Previous runtime preserved:", previous.as_posix())
     print("> " + target_name + " runtime copied successfully.")
+
+
+def _rename(source, destination, attempts=20):
+    """Path.rename with retries: on Windows the antivirus keeps the freshly copied .exe/.dll open
+    for a few seconds and renaming their folder fails with "Access denied" (WinError 5)."""
+    import time
+    for attempt in range(attempts):
+        try:
+            return source.rename(destination)
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(1.5)
 
 
 def get_engine_source(target_name):
@@ -105,9 +122,9 @@ def get_engine_source(target_name):
     if legacy and target_name == host_target:
         return valid_runtime_dir(Path(legacy), target_name, "RANGEARMOR_ENGINE_DIR")
 
-    # Portable installation: rangearmor/release/scripts/ is beside the engine,
-    # so the Panel works after extraction without workspace folders or overrides.
-    installed = valid_runtime_dir(Path(__file__).resolve().parents[3], target_name, None)
+    # Installed engine: these scripts live in <engine>/2.79/scripts/export_desktop/,
+    # so the export works after extraction without workspace folders or overrides.
+    installed = valid_runtime_dir(_common.ENGINE_DIR, target_name, None)
     if installed:
         return installed
 

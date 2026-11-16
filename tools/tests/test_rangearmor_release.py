@@ -9,7 +9,7 @@ import subprocess
 import json
 from unittest import mock
 
-SCRIPTS = pathlib.Path(__file__).resolve().parents[1] / 'rangearmor/release/scripts'
+SCRIPTS = pathlib.Path(__file__).resolve().parents[2] / 'source/release/scripts/export_desktop'
 sys.path.insert(0, str(SCRIPTS))
 spec = importlib.util.spec_from_file_location('armor_release', SCRIPTS / 'build_release.py')
 release = importlib.util.module_from_spec(spec)

@@ -34,7 +34,7 @@ def build(data, args):
         engine = project / "engine" / target
         if not launcher.is_file() or not engine.is_dir():
             raise RuntimeError("Missing launcher or runtime for " + target)
-        templates = Path(__file__).resolve().parents[1] / 'launcher'
+        templates = common.TEMPLATES / 'launcher'
         manifest = templates / 'legacy-template-sha256.json'
         if manifest.is_file():
             known = json.loads(manifest.read_text(encoding='utf-8')).get(target, [])
@@ -52,7 +52,9 @@ def build(data, args):
         inputs.append((target, suffix, launcher, engine, destination))
     use_cooked = not args.get('--no-cook', False)
     if use_cooked:
+        common.step('cook')
         prepare_cooked.prepare(data)
+    common.step('package')
     for target, suffix, launcher, engine, destination in inputs:
         _deliver(release, destination, [(target, suffix, launcher, engine)], data, project,
                  use_cooked, args.get("--compress") and (".zip" if target == "Windows64" else ".tar.xz"))
@@ -68,7 +70,7 @@ def build(data, args):
     elif args.get("--universal"):
         missing = [key for key in ("Windows64", "Linux64") if key not in [entry[0] for entry in inputs]]
         print("! Universal package skipped: no runtime for " + ", ".join(missing) +
-              ". Set both Windows and Linux runtimes in the Paths tab.")
+              ". It needs both the Windows and the Linux engine.")
 
 
 def _drop_protected_sources(data_dir):
@@ -103,8 +105,65 @@ def _compile_scripts(data_dir):
     print("> Compiled scripts:", len(sources))
 
 
+def _set_icon(data, project, executables):
+    """Põe o ícone do jogo (IconPath, .ico) nos .exe da entrega, só na cópia. Precisa do
+    Resource Hacker (tools/ ao lado destes scripts), que só roda no Windows; fora dele avisa e segue."""
+    icon = data.get("IconPath")
+    if not icon:
+        return
+    icon = Path(icon) if Path(icon).is_absolute() else project / icon
+    hacker = common.TEMPLATES / "tools" / "ResourceHacker.exe"
+    if not icon.is_file() or icon.suffix.lower() != ".ico":
+        print("! Game icon skipped (needs an existing .ico):", icon)
+        return
+    if platform.system() != "Windows" or not hacker.is_file():
+        print("! Game icon skipped: Resource Hacker only runs on Windows")
+        return
+    import subprocess
+    for exe in executables:
+        if not exe.is_file():
+            continue
+        result = subprocess.run([str(hacker), "-open", str(exe), "-save", str(exe), "-action", "addoverwrite",
+                                 "-res", str(icon), "-mask", "ICONGROUP,APPICON,"],
+                                capture_output=True, text=True, errors="replace", timeout=120)
+        if result.returncode:
+            print("! Could not set the icon of", exe.name)
+        else:
+            print("> Icon set:", exe.name)
+
+
+def _replace(source, destination, attempts=20):
+    """os.replace com novas tentativas: no Windows o antivírus segura por alguns segundos os .exe/.dll
+    recém-copiados (ou com ícone trocado) e renomear a pasta deles dá "Acesso negado" (WinError 5)."""
+    import time
+    for attempt in range(attempts):
+        try:
+            return os.replace(source, destination)
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(1.5)
+
+
+LONG_PREFIX = "\\\\?\\"
+
+
+def _long(path):
+    """Caminho com o prefixo de caminho longo no Windows: a engine copiada (2.79/scripts/addons/...) dentro
+    de release/<pasta temporária>/<Jogo-versão-alvo>/engine/... passa de 260 caracteres."""
+    path = str(path)
+    if platform.system() != "Windows" or path.startswith(LONG_PREFIX):
+        return Path(path)
+    path = os.path.abspath(path)
+    if path.startswith("\\\\"):  # pasta de rede: \\servidor\pasta vira \\?\UNC\servidor\pasta
+        return Path(LONG_PREFIX + "UNC" + path[1:])
+    return Path(LONG_PREFIX + path)
+
+
 def _deliver(release, destination, targets, data, project, use_cooked, archive_ext):
-    with tempfile.TemporaryDirectory(prefix=".rangearmor-stage-", dir=str(release)) as temp:
+    with tempfile.TemporaryDirectory(prefix=".rangearmor-stage-", dir=str(release),
+                                     ignore_cleanup_errors=True) as temp:
+        temp = str(_long(temp))
         stage = Path(temp) / destination.name
         stage.mkdir()
         # Backups do editor (.range1, .blend1...) nunca sao lidos pelo jogo e
@@ -142,7 +201,10 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
             shutil.copy2(str(launcher), str(game_launcher))
             if not suffix:
                 game_launcher.chmod(game_launcher.stat().st_mode | 0o111)
-            shutil.copytree(str(engine), str(stage / "engine" / target))
+            shutil.copytree(str(_long(engine)), str(stage / "engine" / target))
+            if target == "Windows64":
+                _set_icon(data, project, [game_launcher, stage / "engine" / target /
+                                          data['EngineExecutables'][target].name])
         if config is not None:
             delivered_config.write_text(json.dumps(config, indent=2, ensure_ascii=False), encoding='utf-8')
         archive = None
@@ -169,15 +231,15 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
         previous = None
         if destination.exists():
             previous = Path(tempfile.mkdtemp(prefix=destination.name + ".previous-", dir=str(release)))
-            os.replace(str(destination), str(previous / destination.name))
+            _replace(str(destination), str(previous / destination.name))
         try:
-            os.replace(str(stage), str(destination))
+            _replace(str(stage), str(destination))
         except OSError:
             if previous is not None:
-                os.replace(str(previous / destination.name), str(destination))
+                _replace(str(previous / destination.name), str(destination))
             raise
         if archive is not None:
-            os.replace(str(archive), str(release / archive.name))
+            _replace(str(archive), str(release / archive.name))
         if previous is not None:
             print("> Previous delivery preserved:", previous)
 

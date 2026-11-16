@@ -271,7 +271,6 @@ class SCENE_PT_range_web(SceneButtonsPanel, Panel):
     bl_label = "Web"
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_GAME'}
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):

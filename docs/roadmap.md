@@ -522,9 +522,11 @@ existem no `_prepareData` mas não são usados e a pasta `Track/` está vazia.
 - **Associação de arquivos**: abrir `.blend` e `.range` direto com os executáveis adequados (instalação/registro
   no Windows, duplo clique).
   Registro/remoção (`-r`/`-u`) e comandos do Registro validados em 2026-09-24; falta somente validar o duplo clique no Explorer.
-- **Export presets (RangeArmor)**: falta o teste manual (projeto novo e antigo) do plano.
-  `company_name`, `icon_path` e toggles desktop já são gravados por `wm.py`, com extensão do schema
-  registrada no plano; a pendência é de validação manual, não de implementação desses campos.
+- **Export to Desktop (2026-11-16)**: falta o aceite visual da janela com o usuário (temas e idiomas), exportar e
+  abrir no Linux (bancada) e o primeiro release sem o asset `RangeArmor-*.zip` (`Launcher.exe` no pacote pelo
+  `stage_release_windows.py`; no Linux o launcher precisa entrar em `2.79/scripts/export_desktop/launcher/`).
+- **Criptografia real dos arquivos do jogo**: o `.rasec` é só ofuscação com chave fixa. Estudar o SPINDLE
+  (`SpindleEncryption.h`, caminho opcional do player) para uma chave por jogo; tarefa separada.
 - **Auditoria de `source/blender`** ([relatório](relatorio-varredura-bugs-silenciosos.md)): os 26 itens têm
   correção ou descarte; falta só GPU-001, testar `gl_load()` numa sessão interativa já aberta.
 - **Auditoria do Cycles** ([relatório](relatorio-varredura-cycles.md)): CYC-001 a CYC-012 corrigidos; faltam as

@@ -182,16 +182,17 @@ class SCENE_PT_game_physics(SceneButtonsPanel, Panel):
             box.label(text="Speaker objects only; frames skipped between updates, 0 = every frame", icon='INFO')
 
 
-# Abas Network / RangeArmor / Web / Android no topo da aba Export Game: so estado da tela (WindowManager), nao vai para o .range.
+# Abas Desktop / Web / Android / Network no topo da aba Export Game: so estado da tela (WindowManager), nao vai
+# para o .range. 'RANGEARMOR' e o id antigo da aba Desktop (tutoriais e scripts usam), so o rotulo mudou.
 bpy.types.WindowManager.ae_export_panel_category = EnumProperty(
     name="Export Panels",
     items=(
-        ('NETWORK', "Network", "Room, ports and server for multiplayer", 'NETWORK', 0),
-        ('RANGEARMOR', "Export", "Desktop builds with RangeArmor", 'DESKTOP', 1),
+        ('RANGEARMOR', "Desktop", "Windows and Linux game, ready to share", 'DESKTOP', 1),
         ('WEB', "Web", "Package and touch controls for the Web runtime", 'WEB', 2),
         ('ANDROID', "Android", "App settings for the Android (Web) runtime", 'ANDROID', 3),
+        ('NETWORK', "Network", "Room, ports and server for multiplayer", 'NETWORK', 0),
     ),
-    default='NETWORK',
+    default='RANGEARMOR',
 )
 
 

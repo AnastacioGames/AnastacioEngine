@@ -47,15 +47,21 @@ def _config(context):
     import os
     from range_web import android
 
+    from .properties_scene import game_name, game_version, game_icon
+
     settings = context.scene.range_android
-    name = settings.app_name.strip() or os.path.splitext(os.path.basename(bpy.data.filepath))[0]
+    # Campos vazios do app herdam o bloco Game (nome, versao e icone comuns aos exports).
+    name = settings.app_name.strip() or game_name(context.scene)
+    icon = bpy.path.abspath(settings.icon) if settings.icon else game_icon(context.scene)
+    if icon and not icon.lower().endswith(".png"):
+        icon = ""
     config = dict(android.DEFAULTS)
     config.update({
         "applicationId": settings.application_id.strip(),
         "appName": name,
-        "versionName": settings.version_name.strip(),
+        "versionName": settings.version_name.strip() or game_version(context.scene),
         "versionCode": settings.version_code,
-        "icon": bpy.path.abspath(settings.icon) if settings.icon else "",
+        "icon": icon,
         "orientation": settings.orientation.lower(),
         "buildType": settings.build_type.lower(),
         "keystore": bpy.path.abspath(settings.keystore) if settings.keystore else "",
@@ -152,7 +158,7 @@ class RangeAndroidSettings(PropertyGroup):
     )
     app_name: bpy.props.StringProperty(
         name="App name",
-        description="Name shown under the icon on the phone; empty uses the file name",
+        description="Name shown under the icon on the phone; empty uses the name of the Game box",
         default="",
     )
     version_name: bpy.props.StringProperty(
@@ -167,7 +173,7 @@ class RangeAndroidSettings(PropertyGroup):
     )
     icon: bpy.props.StringProperty(
         name="App icon",
-        description="PNG image of the app icon (square, 512x512 recommended); empty uses the Android default",
+        description="PNG image of the app icon (square, 512x512 recommended); empty uses the icon of the Game box",
         subtype='FILE_PATH',
         default="",
     )
@@ -230,7 +236,6 @@ class SCENE_PT_range_android(SceneButtonsPanel, Panel):
     bl_label = "Android (Web)"
     bl_context = "export"
     COMPAT_ENGINES = {'BLENDER_GAME'}
-    bl_options = {'DEFAULT_CLOSED'}
 
     @classmethod
     def poll(cls, context):

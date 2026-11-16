@@ -1,6 +1,19 @@
 from pathlib import Path as _Path
 from json import loads as _loads
 
+# Export to Desktop: estes scripts ficam em <engine>/2.79/scripts/export_desktop/, com launcher/,
+# icons/ e tools/ ao lado. Na instalação antiga (painel RangeArmor) ficavam em
+# <engine>/rangearmor/release/scripts/, com os modelos uma pasta acima.
+HERE = _Path(__file__).resolve().parent
+TEMPLATES = HERE if (HERE / 'launcher').is_dir() else HERE.parent
+# Pasta do executável da engine: 3 níveis acima nos dois formatos.
+ENGINE_DIR = HERE.parents[2]
+
+
+def step(name):
+    """Marca de etapa lida pela janela Export to Desktop (o resto da saída é log)."""
+    print('@step ' + name, flush=True)
+
 
 def resolve_runtime(path):
     """Accept either standard desktop runtime name without changing custom paths."""

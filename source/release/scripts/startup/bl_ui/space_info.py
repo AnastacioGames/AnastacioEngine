@@ -268,11 +268,11 @@ class INFO_MT_file(Menu):
 
         layout.menu("INFO_MT_file_import", icon='IMPORT')
         layout.menu("INFO_MT_file_export", icon='EXPORT')
-        import sys
-        if sys.platform == "win32":
-            layout.operator("wm.export_with_rangearmor", text="Export Game With RANGEARMOR", icon='RANGEARMOR')
+        # Export to Desktop salva o arquivo protegido (.rasec) sozinho; wm.save_as_mainfile_protected
+        # continua existindo para scripts.
+        layout.operator_context = 'INVOKE_DEFAULT'
+        layout.operator("wm.export_to_desktop", text="Export to Desktop...", icon='DESKTOP')
         layout.operator_context = 'INVOKE_AREA'
-        layout.operator("wm.save_as_mainfile_protected", text="Save .Range Protected File", icon='RANGEARMOR').copy = True
 
         layout.separator(factor=1)
 

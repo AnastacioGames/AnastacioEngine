@@ -107,6 +107,24 @@ def validate_startup_scripts(package_dir: Path) -> None:
         )
 
 
+def validate_export_desktop(package_dir: Path) -> None:
+    """Export to Desktop vem dentro da engine (substitui o pacote RangeArmor à parte).
+
+    O Launcher.exe não fica no git: se o build/bin não o trouxer, vem do modelo compilado em
+    tools/rangearmor/release/launcher/ (fonte em tools/rangearmor/source/launcher)."""
+    pasta = package_dir / "2.79" / "scripts" / "export_desktop"
+    if not (pasta / "build_release.py").is_file():
+        raise RuntimeError(f"Export to Desktop ausente: {pasta}")
+    launcher = pasta / "launcher" / "Launcher.exe"
+    if not launcher.is_file():
+        modelo = ROOT / "tools" / "rangearmor" / "release" / "launcher" / "Launcher.exe"
+        if not modelo.is_file():
+            raise RuntimeError(f"Launcher.exe do jogo ausente (nem em {modelo})")
+        launcher.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(modelo, launcher)
+        print(f"Launcher do jogo copiado de {modelo}")
+
+
 def validate_ragdoll_scripts(package_dir: Path) -> None:
     """Ensure the bundled Anastacio Ragdoll addon and runtime travel together."""
     scripts = package_dir / "2.79" / "scripts"
@@ -183,6 +201,7 @@ def main() -> None:
     zip_path = DIST_DIR / f"{pkg_name}.zip"
     try:
         validate_startup_scripts(staging_dir)
+        validate_export_desktop(staging_dir)
         validate_ragdoll_scripts(staging_dir)
     except (OSError, SyntaxError, ValueError, RuntimeError) as ex:
         raise SystemExit(f"ERRO: {ex}")

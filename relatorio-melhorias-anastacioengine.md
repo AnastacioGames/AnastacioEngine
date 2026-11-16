@@ -69,7 +69,7 @@ procure por assunto com `grep -n "^## .*termo" docs/changelog*.md`.
 - **Jogo:** multiplayer nativo (ENet + WebSocket, servidor headless, predição, RPC) e complemento Steam no
   Windows, World Sound (Music/Ambient, chuva e trovão), VR no celular, deformação por impacto, ragdoll,
   veículos (controle arcade, Smart Component), idiomas do jogo (`Range.locale`), screencast, Start Asleep.
-- **Ferramentas:** Decimate High Quality, RangeArmor com cooking, pacote Universal, relatório de crash sem PDB.
+- **Ferramentas:** Decimate High Quality, Export to Desktop (ex-RangeArmor, 2026-11-16) com cooking, pacote Universal, relatório de crash sem PDB.
 - **Releases** 0.5.0 a 0.5.4.
 
 ### Novembro 2026

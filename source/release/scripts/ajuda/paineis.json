@@ -709,16 +709,28 @@
    "es": "Convierte el material a nodos en estilo PBR (más realista) o Classic, manteniendo las texturas que ya usa."
   }
  },
+ "SCENE_PT_game_info": {
+  "titulo": {
+   "pt": "Jogo",
+   "en": "Game",
+   "es": "Juego"
+  },
+  "texto": {
+   "pt": "Nome, versão e ícone do jogo. Valem para as exportações Desktop, Web e Android; no Android, os campos vazios do app usam estes.",
+   "en": "Name, version and icon of the game. Used by the Desktop, Web and Android exports; on Android, empty app fields use these.",
+   "es": "Nombre, versión e icono del juego. Valen para las exportaciones Desktop, Web y Android; en Android, los campos vacíos de la app usan estos."
+  }
+ },
  "SCENE_PT_rangearmor_export": {
   "titulo": {
    "pt": "Exportar para PC",
-   "en": "Export (RangeArmor)",
+   "en": "Export to Desktop",
    "es": "Exportar para PC"
   },
   "texto": {
-   "pt": "Gera o jogo para Windows e Linux. Preencha nome, versão e ícone em Package Info e clique em Export Game (1 Click); o arquivo precisa estar salvo na pasta data/ do projeto.",
-   "en": "Builds the game for Windows and Linux. Fill in name, version and icon under Package Info and click Export Game (1 Click); the file must be saved in the project's data/ folder.",
-   "es": "Genera el juego para Windows y Linux. Completa nombre, versión e icono en Package Info y haz clic en Export Game (1 Click); el archivo debe estar guardado en la carpeta data/ del proyecto."
+   "pt": "Gera o jogo para Windows e Linux, pronto para compartilhar. Clique em Exportar para PC... e siga os passos: nome, plataformas e exportar. A janela cria a pasta do projeto e protege os arquivos sozinha.",
+   "en": "Builds the game for Windows and Linux, ready to share. Click Export to Desktop... and follow the steps: name, platforms and export. The window creates the project folder and protects the files by itself.",
+   "es": "Genera el juego para Windows y Linux, listo para compartir. Haz clic en Exportar para PC... y sigue los pasos: nombre, plataformas y exportar. La ventana crea la carpeta del proyecto y protege los archivos sola."
   },
   "tutorial": "exportar_desktop"
  },

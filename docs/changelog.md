@@ -8,6 +8,30 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-16 — Export to Desktop substitui o painel RangeArmor
+
+- O painel RangeArmor (programa Rust à parte) só guardava caminhos e chamava os scripts Python; o nome sugeria
+  "blindagem", mas a proteção (`.rasec`) é da própria engine. Exigia baixar outro pacote, salvar o arquivo
+  protegido à mão e preencher três abas na ordem certa.
+- Janela nova **Export to Desktop** (`startup/range_export_desktop.py`, `wm.export_to_desktop`), no visual da
+  janela de Tutoriais: (Projeto) → Jogo → Plataformas → Exportando → Pronto. Cria a pasta `<Nome>/data/` quando o
+  arquivo não está num projeto, salva, gera o `.rasec` e o `config.json`, copia a engine (de novo quando a
+  instalada mudou) e roda `build_release.py` num processo à parte lido por thread (editor não trava). Etapas
+  pelas linhas `@step` da saída; Cancelar, Copiar log, Abrir pasta e Testar o jogo.
+- Scripts, ícones, Resource Hacker e o launcher do jogo foram de `tools/rangearmor/release/` para
+  `source/release/scripts/export_desktop/` (vão no pacote da engine; `Launcher.exe` continua fora do git e o
+  `stage_release_windows.py` o põe no pacote). Instalação antiga em `<bin>/rangearmor/release/` segue aceita.
+  Recompilação automática do launcher com cargo saiu.
+- `build_release.py` põe o ícone do jogo (`.ico`, Resource Hacker) nos `.exe` da entrega; o editor gera o `.ico`
+  (256/48/32/16 px) a partir de um PNG. Cópia da engine tenta renomear de novo por até 30 s: no Windows o
+  antivírus segura os `.exe` recém-copiados e o renome dava "Acesso negado".
+- Aba Export Game: abas Desktop / Web / Android / Network abrindo em Desktop; bloco único **Game** (nome, versão,
+  ícone; `Scene.range_game_info`) usado pelo Desktop e, nos campos vazios, pelo Android; arquivos antigos leem
+  `rangearmor_export.product_name/version`. Painéis Web e Android abrem expandidos. Opção "Make .zip to share".
+- Menu File: "Export to Desktop..." no lugar de "Export Game With RANGEARMOR" e "Save .Range Protected File"
+  (`wm.save_as_mainfile_protected` continua para scripts). "Export Game (1 Click)" virou "Export Now".
+- Tutorial `exportar_desktop` refeito para a janela (revisor: só o passo de plataformas pula sozinho, como antes).
+
 ## 2026-11-15 — Tutoriais: áreas vazias ou piscando no Linux com o cartão ligado
 
 - Diagnóstico: o desenho do cartão (`_desenhar` em `startup/range_tutorials.py`) terminava com
