@@ -243,6 +243,8 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   `surface_set_normal(n)` (n nesses eixos; sem chamada = normal do polígono), já na convenção do Normal Map
   (mundo com world space shading; senão view com o sinal do BI). Ligue Color e Normal num nó Material para a
   luz da cena.
+  `surface_set_position(p)` (2026-11-17): luzes e sombras do material passam a ser calculadas no ponto p
+  (nesses eixos) em vez do polígono, por exemplo no acerto do impostor atrás do card.
 - `in_<nome>(uv)` com nós antes da entrada (2026-11-11): a cadeia ligada (Image Texture, Mix, Mapping,
   Texture Coordinate só pela saída UV, valores) é rodada de novo na UV pedida, até 64 nós. Cadeia com
   normal, posição, outra camada de UV ou outro GLSL Script lê o valor do pixel atual e avisa no console.

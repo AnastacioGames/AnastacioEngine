@@ -975,6 +975,8 @@ static void codegen_call_node(DynStr *ds, GPUNode *node, bool uv_override)
 			else if (input->source == GPU_SOURCE_BUILTIN) {
 				if (input->builtin == GPU_VIEW_NORMAL)
 					BLI_dynstr_append(ds, "facingnormal");
+				else if (input->builtin == GPU_VIEW_POSITION)
+					BLI_dynstr_append(ds, "gpu_fragpos");
 				else
 					BLI_dynstr_append(ds, GPU_builtin_name(input->builtin));
 			}
@@ -1527,6 +1529,9 @@ static char *code_generate_fragment(ListBase *nodes, const char *usercode, const
 		BLI_dynstr_appendf(ds, "%s float varshelllayer;\n", GPU_CODEGEN_USE_MODERN_QUALIFIERS ? "in" : "varying");
 	}
 
+	/* View position read by the nodes (lights, shadows, view vector). A @surface script can move it
+	 * to the point it really draws (surface_set_position: impostor hit behind the card). */
+	BLI_dynstr_append(ds, "vec3 gpu_fragpos;\n#define GPU_FRAGPOS\n");
 	codegen_print_scripts(ds, nodes, scripts, GPU_NODE_STAGE_FRAGMENT);
 
 	if (usercode) {
@@ -1539,6 +1544,8 @@ static char *code_generate_fragment(ListBase *nodes, const char *usercode, const
 
 	BLI_dynstr_append(ds, "void main()\n{\n");
 
+	BLI_dynstr_append(ds, (builtins & GPU_VIEW_POSITION) ? "\tgpu_fragpos = varposition;\n" :
+	                                                       "\tgpu_fragpos = vec3(0.0);\n");
 	if (builtins & GPU_VIEW_NORMAL)
 		BLI_dynstr_append(ds, "\tvec3 facingnormal = gl_FrontFacing? varnormal: -varnormal;\n");
 

@@ -312,10 +312,13 @@ void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3d, Regi
 				mul_m4_m4m4(rv3d.persmat, rv3d.winmat, rv3d.viewmat);
 				invert_m4_m4(rv3d.persinv, rv3d.viewinv);
 
+				/* Depth pass too: Billboard/wind materials cast with their shader (draw_mesh_object). */
+				GPU_shadow_depth_pass_set(true);
 				ED_view3d_draw_offscreen(
 				            bmain, scene, v3d, &ar, viewport[2], viewport[3], viewmat, winmat,
 				            false, false, true,
 				            NULL, NULL, NULL, NULL);
+				GPU_shadow_depth_pass_set(false);
 				GPU_lamp_shadow_buffer_unbind(shadow->lamp);
 			}
 

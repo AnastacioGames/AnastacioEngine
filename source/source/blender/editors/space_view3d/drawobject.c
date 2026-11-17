@@ -4834,7 +4834,25 @@ static bool draw_mesh_object(Scene *scene, ARegion *ar, View3D *v3d, RegionView3
 		GPU_basic_shader_stipple(shad_alpha < 0.375f ? GPU_SHADER_STIPPLE_QUARTTONE : GPU_SHADER_STIPPLE_HALFTONE);
 		glEnable(GL_POLYGON_STIPPLE);
 	}
-	retval = draw_mesh_object_body(scene, ar, v3d, rv3d, base, dt, ob_wire_col, dflag);
+	/* Materials that move vertices (Billboard, wind) or cut themselves in the shader (impostor
+	 * discard) cast with their own GLSL shader, like the game's alpha shadow bucket
+	 * (KX_BlenderMaterial): the solid pass would draw the undeformed polygon. Depth maps only. */
+	bool shadow_glsl = false;
+	if ((v3d->flag2 & V3D_RENDER_SHADOW) && GPU_shadow_depth_pass_get() && !shadow_stipple) {
+		for (int i = 1; i <= ob->totcol && !shadow_glsl; ++i) {
+			Material *ma = give_current_material(ob, i);
+			shadow_glsl = ma && GPU_material_moves_vertices(ma);
+		}
+	}
+	if (shadow_glsl) {
+		const char drawtype = v3d->drawtype;
+		v3d->drawtype = OB_MATERIAL;
+		retval = draw_mesh_object_body(scene, ar, v3d, rv3d, base, OB_MATERIAL, ob_wire_col, dflag);
+		v3d->drawtype = drawtype;
+	}
+	else {
+		retval = draw_mesh_object_body(scene, ar, v3d, rv3d, base, dt, ob_wire_col, dflag);
+	}
 	if (shadow_stipple) {
 		glDisable(GL_POLYGON_STIPPLE);
 	}

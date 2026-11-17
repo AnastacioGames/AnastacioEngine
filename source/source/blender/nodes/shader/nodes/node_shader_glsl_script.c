@@ -750,7 +750,15 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		                      "0.0, 1.0); }\n"
 		                      /* @output_normal: a normal in the surface axes; zero keeps the polygon's. */
 		                      "vec3 script_surf_out_nor = vec3(0.0);\n"
-		                      "void surface_set_normal(vec3 n) { script_surf_out_nor = n; }\n");
+		                      "void surface_set_normal(vec3 n) { script_surf_out_nor = n; }\n"
+		                      /* Point (surface axes, meters) the lights and shadows use instead of the
+		                       * polygon's: gpu_fragpos of the fragment shader (gpu_codegen.c). */
+		                      "#ifdef GPU_FRAGPOS\n"
+		                      "void surface_set_position(vec3 p) { gpu_fragpos = (script_surf_lv * "
+		                      "vec4(p / max(script_surf_sc, vec3(1e-8)), 1.0)).xyz; }\n"
+		                      "#else\n"
+		                      "void surface_set_position(vec3 p) { }\n"
+		                      "#endif\n");
 	}
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];

@@ -150,6 +150,7 @@ vec4 node(vec2 uv)
             nb = normalize((tu * tn.x + tv * tn.y) * params.detail_strength + nb * max(tn.z, 0.0));
         }
         surface_set_normal(nb);
+        surface_set_position(q);
         gl_FragDepth = surface_depth(q);
         return vec4(imp_srgb_to_linear(clamp(c.rgb, 0.0, 1.0)), 1.0);
     }
@@ -214,5 +215,7 @@ vec4 node(vec2 uv)
     gl_FragDepth = surface_depth(q);
     // Baked normal (object axes) for the scene lights: Normal output -> Material node.
     surface_set_normal(nsum);
+    // Lights and shadows at the hit too, not on the card plane in the middle of the cube.
+    surface_set_position(q);
     return vec4(imp_srgb_to_linear(clamp(sum / max(wsum, 1e-6), 0.0, 1.0)), 1.0);
 }
