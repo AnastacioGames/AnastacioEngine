@@ -3,6 +3,7 @@
 // @description Impostor de Caixa: desenha o objeto assado em 6 vistas (Bake Box Impostor) num card virado para a câmera, com volume por parallax. Ligue o nó Billboard (Lock Axis 0) no Vertex Offset.
 // @output color
 // @surface
+// @output_normal
 // @param color: image
 // @param data: image
 // @param extent: float(0.0001, 10000) = 1
@@ -116,10 +117,12 @@ vec4 node(vec2 uv)
         vec3 q = p + dir * b_in;
         int k = (bn.x >= bn.y && bn.x >= bn.z) ? views.x : (bn.y >= bn.z) ? views.y : views.z;
         float dq;
-        vec4 c = img_color_lod(imp_uv(k, q, ext, margin, dq), 0.0);
+        vec2 st_box = imp_uv(k, q, ext, margin, dq);
+        vec4 c = img_color_lod(st_box, 0.0);
         if (c.a < 0.5) {
             discard;
         }
+        surface_set_normal(img_data_lod(st_box, 0.0).rgb * 2.0 - 1.0);
         gl_FragDepth = surface_depth(q);
         return vec4(imp_srgb_to_linear(clamp(c.rgb, 0.0, 1.0)), 1.0);
     }
@@ -166,6 +169,7 @@ vec4 node(vec2 uv)
         e_min = min(e_min, err[i]);
     }
     vec3 sum = vec3(0.0);
+    vec3 nsum = vec3(0.0);
     float wsum = 0.0;
     for (int i = 0; i < 3; i++) {
         int k = (i == 0) ? views.x : (i == 1) ? views.y : views.z;
@@ -176,9 +180,12 @@ vec4 node(vec2 uv)
         vec4 c = img_color_lod(st, 0.0);
         float w = (0.05 + max(dot(n, -dir), 0.0)) * max(0.0, 1.0 - (err[i] - e_min) / 0.02);
         sum += c.rgb * w;
+        nsum += (img_data_lod(st, 0.0).rgb * 2.0 - 1.0) * w;
         wsum += w;
     }
     // Depth of the hit, not of the card plane: objects crossing the impostor cut its real shape.
     gl_FragDepth = surface_depth(q);
+    // Baked normal (object axes) for the scene lights: Normal output -> Material node.
+    surface_set_normal(nsum);
     return vec4(imp_srgb_to_linear(clamp(sum / max(wsum, 1e-6), 0.0, 1.0)), 1.0);
 }

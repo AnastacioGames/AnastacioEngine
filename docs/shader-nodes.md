@@ -239,6 +239,10 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   ([plano-imposter-caixa.md](plano-imposter-caixa.md)).
   `surface_depth(p)` (2026-11-17) dá a profundidade de janela de um ponto nesses eixos, para escrever
   `gl_FragDepth` de um acerto por raio (escreva em todo caminho que não dá `discard`).
+  `// @output_normal` (2026-11-17, só com `@surface` e saída color): segunda saída **Normal**, definida por
+  `surface_set_normal(n)` (n nesses eixos; sem chamada = normal do polígono), já na convenção do Normal Map
+  (mundo com world space shading; senão view com o sinal do BI). Ligue Color e Normal num nó Material para a
+  luz da cena.
 - `in_<nome>(uv)` com nós antes da entrada (2026-11-11): a cadeia ligada (Image Texture, Mix, Mapping,
   Texture Coordinate só pela saída UV, valores) é rodada de novo na UV pedida, até 64 nós. Cadeia com
   normal, posição, outra camada de UV ou outro GLSL Script lê o valor do pixel atual e avisa no console.

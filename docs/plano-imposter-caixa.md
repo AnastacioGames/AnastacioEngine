@@ -67,7 +67,9 @@ caixotes, prédios). O bake liga sozinho quando >= 95% de cada face da bbox tem 
 (`_box_fill`, guardado em `card["box_impostor_fill"]`); furos de 1 texel somem na dilatação.
 Profundidade do acerto feita (`surface_depth` + `gl_FragDepth`, aguardando aceite): objetos que
 atravessam o impostor cortam a forma real (desliga o early-Z só desse material).
-Falta: normal para a luz, botão na UI.
+Luz feita (aguardando aceite): `@output_normal` no nó GLSL, normal assada → nó Material (material do
+card com difuso branco 1.0, sem specular), então sol/luzes da cena sombreiam o impostor.
+Falta: botão na UI.
 
 1. **C (pequeno):** `@surface` ganha `surface(uv).view` = direção câmera → pixel no espaço do
    objeto (em metros, mesma convenção de `position`), calculada no wrapper a partir de `scr_slv`

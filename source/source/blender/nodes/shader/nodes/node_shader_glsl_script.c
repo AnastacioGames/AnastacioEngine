@@ -327,6 +327,9 @@ typedef struct HeaderInfo {
 	bool shading;
 	/* "// @surface": the script also gets the object position and normal (surface(), triplanar_<image>()). */
 	bool surface;
+	/* "// @output_normal" (with @surface): second output Normal, set by surface_set_normal(), in the
+	 * convention of the Material node's Normal input, so the scene lights shade the result. */
+	bool output_normal;
 	/* Image params in header order, and which of them have an image (only those are bound). */
 	char images[HEADER_MAX_IMAGES][48];
 	int totimage;
@@ -599,7 +602,7 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 {
 	HeaderEntry entries[HEADER_MAX_ENTRIES];
 	int tot = 0, totin = 0, totparam = 0, line = 0;
-	bool has_output = false, has_shading = false, has_surface = false;
+	bool has_output = false, has_shading = false, has_surface = false, has_out_normal = false;
 
 	memset(info, 0, sizeof(*info));
 	*r_broken = false;
@@ -622,7 +625,10 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		}
 		s = header_space(s + 2);
 		const char *rest;
-		if ((rest = header_tag(s, "output"))) {
+		if (header_tag(s, "output_normal")) {
+			has_out_normal = true;
+		}
+		else if ((rest = header_tag(s, "output"))) {
 			has_output = true;
 			info->output_gray = STREQLEN(rest, "gray", 4);
 			if (!info->output_gray && !STREQLEN(rest, "color", 5)) {
@@ -692,6 +698,10 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		header_error(node, 1, "use @surface or @shading, not both");
 		*r_broken = true;
 	}
+	if (has_out_normal && (!has_surface || info->output_gray)) {
+		header_error(node, 1, "@output_normal needs @surface and a color output");
+		*r_broken = true;
+	}
 	if (has_shading) {
 		for (int i = 0; i < tot; i++) {
 			for (int f = 0; f < SHADE_TOT; f++) {
@@ -723,6 +733,7 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 	}
 	info->shading = has_shading;
 	info->surface = has_surface;
+	info->output_normal = has_out_normal && !info->output_gray;
 	if (has_surface) {
 		/* Filled by the wrapper: position and normal of this fragment in object space. */
 		BLI_dynstr_append(ds, "vec3 script_surf_pos; vec3 script_surf_nor; vec3 script_surf_view;\n"
@@ -736,7 +747,10 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		                      "float surface_depth(vec3 p) { vec4 c = gl_ProjectionMatrix * (script_surf_lv * "
 		                      "vec4(p / max(script_surf_sc, vec3(1e-8)), 1.0)); "
 		                      "return clamp(gl_DepthRange.near + ((c.z / c.w) * 0.5 + 0.5) * gl_DepthRange.diff, "
-		                      "0.0, 1.0); }\n");
+		                      "0.0, 1.0); }\n"
+		                      /* @output_normal: a normal in the surface axes; zero keeps the polygon's. */
+		                      "vec3 script_surf_out_nor = vec3(0.0);\n"
+		                      "void surface_set_normal(vec3 n) { script_surf_out_nor = n; }\n");
 	}
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];
@@ -902,6 +916,9 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		BLI_dynstr_append(ds, "void main(vec3 UV, out vec4 Albedo, out vec3 Normal, out float Roughness, "
 		                      "out float Metallic, out vec4 Emission, out float Alpha)\n{\n");
 	}
+	else if (info->output_normal) {
+		BLI_dynstr_append(ds, "void main(vec3 UV, out vec4 Color, out vec3 Normal)\n{\n");
+	}
 	else {
 		BLI_dynstr_appendf(ds, "void main(vec3 UV, out %s)\n{\n", info->output_gray ? "float Value" : "vec4 Color");
 	}
@@ -923,6 +940,14 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		                  "\tNormal = (dot(c.normal, c.normal) > 1e-12) ? normalize(c.normal) : u_normal;\n"
 		                  "\tRoughness = c.roughness; Metallic = c.metallic;\n"
 		                  "\tEmission = vec4(c.emission, 1.0); Alpha = c.alpha;\n}\n");
+	}
+	else if (info->output_normal) {
+		/* Surface axes (meters) -> view: the loc-to-view columns carry the object scale. Turned to the
+		 * Material node's convention in the GPU callback. */
+		BLI_dynstr_append(ds, "\tColor = node(UV.xy);\n"
+		                      "\tvec3 n = (dot(script_surf_out_nor, script_surf_out_nor) > 1e-12) ? "
+		                      "script_surf_out_nor : script_surf_nor;\n"
+		                      "\tNormal = normalize(mat3(script_surf_lv) * (n / max(script_surf_sc, vec3(1e-8))));\n}\n");
 	}
 	else {
 		BLI_dynstr_append(ds, info->output_gray ? "\tValue = node(UV.xy).r;\n}\n" : "\tColor = node(UV.xy);\n}\n");
@@ -1405,6 +1430,17 @@ static int node_shader_gpu_glsl_script(GPUMaterial *mat, bNode *node, bNodeExecD
 		ok = GPU_link_script(mat, code, wrapper, in, out, uniform_names, use_time, node->name, images, totimage,
 		                     extras, extra_types, surface ? 3 : 0);
 		MEM_freeN(wrapper);
+		/* @output_normal: view normal -> the Normal Map convention (world with world space shading;
+		 * negated view otherwise), what the Material node's Normal input expects. */
+		if (ok && info.output_normal && sockout > 1 && out[1].link) {
+			if (GPU_material_use_world_space_shading(mat)) {
+				GPU_link(mat, "direction_transform_m4v3", out[1].link,
+				         GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX), &out[1].link);
+			}
+			else {
+				GPU_link(mat, "vec_math_negate", out[1].link, &out[1].link);
+			}
+		}
 	}
 	MEM_SAFE_FREE(code);
 	return ok;

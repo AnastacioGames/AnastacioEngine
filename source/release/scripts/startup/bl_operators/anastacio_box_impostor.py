@@ -382,7 +382,19 @@ def _card_material(card, ob, color, data, half, hb, box_mode):
     bill = tree.nodes.new("ShaderNodeBillboard")
     bill.location = (0, -200)
     bill.inputs["Lock Axis"].default_value = 0.0
-    tree.links.new(script.outputs["Color"], out.inputs["Color"])
+    # Lit by the scene: baked albedo + baked normal into a Material node (the material's own settings:
+    # white diffuse at full intensity, no specular, so the albedo comes through unchanged).
+    mat.diffuse_color = (1.0, 1.0, 1.0)
+    mat.diffuse_intensity = 1.0
+    mat.specular_intensity = 0.0
+    shade = tree.nodes.new("ShaderNodeMaterial")
+    shade.location = (150, 100)
+    shade.material = mat
+    tree.links.new(script.outputs["Color"], shade.inputs["Color"])
+    if "Normal" in script.outputs:
+        tree.links.new(script.outputs["Normal"], shade.inputs["Normal"])
+    tree.links.new(shade.outputs["Color"], out.inputs["Color"])
+    out.location = (450, 0)
     tree.links.new(bill.outputs[0], out.inputs["Vertex Offset"])
     mat.game_settings.use_backface_culling = False
     card.data.materials.clear()

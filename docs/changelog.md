@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa: luz da cena
+
+- Nodes GLSL: `// @output_normal` (com `@surface`) dá a saída Normal via `surface_set_normal(n)`.
+- `box_impostor.glsl` passa a normal assada; o bake liga Color + Normal num nó Material → o impostor
+  recebe sol e luzes como o objeto real.
+
 ## 2026-11-17 — Impostor de Caixa: profundidade do acerto
 
 - Nodes GLSL `@surface`: `surface_depth(p)` (profundidade de janela, respeita `gl_DepthRange`).
