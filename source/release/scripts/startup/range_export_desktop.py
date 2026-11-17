@@ -72,9 +72,10 @@ T = {
     "falta_nome": {"pt": "Escreva o nome do jogo.", "en": "Type the game name.", "es": "Escribe el nombre del juego."},
     # Plataformas
     "plat_t": {"pt": "Para quais computadores?", "en": "For which computers?", "es": "¿Para qué computadoras?"},
-    "win_d": {"pt": "Pasta com o .exe do jogo.", "en": "Folder with the game .exe.", "es": "Carpeta con el .exe del juego."},
-    "lin_d": {"pt": "Pasta com o executável Linux.", "en": "Folder with the Linux executable.",
-              "es": "Carpeta con el ejecutable Linux."},
+    "win_d": {"pt": "64 bits. Pasta com o .exe do jogo.", "en": "64-bit. Folder with the game .exe.",
+              "es": "64 bits. Carpeta con el .exe del juego."},
+    "lin_d": {"pt": "64 bits. Pasta com o executável Linux.", "en": "64-bit. Folder with the Linux executable.",
+              "es": "64 bits. Carpeta con el ejecutable Linux."},
     "sem_rt": {"pt": "Engine desta plataforma não encontrada.", "en": "Engine for this platform not found.",
                "es": "Engine de esta plataforma no encontrada."},
     "ligado": {"pt": "Incluído", "en": "Included", "es": "Incluido"},
