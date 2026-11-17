@@ -61,6 +61,10 @@ esférico → Vertex Offset). Decisões do teste: marcha só com as 3 vistas vol
 partes finas como a orelha viram lâminas e os passos pulam); profundidade lida no texel mais próximo e
 dilatada 1 texel no bake, cor espalhada para os texels transparentes; leituras com `img_<nome>_lod`
 (mipmap em laço com break dava linhas); 32 passos padrão. Card fora do Auto Static Batch (Billboard).
+Etapa 3b (modo Box) feita, aguardando aceite: param `box_mode` + `box_x/y/z` (meias-medidas da
+bbox); o raio acerta a bbox real e lê 1 vez a cor da face de entrada (objetos que preenchem a caixa:
+caixotes, prédios). O bake liga sozinho quando >= 95% de cada face da bbox tem a profundidade da face
+(`_box_fill`, guardado em `card["box_impostor_fill"]`); furos de 1 texel somem na dilatação.
 Falta: escrever a profundidade do acerto (hoje vale a do plano do card, objetos atravessando o card se
 cruzam errado), normal para a luz, botão na UI.
 

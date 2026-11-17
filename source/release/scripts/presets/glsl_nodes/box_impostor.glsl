@@ -7,6 +7,10 @@
 // @param data: image
 // @param extent: float(0.0001, 10000) = 1
 // @param steps: int(1, 32) = 32
+// @param box_mode: int(0, 1) = 0
+// @param box_x: float(0.0001, 10000) = 1
+// @param box_y: float(0.0001, 10000) = 1
+// @param box_z: float(0.0001, 10000) = 1
 
 // docs/plano-imposter-caixa.md. Atlas 3x2 do bake (anastacio_box_impostor.py): vista k na coluna
 // k % 3, linha k / 3; 0 +X, 1 -X, 2 +Y, 3 -Y, 4 +Z, 5 -Z. "data": RGB = normal, A = profundidade a
@@ -96,6 +100,29 @@ vec4 node(vec2 uv)
 
     // The view on the camera's side of each axis.
     ivec3 views = ivec3(dir.x < 0.0 ? 0 : 1, dir.y < 0.0 ? 2 : 3, dir.z < 0.0 ? 4 : 5);
+    // Box mode (objects that fill their bounding box: crates, buildings): the entry point on the box
+    // (half sizes box_x/y/z, centered like the cube) is already the surface; one read from the view of
+    // the face the ray enters through.
+    if (params.box_mode != 0) {
+        vec3 h = min(vec3(params.box_x, params.box_y, params.box_z), vec3(ext));
+        vec3 b0 = (-h - p) / d;
+        vec3 b1 = (h - p) / d;
+        vec3 bn = min(b0, b1);
+        vec3 bf = max(b0, b1);
+        float b_in = max(max(bn.x, bn.y), bn.z);
+        if (b_in >= min(min(bf.x, bf.y), bf.z)) {
+            discard;
+        }
+        vec3 q = p + dir * b_in;
+        int k = (bn.x >= bn.y && bn.x >= bn.z) ? views.x : (bn.y >= bn.z) ? views.y : views.z;
+        float dq;
+        vec4 c = img_color_lod(imp_uv(k, q, ext, margin, dq), 0.0);
+        if (c.a < 0.5) {
+            discard;
+        }
+        return vec4(imp_srgb_to_linear(clamp(c.rgb, 0.0, 1.0)), 1.0);
+    }
+
     int n_steps = clamp(params.steps, 1, 32);
     float dt = (t_out - t_in) / float(n_steps);
     float t_prev = t_in;

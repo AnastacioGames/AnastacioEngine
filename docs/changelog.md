@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa, etapa 3b: modo Box
+
+- `box_impostor.glsl`: `box_mode` + `box_x/y/z`; acerto direto na bbox real, 1 leitura de cor por pixel.
+- Bake mede quanto o objeto preenche a bbox (`_box_fill`) e liga o modo Box sozinho (>= 0.95).
+- Cena de teste: `montar_caixa()` em `tools/debug/cenas/criar_cena_box_impostor.py`.
+
 ## 2026-11-17 — Impostor de Caixa, etapa 3: nó do parallax
 
 - Nó GLSL `presets/glsl_nodes/box_impostor.glsl` (Library > Impostor): marcha o raio do olho pela caixa

@@ -122,6 +122,42 @@ def bake_data(ob, res):
     return atlas, center, half
 
 
+def _box_halves(ob):
+    """Half sizes of the bounding box in meters (centered like the cube)."""
+    sca = ob.matrix_world.decompose()[2]
+    pts = [Vector((c[0] * sca.x, c[1] * sca.y, c[2] * sca.z)) for c in ob.bound_box]
+    return Vector((max(max(p[i] for p in pts) - min(p[i] for p in pts), 0.0) * 0.5 for i in range(3)))
+
+
+def _box_fill(atlas, res, half, hb):
+    """Smallest fraction, over the 6 views, of the bounding-box face that the object covers right at
+    that face (the stored depth is the box face's). 1.0 = a solid box: the Box mode of the node is
+    exact for it."""
+    worst = 1.0
+    tol = 2.0 / res + 0.01
+    for i, (n, u, v) in enumerate(VIEWS):
+        an = [abs(c) for c in n].index(1)
+        au = [abs(c) for c in u].index(1)
+        av = [abs(c) for c in v].index(1)
+        expected = (half - hb[an]) / (2.0 * half)
+        x0, y0 = (i % COLS) * res, (i // COLS) * res
+        inside = good = 0
+        for py in range(res):
+            fv = (2.0 * (py + 0.5) / res - 1.0) * half
+            if abs(fv) > hb[av] * 0.97:
+                continue
+            for px in range(res):
+                fu = (2.0 * (px + 0.5) / res - 1.0) * half
+                if abs(fu) > hb[au] * 0.97:
+                    continue
+                inside += 1
+                if abs(atlas[y0 + py, x0 + px, 3] - expected) <= tol:
+                    good += 1
+        if inside:
+            worst = min(worst, good / inside)
+    return worst
+
+
 def _dilate_depth(cell):
     """Depth = min of the 3x3 neighbours, inside one cell (in place). The shader keeps a point only
     when it is behind the surface in all 6 views; one texel of slack there closes the cracks that
@@ -318,7 +354,7 @@ def _impostor_text():
     return text
 
 
-def _card_material(card, ob, color, data, half):
+def _card_material(card, ob, color, data, half, hb, box_mode):
     """Box Impostor node -> Output Color, Billboard (spherical) -> Vertex Offset."""
     text = _impostor_text()
     if text is None:
@@ -339,6 +375,10 @@ def _card_material(card, ob, color, data, half):
     script["img_data"] = data
     tree.interface_update(bpy.context)
     script.inputs["Extent"].default_value = half
+    script.inputs["Box Mode"].default_value = 1 if box_mode else 0
+    script.inputs["Box X"].default_value = max(hb.x, 1e-4)
+    script.inputs["Box Y"].default_value = max(hb.y, 1e-4)
+    script.inputs["Box Z"].default_value = max(hb.z, 1e-4)
     bill = tree.nodes.new("ShaderNodeBillboard")
     bill.location = (0, -200)
     bill.inputs["Lock Axis"].default_value = 0.0
@@ -381,9 +421,14 @@ class OBJECT_OT_bake_box_impostor(Operator):
         color_img = _store_image(ob.name + "_imp_color", color, False)
         data_img = _store_image(ob.name + "_imp_data", data, True)
         card = _card(ob, center, half)
-        if _card_material(card, ob, color_img, data_img, half) is None:
+        hb = _box_halves(ob)
+        fill = _box_fill(data, res, half, hb)
+        box_mode = fill >= 0.95
+        card["box_impostor_fill"] = fill
+        if _card_material(card, ob, color_img, data_img, half, hb, box_mode) is None:
             self.report({'WARNING'}, "box_impostor.glsl not found: the card has no material")
-        self.report({'INFO'}, "Box Impostor: %s, %d px per view, %.1f s" % (card.name, res, time.time() - t0))
+        self.report({'INFO'}, "Box Impostor: %s, %d px per view, %s mode, %.1f s" % (
+            card.name, res, "Box" if box_mode else "Volume", time.time() - t0))
         return {'FINISHED'}
 
 
