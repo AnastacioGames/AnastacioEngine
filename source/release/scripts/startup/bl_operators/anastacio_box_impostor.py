@@ -502,7 +502,13 @@ def _card(ob, center, half, box_mode=False):
     else:
         pts = [Vector((v.co.x * sca.x, v.co.y * sca.y, v.co.z * sca.z)) for v in ob.data.vertices]
     r = max((p - center).length for p in pts) * 1.04 / smin
-    verts = [(-r, 0.0, -r), (r, 0.0, -r), (r, 0.0, r), (-r, 0.0, r)]
+    # The engine culls by the mesh's bounding box, and the material moves the card to the cube center
+    # and turns it in any direction: a zero-area triangle (collinear, draws nothing) stretches the box to
+    # the sphere's box around the center, so the card never goes out early at the screen edge.
+    c = Vector((center.x / max(abs(sca.x), 1e-6), center.y / max(abs(sca.y), 1e-6),
+                center.z / max(abs(sca.z), 1e-6)))
+    verts = [(-r, 0.0, -r), (r, 0.0, -r), (r, 0.0, r), (-r, 0.0, r),
+             tuple(c - Vector((r, r, r))), tuple(c + Vector((r, r, r))), tuple(c)]
     me = bpy.data.meshes.new(name)
     card = bpy.data.objects.get(name)
     if card is not None and card.type == 'MESH':
@@ -515,7 +521,7 @@ def _card(ob, center, half, box_mode=False):
     else:
         card = bpy.data.objects.new(name, me)
         bpy.context.scene.objects.link(card)
-    me.from_pydata(verts, [], [(0, 1, 2, 3)])
+    me.from_pydata(verts, [], [(0, 1, 2, 3), (4, 5, 6)])
     me.update()
     card.matrix_world = ob.matrix_world.copy()
     card["box_impostor_half"] = half
