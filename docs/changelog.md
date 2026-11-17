@@ -8,6 +8,18 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Nó GLSL `@surface`: `surface(uv).view` (Impostor de Caixa, Etapa 1)
+
+- Plano novo em [plano-imposter-caixa.md](plano-imposter-caixa.md): impostor com 6 vistas assadas
+  (cor, normal, profundidade) e parallax num nó GLSL, revisado pelo Codex.
+- `node_shader_glsl_script.c`: `Surface` ganha `view`, a direção câmera → pixel nos eixos do objeto
+  (mesma convenção em metros de `position`), calculada no wrapper a partir de `GPU_LOC_TO_VIEW_MATRIX`,
+  sem builtin novo. Perspectiva: câmera = `-(c_i·t)/s_i`; ortográfica (`gl_ProjectionMatrix[3][3] != 0`):
+  `-c_i.z/s_i`. Usa a posição já deslocada pelo Vertex Offset (Billboard). Supõe eixos sem cisalhamento.
+- Teste: `tools/debug/cenas/criar_cena_surface_view.py` no editor invisível (`controle.py`), modo
+  Material pela câmera. Perspectiva: degradê esperado (centro (0.5,0.5,0) com o plano girado 90° em X,
+  mais vermelho à direita, mais verde em cima). Ortográfica: cor uniforme. Runtime e Web não testados.
+
 ## 2026-11-16 — Export to Desktop substitui o painel RangeArmor
 
 - O painel RangeArmor (programa Rust à parte) só guardava caminhos e chamava os scripts Python; o nome sugeria

@@ -725,10 +725,10 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 	info->surface = has_surface;
 	if (has_surface) {
 		/* Filled by the wrapper: position and normal of this fragment in object space. */
-		BLI_dynstr_append(ds, "vec3 script_surf_pos; vec3 script_surf_nor;\n"
-		                      "struct Surface { vec3 position; vec3 normal; };\n"
+		BLI_dynstr_append(ds, "vec3 script_surf_pos; vec3 script_surf_nor; vec3 script_surf_view;\n"
+		                      "struct Surface { vec3 position; vec3 normal; vec3 view; };\n"
 		                      "Surface surface(vec2 uv) { Surface s; s.position = script_surf_pos; "
-		                      "s.normal = script_surf_nor; return s; }\n"
+		                      "s.normal = script_surf_nor; s.view = script_surf_view; return s; }\n"
 		                      "float covered(vec2 uv) { return 1.0; }\n");
 	}
 	for (int i = 0; i < tot; i++) {
@@ -1245,6 +1245,17 @@ static char *script_wrapper(const ScriptParam *params, int tot, bool use_time, i
 		                      "dot(scr_slv[2].xyz, scr_snor)) / max(scr_ssc, vec3(1e-8));\n"
 		                      "\tscript_surf_nor = (dot(scr_sn, scr_sn) > 1e-12) ? normalize(scr_sn) : "
 		                      "vec3(0.0, 0.0, 1.0);\n");
+		/* View ray (camera -> fragment) in the same axes. With orthogonal axes the camera (view
+		 * origin) in meters is -(c_i . t) / s_i, c_i = loc-to-view column i, t = its translation;
+		 * an orthographic camera looks down view -Z, i.e. -c_i.z / s_i. Works with vertex offsets
+		 * (Billboard): scr_spos is the displaced position. */
+		BLI_dynstr_append(ds, "\tvec3 scr_st = scr_slv[3].xyz;\n"
+		                      "\tvec3 scr_sv = (gl_ProjectionMatrix[3][3] == 0.0) ?\n"
+		                      "\t\tscript_surf_pos + vec3(dot(scr_slv[0].xyz, scr_st), dot(scr_slv[1].xyz, scr_st), "
+		                      "dot(scr_slv[2].xyz, scr_st)) / max(scr_ssc, vec3(1e-8)) :\n"
+		                      "\t\t-vec3(scr_slv[0].z, scr_slv[1].z, scr_slv[2].z) / max(scr_ssc, vec3(1e-8));\n"
+		                      "\tscript_surf_view = (dot(scr_sv, scr_sv) > 1e-12) ? normalize(scr_sv) : "
+		                      "vec3(0.0, 0.0, -1.0);\n");
 	}
 
 	/* Uniforms first, then the call. */

@@ -233,6 +233,9 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
 - `@surface` (2026-11-11): `surface(uv)` dá posição e normal do objeto (em metros, com a escala do
   objeto), `covered(uv)` devolve 1 e cada `@param` image ganha `triplanar_<nome>(escala)`, sem espelhar
   faces opostas. Não combina com `@shading`. Exemplo: `presets/glsl_nodes/triplanar.glsl`.
+  `surface(uv).view` (2026-11-17) é a direção normalizada câmera → pixel nos mesmos eixos (perspectiva
+  ou ortográfica, com Vertex Offset incluído), para parallax e impostores
+  ([plano-imposter-caixa.md](plano-imposter-caixa.md)).
 - `in_<nome>(uv)` com nós antes da entrada (2026-11-11): a cadeia ligada (Image Texture, Mix, Mapping,
   Texture Coordinate só pela saída UV, valores) é rodada de novo na UV pedida, até 64 nós. Cadeia com
   normal, posição, outra camada de UV ou outro GLSL Script lê o valor do pixel atual e avisa no console.
