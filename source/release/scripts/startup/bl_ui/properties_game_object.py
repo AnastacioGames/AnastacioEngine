@@ -1015,107 +1015,112 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         ob = context.object
         gs = context.scene.game_settings
 
-        wm = context.window_manager
-        levels = [(i, l) for i, l in enumerate(ob.lod_levels) if i > 0]
-
-        # 1. Levels: the meshes and distances.
-        box = _lod_section(layout, wm, "lod_show_levels", "Levels", 'MOD_DECIM')
-        if box:
-            box.prop(ob, "lod_factor", text="Distance Factor")
-            box.prop(ob, "use_lod_physics", text="Physics Update")
-            for i, level in levels:
-                sub = box.box()
-                row = sub.row(align=True)
-                row.prop(level, "object", text="")
-                row.prop(level, "use_invisible_mesh", text="")
-                row.operator("object.lod_remove", text="", icon='PANEL_CLOSE').index = i
-                row = sub.row()
-                row.prop(level, "distance")
-                row = row.row(align=True)
-                row.prop(level, "use_mesh", text="")
-                row.prop(level, "use_material", text="")
-                row = sub.row()
-                row.active = gs.use_scene_hysteresis
-                row.prop(level, "use_object_hysteresis", text="Hysteresis Override")
-                row = sub.row()
-                row.active = gs.use_scene_hysteresis and level.use_object_hysteresis
-                row.prop(level, "object_hysteresis_percentage", text="")
+        col = layout.column()
+        col.prop(ob, "lod_factor", text="Distance Factor")
+        col.prop(ob, "use_lod_physics", text="Physics Update")
+        for i, level in _lod_levels(ob):
+            box = col.box()
             row = box.row(align=True)
-            row.operator("object.lod_add", text="Add", icon='ZOOMIN')
-            row.menu("OBJECT_MT_lod_tools", text="", icon='TRIA_DOWN')
+            row.prop(level, "object", text="")
+            row.prop(level, "use_invisible_mesh", text="")
+            row.operator("object.lod_remove", text="", icon='PANEL_CLOSE').index = i
+            row = box.row()
+            row.prop(level, "distance")
+            row = row.row(align=True)
+            row.prop(level, "use_mesh", text="")
+            row.prop(level, "use_material", text="")
+            row = box.row()
+            row.active = gs.use_scene_hysteresis
+            row.prop(level, "use_object_hysteresis", text="Hysteresis Override")
+            row = box.row()
+            row.active = gs.use_scene_hysteresis and level.use_object_hysteresis
+            row.prop(level, "object_hysteresis_percentage", text="")
+        row = col.row(align=True)
+        row.operator("object.lod_add", text="Add", icon='ZOOMIN')
+        row.menu("OBJECT_MT_lod_tools", text="", icon='TRIA_DOWN')
 
-        # 2. Flat Impostor: a level's quad turns around Z to face the camera (cheap; trees).
-        box = _lod_section(layout, wm, "lod_show_flat", "Flat Impostor (Billboard)", 'IMAGE_DATA')
-        if box:
-            if not levels:
-                box.label(text="Add a level first", icon='INFO')
-            for i, level in levels:
-                sub = box.box()
-                row = sub.row()
-                row.active = level.use_mesh
-                name = level.object.name if level.object else "Level %d" % i
-                row.prop(level, "use_billboard", text=name)
-                if not level.use_billboard:
-                    continue
-                sub.prop(level, "use_atlas", text="Multi-Angle Atlas")
-                if level.use_atlas:
-                    row = sub.row(align=True)
-                    row.prop(context.scene, "lod_impostor_bake_angles", text="Angles")
-                    row = sub.row(align=True)
-                    row.enabled = False
-                    row.prop(level, "atlas_columns", text="Columns")
-                    row.prop(level, "atlas_rows", text="Rows")
-                row = sub.row(align=True)
-                row.operator("object.bake_lod_impostor", text="Bake Impostor Texture", icon='RENDER_STILL').index = i
-                row.prop(context.scene, "lod_impostor_bake_resolution", text="")
 
-        # 3. Box Impostor (anastacio_box_impostor.py): 6 baked views on a camera-facing card with
-        # parallax; volume and light from any angle, also on objects parented to bones.
-        if ob.type != 'MESH':
-            return
-        box = _lod_section(layout, wm, "lod_show_box", "Box Impostor", 'MOD_BUILD')
-        if not box:
-            return
+def _lod_levels(ob):
+    """LOD levels after the base one (index 0 is the object itself)."""
+    return [(i, l) for i, l in enumerate(ob.lod_levels) if i > 0]
+
+
+class OBJECT_PT_flat_impostor(ObjectButtonsPanel, Panel):
+    """A LOD level's quad turns around Z to face the camera (cheap; trees seen from the side)."""
+    bl_label = "Flat Impostor (Billboard)"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (super().poll(context) and ob.type not in {'CAMERA', 'EMPTY', 'LAMP'})
+
+    def draw(self, context):
+        layout = self.layout
+        levels = _lod_levels(context.object)
+        if not levels:
+            layout.label(text="Add a level first", icon='INFO')
+        for i, level in levels:
+            box = layout.box()
+            row = box.row()
+            row.active = level.use_mesh
+            name = level.object.name if level.object else "Level %d" % i
+            row.prop(level, "use_billboard", text=name)
+            if not level.use_billboard:
+                continue
+            box.prop(level, "use_atlas", text="Multi-Angle Atlas")
+            if level.use_atlas:
+                row = box.row(align=True)
+                row.prop(context.scene, "lod_impostor_bake_angles", text="Angles")
+                row = box.row(align=True)
+                row.enabled = False
+                row.prop(level, "atlas_columns", text="Columns")
+                row.prop(level, "atlas_rows", text="Rows")
+            row = box.row(align=True)
+            row.operator("object.bake_lod_impostor", text="Bake Impostor Texture", icon='RENDER_STILL').index = i
+            row.prop(context.scene, "lod_impostor_bake_resolution", text="")
+
+
+class OBJECT_PT_box_impostor(ObjectButtonsPanel, Panel):
+    """anastacio_box_impostor.py: 6 baked views on a camera-facing card with parallax; volume and
+    light from any angle, also on objects parented to bones."""
+    bl_label = "Box Impostor"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        return super().poll(context) and context.object.type == 'MESH'
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
         sc = context.scene
-        row = box.row(align=True)
+        row = layout.row(align=True)
         row.prop(sc, "box_impostor_resolution", text="")
         row.prop(sc, "box_impostor_mode", text="")
-        sub = box.row()
+        sub = layout.row()
         sub.active = sc.box_impostor_mode != 'BOX'
         sub.prop(sc, "box_impostor_steps")
         from bl_operators.anastacio_box_impostor import has_normal_map
-        row = box.row()
+        row = layout.row()
         if has_normal_map(ob):
             row.prop(sc, "box_impostor_normal_map", text="Include Normal Map")
         else:
             row.label(text="No normal map in the materials", icon='INFO')
-        row = box.row(align=True)
+        row = layout.row(align=True)
         row.prop(sc, "box_impostor_use_lod")
         sub = row.row(align=True)
         sub.active = sc.box_impostor_use_lod
         sub.prop(sc, "box_impostor_lod_distance")
-        op = box.operator("object.bake_box_impostor", icon='RENDER_STILL')
+        op = layout.operator("object.bake_box_impostor", icon='RENDER_STILL')
         op.resolution = sc.box_impostor_resolution
         op.mode = sc.box_impostor_mode
         op.steps = sc.box_impostor_steps
         op.normal_map = sc.box_impostor_normal_map
         op.use_lod = sc.box_impostor_use_lod
         op.lod_distance = sc.box_impostor_lod_distance
-
-
-def _lod_section(layout, wm, prop, title, icon):
-    """Collapsible box of the LOD panel; returns the box when open, else None."""
-    box = layout.box()
-    row = box.row()
-    show = getattr(wm, prop)
-    row.prop(wm, prop, text="", icon='TRIA_DOWN' if show else 'TRIA_RIGHT', emboss=False)
-    row.label(text=title, icon=icon)
-    return box if show else None
-
-
-bpy.types.WindowManager.lod_show_levels = BoolProperty(name="Levels", default=True)
-bpy.types.WindowManager.lod_show_flat = BoolProperty(name="Flat Impostor", default=True)
-bpy.types.WindowManager.lod_show_box = BoolProperty(name="Box Impostor", default=True)
 
 
 class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
