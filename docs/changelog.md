@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa: profundidade do acerto
+
+- Nodes GLSL `@surface`: `surface_depth(p)` (profundidade de janela, respeita `gl_DepthRange`).
+- `box_impostor.glsl` escreve `gl_FragDepth` do acerto nos modos Box e Volume; objetos que atravessam
+  o card cortam a forma assada, não o plano do card.
+
 ## 2026-11-17 — Impostor de Caixa, etapa 3b: modo Box
 
 - `box_impostor.glsl`: `box_mode` + `box_x/y/z`; acerto direto na bbox real, 1 leitura de cor por pixel.

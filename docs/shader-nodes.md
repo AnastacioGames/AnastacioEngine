@@ -237,6 +237,8 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
   `surface(uv).view` (2026-11-17) é a direção normalizada câmera → pixel nos mesmos eixos (perspectiva
   ou ortográfica, com Vertex Offset incluído), para parallax e impostores
   ([plano-imposter-caixa.md](plano-imposter-caixa.md)).
+  `surface_depth(p)` (2026-11-17) dá a profundidade de janela de um ponto nesses eixos, para escrever
+  `gl_FragDepth` de um acerto por raio (escreva em todo caminho que não dá `discard`).
 - `in_<nome>(uv)` com nós antes da entrada (2026-11-11): a cadeia ligada (Image Texture, Mix, Mapping,
   Texture Coordinate só pela saída UV, valores) é rodada de novo na UV pedida, até 64 nós. Cadeia com
   normal, posição, outra camada de UV ou outro GLSL Script lê o valor do pixel atual e avisa no console.

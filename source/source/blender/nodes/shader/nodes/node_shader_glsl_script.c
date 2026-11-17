@@ -729,7 +729,14 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 		                      "struct Surface { vec3 position; vec3 normal; vec3 view; };\n"
 		                      "Surface surface(vec2 uv) { Surface s; s.position = script_surf_pos; "
 		                      "s.normal = script_surf_nor; s.view = script_surf_view; return s; }\n"
-		                      "float covered(vec2 uv) { return 1.0; }\n");
+		                      "float covered(vec2 uv) { return 1.0; }\n"
+		                      /* Window depth (for gl_FragDepth) of a point in the surface axes (meters),
+		                       * e.g. a ray-marched hit behind the drawn polygon. */
+		                      "mat4 script_surf_lv; vec3 script_surf_sc;\n"
+		                      "float surface_depth(vec3 p) { vec4 c = gl_ProjectionMatrix * (script_surf_lv * "
+		                      "vec4(p / max(script_surf_sc, vec3(1e-8)), 1.0)); "
+		                      "return clamp(gl_DepthRange.near + ((c.z / c.w) * 0.5 + 0.5) * gl_DepthRange.diff, "
+		                      "0.0, 1.0); }\n");
 	}
 	for (int i = 0; i < tot; i++) {
 		const HeaderEntry *e = &entries[i];
@@ -1246,6 +1253,7 @@ static char *script_wrapper(const ScriptParam *params, int tot, bool use_time, i
 		BLI_dynstr_append(ds, "\tvec3 scr_ssc = vec3(length(scr_slv[0].xyz), length(scr_slv[1].xyz), "
 		                      "length(scr_slv[2].xyz));\n"
 		                      "\tscript_surf_pos = scr_spos * scr_ssc;\n"
+		                      "\tscript_surf_lv = scr_slv; script_surf_sc = scr_ssc;\n"
 		                      "\tvec3 scr_sn = vec3(dot(scr_slv[0].xyz, scr_snor), dot(scr_slv[1].xyz, scr_snor), "
 		                      "dot(scr_slv[2].xyz, scr_snor)) / max(scr_ssc, vec3(1e-8));\n"
 		                      "\tscript_surf_nor = (dot(scr_sn, scr_sn) > 1e-12) ? normalize(scr_sn) : "

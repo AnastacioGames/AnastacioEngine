@@ -120,6 +120,7 @@ vec4 node(vec2 uv)
         if (c.a < 0.5) {
             discard;
         }
+        gl_FragDepth = surface_depth(q);
         return vec4(imp_srgb_to_linear(clamp(c.rgb, 0.0, 1.0)), 1.0);
     }
 
@@ -177,5 +178,7 @@ vec4 node(vec2 uv)
         sum += c.rgb * w;
         wsum += w;
     }
+    // Depth of the hit, not of the card plane: objects crossing the impostor cut its real shape.
+    gl_FragDepth = surface_depth(q);
     return vec4(imp_srgb_to_linear(clamp(sum / max(wsum, 1e-6), 0.0, 1.0)), 1.0);
 }
