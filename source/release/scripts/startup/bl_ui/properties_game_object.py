@@ -1038,7 +1038,7 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
 
             row = box.row()
             row.active = level.use_mesh
-            row.prop(level, "use_billboard", text="Billboard (impostor)")
+            row.prop(level, "use_billboard", text="Flat Impostor (Billboard)")
 
             if level.use_billboard:
                 row = box.row()

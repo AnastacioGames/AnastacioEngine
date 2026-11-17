@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostores: painel explica qual usar; Impostor de Caixa em cabeça presa a osso
+
+- Painel LOD: "Billboard (impostor)" vira "Flat Impostor (Billboard)"; dicas novas (RNA `use_billboard` e `object.bake_box_impostor`) dizem quando usar cada um: plano = mais barato, árvores vistas de lado; caixa = volume, luz, qualquer ângulo, objetos presos a ossos. Traduzido em PT/ES/RU.
+- Testado: Suzanne presa a osso com pose girada e osso girado no jogo — impostor de caixa igual ao real, sem código novo (o card usa os eixos do objeto).
+
 ## 2026-11-17 — Impostor de Caixa: GPU Instancing do card
 
 - Com Geometry Instancing, `LOC_TO_VIEW` e a inversa (uniforms por objeto que o desenho instanciado não envia) são montadas da view e da matriz da instância (`GPU_material_builtin`); vale para todo nó e para o GLSL `@surface`.

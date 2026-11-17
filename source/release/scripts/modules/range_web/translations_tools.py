@@ -430,7 +430,7 @@ TABLE = (
      '(<archivo>_standalone_<fecha>.mp4, misma carpeta y ajustes)',
      'Во время записи игра, запущенная через Standalone, записывает своё окно в отдельное видео '
      '(<файл>_standalone_<дата>.mp4, та же папка и настройки)'),
-    ('Billboard (impostor)', 'Billboard (impostor)', 'Billboard (impostor)', 'Билборд (импостор)'),
+    ('Flat Impostor (Billboard)', 'Impostor plano (Billboard)', 'Impostor plano (Billboard)', 'Плоский импостор (билборд)'),
     ('When this file is launched directly (double-click or command line), the game starts full window instead of '
      'the editor, and closing the game closes the program. Needs Auto Run Python Scripts enabled. Opening the file '
      'from inside the editor does not start it',

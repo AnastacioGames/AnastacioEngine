@@ -124,7 +124,7 @@ TABLE = (
     ("Between Selected Markers", "Entre os marcadores selecionados", "Entre los marcadores seleccionados",
      "Между выделенными маркерами"),
     ("Bias:", "Viés:", "Sesgo:", "Смещение:"),
-    ("Billboard (impostor)", "Billboard (impostor)", "Billboard (impostor)", "Билборд (импостор)"),
+    ("Flat Impostor (Billboard)", "Impostor plano (Billboard)", "Impostor plano (Billboard)", "Плоский импостор (билборд)"),
     ("Billboard:", "Billboard:", "Billboard:", "Билборд:"),
     ("Bind", "Vincular", "Vincular", "Привязать"),
     ("Binding Properties:", "Propriedades do binding:", "Propiedades del binding:", "Свойства привязки:"),

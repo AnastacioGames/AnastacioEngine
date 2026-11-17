@@ -651,8 +651,9 @@ def _remove_lod(context, ob, card):
 
 
 class OBJECT_OT_bake_box_impostor(Operator):
-    """Bake 6 orthographic views (albedo, normal, depth) of the active mesh into two atlases and """ \
-        """create a camera-facing card for the Box Impostor"""
+    """Box impostor: 6 baked views on a camera-facing card with real volume and scene lighting, """ \
+        """right from any angle (also from above and on objects parented to bones); """ \
+        """costs more GPU than the flat billboard"""
     bl_idname = "object.bake_box_impostor"
     bl_label = "Bake Box Impostor"
     bl_options = {'REGISTER', 'UNDO'}

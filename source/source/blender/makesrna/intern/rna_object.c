@@ -2907,7 +2907,7 @@ static void rna_def_object_lodlevel(BlenderRNA *brna)
 
 	prop = RNA_def_property(srna, "use_billboard", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flags", OB_LOD_USE_BILLBOARD);
-	RNA_def_property_ui_text(prop, "Billboard", "Rotate this level of detail's mesh around Z to always face the camera (for tree/foliage impostors)");
+	RNA_def_property_ui_text(prop, "Billboard", "Flat impostor: this level's mesh turns around Z to face the camera. Cheapest (one texture read per pixel), best for trees and foliage seen from the side; looks flat from above");
 	RNA_def_property_update(prop, NC_OBJECT | ND_LOD, NULL);
 
 	prop = RNA_def_property(srna, "use_atlas", PROP_BOOLEAN, PROP_NONE);
