@@ -271,7 +271,7 @@ class INFO_MT_file(Menu):
         # Export to Desktop salva o arquivo protegido (.rasec) sozinho; wm.save_as_mainfile_protected
         # continua existindo para scripts.
         layout.operator_context = 'INVOKE_DEFAULT'
-        layout.operator("wm.export_to_desktop", text="Export to Desktop...", icon='DESKTOP')
+        layout.operator("wm.export_to_desktop", text="Export Game To Desktop...", icon='DESKTOP')
         layout.operator_context = 'INVOKE_AREA'
 
         layout.separator(factor=1)

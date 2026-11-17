@@ -1745,6 +1745,7 @@ MESSAGES = (
 EXPORT_PANELS = (
     ("Export to Desktop", "Exportar para PC", "Exportar para PC", "Экспорт для ПК"),
     ("Export to Desktop...", "Exportar para PC...", "Exportar para PC...", "Экспорт для ПК..."),
+    ("Export Game To Desktop...", "Exportar jogo para PC...", "Exportar juego para PC...", "Экспорт игры для ПК..."),
     ("Export Now (last settings)", "Exportar agora (últimas opções)", "Exportar ahora (últimas opciones)",
      "Экспортировать сейчас (последние настройки)"),
     ("Export Now", "Exportar agora", "Exportar ahora", "Экспортировать сейчас"),

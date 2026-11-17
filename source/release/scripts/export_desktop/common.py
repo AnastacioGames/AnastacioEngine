@@ -10,6 +10,21 @@ TEMPLATES = HERE if (HERE / 'launcher').is_dir() else HERE.parent
 ENGINE_DIR = HERE.parents[2]
 
 
+# Arquivos de uma pasta de build que o jogo não usa: editor, ferramentas do build, símbolos de depuração
+# (o .pdb do player sozinho tem ~750 MB) e testes. Só a pasta raiz da engine é filtrada por nome de pasta.
+DEV_NAMES = {"makesdna", "makesrna", "datatoc", "datatoc_icon", "msgfmt", "rangearmor", "rangearmor_panel",
+             "rangeengine", "rangeengine.exe", "anastacioengine", "anastacioengine.exe", "imgui.ini",
+             "makesdna.exe", "makesrna.exe", "datatoc.exe", "datatoc_icon.exe", "msgfmt.exe", "demos"}
+DEV_SUFFIXES = (".pdb", ".lib", ".exp", ".ilk")
+
+
+def ignore_dev_files(_directory, names):
+    """shutil.copytree(ignore=...): tira da engine copiada o que só serve para desenvolver."""
+    return {name for name in names
+            if name.lower() in DEV_NAMES or name.lower().endswith(DEV_SUFFIXES)
+            or name.lower().endswith(("_tests.exe", "_test.exe"))}
+
+
 def step(name):
     """Marca de etapa lida pela janela Export to Desktop (o resto da saída é log)."""
     print('@step ' + name, flush=True)

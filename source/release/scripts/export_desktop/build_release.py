@@ -201,7 +201,8 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
             shutil.copy2(str(launcher), str(game_launcher))
             if not suffix:
                 game_launcher.chmod(game_launcher.stat().st_mode | 0o111)
-            shutil.copytree(str(_long(engine)), str(stage / "engine" / target))
+            # Projetos copiados de um build de desenvolvimento trazem .pdb e ferramentas: ficam fora.
+            shutil.copytree(str(_long(engine)), str(stage / "engine" / target), ignore=common.ignore_dev_files)
             if target == "Windows64":
                 _set_icon(data, project, [game_launcher, stage / "engine" / target /
                                           data['EngineExecutables'][target].name])
@@ -210,6 +211,7 @@ def _deliver(release, destination, targets, data, project, use_cooked, archive_e
         archive = None
         if archive_ext:
             archive = Path(temp) / (destination.name + archive_ext)
+            print("> Packing " + archive.name + " (this can take a few minutes)...", flush=True)
             if archive_ext == ".zip":
                 with zipfile.ZipFile(str(archive), "w", zipfile.ZIP_DEFLATED) as output:
                     for file in stage.rglob("*"):

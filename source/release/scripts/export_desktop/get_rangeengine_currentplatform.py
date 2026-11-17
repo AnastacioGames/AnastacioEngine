@@ -161,10 +161,8 @@ def search_roots():
             yield root
 
 
-def ignore_runtime_tools(_directory, names):
-    excluded = {"makesdna", "makesrna", "datatoc", "rangearmor", "rangearmor_panel",
-                "rangeengine", "rangeengine.exe", "anastacioengine", "anastacioengine.exe"}
-    return {name for name in names if name.lower() in excluded}
+def ignore_runtime_tools(directory, names):
+    return _common.ignore_dev_files(directory, names)
 
 
 if __name__ == "__main__":

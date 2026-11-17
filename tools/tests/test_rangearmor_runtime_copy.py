@@ -70,6 +70,7 @@ class RuntimeCopy(unittest.TestCase):
         with mock.patch.object(sys, 'path', [scripts] + sys.path):
             import common as real_common
         common.resolve_runtime.side_effect = real_common.resolve_runtime
+        common.ignore_dev_files.side_effect = real_common.ignore_dev_files
         with tempfile.TemporaryDirectory(prefix='Armor cópia ') as directory:
             root = Path(directory)
             source = root / 'installation'
