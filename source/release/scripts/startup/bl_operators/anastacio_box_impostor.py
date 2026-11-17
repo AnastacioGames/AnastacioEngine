@@ -486,14 +486,22 @@ def _store_image(name, atlas, non_color):
     return image
 
 
-def _card(ob, center, half):
+def _card(ob, center, half, box_mode=False):
     """Quad on the local XZ plane (the Billboard node's convention) covering the cube from any side.
     Same origin, rotation and scale as the object, so its mesh and material can be the object's LOD
     level; the Billboard turns it around the origin, so it also covers the cube center's offset."""
     name = ob.name + "_box_impostor"
     sca = ob.matrix_world.to_scale()
     smin = max(min(abs(sca.x), abs(sca.y), abs(sca.z)), 1e-6)
-    r = (half * math.sqrt(3.0) + center.length) / smin
+    # The card is centered on the cube center (the material adds it to the Billboard offset), so it only
+    # has to cover the farthest point of the object from there, seen from any side: a sphere. A volume
+    # impostor only draws where the object is (vertices); the Box mode draws the whole bounding box.
+    corners = [Vector((c[0] * sca.x, c[1] * sca.y, c[2] * sca.z)) for c in ob.bound_box]
+    if box_mode or ob.type != 'MESH' or not ob.data.vertices:
+        pts = corners
+    else:
+        pts = [Vector((v.co.x * sca.x, v.co.y * sca.y, v.co.z * sca.z)) for v in ob.data.vertices]
+    r = max((p - center).length for p in pts) * 1.04 / smin
     verts = [(-r, 0.0, -r), (r, 0.0, -r), (r, 0.0, r), (-r, 0.0, r)]
     me = bpy.data.meshes.new(name)
     card = bpy.data.objects.get(name)
@@ -607,7 +615,15 @@ def _card_material(card, ob, color, data, center, half, hb, box_mode, steps=32, 
         tree.links.new(script.outputs["Normal"], shade.inputs["Normal"])
     tree.links.new(shade.outputs["Color"], out.inputs["Color"])
     out.location = (450, 0)
-    tree.links.new(bill.outputs[0], out.inputs["Vertex Offset"])
+    # Pivot on the cube center instead of the object origin: offset + center (object space).
+    sca = card.matrix_world.to_scale()
+    add = tree.nodes.new("ShaderNodeVectorMath")
+    add.location = (150, -200)
+    add.operation = 'ADD'
+    add.inputs[1].default_value = (center.x / max(abs(sca.x), 1e-6), center.y / max(abs(sca.y), 1e-6),
+                                   center.z / max(abs(sca.z), 1e-6))
+    tree.links.new(bill.outputs[0], add.inputs[0])
+    tree.links.new(add.outputs[0], out.inputs["Vertex Offset"])
     mat.game_settings.use_backface_culling = False
     # Copies of the object share the card: one instanced draw (LOC_TO_VIEW and the Billboard
     # follow the instance matrix, see GPU_material_builtin and node_billboard).
@@ -715,7 +731,7 @@ class OBJECT_OT_bake_box_impostor(Operator):
                 nmap = ", detail normal " + detail[0].name
         color_img = _store_image(ob.name + "_imp_color", color, False)
         data_img = _store_image(ob.name + "_imp_data", data, True)
-        card = _card(ob, center, half)
+        card = _card(ob, center, half, box_mode)
         card["box_impostor_fill"] = fill
         if _card_material(card, ob, color_img, data_img, center, half, hb, box_mode, self.steps, detail) is None:
             self.report({'WARNING'}, "box_impostor.glsl not found: the card has no material")
