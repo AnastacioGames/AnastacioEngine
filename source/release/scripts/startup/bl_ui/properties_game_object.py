@@ -22,7 +22,7 @@ import os
 import math
 from array import array
 from bpy.types import Panel, Menu, UIList, Operator, AnimationEventTrigger
-from bpy.props import IntProperty, StringProperty, EnumProperty
+from bpy.props import BoolProperty, IntProperty, StringProperty, EnumProperty
 from mathutils import Vector
 from bpy.app.translations import pgettext_iface as iface_
 
@@ -983,6 +983,12 @@ bpy.types.Scene.box_impostor_mode = EnumProperty(
     default='AUTO',
 )
 
+bpy.types.Scene.box_impostor_normal_map = BoolProperty(
+    name="Include Normal Map", description="Bake the material's normal maps into the impostor normals "
+    "(doubles the bake time)",
+    default=True,
+)
+
 bpy.types.Scene.box_impostor_steps = IntProperty(
     name="Steps", description="Ray march steps in Volume mode (fewer = faster, thin parts may vanish)",
     min=1, max=32, default=32,
@@ -1069,10 +1075,17 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
             sub = box.row()
             sub.active = sc.box_impostor_mode != 'BOX'
             sub.prop(sc, "box_impostor_steps")
+            from bl_operators.anastacio_box_impostor import has_normal_map
+            row = box.row()
+            if has_normal_map(ob):
+                row.prop(sc, "box_impostor_normal_map", text="Include Normal Map")
+            else:
+                row.label(text="No normal map in the materials", icon='INFO')
             op = box.operator("object.bake_box_impostor", icon='RENDER_STILL')
             op.resolution = sc.box_impostor_resolution
             op.mode = sc.box_impostor_mode
             op.steps = sc.box_impostor_steps
+            op.normal_map = sc.box_impostor_normal_map
         
 class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
     bl_label = "Animation Events"

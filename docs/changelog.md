@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa: normal map do material
+
+- Modo Box: o bake liga sozinho a imagem do normal map do material clássico no nó (`detail`, `detail_scale`, `detail_strength`, `detail_orient`); o nó lê o arquivo em resolução cheia no ponto de entrada, no espaço tangente da face, com a orientação do UV de cada face detectada (troca/espelho). O bake pode ficar em 64 px.
+- Modo Volume: `bake_normals` renderiza 6 vistas numa cena temporária (passe Normal do BI, que vem negado) e troca as normais do atlas.
+- Painel: "Include Normal Map" (ligado) quando o material tem normal map.
+- Limites: offset da textura, escala X≠Y e UV em ilhas espalhadas desalinham o detalhe. A sombra do sol ainda é calculada no plano do card (metade da face de costas para o sol acende).
+
 ## 2026-11-17 — Impostor de Caixa: painel no LOD e material igual ao original
 
 - Bloco "Box Impostor" no painel Levels of Detail (aba Game do objeto): resolução, modo (Auto/Box/Volume), Steps e o botão Bake Box Impostor.

@@ -12,6 +12,10 @@
 // @param box_x: float(0.0001, 10000) = 1
 // @param box_y: float(0.0001, 10000) = 1
 // @param box_z: float(0.0001, 10000) = 1
+// @param detail: image
+// @param detail_scale: float(0.0001, 10000) = 1
+// @param detail_strength: float(0, 10) = 0
+// @param detail_orient: int(0, 262143) = 0
 
 // docs/plano-imposter-caixa.md. Atlas 3x2 do bake (anastacio_box_impostor.py): vista k na coluna
 // k % 3, linha k / 3; 0 +X, 1 -X, 2 +Y, 3 -Y, 4 +Z, 5 -Z. "data": RGB = normal, A = profundidade a
@@ -122,7 +126,30 @@ vec4 node(vec2 uv)
         if (c.a < 0.5) {
             discard;
         }
-        surface_set_normal(img_data_lod(st_box, 0.0).rgb * 2.0 - 1.0);
+        vec3 nb = img_data_lod(st_box, 0.0).rgb * 2.0 - 1.0;
+        // Detail normal map (the object's own, full resolution): tangent space on the entry face, U and
+        // V of that face as tangent and bitangent, UV = meters * detail_scale from the box corner.
+        if (params.detail_strength > 0.0) {
+            vec3 fn, fu, fv;
+            imp_axes(k, fn, fu, fv);
+            // How the object's UV sits on this face (3 bits per view from the bake): swap U/V, flip
+            // U, flip V, so the pattern and its tangents follow the original mapping.
+            int code = (params.detail_orient / int(pow(8.0, float(k)) + 0.5)) - 
+                       (params.detail_orient / int(pow(8.0, float(k + 1)) + 0.5)) * 8;
+            bool swp = (code - (code / 2) * 2) == 1;
+            float sx = ((code / 2) - (code / 4) * 2) == 1 ? -1.0 : 1.0;
+            float sy = (code / 4) == 1 ? -1.0 : 1.0;
+            vec3 tu = swp ? fv : fu;
+            vec3 tv = swp ? fu : fv;
+            tu *= sx;
+            tv *= sy;
+            vec2 duv = (vec2(dot(q, tu), dot(q, tv)) + vec2(dot(h, abs(tu)), dot(h, abs(tv)))) *
+                       params.detail_scale;
+            vec3 tn = img_detail(duv).rgb * 2.0 - 1.0;
+            // Tangent frame (tu, tv, face normal); the strength scales the tilt like the Normal factor.
+            nb = normalize((tu * tn.x + tv * tn.y) * params.detail_strength + nb * max(tn.z, 0.0));
+        }
+        surface_set_normal(nb);
         gl_FragDepth = surface_depth(q);
         return vec4(imp_srgb_to_linear(clamp(c.rgb, 0.0, 1.0)), 1.0);
     }

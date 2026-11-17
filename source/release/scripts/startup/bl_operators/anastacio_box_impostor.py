@@ -17,7 +17,7 @@ import math
 import os
 
 import bpy
-from bpy.props import EnumProperty, IntProperty
+from bpy.props import BoolProperty, EnumProperty, IntProperty
 from bpy.types import Operator
 from mathutils import Matrix, Vector
 
@@ -267,6 +267,188 @@ def bake_color(ob, res, center, half, workdir):
     return atlas
 
 
+def has_normal_map(ob):
+    """True when a material of the object has a texture with the Normal influence on (classic
+    material normal maps / bump)."""
+    for slot in ob.material_slots:
+        m = slot.material
+        if m is None:
+            continue
+        for i, ts in enumerate(m.texture_slots):
+            if ts and ts.texture and ts.use_map_normal and m.use_textures[i]:
+                return True
+    return False
+
+
+def detail_normal_map(ob):
+    """(image, uv_per_meter, strength) of the first image normal map of the object's materials, or
+    None. uv_per_meter: UV units per meter of surface, from the mesh's UV area / face area (times the
+    texture slot's scale), for the Box mode's detail normal."""
+    found = None
+    for slot in ob.material_slots:
+        m = slot.material
+        if m is None:
+            continue
+        for i, ts in enumerate(m.texture_slots):
+            t = ts.texture if ts else None
+            if (t and ts.use_map_normal and m.use_textures[i] and t.type == 'IMAGE' and t.image and
+                    t.use_normal_map):
+                found = (t.image, ts)
+                break
+        if found:
+            break
+    if found is None:
+        return None
+    image, ts = found
+    me = ob.data
+    if not me.uv_layers:
+        return None
+    uv = me.uv_layers.active.data
+    sca = ob.matrix_world.decompose()[2]
+    area = uv_area = 0.0
+    for poly in me.polygons:
+        pts = [me.vertices[me.loops[li].vertex_index].co for li in poly.loop_indices]
+        pts = [Vector((c.x * sca.x, c.y * sca.y, c.z * sca.z)) for c in pts]
+        uvs = [uv[li].uv for li in poly.loop_indices]
+        for j in range(1, len(pts) - 1):
+            area += (pts[j] - pts[0]).cross(pts[j + 1] - pts[0]).length * 0.5
+            a, b = uvs[j] - uvs[0], uvs[j + 1] - uvs[0]
+            uv_area += abs(a.x * b.y - a.y * b.x) * 0.5
+    if area < 1e-12 or uv_area < 1e-12:
+        return None
+    per_m = math.sqrt(uv_area / area) * max(ts.scale.x, 1e-4)
+    return image, per_m, ts.normal_factor, _uv_orient(me, uv, sca)
+
+
+def _uv_orient(me, uv, sca):
+    """Per view, how the UV runs on the faces facing that way, packed 3 bits per view (view k at
+    8**k): bit 0 = U follows the view's V axis (swap), bit 1 = U runs backwards, bit 2 = V runs
+    backwards. From the largest polygon facing the view."""
+    code = 0
+    for k, (n, u, v) in enumerate(VIEWS):
+        n, u, v = Vector(n), Vector(u), Vector(v)
+        best, best_area = None, 0.0
+        for poly in me.polygons:
+            nm = Vector((poly.normal.x / max(sca.x, 1e-8), poly.normal.y / max(sca.y, 1e-8),
+                         poly.normal.z / max(sca.z, 1e-8))).normalized()
+            if nm.dot(n) > 0.9 and poly.area > best_area:
+                best, best_area = poly, poly.area
+        if best is None or best.loop_total < 3:
+            continue
+        li = list(best.loop_indices)
+        p = [me.vertices[me.loops[i].vertex_index].co for i in li[:3]]
+        p = [Vector((c.x * sca.x, c.y * sca.y, c.z * sca.z)) for c in p]
+        t = [uv[i].uv for i in li[:3]]
+        # UV = M * (s, t) on the face plane: solve from 2 edges.
+        e1, e2 = p[1] - p[0], p[2] - p[0]
+        a = Matrix(((e1.dot(u), e2.dot(u)), (e1.dot(v), e2.dot(v))))
+        b = Matrix(((t[1].x - t[0].x, t[2].x - t[0].x), (t[1].y - t[0].y, t[2].y - t[0].y)))
+        if abs(a.determinant()) < 1e-12:
+            continue
+        m = b * a.inverted()
+        swap = abs(m[0][1]) > abs(m[0][0])
+        du = m[0][1] if swap else m[0][0]
+        dv = m[1][0] if swap else m[1][1]
+        bits = (1 if swap else 0) | (2 if du < 0 else 0) | (4 if dv < 0 else 0)
+        code += bits * 8 ** k
+    return code
+
+
+def bake_normals(ob, res, center, half, workdir, data):
+    """Replace the normals in the data atlas (in place) by the shading normals of 6 Blender Internal
+    renders (Normal pass, so the material's normal maps are included). The renders run in a temporary
+    scene: the user's compositor is not touched. Only texels where the render saw the object change;
+    the depth stays the ray-cast one."""
+    import glob
+    import numpy as np
+    loc, rot, _sca = ob.matrix_world.decompose()
+    rot_m = rot.to_matrix()
+    tmp = bpy.data.scenes.new("_BoxImpostorNormals")
+    cam_data = bpy.data.cameras.new("_BoxImpostorNorCam")
+    cam_data.type = 'ORTHO'
+    cam_data.ortho_scale = 2.0 * half
+    cam_data.clip_start = half * 0.001
+    cam_data.clip_end = half * 4.0
+    cam = bpy.data.objects.new("_BoxImpostorNorCam", cam_data)
+    mats = [s.material for s in ob.material_slots if s.material]
+    shadeless = [(m, m.use_shadeless) for m in mats]
+    try:
+        tmp.objects.link(ob)
+        tmp.objects.link(cam)
+        tmp.layers = ob.layers
+        cam.layers = ob.layers
+        tmp.camera = cam
+        r = tmp.render
+        r.engine = 'BLENDER_RENDER'
+        r.resolution_x = r.resolution_y = res
+        r.resolution_percentage = 100
+        r.alpha_mode = 'TRANSPARENT'
+        r.use_compositing = True
+        r.image_settings.file_format = 'PNG'
+        r.filepath = os.path.join(workdir, "_box_impostor_nor_combined")
+        tmp.render.layers[0].use_pass_normal = True
+        for m in mats:
+            m.use_shadeless = True
+        tmp.use_nodes = True
+        tree = tmp.node_tree
+        for node in list(tree.nodes):
+            tree.nodes.remove(node)
+        rl = tree.nodes.new("CompositorNodeRLayers")
+        rl.scene = tmp
+        comp = tree.nodes.new("CompositorNodeComposite")
+        tree.links.new(rl.outputs["Image"], comp.inputs["Image"])
+        fo = tree.nodes.new("CompositorNodeOutputFile")
+        fo.base_path = workdir
+        fo.format.file_format = 'OPEN_EXR'
+        fo.format.color_depth = '32'
+        fo.format.color_mode = 'RGBA'
+        alpha = tree.nodes.new("CompositorNodeSetAlpha")
+        tree.links.new(rl.outputs["Normal"], alpha.inputs["Image"])
+        tree.links.new(rl.outputs["Alpha"], alpha.inputs["Alpha"])
+        tree.links.new(alpha.outputs["Image"], fo.inputs[0])
+        for i, (n, u, v) in enumerate(VIEWS):
+            n, u, v = Vector(n), Vector(u), Vector(v)
+            basis = Matrix((u, v, n)).transposed()
+            cam.matrix_world = Matrix.Translation(loc + rot_m * (center + n * (half * 2.0))) *                 (rot_m * basis).to_4x4()
+            prefix = "_box_impostor_nor%d_" % i
+            fo.file_slots[0].path = prefix
+            bpy.ops.render.render(write_still=True, scene=tmp.name)
+            files = glob.glob(os.path.join(workdir, prefix + "*.exr"))
+            if not files:
+                raise RuntimeError("Normal pass not written")
+            img = bpy.data.images.load(files[0])
+            try:
+                px = np.array(img.pixels[:], np.float32).reshape(res, res, 4)
+            finally:
+                bpy.data.images.remove(img)
+            for f in files:
+                try:
+                    os.remove(f)
+                except OSError:
+                    pass
+            # Camera space -> the bake's axes (meters): the camera's x, y, z are u, v, n. Blender
+            # Internal's Normal pass points away from the viewer, hence the minus.
+            nc = -px[..., :3]
+            nm = nc[..., 0:1] * np.array(u) + nc[..., 1:2] * np.array(v) + nc[..., 2:3] * np.array(n)
+            length = np.linalg.norm(nm, axis=2, keepdims=True)
+            ok = (px[..., 3] > 0.5) & (length[..., 0] > 1e-6)
+            nm = nm / np.maximum(length, 1e-6)
+            x0, y0 = (i % COLS) * res, (i // COLS) * res
+            cell = data[y0:y0 + res, x0:x0 + res]
+            hit = ok & (cell[..., 3] < 0.996)
+            cell[hit, 0:3] = nm[hit] * 0.5 + 0.5
+    finally:
+        for m, s in shadeless:
+            m.use_shadeless = s
+        bpy.data.scenes.remove(tmp)
+        bpy.data.objects.remove(cam)
+        bpy.data.cameras.remove(cam_data)
+        try:
+            os.remove(r.filepath + ".png")
+        except (OSError, NameError):
+            pass
+
+
 def _bleed_color(cell, passes=2):
     """Spread the color into the transparent texels next to the silhouette (in place, RGB only; alpha
     kept). The depth is baked one texel fatter, so the shader may land on those texels."""
@@ -365,7 +547,7 @@ _SHADING_PROPS = ("diffuse_shader", "diffuse_intensity", "specular_shader", "spe
                   "translucency", "use_shadeless")
 
 
-def _card_material(card, ob, color, data, half, hb, box_mode, steps=32):
+def _card_material(card, ob, color, data, half, hb, box_mode, steps=32, detail=None):
     """Box Impostor node -> Output Color, Billboard (spherical) -> Vertex Offset."""
     text = _impostor_text()
     if text is None:
@@ -384,8 +566,13 @@ def _card_material(card, ob, color, data, half, hb, box_mode, steps=32):
     tree.interface_update(bpy.context)
     script["img_color"] = color
     script["img_data"] = data
+    if detail is not None:
+        script["img_detail"] = detail[0]
     tree.interface_update(bpy.context)
     script.inputs["Extent"].default_value = half
+    script.inputs["Detail Scale"].default_value = detail[1] if detail else 1.0
+    script.inputs["Detail Strength"].default_value = detail[2] if detail else 0.0
+    script.inputs["Detail Orient"].default_value = detail[3] if detail else 0
     script.inputs["Box Mode"].default_value = 1 if box_mode else 0
     script.inputs["Steps"].default_value = steps
     script.inputs["Box X"].default_value = max(hb.x, 1e-4)
@@ -438,6 +625,10 @@ class OBJECT_OT_bake_box_impostor(Operator):
                ('BOX', "Box", "One read on the bounding box: crates, buildings, walls (fastest)"),
                ('VOLUME', "Volume", "Ray march in 3 views: any shape (Suzanne, trees)")),
         default='AUTO')
+    normal_map: BoolProperty(
+        name="Normal Map", description="Bake the material's normal maps into the impostor normals "
+        "(only used when a material has a texture with Normal influence; doubles the bake time)",
+        default=True)
     steps: IntProperty(
         name="Steps", description="Ray march steps in Volume mode (fewer = faster, thin parts may vanish)",
         min=1, max=32, default=32)
@@ -458,17 +649,29 @@ class OBJECT_OT_bake_box_impostor(Operator):
         t0 = time.time()
         data, center, half = bake_data(ob, res)
         color = bake_color(ob, res, center, half, workdir)
-        color_img = _store_image(ob.name + "_imp_color", color, False)
-        data_img = _store_image(ob.name + "_imp_data", data, True)
-        card = _card(ob, center, half)
         hb = _box_halves(ob)
         fill = _box_fill(data, res, half, hb)
         box_mode = fill >= 0.95 if self.mode == 'AUTO' else self.mode == 'BOX'
+        # Normal maps: in Box mode the object's own image is read by the node at full resolution
+        # (detail normal); otherwise baked into the atlas normals.
+        detail = None
+        nmap = ""
+        if self.normal_map and has_normal_map(ob):
+            detail = detail_normal_map(ob) if box_mode else None
+            if detail is None:
+                bake_normals(ob, res, center, half, workdir, data)
+                nmap = ", normal map baked"
+            else:
+                nmap = ", detail normal " + detail[0].name
+        color_img = _store_image(ob.name + "_imp_color", color, False)
+        data_img = _store_image(ob.name + "_imp_data", data, True)
+        card = _card(ob, center, half)
         card["box_impostor_fill"] = fill
-        if _card_material(card, ob, color_img, data_img, half, hb, box_mode, self.steps) is None:
+        if _card_material(card, ob, color_img, data_img, half, hb, box_mode, self.steps, detail) is None:
             self.report({'WARNING'}, "box_impostor.glsl not found: the card has no material")
-        self.report({'INFO'}, "Box Impostor: %s, %d px per view, %s mode, %.1f s" % (
-            card.name, res, "Box" if box_mode else "Volume", time.time() - t0))
+        self.report({'INFO'}, "Box Impostor: %s, %d px per view, %s mode%s, %.1f s" % (
+            card.name, res, "Box" if box_mode else "Volume", nmap,
+            time.time() - t0))
         return {'FINISHED'}
 
 
