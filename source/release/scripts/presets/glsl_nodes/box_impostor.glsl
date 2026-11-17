@@ -72,7 +72,13 @@ bool imp_inside(vec3 p, float ext, float margin, float eps, ivec3 views)
         float d;
         vec2 st = imp_uv(k, p, ext, margin, d);
         float stored = imp_depth(st);
-        if (stored > 0.996 || d < stored - eps) {
+        if (stored > 0.996) {
+            return false;
+        }
+        // A point in front of the first surface is air for that view... except on the vertical axis of
+        // a hollow object (house with no floor, open crate): the view from below sees the ceiling, and
+        // the thin walls, seen edge-on, would be carved away. The side views decide there.
+        if (d < stored - eps && i < 2) {
             return false;
         }
     }
