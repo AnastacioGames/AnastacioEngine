@@ -202,7 +202,8 @@ vec4 node(vec2 uv) { return vec4(in_mask(uv) * params.scale); }
 - `@param tex: image` (até 4): lido com `img_tex(uv)`. A imagem é escolhida no botão do nó (busca + X para
   limpar, operador `node.glsl_image_set`) e fica numa propriedade de ID `img_<nome>` do nó, salva no `.range`.
   Sem imagem, `img_tex` devolve preto transparente. O gerador expõe o sampler como `SCRIPT_IMG<i>` (`samp<N>`).
-  Exemplo: `presets/glsl_nodes/image_tint.glsl`.
+  Exemplo: `presets/glsl_nodes/image_tint.glsl`. `img_tex_lod(uv, lod)` lê com nível de mipmap fixo (use dentro de
+  laços com `break`/`discard`, onde o nível automático sai indefinido e risca a imagem).
 - `@param ao: meshmap(ao|curvature|thickness|normal|position)`: mapa assado da malha, escolhido no mesmo
   botão e lido como dado (sem sRGB) por `mesh_ao(uv)`. Os mapas cinza devolvem `float` (canal R), `normal`
   devolve `vec3` em -1..1 e `position` o `vec3` gravado. Sem mapa: AO 1, curvatura 0.5, espessura 0,

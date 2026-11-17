@@ -3868,14 +3868,15 @@ static void BL_PrefetchMaterialImages(const std::vector<KX_BlenderMaterial *>& m
  * A script moving it by name still works (the member is split out), it only costs the rebuild. */
 /* Node tree reading per-object data the batch can't keep (one draw shares the reference object's
  * uniforms and an identity object matrix): Object Info (Random, Object/Material Index, Location)
- * or the Object output of Texture Coordinate. */
+ * or the Object output of Texture Coordinate. Billboard turns the mesh around the object origin with
+ * the object matrix, which the merged array no longer has (Box Impostor cards use it). */
 static bool BL_NodeTreeUsesObjectData(bNodeTree *ntree, int depth)
 {
 	if (!ntree || depth > 8) {
 		return false;
 	}
 	for (bNode *node = (bNode *)ntree->nodes.first; node; node = node->next) {
-		if (node->type == SH_NODE_OBJECT_INFO) {
+		if (node->type == SH_NODE_OBJECT_INFO || node->type == SH_NODE_BILLBOARD) {
 			return true;
 		}
 		if (node->type == NODE_GROUP && BL_NodeTreeUsesObjectData((bNodeTree *)node->id, depth + 1)) {

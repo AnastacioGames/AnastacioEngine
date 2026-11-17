@@ -118,7 +118,25 @@ def bake_data(ob, res):
                 nm = nm.normalized() if nm.length > 1e-12 else n
                 atlas[y0 + py, x0 + px] = (nm.x * 0.5 + 0.5, nm.y * 0.5 + 0.5, nm.z * 0.5 + 0.5,
                                            min(max(depth, 0.0), 1.0))
+        _dilate_depth(atlas[y0:y0 + res, x0:x0 + res])
     return atlas, center, half
+
+
+def _dilate_depth(cell):
+    """Depth = min of the 3x3 neighbours, inside one cell (in place). The shader keeps a point only
+    when it is behind the surface in all 6 views; one texel of slack there closes the cracks that
+    rounding to texels cuts at silhouettes and thin parts. The normal is copied from the neighbour
+    that gave the depth."""
+    import numpy as np
+    h, w = cell.shape[0], cell.shape[1]
+    pad = np.pad(cell, ((1, 1), (1, 1), (0, 0)), mode='edge')
+    best = cell.copy()
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            nb = pad[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]
+            closer = nb[..., 3] < best[..., 3]
+            best[closer] = nb[closer]
+    cell[...] = best
 
 
 def bake_color(ob, res, center, half, workdir):
@@ -186,6 +204,7 @@ def bake_color(ob, res, center, half, workdir):
                 os.remove(path)
             except OSError:
                 pass
+            _bleed_color(px)
             x0, y0 = (i % COLS) * res, (i // COLS) * res
             atlas[y0:y0 + res, x0:x0 + res] = px
     finally:
@@ -210,6 +229,28 @@ def bake_color(ob, res, center, half, workdir):
         bpy.data.objects.remove(cam)
         bpy.data.cameras.remove(cam_data)
     return atlas
+
+
+def _bleed_color(cell, passes=2):
+    """Spread the color into the transparent texels next to the silhouette (in place, RGB only; alpha
+    kept). The depth is baked one texel fatter, so the shader may land on those texels."""
+    import numpy as np
+    h, w = cell.shape[0], cell.shape[1]
+    for _ in range(passes):
+        solid = cell[..., 3] >= 0.5
+        rgb = np.where(solid[..., None], cell[..., 0:3], 0.0)
+        cnt = solid.astype(np.float32)
+        prgb = np.pad(rgb, ((1, 1), (1, 1), (0, 0)))
+        pcnt = np.pad(cnt, ((1, 1), (1, 1)))
+        acc = np.zeros_like(rgb)
+        n = np.zeros_like(cnt)
+        for dy in (-1, 0, 1):
+            for dx in (-1, 0, 1):
+                acc += prgb[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]
+                n += pcnt[1 + dy:1 + dy + h, 1 + dx:1 + dx + w]
+        grow = (~solid) & (n > 0)
+        cell[grow, 0:3] = acc[grow] / n[grow][:, None]
+        cell[grow, 3] = 0.5
 
 
 def _store_image(name, atlas, non_color):
@@ -249,6 +290,66 @@ def _card(ob, center, half):
     return card
 
 
+def _impostor_text():
+    """Text with presets/glsl_nodes/box_impostor.glsl, shared like node.glsl_node_add does (the code is
+    copied into the .range, the exported game does not need the library file)."""
+    path = None
+    for folder in bpy.utils.preset_paths("glsl_nodes"):
+        cand = os.path.join(folder, "box_impostor.glsl")
+        if os.path.isfile(cand):
+            path = cand
+            break
+    if path is None:
+        return None
+    with open(path, encoding="utf-8") as f:
+        source = f.read()
+    source_path = os.path.normcase(os.path.abspath(path))
+    for t in bpy.data.texts:
+        if t.get("glsl_node_file") == source_path and t.as_string() == source:
+            return t
+    text = bpy.data.texts.new("box_impostor.glsl")
+    text.from_string(source)
+    text["glsl_node_file"] = source_path
+    try:
+        from glsl_node_reload import mark_text
+        mark_text(text, source_path, source)
+    except ImportError:
+        pass
+    return text
+
+
+def _card_material(card, ob, color, data, half):
+    """Box Impostor node -> Output Color, Billboard (spherical) -> Vertex Offset."""
+    text = _impostor_text()
+    if text is None:
+        return None
+    name = ob.name + "_box_impostor"
+    mat = bpy.data.materials.get(name) or bpy.data.materials.new(name)
+    mat.use_nodes = True
+    tree = mat.node_tree
+    for node in list(tree.nodes):
+        tree.nodes.remove(node)
+    out = tree.nodes.new("ShaderNodeOutput")
+    out.location = (300, 0)
+    script = tree.nodes.new("ShaderNodeGLSLScript")
+    script.location = (0, 100)
+    script.script = text
+    tree.interface_update(bpy.context)
+    script["img_color"] = color
+    script["img_data"] = data
+    tree.interface_update(bpy.context)
+    script.inputs["Extent"].default_value = half
+    bill = tree.nodes.new("ShaderNodeBillboard")
+    bill.location = (0, -200)
+    bill.inputs["Lock Axis"].default_value = 0.0
+    tree.links.new(script.outputs["Color"], out.inputs["Color"])
+    tree.links.new(bill.outputs[0], out.inputs["Vertex Offset"])
+    mat.game_settings.use_backface_culling = False
+    card.data.materials.clear()
+    card.data.materials.append(mat)
+    return mat
+
+
 class OBJECT_OT_bake_box_impostor(Operator):
     """Bake 6 orthographic views (albedo, normal, depth) of the active mesh into two atlases and """ \
         """create a camera-facing card for the Box Impostor"""
@@ -277,9 +378,11 @@ class OBJECT_OT_bake_box_impostor(Operator):
         t0 = time.time()
         data, center, half = bake_data(ob, res)
         color = bake_color(ob, res, center, half, workdir)
-        _store_image(ob.name + "_imp_color", color, False)
-        _store_image(ob.name + "_imp_data", data, True)
+        color_img = _store_image(ob.name + "_imp_color", color, False)
+        data_img = _store_image(ob.name + "_imp_data", data, True)
         card = _card(ob, center, half)
+        if _card_material(card, ob, color_img, data_img, half) is None:
+            self.report({'WARNING'}, "box_impostor.glsl not found: the card has no material")
         self.report({'INFO'}, "Box Impostor: %s, %d px per view, %.1f s" % (card.name, res, time.time() - t0))
         return {'FINISHED'}
 

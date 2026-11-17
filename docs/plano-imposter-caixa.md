@@ -55,7 +55,14 @@ no Vertex Offset, para cobrir a caixa de qualquer ângulo.
 
 Estado: Etapa 1 feita (91d183384). Etapa 2 feita: `object.bake_box_impostor`
 (`startup/bl_operators/anastacio_box_impostor.py`); caixa cúbica em metros, eixos U/V por vista no topo
-do arquivo; ainda sem botão na interface (F3) e sem material no card (vem com a Etapa 3).
+do arquivo; ainda sem botão na interface (F3). Etapa 3 (cor) feita, aguardando aceite: nó
+`presets/glsl_nodes/box_impostor.glsl` + material do card criado pelo bake (nó → Color, Billboard
+esférico → Vertex Offset). Decisões do teste: marcha só com as 3 vistas voltadas para a câmera (com as 6,
+partes finas como a orelha viram lâminas e os passos pulam); profundidade lida no texel mais próximo e
+dilatada 1 texel no bake, cor espalhada para os texels transparentes; leituras com `img_<nome>_lod`
+(mipmap em laço com break dava linhas); 32 passos padrão. Card fora do Auto Static Batch (Billboard).
+Falta: escrever a profundidade do acerto (hoje vale a do plano do card, objetos atravessando o card se
+cruzam errado), normal para a luz, botão na UI.
 
 1. **C (pequeno):** `@surface` ganha `surface(uv).view` = direção câmera → pixel no espaço do
    objeto (em metros, mesma convenção de `position`), calculada no wrapper a partir de `scr_slv`

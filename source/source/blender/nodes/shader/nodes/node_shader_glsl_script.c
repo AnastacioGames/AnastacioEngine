@@ -848,14 +848,19 @@ static char *script_translate_header(const bNode *node, const char *src, HeaderI
 				}
 			}
 			else if (ima) {
+				/* img_<name>_lod: explicit mip level, for reads inside loops with break/discard, where the
+				 * derivatives that pick the level of img_<name> are undefined (lines between pixels). */
 				BLI_dynstr_appendf(ds, "vec4 img_%s(vec2 uv) { return texture2D(SCRIPT_IMG%d, uv); }\n", e->name,
 				                   info->totbound);
+				BLI_dynstr_appendf(ds, "vec4 img_%s_lod(vec2 uv, float lod) { return textureLod(SCRIPT_IMG%d, uv, lod); }\n",
+				                   e->name, info->totbound);
 				info->image_data[info->totbound] = false;
 				info->image_ids[info->totbound++] = ima;
 			}
 			else {
 				/* No image chosen yet: transparent black, the shader still compiles. */
 				BLI_dynstr_appendf(ds, "vec4 img_%s(vec2 uv) { return vec4(0.0); }\n", e->name);
+				BLI_dynstr_appendf(ds, "vec4 img_%s_lod(vec2 uv, float lod) { return vec4(0.0); }\n", e->name);
 			}
 		}
 	}

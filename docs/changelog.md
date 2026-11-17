@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa, etapa 3: nó do parallax
+
+- Nó GLSL `presets/glsl_nodes/box_impostor.glsl` (Library > Impostor): marcha o raio do olho pela caixa
+  nas 3 vistas voltadas para a câmera, refino binário, cor das vistas que viram o ponto; sem acerto,
+  `discard`. Params `extent` (meia aresta da caixa) e `steps` (1-32, padrão 32).
+- `object.bake_box_impostor` cria o material do card (nó + Billboard esférico no Vertex Offset), dilata a
+  profundidade 1 texel e espalha a cor nos texels transparentes.
+- Nodes GLSL: `img_<nome>_lod(uv, lod)` (textureLod). Auto Static Batch: material com Billboard fica fora.
+- Limitação: a profundidade escrita é a do plano do card.
+
 ## 2026-11-17 — Impostor de Caixa, Etapa 2: `object.bake_box_impostor`
 
 - `startup/bl_operators/anastacio_box_impostor.py`: assa 6 vistas ortográficas do objeto ativo num cubo
