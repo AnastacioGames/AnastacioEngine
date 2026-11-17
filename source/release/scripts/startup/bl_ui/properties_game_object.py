@@ -1015,15 +1015,14 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         ob = context.object
         gs = context.scene.game_settings
 
-        col = layout.column()
-        col.prop(ob, "lod_factor", text="Distance Factor")
-        col.prop(ob, "use_lod_physics", text="Physics Update")
         wm = context.window_manager
         levels = [(i, l) for i, l in enumerate(ob.lod_levels) if i > 0]
 
         # 1. Levels: the meshes and distances.
         box = _lod_section(layout, wm, "lod_show_levels", "Levels", 'MOD_DECIM')
         if box:
+            box.prop(ob, "lod_factor", text="Distance Factor")
+            box.prop(ob, "use_lod_physics", text="Physics Update")
             for i, level in levels:
                 sub = box.box()
                 row = sub.row(align=True)
