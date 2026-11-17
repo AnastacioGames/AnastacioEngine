@@ -16,6 +16,7 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - Tentado e descartado: opção "Vertical" (Lock Axis, retângulo justo para casas); fica achatado visto de cima e corta o telhado.
 - Objetos largos e baixos continuam com o quadrado grande (cobre a esfera, de qualquer lado). Medido (desktop, 60 fps travados): 400 cards da casa em 1 draw instanciado custam ~0,045 ms de MainRender e ~0,012 ms de GPU; 64 casas reais × impostor: 0,182 × 0,156 ms. O shader descarta cedo o pixel cujo raio não cruza a caixa.
 - Falta ver no jogo: casa alinhada no card e culling na borda da tela.
+- Modo Volume: objeto oco (casa sem piso) tinha a parede cortada na linha do horizonte olhando para cima (a vista de baixo via o forro e descartava a parede de perfil). Na vista vertical, ponto na frente da 1a superficie nao reprova mais; X/Y decidem. Aceito pelo usuario; refazer o bake para pegar o shader novo.
 
 ## 2026-11-17 — Impostores: painel explica qual usar; Impostor de Caixa em cabeça presa a osso
 
