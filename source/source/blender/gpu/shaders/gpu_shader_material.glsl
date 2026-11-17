@@ -358,6 +358,13 @@ void point_transform_m4v3(vec3 vin, mat4 mat, out vec3 vout)
 	vout = (mat * vec4(vin, 1.0)).xyz;
 }
 
+/* Instancing: loc-to-view and its inverse from the view matrix and the instance matrix
+ * (GPU_material_builtin); the per-object uniforms are never set for instanced draws. */
+void mat4_mul_m4m4(mat4 a, mat4 b, out mat4 r)
+{
+	r = a * b;
+}
+
 void point_texco_remap_square(vec3 vin, out vec3 vout)
 {
 	vout = vec3(vin - vec3(0.5, 0.5, 0.5)) * 2.0;
@@ -7833,7 +7840,8 @@ void node_outline(float width, float layer, out float fac)
  * space) and removes the original X/Z so the result replaces them rather than adding on top.
  * Lock Axis keeps the up vector on local +Z (cylindrical billboard, e.g. grass/trees); otherwise
  * the billboard is spherical (always fully faces the camera, e.g. particles/UI markers). */
-void node_billboard(float lock_axis, float scale, mat4 invviewmat, mat4 invobmat, out vec3 offset)
+void node_billboard(float lock_axis, float scale, mat4 invviewmat, mat4 invobmat, mat4 obmat,
+                    float instanced, out vec3 offset)
 {
 	vec3 cam_right = invviewmat[0].xyz;
 	vec3 cam_up = (lock_axis > 0.5) ? vec3(0.0, 0.0, 1.0) : invviewmat[1].xyz;
@@ -7851,9 +7859,17 @@ void node_billboard(float lock_axis, float scale, mat4 invviewmat, mat4 invobmat
 		up_obj = normalize((invobmat * vec4(cam_up, 0.0)).xyz);
 	}
 
+	/* Instancing: the vertex arrives already moved by the instance matrix (gpu_shader_vertex.glsl);
+	 * work in the instance's object space and turn the offset back to world space. */
 	vec3 co = vertex_position();
+	if (instanced > 0.5) {
+		co = (invobmat * vec4(co, 1.0)).xyz;
+	}
 	vec3 billboarded = (right_obj * co.x + up_obj * co.z) * max(scale, 0.0001);
 	offset = billboarded - co;
+	if (instanced > 0.5) {
+		offset = mat3(obmat) * offset;
+	}
 }
 
 /* Strands: the geometry stage emits Density thin triangles per input triangle, growing along the

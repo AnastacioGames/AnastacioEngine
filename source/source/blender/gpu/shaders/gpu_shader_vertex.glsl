@@ -278,11 +278,17 @@ void main()
 						vec4(0.0, 0.0, 0.0, 1.0));
 
 	varinstmat = transpose(instmat);
-#if !defined(GPU_ATI)
-	varinstinvmat = inverse(varinstmat);
-#else
-	varinstinvmat = varinstmat;
-#endif
+	/* Affine inverse by hand (rows of the 3x3 inverse = cross products / det): exact on every
+	 * driver, unlike the old GPU_ATI path that used the matrix itself as its inverse and broke
+	 * every node reading the inverse object matrix (Billboard, GLSL Script @surface). */
+	{
+		vec3 ia = varinstmat[0].xyz, ib = varinstmat[1].xyz, ic = varinstmat[2].xyz;
+		vec3 r0 = cross(ib, ic), r1 = cross(ic, ia), r2 = cross(ia, ib);
+		float idet = dot(ia, r0);
+		mat3 inv3 = transpose(mat3(r0, r1, r2)) / (abs(idet) > 1e-20 ? idet : (idet < 0.0 ? -1e-20 : 1e-20));
+		varinstinvmat = mat4(vec4(inv3[0], 0.0), vec4(inv3[1], 0.0), vec4(inv3[2], 0.0),
+		                     vec4(-(inv3 * varinstmat[3].xyz), 1.0));
+	}
 	varinstcolor = ininstcolor;
 	varinstlayer = ininstlayer;
 	varinstinfo = ininstinfo;

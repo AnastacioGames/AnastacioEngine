@@ -100,6 +100,13 @@ Etapa 5 medida (2026-11-17, desktop, cena gerada por script): 1600 Suzannes subd
 real com Auto Static Batch é mais barato: o impostor não entra no batch nem no instancing (1600 draws).
 Ganho esperado só com malhas bem mais pesadas por objeto, iGPU/celular, ou depois de instancing do card.
 
+Instancing do card (2026-11-17): o material do card sai com Geometry Instancing ligado. Com
+instancing, `GPU_material_builtin` monta `LOC_TO_VIEW` = view × matriz da instância e a inversa =
+inversa da instância × inversa da view; o Billboard passa o vértice (já em mundo) para o espaço da
+instância e devolve o offset em mundo; a inversa da instância é afim feita à mão no vertex (o caminho
+`GPU_ATI` usava a própria matriz como inversa, errado em toda AMD). Mesma cena: MainRender 1,73 ms →
+0,27 ms; imagem igual sem instancing (só ~380 pixels de borda), também com rotação e escala por cópia.
+
 ## Revisão do Codex (2026-11-17), aceita após conferir no código
 
 - A marcha usa a interseção da **reta** com a caixa e começa em `t_entra` mesmo negativo: o card

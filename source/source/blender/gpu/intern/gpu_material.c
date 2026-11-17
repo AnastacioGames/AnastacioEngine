@@ -176,6 +176,22 @@ GPUNodeLink *GPU_material_builtin(GPUMaterial *mat, GPUBuiltin builtin)
 				builtin = GPU_INSTANCING_INFO;
 				break;
 			}
+			/* The per-object loc-to-view uniforms are never set for instanced draws
+			 * (GPU_material_bind_uniforms is skipped): build them from the view matrix and the
+			 * instance matrix, so nodes and GLSL Script @surface follow each instance. */
+			case GPU_LOC_TO_VIEW_MATRIX:
+			{
+				GPUNodeLink *link;
+				GPU_link(mat, "mat4_mul_m4m4", GPU_builtin(GPU_VIEW_MATRIX), GPU_builtin(GPU_INSTANCING_MATRIX), &link);
+				return link;
+			}
+			case GPU_INVERSE_LOC_TO_VIEW_MATRIX:
+			{
+				GPUNodeLink *link;
+				GPU_link(mat, "mat4_mul_m4m4", GPU_builtin(GPU_INSTANCING_INVERSE_MATRIX),
+				         GPU_builtin(GPU_INVERSE_VIEW_MATRIX), &link);
+				return link;
+			}
 			default:
 			{
 				break;

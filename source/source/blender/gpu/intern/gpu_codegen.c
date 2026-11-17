@@ -1708,7 +1708,10 @@ static void codegen_vertex_nodes(DynStr *ds, ListBase *nodes, GPUNodeLink *verte
 	codegen_print_scripts(decl, nodes, scripts, GPU_NODE_STAGE_VERTEX);
 
 	BLI_dynstr_append(body, "void vertex_nodes(vec3 vn_co, vec3 vn_nor, out vec3 vn_offset)\n{\n");
+	/* Instancing: vn_co is already in world space (gpu_shader_vertex.glsl applies the instance matrix). */
+	BLI_dynstr_append(body, "#ifdef USE_INSTANCING\n\tvec3 vn_viewpos = (unfviewmat * vec4(vn_co, 1.0)).xyz;\n#else\n");
 	BLI_dynstr_append(body, "\tvec3 vn_viewpos = (unfviewmat * unfobmat * vec4(vn_co, 1.0)).xyz;\n");
+	BLI_dynstr_append(body, "#endif\n");
 	BLI_dynstr_append(body, "\tvec3 vn_viewnor = normalize(gl_NormalMatrix * vn_nor);\n");
 
 	for (node = nodes->first; node; node = node->next) {

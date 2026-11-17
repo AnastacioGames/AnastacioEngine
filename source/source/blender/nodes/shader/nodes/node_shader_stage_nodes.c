@@ -269,9 +269,13 @@ static bNodeSocketTemplate sh_node_billboard_in[] = {
 
 static int node_shader_gpu_billboard(GPUMaterial *mat, bNode *UNUSED(node), bNodeExecData *UNUSED(execdata), GPUNodeStack *in, GPUNodeStack *out)
 {
+	/* Constants: GPU_uniform keeps the pointer until the shader is built. */
+	static float one = 1.0f, zero = 0.0f;
 	return GPU_stack_link(mat, "node_billboard", in, out,
 	                       GPU_material_builtin(mat, GPU_INVERSE_VIEW_MATRIX),
-	                       GPU_material_builtin(mat, GPU_INVERSE_OBJECT_MATRIX));
+	                       GPU_material_builtin(mat, GPU_INVERSE_OBJECT_MATRIX),
+	                       GPU_material_builtin(mat, GPU_OBJECT_MATRIX),
+	                       GPU_uniform(GPU_material_use_instancing(mat) ? &one : &zero));
 }
 
 void register_node_type_sh_billboard(void)

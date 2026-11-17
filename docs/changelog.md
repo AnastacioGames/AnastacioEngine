@@ -8,6 +8,13 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa: GPU Instancing do card
+
+- Com Geometry Instancing, `LOC_TO_VIEW` e a inversa (uniforms por objeto que o desenho instanciado não envia) são montadas da view e da matriz da instância (`GPU_material_builtin`); vale para todo nó e para o GLSL `@surface`.
+- Billboard funciona com instancing (vértice levado ao espaço da instância e offset de volta ao mundo).
+- `gpu_shader_vertex.glsl`: inversa da instância afim feita à mão; o ramo `GPU_ATI` usava a própria matriz como inversa (nós com Inverse Object Matrix errados em placas AMD).
+- O bake liga Geometry Instancing no material do card. 1600 cópias: MainRender 1,73 → 0,27 ms.
+
 ## 2026-11-17 — Impostor de Caixa: LOD e medição
 
 - O card agora tem a origem, rotação e escala do objeto (centro do cubo nos params `center_x/y/z` do nó), então serve de malha de LOD do próprio objeto.

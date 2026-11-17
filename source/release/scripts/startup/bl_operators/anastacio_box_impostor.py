@@ -609,6 +609,9 @@ def _card_material(card, ob, color, data, center, half, hb, box_mode, steps=32, 
     out.location = (450, 0)
     tree.links.new(bill.outputs[0], out.inputs["Vertex Offset"])
     mat.game_settings.use_backface_culling = False
+    # Copies of the object share the card: one instanced draw (LOC_TO_VIEW and the Billboard
+    # follow the instance matrix, see GPU_material_builtin and node_billboard).
+    mat.use_instancing = True
     card.data.materials.clear()
     card.data.materials.append(mat)
     return mat
