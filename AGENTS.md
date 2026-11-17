@@ -123,6 +123,7 @@ Antes deles, use `docs/local-knowledge/index-<área>.md`: índice mecânico (arq
 
 ## Outras regras práticas
 
+- **Editor web é outro repo**: `D:\AnastacioEditorWeb` (núcleo wasm + `bpy` do navegador) usa esta engine só como dependência de build (`build-web` e `build_web_editor`, fora do git) e não exige mudar código daqui. Não edite a engine para atender o editor web; fronteira e rebuild em `D:\AnastacioEditorWeb\docsronteira-engine-editor-web.md`. Mudou header DNA/RNA? Recompile o núcleo wasm de lá.
 - **Busque antes de construir**: antes de gastar esforço numa ferramenta externa ou infraestrutura nova para
   resolver um problema (ex: profiling de GPU), procure primeiro no próprio código por algo que já faça isso
   (classes de query, flags de feature, migrações parecidas já registradas no changelog).
