@@ -8,6 +8,22 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa, Etapa 2: `object.bake_box_impostor`
+
+- `startup/bl_operators/anastacio_box_impostor.py`: assa 6 vistas ortográficas do objeto ativo num cubo
+  em metros (local × escala, a convenção de `surface(uv).position`) e grava dois atlas 3x2 empacotados no
+  `.range`: `<obj>_imp_color` (albedo RGBA por Blender Internal com os materiais em Shadeless, view
+  transform Default) e `<obj>_imp_data` (Non-Color: normal em metros nos eixos do objeto em RGB,
+  profundidade a partir da face / tamanho do cubo em A, 1 sem acerto). Normal e profundidade por raycast
+  (BVH da malha com modificadores, normal suave interpolada), sem passes do compositor. Cria
+  `<obj>_box_impostor`: quad XZ (convenção do nó Billboard) com raio `half·√3`, na posição do centro do
+  cubo e na rotação do objeto; guarda `box_impostor_half`. Eixos U/V de cada vista no topo do arquivo.
+- Teste: `tools/debug/cenas/criar_cena_box_impostor.py` (Suzanne suave + Subsurf, girada 30°, escala
+  (1,1,1.5), metade vermelha/azul por X) no editor invisível: 128 px por vista em 1,1 s, as 6 vistas na
+  orientação esperada, recorte da cor e da profundidade iguais exceto 1,6% (bordas com antialiasing),
+  profundidade 0,012..0,788, câmera temporária removida.
+- Visto à parte, não corrigido: `Image.save_render()` numa imagem gerada e empacotada fecha o editor.
+
 ## 2026-11-17 — Nó GLSL `@surface`: `surface(uv).view` (Impostor de Caixa, Etapa 1)
 
 - Plano novo em [plano-imposter-caixa.md](plano-imposter-caixa.md): impostor com 6 vistas assadas

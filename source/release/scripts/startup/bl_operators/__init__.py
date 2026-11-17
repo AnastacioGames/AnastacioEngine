@@ -42,6 +42,7 @@ _modules = [
     "anastacio_sound_record",
     "anastacio_scene_doctor",
     "anastacio_lod_auto",
+    "anastacio_box_impostor",
     "anastacio_fuse_character",
     "anastacio_hlod",
     "anastacio_collision_proxy",

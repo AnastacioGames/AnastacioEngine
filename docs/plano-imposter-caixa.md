@@ -53,6 +53,10 @@ no Vertex Offset, para cobrir a caixa de qualquer ângulo.
 
 ## Etapas (uma por vez, com aceite)
 
+Estado: Etapa 1 feita (91d183384). Etapa 2 feita: `object.bake_box_impostor`
+(`startup/bl_operators/anastacio_box_impostor.py`); caixa cúbica em metros, eixos U/V por vista no topo
+do arquivo; ainda sem botão na interface (F3) e sem material no card (vem com a Etapa 3).
+
 1. **C (pequeno):** `@surface` ganha `surface(uv).view` = direção câmera → pixel no espaço do
    objeto (em metros, mesma convenção de `position`), calculada no wrapper a partir de `scr_slv`
    (sem builtin novo). Perspectiva: `eye = -vec3(dot(slv[0].xyz,t), dot(slv[1].xyz,t),
