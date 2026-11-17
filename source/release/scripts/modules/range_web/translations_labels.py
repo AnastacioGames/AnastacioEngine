@@ -124,6 +124,8 @@ TABLE = (
     ("Between Selected Markers", "Entre os marcadores selecionados", "Entre los marcadores seleccionados",
      "Между выделенными маркерами"),
     ("Bias:", "Viés:", "Sesgo:", "Смещение:"),
+    ("Box Impostor", "Impostor de caixa", "Impostor de caja", "Коробочный импостор"),
+    ("Add a level first", "Adicione um nível primeiro", "Añade un nivel primero", "Сначала добавьте уровень"),
     ("Flat Impostor (Billboard)", "Impostor plano (Billboard)", "Impostor plano (Billboard)", "Плоский импостор (билборд)"),
     ("Billboard:", "Billboard:", "Billboard:", "Билборд:"),
     ("Bind", "Vincular", "Vincular", "Привязать"),
