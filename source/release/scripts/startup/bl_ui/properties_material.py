@@ -613,9 +613,9 @@ class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
         # The node tree compiles with the sources of the material that owns it, not the ones of a Material node.
         mat = context.material
 
-        col = layout.column()
-        col.label(text="Add nodes in the Node Editor (Shift+A): Vertex, Geometry, Script, Presets", icon='NODETREE')
-        col.label(text="Shader Sources:")
+        layout.label(text="Add nodes in the Node Editor (Shift+A): Vertex, Geometry, Script, Presets", icon='NODETREE')
+        col = layout.box().column()
+        col.label(text="Shader Sources:", icon='FILE_SCRIPT')
         for label, attr in (("Vertex:", "script_vert"), ("Geometry:", "script_geom"),
                             ("Fragment:", "script_frag")):
             row = col.split()
@@ -623,18 +623,22 @@ class MATERIAL_PT_node_shader_sources(MaterialButtonsPanel, Panel):
             row.template_ID(mat, attr, new="text.new", open="text.open")
         if mat.script_geom:
             col.label(text="Geometry needs GPU support, it is skipped on the web", icon='INFO')
-        layout.operator("material.show_generated_code", icon='TEXT')
+        col.operator("material.show_generated_code", icon='TEXT')
 
-        # "uniform <type> u_<name>;" of the GLSL Script nodes, the same values as the node sockets.
+        # "uniform <type> u_<name>;" of the GLSL Script nodes, the same values as the node sockets;
+        # one box per node, titled with its script, so each field shows only its own name.
         nodes = mat.node_tree.nodes if mat.node_tree else ()
-        uniforms = [(node, sock) for node in nodes if node.bl_idname == 'ShaderNodeGLSLScript'
-                    for sock in node.inputs if sock.identifier.startswith("u_") and not sock.is_linked]
-        if uniforms:
-            col = layout.column()
-            col.label(text="Script Uniforms:")
-            for node, sock in uniforms:
+        for node in nodes:
+            if node.bl_idname != 'ShaderNodeGLSLScript':
+                continue
+            socks = [s for s in node.inputs if s.identifier.startswith("u_") and not s.is_linked]
+            if not socks:
+                continue
+            col = layout.box().column()
+            col.label(text="Uniforms: %s" % (node.script.name if node.script else node.name), icon='TEXT')
+            for sock in socks:
                 row = col.split(factor=0.4)
-                row.label(text="%s (%s)" % (sock.name, node.script.name if node.script else node.name))
+                row.label(text=sock.name)
                 row.prop(sock, "default_value", text="")
 
 
