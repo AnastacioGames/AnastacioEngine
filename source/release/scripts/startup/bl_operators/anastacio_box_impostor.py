@@ -17,7 +17,7 @@ import math
 import os
 
 import bpy
-from bpy.props import EnumProperty
+from bpy.props import EnumProperty, IntProperty
 from bpy.types import Operator
 from mathutils import Matrix, Vector
 
@@ -309,12 +309,16 @@ def _card(ob, center, half):
     name = ob.name + "_box_impostor"
     r = half * math.sqrt(3.0)
     verts = [(-r, 0.0, -r), (r, 0.0, -r), (r, 0.0, r), (-r, 0.0, r)]
+    me = bpy.data.meshes.new(name)
     card = bpy.data.objects.get(name)
     if card is not None and card.type == 'MESH':
-        me = card.data
-        me.clear_geometry()
+        # Re-bake: fresh mesh (2.79 has no Mesh.clear_geometry); the old one goes if nothing else uses it.
+        old = card.data
+        card.data = me
+        if old.users == 0:
+            bpy.data.meshes.remove(old)
+            me.name = name
     else:
-        me = bpy.data.meshes.new(name)
         card = bpy.data.objects.new(name, me)
         bpy.context.scene.objects.link(card)
     me.from_pydata(verts, [], [(0, 1, 2, 3)])
@@ -354,7 +358,14 @@ def _impostor_text():
     return text
 
 
-def _card_material(card, ob, color, data, half, hb, box_mode):
+# Material settings that change how a surface takes light (the Shading and Specular panels).
+_SHADING_PROPS = ("diffuse_shader", "diffuse_intensity", "specular_shader", "specular_color",
+                  "specular_intensity", "specular_hardness", "specular_roughness_bsdf",
+                  "specular_metallic_bsdf", "specular_ior", "emit", "ambient", "roughness",
+                  "translucency", "use_shadeless")
+
+
+def _card_material(card, ob, color, data, half, hb, box_mode, steps=32):
     """Box Impostor node -> Output Color, Billboard (spherical) -> Vertex Offset."""
     text = _impostor_text()
     if text is None:
@@ -376,17 +387,25 @@ def _card_material(card, ob, color, data, half, hb, box_mode):
     tree.interface_update(bpy.context)
     script.inputs["Extent"].default_value = half
     script.inputs["Box Mode"].default_value = 1 if box_mode else 0
+    script.inputs["Steps"].default_value = steps
     script.inputs["Box X"].default_value = max(hb.x, 1e-4)
     script.inputs["Box Y"].default_value = max(hb.y, 1e-4)
     script.inputs["Box Z"].default_value = max(hb.z, 1e-4)
     bill = tree.nodes.new("ShaderNodeBillboard")
     bill.location = (0, -200)
     bill.inputs["Lock Axis"].default_value = 0.0
-    # Lit by the scene: baked albedo + baked normal into a Material node (the material's own settings:
-    # white diffuse at full intensity, no specular, so the albedo comes through unchanged).
+    # Lit by the scene: baked albedo + baked normal into a Material node. White diffuse (the albedo comes
+    # from the atlas); the shading settings (metallic, roughness, specular, emit...) copied from the
+    # object's first material, so the card reacts to light like the original.
     mat.diffuse_color = (1.0, 1.0, 1.0)
-    mat.diffuse_intensity = 1.0
-    mat.specular_intensity = 0.0
+    src = next((s.material for s in ob.material_slots if s.material), None)
+    # No material on the object: the defaults of a new one (a re-bake must not keep the last values).
+    tmp = None if src is not None and src != mat else bpy.data.materials.new("_box_impostor_defaults")
+    for prop in _SHADING_PROPS:
+        if hasattr(mat, prop):
+            setattr(mat, prop, getattr(tmp or src, prop))
+    if tmp is not None:
+        bpy.data.materials.remove(tmp)
     shade = tree.nodes.new("ShaderNodeMaterial")
     shade.location = (150, 100)
     shade.material = mat
@@ -413,6 +432,15 @@ class OBJECT_OT_bake_box_impostor(Operator):
         name="Resolution", description="Size of each of the 6 views in pixels",
         items=(('64', "64", ""), ('128', "128", ""), ('256', "256", ""), ('512', "512", "")),
         default='256')
+    mode: EnumProperty(
+        name="Mode", description="How the card finds the surface",
+        items=(('AUTO', "Auto", "Box if the object fills its bounding box, else Volume"),
+               ('BOX', "Box", "One read on the bounding box: crates, buildings, walls (fastest)"),
+               ('VOLUME', "Volume", "Ray march in 3 views: any shape (Suzanne, trees)")),
+        default='AUTO')
+    steps: IntProperty(
+        name="Steps", description="Ray march steps in Volume mode (fewer = faster, thin parts may vanish)",
+        min=1, max=32, default=32)
 
     @classmethod
     def poll(cls, context):
@@ -435,9 +463,9 @@ class OBJECT_OT_bake_box_impostor(Operator):
         card = _card(ob, center, half)
         hb = _box_halves(ob)
         fill = _box_fill(data, res, half, hb)
-        box_mode = fill >= 0.95
+        box_mode = fill >= 0.95 if self.mode == 'AUTO' else self.mode == 'BOX'
         card["box_impostor_fill"] = fill
-        if _card_material(card, ob, color_img, data_img, half, hb, box_mode) is None:
+        if _card_material(card, ob, color_img, data_img, half, hb, box_mode, self.steps) is None:
             self.report({'WARNING'}, "box_impostor.glsl not found: the card has no material")
         self.report({'INFO'}, "Box Impostor: %s, %d px per view, %s mode, %.1f s" % (
             card.name, res, "Box" if box_mode else "Volume", time.time() - t0))

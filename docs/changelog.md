@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa: painel no LOD e material igual ao original
+
+- Bloco "Box Impostor" no painel Levels of Detail (aba Game do objeto): resolução, modo (Auto/Box/Volume), Steps e o botão Bake Box Impostor.
+- O material do card copia do material do objeto o Shading/Specular (metallic, roughness, emit, ambient, shadeless...); antes ficava com os padrões e saía mais escuro que o original.
+- Re-bake do mesmo objeto quebrava (`Mesh.clear_geometry` não existe no 2.79): agora troca a malha do card.
+
 ## 2026-11-17 — Impostor de Caixa: luz da cena
 
 - Nodes GLSL: `// @output_normal` (com `@surface`) dá a saída Normal via `surface_set_normal(n)`.

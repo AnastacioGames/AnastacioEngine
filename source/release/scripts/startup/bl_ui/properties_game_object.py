@@ -969,6 +969,26 @@ bpy.types.Scene.lod_impostor_bake_angles = EnumProperty(
 )
 
 
+bpy.types.Scene.box_impostor_resolution = EnumProperty(
+    name="Box Impostor Resolution", description="Size of each of the 6 baked views in pixels",
+    items=(('64', "64 px", ""), ('128', "128 px", ""), ('256', "256 px", ""), ('512', "512 px", "")),
+    default='256',
+)
+
+bpy.types.Scene.box_impostor_mode = EnumProperty(
+    name="Box Impostor Mode", description="How the card finds the surface",
+    items=(('AUTO', "Auto", "Box if the object fills its bounding box, else Volume"),
+           ('BOX', "Box", "One read on the bounding box: crates, buildings, walls (fastest)"),
+           ('VOLUME', "Volume", "Ray march in 3 views: any shape")),
+    default='AUTO',
+)
+
+bpy.types.Scene.box_impostor_steps = IntProperty(
+    name="Steps", description="Ray march steps in Volume mode (fewer = faster, thin parts may vanish)",
+    min=1, max=32, default=32,
+)
+
+
 class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
     bl_label = "Levels of Detail - LOD"
     COMPAT_ENGINES = {'BLENDER_GAME'}
@@ -1037,6 +1057,22 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         row = col.row(align=True)
         row.operator("object.lod_add", text="Add", icon='ZOOMIN')
         row.menu("OBJECT_MT_lod_tools", text="", icon='TRIA_DOWN')
+
+        # Box Impostor (anastacio_box_impostor.py): 6 baked views on a camera-facing card with parallax.
+        if ob.type == 'MESH':
+            sc = context.scene
+            box = layout.box()
+            box.label(text="Box Impostor", icon='MOD_BUILD')
+            row = box.row(align=True)
+            row.prop(sc, "box_impostor_resolution", text="")
+            row.prop(sc, "box_impostor_mode", text="")
+            sub = box.row()
+            sub.active = sc.box_impostor_mode != 'BOX'
+            sub.prop(sc, "box_impostor_steps")
+            op = box.operator("object.bake_box_impostor", icon='RENDER_STILL')
+            op.resolution = sc.box_impostor_resolution
+            op.mode = sc.box_impostor_mode
+            op.steps = sc.box_impostor_steps
         
 class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
     bl_label = "Animation Events"
