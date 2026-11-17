@@ -1015,7 +1015,7 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
         ob = context.object
         gs = context.scene.game_settings
 
-        col = layout.column()
+        col = layout.box().column()
         col.prop(ob, "lod_factor", text="Distance Factor")
         col.prop(ob, "use_lod_physics", text="Physics Update")
         for i, level in _lod_levels(ob):
@@ -1057,7 +1057,7 @@ class OBJECT_PT_flat_impostor(ObjectButtonsPanel, Panel):
         return (super().poll(context) and ob.type not in {'CAMERA', 'EMPTY', 'LAMP'})
 
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout.box()
         levels = _lod_levels(context.object)
         if not levels:
             layout.label(text="Add a level first", icon='INFO')
@@ -1094,7 +1094,7 @@ class OBJECT_PT_box_impostor(ObjectButtonsPanel, Panel):
         return super().poll(context) and context.object.type == 'MESH'
 
     def draw(self, context):
-        layout = self.layout
+        layout = self.layout.box()
         ob = context.object
         sc = context.scene
         row = layout.row(align=True)
