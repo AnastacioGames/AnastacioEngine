@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa: card justo ao objeto
+
+- O card gira em volta do **centro do objeto**, não da origem: o material soma o centro (espaço do objeto) ao offset do Billboard. Origem num canto (casa) deixava o quadrado com o dobro do tamanho.
+- Raio do card = vértice mais distante do centro (modo Volume) ou canto da caixa (modo Box), com 4% de folga. Antes: `half × √3 + |centro|`, com `half` do maior lado nos 3 eixos.
+- Um triângulo de área zero (pontos colineares) estica a caixa de culling da malha do card até a esfera em volta do centro, para o impostor não sumir na borda da tela.
+- Tentado e descartado: opção "Vertical" (Lock Axis, retângulo justo para casas); fica achatado visto de cima e corta o telhado.
+- Objetos largos e baixos continuam com o quadrado grande (cobre a esfera, de qualquer lado). Medido (desktop, 60 fps travados): 400 cards da casa em 1 draw instanciado custam ~0,045 ms de MainRender e ~0,012 ms de GPU; 64 casas reais × impostor: 0,182 × 0,156 ms. O shader descarta cedo o pixel cujo raio não cruza a caixa.
+- Falta ver no jogo: casa alinhada no card e culling na borda da tela.
+
 ## 2026-11-17 — Impostores: painel explica qual usar; Impostor de Caixa em cabeça presa a osso
 
 - Painel LOD: "Billboard (impostor)" vira "Flat Impostor (Billboard)"; dicas novas (RNA `use_billboard` e `object.bake_box_impostor`) dizem quando usar cada um: plano = mais barato, árvores vistas de lado; caixa = volume, luz, qualquer ângulo, objetos presos a ossos. Traduzido em PT/ES/RU.
