@@ -12,6 +12,9 @@
 // @param box_x: float(0.0001, 10000) = 1
 // @param box_y: float(0.0001, 10000) = 1
 // @param box_z: float(0.0001, 10000) = 1
+// @param center_x: float(-10000, 10000) = 0
+// @param center_y: float(-10000, 10000) = 0
+// @param center_z: float(-10000, 10000) = 0
 // @param detail: image
 // @param detail_scale: float(0.0001, 10000) = 1
 // @param detail_strength: float(0, 10) = 0
@@ -19,8 +22,9 @@
 
 // docs/plano-imposter-caixa.md. Atlas 3x2 do bake (anastacio_box_impostor.py): vista k na coluna
 // k % 3, linha k / 3; 0 +X, 1 -X, 2 +Y, 3 -Y, 4 +Z, 5 -Z. "data": RGB = normal, A = profundidade a
-// partir da face (0..1 da aresta do cubo; 1 = nada). O card fica no centro do cubo, com os eixos do
-// objeto, então surface().position e .view já estão no espaço do bake (metros, -extent..extent).
+// partir da face (0..1 da aresta do cubo; 1 = nada). O card tem a origem, os eixos e a escala do
+// objeto (serve de nível de LOD dele); surface().position menos center_x/y/z é o espaço do bake
+// (metros, -extent..extent).
 //
 // Só as 3 vistas voltadas para a câmera (uma por eixo, pelo sinal do raio). A "sombra" de cada uma
 // (tudo atrás da primeira superfície vista daquela face) vai até o fundo da caixa, então até uma
@@ -84,7 +88,10 @@ vec4 node(vec2 uv)
 {
     Surface s = surface(uv);
     float ext = max(params.extent, 1e-4);
-    vec3 p = s.position;
+    // Cube center in the object's axes (meters): the card shares the object's origin, so it can be
+    // the object's own LOD mesh; everything below works around the cube center.
+    vec3 center = vec3(params.center_x, params.center_y, params.center_z);
+    vec3 p = s.position - center;
     vec3 dir = s.view;
     float margin = 0.5 / max(res().y * 0.5, 1.0);
     float eps = 1.0 / 255.0;
@@ -150,8 +157,8 @@ vec4 node(vec2 uv)
             nb = normalize((tu * tn.x + tv * tn.y) * params.detail_strength + nb * max(tn.z, 0.0));
         }
         surface_set_normal(nb);
-        surface_set_position(q);
-        gl_FragDepth = surface_depth(q);
+        surface_set_position(q + center);
+        gl_FragDepth = surface_depth(q + center);
         return vec4(imp_srgb_to_linear(clamp(c.rgb, 0.0, 1.0)), 1.0);
     }
 
@@ -212,10 +219,10 @@ vec4 node(vec2 uv)
         wsum += w;
     }
     // Depth of the hit, not of the card plane: objects crossing the impostor cut its real shape.
-    gl_FragDepth = surface_depth(q);
+    gl_FragDepth = surface_depth(q + center);
     // Baked normal (object axes) for the scene lights: Normal output -> Material node.
     surface_set_normal(nsum);
     // Lights and shadows at the hit too, not on the card plane in the middle of the cube.
-    surface_set_position(q);
+    surface_set_position(q + center);
     return vec4(imp_srgb_to_linear(clamp(sum / max(wsum, 1e-6), 0.0, 1.0)), 1.0);
 }

@@ -17,7 +17,7 @@ import math
 import os
 
 import bpy
-from bpy.props import BoolProperty, EnumProperty, IntProperty
+from bpy.props import BoolProperty, EnumProperty, FloatProperty, IntProperty
 from bpy.types import Operator
 from mathutils import Matrix, Vector
 
@@ -487,9 +487,13 @@ def _store_image(name, atlas, non_color):
 
 
 def _card(ob, center, half):
-    """Quad on the local XZ plane (the Billboard node's convention) covering the cube from any side."""
+    """Quad on the local XZ plane (the Billboard node's convention) covering the cube from any side.
+    Same origin, rotation and scale as the object, so its mesh and material can be the object's LOD
+    level; the Billboard turns it around the origin, so it also covers the cube center's offset."""
     name = ob.name + "_box_impostor"
-    r = half * math.sqrt(3.0)
+    sca = ob.matrix_world.to_scale()
+    smin = max(min(abs(sca.x), abs(sca.y), abs(sca.z)), 1e-6)
+    r = (half * math.sqrt(3.0) + center.length) / smin
     verts = [(-r, 0.0, -r), (r, 0.0, -r), (r, 0.0, r), (-r, 0.0, r)]
     me = bpy.data.meshes.new(name)
     card = bpy.data.objects.get(name)
@@ -505,8 +509,7 @@ def _card(ob, center, half):
         bpy.context.scene.objects.link(card)
     me.from_pydata(verts, [], [(0, 1, 2, 3)])
     me.update()
-    loc, rot, _sca = ob.matrix_world.decompose()
-    card.matrix_world = Matrix.Translation(loc + rot.to_matrix() * center) * rot.to_matrix().to_4x4()
+    card.matrix_world = ob.matrix_world.copy()
     card["box_impostor_half"] = half
     card["box_impostor_source"] = ob.name
     return card
@@ -547,7 +550,7 @@ _SHADING_PROPS = ("diffuse_shader", "diffuse_intensity", "specular_shader", "spe
                   "translucency", "use_shadeless")
 
 
-def _card_material(card, ob, color, data, half, hb, box_mode, steps=32, detail=None):
+def _card_material(card, ob, color, data, center, half, hb, box_mode, steps=32, detail=None):
     """Box Impostor node -> Output Color, Billboard (spherical) -> Vertex Offset."""
     text = _impostor_text()
     if text is None:
@@ -570,6 +573,9 @@ def _card_material(card, ob, color, data, half, hb, box_mode, steps=32, detail=N
         script["img_detail"] = detail[0]
     tree.interface_update(bpy.context)
     script.inputs["Extent"].default_value = half
+    script.inputs["Center X"].default_value = center.x
+    script.inputs["Center Y"].default_value = center.y
+    script.inputs["Center Z"].default_value = center.z
     script.inputs["Detail Scale"].default_value = detail[1] if detail else 1.0
     script.inputs["Detail Strength"].default_value = detail[2] if detail else 0.0
     script.inputs["Detail Orient"].default_value = detail[3] if detail else 0
@@ -608,6 +614,39 @@ def _card_material(card, ob, color, data, half, hb, box_mode, steps=32, detail=N
     return mat
 
 
+def _add_lod(context, ob, card, distance):
+    """Card on layer 20 (out of sight, still in the scene for the game's LOD) as a level of ob: its
+    mesh and material replace the object's beyond `distance`. A re-bake reuses the same level."""
+    card.layers = [i == 19 for i in range(20)]
+    level = next((l for l in ob.lod_levels if l.object == card), None)
+    if level is None:
+        active = context.scene.objects.active
+        context.scene.objects.active = ob
+        bpy.ops.object.lod_add()
+        context.scene.objects.active = active
+        level = ob.lod_levels[-1]
+        level.object = card
+    level.distance = distance
+    level.use_mesh = True
+    level.use_material = True
+    level.use_billboard = False  # the card's own Billboard node turns it (no CPU turn)
+    # The game walks the levels in order: a closer level after a farther one would never switch.
+    dists = [l.distance for l in ob.lod_levels[1:]]
+    return all(a <= b for a, b in zip(dists, dists[1:]))
+
+
+def _remove_lod(context, ob, card):
+    """Without "Use as LOD": drop the card's level (from a previous bake) and show the card again."""
+    for i in reversed(range(1, len(ob.lod_levels))):
+        if ob.lod_levels[i].object == card:
+            active = context.scene.objects.active
+            context.scene.objects.active = ob
+            bpy.ops.object.lod_remove(index=i)
+            context.scene.objects.active = active
+    if card.layers[19] and not any(card.layers[:19]):
+        card.layers = ob.layers[:]
+
+
 class OBJECT_OT_bake_box_impostor(Operator):
     """Bake 6 orthographic views (albedo, normal, depth) of the active mesh into two atlases and """ \
         """create a camera-facing card for the Box Impostor"""
@@ -632,6 +671,13 @@ class OBJECT_OT_bake_box_impostor(Operator):
     steps: IntProperty(
         name="Steps", description="Ray march steps in Volume mode (fewer = faster, thin parts may vanish)",
         min=1, max=32, default=32)
+    use_lod: BoolProperty(
+        name="Use as LOD", description="Add the card as a LOD level of the object (the card goes to "
+        "layer 20; the game swaps to it beyond the distance)",
+        default=True)
+    lod_distance: FloatProperty(
+        name="LOD Distance", description="Distance from the camera where the impostor replaces the object",
+        min=0.0, default=30.0, unit='LENGTH')
 
     @classmethod
     def poll(cls, context):
@@ -667,10 +713,18 @@ class OBJECT_OT_bake_box_impostor(Operator):
         data_img = _store_image(ob.name + "_imp_data", data, True)
         card = _card(ob, center, half)
         card["box_impostor_fill"] = fill
-        if _card_material(card, ob, color_img, data_img, half, hb, box_mode, self.steps, detail) is None:
+        if _card_material(card, ob, color_img, data_img, center, half, hb, box_mode, self.steps, detail) is None:
             self.report({'WARNING'}, "box_impostor.glsl not found: the card has no material")
+        lod = ""
+        if self.use_lod:
+            lod = ", LOD at %g m" % self.lod_distance
+            if not _add_lod(context, ob, card, self.lod_distance):
+                self.report({'WARNING'}, "LOD distances are not in increasing order: the game may "
+                            "never switch to some levels")
+        else:
+            _remove_lod(context, ob, card)
         self.report({'INFO'}, "Box Impostor: %s, %d px per view, %s mode%s, %.1f s" % (
-            card.name, res, "Box" if box_mode else "Volume", nmap,
+            card.name, res, "Box" if box_mode else "Volume", nmap + lod,
             time.time() - t0))
         return {'FINISHED'}
 

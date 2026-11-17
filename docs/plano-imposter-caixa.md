@@ -88,6 +88,18 @@ Falta: botão na UI.
 4. **LOD:** opção no nível LOD para usar o impostor de caixa (sem o giro na CPU, o shader faz).
 5. Medir na cena controlada: N árvores reais × impostor (FPS, draw calls).
 
+Etapa 4 feita (2026-11-17): o card tem a origem/rotação/escala do objeto (centro do cubo no nó,
+`center_x/y/z`; raio do quad cobre o deslocamento) e o bake, com "Use as LOD" (padrão ligado), põe o card
+na camada 20 e cria/atualiza um nível de LOD do objeto (mesh + material, sem o Billboard da CPU).
+Testado no jogo com origem fora do centro, escala 1,5×1×1 e rotação.
+
+Etapa 5 medida (2026-11-17, desktop, cena gerada por script): 1600 Suzannes subdivididas (7872 faces,
+12,6 M no total) × os mesmos com impostor Volume 128 px/16 passos pelo LOD a 0 m, `getProfileInfo` em
+8 s: real MainRender 0,39 ms + CameraCulling 0,58 ms; impostor MainRender 2,04 ms + CameraCulling
+1,17 ms (os dois presos a 60 fps, o editor invisível não solta o vsync). Na GPU desta máquina o objeto
+real com Auto Static Batch é mais barato: o impostor não entra no batch nem no instancing (1600 draws).
+Ganho esperado só com malhas bem mais pesadas por objeto, iGPU/celular, ou depois de instancing do card.
+
 ## Revisão do Codex (2026-11-17), aceita após conferir no código
 
 - A marcha usa a interseção da **reta** com a caixa e começa em `t_entra` mesmo negativo: o card

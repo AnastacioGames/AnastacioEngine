@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-17 — Impostor de Caixa: LOD e medição
+
+- O card agora tem a origem, rotação e escala do objeto (centro do cubo nos params `center_x/y/z` do nó), então serve de malha de LOD do próprio objeto.
+- Painel/operador: "Use as LOD" (ligado) + distância: o card vai para a camada 20 e vira um nível de LOD (mesh + material; o giro é o nó Billboard, não a CPU). Re-bake reaproveita o nível.
+- Medição (1600 Suzannes de 7872 faces): CPU de render 0,97 ms real × 3,2 ms impostor nesta máquina, porque o real entra no Auto Static Batch e o card não (detalhes em docs/plano-imposter-caixa.md).
+
 ## 2026-11-17 — Impostor de Caixa: luz e sombra no ponto do acerto
 
 - `gpu_codegen.c`: a posição de vista dos nós no fragment vira o global `gpu_fragpos` (= `varposition`); o nó GLSL `@surface` ganha `surface_set_position(p)` para mudá-la. O impostor chama com o acerto: a face de costas para o sol não acende mais pela metade.

@@ -22,7 +22,7 @@ import os
 import math
 from array import array
 from bpy.types import Panel, Menu, UIList, Operator, AnimationEventTrigger
-from bpy.props import BoolProperty, IntProperty, StringProperty, EnumProperty
+from bpy.props import BoolProperty, IntProperty, StringProperty, EnumProperty, FloatProperty
 from mathutils import Vector
 from bpy.app.translations import pgettext_iface as iface_
 
@@ -989,6 +989,12 @@ bpy.types.Scene.box_impostor_normal_map = BoolProperty(
     default=True,
 )
 
+bpy.types.Scene.box_impostor_use_lod = BoolProperty(
+    name="Use as LOD", description="Add the card as a LOD level of the object (card on layer 20)",
+    default=True)
+bpy.types.Scene.box_impostor_lod_distance = FloatProperty(
+    name="Distance", description="Distance from the camera where the impostor replaces the object",
+    min=0.0, default=30.0, unit='LENGTH')
 bpy.types.Scene.box_impostor_steps = IntProperty(
     name="Steps", description="Ray march steps in Volume mode (fewer = faster, thin parts may vanish)",
     min=1, max=32, default=32,
@@ -1081,11 +1087,18 @@ class OBJECT_PT_levels_of_detail(ObjectButtonsPanel, Panel):
                 row.prop(sc, "box_impostor_normal_map", text="Include Normal Map")
             else:
                 row.label(text="No normal map in the materials", icon='INFO')
+            row = box.row(align=True)
+            row.prop(sc, "box_impostor_use_lod")
+            sub = row.row(align=True)
+            sub.active = sc.box_impostor_use_lod
+            sub.prop(sc, "box_impostor_lod_distance")
             op = box.operator("object.bake_box_impostor", icon='RENDER_STILL')
             op.resolution = sc.box_impostor_resolution
             op.mode = sc.box_impostor_mode
             op.steps = sc.box_impostor_steps
             op.normal_map = sc.box_impostor_normal_map
+            op.use_lod = sc.box_impostor_use_lod
+            op.lod_distance = sc.box_impostor_lod_distance
         
 class OBJECT_PT_animation_events(GameButtonsPanel, Panel):
     bl_label = "Animation Events"
