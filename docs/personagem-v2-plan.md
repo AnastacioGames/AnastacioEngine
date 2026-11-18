@@ -385,7 +385,8 @@ volta ao cartão (3, 3, 2). Varredura 7–25 m ida e volta sem quadro sem cabeç
 Decisão do usuário (2026-11-18): o caro é cabeça e mãos; só de perto ficam as originais, depois pode ser LOD ou
 impostor. Cartão fica a 20 m; listras do cartão e furinhos do LOD1/LOD2 vistos em print ampliado não precisam de
 correção. Abaixado/inclinado: `animations_manager._pose_lod_cap` (RolimaRacer 970ecf9) trava em malha como o ragdoll,
-porque o cartão só tem a pose sentada. Em aberto: triciclo (cartão na pose do carro).
+porque o cartão só tem a pose sentada. Triciclo: com o IK do triciclo ligado também fica na malha (RolimaRacer
+081f3f4, decisão do usuário em vez de um 2º cartão).
 
 Histórico do protótipo:
 
