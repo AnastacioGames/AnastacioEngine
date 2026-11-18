@@ -381,7 +381,8 @@ O código (`E corpo`, `lodLevelMax`, travas do ragdoll/abaixar/triciclo) fica: s
 Passos do Volume da cabeça: 10 (`HEAD_IMPOSTOR_STEPS`, 2026-11-18; prints 32 × 17 × 10 a 10/15/25 m quase iguais, em
 `Enzo/13_passos/comparar_passos_10.png`; Enzo instalado e 09 ajustados). Resolução do impostor da cabeça: **256** (`HEAD_IMPOSTOR_RES`, 2026-11-18): imagens 768×512, ~4 MB/piloto em vez
 de ~17 MB; prints 512 × 256 ampliados quase iguais e no tamanho real do jogo (10 m, lente 35) idênticos
-(`Enzo/13_passos/comparar_res.png`, `real_10m.png`). `E impostor P --res N` troca. Enzo refeito e instalado
+(`Enzo/13_passos/comparar_res.png`, `real_10m.png`). `E impostor P --res N` troca. 128 testado (2026-11-18): ampliado serrilha cabelo/rosto, no jogo quase igual; usuário
+manteve **256**; 128 só se um dia houver opção "PC muito fraco" (`comparar_res_128.png`). Enzo refeito e instalado
 (backups: `Enzo/08_impostor_512.range`, `Enzo/09_piloto_512`, `_backup/GroupEnzo_cabeca512_2026-11-18`).
 
 **Pipeline (`E corpo P <Nome>`, depois do `fechar`):** `v2.bake_body_impostor` abre o `06_atlas.range` (corpo cheio),
