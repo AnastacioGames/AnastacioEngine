@@ -396,13 +396,14 @@ Estado no jogo: `_novos/GroupEnzo` = `09_piloto` + impostor do corpo a **20 m** 
 usuário para testar). Usuário: "ficou bom, mas **o corpo fica invisível na hora errada**".
 
 **Para amanhã:**
-1. Corpo invisível na hora errada. Hipótese (não confirmada): cada objeto mede a distância de um ponto diferente
-   (`KX_GameObject::UpdateLod`): `Body` e `Body.001` (deformados) pelo centro da AABB deformada de cada um —
-   quando o `Body` vira o cartão, a AABB muda para a do cartão —, e a `Cabeca` pela origem dela. Perto de 20 m a
-   parte de cima/cabeça somem antes de o corpo virar cartão (ou o corpo volta e a de cima não). Correção provável:
-   os três medirem do mesmo ponto (ex.: um ponto comum do piloto) ou forçar a troca em grupo; o `distanceOrigin`
-   do `KX_LodManager` hoje só existe para HLOD (fixo, do `source`). Reproduzir no runtime invisível com câmera
-   andando de 15 a 25 m e logando `currentLodLevel` dos três.
+1. ~~Corpo invisível na hora errada~~ **RESOLVIDO 2026-11-18.** Não era o ponto de medição (corpo e cabeça
+   medem de pontos a ~0,5 m um do outro). Era a **histerese**: a engine dá de folga uma % (cena: 10 %) da distância
+   entre o nível e o anterior; o corpo (15→20 m) ficava com 0,5 m e a Cabeca (9→20 m) com 1,1 m, então na volta o
+   corpo virava malha sem cabeça a 19,5 m e a Cabeca só reaparecia abaixo de 19 m. Correção:
+   `v2.match_lod_hysteresis` (cada nível com a sua % para a folga ser `LOD_HYST_BAND` = 0,5 m nas três partes;
+   chamada no `finish_pilot_v2`) e a Cabeca/`Body.001` somem `BODY_CARD_HEAD_MARGIN` = 1 m depois do cartão
+   (`montar_lod.py`). Varredura no runtime invisível de 7 a 25 m e de volta, passo 0,25 m: sem nenhum quadro sem
+   cabeça. Enzo instalado corrigido no próprio arquivo (cópia `GroupEnzo.range.antes_histerese`).
 2. Ragdoll: com o cartão, o piloto caído longe aparece sentado no ar. Precisa de um jeito na engine de travar o
    LOD (ex.: atributo Python no KX_GameObject limitando o nível máximo) e o componente do ragdoll usar.
 3. Levar para o pipeline como etapa 11 (`tools/personagem_v2.py`), com a distância final (usuário gostou da

@@ -1683,6 +1683,25 @@ def head_in_body_up_close(arm, body, head, report=print):
             "corpo_lod1_a": body_lod1, "nivel0_tris": autorig._tris(body)}
 
 
+LOD_HYST_BAND = 0.5          # m de folga (histerese) em toda troca de LOD do piloto, igual nas três partes
+BODY_CARD_HEAD_MARGIN = 1.0  # m: a Cabeca/alto do tronco só somem depois que o corpo já virou o cartão
+
+
+def match_lod_hysteresis(objs, band=LOD_HYST_BAND):
+    """A histerese do LOD da engine é uma % da distância ENTRE o nível e o anterior (KX_LodManager): o corpo
+    (15→20 m) ganhava 0,5 m de folga e a Cabeca (9→20 m) 1,1 m, então na volta o corpo virava malha sem cabeça
+    antes de a Cabeca reaparecer (2026-11-18, Enzo: "corpo invisível na hora errada"). Cada nível ganha a sua
+    % para a folga ficar `band` metros em todas as partes; a ordem das trocas fica só nas distâncias."""
+    for ob in objs:
+        if ob is None:
+            continue
+        lv = ob.lod_levels
+        for i in range(1, len(lv)):
+            gap = abs(lv[i].distance - lv[i - 1].distance)
+            lv[i].use_object_hysteresis = True
+            lv[i].object_hysteresis_percentage = int(max(0, min(100, round(100.0 * band / gap)))) if gap > 1e-3 else 0
+
+
 def split_first_person(arm, body):
     """Separa do nível 0 a cabeça e o alto do tronco (autorig.split_fp_part, a mesma altura dos antigos).
     A parte separada ganha os mesmos níveis de LOD com um triângulo invisível (só o corpo mostra o LOD)."""
@@ -1738,6 +1757,7 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
         info["primeira_pessoa_tris"] = autorig._tris(fp_body) if fp_body else 0
     else:
         fp_body = None
+    match_lod_hysteresis([body, fp_body, head])
     # nomes com o grupo antes do ragdoll (as peças levam o nome da armature): vários pilotos v2 na mesma
     # corrida não podem repetir Cabeca, materiais ou actions
     arm.name = "Armature" + group_name
