@@ -1573,7 +1573,7 @@ def reduce_body(arm, body, rest_tris=BODY_REST_TRIS, hands_tris=HANDS_TRIS, lods
 
 HEAD_IMPOSTOR_RES = '512'      # pixels por vista (6 vistas); o rosto precisa de mais que os 256 padrão
 HEAD_IMPOSTOR_DIST = 10.0      # metros: junto do LOD1 do corpo
-HEAD_IMPOSTOR_STEPS = 17       # passos do raio no Volume: igual a 32 nos prints (2026-11-18), quase metade do custo
+HEAD_IMPOSTOR_STEPS = 10       # passos do raio no Volume: prints 32/17/10 quase iguais (2026-11-18), 1/3 do custo
 
 
 def _origin_to_center(ob):

@@ -378,8 +378,8 @@ compressão ≈ 17 MB por piloto (+ 17 MB da cabeça). Para PC fraco pesa mais a
 triângulos. Com `RANGE_WEAK_GPU=16` os números não mudaram (simulador talvez não aja no runtime invisível).
 O Enzo instalado voltou a ser o `09_piloto` sem cartão (backup com cartão em `_backup/GroupEnzo_com_cartao_2026-11-18`).
 O código (`E corpo`, `lodLevelMax`, travas do ragdoll/abaixar/triciclo) fica: sem `lod_max_ragdoll` nada trava.
-Passos do Volume da cabeça: 17 (`HEAD_IMPOSTOR_STEPS`, 2026-11-18; prints 32 × 17 a 10/15/25 m iguais, em
-`Enzo/13_passos/comparar_passos.png`; Enzo instalado e 09 ajustados). Pendente: imagens do impostor da CABEÇA também são 1536×1024 PNG (~17 MB/piloto) → testar 256/384 ou formato comprimido.
+Passos do Volume da cabeça: 10 (`HEAD_IMPOSTOR_STEPS`, 2026-11-18; prints 32 × 17 × 10 a 10/15/25 m quase iguais, em
+`Enzo/13_passos/comparar_passos_10.png`; Enzo instalado e 09 ajustados). Pendente: imagens do impostor da CABEÇA também são 1536×1024 PNG (~17 MB/piloto) → testar 256/384 ou formato comprimido.
 
 **Pipeline (`E corpo P <Nome>`, depois do `fechar`):** `v2.bake_body_impostor` abre o `06_atlas.range` (corpo cheio),
 pose sentada, corpo + cabeça numa malha no espaço do `Body` e assa o Impostor de Caixa (512, Volume pelo AUTO);
