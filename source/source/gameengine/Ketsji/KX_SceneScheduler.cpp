@@ -85,6 +85,11 @@ void KX_SceneScheduler::PostProcessScene(KX_Scene *scene)
 	if (CM_TraceOn(CM_TRACE_RUNTIME)) {
 		CM_TraceEvent("scene_add", "\"scene\":" + CM_TraceStr(scene->GetName()));
 	}
+	const auto hidden = std::find(m_hiddenStartScenes.begin(), m_hiddenStartScenes.end(), scene->GetName());
+	if (hidden != m_hiddenStartScenes.end()) {
+		scene->SetVisible(false);
+		m_hiddenStartScenes.erase(hidden);
+	}
 	bool override_camera = (((m_engine->GetFlag(KX_KetsjiEngine::CAMERA_OVERRIDE)) != 0) && (scene->GetName() == m_engine->GetOverrideSceneName()));
 
 	// if there is no activecamera, or the camera is being
@@ -119,7 +124,7 @@ static void ProfileNoteScene(const std::string& name, double start)
 	}
 }
 
-void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous)
+void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous, bool visible)
 {
 	// only add scene when it doesn't exist!
 	/* Uma cena com end() neste frame sai antes do add: aceitar a nova. */
@@ -129,6 +134,9 @@ void KX_SceneScheduler::ConvertAndAddScene(const std::string& scenename, bool ov
 		CM_Warning("scene " << scenename << " already exists, not added!");
 	}
 	else {
+		if (!visible) {
+			m_hiddenStartScenes.push_back(scenename);
+		}
 		if (asynchronous) {
 			m_addingAsyncScenes.emplace_back(scenename, overlay);
 		}
@@ -387,6 +395,7 @@ void KX_SceneScheduler::DestructPendingScenes()
 	}
 	m_pendingScenes.clear();
 	m_addingAsyncScenes.clear();
+	m_hiddenStartScenes.clear();
 	for (const auto& item : m_preparedScenes) {
 		DestructScene(item.second);
 	}

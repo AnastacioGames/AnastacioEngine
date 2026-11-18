@@ -57,6 +57,10 @@ class KX_SceneScheduler
 	std::vector<std::pair<std::string, std::string> > m_replace_scenes;
 	/// Names of scenes scheduled with addScene(..., asynchronous=True), and if overlay.
 	std::vector<std::pair<std::string, bool> > m_addingAsyncScenes;
+	/** Scenes added with addScene(..., visible=False): hidden as they join the list. The list is
+	 * processed after the logic and right before drawing, so a script could only hide them a frame
+	 * late (a new background scene would show its sky behind the others for that frame). */
+	std::vector<std::string> m_hiddenStartScenes;
 
 	/** Scene added with addScene(..., asynchronous=True): converted, but kept out of the scene list (no
 	 * logic, no drawing) while its shaders compile a few per frame, so a loading screen keeps animating.
@@ -113,7 +117,8 @@ public:
 	void DestructScene(KX_Scene *scene);
 
 	/// asynchronous: see PendingScene.
-	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
+	/// visible=false: the scene joins the list hidden (scene.visible), not drawn in its first frame.
+	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false, bool visible = true);
 	/// Free the scenes still compiling their shaders (engine stop).
 	void DestructPendingScenes();
 	/** Converts a scene ahead (end of frame), so a later add of it does not stall. False if it does not exist.

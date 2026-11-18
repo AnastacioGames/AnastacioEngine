@@ -763,6 +763,10 @@ public:
 	{
 		return m_visible;
 	}
+	void SetVisible(bool visible)
+	{
+		m_visible = visible;
+	}
 
 	/// Use of DBVT tree for camera culling
 	void SetDbvtCulling(bool b);

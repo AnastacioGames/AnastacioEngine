@@ -1452,9 +1452,9 @@ KX_Scene *KX_KetsjiEngine::FindScene(const std::string& scenename)
 	return m_sceneScheduler->FindScene(scenename);
 }
 
-void KX_KetsjiEngine::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous)
+void KX_KetsjiEngine::ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous, bool visible)
 {
-	m_sceneScheduler->ConvertAndAddScene(scenename, overlay, asynchronous);
+	m_sceneScheduler->ConvertAndAddScene(scenename, overlay, asynchronous, visible);
 }
 
 bool KX_KetsjiEngine::PreloadScene(const std::string& scenename)

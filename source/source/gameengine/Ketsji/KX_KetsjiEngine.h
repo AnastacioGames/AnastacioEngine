@@ -650,7 +650,7 @@ public:
 	EXP_ListValue<KX_Scene> *CurrentScenes();
 	KX_Scene *FindScene(const std::string& scenename);
 	void AddScene(KX_Scene *scene);
-	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false);
+	void ConvertAndAddScene(const std::string& scenename, bool overlay, bool asynchronous = false, bool visible = true);
 	/// See KX_SceneScheduler::PreloadScene.
 	bool PreloadScene(const std::string& scenename);
 

@@ -817,27 +817,30 @@ static PyObject *gPyGetBlendFileList(PyObject *object, PyObject *args)
 }
 
 PyDoc_STRVAR(gPyAddScene_doc,
-             "addScene(name, [overlay], asynchronous=False)\n"
+             "addScene(name, [overlay], asynchronous=False, visible=True)\n"
              "Adds a scene to the game engine.\n"
              " name = Name of the scene\n"
              " overlay = Overlay or underlay\n"
              " asynchronous = Compile its shaders a few per frame (setLibLoadFrameBudget) before the scene joins\n"
-             "   getSceneList(), so a loading screen keeps drawing; it then starts like a regular added scene."
+             "   getSceneList(), so a loading screen keeps drawing; it then starts like a regular added scene.\n"
+             " visible = False joins the list already hidden (scene.visible): never drawn before a script shows it\n"
+             "   (a background scene behind a loading screen would otherwise flash its sky for one frame)."
              );
 static PyObject *gPyAddScene(PyObject *, PyObject *args, PyObject *kwds)
 {
 	char *name;
 	int overlay = 1;
 	int asynchronous = 0;
-	static const char *kwlist[] = {"name", "overlay", "asynchronous", nullptr};
+	int visible = 1;
+	static const char *kwlist[] = {"name", "overlay", "asynchronous", "visible", nullptr};
 
-	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|ip:addScene", const_cast<char **>(kwlist), &name, &overlay,
-	                                 &asynchronous))
+	if (!PyArg_ParseTupleAndKeywords(args, kwds, "s|ipp:addScene", const_cast<char **>(kwlist), &name, &overlay,
+	                                 &asynchronous, &visible))
 	{
 		return nullptr;
 	}
 
-	KX_GetActiveEngine()->ConvertAndAddScene(name, (overlay != 0), (asynchronous != 0));
+	KX_GetActiveEngine()->ConvertAndAddScene(name, (overlay != 0), (asynchronous != 0), (visible != 0));
 
 	Py_RETURN_NONE;
 }
