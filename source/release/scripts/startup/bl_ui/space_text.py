@@ -259,6 +259,8 @@ class TEXT_HT_header(Header):
                     row.operator("text.run_script", text="", icon="PLAY")
                 else:
                     row.operator("text.run_shader_script", text="", icon="FILE_REFRESH")
+                if hasattr(bpy.types, "TEXT_OT_open_external"):
+                    row.operator("text.open_external", text="", icon='SCRIPTWIN')
 
                 row = layout.row()
                 row.active = text.name.endswith(".py")
@@ -347,6 +349,8 @@ class TEXT_PT_properties(Panel):
         col.prop(st, "use_live_edit")
         if hasattr(context.scene, "range_text_auto_reload"):
             col.prop(context.scene, "range_text_auto_reload")
+        if hasattr(context.window_manager, "range_external_editor"):
+            col.prop(context.window_manager, "range_external_editor", text="")
 
 
 class TEXT_PT_find(Panel):
