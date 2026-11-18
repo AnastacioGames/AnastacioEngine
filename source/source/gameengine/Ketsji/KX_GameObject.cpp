@@ -140,6 +140,7 @@ KX_GameObject::KX_GameObject(void *sgReplicationInfo,
 	m_lodManager(nullptr),
 	m_animationEventManager(nullptr),
 	m_currentLodLevel(0),
+	m_lodLevelMax(-1),
 	m_meshUser(nullptr),
 	m_wantsImpostorAtlasDeformer(false),
 	m_wantsDentDeformer(false),
@@ -195,6 +196,7 @@ KX_GameObject::KX_GameObject(const KX_GameObject& other)
 	m_lodManager(other.m_lodManager),
 	m_animationEventManager(nullptr),
 	m_currentLodLevel(0),
+	m_lodLevelMax(other.m_lodLevelMax),
 	m_meshUser(nullptr),
 	m_wantsImpostorAtlasDeformer(false),
 	m_wantsDentDeformer(false),
@@ -1608,7 +1610,12 @@ void KX_GameObject::UpdateLod(KX_Scene *scene, const mt::vec3& cam_pos, float lo
 	                        (m_autoUpdateBounds && GetDeformer()) ?
 	                        NodeGetWorldTransform() * m_cullingNode.GetAabb().GetCenter() : NodeGetWorldPosition();
 	const float distance2 = (lodPos - cam_pos).LengthSquared() * (lodfactor * lodfactor);
-	const KX_LodLevel& lodLevel = m_lodManager->GetLevel(scene, m_currentLodLevel, distance2);
+	const KX_LodLevel *pickedLevel = &m_lodManager->GetLevel(scene, m_currentLodLevel, distance2);
+	// lodLevelMax (Python): the far levels are skipped, e.g. a ragdoll pilot must not turn into the seated card.
+	if (m_lodLevelMax >= 0 && pickedLevel->GetLevel() > m_lodLevelMax) {
+		pickedLevel = &m_lodManager->GetLevel(std::min((unsigned int)m_lodLevelMax, m_lodManager->GetLevelCount() - 1));
+	}
+	const KX_LodLevel& lodLevel = *pickedLevel;
 
 	if (lodLevel.GetFlag() & KX_LodLevel::USE_INVISIBLE) {
 		m_bVisibleLOD = false;

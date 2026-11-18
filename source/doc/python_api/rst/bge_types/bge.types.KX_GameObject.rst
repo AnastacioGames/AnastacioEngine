@@ -641,6 +641,13 @@ base class --- :class:`SCA_IObject`
 
       :type: int
 
+   .. attribute:: lodLevelMax
+
+      Highest level of detail (LOD) index this object may switch to; -1 (default) means no limit. Farther levels
+      are skipped while it is set, e.g. a ragdoll character keeps a mesh level instead of a sitting impostor card.
+
+      :type: int (-1 to 255)
+
    .. attribute:: lodManager
 
       Return the lod manager of this object.

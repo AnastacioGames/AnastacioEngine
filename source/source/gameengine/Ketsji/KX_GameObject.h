@@ -134,6 +134,9 @@ protected:
 	KX_LodManager						*m_lodManager;
 	KX_AnimationEventManager			*m_animationEventManager;
 	short								m_currentLodLevel;
+	/// Highest LOD level UpdateLod may pick (-1 = no cap). Python: lodLevelMax. A ragdoll pilot keeps a
+	/// mesh level instead of the seated impostor card when it falls far from the camera.
+	short								m_lodLevelMax;
 	RAS_MeshUser						*m_meshUser;
 	/// Set before ReplaceMesh() when the incoming LOD level needs a private, per-instance
 	/// display array for multi-angle impostor UV selection (see KX_LodLevel::USE_ATLAS).

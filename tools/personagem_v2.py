@@ -148,9 +148,54 @@ def etapa_fechar(args):
                               ragdoll="--sem-ragdoll" not in args)
 
 
+def etapa_corpo(args):
+    """-- corpo <pasta_de_trabalho> [Nome] [--dist 20] [--lod2 15] [--res 512] [--projeto <jogo>]: etapa 11.
+    Assa o Impostor de Caixa do corpo cheio sentado (06_atlas.range) em 10_impostor_corpo.range e o põe como
+    último LOD do 09_piloto/Group<Nome>.range (grava por cima; refaça a etapa fechar para repetir)."""
+    import bpy
+    out_dir = args[0]
+    game = r"D:\ProjetoRolimaRacer"
+    name, dist, lod2, res = None, v2.BODY_IMPOSTOR_DIST, v2.BODY_IMPOSTOR_LOD2, v2.BODY_IMPOSTOR_RES
+    rest = list(args[1:])
+    while rest:
+        a = rest.pop(0)
+        if a == "--dist" and rest:
+            dist = float(rest.pop(0))
+        elif a == "--lod2" and rest:
+            lod2 = float(rest.pop(0))
+        elif a == "--res" and rest:
+            res = rest.pop(0)
+        elif a == "--projeto" and rest:
+            game = rest.pop(0)
+        elif not a.startswith("--") and name is None:
+            name = a
+    name = name or os.path.basename(os.path.normpath(out_dir))
+    bpy.ops.wm.open_mainfile(filepath=os.path.join(out_dir, "06_atlas.range"))
+    arm = next(o for o in bpy.context.scene.objects if o.type == 'ARMATURE')
+    card = v2.bake_body_impostor(arm, bpy.data.objects["Body"], bpy.data.objects["Cabeca"], game, res)
+    card_file = os.path.join(out_dir, "10_impostor_corpo.range")
+    bpy.data.libraries.write(card_file, {card}, fake_user=True)
+    card_name = card.name
+    pilot = os.path.join(out_dir, "09_piloto", "Group%s.range" % name)
+    bpy.ops.wm.open_mainfile(filepath=pilot)
+    with bpy.data.libraries.load(card_file) as (src, dst):
+        dst.objects = [card_name]
+    card = dst.objects[0]
+    card.use_fake_user = False
+    group = "Group" + name
+    ob = bpy.data.objects
+    info = v2.add_body_impostor(ob["Body" + group], ob.get("Body%s.001" % group), ob["Cabeca" + group], card, name,
+                                dist, lod2)
+    bpy.context.user_preferences.filepaths.save_version = 0
+    bpy.ops.wm.save_mainfile()
+    info["arquivo"] = pilot
+    info["cartao_arquivo"] = card_file
+    return info
+
+
 ETAPAS = {"importar": etapa_importar, "esqueleto": etapa_esqueleto, "pesos": etapa_pesos,
           "cabeca": etapa_cabeca, "maos": etapa_maos, "atlas": etapa_atlas, "lod": etapa_lod,
-          "impostor": etapa_impostor, "fechar": etapa_fechar}
+          "impostor": etapa_impostor, "fechar": etapa_fechar, "corpo": etapa_corpo}
 
 
 def main():

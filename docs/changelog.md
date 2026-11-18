@@ -8,6 +8,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — LOD: `lodLevelMax` e pilotos v2 com o impostor do corpo
+
+- `KX_GameObject.lodLevelMax` (Python, -1 = sem limite): o `UpdateLod` não passa desse nível. Uso: o componente Ragdoll do RolimaRacer limita as peças do piloto (`lod_max_ragdoll`) enquanto ele cai, para não mostrar o cartão sentado no ar. A réplica herda o valor.
+- Pipeline Personagem v2: etapa 11 `corpo` (impostor do corpo sentado como último LOD) e `match_lod_hysteresis`. A histerese do LOD é uma % do intervalo até o nível anterior: partes do mesmo piloto com intervalos diferentes trocavam em momentos diferentes (corpo sem cabeça entre 19 e 19,5 m). Agora cada nível tem a sua % para a folga ser 0,5 m em todas.
+
 ## 2026-11-17 — Impostor de Caixa: card justo ao objeto
 
 - O card gira em volta do **centro do objeto**, não da origem: o material soma o centro (espaço do objeto) ao offset do Billboard. Origem num canto (casa) deixava o quadrado com o dobro do tamanho.

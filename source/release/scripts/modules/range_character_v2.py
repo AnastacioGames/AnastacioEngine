@@ -1772,6 +1772,10 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
     for lvl in head.lod_levels[1:]:
         if lvl.object:
             lvl.object.name = lvl.object.data.name = head.name + "_box_impostor"
+    for im in bpy.data.images:
+        # imagens do impostor da cabeça com o grupo no nome (Cabeca_imp_* se repetiria em todo piloto v2)
+        if im.name.startswith("Cabeca_imp"):
+            im.name = head.name + im.name[len("Cabeca"):]
     for ob in [head] + [l.object for l in head.lod_levels[1:] if l.object]:
         for m in ob.data.materials:
             if m and not m.name.startswith(name + "_"):
@@ -1979,3 +1983,109 @@ def render_check(path, objects, size=(768, 768), center=None, extent=None, views
     bpy.data.worlds.remove(world)
     bpy.data.cameras.remove(cam_data)
     return outs
+
+
+# -- Etapa 11: impostor do corpo inteiro (sentado) como último LOD ---------------------------------------
+
+BODY_IMPOSTOR_RES = '512'      # usuário aprovou 512 (1024 só tira um pouco da mancha vista de cima)
+BODY_IMPOSTOR_DIST = 20.0      # metros: o cartão sentado no lugar do corpo (testado e aprovado no jogo, Enzo)
+BODY_IMPOSTOR_LOD2 = 15.0      # o LOD2 de malha vem antes do cartão (os níveis precisam ser crescentes)
+
+
+def bake_body_impostor(arm, body, head, game_root=GAME_ROOT, resolution=BODY_IMPOSTOR_RES):
+    """Impostor de Caixa do corpo CHEIO (abra o 06_atlas.range: o 07+ já é reduzido) na pose sentada do jogo.
+    Corpo + cabeça viram uma malha estática no espaço do Body (origem nos pés, a mesma do Body), então o cartão
+    serve de nível de LOD do próprio Body. Retorna o cartão (com as imagens empacotadas)."""
+    scene = bpy.context.scene
+    head_lods = [lvl.object for lvl in head.lod_levels]
+    for lvl in head.lod_levels[1:]:
+        lvl.object = None
+    clear_pose(arm)
+    autorig.bake_seat_pose(arm, game_root)
+    scene.update()
+    # depois de juntar, o UV ativo é o do atlas do corpo: os slots da cabeça leem o UV dela pelo nome
+    huv = head.data.uv_layers.active.name if head.data.uv_layers.active else None
+    for m in head.data.materials:
+        for s in (m.texture_slots if m else []):
+            if huv and s and s.texture_coords == 'UV' and not s.uv_layer:
+                s.uv_layer = huv
+    parts = []
+    for ob in (body, head):
+        me = ob.to_mesh(scene, True, 'PREVIEW')
+        o = bpy.data.objects.new("_p_" + ob.name, me)
+        scene.objects.link(o)
+        o.matrix_world = ob.matrix_world.copy()
+        parts.append(o)
+    for o in scene.objects:
+        o.select = o in parts
+    scene.objects.active = parts[0]
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    bpy.ops.object.join()
+    whole = scene.objects.active
+    whole.name = whole.data.name = "CorpoSentado"
+    # espaço do Body: o cartão herda origem/eixos do objeto e vira malha de LOD dele
+    whole.data.transform(body.matrix_world.inverted())
+    whole.matrix_world = body.matrix_world.copy()
+    clear_pose(arm)
+    autorig._select_only(whole)
+    scene.update()
+    bpy.ops.object.bake_box_impostor(resolution=resolution, mode='AUTO', normal_map=True,
+                                     use_lod=True, lod_distance=BODY_IMPOSTOR_DIST)
+    card = next((l.object for l in whole.lod_levels[1:] if l.object), None)
+    if card is None:
+        raise RuntimeError("bake_box_impostor não criou o cartão do corpo")
+    card.name = card.data.name = "CorpoSentado_impostor"
+    for lvl, obj in zip(head.lod_levels, head_lods):
+        lvl.object = obj
+    return card
+
+
+def add_body_impostor(body, fp_body, head, card, name, distance=BODY_IMPOSTOR_DIST, lod2=BODY_IMPOSTOR_LOD2):
+    """O cartão vira o último nível do Body<Grupo>. A Cabeca (impostor) e o Body<Grupo>.001 ganham um nível
+    use_invisible_mesh BODY_CARD_HEAD_MARGIN depois (o cartão já tem cabeça: nunca fica sem cabeça na troca) e
+    todos a mesma folga em metros (match_lod_hysteresis). lod_max_ragdoll: o componente Ragdoll do jogo
+    trava o LOD nesse nível (lodLevelMax da engine) enquanto o piloto cai: caído ele não está sentado."""
+    if body.get("corpo_impostor"):
+        raise RuntimeError("%s já tem o impostor do corpo: refaça a etapa fechar antes" % body.name)
+    group = body.name[len("Body"):] if body.name.startswith("Body") else name
+    card.name = card.data.name = "Corpo%s_impostor" % group
+    for m in card.data.materials:
+        if m and not m.name.startswith(name + "_"):
+            m.name = "%s_corpo_%s" % (name, m.name)
+    for im in bpy.data.images:
+        if im.name.startswith("CorpoSentado"):
+            im.name = im.name.replace("CorpoSentado", "Corpo" + group, 1)
+    if card.name not in bpy.context.scene.objects:
+        bpy.context.scene.objects.link(card)
+    card.layers = [i == autorig.HIDDEN_LAYER for i in range(20)]
+    card.parent = None
+    card.matrix_world = body.matrix_world.copy()
+
+    def level(ob, obj, dist, invisible=False):
+        autorig._select_only(ob)
+        bpy.ops.object.lod_add()
+        lvl = ob.lod_levels[-1]
+        lvl.object = obj
+        lvl.distance = dist
+        lvl.use_mesh = lvl.use_material = True
+        lvl.use_invisible_mesh = invisible
+        return lvl
+
+    for ob in (body, fp_body):
+        if ob is not None and lod2 and len(ob.lod_levels) > 2:
+            ob.lod_levels[2].distance = min(ob.lod_levels[2].distance, lod2)
+    level(body, card, distance)
+    autorig._prop(body, "lod_max_ragdoll", len(body.lod_levels) - 2)   # propriedade de jogo
+    for ob in (fp_body, head):
+        if ob is None or len(ob.lod_levels) < 2:
+            continue
+        level(ob, ob.lod_levels[1].object, distance + BODY_CARD_HEAD_MARGIN, invisible=True)
+        autorig._prop(ob, "lod_max_ragdoll", len(ob.lod_levels) - 2)
+    match_lod_hysteresis([body, fp_body, head])
+    body["corpo_impostor"] = card.name
+    return {"cartao": card.name, "distancia": distance, "lod2": lod2,
+            "corpo": [(l.object.name if l.object else None, round(l.distance, 2), l.object_hysteresis_percentage)
+                      for l in body.lod_levels],
+            "cabeca": [(round(l.distance, 2), l.use_invisible_mesh) for l in head.lod_levels],
+            "lod_max_ragdoll": {o.name: o.game.properties["lod_max_ragdoll"].value for o in (body, fp_body, head)
+                                if o and "lod_max_ragdoll" in o.game.properties}}

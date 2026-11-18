@@ -58,7 +58,8 @@ Tudo em background, uma etapa por vez, conferindo a imagem `NN_*.png` de cada um
 | 8 | `E impostor P` | `08_comparacao.png`: impostor no ângulo certo |
 | 9 | `E fechar P <Nome>` | `09_card_foto.png`; info: `cabeca_no_corpo.soldados` > 0, `primeira_pessoa_tris` > 0, 28 peças de ragdoll |
 | 10 | runtime invisível: `10_teste/rodar_instalado.py`, `rodar_sem_corte.py`, `rodar_fp.py` (trocar o nome) | IK do triciclo, `maos_<Nome>`, ragdoll válido; emenda de perto; impostor antes do LOD1 do corpo; 1ª pessoa só pernas e braços |
-| 11 | Instalar: backup de `5 - Personagem Link/_novos/Group<Nome>` em `5 - Personagem Link/_backup/`, copiar `09_piloto` inteiro para lá | testar numa corrida |
+| 11 | `E corpo P <Nome>` (`--dist 20 --lod2 15 --res 512`) | info: cartão a 20 m, Cabeca invisível a 21 m, `lod_max_ragdoll` corpo 2 / cabeça 1; grava `10_impostor_corpo.range` e o cartão no `09_piloto` |
+| 12 | Instalar: backup de `5 - Personagem Link/_novos/Group<Nome>` em `5 - Personagem Link/_backup/`, copiar `09_piloto` inteiro para lá | testar numa corrida |
 
 O piloto final tem: nível 0 do corpo com a cabeça cheia soldada (sem emenda) dividido em `Body<Grupo>` (pernas e
 braços) + `Body<Grupo>.001` (cabeça e tronco, `camera_hide_fp`, de longe invisível); LOD1/LOD2 sem cabeça;
@@ -368,7 +369,22 @@ objetos/constraints/actions do antigo × novo (foi assim que faltaram o IK do tr
 Conferido no runtime invisível (`10_teste/rodar_instalado.py`): `cons["mixamorig:LeftLeg:IK_tri"]` etc. existem,
 `maos_<Nome>` fecha os dedos, ragdoll válido com 14 corpos.
 
-### Etapa 11 — impostor do corpo inteiro como último LOD (EM ANDAMENTO, parou em 2026-11-17)
+### Etapa 11 — impostor do corpo inteiro como último LOD (no pipeline, 2026-11-18)
+
+**Pipeline (`E corpo P <Nome>`, depois do `fechar`):** `v2.bake_body_impostor` abre o `06_atlas.range` (corpo cheio),
+pose sentada, corpo + cabeça numa malha no espaço do `Body` e assa o Impostor de Caixa (512, Volume pelo AUTO);
+grava só o cartão em `10_impostor_corpo.range`. `v2.add_body_impostor` põe o cartão como último LOD do
+`Body<Grupo>` (`BODY_IMPOSTOR_DIST` 20 m, LOD2 puxado para 15 m), níveis invisíveis na `Cabeca<Grupo>` e no
+`Body<Grupo>.001` 1 m depois, folga de 0,5 m em todas as trocas e a propriedade de jogo `lod_max_ragdoll` (corpo 2,
+cabeça 1). Imagens com o grupo no nome (`Corpo<Grupo>_imp_*`, `Cabeca<Grupo>_imp_*`).
+**Ragdoll:** a engine ganhou `KX_GameObject.lodLevelMax` (-1 = sem limite); o componente `Ragdoll` do jogo
+(`ragdoll_system/ragdoll.py`, `_cap_lod`) põe o valor de `lod_max_ragdoll` em cada filho ao ligar e -1 ao
+desligar. Teste no runtime invisível: caído a 25 e 60 m fica malha deitada + impostor da cabeça (2, 2, 1); desligado
+volta ao cartão (3, 3, 2). Varredura 7–25 m ida e volta sem quadro sem cabeça. Enzo reinstalado assim
+(backup do teste de ontem em `_backup/GroupEnzo_teste20m_2026-11-18`).
+Ainda em aberto: distância final (usuário gostou também da imagem de 35 m) e o triciclo (cartão na pose do carro).
+
+Histórico do protótipo:
 
 Ideia do usuário: o piloto passa a corrida sentado, então o Impostor de Caixa (modo Volume) do corpo inteiro **na pose
 sentada do jogo** serve de LOD de longe (um cartão no lugar de malha + esqueleto). Roteiros em
@@ -404,10 +420,8 @@ usuário para testar). Usuário: "ficou bom, mas **o corpo fica invisível na ho
    chamada no `finish_pilot_v2`) e a Cabeca/`Body.001` somem `BODY_CARD_HEAD_MARGIN` = 1 m depois do cartão
    (`montar_lod.py`). Varredura no runtime invisível de 7 a 25 m e de volta, passo 0,25 m: sem nenhum quadro sem
    cabeça. Enzo instalado corrigido no próprio arquivo (cópia `GroupEnzo.range.antes_histerese`).
-2. Ragdoll: com o cartão, o piloto caído longe aparece sentado no ar. Precisa de um jeito na engine de travar o
-   LOD (ex.: atributo Python no KX_GameObject limitando o nível máximo) e o componente do ragdoll usar.
-3. Levar para o pipeline como etapa 11 (`tools/personagem_v2.py`), com a distância final (usuário gostou da
-   imagem de 35 m = LOD2 de malha + impostor da cabeça; decidir onde entra o cartão).
+2. ~~Ragdoll~~ feito 2026-11-18 (`lodLevelMax` + `lod_max_ragdoll`, ver acima).
+3. ~~Pipeline~~ feito 2026-11-18 (`E corpo`); falta decidir a distância final.
 4. Triciclo: o cartão é da pose do carro.
 
 ## Pontos a provar antes da etapa 4 (teste pequeno)

@@ -921,6 +921,7 @@ static int KX_GameObject_pyattr_set_destruction(EXP_PyObjectPlus *self_v, const 
 
 PyAttributeDef KX_GameObject::Attributes[] = {
 	EXP_PYATTRIBUTE_SHORT_RO("currentLodLevel", KX_GameObject, m_currentLodLevel),
+	EXP_PYATTRIBUTE_SHORT_RW("lodLevelMax", -1, 255, true, KX_GameObject, m_lodLevelMax),
 	EXP_PYATTRIBUTE_RW_FUNCTION("lodManager", KX_GameObject, pyattr_get_lodManager, pyattr_set_lodManager),
 	EXP_PYATTRIBUTE_RO_FUNCTION("animationEventManager", KX_GameObject, pyattr_get_animationEventsManager),
 	EXP_PYATTRIBUTE_RW_FUNCTION("name",     KX_GameObject, pyattr_get_name, pyattr_set_name),
