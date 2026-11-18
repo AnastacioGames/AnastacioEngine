@@ -1570,7 +1570,7 @@ void VIEW3D_OT_game_record(wmOperatorType *ot)
 {
 	/* identifiers */
 	ot->name = "Rec Play";
-	ot->description = "Start the game and record the chosen characters (experimental)";
+	ot->description = "Start the game and record the chosen characters as keyframes (experimental)";
 	ot->idname = "VIEW3D_OT_game_record";
 
 	/* api callbacks */
