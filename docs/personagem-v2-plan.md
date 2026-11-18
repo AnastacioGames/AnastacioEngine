@@ -321,6 +321,10 @@ Conferir: `09_card_foto.png` com cabelo escuro, olhos sem anel branco, cabeça n
 
 ### Correções 2026-11-18: 1ª pessoa com braços e pescoço sem ponta (no `fechar`)
 
+**Enzo: pescoço pintado À MÃO pelo usuário** (2026-11-18 10:44, achou o automático forte demais) em
+`Enzo/09_piloto` (cópia `09_piloto_manual`), instalado. **Não rodar `fechar` no Enzo de novo** (recalcula e apaga a
+pintura); se precisar, refazer e copiar os pesos do pescoço de `09_piloto_manual`.
+
 - **1ª pessoa escondia braços e mãos:** os grupos auxiliares `proteger_maos`/`proteger_juntas` (redução da etapa 7)
   ficavam no corpo com peso 1 e "ganhavam" dos ossos em `split_fp_part`. Agora o `finish_pilot_v2` apaga esses
   grupos do corpo e dos LODs e `split_fp_part` só olha grupos `mixamorig:*`. Parte escondida 17393 → 15860 tris;
