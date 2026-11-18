@@ -1573,6 +1573,7 @@ def reduce_body(arm, body, rest_tris=BODY_REST_TRIS, hands_tris=HANDS_TRIS, lods
 
 HEAD_IMPOSTOR_RES = '512'      # pixels por vista (6 vistas); o rosto precisa de mais que os 256 padrão
 HEAD_IMPOSTOR_DIST = 10.0      # metros: junto do LOD1 do corpo
+HEAD_IMPOSTOR_STEPS = 17       # passos do raio no Volume: igual a 32 nos prints (2026-11-18), quase metade do custo
 
 
 def _origin_to_center(ob):
@@ -1595,7 +1596,7 @@ def bake_head_impostor(head, resolution=HEAD_IMPOSTOR_RES, distance=HEAD_IMPOSTO
     autorig._select_only(head)
     bpy.context.scene.update()
     res = bpy.ops.object.bake_box_impostor(resolution=resolution, mode='AUTO', normal_map=True,
-                                           use_lod=True, lod_distance=distance)
+                                           use_lod=True, lod_distance=distance, steps=HEAD_IMPOSTOR_STEPS)
     card = next((l.object for l in head.lod_levels[1:] if l.object), None)
     if card is None:
         raise RuntimeError("bake_box_impostor não criou o cartão (%s)" % res)
