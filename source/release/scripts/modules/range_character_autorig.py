@@ -849,15 +849,17 @@ def split_fp_part(body, height):
     """Separa a cabeca e o alto do tronco (camera_hide_fp). Retorna (resto, parte_escondida)."""
     import bmesh
     import bpy
-    names = {g.index: g.name.replace("mixamorig:", "") for g in body.vertex_groups}
+    # só grupos de osso decidem (um grupo auxiliar com peso 1 escondia braços e mãos)
+    names = {g.index: g.name.replace("mixamorig:", "") for g in body.vertex_groups if g.name.startswith("mixamorig:")}
     mw = body.matrix_world
     zmin = min((mw * v.co).z for v in body.data.vertices)
     limit = zmin + FP_HEIGHT * height
     hide = set()
     for v in body.data.vertices:
-        if not v.groups:
+        bone_w = [g for g in v.groups if g.group in names]
+        if not bone_w:
             continue
-        dom = names[max(v.groups, key=lambda g: g.weight).group]
+        dom = names[max(bone_w, key=lambda g: g.weight).group]
         arm_side = any(k in dom for k in ("Arm", "Hand", "Thumb", "Index", "Middle", "Ring", "Pinky"))
         if dom in FP_BONES or ((mw * v.co).z > limit and not arm_side):
             hide.add(v.index)

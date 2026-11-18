@@ -808,6 +808,47 @@ def blend_neck(arm, ob, extra=NECK_EXTRA, soft=NECK_RADIUS_SOFT):
     return mudou
 
 
+NECK_RADIAL_LIMIT = 0.5   # fora do cilindro do pescoço o Head cai a 0 em 0,5 raio (alça e trapézio não giram)
+
+
+def limit_neck_radial(arm, ob, soft=NECK_RADIAL_LIMIT, ring_idx=None):
+    """Teto do peso do Head pela distância ao eixo do pescoço: 1 dentro do raio da emenda, 0 a `soft` raios fora.
+    O excesso vai para o Neck (o head_look só gira o Head). Com a borda larga do blend_neck (1 raio) a alça da
+    regata e o trapézio giravam com a cabeça e faziam uma quina a 40° (2026-11-18). Rodar antes de juntar a
+    cabeça (o anel ainda é o corte). Retorna nº de vértices mudados."""
+    g_head = ob.vertex_groups.get(HEAD_BONE)
+    g_neck = ob.vertex_groups.get(NECK_BONE) or ob.vertex_groups.new(NECK_BONE)
+    if g_head is None:
+        return 0
+    mw = ob.matrix_world
+    if ring_idx is None:   # o anel do corte: de antes do blend_neck (depois dele há vértices novos com 1)
+        ring_idx = {v.index for v in ob.data.vertices if _weight(ob, v, HEAD_BONE) >= 0.999}
+    ring = [mw * ob.data.vertices[i].co for i in ring_idx]
+    if not ring:
+        return 0
+    am = arm.matrix_world
+    base = am * arm.data.bones[NECK_BONE].head_local
+    eixo = ((am * arm.data.bones[HEAD_BONE].head_local) - base).normalized()
+
+    def radial(p):
+        q = p - base
+        return (q - eixo * q.dot(eixo)).length
+
+    raio = sorted(radial(c) for c in ring)[len(ring) // 2]
+    mudou = 0
+    for v in ob.data.vertices:
+        wh = _weight(ob, v, HEAD_BONE)
+        if wh <= 0.0 or v.index in ring_idx:
+            continue
+        teto = 1.0 - _smooth((radial(mw * v.co) - raio) / (raio * soft))
+        if wh <= teto + 1e-4:
+            continue
+        g_head.add([v.index], teto, 'REPLACE')
+        g_neck.add([v.index], _weight(ob, v, NECK_BONE) + (wh - teto), 'REPLACE')
+        mudou += 1
+    return mudou
+
+
 def match_seam_normals(body, head, tol=0.0015):
     """Normal da emenda igual nos dois objetos: cada lado calculava a normal só com as próprias faces e a luz
     mudava de uma vez na linha do corte. Os vértices do corpo e da cabeça na mesma posição (até `tol`) ganham
@@ -1606,6 +1647,8 @@ def bake_head_impostor(head, resolution=HEAD_IMPOSTOR_RES, distance=HEAD_IMPOSTO
                   "imagens": [i.name for i in bpy.data.images if i.name.startswith(head.name + "_imp")]}
 
 
+NECK_EXTRA_UP_CLOSE = 0.16       # m abaixo da base do pescoço: degradê do nível 0 (testes Enzo/15_pescoco_fp)
+NECK_RADIUS_SOFT_UP_CLOSE = 1.0
 HEAD_SWITCH_MARGIN = 0.3    # m a mais na folga entre a origem do corpo (pés) e a da Cabeca na troca do LOD
 
 
@@ -1622,6 +1665,12 @@ def head_in_body_up_close(arm, body, head, report=print):
     scene = bpy.context.scene
     clear_pose(arm)
     scene.update()
+    # 0. pescoço do nível 0 (o que se vê de perto) com degradê mais longo: com os 8 cm da etapa 4 a torção do
+    # head_look (40°) caía toda logo abaixo do queixo e a mandíbula virava uma ponta (2026-11-18). Só sobe o peso
+    # do Head (blend_neck nunca baixa), antes de juntar a cabeça (o anel ainda é o corte).
+    ring_idx = {v.index for v in body.data.vertices if _weight(body, v, HEAD_BONE) >= 0.999}
+    neck = blend_neck(arm, body, extra=NECK_EXTRA_UP_CLOSE, soft=NECK_RADIUS_SOFT_UP_CLOSE)
+    neck_lim = limit_neck_radial(arm, body, ring_idx=ring_idx)
     # 1. cópia da cabeça como malha deformada pela armature (tudo 100 % Head) e junta no corpo
     hc = bpy.data.objects.new("_cabeca_corpo", head.data.copy())
     scene.objects.link(hc)
@@ -1665,7 +1714,13 @@ def head_in_body_up_close(arm, body, head, report=print):
     # 4. Cabeca: um triângulo invisível de perto, impostor de longe
     card_lvl = next((l for l in head.lod_levels[1:] if l.object), None)
     ph = bpy.data.meshes.new(head.name + "_perto")
-    ph.from_pydata([(0, 0, 0), (0, 0, 1e-5), (1e-5, 0, 0)], [], [(0, 1, 2)])
+    # triângulo de área zero (pontos na mesma reta) com a caixa da cabeça: não desenha nada, mas a caixa de recorte
+    # fica do tamanho da cabeça e o LOD é reavaliado sempre que a cabeça está no quadro (um triângulo minúsculo
+    # podia ficar fora do quadro e travar o nível)
+    hv = [v.co for v in head.data.vertices]
+    mn = Vector((min(c.x for c in hv), min(c.y for c in hv), min(c.z for c in hv)))
+    mx = Vector((max(c.x for c in hv), max(c.y for c in hv), max(c.z for c in hv)))
+    ph.from_pydata([tuple(mn), tuple(mx), tuple((mn + mx) / 2.0)], [], [(0, 1, 2)])
     if card_lvl is not None:
         ph.materials.append(card_lvl.object.data.materials[0])
     old = head.data
@@ -1679,7 +1734,7 @@ def head_in_body_up_close(arm, body, head, report=print):
     body_lod1 = body.lod_levels[1].distance if len(body.lod_levels) > 1 else HEAD_IMPOSTOR_DIST
     if card_lvl is not None:
         card_lvl.distance = max(1.0, body_lod1 - gap)
-    return {"soldados": len(weld_targets),
+    return {"soldados": len(weld_targets), "pescoco_nivel0": neck, "pescoco_teto_radial": neck_lim,
             "cabeca_impostor_a": round(card_lvl.distance, 2) if card_lvl else None,
             "corpo_lod1_a": body_lod1, "nivel0_tris": autorig._tris(body)}
 
@@ -1705,22 +1760,20 @@ def match_lod_hysteresis(objs, band=LOD_HYST_BAND):
 
 def split_first_person(arm, body):
     """Separa do nível 0 a cabeça e o alto do tronco (autorig.split_fp_part, a mesma altura dos antigos).
-    A parte separada ganha os mesmos níveis de LOD com um triângulo invisível (só o corpo mostra o LOD)."""
+    A parte separada ganha os mesmos níveis de LOD como nível invisível (use_invisible_mesh) SEM objeto: a engine só
+    reavalia o LOD de quem está no quadro, e o triângulo minúsculo de antes (na origem, nos pés) saía do quadro com
+    a câmera na cabeça e o tronco ficava invisível de perto (2026-11-18). Invisível, o objeto guarda a caixa da
+    malha real. Sem objeto: com objeto a engine fixa a origem da distância nele (recurso do HLOD)."""
     height = arm.get("autorig_height") or 1.672
     _rest, fp = autorig.split_fp_part(body, height)
     if fp is None or fp is body:
         return None
-    ph = bpy.data.meshes.new(body.name + "_fp_longe")
-    ph.from_pydata([(0, 0, 0), (0, 0, 1e-5), (1e-5, 0, 0)], [], [(0, 1, 2)])
-    ph.materials.append(body.data.materials[0])
-    far = bpy.data.objects.new(ph.name, ph)
-    bpy.context.scene.objects.link(far)
-    far.layers = body.layers
     autorig._select_only(fp)
     while len(fp.lod_levels) < len(body.lod_levels):
         bpy.ops.object.lod_add()
     for i in range(1, len(body.lod_levels)):
-        fp.lod_levels[i].object = far
+        fp.lod_levels[i].object = None
+        fp.lod_levels[i].use_invisible_mesh = True
         fp.lod_levels[i].distance = body.lod_levels[i].distance
     return fp
 
@@ -1749,6 +1802,13 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
     if arm.animation_data:
         arm.animation_data.action = None
     bpy.context.scene.update()
+    # grupos auxiliares da redução (etapa 7) saem: com peso 1 eles "ganhavam" dos ossos e a separação da 1ª
+    # pessoa escondia braços e mãos junto com o tronco (2026-11-18)
+    for ob in [body] + [l.object for l in body.lod_levels[1:] if l.object]:
+        for gname in (PROTECT_GROUP, JOINT_GROUP):
+            g = ob.vertex_groups.get(gname)
+            if g is not None:
+                ob.vertex_groups.remove(g)
     if head_in_body:
         # de perto a cabeça fica dentro do corpo, soldada no corte: sem emenda
         info["cabeca_no_corpo"] = head_in_body_up_close(arm, body, head, report)
@@ -2080,7 +2140,7 @@ def add_body_impostor(body, fp_body, head, card, name, distance=BODY_IMPOSTOR_DI
     for ob in (fp_body, head):
         if ob is None or len(ob.lod_levels) < 2:
             continue
-        level(ob, ob.lod_levels[1].object, distance + BODY_CARD_HEAD_MARGIN, invisible=True)
+        level(ob, None, distance + BODY_CARD_HEAD_MARGIN, invisible=True)   # sem objeto: senão a engine fixa a origem da distância nele
         autorig._prop(ob, "lod_max_ragdoll", len(ob.lod_levels) - 2)
     match_lod_hysteresis([body, fp_body, head])
     body["corpo_impostor"] = card.name

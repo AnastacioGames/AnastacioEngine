@@ -319,6 +319,22 @@ Foto/cartão (`autorig.render_card`) ajustado para o v2: peça presa a osso segu
 materiais com recorte por alfa (cabelo, cílios) continuam recortados (opacos saíam brancos).
 Conferir: `09_card_foto.png` com cabelo escuro, olhos sem anel branco, cabeça no pescoço.
 
+### Correções 2026-11-18: 1ª pessoa com braços e pescoço sem ponta (no `fechar`)
+
+- **1ª pessoa escondia braços e mãos:** os grupos auxiliares `proteger_maos`/`proteger_juntas` (redução da etapa 7)
+  ficavam no corpo com peso 1 e "ganhavam" dos ossos em `split_fp_part`. Agora o `finish_pilot_v2` apaga esses
+  grupos do corpo e dos LODs e `split_fp_part` só olha grupos `mixamorig:*`. Parte escondida 17393 → 15860 tris;
+  escondida, aparecem braços (desde o ombro), mãos, quadril e pernas (`Enzo/10_teste/fp_final_esc.png`).
+- **Pescoço com ponta a 40°:** a alça da regata e o trapézio giravam com a cabeça (borda radial larga do
+  `blend_neck` da etapa 4). No nível 0, antes de juntar a cabeça: `blend_neck` com `NECK_EXTRA_UP_CLOSE` 16 cm e
+  `limit_neck_radial` (teto do Head fora do cilindro do pescoço, 0 a `NECK_RADIAL_LIMIT` 0,5 raio; excesso vai para
+  o Neck). Prints em `Enzo/15_pescoco_fp/` (`folha_teto.png`, `folha_velho_novo.png`). 8/16/24 cm sozinhos não
+  mudavam nada; o teto é o que tira a ponta.
+- **Peças escondidas no LOD:** `Body<Grupo>.001` de longe agora é `use_invisible_mesh` SEM objeto (antes: triângulo
+  minúsculo na origem; e nível invisível COM objeto liga a origem fixa de distância do HLOD na engine). O triângulo de
+  perto da `Cabeca` é de área zero com a caixa da cabeça. Motivo: a engine só reavalia o LOD de quem está no quadro.
+  Num teste o tronco sumiu de perto uma vez (não reproduzido depois); a mudança é por segurança.
+
 ### Etapa 10 — teste no jogo (runtime invisível, Enzo, 2026-11-17)
 
 Cena de teste gerada por script (chão, sol, hemi, câmera, action `CARRO_Main_drive_position` copiada do
