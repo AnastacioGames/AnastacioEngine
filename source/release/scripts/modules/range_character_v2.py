@@ -673,6 +673,8 @@ def head_weights_whole(arm, pieces, chin_gap=0.022, nape_drop=0.010):
             ring.update(inside)
     neck = blend_neck(arm, body, ring_idx=ring)
     lim = limit_neck_radial(arm, body, ring_idx=ring, keep=hv)   # a cabeça fica 100 % Head
+    others = [o for o in pieces if o is not body and autorig._piece(o) not in HEAD_PIECES]
+    inset = inset_skin_under_cloth(body, others)
     changed = [i for i, v in enumerate(body.data.vertices)
                if {body.vertex_groups[e.group].name: round(e.weight, 4) for e in v.groups} != before[i]]
     parts = [o for o in pieces if autorig._piece(o) in HEAD_PIECES]
@@ -682,50 +684,93 @@ def head_weights_whole(arm, pieces, chin_gap=0.022, nape_drop=0.010):
         g = o.vertex_groups.new(HEAD_BONE)
         g.add([v.index for v in o.data.vertices], 1.0, 'REPLACE')
     return {"corte": cut, "cabeca_vertices": len(hv), "borda": len(ring), "pescoco_degrade": neck,
-            "pescoco_teto_radial": lim, "roupa_seguiu_pele": clothes, "pecas_100_head": sorted(o.name for o in parts)}
+            "pescoco_teto_radial": lim, "pele_recuada": inset, "roupa_seguiu_pele": clothes, "pecas_100_head": sorted(o.name for o in parts)}
 
 
 CLOTH_FOLLOW_DIST = 0.03   # m: roupa até 3 cm da pele mudada copia os pesos dela (gola não rasga ao virar)
 
 
-def follow_skin_weights(body, changed, others, dist=CLOTH_FOLLOW_DIST):
-    """Gola, alça e capuz copiam os pesos do vértice de pele mais próximo quando ele mudou na etapa 4."""
+def follow_skin_weights(body, changed, others, dist=CLOTH_FOLLOW_DIST, k=6):
+    """Gola, alça e capuz seguem a pele que mexe com a cabeça: média (inverso da distância) dos pesos dos k vértices
+    de pele mais próximos; até `dist` copia inteiro, de `dist` a 2x`dist` mistura com o peso original (sem degrau
+    entre a roupa que seguiu e a que não seguiu, que rasgava/deixava a pele furar ao virar)."""
     from mathutils import kdtree
     if not changed:
         return {}
     bw = body.matrix_world
-    tree = kdtree.KDTree(len(changed))
-    for i in changed:
+    # pele mudada na etapa 4 ou com peso do Head/Neck (o head_look gira os dois)
+    hn = {g.index for g in body.vertex_groups if g.name in (HEAD_BONE, NECK_BONE)}
+    src = set(changed) | {v.index for v in body.data.vertices if any(e.group in hn and e.weight > 0.0 for e in v.groups)}
+    tree = kdtree.KDTree(len(src))
+    for i in src:
         tree.insert(bw * body.data.vertices[i].co, i)
     tree.balance()
-    # pele com peso do Head ou do Neck (o head_look gira os dois): a roupa por cima segue, senão a alça da
-    # regata fica parada e a pele do ombro passa por ela
-    hn = {g.index for g in body.vertex_groups if g.name in (HEAD_BONE, NECK_BONE)}
-    moving = [v for v in body.data.vertices if any(e.group in hn and e.weight > 0.0 for e in v.groups)]
-    tree_all = kdtree.KDTree(max(1, len(moving)))
-    for v in moving:
-        tree_all.insert(bw * v.co, v.index)
-    tree_all.balance()
+    names = [g.name for g in body.vertex_groups]
     out = {}
     for o in others:
         n = 0
         for v in o.data.vertices:
-            p = o.matrix_world * v.co
-            co, j, d = tree.find(p)
-            if j is None or d > dist:
-                co, j, d = tree_all.find(p) if moving else (None, None, None)
-                if j is None or d > dist:
+            hits = tree.find_n(o.matrix_world * v.co, k)
+            if not hits or hits[0][2] > 2.0 * dist:
+                continue
+            acc, tot = {}, 0.0
+            for co, j, d in hits:
+                if d > 2.0 * dist:
                     continue
+                w = 1.0 / max(d, 0.002)
+                tot += w
+                for e in body.data.vertices[j].groups:
+                    acc[names[e.group]] = acc.get(names[e.group], 0.0) + w * e.weight
+            t = 1.0 if hits[0][2] <= dist else 1.0 - _smooth((hits[0][2] - dist) / dist)
+            old = {o.vertex_groups[e.group].name: e.weight for e in v.groups}
+            mix = {g: t * acc.get(g, 0.0) / tot + (1.0 - t) * old.get(g, 0.0) for g in set(acc) | set(old)}
+            s = sum(mix.values()) or 1.0
             for e in list(v.groups):
                 o.vertex_groups[e.group].remove([v.index])
-            for e in body.data.vertices[j].groups:
-                gname = body.vertex_groups[e.group].name
-                g = o.vertex_groups.get(gname) or o.vertex_groups.new(gname)
-                g.add([v.index], e.weight, 'REPLACE')
+            for g, w in mix.items():
+                if w / s > 0.001:
+                    (o.vertex_groups.get(g) or o.vertex_groups.new(g)).add([v.index], w / s, 'REPLACE')
             n += 1
         if n:
             out[o.name] = n
     return out
+
+
+SKIN_INSET = 0.004   # m: pele sob a roupa fica pelo menos isto abaixo dela (não fura na pose nem no LOD)
+SKIN_INSET_REACH = 0.02
+
+
+def inset_skin_under_cloth(body, clothes, depth=SKIN_INSET, reach=SKIN_INSET_REACH):
+    """Empurra para dentro a pele que está coberta por roupa a menos de `depth` (pontinhos de pele furando a gola)."""
+    from mathutils.bvhtree import BVHTree
+    import bmesh
+    trees = []
+    for o in clothes:
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        bm.transform(o.matrix_world)
+        trees.append(BVHTree.FromBMesh(bm))
+        bm.free()
+    if not trees:
+        return 0
+    mw = body.matrix_world
+    inv = mw.inverted()
+    nm = mw.to_3x3().inverted().transposed()
+    n = 0
+    for v in body.data.vertices:
+        p = mw * v.co
+        nr = (nm * v.normal).normalized()
+        best = None
+        for t in trees:
+            hit = t.ray_cast(p - nr * 0.001, nr, reach)
+            if hit[0] is not None:
+                d = (hit[0] - p).dot(nr)
+                best = d if best is None else min(best, d)
+        if best is not None and best < depth:
+            v.co = inv * (p - nr * (depth - best))
+            n += 1
+    body.data.update()
+    return n
 
 
 HEAD_NECK_RADIUS = 0.07   # m: abaixo do queixo, raio do pescoço que ainda conta como cabeça (sem corte)
