@@ -659,6 +659,7 @@ def head_weights_whole(arm, pieces, chin_gap=0.022, nape_drop=0.010):
     giram). Retorna info."""
     body = next(o for o in pieces if autorig._piece(o) == "body")
     hv, cut = _head_side(arm, body, chin_gap, nape_drop, bisect=False)
+    before = [{body.vertex_groups[e.group].name: round(e.weight, 4) for e in v.groups} for v in body.data.vertices]
     g_head = body.vertex_groups.get(HEAD_BONE) or body.vertex_groups.new(HEAD_BONE)
     for i in hv:
         v = body.data.vertices[i]
@@ -672,13 +673,62 @@ def head_weights_whole(arm, pieces, chin_gap=0.022, nape_drop=0.010):
             ring.update(inside)
     neck = blend_neck(arm, body, ring_idx=ring)
     lim = limit_neck_radial(arm, body, ring_idx=ring, keep=hv)   # a cabeça fica 100 % Head
+    changed = [i for i, v in enumerate(body.data.vertices)
+               if {body.vertex_groups[e.group].name: round(e.weight, 4) for e in v.groups} != before[i]]
     parts = [o for o in pieces if autorig._piece(o) in HEAD_PIECES]
+    clothes = follow_skin_weights(body, changed, [o for o in pieces if o is not body and o not in parts])
     for o in parts:
         o.vertex_groups.clear()
         g = o.vertex_groups.new(HEAD_BONE)
         g.add([v.index for v in o.data.vertices], 1.0, 'REPLACE')
     return {"corte": cut, "cabeca_vertices": len(hv), "borda": len(ring), "pescoco_degrade": neck,
-            "pescoco_teto_radial": lim, "pecas_100_head": sorted(o.name for o in parts)}
+            "pescoco_teto_radial": lim, "roupa_seguiu_pele": clothes, "pecas_100_head": sorted(o.name for o in parts)}
+
+
+CLOTH_FOLLOW_DIST = 0.03   # m: roupa até 3 cm da pele mudada copia os pesos dela (gola não rasga ao virar)
+
+
+def follow_skin_weights(body, changed, others, dist=CLOTH_FOLLOW_DIST):
+    """Gola, alça e capuz copiam os pesos do vértice de pele mais próximo quando ele mudou na etapa 4."""
+    from mathutils import kdtree
+    if not changed:
+        return {}
+    bw = body.matrix_world
+    tree = kdtree.KDTree(len(changed))
+    for i in changed:
+        tree.insert(bw * body.data.vertices[i].co, i)
+    tree.balance()
+    # pele com peso do Head ou do Neck (o head_look gira os dois): a roupa por cima segue, senão a alça da
+    # regata fica parada e a pele do ombro passa por ela
+    hn = {g.index for g in body.vertex_groups if g.name in (HEAD_BONE, NECK_BONE)}
+    moving = [v for v in body.data.vertices if any(e.group in hn and e.weight > 0.0 for e in v.groups)]
+    tree_all = kdtree.KDTree(max(1, len(moving)))
+    for v in moving:
+        tree_all.insert(bw * v.co, v.index)
+    tree_all.balance()
+    out = {}
+    for o in others:
+        n = 0
+        for v in o.data.vertices:
+            p = o.matrix_world * v.co
+            co, j, d = tree.find(p)
+            if j is None or d > dist:
+                co, j, d = tree_all.find(p) if moving else (None, None, None)
+                if j is None or d > dist:
+                    continue
+            for e in list(v.groups):
+                o.vertex_groups[e.group].remove([v.index])
+            for e in body.data.vertices[j].groups:
+                gname = body.vertex_groups[e.group].name
+                g = o.vertex_groups.get(gname) or o.vertex_groups.new(gname)
+                g.add([v.index], e.weight, 'REPLACE')
+            n += 1
+        if n:
+            out[o.name] = n
+    return out
+
+
+HEAD_NECK_RADIUS = 0.07   # m: abaixo do queixo, raio do pescoço que ainda conta como cabeça (sem corte)
 
 
 def _head_side(arm, body, chin_gap, nape_drop, bisect=True):
@@ -704,7 +754,21 @@ def _head_side(arm, body, chin_gap, nape_drop, bisect=True):
     # deixava a borda serrilhada e o serrilhado dobrava ao virar a cabeça. Pesos e UV são interpolados no corte.
     import bmesh
     if not bisect:
-        side = {v.index for v in body.data.vertices if (to_w * v.co - a).dot(n) > -1e-5 and (to_w * v.co).z > neck_z}
+        # o plano é infinito para os lados: atrás (baixo) ele pegava o alto do trapézio (Aldebaran, ombro girava
+        # com a cabeça). Abaixo do queixo só conta o que está perto do eixo do pescoço.
+        top = mw * hb.tail_local
+        bot = mw * neck.head_local if neck else skull - Vector((0, 0, 0.08))
+        ax = (top - bot).normalized()
+
+        def near_axis(c):
+            q = c - bot
+            return (q - ax * q.dot(ax)).length < HEAD_NECK_RADIUS
+
+        side = set()
+        for v in body.data.vertices:
+            c = to_w * v.co
+            if (c - a).dot(n) > -1e-5 and c.z > neck_z and (c.z >= chin.z or near_axis(c)):
+                side.add(v.index)
         return side, {"queixo_z": round(chin.z, 3), "nuca_z": round(skull.z, 3)}
     inv = to_w.inverted()
     bm = bmesh.new()

@@ -47,6 +47,12 @@ Ordem nova: `importar`, `esqueleto`, `pesos`, `cabeca`, `maos`, `atlas`, `lod`, 
 - `cabeca` (padrão novo, `head_weights_whole`) não separa a malha: acima do plano do corte (2,2 cm sob o queixo,
   1 cm sob o crânio) o corpo pesa 100 % Head, assim como cabelo, olhos e cílios (com os pesos do Fuse a boca entortava ao virar); abaixo,
   `blend_neck` (8 cm) só da borda + `limit_neck_radial` (sem mexer na cabeça). `--cortar` = jeito antigo.
+  Abaixo do queixo só conta como cabeça o que está a menos de `HEAD_NECK_RADIUS` (7 cm) do eixo do pescoço: o plano é infinito
+  e pegava o trapézio do Aldebaran. A roupa a até 3 cm da pele mudada, ou da pele com peso Head/Neck, copia os pesos dela
+  (`follow_skin_weights`), senão a gola e a alça rasgavam ao virar.
+- **Todos os 12 refeitos e instalados (2026-11-18):** Enzo, Aldebaran, AldebaranRaiz, Azeite, Bia, Biel, Celesty, Fabio,
+  Patty, Quarta_Feira, Sara e Tio. Nível 0 entre 15 e 22 mil tris. Folha com a cabeça virada: `<Nome>/16_pescoco_virado_frente.png`.
+  Os antigos ficaram em `_backup/Group<Nome>_antigo_v1`. Aldebaran, Quarta_Feira e Tio foram testados no runtime: IK, mãos e ragdoll OK.
 - `atlas`: o rosto e os olhos entram no atlas. Cabelo e cílios (recorte por alfa) ficam com o material do Fuse e entram
   no `Body` depois do AO (`join_keep_materials`). O normal map dos cílios sai.
 - `lod`: a cabeça (`head_region`, acima da base do pescoço) fica travada no nível 0 e não conta na meta do resto. Os LODs levam
