@@ -682,7 +682,8 @@ class OBJECT_OT_bake_box_impostor(Operator):
 
     resolution: EnumProperty(
         name="Resolution", description="Size of each of the 6 views in pixels",
-        items=(('64', "64", ""), ('128', "128", ""), ('256', "256", ""), ('512', "512", "")),
+        items=(('64', "64", ""), ('128', "128", ""), ('256', "256", ""), ('512', "512", ""),
+               ('1024', "1024", "Characters and close-up props (bake about 4x slower than 512)")),
         default='256')
     mode: EnumProperty(
         name="Mode", description="How the card finds the surface",

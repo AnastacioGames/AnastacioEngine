@@ -1201,8 +1201,15 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=No
             ob = link(original.copy())
             ob.data = original.data.copy()
             blocks.append((bpy.data.meshes, ob.data))
-            ob.parent = None
-            ob.matrix_world = original.matrix_world.copy()
+            if original.parent_type == 'BONE' and original.parent is arm:
+                # peça presa a osso (Cabeca do personagem v2): segue o osso da cópia na pose da foto
+                ob.parent = pose_arm
+                ob.parent_type = 'BONE'
+                ob.parent_bone = original.parent_bone
+                ob.matrix_parent_inverse = original.matrix_parent_inverse.copy()
+            else:
+                ob.parent = None
+                ob.matrix_world = original.matrix_world.copy()
             ob.animation_data_clear()
             for mod in ob.modifiers:
                 if mod.type == 'ARMATURE':
@@ -1214,8 +1221,11 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=No
                     m = mat.copy()
                     blocks.append((bpy.data.materials, m))
                     materials[mat] = m
-                    m.use_transparency = False
-                    m.alpha, m.ambient, m.emit = 1.0, 0.0, 0.0
+                    # cabelo/cílios com recorte por alfa (Cabeca do personagem v2) continuam recortados;
+                    # opacos saíam brancos (a cor dos pixels transparentes)
+                    clip = mat.game_settings.alpha_blend == 'CLIP' and mat.use_transparency
+                    m.use_transparency = clip
+                    m.alpha, m.ambient, m.emit = (0.0 if clip else 1.0), 0.0, 0.0
                     m.use_object_color = False
                     m.specular_intensity = 0.08
                     for slot in m.texture_slots:
@@ -1223,7 +1233,7 @@ def render_card(arm, meshes, path, game_root=None, size=CARD_SIZE, photo_path=No
                             tex = slot.texture.copy()
                             blocks.append((bpy.data.textures, tex))
                             slot.texture = tex
-                            slot.use_map_alpha = False
+                            slot.use_map_alpha = clip and slot.use_map_color_diffuse
                             if slot.use_map_normal and tex.image:
                                 # build_atlas ainda nao passou por finish_pilot: normal nunca e sRGB.
                                 normal = tex.image.copy()
