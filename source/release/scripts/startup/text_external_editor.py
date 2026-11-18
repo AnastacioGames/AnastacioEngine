@@ -71,6 +71,22 @@ def _command(editor, filepath, line):
     return [editor, filepath]
 
 
+def open_file(filepath, line=1):
+    """Opens a file in the configured editor (or VS Code, or the system default). Error text or None."""
+    editor = _find_editor()
+    try:
+        if editor:
+            flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # code.cmd without a console
+            subprocess.Popen(_command(editor, filepath, line), creationflags=flags)
+        elif os.name == "nt":
+            os.startfile(filepath)
+        else:
+            subprocess.Popen(["xdg-open", filepath])
+    except Exception as ex:
+        return str(ex)
+    return None
+
+
 class TEXT_OT_open_external(bpy.types.Operator):
     """Open this script in the external editor (VS Code etc.); saved changes reload by themselves"""
     bl_idname = "text.open_external"
@@ -102,18 +118,9 @@ class TEXT_OT_open_external(bpy.types.Operator):
                 self.report({'ERROR'}, "Could not save the text")
                 return {'CANCELLED'}
         filepath = os.path.normpath(bpy.path.abspath(text.filepath))
-        line = text.current_line_index + 1
-        editor = _find_editor()
-        try:
-            if editor:
-                flags = getattr(subprocess, "CREATE_NO_WINDOW", 0)  # code.cmd without a console
-                subprocess.Popen(_command(editor, filepath, line), creationflags=flags)
-            elif os.name == "nt":
-                os.startfile(filepath)
-            else:
-                subprocess.Popen(["xdg-open", filepath])
-        except Exception as ex:
-            self.report({'ERROR'}, "Could not open the editor: %s" % ex)
+        error = open_file(filepath, text.current_line_index + 1)
+        if error:
+            self.report({'ERROR'}, "Could not open the editor: %s" % error)
             return {'CANCELLED'}
         return {'FINISHED'}
 

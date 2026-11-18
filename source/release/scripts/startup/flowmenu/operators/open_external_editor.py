@@ -103,8 +103,16 @@ class FLOWMENU_OT_open_external_editor(Operator):
             self.get_editor_command(base_path)
             return {'CANCELLED'}
 
-        # Abre o arquivo encontrado
-        self.get_editor_command(filepath)
+        # Abre o arquivo no mesmo editor do botao do Text Editor (caminho configurado ou VS Code)
+        try:
+            import text_external_editor
+        except ImportError:
+            self.get_editor_command(filepath)
+            return {'FINISHED'}
+        error = text_external_editor.open_file(filepath)
+        if error:
+            self.report({'ERROR'}, tip_("Could not run the editor '%s': %s") % (text_external_editor._find_editor() or "default", error))
+            return {'CANCELLED'}
         return {'FINISHED'}
 
     def open_project_folder(self, context):
