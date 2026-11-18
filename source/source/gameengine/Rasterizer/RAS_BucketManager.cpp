@@ -49,6 +49,9 @@
 #include "RAS_BucketManager.h"
 
 #include <algorithm>
+
+void (*RAS_BucketManager::BeforeAlphaHook)(RAS_Rasterizer *rasty, RAS_OffScreen *offScreen, bool hasAlpha, void *data) = nullptr;
+void *RAS_BucketManager::BeforeAlphaData = nullptr;
 /* sorting */
 
 
@@ -352,6 +355,13 @@ void RAS_BucketManager::Renderbuckets(RAS_Rasterizer::DrawType drawingMode, cons
 			RenderBasicBuckets(rasty, SOLID_INSTANCING_BUCKET);
 
 			rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_DISABLED);
+
+			/* World clouds under the transparent objects, before the snapshot below so the
+			 * refraction of Glass sees them too. */
+			if (BeforeAlphaHook) {
+				const bool hasAlpha = (m_buckets[ALPHA_BUCKET].size() + m_buckets[ALPHA_INSTANCING_BUCKET].size()) > 0;
+				BeforeAlphaHook(rasty, offScreen, hasAlpha, BeforeAlphaData);
+			}
 
 			// Update depth transparency depth texture after rendering all solid materials.
 			// The same blit also copies the color, read by the screen-space refraction of

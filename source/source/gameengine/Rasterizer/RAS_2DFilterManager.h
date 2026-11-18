@@ -129,6 +129,13 @@ public:
 	 */
 	RAS_OffScreen *RenderFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2]);
 
+	/** Draws the Clouds pass (Clouds, Sky Layers, Volumetric Clouds, sun disc) into drawofs, bound
+	 * with only the solid objects drawn: the transparent ones are then blended over the clouds
+	 * instead of the clouds being painted over them (they don't write depth). The next
+	 * RenderFilters() skips the pass. False when it didn't run (the chain draws it as before). */
+	bool RenderCloudsBeforeAlpha(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *drawofs,
+	                             const float (&sun_screen_pos)[2]);
+
 	/// Add a filter to the stack of filters managed by this object.
 	RAS_2DFilter *AddFilter(RAS_2DFilterData& filterData, bool use_reserved);
 
@@ -221,6 +228,13 @@ private:
 	int m_cloudHistoryWidth = 0;
 	int m_cloudHistoryHeight = 0;
 	int m_cloudHistoryViewport[4] = {0, 0, 0, 0};
+	/// RenderCloudsBeforeAlpha() drew the Clouds pass of this frame: RenderFilters() skips it.
+	bool m_cloudsDrawnEarly = false;
+	/// The clouds history was saved by the pass before the transparent objects (else by the chain,
+	/// with them in it): switching between the two drops it.
+	bool m_cloudHistoryEarly = false;
+	/// Drops the clouds history when it came from another viewport or size.
+	void ValidateCloudHistory(const int viewport[4], int width, int height);
 
 	/// Copy the clouds filter output (color) and the scene depth for the next frame's reuse.
 	void UpdateCloudHistory(RAS_Rasterizer *rasty, RAS_OffScreen *cloudofs, RAS_OffScreen *depthofs, const int viewport[4]);

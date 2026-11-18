@@ -59,6 +59,7 @@ extern "C" {
 #include "KX_Scene.h"
 #include "KX_WorldInfo.h"
 #include "KX_2DFilterManager.h"
+#include "RAS_BucketManager.h"
 #include "RAS_2DFilter.h"
 #include "KX_ShadowRenderer.h"
 #include "KX_DebugRenderer.h"
@@ -134,6 +135,93 @@ KX_RenderPipeline::~KX_RenderPipeline()
 /* Volumetric Fog per frame data (layout in gpu_shader_vfog_lib.glsl): World settings, the sun,
  * the strongest Point/Spot lamps around the camera, up to 2 Spot shadow maps for the light
  * shafts and up to 4 Fog Volumes (objects with the game property "fog_volume"). */
+/* World values of the Clouds pass (also Sky Layers / Volumetric Clouds). Shared by the pass before
+ * the transparent objects (RenderCamera) and the one in the 2D filter chain. */
+static void KX_FillCloudsParams(RAS_2DFilter *clouds, KX_Scene *scene, float time)
+{
+	BuildInFilters *cloudParams = clouds->GetBuildInFilters();
+	cloudParams->cloud_time = time;
+	if (const World *world = scene->GetBlenderScene()->world) {
+		cloudParams->cloud_coverage = world->cloud_coverage;
+		cloudParams->cloud_scale = world->cloud_scale;
+		cloudParams->cloud_speed = world->cloud_speed;
+		cloudParams->cloud_mask = ((world->weather_flag & WO_WEATHER_CLOUDS) ? 1 : 0) +
+		                          ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0) +
+		                          ((world->vcloud_flag & WO_VCLOUDS_ENABLE) ? 4 : 0);
+		cloudParams->sky_layer_coverage = world->sky_layer_coverage;
+		cloudParams->sky_layer_scale = world->sky_layer_scale;
+		cloudParams->sky_layer_speed = world->sky_layer_speed;
+		for (int i = 0; i < 3; ++i) {
+			cloudParams->sky_layer_color[i] = world->sky_layer_color[i];
+		}
+		cloudParams->cloud_detail = world->cloud_detail;
+		cloudParams->sky_layer_detail = world->sky_layer_detail;
+		cloudParams->sky_layer_relief = world->sky_layer_relief;
+		for (int i = 0; i < 3; ++i) {
+			cloudParams->cloud_color[i] = world->cloud_color[i];
+		}
+		cloudParams->vcloud_coverage = world->vcloud_coverage;
+		cloudParams->vcloud_scale = world->vcloud_scale;
+		cloudParams->vcloud_speed = world->vcloud_speed;
+		cloudParams->vcloud_altitude = world->vcloud_altitude;
+		cloudParams->vcloud_thickness = world->vcloud_thickness;
+		cloudParams->vcloud_density = world->vcloud_density;
+		cloudParams->vcloud_detail_scale = world->vcloud_detail_scale;
+		cloudParams->vcloud_silver_intensity = world->vcloud_silver_intensity;
+		cloudParams->vcloud_quality = world->vcloud_quality;
+		cloudParams->vcloud_shadow_enable = (world->vcloud_flag & WO_VCLOUDS_SHADOW_ENABLE) != 0;
+		cloudParams->vcloud_shadow_strength = world->vcloud_shadow_strength;
+		for (int i = 0; i < 3; ++i) {
+			cloudParams->vcloud_color[i] = world->vcloud_color[i];
+		}
+		/* World-space sun direction for the Stage 2 raymarch (self-shadow mini-march,
+		 * Henyey-Greenstein silver lining) and the terrain shadow approximation --
+		 * same lamp/axis as the Light Scattering/Lens Flare sun position above. */
+		cloudParams->vcloud_sundir[0] = 0.0f;
+		cloudParams->vcloud_sundir[1] = 0.0f;
+		cloudParams->vcloud_sundir[2] = 1.0f;
+		if (KX_LightObject *vcloud_sun = scene->GetWorldSun()) {
+			mt::vec3 sunDir = vcloud_sun->NodeGetWorldOrientation().GetColumn(2).Normalized();
+			cloudParams->vcloud_sundir[0] = sunDir.x;
+			cloudParams->vcloud_sundir[1] = sunDir.y;
+			cloudParams->vcloud_sundir[2] = sunDir.z;
+		}
+	}
+}
+
+/* Clouds pass drawn under the transparent objects (RAS_BucketManager::BeforeAlphaHook). Only
+ * when something transparent follows: an opaque only frame keeps the pass in the filter chain,
+ * with no extra copy. */
+struct EarlyCloudsData {
+	KX_Scene *scene;
+	RAS_ICanvas *canvas;
+	bool particles; // GPU particles / blasts are drawn after the buckets, also over the sky
+};
+
+static void KX_EarlyCloudsHook(RAS_Rasterizer *rasty, RAS_OffScreen *offScreen, bool hasAlpha, void *data)
+{
+	EarlyCloudsData *clouds = static_cast<EarlyCloudsData *>(data);
+	if (!hasAlpha && !clouds->particles) {
+		return;
+	}
+	KX_2DFilterManager *filterManager = clouds->scene->Get2DFilterManager();
+	const World *world = clouds->scene->GetBlenderScene()->world;
+	if (!filterManager || !world || !((world->weather_flag & WO_WEATHER_CLOUDS) ||
+	                                  (world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ||
+	                                  (world->vcloud_flag & WO_VCLOUDS_ENABLE)))
+	{
+		return;
+	}
+	RAS_2DFilter *pass = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_CLOUDS, true);
+	if (!pass) {
+		return; // built by PostRenderScene: from the next frame on
+	}
+	pass->SetEnabled(true); // turned on at runtime: PostRenderScene follows the World after this
+	KX_FillCloudsParams(pass, clouds->scene, (float)KX_GetActiveEngine()->GetFrameTime());
+	const float sunPos[2] = {0.5f, 0.0f}; // not used by the clouds shader
+	filterManager->RenderCloudsBeforeAlpha(rasty, clouds->canvas, offScreen, sunPos);
+}
+
 static void KX_FillVolumetricFog(BuildInFilters *params, KX_Scene *scene, const World *world, float time,
                                  const mt::vec3& camPos)
 {
@@ -526,11 +614,15 @@ void KX_RenderPipeline::Render()
 
 				rasterizer->SetAuxilaryClientInfo(scene);
 
+				/* Clouds under the transparent objects only for the first scene (an overlay would paint
+				 * them over the scene below) drawn by one camera (the pass covers the whole image). */
+				m_earlyCloudsAllowed = isfirstscene && sceneFrameData.m_cameraDataList.size() == 1;
 				// Draw the scene once for each camera with an enabled viewport or an active camera.
 				for (const KX_CameraRenderData& cameraFrameData : sceneFrameData.m_cameraDataList) {
 					// do the rendering
 					RenderCamera(scene, cameraFrameData, offScreen, pass++, isfirstscene);
 				}
+				m_earlyCloudsAllowed = false;
 
 				RANGE_PROFILE_MARK_GPU(prof, "render.cameras");
 
@@ -1021,7 +1113,18 @@ void KX_RenderPipeline::RenderCamera(KX_Scene *scene, const KX_CameraRenderData&
 	{ SlowPhaseNote note("cam.predraw", scene); scene->RunDrawingCallbacks(KX_Scene::PRE_DRAW, rendercam); }
 #endif
 
-	{ SlowPhaseNote note("cam.buckets", scene); scene->RenderBuckets(objects, rasterizer->GetDrawingMode(), rendercam->GetWorldToCamera(), rasterizer, offScreen); }
+	{
+		SlowPhaseNote note("cam.buckets", scene);
+		EarlyCloudsData earlyClouds = {scene, m_engine->GetCanvas(),
+		                               !scene->GetGpuParticleObjects().empty() || scene->HasParticleBlasts()};
+		if (m_earlyCloudsAllowed && isFirstScene) {
+			RAS_BucketManager::BeforeAlphaHook = KX_EarlyCloudsHook;
+			RAS_BucketManager::BeforeAlphaData = &earlyClouds;
+		}
+		scene->RenderBuckets(objects, rasterizer->GetDrawingMode(), rendercam->GetWorldToCamera(), rasterizer, offScreen);
+		RAS_BucketManager::BeforeAlphaHook = nullptr;
+		RAS_BucketManager::BeforeAlphaData = nullptr;
+	}
 
 	// GPU particle emitters (simulated once per frame in KX_Scene::UpdateGpuParticleEmitters,
 	// called from NextFrame -- not here, since RenderCamera runs once per camera and would
@@ -1298,54 +1401,7 @@ RAS_OffScreen *KX_RenderPipeline::PostRenderScene(KX_Scene *scene, RAS_OffScreen
 			}
 		}
 		if (RAS_2DFilter *clouds = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_CLOUDS, true)) {
-			BuildInFilters *cloudParams = clouds->GetBuildInFilters();
-			cloudParams->cloud_time = time;
-			if (const World *world = scene->GetBlenderScene()->world) {
-				cloudParams->cloud_coverage = world->cloud_coverage;
-				cloudParams->cloud_scale = world->cloud_scale;
-				cloudParams->cloud_speed = world->cloud_speed;
-				cloudParams->cloud_mask = ((world->weather_flag & WO_WEATHER_CLOUDS) ? 1 : 0) +
-				                          ((world->sky_layer_flag & WO_SKY_LAYERS_ENABLE) ? 2 : 0) +
-				                          ((world->vcloud_flag & WO_VCLOUDS_ENABLE) ? 4 : 0);
-				cloudParams->sky_layer_coverage = world->sky_layer_coverage;
-				cloudParams->sky_layer_scale = world->sky_layer_scale;
-				cloudParams->sky_layer_speed = world->sky_layer_speed;
-				for (int i = 0; i < 3; ++i) {
-					cloudParams->sky_layer_color[i] = world->sky_layer_color[i];
-				}
-				cloudParams->cloud_detail = world->cloud_detail;
-				cloudParams->sky_layer_detail = world->sky_layer_detail;
-				cloudParams->sky_layer_relief = world->sky_layer_relief;
-				for (int i = 0; i < 3; ++i) {
-					cloudParams->cloud_color[i] = world->cloud_color[i];
-				}
-				cloudParams->vcloud_coverage = world->vcloud_coverage;
-				cloudParams->vcloud_scale = world->vcloud_scale;
-				cloudParams->vcloud_speed = world->vcloud_speed;
-				cloudParams->vcloud_altitude = world->vcloud_altitude;
-				cloudParams->vcloud_thickness = world->vcloud_thickness;
-				cloudParams->vcloud_density = world->vcloud_density;
-				cloudParams->vcloud_detail_scale = world->vcloud_detail_scale;
-				cloudParams->vcloud_silver_intensity = world->vcloud_silver_intensity;
-				cloudParams->vcloud_quality = world->vcloud_quality;
-				cloudParams->vcloud_shadow_enable = (world->vcloud_flag & WO_VCLOUDS_SHADOW_ENABLE) != 0;
-				cloudParams->vcloud_shadow_strength = world->vcloud_shadow_strength;
-				for (int i = 0; i < 3; ++i) {
-					cloudParams->vcloud_color[i] = world->vcloud_color[i];
-				}
-				/* World-space sun direction for the Stage 2 raymarch (self-shadow mini-march,
-				 * Henyey-Greenstein silver lining) and the terrain shadow approximation --
-				 * same lamp/axis as the Light Scattering/Lens Flare sun position above. */
-				cloudParams->vcloud_sundir[0] = 0.0f;
-				cloudParams->vcloud_sundir[1] = 0.0f;
-				cloudParams->vcloud_sundir[2] = 1.0f;
-				if (KX_LightObject *vcloud_sun = scene->GetWorldSun()) {
-					mt::vec3 sunDir = vcloud_sun->NodeGetWorldOrientation().GetColumn(2).Normalized();
-					cloudParams->vcloud_sundir[0] = sunDir.x;
-					cloudParams->vcloud_sundir[1] = sunDir.y;
-					cloudParams->vcloud_sundir[2] = sunDir.z;
-				}
-			}
+			KX_FillCloudsParams(clouds, scene, time);
 		}
 		if (RAS_2DFilter *vfog = filterManager->GetFilterPass(RAS_2DFilterManager::FILTERPASS_VFOG, true)) {
 			if (const World *world = scene->GetBlenderScene()->world) {

@@ -43,6 +43,13 @@ class RAS_BucketManager : public mt::SimdClassAllocator
 {
 public:
 	typedef std::vector<RAS_MaterialBucket *> BucketList;
+
+	/** Set by the game engine around one camera's RAS_TEXTURED draw: called once after the solid
+	 * buckets and before the alpha ones (world clouds drawn under the transparent objects).
+	 * nullptr = nothing to do. hasAlpha: some transparent bucket is about to draw. */
+	static void (*BeforeAlphaHook)(RAS_Rasterizer *rasty, RAS_OffScreen *offScreen, bool hasAlpha, void *data);
+	static void *BeforeAlphaData;
+
 	class SortedMeshSlot
 	{
 	public:

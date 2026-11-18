@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — Nuvens atrás de objetos semitransparentes
+
+- As nuvens (Clouds, Sky Layers, Volumetric Clouds e disco do sol) eram um filtro 2D no fim do quadro que só testava a profundidade; vidro e outros objetos com alpha blend não gravam profundidade, então as nuvens eram pintadas por cima deles. Agora, quando há algo transparente (ou partículas GPU) na cena, o passe roda entre os opacos e os transparentes (`RAS_BucketManager::BeforeAlphaHook` → `RAS_2DFilterManager::RenderCloudsBeforeAlpha`), e a cadeia de filtros o pula. A refração do Glass também vê as nuvens. Só na primeira cena, com uma câmera de tela cheia; overlay, split screen e cenas sem transparência seguem o caminho antigo, sem custo extra. O histórico das nuvens volumétricas é invalidado ao trocar de caminho. Sugestão do musikai no Discord; cena de teste em `D:\AnastacioTestes\nuvens_vidro`.
+
 ## 2026-11-18 — Text Editor: abrir no editor externo
 
 - Novo `text_external_editor.py`: o operador `text.open_external` (botão ao lado do Run Script) abre o script no VS Code, na linha do cursor (`code -g`). Se o texto foi editado na engine, ele salva antes; se houver conflito com o disco, ele avisa. O caminho do editor fica na aba Editor do Text Editor e é salvo na pasta de config do usuário (`anastacio_external_editor.txt`). Vazio = VS Code no PATH ou o programa padrão do sistema; aceita `{file}` e `{line}`. Pedido do Ghost DEV no Discord.

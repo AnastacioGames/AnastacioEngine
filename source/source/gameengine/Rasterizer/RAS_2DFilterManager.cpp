@@ -825,14 +825,118 @@ RAS_2DFilter *RAS_2DFilterManager::GetFilterPass(unsigned int passIndex, bool us
 	return (it != m_filters.end()) ? it->second : nullptr;
 }
 
+void RAS_2DFilterManager::ValidateCloudHistory(const int viewport[4], int width, int height)
+{
+	m_frameInputs.cloudHistoryValid = m_frameInputs.cloudHistoryValid && m_cloudHistoryWidth == width &&
+	                                  m_cloudHistoryHeight == height &&
+	                                  std::equal(viewport, viewport + 4, m_cloudHistoryViewport);
+}
+
+bool RAS_2DFilterManager::RenderCloudsBeforeAlpha(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *drawofs,
+                                                  const float (&sun_screen_pos)[2])
+{
+	RAS_PassTo2DFilter::const_iterator found = m_filters.find(FILTERPASS_CLOUDS);
+	if (found == m_filters.end() || !found->second->Ok() || !drawofs) {
+		return false;
+	}
+	RAS_2DFilter *clouds = found->second;
+
+	/* Same full image as the filter chain: a camera drawing only part of the screen (split
+	 * screen, custom viewport) keeps the clouds in the chain. */
+	int viewport[4];
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	const int width = canvas->GetRenderWidth();
+	const int height = canvas->GetRenderHeight();
+	if (viewport[0] != 0 || viewport[1] != 0 || viewport[2] != width || viewport[3] != height) {
+		return false;
+	}
+
+	RAS_OffScreen *filter0 = canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER0);
+	RAS_OffScreen *filter1 = canvas->GetOffScreen(RAS_OffScreen::RAS_OFFSCREEN_FILTER1);
+	if (!filter0 || !filter1 || drawofs == filter0 || drawofs == filter1) {
+		return false;
+	}
+
+	GLint scissor[4];
+	glGetIntegerv(GL_SCISSOR_BOX, scissor);
+	const GLboolean depthTest = glIsEnabled(GL_DEPTH_TEST);
+	const GLboolean blend = glIsEnabled(GL_BLEND);
+	GLboolean depthMask;
+	glGetBooleanv(GL_DEPTH_WRITEMASK, &depthMask);
+
+#ifndef __EMSCRIPTEN__
+	const GLboolean alphaTest = glIsEnabled(GL_ALPHA_TEST);
+#endif
+
+	rasty->Disable(RAS_Rasterizer::RAS_DEPTH_TEST);
+	rasty->SetDepthMask(RAS_Rasterizer::RAS_DEPTHMASK_DISABLED);
+	rasty->Disable(RAS_Rasterizer::RAS_BLEND);
+	rasty->Disable(RAS_Rasterizer::RAS_ALPHA_TEST);
+
+	/* The filter can't read the image it draws into: it reads the solid image (resolved into
+	 * FILTER0 when multisampled, with its depth) and draws into FILTER1, copied back below. */
+	RAS_OffScreen *srcofs = drawofs;
+	if (drawofs->GetSamples()) {
+		drawofs->Blit(filter0, true, 1);
+		srcofs = filter0;
+	}
+	RAS_OffScreen *tmpofs = (srcofs == filter0) ? filter1 : filter0;
+
+	if (!m_cloudHistoryEarly) {
+		m_frameInputs.cloudHistoryValid = false; // saved by the chain, transparent objects in it
+		m_cloudHistoryEarly = true;
+	}
+	ValidateCloudHistory(viewport, (int)srcofs->GetWidth(), (int)srcofs->GetHeight());
+	clouds->SetFrameInputs(&m_frameInputs);
+	RAS_OffScreen *outofs = clouds->Render(rasty, canvas, srcofs, srcofs, tmpofs, sun_screen_pos);
+	const bool drew = (outofs == tmpofs);
+	if (drew && (clouds->GetBuildInFilters()->cloud_mask & 4)) {
+		UpdateCloudHistory(rasty, tmpofs, srcofs, viewport);
+	}
+
+	drawofs->Bind();
+	if (drew) {
+		/* Back into the draw image, color attachment 0 only: the other attachments (TAA motion,
+		 * G-buffer) keep what the solid objects wrote. */
+		const GLenum first = GL_COLOR_ATTACHMENT0;
+		glDrawBuffers(1, &first);
+		rasty->DrawOffScreen(tmpofs, drawofs);
+		drawofs->Bind(); // all the attachments again
+	}
+
+	rasty->SetViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+	rasty->SetScissor(scissor[0], scissor[1], scissor[2], scissor[3]);
+	if (depthTest) {
+		rasty->Enable(RAS_Rasterizer::RAS_DEPTH_TEST);
+	}
+	if (blend) {
+		rasty->Enable(RAS_Rasterizer::RAS_BLEND);
+	}
+#ifndef __EMSCRIPTEN__
+	if (alphaTest) {
+		rasty->Enable(RAS_Rasterizer::RAS_ALPHA_TEST);
+	}
+#endif
+	rasty->SetDepthMask(depthMask ? RAS_Rasterizer::RAS_DEPTHMASK_ENABLED : RAS_Rasterizer::RAS_DEPTHMASK_DISABLED);
+
+	m_cloudsDrawnEarly = drew;
+	return drew;
+}
+
 RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICanvas *canvas, RAS_OffScreen *inputofs, RAS_OffScreen *targetofs, const float (&sun_screen_pos)[2])
 {
 	m_upscaledOutput = nullptr;
+	/* Once per frame, also when no pass draws: the clouds drawn before the transparent objects
+	 * alternate their updated tiles with it. */
+	++m_frameInputs.frame;
+	// Clouds already drawn under the transparent objects this frame (RenderCloudsBeforeAlpha).
+	const bool cloudsDrawnEarly = m_cloudsDrawnEarly;
+	m_cloudsDrawnEarly = false;
 	/* Camera FX passes stay built and are only toggled off, so the map is rarely empty.
 	 * When no pass would draw, skip the chain instead of copying the full screen every frame. */
 	bool anyActive = false;
 	for (const auto &pair : m_filters) {
-		if (pair.second->Ok()) {
+		if (pair.second->Ok() && !(cloudsDrawnEarly && pair.first == FILTERPASS_CLOUDS)) {
 			anyActive = true;
 			break;
 		}
@@ -892,7 +996,6 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	// Used to know if a filter is the last of the chain.
 	const auto pend = std::prev(ordered.end());
 
-	++m_frameInputs.frame;
 	bool usesPrevious = false;
 
 	/* Temporal upscaling (docs/plano-opensource.md item 3): the TAA pass draws at the window size,
@@ -916,10 +1019,13 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	 * screen cameras share this manager) at the same size. */
 	int viewport[4];
 	glGetIntegerv(GL_VIEWPORT, viewport);
-	const bool historyValid = m_frameInputs.cloudHistoryValid;
-	m_frameInputs.cloudHistoryValid = historyValid && m_cloudHistoryWidth == (int)previousofs->GetWidth() &&
-	                                  m_cloudHistoryHeight == (int)previousofs->GetHeight() &&
-	                                  std::equal(viewport, viewport + 4, m_cloudHistoryViewport);
+	if (!cloudsDrawnEarly) {
+		if (m_cloudHistoryEarly) {
+			m_frameInputs.cloudHistoryValid = false;
+			m_cloudHistoryEarly = false;
+		}
+		ValidateCloudHistory(viewport, (int)previousofs->GetWidth(), (int)previousofs->GetHeight());
+	}
 
 	/* Previous view-projection of this viewport (cameras sharing the manager don't get each
 	 * other's); not valid on its first frame, so filters see zero motion instead of Identity. */
@@ -943,6 +1049,9 @@ RAS_OffScreen *RAS_2DFilterManager::RenderFilters(RAS_Rasterizer *rasty, RAS_ICa
 	for (auto it = ordered.begin(), end = ordered.end(); it != end; ++it) {
 		RAS_2DFilter *filter = it->second;
 		if (fullRes && it->first == FILTERPASS_FXAA) {
+			continue;
+		}
+		if (cloudsDrawnEarly && it->first == FILTERPASS_CLOUDS) {
 			continue;
 		}
 		filter->SetFrameInputs(&m_frameInputs);

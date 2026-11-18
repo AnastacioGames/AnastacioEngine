@@ -126,6 +126,8 @@ class KX_RenderPipeline
 	std::vector<std::pair<std::pair<KX_Camera *, RAS_Rasterizer::StereoEye>, std::vector<KX_GameObject *> > > m_visibleMeshCache;
 	/// Window size color + depth: overlay scenes drawn over the temporally upscaled image (RANGE_TAAU).
 	RAS_OffScreen *m_taauSceneOfs = nullptr;
+	/// RenderCamera() may draw the world clouds before the transparent objects: first scene, one camera.
+	bool m_earlyCloudsAllowed = false;
 	/// Its resolve when it is multisampled (the HUD keeps the scene's anti-aliasing).
 	RAS_OffScreen *m_taauSceneResolve = nullptr;
 
