@@ -58,7 +58,7 @@ Tudo em background, uma etapa por vez, conferindo a imagem `NN_*.png` de cada um
 | 8 | `E impostor P` | `08_comparacao.png`: impostor no ângulo certo |
 | 9 | `E fechar P <Nome>` | `09_card_foto.png`; info: `cabeca_no_corpo.soldados` > 0, `primeira_pessoa_tris` > 0, 28 peças de ragdoll |
 | 10 | runtime invisível: `10_teste/rodar_instalado.py`, `rodar_sem_corte.py`, `rodar_fp.py` (trocar o nome) | IK do triciclo, `maos_<Nome>`, ragdoll válido; emenda de perto; impostor antes do LOD1 do corpo; 1ª pessoa só pernas e braços |
-| 11 | `E corpo P <Nome>` (`--dist 20 --lod2 15 --res 512`) | info: cartão a 20 m, Cabeca invisível a 21 m, `lod_max_ragdoll` corpo 2 / cabeça 1; grava `10_impostor_corpo.range` e o cartão no `09_piloto` |
+| 11 | (não usar, ver Etapa 11) `E corpo P <Nome>` (`--dist 20 --lod2 15 --res 512`) | info: cartão a 20 m, Cabeca invisível a 21 m, `lod_max_ragdoll` corpo 2 / cabeça 1; grava `10_impostor_corpo.range` e o cartão no `09_piloto` |
 | 12 | Instalar: backup de `5 - Personagem Link/_novos/Group<Nome>` em `5 - Personagem Link/_backup/`, copiar `09_piloto` inteiro para lá | testar numa corrida |
 
 O piloto final tem: nível 0 do corpo com a cabeça cheia soldada (sem emenda) dividido em `Body<Grupo>` (pernas e
@@ -370,6 +370,15 @@ Conferido no runtime invisível (`10_teste/rodar_instalado.py`): `cons["mixamori
 `maos_<Nome>` fecha os dedos, ragdoll válido com 14 corpos.
 
 ### Etapa 11 — impostor do corpo inteiro como último LOD (no pipeline, 2026-11-18)
+
+**NÃO USAR (medido 2026-11-18, decisão: tirar).** 20 Enzos a 38 m, 3 rodadas alternadas, runtime invisível:
+cartão × LOD2 de malha = MainRender 0,14 × 0,21 ms, mas UpdateParents 0,95 × 0,05 ms com o cartão (CPU pior no
+total); Animations/Skinning iguais (o esqueleto roda de longe do mesmo jeito). Memória: 2 imagens 1536×1024 sem
+compressão ≈ 17 MB por piloto (+ 17 MB da cabeça). Para PC fraco pesa mais a memória (iGPU usa a RAM) do que 899
+triângulos. Com `RANGE_WEAK_GPU=16` os números não mudaram (simulador talvez não aja no runtime invisível).
+O Enzo instalado voltou a ser o `09_piloto` sem cartão (backup com cartão em `_backup/GroupEnzo_com_cartao_2026-11-18`).
+O código (`E corpo`, `lodLevelMax`, travas do ragdoll/abaixar/triciclo) fica: sem `lod_max_ragdoll` nada trava.
+Pendente: imagens do impostor da CABEÇA também são 1536×1024 PNG (~17 MB/piloto) → testar 256/384 ou formato comprimido.
 
 **Pipeline (`E corpo P <Nome>`, depois do `fechar`):** `v2.bake_body_impostor` abre o `06_atlas.range` (corpo cheio),
 pose sentada, corpo + cabeça numa malha no espaço do `Body` e assa o Impostor de Caixa (512, Volume pelo AUTO);
