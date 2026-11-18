@@ -651,7 +651,37 @@ def _weight(o, v, name):
     return next((e.weight for e in v.groups if e.group == g.index), 0.0)
 
 
-def _head_side(arm, body, chin_gap, nape_drop):
+def head_weights_whole(arm, pieces, chin_gap=0.022, nape_drop=0.010):
+    """Etapa 4 sem corte (2026-11-18, o impostor da cabeça não ficou bom): a malha não é separada. Acima do
+    mesmo plano do corte (2,2 cm sob o queixo / 1 cm sob o crânio) o corpo passa a pesar 100 % Head (os pesos do
+    Fuse dão pouco Head ao queixo e ao lábio de baixo e a boca entortava ao virar), cabelo/olhos/cílios/acessórios
+    também; abaixo, o pescoço em degradê (blend_neck) com teto radial (limit_neck_radial: alça e trapézio não
+    giram). Retorna info."""
+    body = next(o for o in pieces if autorig._piece(o) == "body")
+    hv, cut = _head_side(arm, body, chin_gap, nape_drop, bisect=False)
+    g_head = body.vertex_groups.get(HEAD_BONE) or body.vertex_groups.new(HEAD_BONE)
+    for i in hv:
+        v = body.data.vertices[i]
+        for e in list(v.groups):
+            body.vertex_groups[e.group].remove([i])
+        g_head.add([i], 1.0, 'REPLACE')
+    ring = set()
+    for poly in body.data.polygons:
+        inside = [i for i in poly.vertices if i in hv]
+        if inside and len(inside) < len(poly.vertices):
+            ring.update(inside)
+    neck = blend_neck(arm, body, ring_idx=ring)
+    lim = limit_neck_radial(arm, body, ring_idx=ring, keep=hv)   # a cabeça fica 100 % Head
+    parts = [o for o in pieces if autorig._piece(o) in HEAD_PIECES]
+    for o in parts:
+        o.vertex_groups.clear()
+        g = o.vertex_groups.new(HEAD_BONE)
+        g.add([v.index for v in o.data.vertices], 1.0, 'REPLACE')
+    return {"corte": cut, "cabeca_vertices": len(hv), "borda": len(ring), "pescoco_degrade": neck,
+            "pescoco_teto_radial": lim, "pecas_100_head": sorted(o.name for o in parts)}
+
+
+def _head_side(arm, body, chin_gap, nape_drop, bisect=True):
     """Vértices do corpo acima do plano do corte (lado da cabeça) e os 2 pontos que definem o plano."""
     mw = arm.matrix_world
     hb = arm.data.bones[HEAD_BONE]
@@ -673,6 +703,9 @@ def _head_side(arm, body, chin_gap, nape_drop):
     # Corta a malha no plano (faca) antes de separar: emenda reta. Só selecionar faces inteiras acima do plano
     # deixava a borda serrilhada e o serrilhado dobrava ao virar a cabeça. Pesos e UV são interpolados no corte.
     import bmesh
+    if not bisect:
+        side = {v.index for v in body.data.vertices if (to_w * v.co - a).dot(n) > -1e-5 and (to_w * v.co).z > neck_z}
+        return side, {"queixo_z": round(chin.z, 3), "nuca_z": round(skull.z, 3)}
     inv = to_w.inverted()
     bm = bmesh.new()
     bm.from_mesh(body.data)
@@ -756,7 +789,7 @@ NECK_EXTRA = 0.08        # o degradê passa 8 cm da base do pescoço (cabeça do
 NECK_RADIUS_SOFT = 1.0   # borda do cilindro do pescoço: cai de 1 a 0 entre R e 2R (grade em Enzo/11_pescoco)
 
 
-def blend_neck(arm, ob, extra=NECK_EXTRA, soft=NECK_RADIUS_SOFT):
+def blend_neck(arm, ob, extra=NECK_EXTRA, soft=NECK_RADIUS_SOFT, ring_idx=None):
     """Pescoço em degradê para o Head. O anel da emenda é 100 % Head (a cabeça é rígida no Head), mas logo
     abaixo o pescoço do Fuse pesa ~80 % Spine2 e ~20 % Neck; no jogo só o Head gira (head_look até 40°) e a
     torção inteira caía na 1ª faixa: o pescoço fazia uma quina. Aqui cada vértice do pescoço ganha peso do Head
@@ -768,7 +801,10 @@ def blend_neck(arm, ob, extra=NECK_EXTRA, soft=NECK_RADIUS_SOFT):
     if g_head is None:
         return 0
     mw = ob.matrix_world
-    ring = [mw * v.co for v in ob.data.vertices if _weight(ob, v, HEAD_BONE) >= 0.999]
+    if ring_idx is None:
+        ring = [mw * v.co for v in ob.data.vertices if _weight(ob, v, HEAD_BONE) >= 0.999]
+    else:   # sem corte: só a borda de baixo da cabeça (a cabeça inteira daria o raio da cabeça, não o do pescoço)
+        ring = [mw * ob.data.vertices[i].co for i in ring_idx]
     if not ring:
         return 0
     am = arm.matrix_world
@@ -811,7 +847,7 @@ def blend_neck(arm, ob, extra=NECK_EXTRA, soft=NECK_RADIUS_SOFT):
 NECK_RADIAL_LIMIT = 0.5   # fora do cilindro do pescoço o Head cai a 0 em 0,5 raio (alça e trapézio não giram)
 
 
-def limit_neck_radial(arm, ob, soft=NECK_RADIAL_LIMIT, ring_idx=None):
+def limit_neck_radial(arm, ob, soft=NECK_RADIAL_LIMIT, ring_idx=None, keep=()):
     """Teto do peso do Head pela distância ao eixo do pescoço: 1 dentro do raio da emenda, 0 a `soft` raios fora.
     O excesso vai para o Neck (o head_look só gira o Head). Com a borda larga do blend_neck (1 raio) a alça da
     regata e o trapézio giravam com a cabeça e faziam uma quina a 40° (2026-11-18). Rodar antes de juntar a
@@ -838,7 +874,7 @@ def limit_neck_radial(arm, ob, soft=NECK_RADIAL_LIMIT, ring_idx=None):
     mudou = 0
     for v in ob.data.vertices:
         wh = _weight(ob, v, HEAD_BONE)
-        if wh <= 0.0 or v.index in ring_idx:
+        if wh <= 0.0 or v.index in ring_idx or v.index in keep:
             continue
         teto = 1.0 - _smooth((radial(mw * v.co) - raio) / (raio * soft))
         if wh <= teto + 1e-4:
@@ -1326,7 +1362,19 @@ def atlas_body(pieces, tex_dir, name):
     """Etapa 6: as peças do corpo (tudo menos a Cabeca) num atlas 2048 (cor + normal, autorig.build_atlas) e
     numa malha só "Body" com um material opaco no formato do jogo. A Cabeca não muda (tem os materiais
     próprios do Fuse; o impostor dela é assado na etapa 8). Retorna (body, info)."""
-    body_pieces = [o for o in pieces if o.type == 'MESH' and o.name != "Cabeca"]
+    whole = bpy.data.objects.get("Cabeca") is None
+    # sem corte (2026-11-18): cabelo, cílios e acessórios transparentes ficam com o material do Fuse (recorte por alfa)
+    # e entram no Body depois do AO; o rosto vai no atlas com o corpo
+    # (só as que precisam de recorte por alfa; olhos e acessórios opacos vão no atlas: textura a menos por piloto)
+    head_parts = [o for o in pieces if o.type == 'MESH' and autorig._piece(o) in HEAD_PIECES
+                  and any(_see_through(m) for m in o.data.materials)] if whole else []
+    for o in head_parts:
+        for m in o.data.materials:
+            if m and "lash" in m.name.lower():
+                for i, sl in enumerate(m.texture_slots):
+                    if sl and sl.use_map_normal:
+                        m.texture_slots.clear(i)   # normal map não aparece em cílios: uma textura a menos
+    body_pieces = [o for o in pieces if o.type == 'MESH' and o.name != "Cabeca" and o not in head_parts]
     before = {o.name: autorig._tris(o) for o in body_pieces}
     mat, layout = autorig.build_atlas(body_pieces, tex_dir, name)
     body = autorig.join_pieces(body_pieces, "Body")
@@ -1349,9 +1397,28 @@ def atlas_body(pieces, tex_dir, name):
         for block in [b for b in coll if b.users == 0]:
             coll.remove(block)
     ao = bake_ao_into_atlas(body, tex_dir, name)
+    if head_parts:
+        join_keep_materials(body, head_parts)
     return body, {"ao": ao, "pecas": before, "corpo_tris": autorig._tris(body), "material": mat.name,
                   "atlas": {img.name: list(cell) for img, cell in layout.items()},
-                  "materiais_cabeca": [m.name for m in bpy.data.objects["Cabeca"].data.materials]}
+                  "materiais_cabeca": sorted({m.name for m in body.data.materials if m and m is not mat})}
+
+
+def join_keep_materials(body, parts):
+    """Junta `parts` no `body` mantendo os materiais delas: depois de juntar o UV ativo é o do atlas, então os
+    slots de textura sem UV nomeado passam a ler o UV da peça pelo nome (como head_in_body_up_close)."""
+    for o in parts:
+        uv = o.data.uv_layers.active.name if o.data.uv_layers.active else None
+        if uv:
+            for m in o.data.materials:
+                for sl in (m.texture_slots if m else []):
+                    if sl and sl.texture_coords == 'UV' and not sl.uv_layer:
+                        sl.uv_layer = uv
+    scene = bpy.context.scene
+    for o in scene.objects:
+        o.select = o is body or o in parts
+    scene.objects.active = body
+    bpy.ops.object.join()
 
 
 # -- Etapa 7: redução e LOD do corpo ---------------------------------------------------------------------
@@ -1361,7 +1428,8 @@ HANDS_TRIS = 1500            # as duas mãos (o Fuse dá ~2600); as juntas ficam
 JOINT_GROUP = "proteger_juntas"
 JOINT_KEEP = 0.004           # até 4 mm de uma junta: trava total
 JOINT_FADE = 0.010           # trava some aos poucos até 10 mm da junta (meio da falange, palma: reduz)
-BODY_LODS = ((2500, 10.0), (900, 25.0))   # (triângulos, distância) como o gerador antigo; mãos sem trava
+BODY_LODS = ((2500, 10.0), (900, 25.0))
+BODY_LODS_WITH_HEAD = ((4000, 10.0), (1500, 25.0))   # sem corte: a cabeça vai junto nos LODs   # (triângulos, distância) como o gerador antigo; mãos sem trava
 
 
 def _hand_tris(ob):
@@ -1481,6 +1549,10 @@ def _hemisphere(n):
     return out
 
 
+def _see_through(m):
+    return m is not None and (m.use_transparency or any(k in m.name.lower() for k in ("hair", "lash", "brow")))
+
+
 def _hidden_in_current_pose(ob, occluders, dirs):
     """Índices das faces de `ob` fechadas por dentro na pose atual (malhas avaliadas com a armature)."""
     from mathutils.bvhtree import BVHTree
@@ -1490,7 +1562,9 @@ def _hidden_in_current_pose(ob, occluders, dirs):
         me = o.to_mesh(scene, True, 'PREVIEW')
         base = len(verts)
         verts.extend(o.matrix_world * v.co for v in me.vertices)
-        polys.extend(tuple(base + i for i in p.vertices) for p in me.polygons)
+        # cabelo/cílios recortados por alfa não fecham nada: o couro cabeludo sob o cabelo tem que ficar
+        clear = {i for i, m in enumerate(o.data.materials) if _see_through(m)}
+        polys.extend(tuple(base + i for i in p.vertices) for p in me.polygons if p.material_index not in clear)
         bpy.data.meshes.remove(me)
     tree = BVHTree.FromPolygons(verts, polys)
     me = ob.to_mesh(scene, True, 'PREVIEW')     # mesma topologia (só armature): índices iguais aos do ob
@@ -1545,27 +1619,52 @@ def remove_hidden_faces(ob, occluders, rays=HIDDEN_RAYS, poses=(None,)):
     return len(hidden)
 
 
+HEAD_REGION_ABOVE_NECK = 0.03   # m acima da base do pescoço (cabeça do osso Neck)
+HEAD_REGION_HALF_X = 0.14       # m para cada lado do pescoço (fora disso: ombros e braços)
+
+
+def head_region(arm, body):
+    """Vértices da cabeça e do alto do pescoço (sem corte, 2026-11-18): ficam inteiros no nível 0."""
+    nb = arm.data.bones.get(NECK_BONE) or arm.data.bones[HEAD_BONE]
+    base = arm.matrix_world * nb.head_local
+    mw = body.matrix_world
+    out = set()
+    for v in body.data.vertices:
+        c = mw * v.co
+        if c.z > base.z + HEAD_REGION_ABOVE_NECK and abs(c.x - base.x) < HEAD_REGION_HALF_X:
+            out.add(v.index)
+    return out
+
+
 def reduce_body(arm, body, rest_tris=BODY_REST_TRIS, hands_tris=HANDS_TRIS, lods=BODY_LODS,
                 game_root=GAME_ROOT):
     """Etapa 7: nível 0 em duas passadas: (1) resto do corpo a rest_tris com as mãos inteiras travadas;
     (2) mãos a ~hands_tris com só as juntas travadas (proteger_juntas). LOD por distância (cópias reduzidas
     por igual a partir do corpo cheio). Retorna info com triângulos antes/depois."""
     scene = bpy.context.scene
+    if bpy.data.objects.get("Cabeca") is None and lods is BODY_LODS:
+        lods = BODY_LODS_WITH_HEAD
     hands0 = _hand_tris(body)
     full = body.data.copy()
     tris0 = autorig._tris(body)
     # anel do corte travado: na etapa 9 a cabeça cheia é soldada nele (nível 0 sem emenda); a redução
     # deslocava os vértices do anel e só 3 de 42 ainda coincidiam com a cabeça
     ring = [v.index for v in body.data.vertices if _weight(body, v, HEAD_BONE) >= 0.999]
+    if bpy.data.objects.get("Cabeca") is None:
+        ring = sorted(set(ring) | head_region(arm, body))   # cabeça inteira no corpo: nível 0 com a cabeça cheia
     gp = body.vertex_groups.get(PROTECT_GROUP)
     if gp is not None and ring:
         gp.add(ring, 1.0, 'REPLACE')
-    reduce_protected(body, hands0 + rest_tris)
+    rs = set(ring)
+    locked = sum(len(p.vertices) - 2 for p in body.data.polygons if all(i in rs for i in p.vertices))         if bpy.data.objects.get("Cabeca") is None else 0   # cabeça travada não conta na meta do resto do corpo
+    reduce_protected(body, hands0 + rest_tris + locked)
     if gp is not None and ring:
         # fora do grupo das mãos de novo (ele conta os triângulos das mãos); na 2ª passada o proteger_juntas
         # já trava tudo fora das mãos
-        body.vertex_groups[PROTECT_GROUP].remove([v.index for v in body.data.vertices
-                                                  if _weight(body, v, HEAD_BONE) >= 0.999])
+        again = {v.index for v in body.data.vertices if _weight(body, v, HEAD_BONE) >= 0.999}
+        if bpy.data.objects.get("Cabeca") is None:
+            again |= head_region(arm, body)   # índices mudam depois da redução: recalcula
+        body.vertex_groups[PROTECT_GROUP].remove(sorted(again))
     joint_weights(arm, body)
     rest_now = autorig._tris(body) - _hand_tris(body)
     got = reduce_protected(body, rest_now + hands_tris, group=JOINT_GROUP)
@@ -1809,7 +1908,11 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
             g = ob.vertex_groups.get(gname)
             if g is not None:
                 ob.vertex_groups.remove(g)
-    if head_in_body:
+    if head is None:
+        # sem corte (2026-11-18): a cabeça já está no corpo em todos os níveis, com os pesos do Fuse
+        fp_body = split_first_person(arm, body)
+        info["primeira_pessoa_tris"] = autorig._tris(fp_body) if fp_body else 0
+    elif head_in_body:
         # de perto a cabeça fica dentro do corpo, soldada no corte: sem emenda
         info["cabeca_no_corpo"] = head_in_body_up_close(arm, body, head, report)
         # 1ª pessoa (como os pilotos antigos): cabeça + alto do tronco, sem os braços, num objeto à parte com
@@ -1819,6 +1922,7 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
     else:
         fp_body = None
     match_lod_hysteresis([body, fp_body, head])
+    head_objs = [head] + [l.object for l in head.lod_levels[1:] if l.object] if head else []
     # nomes com o grupo antes do ragdoll (as peças levam o nome da armature): vários pilotos v2 na mesma
     # corrida não podem repetir Cabeca, materiais ou actions
     arm.name = "Armature" + group_name
@@ -1829,17 +1933,20 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
         act = bpy.data.actions.get(act_name)
         if act:
             act.name = "%s.%s" % (act_name, group_name)
-    head.name = head.data.name = "Cabeca" + group_name
-    for lvl in head.lod_levels[1:]:
-        if lvl.object:
-            lvl.object.name = lvl.object.data.name = head.name + "_box_impostor"
+    if head is not None:
+        head.name = head.data.name = "Cabeca" + group_name
+        for lvl in head.lod_levels[1:]:
+            if lvl.object:
+                lvl.object.name = lvl.object.data.name = head.name + "_box_impostor"
     for im in bpy.data.images:
         # imagens do impostor da cabeça com o grupo no nome (Cabeca_imp_* se repetiria em todo piloto v2)
         if im.name.startswith("Cabeca_imp"):
             im.name = head.name + im.name[len("Cabeca"):]
-    for ob in [head] + [l.object for l in head.lod_levels[1:] if l.object]:
+    # materiais do Fuse (cabeça/cabelo/olhos) com o nome do piloto; o do atlas já tem o grupo no nome
+    with_fuse = head_objs or [body] + [l.object for l in body.lod_levels[1:] if l.object] + ([fp_body] if fp_body else [])
+    for ob in with_fuse:
         for m in ob.data.materials:
-            if m and not m.name.startswith(name + "_"):
+            if m and not m.name.startswith(name + "_") and group_name not in m.name:
                 m.name = "%s_%s" % (name, m.name)
     ik_ph = add_tricycle_ik(arm, group_name, scene)
     tex_dir = os.path.join(out_dir, "textures")
@@ -1854,7 +1961,7 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
                 shutil.copyfile(src, dst)
             im.filepath = dst
     try:
-        info["cartao"] = autorig.render_card(arm, [body, head], os.path.join(tex_dir, name + "_card.png"),
+        info["cartao"] = autorig.render_card(arm, [body] + ([fp_body] if fp_body and head is None else []) + head_objs[:1], os.path.join(tex_dir, name + "_card.png"),
                                              game_root, photo_path=os.path.join(tex_dir, name + "_foto.png"),
                                              report=report)
     except Exception as exc:
@@ -1863,7 +1970,8 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
     for lvl in body.lod_levels[1:]:
         if lvl.object:
             lvl.object.name = lvl.object.data.name = lvl.object.name.replace("Body", "Body" + group_name, 1)
-    autorig._prop(head, "camera_hide_fp", True)   # 1ª pessoa: esconde a cabeça
+    if head is not None:
+        autorig._prop(head, "camera_hide_fp", True)   # 1ª pessoa: esconde a cabeça
     if fp_body is not None:
         fp_body.name = fp_body.data.name = "Body%s.001" % group_name    # como os antigos
         autorig._prop(fp_body, "camera_hide_fp", True)
@@ -1881,11 +1989,11 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
     scene.objects.link(root)
     root.empty_draw_size = 0.3
     autorig._prop(root, "is_pilot", False)
-    extra = [l.object for l in body.lod_levels[1:] + head.lod_levels[1:] if l.object]
-    for o in [body, head, root] + extra:
+    extra = [l.object for l in body.lod_levels[1:] if l.object] + head_objs[1:]
+    for o in [body, root] + head_objs[:1] + extra:
         o.game.physics_type = 'NO_COLLISION'
     grp = bpy.data.groups.get(group_name) or bpy.data.groups.new(group_name)
-    members = [arm, body, head, ik_ph] + ([fp_body] if fp_body is not None else []) + [o for o in scene.objects if o.name.startswith("RagdollPart-")]
+    members = [arm, body, ik_ph] + head_objs[:1] + ([fp_body] if fp_body is not None else []) + [o for o in scene.objects if o.name.startswith("RagdollPart-")]
     for o in members:
         if o.name not in grp.objects:
             grp.objects.link(o)
@@ -1912,7 +2020,7 @@ def finish_pilot_v2(arm, body, head, name, game_root, out_dir, ragdoll=True, rep
         bpy.ops.wm.save_mainfile()
     info.update({"arquivo": path, "grupo": [o.name for o in grp.objects if not o.name.startswith("RagdollPart-")],
                  "ragdoll_pecas": sum(1 for o in grp.objects if o.name.startswith("RagdollPart-")),
-                 "tris": {"corpo": autorig._tris(body), "cabeca": autorig._tris(head),
+                 "tris": {"corpo": autorig._tris(body), "cabeca": autorig._tris(head) if head else 0,
                           "lods": {o.name: autorig._tris(o) for o in extra}}})
     return info
 

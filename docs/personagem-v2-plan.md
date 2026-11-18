@@ -40,7 +40,24 @@ Criado em 2026-11-17. Substitui, para os pilotos novos, o fluxo de um botão só
 
 Pasta de trabalho: `D:\ProjetoRolimaRacer\personagens\6 - Personagem v2\<Nome>\`.
 
-### Receita rápida (Enzo finalizado em 2026-11-17)
+### Mudança 2026-11-18: cabeça SEM corte e SEM impostor (vale para todos)
+
+O impostor da cabeça não ficou bom: a cabeça fica dentro do corpo em todos os níveis e as etapas 8 e 11 não rodam.
+Ordem nova: `importar`, `esqueleto`, `pesos`, `cabeca`, `maos`, `atlas`, `lod`, `fechar`.
+- `cabeca` (padrão novo, `head_weights_whole`) não separa a malha: acima do plano do corte (2,2 cm sob o queixo,
+  1 cm sob o crânio) o corpo pesa 100 % Head, assim como cabelo, olhos e cílios (com os pesos do Fuse a boca entortava ao virar); abaixo,
+  `blend_neck` (8 cm) só da borda + `limit_neck_radial` (sem mexer na cabeça). `--cortar` = jeito antigo.
+- `atlas`: o rosto e os olhos entram no atlas. Cabelo e cílios (recorte por alfa) ficam com o material do Fuse e entram
+  no `Body` depois do AO (`join_keep_materials`). O normal map dos cílios sai.
+- `lod`: a cabeça (`head_region`, acima da base do pescoço) fica travada no nível 0 e não conta na meta do resto. Os LODs levam
+  a cabeça: `BODY_LODS_WITH_HEAD` 4000 / 1500 tris. Os oclusores ignoram materiais transparentes, para o couro cabeludo sob
+  o cabelo não ser apagado.
+- `fechar` sem `Cabeca`: só `Body<Grupo>` (+ `.001` da 1ª pessoa) e os LODs.
+- Enzo: nível 0 19 658 tris, LOD 4000/1500, 1ª pessoa 15 841; pescoço a 40° sem ponta e boca certa
+  (`Enzo/16_pescoco_virado_*.png`). A versão cortada antiga está em `Enzo_cabeca_cortada/`, e o instalado anterior em
+  `_backup/GroupEnzo_cabeca_cortada_manual`.
+
+### Receita rápida (Enzo finalizado em 2026-11-17; ver a mudança acima)
 
 Tudo em background, uma etapa por vez, conferindo a imagem `NN_*.png` de cada uma (detalhes nas seções abaixo).
 `E = build\bin\AnastacioEngine.exe -b --factory-startup --python tools\personagem_v2.py --` e `P = "<pasta de trabalho>"`:

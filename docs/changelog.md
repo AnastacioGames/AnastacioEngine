@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — Personagem v2: cabeça sem corte e sem impostor
+
+- O impostor da cabeça não ficou bom. A etapa `cabeca` agora só acerta os pesos: 100 % Head acima do plano do queixo e pescoço em degradê com teto radial. A cabeça fica no corpo em todos os níveis (LOD 4000/1500 tris com a cabeça). Cabelo e cílios mantêm o material do Fuse, com recorte por alfa. `fechar` aceita piloto sem `Cabeca`. Detalhes em `docs/personagem-v2-plan.md`.
+
 ## 2026-11-18 — LOD: `lodLevelMax` e pilotos v2 com o impostor do corpo
 
 - `KX_GameObject.lodLevelMax` (Python, -1 = sem limite): o `UpdateLod` não passa desse nível. Uso: o componente Ragdoll do RolimaRacer limita as peças do piloto (`lod_max_ragdoll`) enquanto ele cai, para não mostrar o cartão sentado no ar. A réplica herda o valor.

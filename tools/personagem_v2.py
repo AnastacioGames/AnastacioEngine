@@ -13,6 +13,17 @@ import sys
 import range_character_v2 as v2
 
 
+def _abrir(out_dir, *nomes):
+    """Abre o 1º checkpoint que existir (sem corte da cabeça as etapas 4 e 8 não rodam, 2026-11-18)."""
+    import bpy
+    for n in nomes:
+        f = os.path.join(out_dir, n + ".range")
+        if os.path.isfile(f):
+            bpy.ops.wm.open_mainfile(filepath=f)
+            return n
+    raise FileNotFoundError(", ".join(nomes))
+
+
 def etapa_importar(args):
     obj_path, out_dir = args[0], args[1]
     skeleton = args[2] if len(args) > 2 else v2.DEFAULT_SKELETON
@@ -50,25 +61,30 @@ def etapa_pesos(args):
 
 
 def etapa_cabeca(args):
-    """-- cabeca <pasta_de_trabalho>: abre 03_pesos.range, grava 04_cabeca.range + renders do corte."""
+    """-- cabeca <pasta_de_trabalho> [--cortar]: abre 03_pesos.range, grava 04_cabeca.range. Padrão (2026-11-18):
+    sem corte, só os pesos da cabeça (100 % Head acima do plano do queixo) e do pescoço em degradê."""
     import bpy
     out_dir = args[0]
     bpy.ops.wm.open_mainfile(filepath=os.path.join(out_dir, "03_pesos.range"))
     scene = bpy.context.scene
     arm = next(o for o in scene.objects if o.type == 'ARMATURE')
     pieces = [o for o in scene.objects if o.type == 'MESH']
-    head, info = v2.split_head(arm, pieces)
+    if "--cortar" in args:   # antigo: cabeça separada para o Impostor de Caixa (não usar, 2026-11-18)
+        head, info = v2.split_head(arm, pieces)
+        info["arquivo"] = v2.save_checkpoint(out_dir, "04_cabeca")
+        rest = [o for o in scene.objects if o.type == 'MESH' and o is not head]
+        info["render"] = v2.render_head(os.path.join(out_dir, "04_cabeca.png"), arm, head, rest)
+        return info
+    info = v2.head_weights_whole(arm, pieces)
     info["arquivo"] = v2.save_checkpoint(out_dir, "04_cabeca")
-    rest = [o for o in scene.objects if o.type == 'MESH' and o is not head]
-    info["render"] = v2.render_head(os.path.join(out_dir, "04_cabeca.png"), arm, head, rest)
     return info
 
 
 def etapa_maos(args):
-    """-- maos <pasta_de_trabalho>: abre 04_cabeca.range, grava 05_maos.range + renders das pegadas."""
+    """-- maos <pasta_de_trabalho>: abre 04_cabeca.range (ou 03_pesos.range, sem corte), grava 05_maos.range."""
     import bpy
     out_dir = args[0]
-    bpy.ops.wm.open_mainfile(filepath=os.path.join(out_dir, "04_cabeca.range"))
+    _abrir(out_dir, "04_cabeca", "03_pesos")
     scene = bpy.context.scene
     arm = next(o for o in scene.objects if o.type == 'ARMATURE')
     pieces = [o for o in scene.objects if o.type == 'MESH']
@@ -103,10 +119,10 @@ def etapa_lod(args):
     body = bpy.data.objects["Body"]
     info = v2.reduce_body(arm, body)
     info["arquivo"] = v2.save_checkpoint(out_dir, "07_lod")
-    head = bpy.data.objects["Cabeca"]
-    info["render"] = v2.render_check(os.path.join(out_dir, "07_lod.png"), [body, head])
+    head = [o for o in [bpy.data.objects.get("Cabeca")] if o]
+    info["render"] = v2.render_check(os.path.join(out_dir, "07_lod.png"), [body] + head)
     for lvl in body.lod_levels[1:]:
-        info["render"] += v2.render_check(os.path.join(out_dir, "07_%s.png" % lvl.object.name), [lvl.object, head],
+        info["render"] += v2.render_check(os.path.join(out_dir, "07_%s.png" % lvl.object.name), [lvl.object] + head,
                                           views=(("frente", (0, 1, 0)),))
     info["render"] += v2.render_hands(os.path.join(out_dir, "07_maos.png"), arm, [body])
     return info
@@ -127,7 +143,8 @@ def etapa_impostor(args):
 
 
 def etapa_fechar(args):
-    """-- fechar <pasta_de_trabalho> [Nome] [--projeto <jogo>] [--sem-ragdoll]: abre 08_impostor.range e grava
+    """-- fechar <pasta_de_trabalho> [Nome] [--projeto <jogo>] [--sem-ragdoll]: abre 08_impostor.range (ou
+    07_lod.range, sem corte da cabeça) e grava
     <pasta>/09_piloto/Group<Nome>.range (não mexe no piloto que o jogo usa hoje)."""
     import bpy
     out_dir = args[0]
@@ -141,10 +158,10 @@ def etapa_fechar(args):
         elif not a.startswith("--") and name is None:
             name = a
     name = name or os.path.basename(os.path.normpath(out_dir))
-    bpy.ops.wm.open_mainfile(filepath=os.path.join(out_dir, "08_impostor.range"))
+    _abrir(out_dir, "08_impostor", "07_lod")
     scene = bpy.context.scene
     arm = next(o for o in scene.objects if o.type == 'ARMATURE')
-    body, head = bpy.data.objects["Body"], bpy.data.objects["Cabeca"]
+    body, head = bpy.data.objects["Body"], bpy.data.objects.get("Cabeca")
     return v2.finish_pilot_v2(arm, body, head, name, game, os.path.join(out_dir, "09_piloto"),
                               ragdoll="--sem-ragdoll" not in args)
 
