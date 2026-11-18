@@ -382,7 +382,9 @@ cabeça 1). Imagens com o grupo no nome (`Corpo<Grupo>_imp_*`, `Cabeca<Grupo>_im
 desligar. Teste no runtime invisível: caído a 25 e 60 m fica malha deitada + impostor da cabeça (2, 2, 1); desligado
 volta ao cartão (3, 3, 2). Varredura 7–25 m ida e volta sem quadro sem cabeça. Enzo reinstalado assim
 (backup do teste de ontem em `_backup/GroupEnzo_teste20m_2026-11-18`).
-Ainda em aberto: distância final (usuário gostou também da imagem de 35 m) e o triciclo (cartão na pose do carro).
+Decisão do usuário (2026-11-18): o caro é cabeça e mãos; só de perto ficam as originais, depois pode ser LOD ou
+impostor. Cartão fica a 20 m; listras do cartão e furinhos do LOD1/LOD2 vistos em print ampliado não precisam de
+correção. Em aberto: triciclo (cartão na pose do carro).
 
 Histórico do protótipo:
 
