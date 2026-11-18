@@ -22,6 +22,7 @@
 #include <stdio.h>
 
 #include "BLI_utildefines.h"
+#include "BLI_listbase.h"
 
 #include "RNA_define.h"
 
@@ -31,6 +32,15 @@
 
 #include "WM_api.h"
 #include "WM_types.h"
+
+#include "BKE_report.h"
+#include "BKE_text.h"
+
+#include "DNA_text_types.h"
+
+#ifdef WITH_PYTHON
+#  include "BPY_extern.h"
+#endif
 
 static void rna_Text_clear(Text *text)
 {
@@ -42,6 +52,28 @@ static void rna_Text_write(Text *text, const char *str)
 {
 	BKE_text_write(text, NULL, str);
 	WM_main_add_notifier(NC_TEXT | NA_EDITED, text);
+}
+
+/* Same as the Reload operator, without needing a Text Editor in the context (auto reload). */
+static bool rna_Text_reload(Text *text, ReportList *reports)
+{
+	const int orig_curl = BLI_findindex(&text->lines, text->curl);
+	const int orig_curc = text->curc;
+
+	if (!BKE_text_reload(text)) {
+		BKE_report(reports, RPT_ERROR, "Could not reopen file");
+		return false;
+	}
+#ifdef WITH_PYTHON
+	if (text->compiled)
+		BPY_text_free_code(text);
+#endif
+	/* The file is the saved state now: not "edited since last save". */
+	text->flags &= ~TXT_ISDIRTY;
+	/* Keep the cursor where it was (clamped by txt_move_to), like the Reload operator. */
+	txt_move_to(text, (orig_curl > 0) ? orig_curl : 0, (orig_curc > 0) ? orig_curc : 0, false);
+	WM_main_add_notifier(NC_TEXT | NA_EDITED, text);
+	return true;
 }
 
 #else
@@ -58,6 +90,12 @@ void RNA_api_text(StructRNA *srna)
 	RNA_def_function_ui_description(func, "write text at the cursor location and advance to the end of the text block");
 	parm = RNA_def_string(func, "text", "Text", 0, "", "New text for this data-block");
 	RNA_def_parameter_flags(parm, 0, PARM_REQUIRED);
+
+	func = RNA_def_function(srna, "reload", "rna_Text_reload");
+	RNA_def_function_ui_description(func, "Reload the text from its file (no Text Editor needed)");
+	RNA_def_function_flag(func, FUNC_USE_REPORTS);
+	parm = RNA_def_boolean(func, "result", 0, "", "True when the file was read");
+	RNA_def_function_return(func, parm);
 }
 
 #endif

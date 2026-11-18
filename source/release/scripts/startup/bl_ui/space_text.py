@@ -345,6 +345,8 @@ class TEXT_PT_properties(Panel):
         if text:
             col.prop(text, "use_tabs_as_spaces")
         col.prop(st, "use_live_edit")
+        if hasattr(context.scene, "range_text_auto_reload"):
+            col.prop(context.scene, "range_text_auto_reload")
 
 
 class TEXT_PT_find(Panel):

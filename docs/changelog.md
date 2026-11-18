@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — Text Editor: recarrega sozinho scripts salvos fora (VS Code)
+
+- Novo `text_auto_reload.py` (startup): a cada 0,5 s, recarrega o Text ligado a um arquivo quando o arquivo muda no disco, desde que o Text não tenha sido editado na engine (comparação por hash; editado → fica a barra Resolve Conflict). A opção `Scene.range_text_auto_reload` ("Auto Reload from Disk", ligada por padrão) fica na aba Editor do Text Editor. Nova API `Text.reload()` em C (`rna_text_api.c`), que funciona sem um Text Editor no contexto, mantém o cursor e atualiza o mtime. Pedido do Ghost DEV no Discord.
+
 ## 2026-11-18 — Personagem v2: cabeça sem corte e sem impostor
 
 - O impostor da cabeça não ficou bom. A etapa `cabeca` agora só acerta os pesos: 100 % Head acima do plano do queixo e pescoço em degradê com teto radial. A cabeça fica no corpo em todos os níveis (LOD 4000/1500 tris com a cabeça). Cabelo e cílios mantêm o material do Fuse, com recorte por alfa. `fechar` aceita piloto sem `Cabeca`. Detalhes em `docs/personagem-v2-plan.md`.
