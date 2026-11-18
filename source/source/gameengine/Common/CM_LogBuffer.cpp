@@ -25,6 +25,7 @@
 #include "CM_LogBuffer.h"
 
 #include <iostream>
+#include <mutex>
 
 namespace {
 
@@ -39,6 +40,10 @@ private:
 	std::streambuf* m_dest;
 	CM_LogBuffer* m_owner;
 	std::string m_line;
+	/* std::cout is written from worker threads too (async LibLoad, Trace): m_line and the console
+	 * streambuf are not thread safe, and two writers at once corrupted the heap (crash in fputc while
+	 * a LibLoad printed, 2026-11-18). Recursive: xsputn below calls overflow. */
+	std::recursive_mutex m_mutex;
 
 	static CM_LogLevel DetectLevel(const std::string& line)
 	{
@@ -57,6 +62,7 @@ private:
 protected:
 	int overflow(int c) override
 	{
+		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 		if (c != EOF) {
 			if (c == '\n') {
 				m_owner->Push(DetectLevel(m_line), m_line);
@@ -69,8 +75,22 @@ protected:
 		return m_dest->sputc(static_cast<char>(c));
 	}
 
+	/* Whole strings under one lock, so lines from two threads do not interleave byte by byte. */
+	std::streamsize xsputn(const char *s, std::streamsize n) override
+	{
+		std::lock_guard<std::recursive_mutex> lock(m_mutex);
+		std::streamsize i = 0;
+		for (; i < n; ++i) {
+			if (overflow(static_cast<unsigned char>(s[i])) == EOF) {
+				break;
+			}
+		}
+		return i;
+	}
+
 	int sync() override
 	{
+		std::lock_guard<std::recursive_mutex> lock(m_mutex);
 		return m_dest->pubsync();
 	}
 
