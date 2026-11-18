@@ -1571,7 +1571,7 @@ def reduce_body(arm, body, rest_tris=BODY_REST_TRIS, hands_tris=HANDS_TRIS, lods
 
 # -- Etapa 8: Impostor de Caixa da cabeça -----------------------------------------------------------------
 
-HEAD_IMPOSTOR_RES = '512'      # pixels por vista (6 vistas); o rosto precisa de mais que os 256 padrão
+HEAD_IMPOSTOR_RES = '256'      # pixels por vista (6 vistas): igual a 512 no jogo (prints 2026-11-18), 4x menos memória
 HEAD_IMPOSTOR_DIST = 10.0      # metros: junto do LOD1 do corpo
 HEAD_IMPOSTOR_STEPS = 10       # passos do raio no Volume: prints 32/17/10 quase iguais (2026-11-18), 1/3 do custo
 

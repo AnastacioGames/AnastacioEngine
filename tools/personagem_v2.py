@@ -113,13 +113,14 @@ def etapa_lod(args):
 
 
 def etapa_impostor(args):
-    """-- impostor <pasta_de_trabalho>: abre 07_lod.range, grava 08_impostor.range (cabeça com Impostor de
-    Caixa como LOD). A Cabeca não passa pela redução da etapa 7: o bake sai da cabeça cheia do Fuse."""
+    """-- impostor <pasta_de_trabalho> [--res 512]: abre 07_lod.range, grava 08_impostor.range (cabeça com
+    Impostor de Caixa como LOD). A Cabeca não passa pela redução da etapa 7: o bake sai da cabeça cheia do Fuse."""
     import bpy
     out_dir = args[0]
+    res = args[args.index("--res") + 1] if "--res" in args else v2.HEAD_IMPOSTOR_RES
     bpy.ops.wm.open_mainfile(filepath=os.path.join(out_dir, "07_lod.range"))
     head = bpy.data.objects["Cabeca"]
-    card, info = v2.bake_head_impostor(head)
+    card, info = v2.bake_head_impostor(head, resolution=res)
     info["cabeca_tris"] = sum(len(p.vertices) - 2 for p in head.data.polygons)
     info["arquivo"] = v2.save_checkpoint(out_dir, "08_impostor")
     return info

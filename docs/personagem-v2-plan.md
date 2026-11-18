@@ -379,7 +379,10 @@ triângulos. Com `RANGE_WEAK_GPU=16` os números não mudaram (simulador talvez 
 O Enzo instalado voltou a ser o `09_piloto` sem cartão (backup com cartão em `_backup/GroupEnzo_com_cartao_2026-11-18`).
 O código (`E corpo`, `lodLevelMax`, travas do ragdoll/abaixar/triciclo) fica: sem `lod_max_ragdoll` nada trava.
 Passos do Volume da cabeça: 10 (`HEAD_IMPOSTOR_STEPS`, 2026-11-18; prints 32 × 17 × 10 a 10/15/25 m quase iguais, em
-`Enzo/13_passos/comparar_passos_10.png`; Enzo instalado e 09 ajustados). Pendente: imagens do impostor da CABEÇA também são 1536×1024 PNG (~17 MB/piloto) → testar 256/384 ou formato comprimido.
+`Enzo/13_passos/comparar_passos_10.png`; Enzo instalado e 09 ajustados). Resolução do impostor da cabeça: **256** (`HEAD_IMPOSTOR_RES`, 2026-11-18): imagens 768×512, ~4 MB/piloto em vez
+de ~17 MB; prints 512 × 256 ampliados quase iguais e no tamanho real do jogo (10 m, lente 35) idênticos
+(`Enzo/13_passos/comparar_res.png`, `real_10m.png`). `E impostor P --res N` troca. Enzo refeito e instalado
+(backups: `Enzo/08_impostor_512.range`, `Enzo/09_piloto_512`, `_backup/GroupEnzo_cabeca512_2026-11-18`).
 
 **Pipeline (`E corpo P <Nome>`, depois do `fechar`):** `v2.bake_body_impostor` abre o `06_atlas.range` (corpo cheio),
 pose sentada, corpo + cabeça numa malha no espaço do `Body` e assa o Impostor de Caixa (512, Volume pelo AUTO);
