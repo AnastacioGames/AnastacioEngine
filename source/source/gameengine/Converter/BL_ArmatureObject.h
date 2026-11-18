@@ -72,6 +72,8 @@ protected:
 	/// Consecutive frames skipped by anim_needs_update() (KX_Scene.cpp) while fully culled; forces
 	/// a periodic full update so a frozen AABB can never hide the armature from view forever.
 	unsigned short m_cullSkipFrames;
+	/// False until the first pose update: anim_needs_update() must not skip it as culled.
+	bool m_posedOnce;
 
 	/// Extra rotation per bone (Python setBoneRotationOffset), applied after the actions and
 	/// before the skinning. base/written let a frame without an action on the bone undo the

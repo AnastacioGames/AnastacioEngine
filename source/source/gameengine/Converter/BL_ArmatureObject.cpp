@@ -212,6 +212,7 @@ BL_ArmatureObject::BL_ArmatureObject(void *sgReplicationInfo,
 	m_drawDebug(false),
 	m_lastapplyframe(0.0),
 	m_cullSkipFrames(0),
+	m_posedOnce(false),
 	m_boneRotOffsetsDirty(false)
 {
 	m_controlledConstraints = new EXP_ListValue<BL_ArmatureConstraint>();
@@ -388,6 +389,8 @@ void BL_ArmatureObject::ProcessReplica()
 	m_objArma->data = BKE_armature_copy(G.main, tmp);
 
 	LoadChannels();
+	// A new copy (addObject) has new child meshes, still culled until the first render.
+	m_posedOnce = false;
 }
 
 int BL_ArmatureObject::GetGameObjectType() const
@@ -585,6 +588,11 @@ static const unsigned short CULL_SKIP_FORCE_INTERVAL = 15;
 
 bool BL_ArmatureObject::TickCullSkip()
 {
+	/* Child meshes of a just added armature count as culled until the first render tests them:
+	 * without this the first frame skipped the pose and drew the rest pose (T) for one frame. */
+	if (!m_posedOnce) {
+		return true;
+	}
 	if (++m_cullSkipFrames >= CULL_SKIP_FORCE_INTERVAL) {
 		m_cullSkipFrames = 0;
 		return true;
@@ -595,6 +603,7 @@ bool BL_ArmatureObject::TickCullSkip()
 void BL_ArmatureObject::ResetCullSkip()
 {
 	m_cullSkipFrames = 0;
+	m_posedOnce = true;
 }
 
 void BL_ArmatureObject::GetPose(bPose **pose) const
