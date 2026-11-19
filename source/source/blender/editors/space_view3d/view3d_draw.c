@@ -3421,17 +3421,16 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 	{
 		/* On screen the lens is centered and sized on the camera frame; an offscreen render
 		 * from the camera is the frame itself. */
-		float frame[4] = {0.0f, 0.0f, 1.0f, 1.0f};
-		if (!offscreen) {
-			rctf border;
-			const float w = (float)ar->winx, h = (float)ar->winy;
-			ED_view3d_calc_camera_border(scene, ar, v3d, rv3d, &border, false);
-			frame[0] = border.xmin / w;
-			frame[1] = border.ymin / h;
-			frame[2] = BLI_rctf_size_x(&border) / w;
-			frame[3] = BLI_rctf_size_y(&border) / h;
+		if (offscreen) {
+			GPU_fx_compositor_set_camera_lens(fx, params, NULL);
 		}
-		GPU_fx_compositor_set_camera_lens(fx, params, frame);
+		else {
+			/* In region pixels; the compositor divides by its buffer size. */
+			rctf border;
+			ED_view3d_calc_camera_border(scene, ar, v3d, rv3d, &border, false);
+			const float frame[4] = {border.xmin, border.ymin, BLI_rctf_size_x(&border), BLI_rctf_size_y(&border)};
+			GPU_fx_compositor_set_camera_lens(fx, params, frame);
+		}
 	}
 	else {
 		GPU_fx_compositor_set_camera_lens(fx, NULL, NULL);

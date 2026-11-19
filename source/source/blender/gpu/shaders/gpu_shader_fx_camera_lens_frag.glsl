@@ -4,7 +4,7 @@
 uniform sampler2D colorbuffer;
 // x: chromatic, y: vignette, z: vignette radius, w: fisheye
 uniform vec4 lens_params;
-// x: grain strength, y: grain seed
+// x: grain strength, y: grain seed, zw: buffer size in pixels (no textureSize in GLSL 1.20)
 uniform vec4 grain_params;
 // Camera frame inside the buffer, in uv: x min, y min, width, height. The lens works in the
 // frame's own coordinates, as in the game where the frame is the whole screen.
@@ -14,7 +14,7 @@ in vec4 uvcoord; // coordinates [0.0, 1.0]
 
 void main()
 {
-	vec2 size = vec2(textureSize(colorbuffer, 0)) * lens_frame.zw;
+	vec2 size = grain_params.zw * lens_frame.zw;
 	float aspect = size.x / size.y;
 
 	vec2 fuv = (uvcoord.xy - lens_frame.xy) / lens_frame.zw;

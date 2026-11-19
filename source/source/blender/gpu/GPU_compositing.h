@@ -95,7 +95,7 @@ void GPU_fx_compositor_destroy(GPUFX *fx);
 /* initialize a framebuffer with size taken from the viewport */
 /* Preview the active camera's lens effects (Camera > Game FX) in the next passes:
  * params = chromatic, vignette, vignette radius, fisheye (NULL turns it off);
- * frame = camera frame in the buffer as uv x min, y min, width, height (NULL = whole buffer). */
+ * frame = camera frame in the buffer in pixels: x min, y min, width, height (NULL = whole buffer). */
 void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const float frame[4]);
 
 bool GPU_fx_compositor_initialize_passes(

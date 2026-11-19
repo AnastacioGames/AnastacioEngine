@@ -505,7 +505,8 @@ void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const f
 	fx->camera_lens = params && (params[0] > 0.0f || params[1] > 0.0f || params[3] != 0.0f);
 	if (fx->camera_lens) {
 		copy_v4_v4(fx->camera_lens_params, params);
-		copy_v4_fl4(fx->camera_lens_frame, 0.0f, 0.0f, 1.0f, 1.0f);
+		/* In pixels; turned into uv of the buffer in the pass, from its real size. */
+		zero_v4(fx->camera_lens_frame);
 		if (frame && frame[2] > 0.0f && frame[3] > 0.0f) {
 			copy_v4_v4(fx->camera_lens_frame, frame);
 		}
@@ -2146,12 +2147,20 @@ bool GPU_fx_do_composite_pass(
 			 * just changes on each redraw. Kept small for float precision. */
 			float grain_params[4] = {use_grain ? scenefx.grain_strength : 0.0f,
 			                         (float)((int)(PIL_check_seconds_timer() * 60.0) % 1000) * 0.05f,
-			                         0.0f, 0.0f};
+			                         (float)fx->gbuffer_dim[0], (float)fx->gbuffer_dim[1]};
 			float lens_params[4] = {0.0f, 0.0f, 0.0f, 0.0f};
 			float lens_frame[4] = {0.0f, 0.0f, 1.0f, 1.0f};
 			if (use_lens) {
 				copy_v4_v4(lens_params, fx->camera_lens_params);
-				copy_v4_v4(lens_frame, fx->camera_lens_frame);
+				const float *f = fx->camera_lens_frame;
+				/* Frame in pixels over the buffer size (with a scissor the buffer is one pixel
+				 * larger than the region); none = the whole buffer (offscreen camera render). */
+				if (f[2] > 0.0f && f[3] > 0.0f && fx->gbuffer_dim[0] > 0 && fx->gbuffer_dim[1] > 0) {
+					lens_frame[0] = f[0] / fx->gbuffer_dim[0];
+					lens_frame[1] = f[1] / fx->gbuffer_dim[1];
+					lens_frame[2] = f[2] / fx->gbuffer_dim[0];
+					lens_frame[3] = f[3] / fx->gbuffer_dim[1];
+				}
 			}
 
 			GPU_shader_bind(grain_shader);
