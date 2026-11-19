@@ -3832,7 +3832,6 @@ class VIEW3D_PT_shading(Panel):
                 layout.prop(view, "show_occlude_wire")
 
 
-class VIEW3D_PT_overlay(Panel):
 class VIEW3D_PT_camera_hud_base:
     """Popovers do Camera HUD (barra no topo da viewport em vista de câmera)."""
     bl_space_type = 'VIEW_3D'
@@ -3990,6 +3989,7 @@ class VIEW3D_PT_camera_hud_display(VIEW3D_PT_camera_hud_base, Panel):
         row.prop(view, "show_camera_hud_display", text="Display", toggle=True)
 
 
+class VIEW3D_PT_overlay(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
     bl_label = "Overlay"
@@ -4036,13 +4036,13 @@ class VIEW3D_PT_camera_hud_display(VIEW3D_PT_camera_hud_base, Panel):
         col.prop(prefs, "show_view_name", text="View Name")
         col.prop(view, "show_stats", text="Statistics")
         split.column().prop(prefs, "show_object_info", text="Object Info")
-
         layout.prop(view, "show_camera_hud", text="Camera HUD")
         row = layout.row(align=True)
         row.prop(view, "show_camera_hud_lens", text="Lens", toggle=True)
         row.prop(view, "show_camera_hud_focus", text="Focus", toggle=True)
         row.prop(view, "show_camera_hud_effects", text="Effects", toggle=True)
         row.prop(view, "show_camera_hud_display", text="Display", toggle=True)
+
         layout.separator()
 
         layout.label(text="Objects")
@@ -4787,11 +4787,11 @@ classes = (
     VIEW3D_PT_game_layers,
     VIEW3D_OT_game_layers_unpin,
     VIEW3D_PT_shading,
-    VIEW3D_PT_overlay,
     VIEW3D_PT_camera_hud_lens,
     VIEW3D_PT_camera_hud_focus,
     VIEW3D_PT_camera_hud_effects,
     VIEW3D_PT_camera_hud_display,
+    VIEW3D_PT_overlay,
     VIEW3D_PT_gizmo,
     VIEW3D_PT_pivot_point,
     VIEW3D_OT_object_type_toggle,
