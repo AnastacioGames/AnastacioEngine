@@ -104,6 +104,8 @@ void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const f
 typedef struct GPUFXNodeUniform {
 	char name[64];
 	int size;  /* 1 (Value) or 4 (RGB) */
+	bool is_int;  /* int/bool uniform (glUniform1i with ivalue) */
+	int ivalue;
 	float value[4];
 } GPUFXNodeUniform;
 
@@ -120,6 +122,12 @@ typedef struct GPUFXNodeStage {
  * Shaders are rebuilt only when their text changes; uniform values are taken every call. */
 void GPU_fx_compositor_set_node_stages(GPUFX *fx, GPUFXNodeStage *stages, int num_stages);
 void GPU_fx_node_stages_free(GPUFXNodeStage *stages, int num_stages);
+
+/* Preview of the scene's Custom Filter actuators: one single pass shader per stage (no caches),
+ * in pass order; the first  num_before_lens run before the camera lens, the rest after the
+ * compositor (the game's order). Same ownership and rebuild rules as the node stages. */
+#define GPU_FX_FILTER_MAX 16
+void GPU_fx_compositor_set_filter_stages(GPUFX *fx, GPUFXNodeStage *stages, int num_stages, int num_before_lens);
 
 bool GPU_fx_compositor_initialize_passes(
         struct Scene *scene, GPUFX *fx, const struct rcti *rect, const struct rcti *scissor_rect,

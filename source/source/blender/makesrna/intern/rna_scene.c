@@ -5700,6 +5700,13 @@ static void rna_def_gpu_fx(BlenderRNA *brna)
 	                         "Show the scene's compositor nodes (Use Nodes) as the game runs them, "
 	                         "only the nodes the game supports");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "use_game_2d_filters", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "fx_flag", GPU_FX_FLAG_2D_FILTERS);
+	RNA_def_property_ui_text(prop, "2D Filters",
+	                         "Show the Custom Filter actuators of the scene's objects with their properties "
+	                         "as they start in the game (filters added by Python are not shown)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_scene_gpu_bloom_fx(BlenderRNA *brna)

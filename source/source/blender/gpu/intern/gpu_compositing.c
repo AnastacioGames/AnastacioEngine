@@ -184,6 +184,8 @@ typedef struct {
 #define GPU_SCENEFX_CAMERA_LENS (1 << 30)
 /* Runtime only: the game's compositor nodes are previewed (GPU_fx_compositor_set_node_stages). */
 #define GPU_SCENEFX_NODE_COMPOSITOR (1 << 29)
+/* Runtime only: Custom Filter actuators are previewed (GPU_fx_compositor_set_filter_stages). */
+#define GPU_SCENEFX_2D_FILTERS (1 << 28)
 
 typedef struct {
 	int invrendertargetdim_uniform;
@@ -323,6 +325,13 @@ struct GPUFX {
 	GPUTexture *node_caches[GPU_FX_NODE_MAX_CACHES];
 	GPUFrameBuffer *node_fb;
 	int node_frame;
+
+	/* runtime only: Custom Filter actuators (GPU_fx_compositor_set_filter_stages) */
+	GPUFXNodeStage *filter_stages;
+	int filter_num_stages;
+	int filter_num_before;
+	GPUShader *filter_shaders[GPU_FX_FILTER_MAX];
+	bool filter_failed;
 
 	/* number of passes, needed to detect if ping pong buffer allocation is needed */
 	int num_passes;
@@ -566,6 +575,41 @@ void GPU_fx_compositor_set_node_stages(GPUFX *fx, GPUFXNodeStage *stages, int nu
 	fx->node_num_stages = num_stages;
 }
 
+static void gpu_fx_filter_free_gl(GPUFX *fx)
+{
+	for (int i = 0; i < GPU_FX_FILTER_MAX; i++) {
+		if (fx->filter_shaders[i]) {
+			GPU_shader_free(fx->filter_shaders[i]);
+			fx->filter_shaders[i] = NULL;
+		}
+	}
+	fx->filter_failed = false;
+}
+
+void GPU_fx_compositor_set_filter_stages(GPUFX *fx, GPUFXNodeStage *stages, int num_stages, int num_before_lens)
+{
+	if (num_stages > GPU_FX_FILTER_MAX) {
+		/* the game runs them all; the preview keeps the first ones in pass order */
+		for (int i = GPU_FX_FILTER_MAX; i < num_stages; i++) {
+			MEM_SAFE_FREE(stages[i].shader);
+			MEM_SAFE_FREE(stages[i].uniforms);
+		}
+		num_stages = GPU_FX_FILTER_MAX;
+	}
+	CLAMP(num_before_lens, 0, num_stages);
+	bool same = stages && fx->filter_stages && num_stages == fx->filter_num_stages;
+	for (int i = 0; same && i < num_stages; i++) {
+		same = STREQ(stages[i].shader, fx->filter_stages[i].shader);
+	}
+	if (!same) {
+		gpu_fx_filter_free_gl(fx);
+	}
+	GPU_fx_node_stages_free(fx->filter_stages, fx->filter_num_stages);
+	fx->filter_stages = stages;
+	fx->filter_num_stages = num_stages;
+	fx->filter_num_before = num_before_lens;
+}
+
 /* Vertex stage of the game's 2D Filters (RAS_VertexShader2DFilter.glsl) for the compositor
  * fragment shaders, which read texCoordVarying with USE_CORE_PROFILE. */
 static const char *gpu_fx_node_vert =
@@ -573,6 +617,9 @@ static const char *gpu_fx_node_vert =
         "void main()\n"
         "{\n"
         "\ttexCoordVarying = gl_MultiTexCoord0.xy;\n"
+        "#ifndef USE_CORE_PROFILE\n"
+        "\tgl_TexCoord[0] = gl_MultiTexCoord0;\n"
+        "#endif\n"
         "\tgl_Position = gl_Vertex;\n"
         "}\n";
 
@@ -598,10 +645,33 @@ static bool gpu_fx_node_prepare(GPUFX *fx)
 	return true;
 }
 
-static void gpu_fx_node_bind_stage(GPUFX *fx, int index, GPUTexture *src, float projmat[4][4])
+/* Like the compositor: a filter that fails to compile turns the filter preview off (it is not
+ * rebuilt on every redraw) until a shader text changes. The game skips only the broken one. */
+static bool gpu_fx_filter_prepare(GPUFX *fx)
 {
-	GPUShader *sh = fx->node_shaders[index];
-	const GPUFXNodeStage *stage = &fx->node_stages[index];
+	if (fx->filter_num_stages == 0 || fx->filter_failed) {
+		return false;
+	}
+	for (int i = 0; i < fx->filter_num_stages; i++) {
+		if (!fx->filter_shaders[i]) {
+			fx->filter_shaders[i] = GPU_shader_create(gpu_fx_node_vert, fx->filter_stages[i].shader, NULL, NULL,
+			                                          NULL, 0, 0, 0);
+			if (!fx->filter_shaders[i]) {
+				fprintf(stderr, "2D Filters preview: filter %d shader failed\n", i);
+				gpu_fx_filter_free_gl(fx);
+				fx->filter_failed = true;
+				return false;
+			}
+		}
+	}
+	return true;
+}
+
+/* Binds a stage shader with the game's 2D filter uniforms (RAS_2DFilter::BindUniforms) that make
+ * sense without a running game: time stays at the first frame. */
+static void gpu_fx_stage_bind(GPUFX *fx, GPUShader *sh, const GPUFXNodeStage *stage, GPUTexture *src,
+                              float viewmat[4][4], float projmat[4][4], int frame)
+{
 	int slot = 0;
 	char name[32];
 
@@ -624,16 +694,45 @@ static void gpu_fx_node_bind_stage(GPUFX *fx, int index, GPUTexture *src, float 
 	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTextureWidth"), 1, 1, &w);
 	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTextureHeight"), 1, 1, &h);
 	glUniformMatrix4fv(GPU_shader_get_uniform(sh, "bgl_ProjectionMatrix"), 1, GL_FALSE, (float *)projmat);
-	GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "bgl_Frame"), fx->node_frame);
+	GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "bgl_Frame"), frame);
+	{
+		float m[4][4], offsets[18];
+		const float res[2] = {w, h};
+		const float zero = 0.0f;
+		glUniformMatrix4fv(GPU_shader_get_uniform(sh, "bgl_ViewMatrix"), 1, GL_FALSE, (float *)viewmat);
+		invert_m4_m4(m, viewmat);
+		glUniformMatrix4fv(GPU_shader_get_uniform(sh, "bgl_InverseViewMatrix"), 1, GL_FALSE, (float *)m);
+		invert_m4_m4(m, projmat);
+		glUniformMatrix4fv(GPU_shader_get_uniform(sh, "bgl_InverseProjectionMatrix"), 1, GL_FALSE, (float *)m);
+		GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_Resolution"), 2, 1, res);
+		/* RAS_2DFilter::ComputeTextureOffsets: the 3x3 neighbour offsets of one pixel */
+		for (int i = 0; i < 3; i++) {
+			for (int j = 0; j < 3; j++) {
+				offsets[((i * 3) + j) * 2 + 0] = (float)(i - 1) / w;
+				offsets[((i * 3) + j) * 2 + 1] = (float)(j - 1) / h;
+			}
+		}
+		GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_TextureCoordinateOffset"), 2, 9, offsets);
+		GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_Time"), 1, 1, &zero);
+	}
 	for (int u = 0; u < stage->num_uniforms; u++) {
 		const GPUFXNodeUniform *nu = &stage->uniforms[u];
-		GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, nu->name), nu->size, 1, nu->value);
+		if (nu->is_int) {
+			GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, nu->name), nu->ivalue);
+		}
+		else {
+			GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, nu->name), nu->size, 1, nu->value);
+		}
 	}
 }
 
-static void gpu_fx_node_unbind_stage(GPUFX *fx, int index, GPUTexture *src)
+static void gpu_fx_node_bind_stage(GPUFX *fx, int index, GPUTexture *src, float viewmat[4][4], float projmat[4][4])
 {
-	const GPUFXNodeStage *stage = &fx->node_stages[index];
+	gpu_fx_stage_bind(fx, fx->node_shaders[index], &fx->node_stages[index], src, viewmat, projmat, fx->node_frame);
+}
+
+static void gpu_fx_stage_unbind(GPUFX *fx, const GPUFXNodeStage *stage, GPUTexture *src)
+{
 	for (int k = 0; k < stage->num_caches; k++) {
 		if (fx->node_caches[stage->caches[k]]) {
 			GPU_texture_unbind(fx->node_caches[stage->caches[k]]);
@@ -646,7 +745,7 @@ static void gpu_fx_node_unbind_stage(GPUFX *fx, int index, GPUTexture *src)
 
 /* Draws the cache stages into their own textures, like the game's comp_cache passes; false
  * when the textures could not be made (the last stage then reads nothing for them). */
-static bool gpu_fx_node_draw_caches(GPUFX *fx, GPUTexture *src, float projmat[4][4])
+static bool gpu_fx_node_draw_caches(GPUFX *fx, GPUTexture *src, float viewmat[4][4], float projmat[4][4])
 {
 	char err_out[256];
 	const int w = fx->gbuffer_dim[0], h = fx->gbuffer_dim[1];
@@ -678,9 +777,9 @@ static bool gpu_fx_node_draw_caches(GPUFX *fx, GPUTexture *src, float projmat[4]
 			return false;
 		}
 		GPU_texture_bind_as_framebuffer(tex);
-		gpu_fx_node_bind_stage(fx, i, src, projmat);
+		gpu_fx_node_bind_stage(fx, i, src, viewmat, projmat);
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-		gpu_fx_node_unbind_stage(fx, i, src);
+		gpu_fx_stage_unbind(fx, &fx->node_stages[i], src);
 		GPU_framebuffer_texture_unbind(fx->node_fb, tex);
 		GPU_framebuffer_texture_detach(tex);
 		if (fx->node_stages[i].mipmap) {
@@ -699,6 +798,8 @@ void GPU_fx_compositor_destroy(GPUFX *fx)
 	cleanup_fx_gl_data(fx, true);
 	gpu_fx_node_free_gl(fx);
 	GPU_fx_node_stages_free(fx->node_stages, fx->node_num_stages);
+	gpu_fx_filter_free_gl(fx);
+	GPU_fx_node_stages_free(fx->filter_stages, fx->filter_num_stages);
 	glDeleteBuffers(1, &fx->vbuffer);
 	MEM_freeN(fx);
 }
@@ -750,7 +851,7 @@ bool GPU_fx_compositor_initialize_passes(
 	 * (camera view and a lens that does something), never on the View3D toggle alone. */
 	fx_flag &= ~GPU_FX_FLAG_CAMERA_LENS;
 	/* Same for the compositor preview: on only with stages that compiled. */
-	fx_flag &= ~GPU_FX_FLAG_NODE_COMPOSITOR;
+	fx_flag &= ~(GPU_FX_FLAG_NODE_COMPOSITOR | GPU_FX_FLAG_2D_FILTERS);
 
 	if (!scenefx_settings->bloom || !(scene->scenefx_settings.editor_render_flag & SCENE_FX_FLAG_BLOOM)) {
 		scenefx_flag &= ~SCENE_FX_FLAG_BLOOM;
@@ -828,6 +929,9 @@ bool GPU_fx_compositor_initialize_passes(
 	if (gpu_fx_node_prepare(fx)) {
 		scenefx_flag |= GPU_SCENEFX_NODE_COMPOSITOR;
 	}
+	if (gpu_fx_filter_prepare(fx)) {
+		scenefx_flag |= GPU_SCENEFX_2D_FILTERS;
+	}
 
 	/* The ping-pong textures are laid out according to the active pass chain.
 	 * Recreate them when a scene effect is toggled so removing the final FXAA
@@ -901,6 +1005,8 @@ bool GPU_fx_compositor_initialize_passes(
 
 	if (scenefx_flag & GPU_SCENEFX_NODE_COMPOSITOR)
 		num_passes++;
+	if (scenefx_flag & GPU_SCENEFX_2D_FILTERS)
+		num_passes += fx->filter_num_stages;
 
 	if (!fx->gbuffer) {
 		fx->gbuffer = GPU_framebuffer_create();
@@ -1126,6 +1232,29 @@ static void gpu_fx_bind_render_target(int *passes_left, GPUFX *fx, struct GPUOff
 	else {
 		/* bind the ping buffer to the color buffer */
 		GPU_framebuffer_texture_attach(fx->gbuffer, target, 0, NULL);
+	}
+}
+
+/* Custom Filter stages [from, to) as ping-pong passes, each reading the previous result. */
+static void gpu_fx_filter_draw(GPUFX *fx, int from, int to, int *passes_left, struct GPUOffScreen *ofs,
+                               GPUTexture **src, GPUTexture **target, float viewmat[4][4], float projmat[4][4])
+{
+	for (int i = from; i < to; i++) {
+		gpu_fx_stage_bind(fx, fx->filter_shaders[i], &fx->filter_stages[i], *src, viewmat, projmat, fx->node_frame);
+		gpu_fx_bind_render_target(passes_left, fx, ofs, *target);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		gpu_fx_stage_unbind(fx, &fx->filter_stages[i], *src);
+		/* may not be attached, in that case this just returns */
+		if (*target) {
+			GPU_framebuffer_texture_detach(*target);
+			if (ofs) {
+				GPU_offscreen_bind(ofs, false);
+			}
+			else {
+				GPU_framebuffer_restore();
+			}
+		}
+		SWAP(GPUTexture *, *target, *src);
 	}
 }
 
@@ -2348,6 +2477,16 @@ bool GPU_fx_do_composite_pass(
 
 	/* camera lens pass (chromatic aberration, vignette, fisheye) and film grain, one pass like the
 	 * in-game camera lens filter, with the same math (gpu_shader_camera_lens_lib.glsl) */
+	/* Custom Filters with a pass number below the camera lens (the game's FILTERPASS order) */
+	/* one bgl_Frame per drawn frame, shared by filters and compositor */
+	if (fx->sce_effects & (GPU_SCENEFX_2D_FILTERS | GPU_SCENEFX_NODE_COMPOSITOR)) {
+		fx->node_frame++;
+	}
+	if (fx->sce_effects & GPU_SCENEFX_2D_FILTERS) {
+		gpu_fx_filter_draw(fx, 0, fx->filter_num_before, &passes_left, ofs, &src, &target, viewmat, projmat);
+		numslots = 0;
+	}
+
 	if (fx->sce_effects & (SCENE_FX_FLAG_GRAIN | GPU_SCENEFX_CAMERA_LENS)) {
 		GPUShader *grain_shader;
 		grain_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_CAMERA_LENS, is_persp);
@@ -2411,20 +2550,19 @@ bool GPU_fx_do_composite_pass(
 	/* game compositor (Use Nodes), after the camera lens as in the game's filter order */
 	if (fx->sce_effects & GPU_SCENEFX_NODE_COMPOSITOR) {
 		const int last = fx->node_num_stages - 1;
-		fx->node_frame++;
-		if (!gpu_fx_node_draw_caches(fx, src, projmat)) {
+		if (!gpu_fx_node_draw_caches(fx, src, viewmat, projmat)) {
 			/* This frame reads empty caches; the next redraw leaves the preview off. */
 			fprintf(stderr, "Compositing preview: cache textures failed\n");
 			fx->node_failed = true;
 		}
-		gpu_fx_node_bind_stage(fx, last, src, projmat);
+		gpu_fx_node_bind_stage(fx, last, src, viewmat, projmat);
 
 		/* draw */
 		gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
 
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 
-		gpu_fx_node_unbind_stage(fx, last, src);
+		gpu_fx_stage_unbind(fx, &fx->node_stages[last], src);
 
 		/* may not be attached, in that case this just returns */
 		if (target) {
@@ -2439,6 +2577,13 @@ bool GPU_fx_do_composite_pass(
 
 		/* swap here, after src/target have been unbound */
 		SWAP(GPUTexture *, target, src);
+		numslots = 0;
+	}
+
+	/* Custom Filters from the camera lens pass on (after the compositor, as in the game) */
+	if (fx->sce_effects & GPU_SCENEFX_2D_FILTERS) {
+		gpu_fx_filter_draw(fx, fx->filter_num_before, fx->filter_num_stages, &passes_left, ofs, &src, &target,
+		                   viewmat, projmat);
 		numslots = 0;
 	}
 

@@ -27,10 +27,13 @@
 
 #include "PIL_time.h"
 
+#include "DNA_actuator_types.h"
 #include "DNA_armature_types.h"
 #include "DNA_camera_types.h"
 #include "DNA_customdata_types.h"
 #include "DNA_object_types.h"
+#include "DNA_property_types.h"
+#include "DNA_text_types.h"
 #include "DNA_group_types.h"
 #include "DNA_mesh_types.h"
 #include "DNA_key_types.h"
@@ -65,6 +68,7 @@
 #include "BKE_paint.h"
 #include "BKE_scene.h"
 #include "BKE_screen.h"
+#include "BKE_text.h"
 #include "BKE_unit.h"
 #include "BKE_movieclip.h"
 
@@ -3430,6 +3434,92 @@ static void view3d_fx_node_compositor(GPUFX *fx, Scene *scene, const GPUFXSettin
 	GPU_fx_compositor_set_node_stages(fx, stages, num);
 }
 
+/* RAS_2DFilterManager.h FILTERPASS_CAMERA_LENS: custom passes below it run before the lens. */
+#define VIEW3D_FX_FILTERPASS_CAMERA_LENS 23
+
+typedef struct View3DFxFilter {
+	bActuator *act;
+	Object *ob;
+	int pass;
+} View3DFxFilter;
+
+static int view3d_fx_filter_cmp(const void *a, const void *b)
+{
+	const View3DFxFilter *fa = a, *fb = b;
+	return (fa->pass > fb->pass) - (fa->pass < fb->pass);
+}
+
+/* Game Preview > 2D Filters: the Custom Filter actuators of the scene's objects (a Text with the
+ * shader) by pass number, with the owner's int/float/bool properties as uniforms at their start
+ * values, like KX_2DFilter at the first frame. Filters added from Python are not known here. */
+static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *fx_settings)
+{
+	View3DFxFilter found[GPU_FX_FILTER_MAX * 2];
+	int num_found = 0;
+
+	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_2D_FILTERS)) {
+		for (Base *base = scene->base.first; base; base = base->next) {
+			for (bActuator *act = base->object->actuators.first; act; act = act->next) {
+				const bTwoDFilterActuator *f = act->data;
+				if (act->type != ACT_2DFILTER || !f || f->type != ACT_2DFILTER_CUSTOMFILTER || !f->text) {
+					continue;
+				}
+				/* the game keeps one filter per pass: the last one converted wins */
+				int k;
+				for (k = 0; k < num_found && found[k].pass != f->int_arg; k++) {}
+				if (k == num_found) {
+					if (num_found == ARRAY_SIZE(found)) {
+						continue;
+					}
+					num_found++;
+				}
+				found[k].act = act;
+				found[k].ob = base->object;
+				found[k].pass = f->int_arg;
+			}
+		}
+		qsort(found, num_found, sizeof(*found), view3d_fx_filter_cmp);
+	}
+
+	GPUFXNodeStage *stages = num_found ? MEM_callocN(sizeof(*stages) * num_found, __func__) : NULL;
+	int num_before = 0;
+	for (int i = 0; i < num_found; i++) {
+		const bTwoDFilterActuator *f = found[i].act->data;
+		GPUFXNodeStage *st = &stages[i];
+		st->shader = txt_to_buf(f->text);
+		if (!st->shader) {
+			st->shader = BLI_strdup("");
+		}
+		int num_props = 0;
+		for (bProperty *prop = found[i].ob->prop.first; prop; prop = prop->next) {
+			num_props += ELEM(prop->type, GPROP_BOOL, GPROP_INT, GPROP_FLOAT);
+		}
+		if (num_props) {
+			st->uniforms = MEM_callocN(sizeof(*st->uniforms) * num_props, __func__);
+			for (bProperty *prop = found[i].ob->prop.first; prop; prop = prop->next) {
+				GPUFXNodeUniform *u;
+				if (!ELEM(prop->type, GPROP_BOOL, GPROP_INT, GPROP_FLOAT)) {
+					continue;
+				}
+				u = &st->uniforms[st->num_uniforms++];
+				BLI_strncpy(u->name, prop->name, sizeof(u->name));
+				u->size = 1;
+				u->is_int = prop->type != GPROP_FLOAT;
+				if (prop->type == GPROP_FLOAT) {
+					u->value[0] = *(float *)&prop->data;
+				}
+				else {
+					u->ivalue = prop->data;
+				}
+			}
+		}
+		if (found[i].pass < VIEW3D_FX_FILTERPASS_CAMERA_LENS) {
+			num_before++;
+		}
+	}
+	GPU_fx_compositor_set_filter_stages(fx, stages, num_found, num_before);
+}
+
 static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d,
                                   const GPUFXSettings *fx_settings, bool offscreen)
 {
@@ -3438,6 +3528,7 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 		return;
 	}
 	view3d_fx_node_compositor(fx, scene, fx_settings);
+	view3d_fx_2d_filters(fx, scene, fx_settings);
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_LENS) &&
 	    rv3d->persp == RV3D_CAMOB && BKE_camera_lens_preview_params(v3d->camera, params))
 	{
@@ -3563,7 +3654,7 @@ void ED_view3d_draw_offscreen(
 	if (do_compositing) {
 		if (!winmat)
 			is_persp = rv3d->is_persp;
-		GPU_fx_do_composite_pass(fx, viewmat, winmat, is_persp, scene, ofs);
+		GPU_fx_do_composite_pass(fx, viewmat ? viewmat : rv3d->viewmat, winmat ? winmat : rv3d->winmat, is_persp, scene, ofs);
 	}
 
 	if ((v3d->flag2 & V3D_RENDER_SHADOW) == 0) {

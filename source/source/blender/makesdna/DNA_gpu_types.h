@@ -47,6 +47,8 @@ typedef enum eGPUFXFlags {
 	GPU_FX_FLAG_CAMERA_LENS = (1 << 1),
 	/* preview of the scene's compositor nodes as the game runs them (Compositing in the game) */
 	GPU_FX_FLAG_NODE_COMPOSITOR = (1 << 2),
+	/* preview of the Custom Filter actuators declared in the scene (2D Filters in the game) */
+	GPU_FX_FLAG_2D_FILTERS  = (1 << 3),
 } eGPUFXFlags;
 
 #endif  /* __DNA_GPU_TYPES_H__ */
