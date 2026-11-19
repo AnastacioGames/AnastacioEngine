@@ -3809,6 +3809,7 @@ class VIEW3D_PT_shading(Panel):
             sub.prop(fx_settings, "use_camera_lens")
             col.prop(fx_settings, "use_game_compositor")
             col.prop(fx_settings, "use_game_2d_filters")
+            col.prop(fx_settings, "use_game_taa")
         col.prop(view, "show_invisible_lods")
 
         layout.separator()

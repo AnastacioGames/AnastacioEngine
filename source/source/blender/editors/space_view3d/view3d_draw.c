@@ -3705,8 +3705,34 @@ static int view3d_fx_motion_next;
 static wmTimer *view3d_fx_motion_timer;
 #define VIEW3D_FX_MOTION_STEP 0.04
 
-/* The view stopped but its last draw still shows the trail: a few redraws let it settle like the
- * game's next frames. The window manager is replaced on file load (its timers with it). */
+/* Game Preview > TAA, per region on screen: the history of RAS_2DFilterManager::PrepareTaaHistory /
+ * CommitTaaHistory (the texture itself lives in the region's compositor). */
+typedef struct View3DFxTaa {
+	const RegionView3D *rv3d;
+	const GPUFX *fx;
+	int size[2];
+	int frame;                /* Halton index of this draw */
+	float jitter[2];          /* of this draw, in pixels */
+	float prev_jitter[2];     /* of the history */
+	float prev_persmat[4][4]; /* jittered view-projection the history was drawn with */
+	float base_persmat[4][4]; /* without jitter, last draw: notices a still view */
+	float winmat[4][4];       /* this draw's jittered projection */
+	bool valid;               /* the history holds the last draw */
+	bool active;              /* this draw jitters */
+	bool was_active;
+	int settle;               /* redraws left to converge */
+	double time;
+} View3DFxTaa;
+
+static View3DFxTaa view3d_fx_taa[8];
+static int view3d_fx_taa_next;
+/* game: RAS_2DFilterManager m_taaPhases; redraws to converge with the still weight 0.08 */
+#define VIEW3D_FX_TAA_PHASES 8
+#define VIEW3D_FX_TAA_SETTLE 24
+
+/* The view stopped but its last draw still shows the trail (or the TAA still converges): a few
+ * redraws let it settle like the game's next frames. The window manager is replaced on file load
+ * (its timers with it). */
 static void view3d_fx_motion_redraw(void)
 {
 	/* one timer for every view: on while any of them, drawn lately, still settles */
@@ -3715,6 +3741,10 @@ static void view3d_fx_motion_redraw(void)
 	for (int i = 0; i < ARRAY_SIZE(view3d_fx_motion); i++) {
 		const View3DFxMotion *m = &view3d_fx_motion[i];
 		settling |= m->rv3d && m->settling && now - m->time < 1.0;
+	}
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_taa); i++) {
+		const View3DFxTaa *a = &view3d_fx_taa[i];
+		settling |= a->rv3d && a->active && a->settle > 0 && now - a->time < 1.0;
 	}
 	wmWindowManager *wm = G_MAIN ? G_MAIN->wm.first : NULL;
 	wmTimer *wt = view3d_fx_motion_timer;
@@ -3737,6 +3767,12 @@ static void view3d_fx_motion_redraw(void)
 /* A view drawn without the effect (off, out of camera view) settles no more; it is set again below. */
 static void view3d_fx_motion_forget(const RegionView3D *rv3d)
 {
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_taa); i++) {
+		if (view3d_fx_taa[i].rv3d == rv3d) {
+			view3d_fx_taa[i].was_active = view3d_fx_taa[i].active;
+			view3d_fx_taa[i].active = false;
+		}
+	}
 	for (int i = 0; i < ARRAY_SIZE(view3d_fx_motion); i++) {
 		if (view3d_fx_motion[i].rv3d == rv3d && !view3d_fx_motion[i].offscreen) {
 			view3d_fx_motion[i].settling = false;
@@ -3870,6 +3906,148 @@ static bool view3d_fx_camera_motion(Scene *scene, View3D *v3d, RegionView3D *rv3
 #endif
 }
 
+#ifdef WITH_GAMEENGINE
+/* KX_2DFilterManager.cpp: the text of the game's TAA pass (RAS_TAA2DFilter.glsl). */
+extern const char *KX_TAAPreviewShader(void);
+#endif
+
+/* RAS_2DFilterManager::TaaJitterOfFrame: Halton (2, 3) from index 1, in pixels around 0. */
+static void view3d_fx_taa_jitter(int frame, float r_jitter[2])
+{
+	const int index = (frame % VIEW3D_FX_TAA_PHASES) + 1;
+	const int bases[2] = {2, 3};
+	for (int axis = 0; axis < 2; axis++) {
+		float f = 1.0f, r = 0.0f;
+		for (int i = index; i > 0; i /= bases[axis]) {
+			f /= (float)bases[axis];
+			r += f * (float)(i % bases[axis]);
+		}
+		r_jitter[axis] = r - 0.5f;
+	}
+}
+
+/* Game Preview > TAA (on screen, scene's TAA on): the game's TAA pass between its DOF and its lens
+ * pass. This draw is jittered (view3d_fx_taa_begin) and blends into the region's history. */
+static bool view3d_fx_taa_stage(Scene *scene, ARegion *ar, RegionView3D *rv3d, const GPUFX *fx,
+                                GPUFXNodeStage *r_stage)
+{
+#ifdef WITH_GAMEENGINE
+	if (!scene->scenefx_settings.use_taa || ar->winx < 2 || ar->winy < 2) {
+		return false;
+	}
+	View3DFxTaa *a = NULL;
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_taa) && !a; i++) {
+		if (view3d_fx_taa[i].rv3d == rv3d) {
+			a = &view3d_fx_taa[i];
+		}
+	}
+	if (!a) {
+		a = &view3d_fx_taa[view3d_fx_taa_next];
+		view3d_fx_taa_next = (view3d_fx_taa_next + 1) % ARRAY_SIZE(view3d_fx_taa);
+		memset(a, 0, sizeof(*a));
+		a->rv3d = rv3d;
+	}
+	/* history of another compositor or size, or a draw without TAA in between */
+	if (!a->was_active || a->fx != fx || a->size[0] != ar->winx || a->size[1] != ar->winy) {
+		a->valid = false;
+	}
+	a->fx = fx;
+	a->size[0] = ar->winx;
+	a->size[1] = ar->winy;
+
+	/* converge again after the view moved, or on a redraw (an edit) after it converged and rested;
+	 * a pause while converging (slow draws) does not restart it, so the redraws always end */
+	const double now = PIL_check_seconds_timer();
+	if (!a->valid || !equals_m4m4(a->base_persmat, rv3d->persmat) || (a->settle == 0 && now - a->time > 0.25)) {
+		a->settle = VIEW3D_FX_TAA_SETTLE;
+	}
+	else if (a->settle > 0) {
+		a->settle--;
+	}
+	copy_m4_m4(a->base_persmat, rv3d->persmat);
+	a->time = now;
+
+	/* KX_RenderPipeline: offset(0, 3) = 2 jx / width on the left of the projection */
+	view3d_fx_taa_jitter(a->frame, a->jitter);
+	copy_m4_m4(a->winmat, rv3d->winmat);
+	const float tx = 2.0f * a->jitter[0] / (float)ar->winx, ty = 2.0f * a->jitter[1] / (float)ar->winy;
+	for (int c = 0; c < 4; c++) {
+		a->winmat[c][0] += tx * a->winmat[c][3];
+		a->winmat[c][1] += ty * a->winmat[c][3];
+	}
+	a->active = true;
+
+	float invproj[4][4];
+	invert_m4_m4(invproj, a->winmat);
+	/* RAS_2DFilter.cpp: {valid, sharpen, weight still, weight moving} */
+	const float params[4] = {a->valid ? 1.0f : 0.0f, scene->scenefx_settings.taa_sharpen, 0.08f, 0.25f};
+	const float jitter[4] = {a->jitter[0], a->jitter[1], a->prev_jitter[0], a->prev_jitter[1]};
+
+	memset(r_stage, 0, sizeof(*r_stage));
+	r_stage->shader = BLI_sprintfN("uniform vec2 ge_FragOrigin;\n"
+	                               "#define TAA_FRAG_COORD (gl_FragCoord.xy - ge_FragOrigin)\n%s",
+	                               KX_TAAPreviewShader());
+	r_stage->history = true;
+	r_stage->num_uniforms = 5;
+	r_stage->uniforms = MEM_callocN(sizeof(*r_stage->uniforms) * r_stage->num_uniforms, __func__);
+	GPUFXNodeUniform *u = r_stage->uniforms;
+	BLI_strncpy(u[0].name, "ge_TAAJitter", sizeof(u[0].name));
+	u[0].size = 4;
+	copy_v4_v4(u[0].value, jitter);
+	BLI_strncpy(u[1].name, "ge_TAAParams", sizeof(u[1].name));
+	u[1].size = 4;
+	copy_v4_v4(u[1].value, params);
+	BLI_strncpy(u[2].name, "ge_TAAHistoryViewProj", sizeof(u[2].name));
+	u[2].size = 16;
+	memcpy(u[2].value, a->valid ? a->prev_persmat : rv3d->persmat, sizeof(float[16]));
+	BLI_strncpy(u[3].name, "unfinvviewmat", sizeof(u[3].name));
+	u[3].size = 16;
+	memcpy(u[3].value, rv3d->viewinv, sizeof(float[16]));
+	BLI_strncpy(u[4].name, "unfinvprojmat", sizeof(u[4].name));
+	u[4].size = 16;
+	memcpy(u[4].value, invproj, sizeof(float[16]));
+	return true;
+#else
+	UNUSED_VARS(scene, ar, rv3d, fx, r_stage);
+	return false;
+#endif
+}
+
+static View3DFxTaa *view3d_fx_taa_find_active(const RegionView3D *rv3d)
+{
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_taa); i++) {
+		if (view3d_fx_taa[i].rv3d == rv3d && view3d_fx_taa[i].active) {
+			return &view3d_fx_taa[i];
+		}
+	}
+	return NULL;
+}
+
+/* After the compositor is set up: the objects and the post process of this draw use the jittered
+ * projection; view3d_fx_taa_end gives the plain one back to what is drawn after the composite. */
+static void view3d_fx_taa_begin(wmWindow *win, Scene *scene, ARegion *ar, View3D *v3d)
+{
+	View3DFxTaa *a = view3d_fx_taa_find_active(ar->regiondata);
+	if (a) {
+		ED_view3d_draw_setup_view(win, scene, ar, v3d, NULL, a->winmat, NULL);
+	}
+}
+
+static void view3d_fx_taa_end(wmWindow *win, Scene *scene, ARegion *ar, View3D *v3d, const GPUFX *fx)
+{
+	RegionView3D *rv3d = ar->regiondata;
+	View3DFxTaa *a = view3d_fx_taa_find_active(rv3d);
+	if (!a) {
+		return;
+	}
+	/* the history now holds this draw, if the compositor kept it */
+	a->valid = GPU_fx_compositor_history_kept(fx);
+	copy_m4_m4(a->prev_persmat, rv3d->persmat);
+	copy_v2_v2(a->prev_jitter, a->jitter);
+	a->frame++;
+	ED_view3d_draw_setup_view(win, scene, ar, v3d, NULL, NULL, NULL);
+}
+
 static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d,
                                   const GPUFXSettings *fx_settings, bool offscreen)
 {
@@ -3878,7 +4056,7 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 		return;
 	}
 	view3d_fx_node_compositor(fx, scene, fx_settings);
-	GPUFXNodeStage fixed[2];
+	GPUFXNodeStage fixed[3];
 	int num_fixed = 0;
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_DOF) &&
 	    view3d_fx_camera_dof(scene, ar, v3d, rv3d, offscreen, &fixed[num_fixed]))
@@ -3887,6 +4065,12 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 	}
 	if (!offscreen) {
 		view3d_fx_motion_forget(rv3d);
+		/* the game's order: DOF, TAA, then its lens pass (motion blur) */
+		if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_TAA) &&
+		    view3d_fx_taa_stage(scene, ar, rv3d, fx, &fixed[num_fixed]))
+		{
+			num_fixed++;
+		}
 	}
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_MOTION) &&
 	    view3d_fx_camera_motion(scene, v3d, rv3d, offscreen, &fixed[num_fixed]))
@@ -4755,6 +4939,10 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 			v3d->ftime = 0.0f;
 	}
 
+	if (do_compositing) {
+		view3d_fx_taa_begin(win, scene, ar, v3d);
+	}
+
 	/* main drawing call */
 	view3d_draw_objects(C, bmain, scene, v3d, ar, grid_unit, true, false, do_compositing ? rv3d->compositor : NULL);
 
@@ -4764,6 +4952,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	/* post process */
 	if (do_compositing) {
 		GPU_fx_do_composite_pass(rv3d->compositor, rv3d->viewmat, rv3d->winmat, rv3d->is_persp, scene, NULL);
+		view3d_fx_taa_end(win, scene, ar, v3d, rv3d->compositor);
 	}
 
 	/* Disable back anti-aliasing */

@@ -74,6 +74,7 @@ extern "C" {
 	extern char datatoc_RAS_LensFlare2DFilter_glsl[];
 	extern char datatoc_RAS_CameraDof2DFilter_glsl[];
 	extern char datatoc_RAS_CameraLens2DFilter_glsl[];
+	extern char datatoc_RAS_TAA2DFilter_glsl[];
 }
 
 /* The 8 reserved slots FILTERPASS_BLOOM .. +7 (5..12) are shared since the dual filter bloom only
@@ -1751,4 +1752,10 @@ extern "C" const char *KX_CameraLensPreviewShader(void)
 	static const std::string text = std::string(datatoc_gpu_shader_camera_lens_lib_glsl) +
 	                                datatoc_RAS_CameraLens2DFilter_glsl;
 	return text.c_str();
+}
+
+/* And the TAA pass (RAS_TAA2DFilter.glsl), drawn by the 3D View preview with its own history. */
+extern "C" const char *KX_TAAPreviewShader(void)
+{
+	return datatoc_RAS_TAA2DFilter_glsl;
 }

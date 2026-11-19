@@ -341,6 +341,11 @@ struct GPUFX {
 
 	/* Volumetric Clouds temporal reuse, same scheme as RAS_2DFilterManager: the clouds pass
 	 * output and depth of the last frame, with the view-projection they were drawn with. */
+	/* output of the history stage (game TAA preview) of the last draw */
+	unsigned int stage_history;
+	int stage_history_w, stage_history_h;
+	bool stage_history_kept;
+
 	unsigned int cloud_history;
 	unsigned int cloud_history_depth;
 	int cloud_history_w, cloud_history_h;
@@ -494,6 +499,13 @@ static void cleanup_fx_gl_data(GPUFX *fx, bool do_fbo)
 		fx->cloud_history_w = fx->cloud_history_h = 0;
 	}
 	fx->cloud_history_valid = false;
+
+	if (fx->stage_history) {
+		glDeleteTextures(1, &fx->stage_history);
+		fx->stage_history = 0;
+		fx->stage_history_w = fx->stage_history_h = 0;
+	}
+	fx->stage_history_kept = false;
 
 	cleanup_fx_dof_buffers(fx);
 
@@ -690,6 +702,12 @@ static void gpu_fx_stage_bind(GPUFX *fx, GPUShader *sh, const GPUFXNodeStage *st
 		GPU_texture_bind(tex, slot++);
 		GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, name), tex);
 	}
+	if (stage->history && fx->stage_history) {
+		glActiveTexture(GL_TEXTURE0 + slot);
+		glBindTexture(GL_TEXTURE_2D, fx->stage_history);
+		glActiveTexture(GL_TEXTURE0);
+		GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "ge_TAAHistory"), slot++);
+	}
 	const float w = (float)fx->gbuffer_dim[0], h = (float)fx->gbuffer_dim[1];
 	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTextureWidth"), 1, 1, &w);
 	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTextureHeight"), 1, 1, &h);
@@ -720,6 +738,9 @@ static void gpu_fx_stage_bind(GPUFX *fx, GPUShader *sh, const GPUFXNodeStage *st
 		if (nu->is_int) {
 			GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, nu->name), nu->ivalue);
 		}
+		else if (nu->size == 16) {
+			glUniformMatrix4fv(GPU_shader_get_uniform(sh, nu->name), 1, GL_FALSE, nu->value);
+		}
 		else {
 			GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, nu->name), nu->size, 1, nu->value);
 		}
@@ -733,6 +754,12 @@ static void gpu_fx_node_bind_stage(GPUFX *fx, int index, GPUTexture *src, float 
 
 static void gpu_fx_stage_unbind(GPUFX *fx, const GPUFXNodeStage *stage, GPUTexture *src)
 {
+	if (stage->history) {
+		/* the unit right after the depth and the caches (gpu_fx_stage_bind) */
+		glActiveTexture(GL_TEXTURE0 + 2 + stage->num_caches);
+		glBindTexture(GL_TEXTURE_2D, 0);
+		glActiveTexture(GL_TEXTURE0);
+	}
 	for (int k = 0; k < stage->num_caches; k++) {
 		if (fx->node_caches[stage->caches[k]]) {
 			GPU_texture_unbind(fx->node_caches[stage->caches[k]]);
@@ -852,7 +879,7 @@ bool GPU_fx_compositor_initialize_passes(
 	fx_flag &= ~GPU_FX_FLAG_CAMERA_LENS;
 	/* Same for the compositor preview: on only with stages that compiled. */
 	fx_flag &= ~(GPU_FX_FLAG_NODE_COMPOSITOR | GPU_FX_FLAG_2D_FILTERS | GPU_FX_FLAG_CAMERA_DOF |
-	             GPU_FX_FLAG_CAMERA_MOTION);
+	             GPU_FX_FLAG_CAMERA_MOTION | GPU_FX_FLAG_TAA);
 
 	if (!scenefx_settings->bloom || !(scene->scenefx_settings.editor_render_flag & SCENE_FX_FLAG_BLOOM)) {
 		scenefx_flag &= ~SCENE_FX_FLAG_BLOOM;
@@ -1236,14 +1263,66 @@ static void gpu_fx_bind_render_target(int *passes_left, GPUFX *fx, struct GPUOff
 	}
 }
 
+/* Keeps what the history stage just drew (bound frame buffer, viewport vp) for the next draw. */
+static void gpu_fx_stage_history_keep(GPUFX *fx, const int vp[4])
+{
+	fx->stage_history_kept = false;
+	if (vp[2] != fx->gbuffer_dim[0] || vp[3] != fx->gbuffer_dim[1]) {
+		return;
+	}
+	/* a partial redraw drew only its scissor: the rest is not this draw's image */
+	if (glIsEnabled(GL_SCISSOR_TEST)) {
+		int sc[4];
+		glGetIntegerv(GL_SCISSOR_BOX, sc);
+		if (sc[0] > vp[0] || sc[1] > vp[1] || sc[0] + sc[2] < vp[0] + vp[2] || sc[1] + sc[3] < vp[1] + vp[3]) {
+			return;
+		}
+	}
+	if (!fx->stage_history || fx->stage_history_w != vp[2] || fx->stage_history_h != vp[3]) {
+		if (!fx->stage_history) {
+			glGenTextures(1, &fx->stage_history);
+		}
+		glBindTexture(GL_TEXTURE_2D, fx->stage_history);
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, vp[2], vp[3], 0, GL_RGBA, GL_FLOAT, NULL);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+		fx->stage_history_w = vp[2];
+		fx->stage_history_h = vp[3];
+	}
+	/* the scissor of a partial redraw does not limit the copy */
+	glBindTexture(GL_TEXTURE_2D, fx->stage_history);
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vp[0], vp[1], vp[2], vp[3]);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	fx->stage_history_kept = true;
+}
+
+bool GPU_fx_compositor_history_kept(const GPUFX *fx)
+{
+	return fx && fx->stage_history_kept;
+}
+
 /* Custom Filter stages [from, to) as ping-pong passes, each reading the previous result. */
 static void gpu_fx_filter_draw(GPUFX *fx, int from, int to, int *passes_left, struct GPUOffScreen *ofs,
                                GPUTexture **src, GPUTexture **target, float viewmat[4][4], float projmat[4][4])
 {
 	for (int i = from; i < to; i++) {
+		const bool history = fx->filter_stages[i].history;
 		gpu_fx_stage_bind(fx, fx->filter_shaders[i], &fx->filter_stages[i], *src, viewmat, projmat, fx->node_frame);
 		gpu_fx_bind_render_target(passes_left, fx, ofs, *target);
+		int vp[4];
+		if (history) {
+			/* the window origin of the target (the region when this is the last pass) */
+			glGetIntegerv(GL_VIEWPORT, vp);
+			const float origin[2] = {(float)vp[0], (float)vp[1]};
+			GPU_shader_uniform_vector(fx->filter_shaders[i], GPU_shader_get_uniform(fx->filter_shaders[i], "ge_FragOrigin"),
+			                          2, 1, origin);
+		}
 		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		if (history) {
+			gpu_fx_stage_history_keep(fx, vp);
+		}
 		gpu_fx_stage_unbind(fx, &fx->filter_stages[i], *src);
 		/* may not be attached, in that case this just returns */
 		if (*target) {
@@ -1643,6 +1722,7 @@ bool GPU_fx_do_composite_pass(
 	    {-1.0f, 1.0f, -1.0f, 1.0f}
 	};
 
+	fx->stage_history_kept = false;
 	if (fx->effects == 0 && fx->sce_effects	== 0)
 		return false;
 

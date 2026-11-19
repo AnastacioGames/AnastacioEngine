@@ -103,10 +103,10 @@ void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const f
 #define GPU_FX_NODE_MAX_CACHES 8
 typedef struct GPUFXNodeUniform {
 	char name[64];
-	int size;  /* 1 (Value) or 4 (RGB) */
+	int size;  /* 1 (Value), 2, 4 (RGB) or 16 (mat4, column major) */
 	bool is_int;  /* int/bool uniform (glUniform1i with ivalue) */
 	int ivalue;
-	float value[4];
+	float value[16];
 } GPUFXNodeUniform;
 
 typedef struct GPUFXNodeStage {
@@ -116,6 +116,9 @@ typedef struct GPUFXNodeStage {
 	bool mipmap;
 	GPUFXNodeUniform *uniforms;
 	int num_uniforms;
+	/* the game's TAA pass: reads "ge_TAAHistory" (this stage's output of the last draw) and gets
+	 * "ge_FragOrigin" (window origin of its target); its output is kept for the next draw */
+	bool history;
 } GPUFXNodeStage;
 
 /* Takes ownership of \a stages (MEM_ allocated, shader and uniforms too); NULL / 0 turns it off.
@@ -128,6 +131,8 @@ void GPU_fx_node_stages_free(GPUFXNodeStage *stages, int num_stages);
  * compositor (the game's order). Same ownership and rebuild rules as the node stages. */
 #define GPU_FX_FILTER_MAX 16
 void GPU_fx_compositor_set_filter_stages(GPUFX *fx, GPUFXNodeStage *stages, int num_stages, int num_before_lens);
+/* True when the last composite pass kept the output of its history stage (the next draw may read it). */
+bool GPU_fx_compositor_history_kept(const GPUFX *fx);
 
 bool GPU_fx_compositor_initialize_passes(
         struct Scene *scene, GPUFX *fx, const struct rcti *rect, const struct rcti *scissor_rect,

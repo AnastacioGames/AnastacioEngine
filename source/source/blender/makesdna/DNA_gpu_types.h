@@ -53,6 +53,8 @@ typedef enum eGPUFXFlags {
 	GPU_FX_FLAG_CAMERA_DOF  = (1 << 4),
 	/* preview of the active camera's Game FX Directional / Speed Blur from the view's own motion */
 	GPU_FX_FLAG_CAMERA_MOTION = (1 << 5),
+	/* preview of the scene's TAA (Scene > Post-process), converged over the view's redraws */
+	GPU_FX_FLAG_TAA         = (1 << 6),
 } eGPUFXFlags;
 
 #endif  /* __DNA_GPU_TYPES_H__ */

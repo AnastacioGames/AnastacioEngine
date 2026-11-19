@@ -30,6 +30,12 @@ out vec4 fragColor;
   #define gl_FragColor fragColor
 #endif
 
+/* Pixel position in the pass output: the 3D View preview draws the last pass straight into the
+ * region, whose window origin it subtracts (view3d_draw.c). */
+#ifndef TAA_FRAG_COORD
+#define TAA_FRAG_COORD gl_FragCoord.xy
+#endif
+
 uniform sampler2D bgl_RenderedTexture;
 uniform sampler2D bgl_DepthTexture;
 uniform sampler2D ge_TAAHistory;
@@ -127,7 +133,7 @@ void UpscaleMain()
 	ivec2 size = textureSize(bgl_RenderedTexture, 0);
 	vec2 inSize = vec2(size);
 	vec2 outSize = ge_TAAUpscale.zw;
-	vec2 uv = gl_FragCoord.xy / outSize;
+	vec2 uv = TAA_FRAG_COORD / outSize;
 	/* Where this window pixel falls among the render texels: texel k (center k + 0.5) holds the
 	 * scene at k + 0.5 - jitter, so the jittered position is the plain one plus the jitter. */
 	vec2 inPos = uv * inSize + ge_TAAJitter.xy;
@@ -213,7 +219,7 @@ void main()
 		return;
 	}
 	ivec2 size = textureSize(bgl_RenderedTexture, 0);
-	ivec2 texel = ivec2(gl_FragCoord.xy);
+	ivec2 texel = ivec2(TAA_FRAG_COORD);
 	vec2 texSize = vec2(size);
 	vec2 uv = (vec2(texel) + 0.5) / texSize;
 
