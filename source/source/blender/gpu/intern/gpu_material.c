@@ -3324,6 +3324,12 @@ static void do_material_tex(GPUShadeInput *shi)
 				rgbnor = TEX_RGB;
 
 				talpha = ((tex->imaflag & TEX_USEALPHA) && tex->ima && (tex->ima->flag & IMA_IGNORE_ALPHA) == 0);
+				/* A realtime environment map's alpha is whatever the reflected objects wrote (an Alpha
+				 * Clip leaf keeps its texture alpha 0.5-1), not transparency: used as the blend factor
+				 * it mixed the material color into the reflection (light outline on cutout edges). */
+				if (tex->type == TEX_ENVMAP && tex->env->stype == ENV_REALT) {
+					talpha = 0;
+				}
 			}
 			else if (tex && (tex->type == TEX_WOOD))
 			{

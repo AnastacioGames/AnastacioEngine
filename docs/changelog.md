@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — Reflexo realtime: sem borda clara em Alpha Clip
+
+- **Bug (Discord, Kitsuy, `alpha_effect_bug.range`):** folhagem com Alpha Clip refletida por Environment Map realtime ganhava contorno cinza-claro só no reflexo. A folha grava o alpha da textura (0,5-1) no alvo RGBA e o plano usava esse alpha como fator do blend com a cor do material (branca). Vinha da Range original (a 1.6 mostra pior).
+- **Correção:** `gpu_material.c` ignora o alpha (`talpha = 0`) de `TEX_ENVMAP` com `env->stype == ENV_REALT`; envmap carregado de arquivo mantém o alpha. MAP_ALPHA, nós e textura do World não mudaram.
+- Testado por capturas (MIX, Sky Color, Sky Texture) e aceito com janela. Textura em Multiply sumindo é normal: Alpha do material 0 × alpha da textura = 0.
+
 ## 2026-11-18 — Text Editor: digitação mais leve, guias de recuo, espaços visíveis, busca do fim e tutorial
 
 - **Erros ao vivo numa thread:** `text_autocomplete.diagnosticos()` responde `WAIT` e roda ast+pyflakes (70-200 ms) em `threading.Thread`; o C (`text_hints.c`, `DiagCache.waiting`) mantém os sublinhados antigos e pergunta de novo no timer. A pausa antes de checar caiu de 0,8 para 0,5 s.
