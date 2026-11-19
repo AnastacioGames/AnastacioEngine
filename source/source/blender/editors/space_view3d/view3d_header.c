@@ -492,10 +492,8 @@ void view3d_header_tool_controls(uiLayout *row, bContext *C)
 	}
 	uiItemS(row);
 
-	uiItemR(row, &v3dptr, "realtime_viewport_shading", UI_ITEM_R_TOGGLE, "", ICON_RESTRICT_RENDER_OFF);
-	uiItemR(row, &v3dptr, "show_only_render", UI_ITEM_R_TOGGLE, "",
-	        (v3d->flag2 & V3D_RENDER_OVERRIDE) ? ICON_RESTRICT_VIEW_ON : ICON_RESTRICT_VIEW_OFF);
-	uiItemPopoverPanel(row, C, "VIEW3D_PT_overlay", "", ICON_DOWNARROW_HLT);
+	/* Realtime e Show Only Render agora ficam dentro do popover Overlay. */
+	uiItemPopoverPanel(row, C, "VIEW3D_PT_overlay", "  Overlay   ", ICON_DOWNARROW_HLT);
 	uiItemS(row);
 
 	/* Shading: 4 botões lado a lado + popover, como no Blender 5. */

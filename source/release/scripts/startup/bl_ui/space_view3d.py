@@ -4256,6 +4256,14 @@ class VIEW3D_PT_overlay(Panel):
         prefs = context.user_preferences.view
         layout.label(text="Viewport Overlays")
 
+        # Antes ficavam soltos no cabeçalho: Real-time shading e Show Only Render.
+        row = layout.row(align=True)
+        row.prop(view, "realtime_viewport_shading", text="Realtime", icon='RESTRICT_RENDER_OFF', toggle=True)
+        row.prop(view, "show_only_render", text="Only Render",
+                 icon='RESTRICT_VIEW_ON' if view.show_only_render else 'RESTRICT_VIEW_OFF', toggle=True)
+
+        layout.separator()
+
         # Guides (Blender 5): grade, eixos e escala.
         layout.label(text="Guides")
         split = layout.split(factor=0.5)
