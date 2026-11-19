@@ -320,10 +320,6 @@ void GPG_Canvas::ResizeWindow(int width, int height)
 
 void GPG_Canvas::SetFullScreen(bool enable)
 {
-	/* Borderless Window option: window mode is fixed, otherwise the frame would come back. */
-	if (s_lockWindowSize) {
-		return;
-	}
 	GHOST_ISystem *system = GHOST_ISystem::getSystem();
 	system->setFullScreen(enable, m_window);
 }
