@@ -3805,6 +3805,7 @@ class VIEW3D_PT_shading(Panel):
             sub.active = view.region_3d.view_perspective == 'CAMERA'
             sub.prop(fx_settings, "use_dof")
             sub.prop(fx_settings, "use_camera_dof")
+            sub.prop(fx_settings, "use_camera_motion_blur")
             sub.prop(fx_settings, "use_camera_lens")
             col.prop(fx_settings, "use_game_compositor")
             col.prop(fx_settings, "use_game_2d_filters")

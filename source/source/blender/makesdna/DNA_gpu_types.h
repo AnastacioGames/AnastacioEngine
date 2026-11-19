@@ -51,6 +51,8 @@ typedef enum eGPUFXFlags {
 	GPU_FX_FLAG_2D_FILTERS  = (1 << 3),
 	/* preview of the active camera's Game FX depth of field (the game's bokeh pass) */
 	GPU_FX_FLAG_CAMERA_DOF  = (1 << 4),
+	/* preview of the active camera's Game FX Directional / Speed Blur from the view's own motion */
+	GPU_FX_FLAG_CAMERA_MOTION = (1 << 5),
 } eGPUFXFlags;
 
 #endif  /* __DNA_GPU_TYPES_H__ */

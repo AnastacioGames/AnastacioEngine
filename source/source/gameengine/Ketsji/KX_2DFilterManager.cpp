@@ -1744,3 +1744,11 @@ extern "C" const char *KX_CameraDofPreviewShader(void)
 {
 	return datatoc_RAS_CameraDof2DFilter_glsl;
 }
+
+/* And its Directional / Speed Blur: the game's lens pass with the lens library in front. */
+extern "C" const char *KX_CameraLensPreviewShader(void)
+{
+	static const std::string text = std::string(datatoc_gpu_shader_camera_lens_lib_glsl) +
+	                                datatoc_RAS_CameraLens2DFilter_glsl;
+	return text.c_str();
+}

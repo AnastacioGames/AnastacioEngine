@@ -3443,28 +3443,35 @@ typedef struct View3DFxFilter {
 	bActuator *act;
 	Object *ob;
 	int pass;
+	int fixed;  /* act NULL: index of the game's own stage (DOF, then motion blur) */
 } View3DFxFilter;
 
 static int view3d_fx_filter_cmp(const void *a, const void *b)
 {
 	const View3DFxFilter *fa = a, *fb = b;
-	return (fa->pass > fb->pass) - (fa->pass < fb->pass);
+	if (fa->pass != fb->pass) {
+		return (fa->pass > fb->pass) - (fa->pass < fb->pass);
+	}
+	return (fa->fixed > fb->fixed) - (fa->fixed < fb->fixed);
 }
 
 /* Game Preview > 2D Filters: the Custom Filter actuators of the scene's objects (a Text with the
  * shader) by pass number, with the owner's int/float/bool properties as uniforms at their start
  * values, like KX_2DFilter at the first frame. Filters added from Python are not known here. */
-static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *fx_settings, GPUFXNodeStage *dof)
+static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *fx_settings,
+                                 GPUFXNodeStage *fixed, int num_fixed)
 {
 	View3DFxFilter found[GPU_FX_FILTER_MAX * 2];
 	int num_found = 0;
 
-	/* the game's DOF pass (act NULL): FILTERPASS_CAMERA_DOF, between the custom passes and the lens */
-	if (dof) {
-		found[0].act = NULL;
-		found[0].ob = NULL;
-		found[0].pass = VIEW3D_FX_FILTERPASS_CAMERA_DOF;
-		num_found = 1;
+	/* the game's own passes (act NULL): its DOF at FILTERPASS_CAMERA_DOF, then the motion blur of
+	 * its lens pass, between the custom passes and the lens */
+	for (int k = 0; k < num_fixed; k++) {
+		found[k].act = NULL;
+		found[k].ob = NULL;
+		found[k].pass = VIEW3D_FX_FILTERPASS_CAMERA_DOF;
+		found[k].fixed = k;
+		num_found++;
 	}
 
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_2D_FILTERS)) {
@@ -3490,6 +3497,7 @@ static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *f
 				found[k].act = act;
 				found[k].ob = base->object;
 				found[k].pass = f->int_arg;
+				found[k].fixed = 0;
 			}
 		}
 		qsort(found, num_found, sizeof(*found), view3d_fx_filter_cmp);
@@ -3500,7 +3508,7 @@ static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *f
 	for (int i = 0; i < num_found; i++) {
 		GPUFXNodeStage *st = &stages[i];
 		if (!found[i].act) {
-			*st = *dof;
+			*st = fixed[found[i].fixed];
 			num_before++;
 			continue;
 		}
@@ -3547,7 +3555,7 @@ extern const char *KX_CameraDofPreviewShader(void);
 /* Distance along the camera axis to the nearest object (not the camera) whose bool/int/float
  * property `name` is not zero, like KX_Camera::FindPropertyFocus; false when there is none. */
 static bool view3d_fx_dof_property_focus(Scene *scene, Object *camera, const char *name, const float fwd[3],
-                                         float *r_dist)
+                                         float *r_dist, float r_pos[3])
 {
 	float best = FLT_MAX;
 	bool found = false;
@@ -3566,10 +3574,37 @@ static bool view3d_fx_dof_property_focus(Scene *scene, Object *camera, const cha
 			best = d2;
 			sub_v3_v3v3(rel, ob->obmat[3], camera->obmat[3]);
 			*r_dist = dot_v3v3(rel, fwd);
+			copy_v3_v3(r_pos, ob->obmat[3]);
 			found = true;
 		}
 	}
 	return found;
+}
+
+/* The game's focus at rest (KX_Camera::UpdateGameFX): distance along the view axis and the point
+ * it is taken from. Manual and Auto (no physics ray here) use the manual distance. */
+static float view3d_fx_camera_focus(Scene *scene, Object *ob, float r_pos[3])
+{
+	const Camera *ca = ob->data;
+	const CameraGameFX *gfx = &ca->gamefx;
+	float fwd[3], focus = ca->gpu_dof.focus_distance;
+	bool found = false;
+	normalize_v3_v3(fwd, ob->obmat[2]);
+	negate_v3(fwd);
+	if (gfx->focus_mode == CAM_FOCUS_OBJECT && ca->dof_ob) {
+		float rel[3];
+		sub_v3_v3v3(rel, ca->dof_ob->obmat[3], ob->obmat[3]);
+		focus = dot_v3v3(rel, fwd);
+		copy_v3_v3(r_pos, ca->dof_ob->obmat[3]);
+		found = true;
+	}
+	else if (gfx->focus_mode == CAM_FOCUS_PROPERTY && gfx->focus_prop[0]) {
+		found = view3d_fx_dof_property_focus(scene, ob, gfx->focus_prop, fwd, &focus, r_pos);
+	}
+	if (!found) {
+		madd_v3_v3v3fl(r_pos, ob->obmat[3], fwd, focus);
+	}
+	return max_ff(focus, ca->clipsta);
 }
 
 /* Game Preview > Camera DOF: the game's DOF pass (KX_2DFilterManager::UpdateCameraFX) with the
@@ -3590,18 +3625,8 @@ static bool view3d_fx_camera_dof(Scene *scene, ARegion *ar, View3D *v3d, RegionV
 		return false;
 	}
 
-	float fwd[3], focus = ca->gpu_dof.focus_distance;
-	normalize_v3_v3(fwd, ob->obmat[2]);
-	negate_v3(fwd);
-	if (gfx->focus_mode == CAM_FOCUS_OBJECT && ca->dof_ob) {
-		float rel[3];
-		sub_v3_v3v3(rel, ca->dof_ob->obmat[3], ob->obmat[3]);
-		focus = dot_v3v3(rel, fwd);
-	}
-	else if (gfx->focus_mode == CAM_FOCUS_PROPERTY && gfx->focus_prop[0]) {
-		view3d_fx_dof_property_focus(scene, ob, gfx->focus_prop, fwd, &focus);
-	}
-	focus = max_ff(focus, ca->clipsta);
+	float focus_pos[3];
+	const float focus = view3d_fx_camera_focus(scene, ob, focus_pos);
 
 	/* The blur radius is in game pixels: scale it to the camera frame on screen. */
 	float scale = 1.0f;
@@ -3657,6 +3682,194 @@ static bool view3d_fx_camera_dof(Scene *scene, ARegion *ar, View3D *v3d, RegionV
 #endif
 }
 
+#ifdef WITH_GAMEENGINE
+/* KX_2DFilterManager.cpp: the game's lens pass (lens library + RAS_CameraLens2DFilter.glsl). */
+extern const char *KX_CameraLensPreviewShader(void);
+#endif
+
+/* What the last draw of a view saw, like KX_2DFilterManager::m_prevViewProj and KX_Camera's motion:
+ * per region and per on screen / offscreen (their matrices differ). */
+typedef struct View3DFxMotion {
+	const RegionView3D *rv3d;
+	bool offscreen;
+	const Object *camera;
+	float persmat[4][4];
+	float campos[3];
+	double time;
+	float speed;
+	bool settling;  /* on screen, its last draw still showed a trail */
+} View3DFxMotion;
+
+static View3DFxMotion view3d_fx_motion[8];
+static int view3d_fx_motion_next;
+static wmTimer *view3d_fx_motion_timer;
+#define VIEW3D_FX_MOTION_STEP 0.04
+
+/* The view stopped but its last draw still shows the trail: a few redraws let it settle like the
+ * game's next frames. The window manager is replaced on file load (its timers with it). */
+static void view3d_fx_motion_redraw(void)
+{
+	/* one timer for every view: on while any of them, drawn lately, still settles */
+	const double now = PIL_check_seconds_timer();
+	bool settling = false;
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_motion); i++) {
+		const View3DFxMotion *m = &view3d_fx_motion[i];
+		settling |= m->rv3d && m->settling && now - m->time < 1.0;
+	}
+	wmWindowManager *wm = G_MAIN ? G_MAIN->wm.first : NULL;
+	wmTimer *wt = view3d_fx_motion_timer;
+	const bool ours = wt && wm && BLI_findindex(&wm->timers, wt) != -1 && wt->event_type == TIMERNOTIFIER &&
+	                  POINTER_AS_UINT(wt->customdata) == (NC_SPACE | ND_SPACE_VIEW3D) &&
+	                  wt->timestep == VIEW3D_FX_MOTION_STEP;
+	if (!ours) {
+		view3d_fx_motion_timer = NULL;
+	}
+	if (settling && !view3d_fx_motion_timer && wm) {
+		view3d_fx_motion_timer = WM_event_add_timer_notifier(wm, NULL, NC_SPACE | ND_SPACE_VIEW3D,
+		                                                     VIEW3D_FX_MOTION_STEP);
+	}
+	else if (!settling && view3d_fx_motion_timer) {
+		WM_event_remove_timer_notifier(wm, NULL, view3d_fx_motion_timer);
+		view3d_fx_motion_timer = NULL;
+	}
+}
+
+/* A view drawn without the effect (off, out of camera view) settles no more; it is set again below. */
+static void view3d_fx_motion_forget(const RegionView3D *rv3d)
+{
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_motion); i++) {
+		if (view3d_fx_motion[i].rv3d == rv3d && !view3d_fx_motion[i].offscreen) {
+			view3d_fx_motion[i].settling = false;
+		}
+	}
+}
+
+/* Game Preview > Camera Motion Blur: Directional Blur (reprojection from this draw's matrices to the
+ * last draw's, KX_2DFilterManager::UpdateCameraFX) and Speed Blur (the camera object's speed) of the
+ * game's lens pass, as a stage before the lens (which draws the chromatic aberration, vignette and
+ * fisheye of that same pass). Camera view only; the view's own redraws are the frames. */
+static bool view3d_fx_camera_motion(Scene *scene, View3D *v3d, RegionView3D *rv3d, bool offscreen,
+                                    GPUFXNodeStage *r_stage)
+{
+#ifdef WITH_GAMEENGINE
+	Object *ob = v3d->camera;
+	if (rv3d->persp != RV3D_CAMOB || !ob || ob->type != OB_CAMERA) {
+		return false;
+	}
+	const Camera *ca = ob->data;
+	const CameraGameFX *gfx = &ca->gamefx;
+	const bool use_dir = (gfx->flag & CAM_GFX_DIRBLUR) && gfx->dirblur_strength > 0.0f;
+	const bool use_speed = (gfx->flag & CAM_GFX_SPEEDBLUR) && gfx->speedblur_strength > 0.0f;
+	if (!use_dir && !use_speed) {
+		return false;
+	}
+
+	View3DFxMotion *m = NULL;
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_motion) && !m; i++) {
+		if (view3d_fx_motion[i].rv3d == rv3d && view3d_fx_motion[i].offscreen == offscreen) {
+			m = &view3d_fx_motion[i];
+		}
+	}
+	const double now = PIL_check_seconds_timer();
+	const bool history = m && m->camera == ob;
+	if (!m) {
+		m = &view3d_fx_motion[view3d_fx_motion_next];
+		view3d_fx_motion_next = (view3d_fx_motion_next + 1) % ARRAY_SIZE(view3d_fx_motion);
+		m->rv3d = rv3d;
+		m->offscreen = offscreen;
+	}
+
+	bool moved = false;
+	float reproject[4][4];
+	unit_m4(reproject);
+	float fps_scale = 1.0f;
+	if (history) {
+		for (int i = 0; i < 16 && !moved; i++) {
+			moved = fabsf((&rv3d->persmat[0][0])[i] - (&m->persmat[0][0])[i]) > 1e-6f;
+		}
+		float inv[4][4];
+		if (invert_m4_m4(inv, rv3d->persmat)) {
+			mul_m4_m4m4(reproject, m->persmat, inv);
+		}
+		const double delta = now - m->time;
+		if (delta > 0.0) {
+			fps_scale = CLAMPIS((float)((1.0 / 60.0) / delta), 0.25f, 2.0f);
+		}
+		/* KX_Camera::UpdateMotion: speed smoothed over ~0.1 s */
+		const float dt = min_ff(max_ff((float)delta, 0.0f), 0.25f);
+		if (dt > 0.0f) {
+			const float speed = len_v3v3(ob->obmat[3], m->campos) / dt;
+			const float k = min_ff(1.0f, dt * 10.0f);
+			m->speed += (speed - m->speed) * k;
+		}
+	}
+	else {
+		m->speed = 0.0f;
+	}
+	copy_m4_m4(m->persmat, rv3d->persmat);
+	copy_v3_v3(m->campos, ob->obmat[3]);
+	m->camera = ob;
+	m->time = now;
+
+	const float speed_factor = min_ff(m->speed / max_ff(gfx->speedblur_max_speed, 0.1f), 1.0f);
+	const bool dir_blur = use_dir && moved;
+	const bool speed_blur = use_speed && speed_factor > 1e-3f;
+	if (!offscreen) {
+		m->settling = dir_blur || speed_blur;
+	}
+	if (!dir_blur && !speed_blur) {
+		return false;
+	}
+
+	/* the focus point on screen (bottom-up uv of this buffer), as KX_Camera::m_focusScreen */
+	float focus_pos[3], focus_uv[2] = {0.5f, 0.5f};
+	const float focus = view3d_fx_camera_focus(scene, ob, focus_pos);
+	float clip[4];
+	copy_v3_v3(clip, focus_pos);
+	clip[3] = 1.0f;
+	mul_m4_v4(rv3d->persmat, clip);
+	if (clip[3] > 1e-4f) {
+		focus_uv[0] = clip[0] / clip[3] * 0.5f + 0.5f;
+		focus_uv[1] = clip[1] / clip[3] * 0.5f + 0.5f;
+	}
+
+	float fx[40] = {0.0f};
+	fx[0] = focus;
+	fx[1] = gfx->focus_range;
+	fx[2] = ca->clipsta;
+	fx[3] = ca->clipend;
+	fx[7] = (ca->type == CAM_ORTHO) ? 0.0f : 1.0f;
+	fx[8] = speed_blur ? gfx->speedblur_strength * speed_factor : 0.0f;
+	fx[9] = focus_uv[0];
+	fx[10] = focus_uv[1];
+	fx[11] = (gfx->flag & CAM_GFX_BLUR_PROTECT) ? 1.0f : 0.0f;
+	if (dir_blur) {
+		fx[12] = gfx->dirblur_strength * 2.0f * fps_scale;
+		fx[13] = gfx->dirblur_max;
+		for (int c = 0; c < 4; c++) {
+			copy_v4_v4(&fx[24 + c * 4], reproject[c]);
+		}
+	}
+	/* chromatic aberration, vignette, fisheye and grain stay 0: the lens draws them */
+
+	memset(r_stage, 0, sizeof(*r_stage));
+	/* GLSL 1.20 here (the game compiles it as 3.30) */
+	r_stage->shader = BLI_sprintfN("#define texture texture2D\n%s", KX_CameraLensPreviewShader());
+	r_stage->uniforms = MEM_callocN(sizeof(*r_stage->uniforms) * 10, __func__);
+	r_stage->num_uniforms = 10;
+	for (int k = 0; k < 10; k++) {
+		GPUFXNodeUniform *u = &r_stage->uniforms[k];
+		BLI_snprintf(u->name, sizeof(u->name), "ge_CameraFX[%d]", k);
+		u->size = 4;
+		copy_v4_v4(u->value, &fx[k * 4]);
+	}
+	return true;
+#else
+	UNUSED_VARS(scene, v3d, rv3d, offscreen, r_stage);
+	return false;
+#endif
+}
+
 static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d,
                                   const GPUFXSettings *fx_settings, bool offscreen)
 {
@@ -3665,10 +3878,25 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 		return;
 	}
 	view3d_fx_node_compositor(fx, scene, fx_settings);
-	GPUFXNodeStage dof;
-	const bool use_dof = fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_DOF) &&
-	                     view3d_fx_camera_dof(scene, ar, v3d, rv3d, offscreen, &dof);
-	view3d_fx_2d_filters(fx, scene, fx_settings, use_dof ? &dof : NULL);
+	GPUFXNodeStage fixed[2];
+	int num_fixed = 0;
+	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_DOF) &&
+	    view3d_fx_camera_dof(scene, ar, v3d, rv3d, offscreen, &fixed[num_fixed]))
+	{
+		num_fixed++;
+	}
+	if (!offscreen) {
+		view3d_fx_motion_forget(rv3d);
+	}
+	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_MOTION) &&
+	    view3d_fx_camera_motion(scene, v3d, rv3d, offscreen, &fixed[num_fixed]))
+	{
+		num_fixed++;
+	}
+	if (!offscreen) {
+		view3d_fx_motion_redraw();
+	}
+	view3d_fx_2d_filters(fx, scene, fx_settings, fixed, num_fixed);
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_LENS) &&
 	    rv3d->persp == RV3D_CAMOB && BKE_camera_lens_preview_params(v3d->camera, params))
 	{
@@ -4504,6 +4732,8 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	 * framebuffer/attribute bookkeeping) to re-run every single frame even
 	 * with every filter off. */
 	if (!do_compositing && rv3d->compositor) {
+		view3d_fx_motion_forget(rv3d);
+		view3d_fx_motion_redraw();
 		GPU_fx_compositor_destroy(rv3d->compositor);
 		rv3d->compositor = NULL;
 	}
