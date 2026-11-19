@@ -984,6 +984,31 @@ void BKE_camera_multiview_params(RenderData *rd, CameraParams *params, Object *c
 	}
 }
 
+/* Game FX lens values as the game's camera lens filter gets them with the camera at rest
+ * (KX_2DFilterManager::UpdateCameraFX): chromatic, vignette, vignette radius, fisheye.
+ * False when the lens does nothing. */
+bool BKE_camera_lens_preview_params(const Object *camera, float r_params[4])
+{
+	zero_v4(r_params);
+	if (!camera || camera->type != OB_CAMERA) {
+		return false;
+	}
+	const CameraGameFX *gfx = &((const Camera *)camera->data)->gamefx;
+	const bool chroma = (gfx->flag & CAM_GFX_CHROMA) && gfx->chroma_strength > 0.0f;
+	const bool vignette = (gfx->flag & CAM_GFX_VIGNETTE) &&
+	                      (gfx->vignette_strength > 0.0f || gfx->fisheye_strength != 0.0f);
+	if (chroma) {
+		/* Grow With Speed: 0.25 + speed factor, and the speed is 0 here. */
+		r_params[0] = gfx->chroma_strength * ((gfx->flag & CAM_GFX_CHROMA_SPEED) ? 0.25f : 1.0f);
+	}
+	if (vignette) {
+		r_params[1] = gfx->vignette_strength;
+		r_params[3] = gfx->fisheye_strength;
+	}
+	r_params[2] = gfx->vignette_radius;
+	return chroma || vignette;
+}
+
 void BKE_camera_to_gpu_dof(struct Object *camera, struct GPUFXSettings *r_fx_settings)
 {
 	if (camera->type == OB_CAMERA) {

@@ -172,8 +172,15 @@ typedef struct {
 
 typedef struct {
   int color_uniform;
+  int lens_params_uniform;
+  int lens_frame_uniform;
   int grain_params_uniform;
-} GPUGRAINShaderInterface;
+} GPUCAMERALENSShaderInterface;
+
+/* Runtime-only bit in the scene effect flags: the active camera's lens (chromatic aberration,
+ * vignette, fisheye) is previewed, set by GPU_fx_compositor_set_camera_lens. It shares the
+ * film grain pass, as in the game's camera lens filter. */
+#define GPU_SCENEFX_CAMERA_LENS (1 << 30)
 
 typedef struct {
 	int invrendertargetdim_uniform;
@@ -298,6 +305,11 @@ struct GPUFX {
 
 	/* or-ed flags of enabled effects */
 	int effects, sce_effects;
+
+	/* camera lens preview: chromatic, vignette, vignette radius, fisheye */
+	bool camera_lens;
+	float camera_lens_params[4];
+	float camera_lens_frame[4];
 
 	/* number of passes, needed to detect if ping pong buffer allocation is needed */
 	int num_passes;
@@ -487,6 +499,19 @@ void GPU_fx_compositor_destroy(GPUFX *fx)
 	MEM_freeN(fx);
 }
 
+void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const float frame[4])
+{
+	/* Only something to draw when one of the values does anything (same test as the game). */
+	fx->camera_lens = params && (params[0] > 0.0f || params[1] > 0.0f || params[3] != 0.0f);
+	if (fx->camera_lens) {
+		copy_v4_v4(fx->camera_lens_params, params);
+		copy_v4_fl4(fx->camera_lens_frame, 0.0f, 0.0f, 1.0f, 1.0f);
+		if (frame && frame[2] > 0.0f && frame[3] > 0.0f) {
+			copy_v4_v4(fx->camera_lens_frame, frame);
+		}
+	}
+}
+
 bool GPU_fx_compositor_initialize_passes(
         Scene *scene, GPUFX *fx, const rcti *rect, const rcti *scissor_rect,
         const GPUFXSettings *fx_settings)
@@ -516,6 +541,9 @@ bool GPU_fx_compositor_initialize_passes(
 	if (!fx_settings->dof) {
 		fx_flag &= ~GPU_FX_FLAG_DOF;
 	}
+	/* The lens preview runs as the runtime scene bit set from GPU_fx_compositor_set_camera_lens
+	 * (camera view and a lens that does something), never on the View3D toggle alone. */
+	fx_flag &= ~GPU_FX_FLAG_CAMERA_LENS;
 
 	if (!scenefx_settings->bloom || !(scene->scenefx_settings.editor_render_flag & SCENE_FX_FLAG_BLOOM)) {
 		scenefx_flag &= ~SCENE_FX_FLAG_BLOOM;
@@ -587,6 +615,10 @@ bool GPU_fx_compositor_initialize_passes(
 		scenefx_flag |= SCENE_FX_FLAG_GRAIN;
 	}
 
+	if (fx->camera_lens) {
+		scenefx_flag |= GPU_SCENEFX_CAMERA_LENS;
+	}
+
 	/* The ping-pong textures are laid out according to the active pass chain.
 	 * Recreate them when a scene effect is toggled so removing the final FXAA
 	 * pass cannot reuse targets from the previous chain. */
@@ -654,7 +686,7 @@ bool GPU_fx_compositor_initialize_passes(
 	if (scenefx_flag & SCENE_FX_FLAG_VFOG)
 		num_passes++;
 
-	if (scenefx_flag & SCENE_FX_FLAG_GRAIN)
+	if (scenefx_flag & (SCENE_FX_FLAG_GRAIN | GPU_SCENEFX_CAMERA_LENS))
 		num_passes++;
 
 	if (!fx->gbuffer) {
@@ -2101,23 +2133,34 @@ bool GPU_fx_do_composite_pass(
 		}
 	}
 
-	/* film grain pass, same noise as the in-game camera lens pass */
-	if (fx->sce_effects & SCENE_FX_FLAG_GRAIN) {
+	/* camera lens pass (chromatic aberration, vignette, fisheye) and film grain, one pass like the
+	 * in-game camera lens filter, with the same math (gpu_shader_camera_lens_lib.glsl) */
+	if (fx->sce_effects & (SCENE_FX_FLAG_GRAIN | GPU_SCENEFX_CAMERA_LENS)) {
 		GPUShader *grain_shader;
-		grain_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_GRAIN, is_persp);
+		grain_shader = GPU_shader_get_builtin_fx_shader(GPU_SHADER_FX_CAMERA_LENS, is_persp);
 		if (grain_shader) {
-			GPUGRAINShaderInterface *interface = GPU_shader_get_interface(grain_shader);
+			GPUCAMERALENSShaderInterface *interface = GPU_shader_get_interface(grain_shader);
+			const bool use_grain = (fx->sce_effects & SCENE_FX_FLAG_GRAIN) != 0;
+			const bool use_lens = (fx->sce_effects & GPU_SCENEFX_CAMERA_LENS) != 0;
 			/* Seed from real time: the viewport isn't redrawn every frame, so the grain
 			 * just changes on each redraw. Kept small for float precision. */
-			float grain_params[4] = {scenefx.grain_strength,
+			float grain_params[4] = {use_grain ? scenefx.grain_strength : 0.0f,
 			                         (float)((int)(PIL_check_seconds_timer() * 60.0) % 1000) * 0.05f,
 			                         0.0f, 0.0f};
+			float lens_params[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			float lens_frame[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+			if (use_lens) {
+				copy_v4_v4(lens_params, fx->camera_lens_params);
+				copy_v4_v4(lens_frame, fx->camera_lens_frame);
+			}
 
 			GPU_shader_bind(grain_shader);
 
 			GPU_texture_bind(src, numslots++);
 			GPU_shader_uniform_texture(grain_shader, interface->color_uniform, src);
 			GPU_shader_uniform_vector(grain_shader, interface->grain_params_uniform, 4, 1, grain_params);
+			GPU_shader_uniform_vector(grain_shader, interface->lens_params_uniform, 4, 1, lens_params);
+			GPU_shader_uniform_vector(grain_shader, interface->lens_frame_uniform, 4, 1, lens_frame);
 
 			/* draw */
 			gpu_fx_bind_render_target(&passes_left, fx, ofs, target);
@@ -2877,11 +2920,13 @@ void GPU_fx_shader_init_interface(struct GPUShader *shader, GPUFXShaderEffect ef
 			GPU_shader_set_interface(shader, interface);
 			break;
 		}
-		case GPU_SHADER_FX_GRAIN:
+		case GPU_SHADER_FX_CAMERA_LENS:
 		{
-			GPUGRAINShaderInterface *interface = MEM_mallocN(sizeof(GPUGRAINShaderInterface), "GPUGRAINShaderInterface");
+			GPUCAMERALENSShaderInterface *interface = MEM_mallocN(sizeof(GPUCAMERALENSShaderInterface), "GPUCAMERALENSShaderInterface");
 
 			interface->color_uniform = GPU_shader_get_uniform(shader, "colorbuffer");
+			interface->lens_params_uniform = GPU_shader_get_uniform(shader, "lens_params");
+			interface->lens_frame_uniform = GPU_shader_get_uniform(shader, "lens_frame");
 			interface->grain_params_uniform = GPU_shader_get_uniform(shader, "grain_params");
 
 			GPU_shader_set_interface(shader, interface);

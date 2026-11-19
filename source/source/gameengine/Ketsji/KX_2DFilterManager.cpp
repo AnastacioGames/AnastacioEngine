@@ -69,6 +69,7 @@ extern "C" {
 	extern char datatoc_RAS_VolumetricFog2DFilter_glsl[];
 	extern char datatoc_RAS_VolumetricFogImage2DFilter_glsl[];
 	extern char datatoc_gpu_shader_vfog_lib_glsl[];
+	extern char datatoc_gpu_shader_camera_lens_lib_glsl[];
 	extern char datatoc_RAS_Temporal2DFilter_glsl[];
 	extern char datatoc_RAS_LensFlare2DFilter_glsl[];
 	extern char datatoc_RAS_CameraDof2DFilter_glsl[];
@@ -849,8 +850,10 @@ RAS_2DFilterData KX_2DFilterManager::CameraFXData(int pass)
 	data.mipmap = false;
 	data.propertyNames = {};
 	data.buildInFilters = {};
-	data.shaderText = (pass == FILTERPASS_CAMERA_DOF) ? datatoc_RAS_CameraDof2DFilter_glsl :
-	                                                    datatoc_RAS_CameraLens2DFilter_glsl;
+	/* The lens math is shared with the 3D View preview, passed as library code like the fog. */
+	data.shaderText = (pass == FILTERPASS_CAMERA_DOF) ?
+	                      std::string(datatoc_RAS_CameraDof2DFilter_glsl) :
+	                      std::string(datatoc_gpu_shader_camera_lens_lib_glsl) + datatoc_RAS_CameraLens2DFilter_glsl;
 	return data;
 }
 

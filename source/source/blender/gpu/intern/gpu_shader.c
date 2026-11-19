@@ -107,7 +107,8 @@ extern char datatoc_gpu_shader_fx_rain_frag_glsl[];
 extern char datatoc_gpu_shader_fx_clouds_frag_glsl[];
 extern char datatoc_gpu_shader_fx_vfog_frag_glsl[];
 extern char datatoc_gpu_shader_vfog_lib_glsl[];
-extern char datatoc_gpu_shader_fx_grain_frag_glsl[];
+extern char datatoc_gpu_shader_fx_camera_lens_frag_glsl[];
+extern char datatoc_gpu_shader_camera_lens_lib_glsl[];
 extern char datatoc_gpu_shader_fx_dof_frag_glsl[];
 extern char datatoc_gpu_shader_fx_dof_vert_glsl[];
 extern char datatoc_gpu_shader_fx_dof_hq_frag_glsl[];
@@ -1759,8 +1760,9 @@ GPUShader *GPU_shader_get_builtin_fx_shader(int effect, bool persp)
 				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_vfog_frag_glsl, NULL, datatoc_gpu_shader_vfog_lib_glsl, defines, 0, 0, 0);
 				break;
 
-			case GPU_SHADER_FX_GRAIN:
-				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_grain_frag_glsl, NULL, datatoc_gpu_shader_fx_lib_glsl, defines, 0, 0, 0);
+			case GPU_SHADER_FX_CAMERA_LENS:
+				/* The lens math is shared with the game filter, passed as the library code. */
+				shader = GPU_shader_create(datatoc_gpu_shader_fx_vert_glsl, datatoc_gpu_shader_fx_camera_lens_frag_glsl, NULL, datatoc_gpu_shader_camera_lens_lib_glsl, defines, 0, 0, 0);
 				break;
 		}
 

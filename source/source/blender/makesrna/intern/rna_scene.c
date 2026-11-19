@@ -5686,6 +5686,13 @@ static void rna_def_gpu_fx(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Depth Of Field",
 	                         "Use depth of field on viewport using the values from active camera");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_GPUFXSettings_fx_update");
+
+	prop = RNA_def_property(srna, "use_camera_lens", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "fx_flag", GPU_FX_FLAG_CAMERA_LENS);
+	RNA_def_property_ui_text(prop, "Camera Lens",
+	                         "Show the active camera's Chromatic Aberration, Vignette and Fisheye "
+	                         "(Camera > Game FX) in camera view, as in the game at rest");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_scene_gpu_bloom_fx(BlenderRNA *brna)

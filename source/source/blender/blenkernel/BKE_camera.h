@@ -131,6 +131,7 @@ bool BKE_camera_view_frame_fit_to_coords(
         float r_co[3], float *r_scale);
 
 void BKE_camera_to_gpu_dof(struct Object *camera, struct GPUFXSettings *r_fx_settings);
+bool BKE_camera_lens_preview_params(const struct Object *camera, float r_params[4]);
 
 /* Camera multi-view API */
 

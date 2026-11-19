@@ -43,6 +43,8 @@ typedef struct GPUFXSettings {
 /* shaderfx enables */
 typedef enum eGPUFXFlags {
 	GPU_FX_FLAG_DOF         = (1 << 0),
+	/* preview of the active camera's Game FX lens: chromatic aberration, vignette, fisheye */
+	GPU_FX_FLAG_CAMERA_LENS = (1 << 1),
 } eGPUFXFlags;
 
 #endif  /* __DNA_GPU_TYPES_H__ */

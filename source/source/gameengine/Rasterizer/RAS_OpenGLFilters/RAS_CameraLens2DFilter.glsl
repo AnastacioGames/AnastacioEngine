@@ -51,18 +51,12 @@ void main()
 #endif
 	float aspect = bgl_RenderedTextureWidth / bgl_RenderedTextureHeight;
 
-	// Fisheye (barrel) / pincushion distortion.
+	// Fisheye (barrel) / pincushion distortion; lens math in gpu_shader_camera_lens_lib.glsl.
 	float fisheye = ge_CameraFX[4].w;
+	uv = camera_lens_fisheye(uv, aspect, fisheye);
 	vec2 v = uv - 0.5;
-	if (fisheye != 0.0) {
-		vec2 va = v * vec2(aspect, 1.0);
-		float r2 = dot(va, va);
-		uv = 0.5 + v * (1.0 - fisheye * 0.5 + fisheye * r2);
-		v = uv - 0.5;
-	}
 
-	float chroma = ge_CameraFX[4].x;
-	vec2 chromaShift = v * length(v) * chroma * 0.02;
+	vec2 chromaShift = camera_lens_chroma_shift(v, ge_CameraFX[4].x);
 
 	float speed = ge_CameraFX[2].x;
 	float motionScale = ge_CameraFX[3].x;
@@ -125,28 +119,11 @@ void main()
 		color = fetchColor(uv, chromaShift);
 	}
 
-	// Vignette.
-	float vignette = ge_CameraFX[4].y;
-	if (vignette > 0.0) {
-		float radius = ge_CameraFX[4].z;
-		// 0 at the center, 1 at the corners.
-		float d = length(v * 2.0) * 0.7071;
-		float shade = smoothstep(radius, radius - 0.5, d);
-		color *= mix(1.0, shade, vignette);
-	}
-
-	// Film grain, stronger on the mid tones.
-	float grain = ge_CameraFX[5].y;
-	if (grain > 0.0) {
-		vec2 seed = uv + vec2(ge_CameraFX[5].z * 0.05, ge_CameraFX[5].z * 0.03);
-		float n = fract(sin(dot(seed, vec2(12.9898, 78.233))) * 43758.5453) - 0.5;
-		float luma = dot(color, vec3(0.299, 0.587, 0.114));
-		float lumaMask = 1.0 - pow(abs(luma - 0.5) * 2.0, 2.0);
-		color += n * grain * (0.5 + 0.5 * lumaMask);
-	}
+	color = camera_lens_vignette(color, v, ge_CameraFX[4].y, ge_CameraFX[4].z);
+	color = camera_lens_grain(color, uv, ge_CameraFX[5].y, ge_CameraFX[5].z);
 
 	// Outside the distorted frame.
-	if (fisheye != 0.0 && (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0)) {
+	if (fisheye != 0.0 && camera_lens_outside(uv)) {
 		color = vec3(0.0);
 	}
 

@@ -78,8 +78,8 @@ typedef enum GPUFXShaderEffect {
 	GPU_SHADER_FX_RAIN = 17,
 	/* Clouds shader */
 	GPU_SHADER_FX_CLOUDS = 18,
-	/* Film Grain shader */
-	GPU_SHADER_FX_GRAIN = 19,
+	/* Camera lens shader: chromatic aberration, vignette, fisheye and film grain */
+	GPU_SHADER_FX_CAMERA_LENS = 19,
 	GPU_SHADER_FX_VFOG = 20,
 } GPUFXShaderEffect;
 
@@ -93,6 +93,11 @@ GPUFX *GPU_fx_compositor_create(void);
 void GPU_fx_compositor_destroy(GPUFX *fx);
 
 /* initialize a framebuffer with size taken from the viewport */
+/* Preview the active camera's lens effects (Camera > Game FX) in the next passes:
+ * params = chromatic, vignette, vignette radius, fisheye (NULL turns it off);
+ * frame = camera frame in the buffer as uv x min, y min, width, height (NULL = whole buffer). */
+void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const float frame[4]);
+
 bool GPU_fx_compositor_initialize_passes(
         struct Scene *scene, GPUFX *fx, const struct rcti *rect, const struct rcti *scissor_rect,
         const struct GPUFXSettings *fx_settings);
