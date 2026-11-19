@@ -328,6 +328,17 @@ typedef struct View3D {
 #define V3D_CAMERA_HUD_HIDE_FOCUS		(1 << 1)
 #define V3D_CAMERA_HUD_HIDE_EFFECTS		(1 << 2)
 #define V3D_CAMERA_HUD_HIDE_DISPLAY		(1 << 3)
+#define V3D_CAMERA_HUD_HIDE_VIEWPORT	(1 << 4)
+/* Light HUD: barra no topo quando o objeto ativo é uma luz. Usa os bits altos de camera_hud_hide. */
+#define V3D_HIDE_LIGHT_HUD			(1 << 30) /* esconde a barra de ajustes da luz (flag2; padrão: visível) */
+#define V3D_LIGHT_HUD_HIDE_LIGHT		(1 << 8)
+#define V3D_LIGHT_HUD_HIDE_SHADOW		(1 << 9)
+#define V3D_LIGHT_HUD_HIDE_DISPLAY		(1 << 10)
+/* Empty HUD: mesma barra, quando o objeto ativo é um Empty. */
+#define V3D_EMPTY_HUD_HIDE_EMPTY		(1 << 11)
+#define V3D_EMPTY_HUD_HIDE_REVERB		(1 << 12)
+#define V3D_EMPTY_HUD_HIDE_LIGHTNING	(1 << 13)
+#define V3D_EMPTY_HUD_HIDE_ALL			(1 << 14) /* esconde a barra inteira do Empty (padrão: visível) */
 
 #define V3D_GAME_IN_HEADER(v3d) (((v3d)->flag2 & (V3D_FLOATING_CONTROLS_IN_HEADER | V3D_GAME_CONTROLS_IN_HEADER)) != 0)
 #define V3D_TOOL_IN_HEADER(v3d) (((v3d)->flag2 & (V3D_FLOATING_CONTROLS_IN_HEADER | V3D_TOOL_CONTROLS_IN_HEADER)) != 0)

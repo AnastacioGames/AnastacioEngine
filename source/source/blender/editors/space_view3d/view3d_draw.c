@@ -5458,10 +5458,92 @@ static void view3d_draw_camera_hud(const bContext *C, ARegion *ar, View3D *v3d)
 	if ((v3d->camera_hud_hide & V3D_CAMERA_HUD_HIDE_DISPLAY) == 0) {
 		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_camera_hud_display", "  Display   ", ICON_SETTINGS);
 	}
+	if ((v3d->camera_hud_hide & V3D_CAMERA_HUD_HIDE_VIEWPORT) == 0) {
+		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_camera_hud_viewport", "  Viewport   ", ICON_SCREEN_BACK);
+	}
 
 	int end_x = x, end_y = y;
 	UI_block_layout_resolve(block, &end_x, &end_y);
 	/* Centraliza no topo; se não couber, fica à esquerda. */
+	const int center_x = (rect.xmin + rect.xmax) / 2 - (end_x - x) / 2;
+	if (center_x > x) {
+		UI_block_translate(block, center_x - x, 0);
+	}
+	UI_block_end(C, block);
+	{
+		bTheme *btheme = UI_GetTheme();
+		unsigned char col[4];
+
+		copy_v4_v4_uchar(col, (unsigned char *)btheme->tui.wcol_tool.inner);
+		col[3] = 255;
+		UI_block_draw_group_backgrounds(block, col, 0.2f * U.widget_unit);
+	}
+	UI_block_draw(C, block);
+}
+
+/* Barra de ajustes da luz no topo da viewport, quando o objeto ativo é uma luz. Mesmo esquema
+ * do Camera HUD (popovers VIEW3D_PT_light_hud_*). Se o Camera HUD também está na tela, fica
+ * logo abaixo dele. Liga/desliga em Overlay > Light HUD (show_light_hud). */
+static void view3d_draw_light_hud(const bContext *C, ARegion *ar, View3D *v3d)
+{
+	RegionView3D *rv3d = ar->regiondata;
+	Object *ob = CTX_data_active_object(C);
+
+	if ((v3d->flag2 & V3D_RENDER_OVERRIDE) || rv3d == NULL || ob == NULL ||
+	    (ob->type != OB_LAMP && ob->type != OB_EMPTY))
+	{
+		return;
+	}
+	const bool is_empty = (ob->type == OB_EMPTY);
+	if (is_empty ? (v3d->camera_hud_hide & V3D_EMPTY_HUD_HIDE_ALL) : (v3d->flag2 & V3D_HIDE_LIGHT_HUD)) {
+		return;
+	}
+	if (ED_screen_is_rec_studio(CTX_wm_screen(C))) {
+		return;
+	}
+
+	const bool camera_hud_on =
+	        (v3d->flag2 & V3D_HIDE_CAMERA_HUD) == 0 && rv3d->persp == RV3D_CAMOB &&
+	        v3d->camera != NULL && v3d->camera->type == OB_CAMERA;
+
+	rcti rect;
+	ED_region_visible_rect(ar, &rect);
+
+	const int x = rect.xmin + UI_UNIT_X / 2;
+	const int y = rect.ymax - UI_UNIT_Y - (UI_UNIT_Y / 2) - (camera_hud_on ? UI_UNIT_Y + UI_UNIT_Y / 2 : 0);
+
+	uiBlock *block = UI_block_begin(C, ar, is_empty ? "view3d_empty_hud" : "view3d_light_hud", UI_EMBOSS);
+	uiLayout *layout = UI_block_layout(
+	        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, x, y, UI_UNIT_Y, 1, 0, UI_style_get());
+	uiLayout *row = uiLayoutRow(layout, false);
+
+	if (is_empty) {
+		uiItemL(row, ob->id.name + 2, ICON_OUTLINER_OB_EMPTY);
+		if ((v3d->camera_hud_hide & V3D_EMPTY_HUD_HIDE_EMPTY) == 0) {
+			uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_empty_hud_empty", "  Empty   ", ICON_EMPTY_DATA);
+		}
+		if ((v3d->camera_hud_hide & V3D_EMPTY_HUD_HIDE_REVERB) == 0) {
+			uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_empty_hud_reverb", "  Reverb   ", ICON_SOUND);
+		}
+		if ((v3d->camera_hud_hide & V3D_EMPTY_HUD_HIDE_LIGHTNING) == 0) {
+			uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_empty_hud_lightning", "  Lightning   ", ICON_FORCE_LENNARDJONES);
+		}
+	}
+	else {
+		uiItemL(row, ob->id.name + 2, ICON_OUTLINER_OB_LAMP);
+		if ((v3d->camera_hud_hide & V3D_LIGHT_HUD_HIDE_LIGHT) == 0) {
+			uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_light_hud_light", "  Light   ", ICON_LAMP_DATA);
+		}
+		if ((v3d->camera_hud_hide & V3D_LIGHT_HUD_HIDE_SHADOW) == 0) {
+			uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_light_hud_shadow", "  Shadow   ", ICON_MATCUBE);
+		}
+		if ((v3d->camera_hud_hide & V3D_LIGHT_HUD_HIDE_DISPLAY) == 0) {
+			uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_light_hud_display", "  Display   ", ICON_SETTINGS);
+		}
+	}
+
+	int end_x = x, end_y = y;
+	UI_block_layout_resolve(block, &end_x, &end_y);
 	const int center_x = (rect.xmin + rect.xmax) / 2 - (end_x - x) / 2;
 	if (center_x > x) {
 		UI_block_translate(block, center_x - x, 0);
@@ -5513,6 +5595,7 @@ void view3d_main_region_draw(const bContext *C, ARegion *ar)
 	view3d_draw_floating_controls(C, ar, v3d, scene);
 	view3d_draw_floating_debug_controls(C, ar, v3d, scene);
 	view3d_draw_camera_hud(C, ar, v3d);
+	view3d_draw_light_hud(C, ar, v3d);
 
 	v3d->flag |= V3D_INVALID_BACKBUF;
 

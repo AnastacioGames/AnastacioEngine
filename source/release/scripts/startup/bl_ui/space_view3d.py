@@ -3833,6 +3833,219 @@ class VIEW3D_PT_shading(Panel):
                 layout.prop(view, "show_occlude_wire")
 
 
+class VIEW3D_PT_empty_hud_base:
+    """Popovers do Empty HUD (barra no topo da viewport quando o objeto ativo é um Empty)."""
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_ui_units_x = 14
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob is not None and ob.type == 'EMPTY'
+
+
+class VIEW3D_PT_empty_hud_empty(VIEW3D_PT_empty_hud_base, Panel):
+    bl_label = "Empty"
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+
+        layout.prop(ob, "empty_draw_type", text="Display")
+        layout.prop(ob, "empty_draw_size", text="Size")
+        if ob.empty_draw_type == 'IMAGE':
+            layout.template_ID(ob, "data", open="image.open", unlink="object.unlink_data")
+            layout.prop(ob, "color", text="Transparency", index=3, slider=True)
+            row = layout.row(align=True)
+            row.prop(ob, "empty_image_offset", text="Offset X", index=0)
+            row.prop(ob, "empty_image_offset", text="Y", index=1)
+        layout.separator()
+        view = context.space_data
+        layout.prop(view, "show_empty_hud", text="Empty HUD")
+        row = layout.row(align=True)
+        row.prop(view, "show_empty_hud_empty", text="Empty", toggle=True)
+        row.prop(view, "show_empty_hud_reverb", text="Reverb", toggle=True)
+        row.prop(view, "show_empty_hud_lightning", text="Lightning", toggle=True)
+
+
+class VIEW3D_PT_empty_hud_reverb(VIEW3D_PT_empty_hud_base, Panel):
+    bl_label = "Reverb Area"
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+        ra = ob.reverb_area
+
+        layout.prop(ob, "use_reverb_area", text="Reverb Area")
+        col = layout.column()
+        col.active = ob.use_reverb_area
+        col.prop(ra, "preset")
+        col.prop(ra, "shape")
+        col.prop(ob, "empty_draw_size", text="Size")
+        col.prop(ra, "inner_factor", slider=True)
+        col.prop(ra, "priority")
+        row = col.row(align=True)
+        row.prop(ra, "use_filter")
+        sub = row.row(align=True)
+        sub.active = ra.use_filter
+        sub.prop(ra, "filter_type", text="")
+
+
+class VIEW3D_PT_empty_hud_lightning(VIEW3D_PT_empty_hud_base, Panel):
+    bl_label = "Lightning"
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.active_object
+        ls = ob.lightning
+
+        layout.prop(ob, "use_lightning", text="Lightning")
+        col = layout.column()
+        col.active = ob.use_lightning
+        row = col.row(align=True)
+        row.prop(ls, "shape", text="")
+        row.prop(ob, "empty_draw_size", text="Size")
+        col.prop(ls, "target")
+        sub = col.column()
+        sub.active = ls.target is None
+        sub.prop(ls, "height")
+        sub.prop(ls, "use_hit_ground")
+        col.row().prop(ls, "mode", expand=True)
+        if ls.mode == 'AUTOMATIC':
+            col.prop(ls, "rate")
+            col.prop(ls, "big_chance", slider=True)
+
+
+class VIEW3D_PT_light_hud_base:
+    """Popovers do Light HUD (barra no topo da viewport quando o objeto ativo é uma luz)."""
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'HEADER'
+    bl_ui_units_x = 14
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob is not None and ob.type == 'LAMP'
+
+
+class VIEW3D_PT_light_hud_light(VIEW3D_PT_light_hud_base, Panel):
+    bl_label = "Light"
+
+    def draw(self, context):
+        layout = self.layout
+        lamp = context.active_object.data
+
+        layout.row().prop(lamp, "type", expand=True)
+        row = layout.row()
+        row.prop(lamp, "color", text="")
+        if lamp.type == 'HEMI':
+            row.prop(lamp, "second_color", text="")
+        layout.prop(lamp, "energy")
+
+        if lamp.type in {'POINT', 'SPOT'}:
+            row = layout.row()
+            row.prop(lamp, "falloff_type", text="")
+            row.prop(lamp, "distance")
+            if lamp.falloff_type == 'LINEAR_QUADRATIC_WEIGHTED':
+                row = layout.row(align=True)
+                row.prop(lamp, "linear_attenuation", slider=True, text="Linear")
+                row.prop(lamp, "quadratic_attenuation", slider=True, text="Quadratic")
+            elif lamp.falloff_type == 'INVERSE_COEFFICIENTS':
+                row = layout.row(align=True)
+                row.prop(lamp, "constant_coefficient", text="Const")
+                row.prop(lamp, "linear_coefficient", text="Linear")
+                row.prop(lamp, "quadratic_coefficient", text="Quad")
+            elif lamp.falloff_type == 'INVSQUARE_CUTOFF':
+                row = layout.row(align=True)
+                row.prop(lamp, "radius", text="Radius")
+                row.prop(lamp, "cutoff_threshold", text="CutOff")
+        elif lamp.type in {'AREA', 'HEMI'}:
+            layout.prop(lamp, "distance")
+
+        if lamp.type == 'SPOT':
+            row = layout.row(align=True)
+            row.prop(lamp, "spot_size", text="Cone")
+            row.prop(lamp, "spot_blend", text="Blend", slider=True)
+        elif lamp.type == 'AREA':
+            layout.row().prop(lamp, "shape", expand=True)
+            row = layout.row(align=True)
+            row.prop(lamp, "size", text="Size X" if lamp.shape == 'RECTANGLE' else "Size")
+            if lamp.shape == 'RECTANGLE':
+                row.prop(lamp, "size_y", text="Y")
+
+        row = layout.row()
+        row.prop(lamp, "use_specular")
+        row.prop(lamp, "use_diffuse")
+
+
+class VIEW3D_PT_light_hud_shadow(VIEW3D_PT_light_hud_base, Panel):
+    bl_label = "Shadow"
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.active_object
+        return ob is not None and ob.type == 'LAMP' and ob.data.type in {'POINT', 'SUN', 'SPOT'}
+
+    def draw(self, context):
+        layout = self.layout
+        lamp = context.active_object.data
+
+        layout.prop(lamp, "use_shadow", text="Use Shadow")
+        col = layout.column()
+        col.active = lamp.use_shadow
+        if lamp.type == 'POINT':
+            col.label(text="Point shadow costs 6 render passes per frame", icon='ERROR')
+
+        row = col.row()
+        row.prop(lamp, "shadow_color", text="")
+        if lamp.type != 'POINT':
+            row.prop(lamp, "static_shadow")
+        if lamp.type == 'SUN':
+            col.prop(lamp, "use_csm_shadow", text="Cascaded Shadow Mapping")
+            col.prop(lamp, "shadow_blend", text="Shadow Fade", slider=True)
+            col.prop(lamp, "shadow_frustum_size", text="Frustum Size")
+        if hasattr(lamp, "shadow_size_preset") and not (lamp.type == 'SUN' and lamp.use_csm_shadow):
+            col.prop(lamp, "shadow_size_preset", text="Size")
+            if lamp.shadow_size_preset == 'CUSTOM':
+                col.prop(lamp, "shadow_buffer_size", text="Custom Size")
+        if lamp.type != 'POINT':
+            row = col.row(align=True)
+            row.prop_enum(lamp, "shadow_filter", "NONE", text="Hard")
+            row.prop_enum(lamp, "shadow_filter", "PCF", text="Soft")
+            row.prop_enum(lamp, "shadow_filter", "PCF_PENUMBRA", text="Realistic")
+        row = col.row(align=True)
+        row.prop(lamp, "shadow_buffer_bias", text="Bias")
+        row.prop(lamp, "shadow_buffer_slope_bias", text="Slope")
+        row = col.row(align=True)
+        row.prop(lamp, "shadow_buffer_clip_start", text="Clip Start")
+        row.prop(lamp, "shadow_buffer_clip_end", text="Clip End")
+        if lamp.type in {'SPOT', 'POINT'}:
+            col.prop(lamp, "use_auto_shadow_update", text="Auto Update")
+
+
+class VIEW3D_PT_light_hud_display(VIEW3D_PT_light_hud_base, Panel):
+    bl_label = "Display"
+
+    def draw(self, context):
+        layout = self.layout
+        lamp = context.active_object.data
+
+        if lamp.type == 'SPOT':
+            layout.prop(lamp, "show_cone")
+        if lamp.type in {'POINT', 'SUN', 'SPOT'}:
+            layout.prop(lamp, "show_shadow_box",
+                        text="Show Shadow Sphere" if lamp.type == 'POINT' else "Show Shadow Box")
+        layout.prop(lamp, "use_negative")
+        layout.prop(lamp, "use_own_layer", text="This Layer Only")
+        view = context.space_data
+        layout.prop(view, "show_light_hud", text="Light HUD")
+        row = layout.row(align=True)
+        row.prop(view, "show_light_hud_light", text="Light", toggle=True)
+        row.prop(view, "show_light_hud_shadow", text="Shadow", toggle=True)
+        row.prop(view, "show_light_hud_display", text="Display", toggle=True)
+
+
 class VIEW3D_PT_camera_hud_base:
     """Popovers do Camera HUD (barra no topo da viewport em vista de câmera)."""
     bl_space_type = 'VIEW_3D'
@@ -3988,6 +4201,39 @@ class VIEW3D_PT_camera_hud_display(VIEW3D_PT_camera_hud_base, Panel):
         row.prop(view, "show_camera_hud_focus", text="Focus", toggle=True)
         row.prop(view, "show_camera_hud_effects", text="Effects", toggle=True)
         row.prop(view, "show_camera_hud_display", text="Display", toggle=True)
+        row.prop(view, "show_camera_hud_viewport", text="Viewport", toggle=True)
+
+
+class VIEW3D_PT_camera_hud_viewport(VIEW3D_PT_camera_hud_base, Panel):
+    bl_label = "Viewport"
+
+    def draw(self, context):
+        layout = self.layout
+        cam = context.space_data.camera.data
+        viewport = cam.viewport
+
+        layout.prop(cam, "use_viewport", text="Custom Viewport")
+        col = layout.column()
+        col.active = cam.use_viewport
+
+        for items in (
+            (('FULL', "Full Screen"), ('PICTURE_IN_PICTURE', "Picture-in-Picture")),
+            (('LEFT', "Left"), ('RIGHT', "Right"), ('TOP', "Top"), ('BOTTOM', "Bottom")),
+            (('TOP_LEFT', "Top Left"), ('TOP_RIGHT', "Top Right")),
+            (('BOTTOM_LEFT', "Bottom Left"), ('BOTTOM_RIGHT', "Bottom Right")),
+        ):
+            row = col.row(align=True)
+            for preset, text in items:
+                row.operator("camera.game_viewport_preset", text=text).preset = preset
+
+        row = col.row(align=True)
+        row.prop(viewport, "left_ratio", text="Left")
+        row.prop(viewport, "right_ratio", text="Right")
+        row = col.row(align=True)
+        row.prop(viewport, "bottom_ratio", text="Bottom")
+        row.prop(viewport, "top_ratio", text="Top")
+        if viewport.left_ratio >= viewport.right_ratio or viewport.bottom_ratio >= viewport.top_ratio:
+            col.label(text="Left/Bottom must be lower than Right/Top", icon='ERROR')
 
 
 class VIEW3D_PT_overlay(Panel):
@@ -4043,6 +4289,17 @@ class VIEW3D_PT_overlay(Panel):
         row.prop(view, "show_camera_hud_focus", text="Focus", toggle=True)
         row.prop(view, "show_camera_hud_effects", text="Effects", toggle=True)
         row.prop(view, "show_camera_hud_display", text="Display", toggle=True)
+        row.prop(view, "show_camera_hud_viewport", text="Viewport", toggle=True)
+        layout.prop(view, "show_light_hud", text="Light HUD")
+        row = layout.row(align=True)
+        row.prop(view, "show_light_hud_light", text="Light", toggle=True)
+        row.prop(view, "show_light_hud_shadow", text="Shadow", toggle=True)
+        row.prop(view, "show_light_hud_display", text="Display", toggle=True)
+        layout.prop(view, "show_empty_hud", text="Empty HUD")
+        row = layout.row(align=True)
+        row.prop(view, "show_empty_hud_empty", text="Empty", toggle=True)
+        row.prop(view, "show_empty_hud_reverb", text="Reverb", toggle=True)
+        row.prop(view, "show_empty_hud_lightning", text="Lightning", toggle=True)
 
         layout.separator()
 
@@ -4792,6 +5049,13 @@ classes = (
     VIEW3D_PT_camera_hud_focus,
     VIEW3D_PT_camera_hud_effects,
     VIEW3D_PT_camera_hud_display,
+    VIEW3D_PT_camera_hud_viewport,
+    VIEW3D_PT_light_hud_light,
+    VIEW3D_PT_light_hud_shadow,
+    VIEW3D_PT_light_hud_display,
+    VIEW3D_PT_empty_hud_empty,
+    VIEW3D_PT_empty_hud_reverb,
+    VIEW3D_PT_empty_hud_lightning,
     VIEW3D_PT_overlay,
     VIEW3D_PT_gizmo,
     VIEW3D_PT_pivot_point,

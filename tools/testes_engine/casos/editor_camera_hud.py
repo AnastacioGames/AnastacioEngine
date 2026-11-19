@@ -15,6 +15,7 @@ for a in bpy.context.screen.areas:
         sp = a.spaces.active
         sp.region_3d.view_perspective = 'CAMERA'
         sp.show_camera_hud = %s
+bpy.types.VIEW3D_PT_camera_hud_viewport
 resultado = [bpy.types.VIEW3D_PT_camera_hud_lens.bl_label, sp.show_camera_hud, sp.camera is not None]
 '''
 

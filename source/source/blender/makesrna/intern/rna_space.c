@@ -2855,12 +2855,61 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 			{"show_camera_hud_focus", "Focus", V3D_CAMERA_HUD_HIDE_FOCUS},
 			{"show_camera_hud_effects", "Effects", V3D_CAMERA_HUD_HIDE_EFFECTS},
 			{"show_camera_hud_display", "Display", V3D_CAMERA_HUD_HIDE_DISPLAY},
+			{"show_camera_hud_viewport", "Viewport", V3D_CAMERA_HUD_HIDE_VIEWPORT},
 		};
-		for (int i = 0; i < 4; i++) {
+		for (int i = 0; i < 5; i++) {
 			prop = RNA_def_property(srna, hud_buttons[i].id, PROP_BOOLEAN, PROP_NONE);
 			RNA_def_property_boolean_negative_sdna(prop, NULL, "camera_hud_hide", hud_buttons[i].bit);
 			RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
 			RNA_def_property_ui_text(prop, hud_buttons[i].name, "Show this button in the Camera HUD");
+			RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+		}
+	}
+
+	prop = RNA_def_property(srna, "show_light_hud", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag2", V3D_HIDE_LIGHT_HUD);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop,
+	                         "Light HUD",
+	                         "Show the light settings bar (light, shadow, display) inside the viewport "
+	                         "while a light is the active object");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	{
+		static const struct {const char *id, *name; int bit;} light_hud_buttons[] = {
+			{"show_light_hud_light", "Light", V3D_LIGHT_HUD_HIDE_LIGHT},
+			{"show_light_hud_shadow", "Shadow", V3D_LIGHT_HUD_HIDE_SHADOW},
+			{"show_light_hud_display", "Display", V3D_LIGHT_HUD_HIDE_DISPLAY},
+		};
+		for (int i = 0; i < 3; i++) {
+			prop = RNA_def_property(srna, light_hud_buttons[i].id, PROP_BOOLEAN, PROP_NONE);
+			RNA_def_property_boolean_negative_sdna(prop, NULL, "camera_hud_hide", light_hud_buttons[i].bit);
+			RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+			RNA_def_property_ui_text(prop, light_hud_buttons[i].name, "Show this button in the Light HUD");
+			RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+		}
+	}
+
+	prop = RNA_def_property(srna, "show_empty_hud", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "camera_hud_hide", V3D_EMPTY_HUD_HIDE_ALL);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop,
+	                         "Empty HUD",
+	                         "Show the empty settings bar (display, reverb, lightning) inside the viewport "
+	                         "while an empty is the active object");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	{
+		static const struct {const char *id, *name; int bit;} empty_hud_buttons[] = {
+			{"show_empty_hud_empty", "Empty", V3D_EMPTY_HUD_HIDE_EMPTY},
+			{"show_empty_hud_reverb", "Reverb", V3D_EMPTY_HUD_HIDE_REVERB},
+			{"show_empty_hud_lightning", "Lightning", V3D_EMPTY_HUD_HIDE_LIGHTNING},
+		};
+		for (int i = 0; i < 3; i++) {
+			prop = RNA_def_property(srna, empty_hud_buttons[i].id, PROP_BOOLEAN, PROP_NONE);
+			RNA_def_property_boolean_negative_sdna(prop, NULL, "camera_hud_hide", empty_hud_buttons[i].bit);
+			RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+			RNA_def_property_ui_text(prop, empty_hud_buttons[i].name, "Show this button in the Empty HUD");
 			RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 		}
 	}
