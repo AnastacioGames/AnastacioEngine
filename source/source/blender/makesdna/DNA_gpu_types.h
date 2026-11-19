@@ -55,6 +55,8 @@ typedef enum eGPUFXFlags {
 	GPU_FX_FLAG_CAMERA_MOTION = (1 << 5),
 	/* preview of the scene's TAA (Scene > Post-process), converged over the view's redraws */
 	GPU_FX_FLAG_TAA         = (1 << 6),
+	/* preview of the scene's Native SSGI (game material buffers + the game's passes) */
+	GPU_FX_FLAG_SSGI        = (1 << 7),
 } eGPUFXFlags;
 
 #endif  /* __DNA_GPU_TYPES_H__ */

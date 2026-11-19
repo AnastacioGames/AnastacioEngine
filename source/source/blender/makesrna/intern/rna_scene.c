@@ -5728,6 +5728,13 @@ static void rna_def_gpu_fx(BlenderRNA *brna)
 	                         "Show the scene's temporal anti-aliasing (Scene > Post-process > TAA) with the game's "
 	                         "pass, converging over a few redraws while the view is still");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "use_game_ssgi", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "fx_flag", GPU_FX_FLAG_SSGI);
+	RNA_def_property_ui_text(prop, "SSGI",
+	                         "Show the scene's Native SSGI with the game's passes (Material shading, materials "
+	                         "with nodes)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_scene_gpu_bloom_fx(BlenderRNA *brna)

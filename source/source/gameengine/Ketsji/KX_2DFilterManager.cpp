@@ -1759,3 +1759,10 @@ extern "C" const char *KX_TAAPreviewShader(void)
 {
 	return datatoc_RAS_TAA2DFilter_glsl;
 }
+
+/* And the Native SSGI trace and composition, for the 3D View preview. */
+extern "C" void KX_SSGIPreviewShaders(const char **r_trace, const char **r_image)
+{
+	*r_trace = datatoc_RAS_SSGI2DFilter_glsl;
+	*r_image = datatoc_RAS_SSGIImage2DFilter_glsl;
+}

@@ -3810,6 +3810,7 @@ class VIEW3D_PT_shading(Panel):
             col.prop(fx_settings, "use_game_compositor")
             col.prop(fx_settings, "use_game_2d_filters")
             col.prop(fx_settings, "use_game_taa")
+            col.prop(fx_settings, "use_game_ssgi")
         col.prop(view, "show_invisible_lods")
 
         layout.separator()

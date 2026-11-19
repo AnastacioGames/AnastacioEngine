@@ -67,6 +67,7 @@
 #include "BKE_global.h"
 #include "BKE_paint.h"
 #include "BKE_scene.h"
+#include "BKE_idprop.h"
 #include "BKE_property.h"
 #include "BKE_screen.h"
 #include "BKE_text.h"
@@ -3146,6 +3147,11 @@ static void view3d_draw_objects(
 		ED_view3d_clipping_set(rv3d);
 	}
 
+	/* the scene's objects write the SSGI material buffers (overlays drawn after them do not) */
+	if (fx) {
+		GPU_fx_compositor_ssgi_targets(fx, true);
+	}
+
 	/* draw set first */
 	if (scene->set) {
 		const short dflag = DRAW_CONSTCOLOR | DRAW_SCENESET;
@@ -3207,6 +3213,10 @@ static void view3d_draw_objects(
 				}
 			}
 		}
+	}
+
+	if (fx) {
+		GPU_fx_compositor_ssgi_targets(fx, false);
 	}
 
 	/* perspective floor goes last to use scene depth and avoid writing to depth buffer */
@@ -4048,6 +4058,63 @@ static void view3d_fx_taa_end(wmWindow *win, Scene *scene, ARegion *ar, View3D *
 	ED_view3d_draw_setup_view(win, scene, ar, v3d, NULL, NULL, NULL);
 }
 
+#ifdef WITH_GAMEENGINE
+/* KX_2DFilterManager.cpp: the game's Native SSGI passes (RAS_SSGI2DFilter / RAS_SSGIImage2DFilter). */
+extern void KX_SSGIPreviewShaders(const char **r_trace, const char **r_image);
+#endif
+
+/* KX_Scene: an "ae_ssgi_*" scene setting, any number type. */
+static float view3d_fx_ssgi_setting(Scene *scene, const char *name, float fallback)
+{
+	IDProperty *prop = IDP_GetPropertyFromGroup(scene->id.properties, name);
+	float value = fallback;
+	if (prop) {
+		value = prop->type == IDP_FLOAT ? IDP_Float(prop) : prop->type == IDP_DOUBLE ? (float)IDP_Double(prop) :
+		        prop->type == IDP_INT ? (float)IDP_Int(prop) : fallback;
+	}
+	return isfinite(value) ? value : fallback;
+}
+
+/* Game Preview > SSGI: the scene's Native SSGI with the values KX_Scene gives the game's filter.
+ * Only Material shading: the materials write the SSGI buffers there (Solid writes none). */
+static void view3d_fx_ssgi(GPUFX *fx, Scene *scene, View3D *v3d, const GPUFXSettings *fx_settings)
+{
+#ifdef WITH_GAMEENGINE
+	const int slot = (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_SSGI) && v3d->drawtype == OB_MATERIAL) ?
+	                 GPU_material_ssgi_slot(scene) : 0;
+	if (!slot) {
+		GPU_fx_compositor_set_ssgi(fx, NULL);
+		return;
+	}
+	GPUFXSSGISettings s;
+	KX_SSGIPreviewShaders(&s.trace_shader, &s.image_shader);
+	s.slot = slot;
+	s.divisor = (int)CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_divisor", 2), 1, 4);
+	s.params[0] = CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_radius", 3), 0.01f, 100.0f);
+	s.params[1] = CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_strength", 1), 0.0f, 4.0f);
+	s.params[2] = CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_thickness", 0.1f), 0.001f, 10.0f);
+	s.params[3] = (float)(int)CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_rays", 4), 1, 16);
+	s.params[4] = (float)(int)CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_steps", 8), 2, 32);
+	s.params[5] = (float)(slot - 1);
+	s.params[6] = (float)s.divisor;
+	s.params[7] = (float)(int)CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_denoise", 1), 0, 2);
+	s.display[0] = scene->view_settings.exposure;
+	s.display[1] = scene->view_settings.gamma;
+	s.display[2] = 0.0f;
+	s.display[3] = BKE_scene_check_color_management_enabled(scene) ? 1.0f : 0.0f;
+	if (STREQ(scene->view_settings.view_transform, "Filmic")) {
+		const char *look = scene->view_settings.look;
+		s.display[2] = strstr(look, "Very Low Contrast") ? 1.10f : strstr(look, "Medium Low Contrast") ? 1.45f :
+		               strstr(look, "Low Contrast") ? 1.30f : strstr(look, "Very High Contrast") ? 2.25f :
+		               strstr(look, "Medium High Contrast") ? 1.80f : strstr(look, "High Contrast") ? 2.00f : 1.60f;
+	}
+	GPU_fx_compositor_set_ssgi(fx, &s);
+#else
+	UNUSED_VARS(scene, v3d, fx_settings);
+	GPU_fx_compositor_set_ssgi(fx, NULL);
+#endif
+}
+
 static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d,
                                   const GPUFXSettings *fx_settings, bool offscreen)
 {
@@ -4057,6 +4124,7 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 	}
 	view3d_fx_node_compositor(fx, scene, fx_settings);
 	GPUFXNodeStage fixed[3];
+	view3d_fx_ssgi(fx, scene, v3d, fx_settings);
 	int num_fixed = 0;
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_DOF) &&
 	    view3d_fx_camera_dof(scene, ar, v3d, rv3d, offscreen, &fixed[num_fixed]))

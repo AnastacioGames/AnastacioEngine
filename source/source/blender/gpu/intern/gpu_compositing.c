@@ -186,6 +186,8 @@ typedef struct {
 #define GPU_SCENEFX_NODE_COMPOSITOR (1 << 29)
 /* Runtime only: Custom Filter actuators are previewed (GPU_fx_compositor_set_filter_stages). */
 #define GPU_SCENEFX_2D_FILTERS (1 << 28)
+/* Runtime only: Native SSGI is previewed (GPU_fx_compositor_set_ssgi). */
+#define GPU_SCENEFX_SSGI (1 << 27)
 
 typedef struct {
 	int invrendertargetdim_uniform;
@@ -346,6 +348,15 @@ struct GPUFX {
 	int stage_history_w, stage_history_h;
 	bool stage_history_kept;
 
+	/* Native SSGI preview: settings, the material buffers (gbuffer attachments slot..slot+3,
+	 * drawn with the objects), the trace at 1/divisor and the game's two shaders */
+	GPUFXSSGISettings ssgi;
+	GPUTexture *ssgi_data[4];
+	GPUTexture *ssgi_trace;
+	GPUShader *ssgi_trace_sh, *ssgi_image_sh;
+	int ssgi_shader_slot;
+	bool ssgi_failed;
+
 	unsigned int cloud_history;
 	unsigned int cloud_history_depth;
 	int cloud_history_w, cloud_history_h;
@@ -466,6 +477,35 @@ static void cleanup_fx_dof_buffers(GPUFX *fx)
 	}
 }
 
+static void gpu_fx_ssgi_free_buffers(GPUFX *fx)
+{
+	for (int i = 0; i < 4; i++) {
+		if (fx->ssgi_data[i]) {
+			GPU_framebuffer_texture_detach(fx->ssgi_data[i]);
+			GPU_texture_free(fx->ssgi_data[i]);
+			fx->ssgi_data[i] = NULL;
+		}
+	}
+	if (fx->ssgi_trace) {
+		GPU_framebuffer_texture_detach(fx->ssgi_trace);
+		GPU_texture_free(fx->ssgi_trace);
+		fx->ssgi_trace = NULL;
+	}
+}
+
+static void gpu_fx_ssgi_free_shaders(GPUFX *fx)
+{
+	if (fx->ssgi_trace_sh) {
+		GPU_shader_free(fx->ssgi_trace_sh);
+		fx->ssgi_trace_sh = NULL;
+	}
+	if (fx->ssgi_image_sh) {
+		GPU_shader_free(fx->ssgi_image_sh);
+		fx->ssgi_image_sh = NULL;
+	}
+	fx->ssgi_shader_slot = 0;
+}
+
 static void cleanup_fx_gl_data(GPUFX *fx, bool do_fbo)
 {
 	if (fx->color_buffer) {
@@ -505,6 +545,7 @@ static void cleanup_fx_gl_data(GPUFX *fx, bool do_fbo)
 		fx->stage_history = 0;
 		fx->stage_history_w = fx->stage_history_h = 0;
 	}
+	gpu_fx_ssgi_free_buffers(fx);
 	fx->stage_history_kept = false;
 
 	cleanup_fx_dof_buffers(fx);
@@ -827,6 +868,7 @@ void GPU_fx_compositor_destroy(GPUFX *fx)
 	GPU_fx_node_stages_free(fx->node_stages, fx->node_num_stages);
 	gpu_fx_filter_free_gl(fx);
 	GPU_fx_node_stages_free(fx->filter_stages, fx->filter_num_stages);
+	gpu_fx_ssgi_free_shaders(fx);
 	glDeleteBuffers(1, &fx->vbuffer);
 	MEM_freeN(fx);
 }
@@ -842,6 +884,96 @@ void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const f
 		if (frame && frame[2] > 0.0f && frame[3] > 0.0f) {
 			copy_v4_v4(fx->camera_lens_frame, frame);
 		}
+	}
+}
+
+void GPU_fx_compositor_set_ssgi(GPUFX *fx, const GPUFXSSGISettings *settings)
+{
+	if (!settings || settings->slot < 1 || settings->slot > 4 || !settings->trace_shader ||
+	    !settings->image_shader)
+	{
+		fx->ssgi.slot = 0;
+		return;
+	}
+	if (settings->slot != fx->ssgi_shader_slot) {
+		gpu_fx_ssgi_free_shaders(fx);
+		fx->ssgi_failed = false;
+	}
+	fx->ssgi = *settings;
+	CLAMP(fx->ssgi.divisor, 1, 4);
+}
+
+/* Compiles the game's two passes for the current slot; a failure keeps the preview off until
+ * the slot changes (it is not rebuilt on every redraw). */
+static bool gpu_fx_ssgi_prepare(GPUFX *fx)
+{
+	if (!fx->ssgi.slot || fx->ssgi_failed || !GLEW_VERSION_3_0) {
+		return false;
+	}
+	if (!fx->ssgi_trace_sh) {
+		char defines[64];
+		/* bgl_DataTextures[0] is the first attachment after the color (KX_2DFilterManager) */
+		BLI_snprintf(defines, sizeof(defines), "#define SSGI_SLOT %d\n", fx->ssgi.slot - 1);
+		fx->ssgi_trace_sh = GPU_shader_create(gpu_fx_node_vert, fx->ssgi.trace_shader, NULL, NULL, defines, 0, 0, 0);
+		fx->ssgi_image_sh = GPU_shader_create(gpu_fx_node_vert, fx->ssgi.image_shader, NULL, NULL, defines, 0, 0, 0);
+		fx->ssgi_shader_slot = fx->ssgi.slot;
+		if (!fx->ssgi_trace_sh || !fx->ssgi_image_sh) {
+			fprintf(stderr, "SSGI preview: shader failed\n");
+			gpu_fx_ssgi_free_shaders(fx);
+			fx->ssgi_shader_slot = fx->ssgi.slot;
+			fx->ssgi_failed = true;
+			return false;
+		}
+	}
+	return true;
+}
+
+/* The 4 material buffers at the frame size and the trace at 1/divisor (half float: the game
+ * falls back to 8 bit only without float targets). */
+static bool gpu_fx_ssgi_buffers(GPUFX *fx, int w, int h, char err_out[256])
+{
+	const int tw = max_ii(1, w / fx->ssgi.divisor), th = max_ii(1, h / fx->ssgi.divisor);
+	if (fx->ssgi_data[0] && (GPU_texture_width(fx->ssgi_data[0]) != w || GPU_texture_height(fx->ssgi_data[0]) != h ||
+	                         GPU_texture_width(fx->ssgi_trace) != tw || GPU_texture_height(fx->ssgi_trace) != th))
+	{
+		gpu_fx_ssgi_free_buffers(fx);
+	}
+	if (!fx->ssgi_data[0]) {
+		for (int i = 0; i < 4; i++) {
+			if (!(fx->ssgi_data[i] = GPU_texture_create_2D(w, h, NULL, GPU_HDR_HALF_FLOAT, err_out))) {
+				gpu_fx_ssgi_free_buffers(fx);
+				return false;
+			}
+		}
+		if (!(fx->ssgi_trace = GPU_texture_create_2D(tw, th, NULL, GPU_HDR_HALF_FLOAT, err_out))) {
+			gpu_fx_ssgi_free_buffers(fx);
+			return false;
+		}
+	}
+	return true;
+}
+
+void GPU_fx_compositor_ssgi_targets(GPUFX *fx, bool enable)
+{
+	if (!fx || !(fx->sce_effects & GPU_SCENEFX_SSGI) || !fx->ssgi_data[0] || !GPU_framebuffer_bound(fx->gbuffer)) {
+		return;
+	}
+	if (enable) {
+		const int slot = fx->ssgi.slot;
+		GLenum bufs[8];
+		for (int i = 0; i < slot + 4; i++) {
+			bufs[i] = (i == 0 || i >= slot) ? GL_COLOR_ATTACHMENT0 + i : GL_NONE;
+		}
+		glDrawBuffers(slot + 4, bufs);
+		/* every draw starts empty: alpha 0 marks a pixel without SSGI data (background, Solid
+		 * objects); the index is the draw buffer's, the same as the attachment's here */
+		const float zero[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+		for (int i = 0; i < 4; i++) {
+			glClearBufferfv(GL_COLOR, slot + i, zero);
+		}
+	}
+	else {
+		glDrawBuffer(GL_COLOR_ATTACHMENT0);
 	}
 }
 
@@ -879,7 +1011,7 @@ bool GPU_fx_compositor_initialize_passes(
 	fx_flag &= ~GPU_FX_FLAG_CAMERA_LENS;
 	/* Same for the compositor preview: on only with stages that compiled. */
 	fx_flag &= ~(GPU_FX_FLAG_NODE_COMPOSITOR | GPU_FX_FLAG_2D_FILTERS | GPU_FX_FLAG_CAMERA_DOF |
-	             GPU_FX_FLAG_CAMERA_MOTION | GPU_FX_FLAG_TAA);
+	             GPU_FX_FLAG_CAMERA_MOTION | GPU_FX_FLAG_TAA | GPU_FX_FLAG_SSGI);
 
 	if (!scenefx_settings->bloom || !(scene->scenefx_settings.editor_render_flag & SCENE_FX_FLAG_BLOOM)) {
 		scenefx_flag &= ~SCENE_FX_FLAG_BLOOM;
@@ -960,6 +1092,9 @@ bool GPU_fx_compositor_initialize_passes(
 	if (gpu_fx_filter_prepare(fx)) {
 		scenefx_flag |= GPU_SCENEFX_2D_FILTERS;
 	}
+	if (gpu_fx_ssgi_prepare(fx)) {
+		scenefx_flag |= GPU_SCENEFX_SSGI;
+	}
 
 	/* The ping-pong textures are laid out according to the active pass chain.
 	 * Recreate them when a scene effect is toggled so removing the final FXAA
@@ -1035,6 +1170,8 @@ bool GPU_fx_compositor_initialize_passes(
 		num_passes++;
 	if (scenefx_flag & GPU_SCENEFX_2D_FILTERS)
 		num_passes += fx->filter_num_stages;
+	if (scenefx_flag & GPU_SCENEFX_SSGI)
+		num_passes++;
 
 	if (!fx->gbuffer) {
 		fx->gbuffer = GPU_framebuffer_create();
@@ -1215,6 +1352,24 @@ bool GPU_fx_compositor_initialize_passes(
 	if (!GPU_framebuffer_texture_attach(fx->gbuffer, fx->color_buffer, 0, err_out))
 		printf("%.256s\n", err_out);
 
+
+	if (scenefx_flag & GPU_SCENEFX_SSGI) {
+		/* the material buffers go to their slots (the composite pass detaches them); the pass
+		 * count above already has the composition, so a failure here draws a plain copy */
+		if (gpu_fx_ssgi_buffers(fx, w, h, err_out)) {
+			for (int i = 0; i < 4; i++) {
+				if (!GPU_framebuffer_texture_attach(fx->gbuffer, fx->ssgi_data[i], fx->ssgi.slot + i, err_out)) {
+					/* without all 4 the composition only copies (gpu_fx_ssgi_draw) */
+					printf("%.256s\n", err_out);
+					gpu_fx_ssgi_free_buffers(fx);
+					break;
+				}
+			}
+		}
+	}
+	else {
+		gpu_fx_ssgi_free_buffers(fx);
+	}
 	if (!GPU_framebuffer_check_valid(fx->gbuffer, err_out))
 		printf("%.256s\n", err_out);
 
@@ -1704,6 +1859,95 @@ static void gpu_vfog_fill(Scene *scene, World *world, const float campos[3], flo
 	data[9][3] = (float)pushers;
 }
 
+/* Binds what both SSGI passes read (RAS_2DFilter::BindUniforms for these names) from unit *unit. */
+static void gpu_fx_ssgi_bind(GPUFX *fx, GPUShader *sh, float projmat[4][4], float invproj[4][4],
+                             float w, float h, int *unit)
+{
+	char name[32];
+	GPU_shader_bind(sh);
+	GPU_texture_bind(fx->depth_buffer, (*unit)++);
+	GPU_texture_filter_mode(fx->depth_buffer, false, false, false);
+	GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "bgl_DepthTexture"), fx->depth_buffer);
+	for (int i = 0; i < 4; i++) {
+		GPU_texture_bind(fx->ssgi_data[i], (*unit)++);
+		BLI_snprintf(name, sizeof(name), "bgl_DataTextures[%d]", fx->ssgi.slot - 1 + i);
+		GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, name), fx->ssgi_data[i]);
+	}
+	glUniformMatrix4fv(GPU_shader_get_uniform(sh, "unfprojmat"), 1, GL_FALSE, (float *)projmat);
+	glUniformMatrix4fv(GPU_shader_get_uniform(sh, "unfinvprojmat"), 1, GL_FALSE, (float *)invproj);
+	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTextureWidth"), 1, 1, &w);
+	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTextureHeight"), 1, 1, &h);
+	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "ge_SSGIParams"), 4, 2, fx->ssgi.params);
+	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "ge_SSGIDisplay"), 4, 1, fx->ssgi.display);
+	GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "bgl_Frame"), 0);
+}
+
+static void gpu_fx_ssgi_unbind(GPUFX *fx)
+{
+	for (int i = 0; i < 4; i++) {
+		GPU_texture_unbind(fx->ssgi_data[i]);
+	}
+	GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
+	GPU_texture_unbind(fx->depth_buffer);
+}
+
+/* Trace at 1/divisor into its own texture, then the composition as one ping-pong pass. Without
+ * the buffers (allocation failed) the pass only copies, so the chain keeps its count. */
+static void gpu_fx_ssgi_draw(GPUFX *fx, int *passes_left, struct GPUOffScreen *ofs, GPUTexture **src,
+                             GPUTexture **target, float projmat[4][4])
+{
+	float invproj[4][4];
+	const float w = (float)fx->gbuffer_dim[0], h = (float)fx->gbuffer_dim[1];
+	int unit = 0;
+	const bool ready = fx->ssgi_data[0] && fx->ssgi_trace;
+	invert_m4_m4(invproj, projmat);
+
+	if (ready) {
+		GPUTexture *trace = fx->ssgi_trace;
+		GPU_framebuffer_texture_attach(fx->gbuffer, trace, 0, NULL);
+		GPU_texture_bind_as_framebuffer(trace);
+		gpu_fx_ssgi_bind(fx, fx->ssgi_trace_sh, projmat, invproj, (float)GPU_texture_width(trace),
+		                 (float)GPU_texture_height(trace), &unit);
+		glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+		gpu_fx_ssgi_unbind(fx);
+		GPU_framebuffer_texture_unbind(fx->gbuffer, trace);
+		GPU_framebuffer_texture_detach(trace);
+	}
+
+	GPUShader *sh = fx->ssgi_image_sh;
+	unit = 0;
+	GPU_shader_bind(sh);
+	GPU_texture_bind(*src, unit++);
+	GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTexture"), *src);
+	if (ready) {
+		GPU_texture_bind(fx->ssgi_trace, unit++);
+		GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "ge_SSGIBuffer"), fx->ssgi_trace);
+		gpu_fx_ssgi_bind(fx, sh, projmat, invproj, w, h, &unit);
+	}
+	else {
+		/* strength 0: the composition returns the frame as it is */
+		const float none[8] = {1.0f, 0.0f, 1.0f, 1.0f, 2.0f, 0.0f, 1.0f, 0.0f};
+		GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "ge_SSGIParams"), 4, 2, none);
+	}
+	gpu_fx_bind_render_target(passes_left, fx, ofs, *target);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	if (ready) {
+		gpu_fx_ssgi_unbind(fx);
+		GPU_texture_unbind(fx->ssgi_trace);
+	}
+	GPU_texture_unbind(*src);
+	if (*target) {
+		GPU_framebuffer_texture_detach(*target);
+		if (ofs) {
+			GPU_offscreen_bind(ofs, false);
+		}
+		else {
+			GPU_framebuffer_restore();
+		}
+	}
+	SWAP(GPUTexture *, *target, *src);
+}
+
 bool GPU_fx_do_composite_pass(
         GPUFX *fx, float viewmat[4][4], float projmat[4][4], bool is_persp,
         struct Scene *scene, struct GPUOffScreen *ofs)
@@ -1729,6 +1973,11 @@ bool GPU_fx_do_composite_pass(
 	GPU_get_dfdy_factors(dfdyfac);
 	/* first, unbind the render-to-texture framebuffer */
 	GPU_framebuffer_texture_detach(fx->color_buffer);
+	for (i = 0; i < 4; i++) {
+		if (fx->ssgi_data[i]) {
+			GPU_framebuffer_texture_detach(fx->ssgi_data[i]);
+		}
+	}
 	GPU_framebuffer_texture_detach(fx->depth_buffer);
 
 	if (fx->restore_stencil) {
@@ -1779,6 +2028,11 @@ bool GPU_fx_do_composite_pass(
 
 	/* SCENE FX Passes */
 	SCENEFXSettings scenefx = scene->scenefx_settings;
+
+	/* Native SSGI first, as in the game (FILTERPASS_SSGI) */
+	if (fx->sce_effects & GPU_SCENEFX_SSGI) {
+		gpu_fx_ssgi_draw(fx, &passes_left, ofs, &src, &target, projmat);
+	}
 
 	/* ssao pass */
 	if (fx->sce_effects & SCENE_FX_FLAG_SSAO) {

@@ -134,6 +134,22 @@ void GPU_fx_compositor_set_filter_stages(GPUFX *fx, GPUFXNodeStage *stages, int 
 /* True when the last composite pass kept the output of its history stage (the next draw may read it). */
 bool GPU_fx_compositor_history_kept(const GPUFX *fx);
 
+/* Preview of the scene's Native SSGI with the game's shaders (RAS_SSGI2DFilter.glsl, trace at
+ * 1/divisor, and RAS_SSGIImage2DFilter.glsl, the composition). The materials write their 4 SSGI
+ * buffers (GPU_material_ssgi_slot) into extra attachments while GPU_fx_compositor_ssgi_targets
+ * is on; the passes run first in the chain, as in the game. */
+typedef struct GPUFXSSGISettings {
+	const char *trace_shader, *image_shader;  /* not owned, must outlive the compositor */
+	int slot;  /* GPU_material_ssgi_slot, 0 = off */
+	int divisor;  /* 1, 2 or 4 */
+	float params[8];  /* ge_SSGIParams */
+	float display[4];  /* ge_SSGIDisplay */
+} GPUFXSSGISettings;
+void GPU_fx_compositor_set_ssgi(GPUFX *fx, const GPUFXSSGISettings *settings);
+/* Between compositor setup and the composite pass: on before the scene's objects, off after
+ * them (overlays drawn later must not write the SSGI buffers). */
+void GPU_fx_compositor_ssgi_targets(GPUFX *fx, bool enable);
+
 bool GPU_fx_compositor_initialize_passes(
         struct Scene *scene, GPUFX *fx, const struct rcti *rect, const struct rcti *scissor_rect,
         const struct GPUFXSettings *fx_settings);
