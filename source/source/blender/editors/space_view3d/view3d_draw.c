@@ -5228,6 +5228,67 @@ static void view3d_draw_floating_debug_controls(const bContext *C, ARegion *ar, 
 	UI_block_draw(C, block);
 }
 
+/* Barra de ajustes da câmera no topo da viewport, só olhando por uma câmera. Cada botão
+ * abre um popover (VIEW3D_PT_camera_hud_*, em space_view3d.py). Liga/desliga em
+ * Overlay > Camera HUD (show_camera_hud). */
+static void view3d_draw_camera_hud(const bContext *C, ARegion *ar, View3D *v3d)
+{
+	RegionView3D *rv3d = ar->regiondata;
+
+	if ((v3d->flag2 & V3D_HIDE_CAMERA_HUD) || (v3d->flag2 & V3D_RENDER_OVERRIDE) ||
+	    rv3d == NULL || rv3d->persp != RV3D_CAMOB ||
+	    v3d->camera == NULL || v3d->camera->type != OB_CAMERA)
+	{
+		return;
+	}
+	if (ED_screen_is_rec_studio(CTX_wm_screen(C))) {
+		return;
+	}
+
+	rcti rect;
+	ED_region_visible_rect(ar, &rect);
+
+	const int x = rect.xmin + UI_UNIT_X / 2;
+	const int y = rect.ymax - UI_UNIT_Y - (UI_UNIT_Y / 2);
+
+	uiBlock *block = UI_block_begin(C, ar, "view3d_camera_hud", UI_EMBOSS);
+	uiLayout *layout = UI_block_layout(
+	        block, UI_LAYOUT_HORIZONTAL, UI_LAYOUT_HEADER, x, y, UI_UNIT_Y, 1, 0, UI_style_get());
+	uiLayout *row = uiLayoutRow(layout, false);
+
+	uiItemL(row, v3d->camera->id.name + 2, ICON_OUTLINER_OB_CAMERA);
+	if ((v3d->camera_hud_hide & V3D_CAMERA_HUD_HIDE_LENS) == 0) {
+		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_camera_hud_lens", "  Lens   ", ICON_CAMERA_DATA);
+	}
+	if ((v3d->camera_hud_hide & V3D_CAMERA_HUD_HIDE_FOCUS) == 0) {
+		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_camera_hud_focus", "  Focus   ", ICON_RESTRICT_VIEW_OFF);
+	}
+	if ((v3d->camera_hud_hide & V3D_CAMERA_HUD_HIDE_EFFECTS) == 0) {
+		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_camera_hud_effects", "  Effects   ", ICON_SEQUENCE);
+	}
+	if ((v3d->camera_hud_hide & V3D_CAMERA_HUD_HIDE_DISPLAY) == 0) {
+		uiItemPopoverPanel(row, (bContext *)C, "VIEW3D_PT_camera_hud_display", "  Display   ", ICON_SETTINGS);
+	}
+
+	int end_x = x, end_y = y;
+	UI_block_layout_resolve(block, &end_x, &end_y);
+	/* Centraliza no topo; se não couber, fica à esquerda. */
+	const int center_x = (rect.xmin + rect.xmax) / 2 - (end_x - x) / 2;
+	if (center_x > x) {
+		UI_block_translate(block, center_x - x, 0);
+	}
+	UI_block_end(C, block);
+	{
+		bTheme *btheme = UI_GetTheme();
+		unsigned char col[4];
+
+		copy_v4_v4_uchar(col, (unsigned char *)btheme->tui.wcol_tool.inner);
+		col[3] = 255;
+		UI_block_draw_group_backgrounds(block, col, 0.2f * U.widget_unit);
+	}
+	UI_block_draw(C, block);
+}
+
 void view3d_main_region_draw(const bContext *C, ARegion *ar)
 {
 	const double t_draw_begin = view3d_layer_profile_draw_begin();
@@ -5262,6 +5323,7 @@ void view3d_main_region_draw(const bContext *C, ARegion *ar)
 	view3d_main_region_draw_info(C, scene, ar, v3d, grid_unit, render_border);
 	view3d_draw_floating_controls(C, ar, v3d, scene);
 	view3d_draw_floating_debug_controls(C, ar, v3d, scene);
+	view3d_draw_camera_hud(C, ar, v3d);
 
 	v3d->flag |= V3D_INVALID_BACKBUF;
 

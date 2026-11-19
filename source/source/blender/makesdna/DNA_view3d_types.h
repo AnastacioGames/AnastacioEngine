@@ -196,7 +196,8 @@ typedef struct View3D {
 	/* transform manipulator info */
 	char twtype, _pad5, twflag;
 
-	short _pad1;
+	/* botões escondidos do Camera HUD (V3D_CAMERA_HUD_HIDE_*); 0 = todos visíveis */
+	short camera_hud_hide;
 
 	/* afterdraw, for xray & transparent */
 	struct ListBase afterdraw_transp;
@@ -320,6 +321,13 @@ typedef struct View3D {
 #define V3D_SHOW_STATS				(1 << 25) /* overlay: vértices/faces/objetos no canto da viewport */
 #define V3D_GAME_CONTROLS_IN_HEADER	(1 << 27) /* grupo do jogo (Cook/Play/Standalone...) no cabeçalho */
 #define V3D_TOOL_CONTROLS_IN_HEADER	(1 << 28) /* resto da barra flutuante (modo, pivô, gizmo, shading) no cabeçalho */
+#define V3D_HIDE_CAMERA_HUD			(1 << 29) /* esconde a barra de ajustes da câmera na vista de câmera (padrão: visível) */
+
+/* View3D->camera_hud_hide */
+#define V3D_CAMERA_HUD_HIDE_LENS		(1 << 0)
+#define V3D_CAMERA_HUD_HIDE_FOCUS		(1 << 1)
+#define V3D_CAMERA_HUD_HIDE_EFFECTS		(1 << 2)
+#define V3D_CAMERA_HUD_HIDE_DISPLAY		(1 << 3)
 
 #define V3D_GAME_IN_HEADER(v3d) (((v3d)->flag2 & (V3D_FLOATING_CONTROLS_IN_HEADER | V3D_GAME_CONTROLS_IN_HEADER)) != 0)
 #define V3D_TOOL_IN_HEADER(v3d) (((v3d)->flag2 & (V3D_FLOATING_CONTROLS_IN_HEADER | V3D_TOOL_CONTROLS_IN_HEADER)) != 0)

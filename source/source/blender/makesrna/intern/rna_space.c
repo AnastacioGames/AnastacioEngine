@@ -2840,6 +2840,31 @@ static void rna_def_space_view3d(BlenderRNA *brna)
 	                         "Show the 3D View debug shortcut buttons inside the viewport");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 
+	prop = RNA_def_property(srna, "show_camera_hud", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flag2", V3D_HIDE_CAMERA_HUD);
+	RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+	RNA_def_property_ui_text(prop,
+	                         "Camera HUD",
+	                         "Show the camera settings bar (lens, focus, effects, display) inside the viewport "
+	                         "while looking through a camera");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	{
+		static const struct {const char *id, *name; int bit;} hud_buttons[] = {
+			{"show_camera_hud_lens", "Lens", V3D_CAMERA_HUD_HIDE_LENS},
+			{"show_camera_hud_focus", "Focus", V3D_CAMERA_HUD_HIDE_FOCUS},
+			{"show_camera_hud_effects", "Effects", V3D_CAMERA_HUD_HIDE_EFFECTS},
+			{"show_camera_hud_display", "Display", V3D_CAMERA_HUD_HIDE_DISPLAY},
+		};
+		for (int i = 0; i < 4; i++) {
+			prop = RNA_def_property(srna, hud_buttons[i].id, PROP_BOOLEAN, PROP_NONE);
+			RNA_def_property_boolean_negative_sdna(prop, NULL, "camera_hud_hide", hud_buttons[i].bit);
+			RNA_def_property_clear_flag(prop, PROP_ANIMATABLE);
+			RNA_def_property_ui_text(prop, hud_buttons[i].name, "Show this button in the Camera HUD");
+			RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+		}
+	}
+
 	prop = RNA_def_property(srna, "show_icon_components", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag2", V3D_RENDER_SHOW_COMPONENTS);
 	RNA_def_property_ui_text(prop, "Show Components", "Show component icon on every object that has at least one component");
