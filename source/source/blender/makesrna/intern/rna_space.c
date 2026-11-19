@@ -3595,6 +3595,33 @@ static void rna_def_space_text(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Show Margin", "Show right margin");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
 
+	prop = RNA_def_property(srna, "use_live_autocomplete", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flags", ST_NO_LIVE_AUTOCOMPLETE);
+	RNA_def_property_ui_text(prop, "Autocomplete While Typing",
+	                         "Open the code completion list by itself after a dot or a few letters "
+	                         "(Tab/Enter accepts, Esc closes); Ctrl+Space always opens it");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
+	prop = RNA_def_property(srna, "use_live_diagnostics", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flags", ST_NO_LIVE_DIAGNOSTICS);
+	RNA_def_property_ui_text(prop, "Check Code While Typing",
+	                         "Underline syntax errors and problems like undefined names in Python texts "
+	                         "after a pause in the typing (nothing of the script runs)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
+	prop = RNA_def_property(srna, "use_auto_close", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flags", ST_NO_AUTO_CLOSE);
+	RNA_def_property_ui_text(prop, "Auto Close Brackets",
+	                         "Typing ( [ { or a quote also types the closing one; typing the closing one "
+	                         "over it just steps past, and Backspace removes an empty pair");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
+	prop = RNA_def_property(srna, "use_highlight_occurrences", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flags", ST_NO_HIGHLIGHT_OCCURRENCES);
+	RNA_def_property_ui_text(prop, "Highlight Occurrences",
+	                         "Highlight the other places of the name under the cursor (or the selected name)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
 	prop = RNA_def_property(srna, "margin_column", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "margin_column");
 	RNA_def_property_range(prop, 0, 1024);

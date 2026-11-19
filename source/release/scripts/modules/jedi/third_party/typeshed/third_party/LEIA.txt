@@ -1,0 +1,1 @@
+Vazio de proposito: os stubs de terceiros do typeshed foram tirados (tamanho). O jedi so lista esta pasta.

@@ -8,6 +8,65 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — Text Editor: Jedi, stubs, outline, snippets, auto-close, ocorrências e PEP 8
+
+- **Jedi 0.19.2 + parso 0.8.4** (MIT, em `scripts/modules`, com LICENSE; sem django-stubs e sem typeshed de terceiros). Quando o provedor próprio não sabe o tipo, ou é chamada de função, o Jedi responde membros, detalhe e assinatura.
+  - Usa os stubs de `scripts/stubs` e o projeto do `.blend`. O site-packages fica fora, porque um `bge` falso de lá quebrava a inferência.
+  - `dynamic_params_for_other_modules` desligado, porque a 1ª consulta levava 7 s.
+  - Aquecimento numa thread. A trava espera até 0,5 s e, se passar disso, fica só o provedor próprio. Medido no editor: import 0,23 s, consulta ~0,5 s.
+- **Stubs `.pyi`** (`tools/autocomplete/gerar_stubs.py` → `scripts/stubs`): bge, mathutils, aud, bgl, blf, gerados do catálogo. Incluem `EXP_ListValue` genérico, operadores de Vector/Matrix e `inputs` de teclado/mouse. Botão "Install VS Code Stubs" na aba Editor. Ao abrir no VS Code, copia para `typings/` da pasta do projeto, com a marca `ANASTACIO_STUBS.txt`. Não sobrescreve um `typings/bge` alheio e nunca apaga nada lá.
+- **Outline** (painel na barra lateral, primeiro da lista): funções e classes do texto, com salto para a linha. O item atual fica destacado.
+- **Snippets** (Edit > Snippets e menu do clique direito): 14 modelos, entre eles componente, controlador e loop de objetos. Trocam a seleção, seguem a indentação e o uso de tab e põem o cursor no `$0`.
+- **Auto-close de `()[]{}''""`** (`use_auto_close`):
+  - pula o fechador já digitado;
+  - Backspace apaga o par vazio;
+  - não age dentro de string ou comentário, nem antes de identificador.
+- **Ocorrências** (`use_highlight_occurrences`): realça as outras ocorrências da palavra sob o cursor, ignorando palavras-chave, strings e comentários.
+- **Format Code (PEP 8)** com Shift+Alt+F, em Format e no clique direito:
+  - autopep8 2.3.1 + pycodestyle 2.12.1 (MIT), com linha de até 120 colunas;
+  - um undo só, e o cursor volta à linha;
+  - com erro de sintaxe não formata e avisa.
+- **Correção na ponte C↔Python:** `PyC_IsInterpreterActive` usava `PyThreadState_GetDict()`. No Python 3.11 isso responde pela thread que está com a GIL, e não necessariamente pela que chama. Com a thread do Jedi viva e um operador que libera a GIL, o editor acessava o dicionário do contexto sem a GIL e travava de vez em quando. Agora usa `PyGILState_Check()`.
+- **Open in External Editor em texto só no .range.** Salva sozinho em `<pasta do .range>/<nome>.py` e abre o editor; se o .range não está salvo, se o nome já existe ou se a gravação falha, abre a janela de salvar e depois o editor. Confere o arquivo no disco e trata nomes reservados do Windows.
+- `import Range` não ganha mais o aviso "imported but unused": a engine usa o módulo só de ele estar importado.
+- Dobra de código (folding) ficou de fora: o editor 2.79 não tem linhas ocultas, e seria preciso mexer no desenho, no cursor e no wrap.
+- Teste: `tools/testes_engine/casos/editor_complementos_codigo.py`. Revisado pelo Codex (índice de formato com tab, formato ainda não gerado, snippet com seleção, typings sem rmtree, GIL).
+
+## 2026-11-18 — Text Editor: erros ao vivo, assinatura e detalhe do item
+
+- **Erros enquanto digita** (textos Python). Depois de uma pausa de 0,8 s, o texto é checado sem executar nada:
+  - `ast.parse` + `compile` pegam erros de sintaxe e de compilação (`return` fora de função) e avisos (`\d` inválido);
+  - o **Pyflakes 3.2.0** (MIT, em `scripts/modules/pyflakes`, com LICENSE) pega nomes indefinidos, imports e variáveis sem uso. Nomes de `from bge.logic import *` vêm do catálogo; estrela de módulo desconhecido não gera aviso.
+  - Desenho: ondulado vermelho (erro) ou amarelo (aviso), marca na coluna dos números e a mensagem depois do fim da linha (erros sempre, avisos só na linha do cursor).
+  - Opção "Check Code While Typing" (`use_live_diagnostics`, flag invertida `ST_NO_LIVE_DIAGNOSTICS`).
+- **Caixa de assinatura.** Ao digitar `(` ou `,` mostra a assinatura com o parâmetro atual em destaque, a descrição da função e a do parâmetro. Acompanha vírgulas e `nome=`, fecha ao sair da chamada ou com Esc; Ctrl+Shift+Space abre. Funciona com a API do jogo, builtins, stdlib e funções/métodos do próprio texto (com docstring).
+- **Detalhe do item da lista.** Ao lado da lista do autocompletar, a assinatura/tipo e a descrição do item selecionado.
+- **Catálogo** agora guarda descrição e parâmetros (`[k, tipo, elem, sig, doc, {param: desc}]`, versão 2), tirados dos `.rst` e das docstrings do runtime (mathutils inclusive).
+- **Como funciona.** `text_hints.c` guarda o resultado por texto (hash do conteúdo). Qualquer mudança vista no desenho conta como edição (digitar, colar, undo, substituir, recarregar), e um timer de notifier redesenha o editor até a pausa terminar. A análise roda em Python (`text_autocomplete.diagnosticos/assinatura/detalhe`) no desenho da região. Acima de 2.500 linhas só a sintaxe é checada, e checagens lentas aumentam a pausa (até 3 s).
+- Teste: `tools/testes_engine/casos/editor_dicas_codigo.py`. Revisado pelo Codex (timer só para quando nada está pendente e confere se é o nosso, coluna do Pyflakes em bytes UTF-8, edições fora da digitação).
+
+## 2026-11-18 — Text Editor: autocompletar de código
+
+- **Lista ao vivo.** Abre sozinha depois de um ponto ou de 3 letras em textos Python e nunca insere nada sozinha: Tab, Enter ou clique aceitam; Esc fecha. Digitar e Backspace passam pelo editor normal e a lista é refeita; espaço ou símbolo fecham.
+  - Enter numa palavra já completa faz nova linha.
+  - A confirmação troca a palavra inteira, corrigindo a caixa (`getcu` → `getCurrentController`), num único undo.
+  - Opção "Autocomplete While Typing" (`SpaceTextEditor.use_live_autocomplete`, flag invertida `ST_NO_LIVE_AUTOCOMPLETE`, ligada por padrão) na aba Editor. Ctrl+Space continua funcionando.
+- **Provedor** `text_autocomplete.py`:
+  - Segue imports (`bge`, `from bge import logic`, alias `Range`/`range`/`GameLogic`) e atribuições simples (`own = cont.owner`, `for ob in scene.objects`, `self.object`/`self.x` em componentes). Também cobre parâmetro `cont`, chamadas, índices, palavras do texto, builtins e palavras-chave.
+  - Não sugere em comentário nem em string, inclusive string tripla.
+  - Não executa o script e só faz introspecção de módulos stdlib da lista ou embutidos.
+- **Catálogo.** Os nomes vêm do runtime: `tools/autocomplete/gerar_api_autocomplete.py` roda o `AnastacioRuntime --server` com `despejar_api.py` e cruza com os tipos dos `.rst`. O resultado vai para `text_autocomplete_api.json`, com 162 classes. Rodar de novo quando a API do jogo mudar.
+- **Correções do código antigo:**
+  - O modal engolia as teclas.
+  - O clique na lista usava a posição do mouse fixa em `{0,0}`.
+  - A caixa da lista não acompanhava UTF-8 nem a borda de baixo.
+  - As palavras do documento entravam com inserção quadrática.
+- **Ponto de atenção.** Neste WM, um modal que devolve `RUNNING_MODAL|PASS_THROUGH` bloqueia as regiões. Por isso:
+  - para deixar a tecla passar e continuar aberto, devolve só `PASS_THROUGH`;
+  - para fechar e deixar passar, `CANCELLED|PASS_THROUGH`;
+  - a lista fecha quando há tecla ou clique em outra área, seleção ou cursor mudados por fora.
+- Teste com teclas reais em `tools/testes_engine/casos/editor_autocompletar.py`. Pedido de fumangy e Skorge no Discord.
+
 ## 2026-11-18 — Nuvens atrás de objetos semitransparentes
 
 - As nuvens (Clouds, Sky Layers, Volumetric Clouds e disco do sol) eram um filtro 2D no fim do quadro que só testava a profundidade; vidro e outros objetos com alpha blend não gravam profundidade, então as nuvens eram pintadas por cima deles. Agora, quando há algo transparente (ou partículas GPU) na cena, o passe roda entre os opacos e os transparentes (`RAS_BucketManager::BeforeAlphaHook` → `RAS_2DFilterManager::RenderCloudsBeforeAlpha`), e a cadeia de filtros o pula. A refração do Glass também vê as nuvens. Só na primeira cena, com uma câmera de tela cheia; overlay, split screen e cenas sem transparência seguem o caminho antigo, sem custo extra. O histórico das nuvens volumétricas é invalidado ao trocar de caminho. Sugestão do musikai no Discord; cena de teste em `D:\AnastacioTestes\nuvens_vidro`.

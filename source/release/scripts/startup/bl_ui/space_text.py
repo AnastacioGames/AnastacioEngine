@@ -310,6 +310,8 @@ class TEXT_MT_editor_menus(Menu):
 
 # Sidebar (N panel), organized in the Blender 2.8 style.
 
+from text_code_tools import TEXT_PT_outline  # classes/functions of the script, click to jump
+
 class TEXT_PT_view(Panel):
     bl_space_type = 'TEXT_EDITOR'
     bl_region_type = 'UI'
@@ -347,10 +349,15 @@ class TEXT_PT_properties(Panel):
         if text:
             col.prop(text, "use_tabs_as_spaces")
         col.prop(st, "use_live_edit")
+        col.prop(st, "use_live_autocomplete")
+        col.prop(st, "use_live_diagnostics")
+        col.prop(st, "use_auto_close")
+        col.prop(st, "use_highlight_occurrences")
         if hasattr(context.scene, "range_text_auto_reload"):
             col.prop(context.scene, "range_text_auto_reload")
         if hasattr(context.window_manager, "range_external_editor"):
             col.prop(context.window_manager, "range_external_editor", text="")
+            col.operator("text.install_vscode_stubs", icon='SCRIPT')
 
 
 class TEXT_PT_find(Panel):
@@ -484,6 +491,10 @@ class TEXT_MT_format(Menu):
     def draw(self, context):
         layout = self.layout
 
+        layout.operator("text.format_code", text="Format Code (PEP 8)")
+
+        layout.separator(factor=1)
+
         layout.operator("text.indent")
         layout.operator("text.unindent")
 
@@ -547,6 +558,7 @@ class TEXT_MT_edit(Menu):
         layout.operator("text.jump")
         layout.operator("text.start_find", text="Find...")
         layout.operator("text.autocomplete")
+        layout.menu("TEXT_MT_snippets")
 
         layout.separator(factor=1)
 
@@ -567,6 +579,11 @@ class TEXT_MT_toolbox(Menu):
 
         layout.separator(factor=1)
 
+        layout.menu("TEXT_MT_snippets")
+        layout.operator("text.format_code", text="Format Code (PEP 8)")
+
+        layout.separator(factor=1)
+
         layout.operator("text.run_script")
 
 
@@ -580,6 +597,7 @@ classes = (
     TEXT_HT_header,
     TEXT_MT_edit,
     TEXT_MT_editor_menus,
+    TEXT_PT_outline,
     TEXT_PT_view,
     TEXT_PT_properties,
     TEXT_PT_find,

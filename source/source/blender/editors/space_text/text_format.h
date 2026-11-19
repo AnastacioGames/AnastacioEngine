@@ -47,6 +47,7 @@ enum {
 #define FMT_CONT_ALL \
 	(FMT_CONT_QUOTESINGLE | FMT_CONT_QUOTEDOUBLE | FMT_CONT_TRIPLE | FMT_CONT_COMMENT_C)
 
+int  text_format_index_from_byte(const struct SpaceText *st, const char *line, int byte);
 int  flatten_string(const struct SpaceText *st, FlattenString *fs, const char *in);
 void flatten_string_free(FlattenString *fs);
 int  flatten_string_strlen(FlattenString *fs, const char *str);

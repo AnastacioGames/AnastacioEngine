@@ -97,6 +97,24 @@ int flatten_string(const SpaceText *st, FlattenString *fs, const char *in)
 	return total;
 }
 
+/* Index in TextLine.format of the char at a byte offset: the format follows the flattened line,
+ * where a tab takes several columns (Range: auto close and occurrences). */
+int text_format_index_from_byte(const SpaceText *st, const char *line, int byte)
+{
+	int total = 0, i = 0;
+	while (line[i] && i < byte) {
+		if (line[i] == '\t') {
+			total += st->tabnumber - (total % st->tabnumber);
+			i++;
+		}
+		else {
+			total++;
+			i += BLI_str_utf8_size_safe(line + i);
+		}
+	}
+	return total;
+}
+
 void flatten_string_free(FlattenString *fs)
 {
 	if (fs->buf != fs->fixedbuf)

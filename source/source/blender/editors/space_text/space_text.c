@@ -248,6 +248,9 @@ static void text_operatortypes(void)
 	WM_operatortype_append(TEXT_OT_resolve_conflict);
 
 	WM_operatortype_append(TEXT_OT_autocomplete);
+	WM_operatortype_append(TEXT_OT_signature_help);
+	WM_operatortype_append(TEXT_OT_hints_hide);
+	WM_operatortype_append(TEXT_OT_format_code);
 }
 
 static void text_keymap(struct wmKeyConfig *keyconf)
@@ -400,6 +403,9 @@ static void text_keymap(struct wmKeyConfig *keyconf)
 	WM_keymap_add_menu(keymap, "TEXT_MT_toolbox", RIGHTMOUSE, KM_PRESS, KM_ANY, 0);
 
 	WM_keymap_add_item(keymap, "TEXT_OT_autocomplete", SPACEKEY, KM_PRESS, KM_CTRL, 0);
+	WM_keymap_add_item(keymap, "TEXT_OT_signature_help", SPACEKEY, KM_PRESS, KM_CTRL | KM_SHIFT, 0);
+	WM_keymap_add_item(keymap, "TEXT_OT_hints_hide", ESCKEY, KM_PRESS, 0, 0);
+	WM_keymap_add_item(keymap, "TEXT_OT_format_code", FKEY, KM_PRESS, KM_SHIFT | KM_ALT, 0);
 
 	WM_keymap_add_item(keymap, "TEXT_OT_line_number", KM_TEXTINPUT, KM_ANY, KM_ANY, 0);
 	WM_keymap_add_item(keymap, "TEXT_OT_insert", KM_TEXTINPUT, KM_ANY, KM_ANY, 0); // last!
@@ -507,6 +513,7 @@ static void text_main_region_draw(const bContext *C, ARegion *ar)
 	// UI_view2d_view_ortho(v2d);
 
 	/* data... */
+	text_hints_update(C, st, ar);  /* python answers for the hints (needs the context) */
 	draw_text_main(st, ar);
 	text_draw_floating_bar(C, ar);
 

@@ -1130,6 +1130,16 @@ typedef enum eSpaceText_Flags {
 	ST_MATCH_CASE           = (1 << 8),
 
 	ST_FIND_ACTIVATE		= (1 << 9),
+	/* Range: do NOT open the autocomplete list by itself while typing (bit off = live on, so old
+	 * files and new spaces get it; only Ctrl+Space when set). See text_autocomplete.c. */
+	ST_NO_LIVE_AUTOCOMPLETE	= (1 << 10),
+	/* Range: do NOT check the python text while typing (errors/warnings underlined), see
+	 * text_hints.c. Bit off = on, like the autocomplete. */
+	ST_NO_LIVE_DIAGNOSTICS	= (1 << 11),
+	/* Range: do NOT type the closing bracket/quote together with the opening one (text_ops.c) */
+	ST_NO_AUTO_CLOSE		= (1 << 12),
+	/* Range: do NOT highlight the other occurrences of the word under the cursor (text_hints.c) */
+	ST_NO_HIGHLIGHT_OCCURRENCES	= (1 << 13),
 } eSpaceText_Flags;
 
 /* SpaceText.findstr/replacestr */

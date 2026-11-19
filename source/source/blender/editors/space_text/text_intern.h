@@ -51,7 +51,7 @@ void text_update_cursor_moved(struct bContext *C);
 #define TEXTXLOC			(st->cwidth * st->linenrs_tot)
 
 #define SUGG_LIST_SIZE	7
-#define SUGG_LIST_WIDTH	20
+#define SUGG_LIST_WIDTH	28
 #define DOC_WIDTH		40
 #define DOC_HEIGHT		10
 
@@ -66,8 +66,28 @@ int text_get_char_pos(const struct SpaceText *st, const char *line, int cur);
 void text_drawcache_tag_update(struct SpaceText *st, int full);
 void text_free_caches(struct SpaceText *st);
 
-int text_do_suggest_select(struct SpaceText *st, struct ARegion *ar);
+int text_do_suggest_select(struct SpaceText *st, struct ARegion *ar, const int mval[2]);
 void text_pop_suggest_list(void);
+/* Rectangle of the suggestion list (same one for drawing and mouse picking): top-left corner
+ * x/y in region space (list grows down from y), box size and row height. False: not visible. */
+bool text_suggest_list_rect(const struct SpaceText *st, struct ARegion *ar,
+                            int *r_x, int *r_y, int *r_boxw, int *r_boxh, int *r_lheight);
+/* Called after the editor typed/deleted text: keeps the open list in sync, or opens it by itself
+ * (Autocomplete While Typing). inserted: the typed code point, 0 for a deletion. */
+void text_autocomplete_after_edit(struct bContext *C, unsigned int inserted);
+bool text_is_python(struct Text *text);
+bool text_autocomplete_list_from_python(int *r_generation);
+
+/* text_hints.c: live diagnostics + signature/documentation boxes */
+void text_hints_after_edit(struct bContext *C, struct SpaceText *st, struct Text *text, unsigned int inserted);
+void text_hints_update(const struct bContext *C, struct SpaceText *st, struct ARegion *ar);
+void text_hints_draw_diagnostics(const struct SpaceText *st, struct ARegion *ar);
+void text_hints_draw_popups(const struct SpaceText *st, struct ARegion *ar);
+void text_hints_draw_occurrences(struct SpaceText *st, struct ARegion *ar);
+void TEXT_OT_signature_help(struct wmOperatorType *ot);
+void TEXT_OT_hints_hide(struct wmOperatorType *ot);
+void TEXT_OT_format_code(struct wmOperatorType *ot);
+struct TextLine *text_draw_first_visible_line(const struct SpaceText *st, int *r_wrap_skip);
 
 int text_get_visible_lines(const struct SpaceText *st, struct ARegion *ar, const char *str);
 int text_get_span_wrap(const struct SpaceText *st, struct ARegion *ar, struct TextLine *from, struct TextLine *to);

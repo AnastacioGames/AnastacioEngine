@@ -2017,6 +2017,8 @@ static const EnumPropertyItem delete_type_items[] = {
 	{DEL_PREV_WORD, "PREVIOUS_WORD", 0, "Previous Word", ""},
 	{0, NULL, 0, NULL, NULL}};
 
+static void text_delete_auto_closed_pair(const SpaceText *st, Text *text, TextUndoBuf *utxt);
+
 static int text_delete_exec(bContext *C, wmOperator *op)
 {
 	SpaceText *st = CTX_wm_space_text(C);
@@ -2042,6 +2044,8 @@ static int text_delete_exec(bContext *C, wmOperator *op)
 		txt_backspace_word(text, utxt);
 	}
 	else if (type == DEL_PREV_CHAR) {
+
+		text_delete_auto_closed_pair(st, text, utxt);
 
 		if (text->flags & TXT_TABSTOSPACES) {
 			if (!txt_has_sel(text) && !txt_cursor_is_line_start(text)) {
@@ -2088,6 +2092,9 @@ static int text_delete_exec(bContext *C, wmOperator *op)
 	/* run the script while editing, evil but useful */
 	if (st->live_edit)
 		text_run_script(C, NULL);
+
+	/* an open code completion list follows the deletion */
+	text_autocomplete_after_edit(C, 0);
 
 	return OPERATOR_FINISHED;
 }
@@ -2921,6 +2928,130 @@ void TEXT_OT_line_number(wmOperatorType *ot)
 	ot->poll = text_region_edit_poll;
 }
 
+/******************* auto close brackets/quotes (Range) **********************/
+
+static char text_closing_pair(char c)
+{
+	switch (c) {
+		case '(': return ')';
+		case '[': return ']';
+		case '{': return '}';
+		case '"': return '"';
+		case '\'': return '\'';
+	}
+	return 0;
+}
+
+static bool text_char_is_ident(char c)
+{
+	return c == '_' || (c >= '0' && c <= '9') || (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+	       (unsigned char)c >= 0x80;
+}
+
+/* Syntax format of the character at a byte offset; 0 when unknown (the format is rebuilt at draw,
+ * an edit since then frees it) or out of the line. */
+static char text_format_at(const SpaceText *st, const TextLine *line, int byte)
+{
+	int fc;
+	if (!line->format || byte < 0 || byte >= line->len) return 0;
+	fc = text_format_index_from_byte(st, line->line, byte);
+	if (fc < 0 || fc >= (int)strlen(line->format)) return 0;
+	return line->format[fc];
+}
+
+static bool text_format_is_text(char fmt)
+{
+	return fmt == FMT_TYPE_STRING || fmt == FMT_TYPE_COMMENT;
+}
+
+/* The cursor sits inside a string or a comment (as far as the last draw knows). */
+static bool text_cursor_in_string_or_comment(SpaceText *st, Text *text)
+{
+	TextLine *line = text->curl;
+	const int c = text->curc;
+	char prev, next;
+	/* freed by an edit since the last draw (fast typing): rebuild it now */
+	if (!line->format && st->showsyntax) ED_text_format_get(text)->format_line(st, line, false);
+	prev = c > 0 ? text_format_at(st, line, c - 1) : 0;
+	next = c < line->len ? text_format_at(st, line, c) : 0;
+	if (prev == FMT_TYPE_COMMENT) return true;
+	return text_format_is_text(prev) && (c >= line->len || text_format_is_text(next));
+}
+
+/* A closing char may come right before: end of line, space or closing/separator punctuation. */
+static bool text_auto_close_fits_before(char next)
+{
+	return next == '\0' || next == ' ' || next == '\t' || strchr(")]}:,;", next);
+}
+
+/* A quote opens a string here: not glued to a name (except the r/b/f/u prefixes) and not right
+ * after the same quote (triple quotes are typed by hand) or a backslash. */
+static bool text_auto_close_quote_fits_after(const TextLine *line, int c, char quote)
+{
+	int k = c;
+	if (c > 0 && (line->line[c - 1] == quote || line->line[c - 1] == '\\')) return false;
+	while (k > 0 && c - k < 2 && strchr("rRbBfFuU", line->line[k - 1])) k--;
+	return k == 0 || !text_char_is_ident(line->line[k - 1]);
+}
+
+/* Typed key: steps over the closing char or types the pair. 0 when it is a plain insert. */
+static int text_insert_auto_close(bContext *C, const char *str)
+{
+	SpaceText *st = CTX_wm_space_text(C);
+	Text *text = CTX_data_edit_text(C);
+	TextLine *line;
+	char ch, close, next;
+	int c;
+
+	if (!st || !text || !text->curl || (st->flags & ST_NO_AUTO_CLOSE) || st->overwrite) return 0;
+	if (!str[0] || str[1] || txt_has_sel(text)) return 0;
+	ch = str[0];
+	line = text->curl;
+	c = text->curc;
+	next = c < line->len ? line->line[c] : '\0';
+
+	/* typing the closing char right before the same char: step past it */
+	if (strchr(")]}\"'", ch) && next == ch && !(c > 0 && line->line[c - 1] == '\\')) {
+		txt_move_right(text, false);
+		text_update_cursor_moved(C);
+		WM_event_add_notifier(C, NC_TEXT | ND_CURSOR, text);
+		text_autocomplete_after_edit(C, (unsigned int)ch);
+		return OPERATOR_FINISHED;
+	}
+
+	close = text_closing_pair(ch);
+	if (!close || !text_auto_close_fits_before(next) || text_cursor_in_string_or_comment(st, text)) return 0;
+	if ((ch == '"' || ch == '\'') && !text_auto_close_quote_fits_after(line, c, ch)) return 0;
+
+	text_drawcache_tag_update(st, 0);
+	{
+		TextUndoBuf *utxt = ED_text_undo_push_init(C);
+		txt_add_char(text, utxt, (unsigned int)ch);
+		txt_add_char(text, utxt, (unsigned int)close);
+		txt_move_left(text, false);
+	}
+	text_update_line_edited(text->curl);
+	text_update_cursor_moved(C);
+	WM_event_add_notifier(C, NC_TEXT | NA_EDITED, text);
+	if (st->live_edit) text_run_script(C, NULL);
+	text_autocomplete_after_edit(C, (unsigned int)ch);
+	return OPERATOR_FINISHED;
+}
+
+/* Backspace between an empty pair "(|)" also removes the closing char. */
+static void text_delete_auto_closed_pair(const SpaceText *st, Text *text, TextUndoBuf *utxt)
+{
+	const TextLine *line = text->curl;
+	const int c = text->curc;
+	char open;
+	if (!st || (st->flags & ST_NO_AUTO_CLOSE) || txt_has_sel(text) || c <= 0 || c >= line->len) return;
+	open = line->line[c - 1];
+	if (!text_closing_pair(open) || line->line[c] != text_closing_pair(open)) return;
+	/* ""|" is the end of a string next to another, not an empty pair */
+	if ((open == '"' || open == '\'') && c >= 2 && line->line[c - 2] == open) return;
+	txt_delete_char(text, utxt);
+}
+
 /******************* insert operator **********************/
 
 static int text_insert_exec(bContext *C, wmOperator *op)
@@ -2967,9 +3098,11 @@ static int text_insert_exec(bContext *C, wmOperator *op)
 static int text_insert_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 {
 	int ret;
+	bool typed = false;
 
 	// if (!RNA_struct_property_is_set(op->ptr, "text")) { /* always set from keymap XXX */
 	if (!RNA_string_length(op->ptr, "text")) {
+		typed = true;
 		/* if alt/ctrl/super are pressed pass through except for utf8 character event
 		 * (when input method are used for utf8 inputs, the user may assign key event
 		 * including alt/ctrl/super like ctrl+m to commit utf8 string.  in such case,
@@ -2994,11 +3127,34 @@ static int text_insert_invoke(bContext *C, wmOperator *op, const wmEvent *event)
 		}
 	}
 
+	/* only a key typed in the editor (not text passed by a script) closes brackets/quotes */
+	if (typed) {
+		char str[BLI_UTF8_MAX + 1];
+		if (RNA_string_length(op->ptr, "text") <= BLI_UTF8_MAX) {
+			RNA_string_get(op->ptr, "text", str);
+			ret = text_insert_auto_close(C, str);
+			if (ret) return ret;
+		}
+	}
+
 	ret = text_insert_exec(C, op);
 
 	/* run the script while editing, evil but useful */
 	if (ret == OPERATOR_FINISHED && CTX_wm_space_text(C)->live_edit)
 		text_run_script(C, NULL);
+
+	/* code completion: keep the open list in sync, or open it by itself (one typed character) */
+	if (ret == OPERATOR_FINISHED) {
+		char str[BLI_UTF8_MAX + 1];
+		unsigned int inserted = 0;
+		if (RNA_string_length(op->ptr, "text") <= BLI_UTF8_MAX) {
+			RNA_string_get(op->ptr, "text", str);
+			if (str[0] && (size_t)BLI_str_utf8_size_safe(str) == strlen(str)) {
+				inserted = BLI_str_utf8_as_unicode(str);
+			}
+		}
+		text_autocomplete_after_edit(C, inserted);
+	}
 
 	return ret;
 }

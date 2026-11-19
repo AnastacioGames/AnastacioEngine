@@ -717,6 +717,28 @@ static int text_get_visible_lines_no(const SpaceText *st, int lineno)
 	return drawcache->line_height[lineno];
 }
 
+/* First line drawn at the top of the view and how many of its wrapped rows are scrolled out
+ * above it: the same walk as draw_text_main (uses the draw cache, so call while drawing). */
+TextLine *text_draw_first_visible_line(const SpaceText *st, int *r_wrap_skip)
+{
+	TextLine *tmp = st->text ? st->text->lines.first : NULL;
+	int i, wraplinecount = 0;
+
+	*r_wrap_skip = 0;
+	for (i = 0; i < st->top && tmp; i++) {
+		if (st->wordwrap) {
+			const int lines = text_get_visible_lines_no(st, i);
+			if (wraplinecount + lines > st->top) {
+				*r_wrap_skip = st->top - wraplinecount;
+				break;
+			}
+			wraplinecount += lines;
+		}
+		tmp = tmp->next;
+	}
+	return tmp;
+}
+
 int text_get_visible_lines(const SpaceText *st, ARegion *ar, const char *str)
 {
 	int i, j, start, end, max, lines, chars;
@@ -1019,44 +1041,78 @@ static void draw_documentation(const SpaceText *st, ARegion *ar)
 
 /*********************** draw suggestion list *******************************/
 
-static void draw_suggestion_list(const SpaceText *st, const TextDrawContext *tdc, ARegion *ar)
+/* Rows the list shows: the matches, at most SUGG_LIST_SIZE (the box shrinks for short lists). */
+static int suggest_list_rows(void)
 {
-	SuggItem *item, *first, *last, *sel;
-	char str[SUGG_LIST_WIDTH * BLI_UTF8_MAX + 1];
-	int offl, offc, vcurl, vcurc;
-	int w, boxw = 0, boxh, i, x, y, *top;
+	SuggItem *item = texttool_suggest_first(), *last = texttool_suggest_last();
+	int rows = 0;
+	for (; item && rows < SUGG_LIST_SIZE; item = item->next) {
+		rows++;
+		if (item == last) break;
+	}
+	return rows;
+}
+
+bool text_suggest_list_rect(const SpaceText *st, ARegion *ar,
+                            int *r_x, int *r_y, int *r_boxw, int *r_boxh, int *r_lheight)
+{
+	int offl, offc, vcurl, vcurc, x, y, boxw, boxh, rows;
 	const int lheight = st->lheight_dpi + TXT_LINE_SPACING;
-	const int margin_x = 2;
+	const char *line;
+	int ident_start;
 
-	if (!st->text) return;
-	if (!texttool_text_is_active(st->text)) return;
-
-	first = texttool_suggest_first();
-	last = texttool_suggest_last();
-
-	if (!first || !last) return;
-
-	text_pop_suggest_list();
-	sel = texttool_suggest_selected();
-	top = texttool_suggest_top();
+	if (!st->text || !st->text->curl) return false;
+	if (!texttool_text_is_active(st->text)) return false;
+	if (!texttool_suggest_first() || !texttool_suggest_last()) return false;
+	rows = suggest_list_rows();
+	if (rows == 0) return false;
 
 	wrap_offset(st, ar, st->text->curl, st->text->curc, &offl, &offc);
 	vcurl = txt_get_span(st->text->lines.first, st->text->curl) - st->top + offl;
-	vcurc = text_get_char_pos(st, st->text->curl->line, st->text->curc) - st->left + offc;
+	line = st->text->curl->line;
+	ident_start = text_find_identifier_start(line, st->text->curc);
+	/* column of the start of the word being completed (columns, not bytes: utf8 safe), so the
+	 * suggestions line up with the typed text */
+	vcurc = text_get_char_pos(st, line, ident_start) - st->left + offc;
 
 	x = st->showlinenrs ? TXT_OFFSET + TEXTXLOC : TXT_OFFSET;
 	x += vcurc * st->cwidth - 4;
 	y = ar->winy - (vcurl + 1) * lheight - 2;
 
-	/* offset back so the start of the text lines up with the suggestions,
-	 * not essential but makes suggestions easier to follow */
-	x -= st->cwidth * (st->text->curc - text_find_identifier_start(st->text->curl->line, st->text->curc));
-
 	boxw = SUGG_LIST_WIDTH * st->cwidth + 20;
-	boxh = SUGG_LIST_SIZE * lheight + 8;
+	boxh = rows * lheight + 8;
 
 	if (x + boxw > ar->winx)
 		x = MAX2(0, ar->winx - boxw);
+	/* no room under the cursor line: open the list above it */
+	if (y - boxh < 0) {
+		const int y_above = ar->winy - vcurl * lheight + boxh + 2;
+		if (y_above <= ar->winy) y = y_above;
+	}
+
+	*r_x = x;
+	*r_y = y;
+	*r_boxw = boxw;
+	*r_boxh = boxh;
+	*r_lheight = lheight;
+	return true;
+}
+
+static void draw_suggestion_list(const SpaceText *st, const TextDrawContext *tdc, ARegion *ar)
+{
+	SuggItem *item, *first, *last, *sel;
+	char str[SUGG_LIST_WIDTH * BLI_UTF8_MAX + 1];
+	int boxw, boxh, lheight, i, x, y, *top;
+	const int margin_x = 2;
+
+	first = texttool_suggest_first();
+	last = texttool_suggest_last();
+
+	text_pop_suggest_list();
+	if (!text_suggest_list_rect(st, ar, &x, &y, &boxw, &boxh, &lheight)) return;
+
+	sel = texttool_suggest_selected();
+	top = texttool_suggest_top();
 
 	/* not needed but stands out nicer */
 	UI_draw_box_shadow(220, x, y - boxh, x + boxw, y);
@@ -1067,7 +1123,7 @@ static void draw_suggestion_list(const SpaceText *st, const TextDrawContext *tdc
 	glRecti(x, y, x + boxw, y - boxh);
 
 	/* Set the top 'item' of the visible list */
-	for (i = 0, item = first; i < *top && item->next; i++, item = item->next) ;
+	for (i = 0, item = first; i < *top && item->next && item != last; i++, item = item->next) ;
 
 	for (i = 0; i < SUGG_LIST_SIZE && item; i++, item = item->next) {
 		int len = txt_utf8_forward_columns(item->name, SUGG_LIST_WIDTH, NULL) - item->name;
@@ -1076,11 +1132,9 @@ static void draw_suggestion_list(const SpaceText *st, const TextDrawContext *tdc
 
 		BLI_strncpy(str, item->name, len + 1);
 
-		w = st->cwidth * text_get_char_pos(st, str, len);
-
 		if (item == sel) {
 			UI_ThemeColor(TH_SHADE2);
-			glRecti(x + margin_x, y - 3, x + margin_x + w, y + lheight - 3);
+			glRecti(x + margin_x, y - 3, x + boxw - margin_x, y + lheight - 3);
 		}
 
 		format_draw_color(item->type);
@@ -1432,6 +1486,9 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	y = ar->winy - st->lheight_dpi;
 	winx = ar->winx - TXT_SCROLL_WIDTH;
 
+	/* other places of the name under the cursor (under the selection and the cursor) */
+	text_hints_draw_occurrences(st, ar);
+
 	/* draw cursor */
 	draw_cursor(st, ar);
 
@@ -1470,6 +1527,8 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 		wrap_skip = 0;
 	}
 
+	text_hints_draw_diagnostics(st, ar);
+
 	if (st->flags & ST_SHOW_MARGIN) {
 		margin_column_x = x + st->cwidth * (st->margin_column - st->left);
 
@@ -1491,6 +1550,7 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	draw_textscroll(st, &scroll, &back);
 	/* draw_documentation(st, ar); - No longer supported */
 	draw_suggestion_list(st, &tdc, ar);
+	text_hints_draw_popups(st, ar);
 
 	text_font_end(&tdc);
 }

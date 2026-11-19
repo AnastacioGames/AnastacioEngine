@@ -1004,8 +1004,10 @@ void PyC_SetHomePath(const char *py_path_bundle)
 
 bool PyC_IsInterpreterActive(void)
 {
-	/* instead of PyThreadState_Get, which calls Py_FatalError */
-	return (PyThreadState_GetDict() != NULL);
+	/* Range: PyThreadState_GetDict() answers for whatever thread holds the GIL, so with a Python
+	 * thread running (Jedi warm-up) while an operator released the GIL, the main thread thought it
+	 * had the GIL and touched dicts without it (crash). Ask if *this* thread holds it. */
+	return PyGILState_Check() != 0;
 }
 
 /* Would be nice if python had this built in
