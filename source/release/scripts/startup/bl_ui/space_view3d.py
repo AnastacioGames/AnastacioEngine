@@ -3832,163 +3832,6 @@ class VIEW3D_PT_shading(Panel):
                 layout.prop(view, "show_occlude_wire")
 
 
-class VIEW3D_PT_camera_hud_base:
-    """Popovers do Camera HUD (barra no topo da viewport em vista de câmera)."""
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'HEADER'
-    bl_ui_units_x = 14
-
-    @classmethod
-    def poll(cls, context):
-        cam = context.space_data.camera
-        return cam is not None and cam.type == 'CAMERA'
-
-
-class VIEW3D_PT_camera_hud_lens(VIEW3D_PT_camera_hud_base, Panel):
-    bl_label = "Lens"
-
-    def draw(self, context):
-        layout = self.layout
-        cam = context.space_data.camera.data
-
-        row = layout.row()
-        row.prop_enum(cam, "type", 'PERSP')
-        row.prop_enum(cam, "type", 'ORTHO')
-
-        col = layout.column()
-        if cam.type == 'ORTHO':
-            col.prop(cam, "ortho_scale")
-        else:
-            row = col.row()
-            row.prop(cam, "angle" if cam.lens_unit == 'FOV' else "lens")
-            row.prop(cam, "lens_unit", text="")
-
-        row = layout.row(align=True)
-        row.prop(cam, "clip_start", text="Near")
-        row.prop(cam, "clip_end", text="Far")
-        row = layout.row(align=True)
-        row.prop(cam, "shift_x", text="Shift X")
-        row.prop(cam, "shift_y", text="Y")
-        row = layout.row(align=True)
-        row.prop(cam, "sensor_width", text="Sensor")
-        row.prop(cam, "sensor_fit", text="")
-
-
-class VIEW3D_PT_camera_hud_focus(VIEW3D_PT_camera_hud_base, Panel):
-    bl_label = "Focus"
-
-    def draw(self, context):
-        layout = self.layout
-        cam = context.space_data.camera.data
-        fx = cam.game_fx
-
-        layout.prop(fx, "focus_mode", expand=True)
-        if fx.focus_mode == 'MANUAL':
-            layout.prop(cam.gpu_dof, "focus_distance", text="Distance")
-        elif fx.focus_mode == 'OBJECT':
-            layout.prop(cam, "dof_object", text="Object")
-        elif fx.focus_mode == 'PROPERTY':
-            layout.prop(fx, "focus_property", text="Property")
-        else:
-            layout.prop(fx, "focus_screen")
-        row = layout.row(align=True)
-        row.prop(fx, "focus_range", text="Range")
-        row.prop(fx, "focus_smooth", text="Smooth")
-
-        layout.separator()
-        layout.label(text="Tracking")
-        layout.prop(fx, "track_mode", expand=True)
-        if fx.track_mode != 'OFF':
-            col = layout.column(align=True)
-            col.prop(fx, "track_speed")
-            col.prop(fx, "track_limit")
-            col.prop(fx, "track_deadzone")
-
-
-class VIEW3D_PT_camera_hud_effects(VIEW3D_PT_camera_hud_base, Panel):
-    bl_label = "Effects"
-
-    def draw(self, context):
-        layout = self.layout
-        view = context.space_data
-        cam = view.camera.data
-        fx = cam.game_fx
-        view_fx = view.fx_settings
-
-        layout.label(text="Depth of Field")
-        layout.prop(fx, "use_dof")
-        if fx.use_dof:
-            layout.prop(fx, "dof_quality", expand=True)
-            col = layout.column(align=True)
-            col.prop(fx, "dof_blur")
-            col.prop(cam.gpu_dof, "blades")
-
-        layout.prop(fx, "use_speed_blur")
-        if fx.use_speed_blur:
-            col = layout.column(align=True)
-            col.prop(fx, "speed_blur_strength")
-            col.prop(fx, "speed_blur_max_speed")
-        layout.prop(fx, "use_directional_blur")
-        if fx.use_directional_blur:
-            col = layout.column(align=True)
-            col.prop(fx, "directional_blur_strength")
-            col.prop(fx, "directional_blur_max")
-
-        layout.separator()
-        layout.label(text="Lens")
-        row = layout.row()
-        row.prop(fx, "use_cat_eye", text="Bokeh", toggle=True)
-        row.prop(fx, "use_chromatic", text="Aberration", toggle=True)
-        row.prop(fx, "use_vignette", text="Vignette", toggle=True)
-        if fx.use_chromatic:
-            layout.prop(fx, "chromatic_strength")
-        if fx.use_vignette:
-            col = layout.column(align=True)
-            col.prop(fx, "vignette_strength")
-            col.prop(fx, "vignette_radius")
-            col.prop(fx, "fisheye_strength")
-
-        layout.separator()
-        layout.label(text="Shake")
-        col = layout.column(align=True)
-        col.prop(fx, "shake_amplitude", text="Amplitude")
-        col.prop(fx, "shake_frequency", text="Frequency")
-
-        layout.separator()
-        layout.label(text="Preview in Viewport")
-        col = layout.column(align=True)
-        col.prop(view_fx, "use_camera_dof")
-        col.prop(view_fx, "use_camera_motion_blur")
-        col.prop(view_fx, "use_camera_lens")
-
-
-class VIEW3D_PT_camera_hud_display(VIEW3D_PT_camera_hud_base, Panel):
-    bl_label = "Display"
-
-    def draw(self, context):
-        layout = self.layout
-        cam = context.space_data.camera.data
-
-        row = layout.row()
-        row.prop(cam, "show_passepartout", text="Passepartout")
-        sub = row.row()
-        sub.active = cam.show_passepartout
-        sub.prop(cam, "passepartout_alpha", text="Alpha", slider=True)
-        layout.prop(cam, "show_safe_areas")
-        layout.prop_menu_enum(cam, "show_guide")
-        row = layout.row()
-        row.prop(cam, "show_limits", text="Limits")
-        row.prop(cam, "show_mist", text="Mist")
-        layout.prop(cam, "draw_size", text="Size")
-        view = context.space_data
-        layout.prop(view, "show_camera_hud", text="Camera HUD")
-        row = layout.row(align=True)
-        row.prop(view, "show_camera_hud_lens", text="Lens", toggle=True)
-        row.prop(view, "show_camera_hud_focus", text="Focus", toggle=True)
-        row.prop(view, "show_camera_hud_effects", text="Effects", toggle=True)
-        row.prop(view, "show_camera_hud_display", text="Display", toggle=True)
-
-
 class VIEW3D_PT_overlay(Panel):
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'HEADER'
@@ -4036,12 +3879,6 @@ class VIEW3D_PT_overlay(Panel):
         col.prop(prefs, "show_view_name", text="View Name")
         col.prop(view, "show_stats", text="Statistics")
         split.column().prop(prefs, "show_object_info", text="Object Info")
-        layout.prop(view, "show_camera_hud", text="Camera HUD")
-        row = layout.row(align=True)
-        row.prop(view, "show_camera_hud_lens", text="Lens", toggle=True)
-        row.prop(view, "show_camera_hud_focus", text="Focus", toggle=True)
-        row.prop(view, "show_camera_hud_effects", text="Effects", toggle=True)
-        row.prop(view, "show_camera_hud_display", text="Display", toggle=True)
 
         layout.separator()
 
@@ -4787,10 +4624,6 @@ classes = (
     VIEW3D_PT_game_layers,
     VIEW3D_OT_game_layers_unpin,
     VIEW3D_PT_shading,
-    VIEW3D_PT_camera_hud_lens,
-    VIEW3D_PT_camera_hud_focus,
-    VIEW3D_PT_camera_hud_effects,
-    VIEW3D_PT_camera_hud_display,
     VIEW3D_PT_overlay,
     VIEW3D_PT_gizmo,
     VIEW3D_PT_pivot_point,
