@@ -49,7 +49,12 @@ protected:
 	/// GHOST window.
 	GHOST_IWindow *m_window;
 
+	/// True when the window was created with the Borderless Window option: it stays at desktop size.
+	static bool s_lockWindowSize;
+
 public:
+	static void SetLockWindowSize(bool lock) { s_lockWindowSize = lock; }
+
 	GPG_Canvas(RAS_Rasterizer *rasty, const RAS_OffScreen::AttachmentList& attachments, GHOST_IWindow *window, int numSamples);
 	virtual ~GPG_Canvas();
 

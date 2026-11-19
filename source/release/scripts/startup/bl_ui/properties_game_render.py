@@ -352,7 +352,8 @@ class RENDER_PT_embedded(RenderButtonsPanel, Panel):
         row = box.row()
         row.label(text="Resolution:", icon="SCENE")
         row = box.row(align=True)
-        row.active = not_osx or not gs.show_fullscreen
+        # Borderless always uses the desktop resolution, so the menu is greyed out.
+        row.active = (not_osx or not gs.show_fullscreen) and not gs.borderless_window
         row.menu("RENDER_MT_game_res_player", text="{} x {}".format(gs.resolution_x, gs.resolution_y))
         col = box.column()
         if show_fullscreen:

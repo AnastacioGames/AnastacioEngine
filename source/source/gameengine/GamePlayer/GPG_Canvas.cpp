@@ -286,8 +286,14 @@ void GPG_Canvas::GetDisplayDimensions(int &width, int &height)
 	height = uiheight;
 }
 
+bool GPG_Canvas::s_lockWindowSize = false;
+
 void GPG_Canvas::ResizeWindow(int width, int height)
 {
+	/* Borderless Window option: the window always keeps the desktop size. */
+	if (s_lockWindowSize) {
+		return;
+	}
 	if (m_window->getState() == GHOST_kWindowStateMaximized) {
 		return;
 	}
@@ -314,6 +320,10 @@ void GPG_Canvas::ResizeWindow(int width, int height)
 
 void GPG_Canvas::SetFullScreen(bool enable)
 {
+	/* Borderless Window option: window mode is fixed, otherwise the frame would come back. */
+	if (s_lockWindowSize) {
+		return;
+	}
 	GHOST_ISystem *system = GHOST_ISystem::getSystem();
 	system->setFullScreen(enable, m_window);
 }

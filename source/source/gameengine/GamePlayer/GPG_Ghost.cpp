@@ -431,6 +431,8 @@ static GHOST_IWindow *startBorderlessWindow(GHOST_ISystem *system,
 		SetWindowLongPtr(ghost_hwnd, GWL_STYLE, style);
 		SetWindowPos(ghost_hwnd, HWND_TOP, 0, 0, (int)sysWidth, (int)sysHeight,
 		            SWP_NOZORDER | SWP_FRAMECHANGED);
+		/* Only where the frame was really removed: size and mode are then fixed. */
+		GPG_Canvas::SetLockWindowSize(true);
 	}
 #endif  // WIN32
 
