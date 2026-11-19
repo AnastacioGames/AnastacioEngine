@@ -1738,3 +1738,9 @@ EXP_PYMETHODDEF_DOC(KX_2DFilterManager, changeSSAOValues, "changeSSAOValues(enab
 }
 
 #endif  // WITH_PYTHON
+
+/* The 3D View's Game Preview > Camera DOF runs this same pass (view3d_draw.c). */
+extern "C" const char *KX_CameraDofPreviewShader(void)
+{
+	return datatoc_RAS_CameraDof2DFilter_glsl;
+}

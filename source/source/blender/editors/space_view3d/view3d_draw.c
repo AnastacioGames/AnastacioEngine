@@ -67,6 +67,7 @@
 #include "BKE_global.h"
 #include "BKE_paint.h"
 #include "BKE_scene.h"
+#include "BKE_property.h"
 #include "BKE_screen.h"
 #include "BKE_text.h"
 #include "BKE_unit.h"
@@ -3436,6 +3437,7 @@ static void view3d_fx_node_compositor(GPUFX *fx, Scene *scene, const GPUFXSettin
 
 /* RAS_2DFilterManager.h FILTERPASS_CAMERA_LENS: custom passes below it run before the lens. */
 #define VIEW3D_FX_FILTERPASS_CAMERA_LENS 23
+#define VIEW3D_FX_FILTERPASS_CAMERA_DOF 22
 
 typedef struct View3DFxFilter {
 	bActuator *act;
@@ -3452,10 +3454,18 @@ static int view3d_fx_filter_cmp(const void *a, const void *b)
 /* Game Preview > 2D Filters: the Custom Filter actuators of the scene's objects (a Text with the
  * shader) by pass number, with the owner's int/float/bool properties as uniforms at their start
  * values, like KX_2DFilter at the first frame. Filters added from Python are not known here. */
-static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *fx_settings)
+static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *fx_settings, GPUFXNodeStage *dof)
 {
 	View3DFxFilter found[GPU_FX_FILTER_MAX * 2];
 	int num_found = 0;
+
+	/* the game's DOF pass (act NULL): FILTERPASS_CAMERA_DOF, between the custom passes and the lens */
+	if (dof) {
+		found[0].act = NULL;
+		found[0].ob = NULL;
+		found[0].pass = VIEW3D_FX_FILTERPASS_CAMERA_DOF;
+		num_found = 1;
+	}
 
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_2D_FILTERS)) {
 		for (Base *base = scene->base.first; base; base = base->next) {
@@ -3467,6 +3477,10 @@ static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *f
 				/* the game keeps one filter per pass: the last one converted wins */
 				int k;
 				for (k = 0; k < num_found && found[k].pass != f->int_arg; k++) {}
+				if (k < num_found && !found[k].act) {
+					/* reserved for the DOF */
+					continue;
+				}
 				if (k == num_found) {
 					if (num_found == ARRAY_SIZE(found)) {
 						continue;
@@ -3484,8 +3498,13 @@ static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *f
 	GPUFXNodeStage *stages = num_found ? MEM_callocN(sizeof(*stages) * num_found, __func__) : NULL;
 	int num_before = 0;
 	for (int i = 0; i < num_found; i++) {
-		const bTwoDFilterActuator *f = found[i].act->data;
 		GPUFXNodeStage *st = &stages[i];
+		if (!found[i].act) {
+			*st = *dof;
+			num_before++;
+			continue;
+		}
+		const bTwoDFilterActuator *f = found[i].act->data;
 		st->shader = txt_to_buf(f->text);
 		if (!st->shader) {
 			st->shader = BLI_strdup("");
@@ -3520,6 +3539,124 @@ static void view3d_fx_2d_filters(GPUFX *fx, Scene *scene, const GPUFXSettings *f
 	GPU_fx_compositor_set_filter_stages(fx, stages, num_found, num_before);
 }
 
+#ifdef WITH_GAMEENGINE
+/* KX_2DFilterManager.cpp: the text of the game's DOF pass (RAS_CameraDof2DFilter.glsl). */
+extern const char *KX_CameraDofPreviewShader(void);
+#endif
+
+/* Distance along the camera axis to the nearest object (not the camera) whose bool/int/float
+ * property `name` is not zero, like KX_Camera::FindPropertyFocus; false when there is none. */
+static bool view3d_fx_dof_property_focus(Scene *scene, Object *camera, const char *name, const float fwd[3],
+                                         float *r_dist)
+{
+	float best = FLT_MAX;
+	bool found = false;
+	for (Base *base = scene->base.first; base; base = base->next) {
+		Object *ob = base->object;
+		/* the game searches the active objects: those on the scene's visible layers */
+		bProperty *prop = (ob != camera && (base->lay & scene->lay)) ? BKE_bproperty_object_get(ob, name) : NULL;
+		if (!prop || !ELEM(prop->type, GPROP_BOOL, GPROP_INT, GPROP_FLOAT) ||
+		    (prop->type == GPROP_FLOAT ? *(float *)&prop->data == 0.0f : prop->data == 0))
+		{
+			continue;
+		}
+		const float d2 = len_squared_v3v3(ob->obmat[3], camera->obmat[3]);
+		if (d2 < best) {
+			float rel[3];
+			best = d2;
+			sub_v3_v3v3(rel, ob->obmat[3], camera->obmat[3]);
+			*r_dist = dot_v3v3(rel, fwd);
+			found = true;
+		}
+	}
+	return found;
+}
+
+/* Game Preview > Camera DOF: the game's DOF pass (KX_2DFilterManager::UpdateCameraFX) with the
+ * camera at rest. The focus is Manual's distance, the DOF Object or the Property object's; Auto
+ * has no physics ray here and uses the manual distance, as the game does before its first hit.
+ * The full resolution gather of the web build (no half resolution passes). Camera view only. */
+static bool view3d_fx_camera_dof(Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d, bool offscreen,
+                                 GPUFXNodeStage *r_stage)
+{
+#ifdef WITH_GAMEENGINE
+	Object *ob = v3d->camera;
+	if (rv3d->persp != RV3D_CAMOB || !ob || ob->type != OB_CAMERA) {
+		return false;
+	}
+	const Camera *ca = ob->data;
+	const CameraGameFX *gfx = &ca->gamefx;
+	if (!(gfx->flag & CAM_GFX_DOF) || gfx->dof_blur <= 0.0f) {
+		return false;
+	}
+
+	float fwd[3], focus = ca->gpu_dof.focus_distance;
+	normalize_v3_v3(fwd, ob->obmat[2]);
+	negate_v3(fwd);
+	if (gfx->focus_mode == CAM_FOCUS_OBJECT && ca->dof_ob) {
+		float rel[3];
+		sub_v3_v3v3(rel, ca->dof_ob->obmat[3], ob->obmat[3]);
+		focus = dot_v3v3(rel, fwd);
+	}
+	else if (gfx->focus_mode == CAM_FOCUS_PROPERTY && gfx->focus_prop[0]) {
+		view3d_fx_dof_property_focus(scene, ob, gfx->focus_prop, fwd, &focus);
+	}
+	focus = max_ff(focus, ca->clipsta);
+
+	/* The blur radius is in game pixels: scale it to the camera frame on screen. */
+	float scale = 1.0f;
+	float frame[4] = {0.0f, 0.0f, 1.0f, 1.0f};
+	if (!offscreen) {
+		rctf border;
+		const float res_x = (float)(scene->r.xsch * scene->r.size) / 100.0f;
+		const float reg_x = max_ff((float)ar->winx, 1.0f), reg_y = max_ff((float)ar->winy, 1.0f);
+		ED_view3d_calc_camera_border(scene, ar, v3d, rv3d, &border, false);
+		if (res_x > 0.0f) {
+			scale = BLI_rctf_size_x(&border) / res_x;
+		}
+		/* the camera frame in the region, in uv: the cat eye centers on it, not on the region */
+		frame[0] = border.xmin / reg_x;
+		frame[1] = border.ymin / reg_y;
+		frame[2] = max_ff(BLI_rctf_size_x(&border) / reg_x, 1e-3f);
+		frame[3] = max_ff(BLI_rctf_size_y(&border) / reg_y, 1e-3f);
+	}
+
+	static const float rings[3] = {2.0f, 3.0f, 5.0f};
+	float fx[24] = {0.0f};
+	fx[0] = focus;
+	fx[1] = gfx->focus_range;
+	fx[2] = ca->clipsta;
+	fx[3] = ca->clipend;
+	fx[4] = gfx->dof_blur * scale;
+	fx[5] = rings[CLAMPIS(gfx->dof_quality, 0, 2)];
+	fx[6] = (gfx->flag & CAM_GFX_CATEYE_BOKEH) ? gfx->cateye_strength : 0.0f;
+	fx[7] = (ca->type == CAM_ORTHO) ? 0.0f : 1.0f;
+	fx[9] = 0.5f;
+	fx[10] = 0.5f;
+	fx[20] = (float)ca->gpu_dof.num_blades;
+
+	memset(r_stage, 0, sizeof(*r_stage));
+	/* GLSL 1.20 here (the game compiles it as 3.30) */
+	r_stage->shader = BLI_sprintfN("#define texture texture2D\n#define DOF_PREVIEW_FRAME\n%s",
+	                               KX_CameraDofPreviewShader());
+	r_stage->uniforms = MEM_callocN(sizeof(*r_stage->uniforms) * 7, __func__);
+	r_stage->num_uniforms = 7;
+	BLI_strncpy(r_stage->uniforms[6].name, "dof_frame", sizeof(r_stage->uniforms[6].name));
+	r_stage->uniforms[6].size = 4;
+	copy_v4_v4(r_stage->uniforms[6].value, frame);
+	for (int k = 0; k < 6; k++) {
+		GPUFXNodeUniform *u = &r_stage->uniforms[k];
+		BLI_snprintf(u->name, sizeof(u->name), "ge_CameraFX[%d]", k);
+		u->size = 4;
+		copy_v4_v4(u->value, &fx[k * 4]);
+	}
+	return true;
+#else
+	UNUSED_VARS(scene, ar, v3d, rv3d, offscreen, r_stage);
+	return false;
+#endif
+}
+
 static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d,
                                   const GPUFXSettings *fx_settings, bool offscreen)
 {
@@ -3528,7 +3665,10 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 		return;
 	}
 	view3d_fx_node_compositor(fx, scene, fx_settings);
-	view3d_fx_2d_filters(fx, scene, fx_settings);
+	GPUFXNodeStage dof;
+	const bool use_dof = fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_DOF) &&
+	                     view3d_fx_camera_dof(scene, ar, v3d, rv3d, offscreen, &dof);
+	view3d_fx_2d_filters(fx, scene, fx_settings, use_dof ? &dof : NULL);
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_LENS) &&
 	    rv3d->persp == RV3D_CAMOB && BKE_camera_lens_preview_params(v3d->camera, params))
 	{

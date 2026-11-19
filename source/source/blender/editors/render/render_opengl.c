@@ -678,7 +678,7 @@ static bool screen_opengl_render_init(bContext *C, wmOperator *op)
 		oglrender->scene->customdata_mask |= oglrender->scene->customdata_mask_modal;
 
 		if (oglrender->v3d->fx_settings.fx_flag & (GPU_FX_FLAG_DOF | GPU_FX_FLAG_CAMERA_LENS | GPU_FX_FLAG_NODE_COMPOSITOR |
-		                                              GPU_FX_FLAG_2D_FILTERS)) {
+		                                              GPU_FX_FLAG_2D_FILTERS | GPU_FX_FLAG_CAMERA_DOF)) {
 			oglrender->fx = GPU_fx_compositor_create();
 		}
 	}

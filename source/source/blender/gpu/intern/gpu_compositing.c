@@ -851,7 +851,7 @@ bool GPU_fx_compositor_initialize_passes(
 	 * (camera view and a lens that does something), never on the View3D toggle alone. */
 	fx_flag &= ~GPU_FX_FLAG_CAMERA_LENS;
 	/* Same for the compositor preview: on only with stages that compiled. */
-	fx_flag &= ~(GPU_FX_FLAG_NODE_COMPOSITOR | GPU_FX_FLAG_2D_FILTERS);
+	fx_flag &= ~(GPU_FX_FLAG_NODE_COMPOSITOR | GPU_FX_FLAG_2D_FILTERS | GPU_FX_FLAG_CAMERA_DOF);
 
 	if (!scenefx_settings->bloom || !(scene->scenefx_settings.editor_render_flag & SCENE_FX_FLAG_BLOOM)) {
 		scenefx_flag &= ~SCENE_FX_FLAG_BLOOM;

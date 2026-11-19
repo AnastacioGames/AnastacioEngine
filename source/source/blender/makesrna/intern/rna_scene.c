@@ -5707,6 +5707,13 @@ static void rna_def_gpu_fx(BlenderRNA *brna)
 	                         "Show the Custom Filter actuators of the scene's objects with their properties "
 	                         "as they start in the game (filters added by Python are not shown)");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "use_camera_dof", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "fx_flag", GPU_FX_FLAG_CAMERA_DOF);
+	RNA_def_property_ui_text(prop, "Camera DOF",
+	                         "Show the active camera's Depth of Field (Camera > Game FX) in camera view as the "
+	                         "game draws it at rest (Auto focus uses the manual distance)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_scene_gpu_bloom_fx(BlenderRNA *brna)

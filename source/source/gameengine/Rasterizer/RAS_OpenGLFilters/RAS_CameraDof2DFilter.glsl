@@ -26,6 +26,10 @@ uniform sampler2D dof_half;
 /* Reduction (DOF_REDUCE, half resolution, runs before the gather): rgb = 2x2 average of the color,
  * a = circle of confusion (0..1). The gather reads only this texture, one fetch per sample. */
 uniform sampler2D dof_reduce;
+#ifdef DOF_PREVIEW_FRAME
+/* 3D View preview: the camera frame inside the region (x, y, w, h in uv) for the cat eye center. */
+uniform vec4 dof_frame;
+#endif
 
 float linearDepth(vec2 uv)
 {
@@ -109,7 +113,12 @@ void main()
 
 	float aspect = bgl_RenderedTextureWidth / bgl_RenderedTextureHeight;
 	// Cat eye: the aperture is clipped by a disc pushed toward the frame center.
+#ifdef DOF_PREVIEW_FRAME
+	aspect *= dof_frame.z / dof_frame.w;
+	vec2 fromCenter = ((uv - dof_frame.xy) / dof_frame.zw - 0.5) * vec2(aspect, 1.0);
+#else
 	vec2 fromCenter = (uv - 0.5) * vec2(aspect, 1.0);
+#endif
 	float catEye = ge_CameraFX[1].z;
 
 	int rings = int(ge_CameraFX[1].y);
