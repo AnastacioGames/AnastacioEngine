@@ -40,6 +40,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
 
 #include "DNA_node_types.h"
 #include "DNA_scene_types.h"
@@ -56,8 +57,11 @@ extern "C" {
 
 extern "C" {
 #include "GPU_extensions.h"
+#include "GPU_compositing.h"
 }
 }
+
+#include "MEM_guardedalloc.h"
 
 namespace {
 
@@ -1672,4 +1676,40 @@ std::vector<KX_CompositorStage> KX_BuildCompositorShaders(Scene *scene, std::vec
 		}
 	}
 	return stages;
+}
+
+extern "C" int KX_CompositorBuildPreviewStages(Scene *scene, GPUFXNodeStage **r_stages)
+{
+	*r_stages = nullptr;
+	std::vector<std::string> skipped;
+	const std::vector<KX_CompositorStage> stages = KX_BuildCompositorShaders(scene, skipped);
+	if (stages.empty() || stages.size() > (size_t)GPU_FX_NODE_MAX_CACHES + 1) {
+		return 0;
+	}
+	GPUFXNodeStage *out = (GPUFXNodeStage *)MEM_callocN(sizeof(GPUFXNodeStage) * stages.size(), __func__);
+	for (size_t i = 0; i < stages.size(); ++i) {
+		const KX_CompositorStage& st = stages[i];
+		GPUFXNodeStage& o = out[i];
+		o.shader = (char *)MEM_mallocN(st.shader.size() + 1, __func__);
+		memcpy(o.shader, st.shader.c_str(), st.shader.size() + 1);
+		o.num_caches = std::min((int)st.caches.size(), GPU_FX_NODE_MAX_CACHES);
+		for (int k = 0; k < o.num_caches; ++k) {
+			o.caches[k] = st.caches[k];
+		}
+		o.mipmap = st.mipmap;
+		o.num_uniforms = (int)st.uniforms.size();
+		if (o.num_uniforms) {
+			o.uniforms = (GPUFXNodeUniform *)MEM_callocN(sizeof(GPUFXNodeUniform) * o.num_uniforms, __func__);
+			for (int u = 0; u < o.num_uniforms; ++u) {
+				const KX_CompositorUniform& cu = st.uniforms[u];
+				snprintf(o.uniforms[u].name, sizeof(o.uniforms[u].name), "%s", cu.name.c_str());
+				o.uniforms[u].size = std::min((int)cu.values.size(), 4);
+				for (int c = 0; c < o.uniforms[u].size; ++c) {
+					o.uniforms[u].value[c] = cu.values[c];
+				}
+			}
+		}
+	}
+	*r_stages = out;
+	return (int)stages.size();
 }

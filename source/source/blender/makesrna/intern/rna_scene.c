@@ -5693,6 +5693,13 @@ static void rna_def_gpu_fx(BlenderRNA *brna)
 	                         "Show the active camera's Chromatic Aberration, Vignette and Fisheye "
 	                         "(Camera > Game FX) in camera view, as in the game at rest");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+
+	prop = RNA_def_property(srna, "use_game_compositor", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "fx_flag", GPU_FX_FLAG_NODE_COMPOSITOR);
+	RNA_def_property_ui_text(prop, "Compositing",
+	                         "Show the scene's compositor nodes (Use Nodes) as the game runs them, "
+	                         "only the nodes the game supports");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
 }
 
 static void rna_def_scene_gpu_bloom_fx(BlenderRNA *brna)

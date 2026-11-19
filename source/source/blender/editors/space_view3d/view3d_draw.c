@@ -3409,6 +3409,27 @@ static void view3d_main_region_clear(Scene *scene, View3D *v3d, ARegion *ar)
 
 /* Camera > Game FX lens preview (View3D > Game Preview > Camera Lens): only in camera view,
  * like the depth of field preview. */
+#ifdef WITH_GAMEENGINE
+/* KX_CompositorFilter.cpp: the game's compositor shaders as C structs (MEM_ allocated). */
+extern int KX_CompositorBuildPreviewStages(Scene *scene, GPUFXNodeStage **r_stages);
+#endif
+
+/* Game Preview > Compositing: the scene's compositor nodes as the game runs them, rebuilt every
+ * redraw (cheap text generation; the compositor only recompiles when a shader text changes). */
+static void view3d_fx_node_compositor(GPUFX *fx, Scene *scene, const GPUFXSettings *fx_settings)
+{
+	GPUFXNodeStage *stages = NULL;
+	int num = 0;
+#ifdef WITH_GAMEENGINE
+	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_NODE_COMPOSITOR)) {
+		num = KX_CompositorBuildPreviewStages(scene, &stages);
+	}
+#else
+	UNUSED_VARS(scene, fx_settings);
+#endif
+	GPU_fx_compositor_set_node_stages(fx, stages, num);
+}
+
 static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *v3d, RegionView3D *rv3d,
                                   const GPUFXSettings *fx_settings, bool offscreen)
 {
@@ -3416,6 +3437,7 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 	if (!fx) {
 		return;
 	}
+	view3d_fx_node_compositor(fx, scene, fx_settings);
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_LENS) &&
 	    rv3d->persp == RV3D_CAMOB && BKE_camera_lens_preview_params(v3d->camera, params))
 	{

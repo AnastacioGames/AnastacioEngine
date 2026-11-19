@@ -98,6 +98,29 @@ void GPU_fx_compositor_destroy(GPUFX *fx);
  * frame = camera frame in the buffer in pixels: x min, y min, width, height (NULL = whole buffer). */
 void GPU_fx_compositor_set_camera_lens(GPUFX *fx, const float params[4], const float frame[4]);
 
+/* Preview of the game's compositor (KX_BuildCompositorShaders): one fragment shader per stage.
+ * All but the last draw into texture "comp_cache<i>"; the last draws the frame. */
+#define GPU_FX_NODE_MAX_CACHES 8
+typedef struct GPUFXNodeUniform {
+	char name[64];
+	int size;  /* 1 (Value) or 4 (RGB) */
+	float value[4];
+} GPUFXNodeUniform;
+
+typedef struct GPUFXNodeStage {
+	char *shader;
+	int caches[GPU_FX_NODE_MAX_CACHES];  /* earlier stages this one samples, unit = position */
+	int num_caches;
+	bool mipmap;
+	GPUFXNodeUniform *uniforms;
+	int num_uniforms;
+} GPUFXNodeStage;
+
+/* Takes ownership of \a stages (MEM_ allocated, shader and uniforms too); NULL / 0 turns it off.
+ * Shaders are rebuilt only when their text changes; uniform values are taken every call. */
+void GPU_fx_compositor_set_node_stages(GPUFX *fx, GPUFXNodeStage *stages, int num_stages);
+void GPU_fx_node_stages_free(GPUFXNodeStage *stages, int num_stages);
+
 bool GPU_fx_compositor_initialize_passes(
         struct Scene *scene, GPUFX *fx, const struct rcti *rect, const struct rcti *scissor_rect,
         const struct GPUFXSettings *fx_settings);

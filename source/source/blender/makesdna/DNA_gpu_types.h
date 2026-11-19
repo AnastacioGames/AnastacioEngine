@@ -45,6 +45,8 @@ typedef enum eGPUFXFlags {
 	GPU_FX_FLAG_DOF         = (1 << 0),
 	/* preview of the active camera's Game FX lens: chromatic aberration, vignette, fisheye */
 	GPU_FX_FLAG_CAMERA_LENS = (1 << 1),
+	/* preview of the scene's compositor nodes as the game runs them (Compositing in the game) */
+	GPU_FX_FLAG_NODE_COMPOSITOR = (1 << 2),
 } eGPUFXFlags;
 
 #endif  /* __DNA_GPU_TYPES_H__ */
