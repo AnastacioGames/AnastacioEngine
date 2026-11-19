@@ -729,6 +729,26 @@ def ssgi_luz(t):
     return t
 
 
+def editor_texto_codigo(t):
+    t = Tela((222, 232, 246), (196, 212, 236))
+    # janela de código escura com linhas coloridas
+    t.ret(50, 40, 470, 320, (40, 44, 56), 14, TINTA, 4)
+    t.ret(50, 40, 470, 76, (60, 66, 82), 14)
+    for i, (x, w, cor) in enumerate(((80, 200, (120, 170, 240)), (80, 260, (210, 210, 220)),
+                                     (80, 180, (210, 210, 220)), (110, 150, (240, 190, 100)),
+                                     (80, 230, (130, 200, 140)))):
+        t.ret(x, 100 + i * 40, x + w, 112 + i * 40, cor, 6)
+    # erro ao vivo: linha ondulada vermelha sob a 3a linha
+    t.linha([(80 + i * 10, 192 + (4 if i % 2 else 0)) for i in range(19)], VERMELHO, 3)
+    # lista do autocompletar
+    t.ret(250, 150, 430, 280, BRANCO, 8, TINTA, 3)
+    t.ret(254, 154, 426, 186, (72, 136, 220), 6)
+    for i in range(3):
+        t.ret(266, 196 + i * 28, 266 + (130 - i * 20), 206 + i * 28, (110, 116, 140), 5)
+    t.cubo(545, 190, 48)
+    return t
+
+
 def texto_caixa_dialogo(t):
     t = Tela((236, 230, 250), (216, 206, 240))
     t.cubo(150, 100, 46)
@@ -816,7 +836,7 @@ def video_player(t):
 
 CAPAS = {f.__name__: f for f in [basico_interface, basico_transformar, basico_primeiro_jogo] + [
     camera_foco, casas_brasileiras, ceu_entardecer, chuva_nevoa, compositing_efeitos, cutscene_abertura, decimate_hq,
-    destruicao_bomba, exportar_desktop, exportar_web, glsl_node, lod_automatico, logica_andar, logica_arvore_andar,
+    destruicao_bomba, editor_texto_codigo, exportar_desktop, exportar_web, glsl_node, lod_automatico, logica_andar, logica_arvore_andar,
     material_atlas_paleta, microfone_pular, mind_map_barra, minimap_radar, occlusion_culling, performance_medir,
     personagem_postura, probe_volume_luz, rec_play_gravar, screencast_gravar, shader_preset, smart_wizard_girador,
     som_world_sound, sombra_realista, ssgi_luz, texto_caixa_dialogo, track_pista, ui_tree_hud, ui_tree_menu,

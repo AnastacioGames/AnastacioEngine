@@ -353,6 +353,8 @@ class TEXT_PT_properties(Panel):
         col.prop(st, "use_live_diagnostics")
         col.prop(st, "use_auto_close")
         col.prop(st, "use_highlight_occurrences")
+        col.prop(st, "use_indent_guides")
+        col.prop(st, "show_whitespace")
         if hasattr(context.scene, "range_text_auto_reload"):
             col.prop(context.scene, "range_text_auto_reload")
         if hasattr(context.window_manager, "range_external_editor"):

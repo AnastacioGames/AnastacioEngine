@@ -394,3 +394,24 @@ SOLUCOES = {
         JOGO,
     ],
 }
+
+# Text Editor: contexto com o texto aberto (os operadores text.* pedem edit_text).
+_TXT = "o = ov('TEXT_EDITOR'); o['edit_text'] = area('TEXT_EDITOR').spaces.active.text; "
+SOLUCOES["editor_texto_codigo"] = [
+    # pasta nova do aluno: sem typings/ de uma rodada anterior (a pasta temporária do revisor é sempre a mesma)
+    "salvar(); import shutil; shutil.rmtree(os.path.join(os.path.dirname(D.filepath), 'typings'), True)",
+    "trocar_baixo('TEXT_EDITOR')",
+    "bpy.ops.text.new(ov('TEXT_EDITOR'))",
+    # o snippet chama text.insert por dentro, que não herda o contexto do override: escreve o mesmo texto
+    "import text_code_tools as t; area('TEXT_EDITOR').spaces.active.text.write("
+    "next(s[3] for s in t.SNIPPETS if s[0] == 'SCRIPT').replace('$0', ''))",
+    _TXT + "bpy.ops.text.insert(o, text='own.worldPosition.z += 0.01\\n')",
+    _TXT + "bpy.ops.text.insert(o, text='print(own.name)\\n')",
+    NADA,  # erro ao vivo: só olhar e corrigir (avanço manual)
+    _TXT + "bpy.ops.text.insert(o, text='speed=5\\n'); bpy.ops.text.format_code(o)",
+    "bpy.ops.text.properties(ov('TEXT_EDITOR'))",
+    _TXT + "bpy.ops.text.install_vscode_stubs(o)",
+    # o aluno clica em Open in External Editor; aqui só o salvar ao lado do .range (sem abrir o VS Code)
+    _TXT + "bpy.ops.text.save_as(o, filepath=os.path.join(os.path.dirname(D.filepath), 'Text.py'), "
+    "check_existing=False)",
+]

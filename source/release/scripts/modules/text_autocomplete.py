@@ -382,16 +382,25 @@ def _expr_antes_do_ponto(antes):
     return expr
 
 
+_cache_imports = {}
+
+
 class _Contexto:
     def __init__(self, linhas, linha_cursor):
         self.linhas = linhas
         self.cursor = linha_cursor
         self.nomes_import = {}   # nome local -> coisa
         self.resolvendo = set()
-        self._ler_imports()
+        # roda a cada tecla: as mesmas linhas de import dao o mesmo resultado
+        chave = tuple(l for l in linhas if "import" in l)
+        if _cache_imports.get("chave") != chave:
+            self._ler_imports(chave)
+            _cache_imports.update(chave=chave, nomes=dict(self.nomes_import))
+        else:
+            self.nomes_import = dict(_cache_imports["nomes"])
 
-    def _ler_imports(self):
-        for linha in self.linhas:
+    def _ler_imports(self, linhas_import):
+        for linha in linhas_import:
             cod = _parte_codigo(linha)[0]
             m = RE_FROM.match(cod)
             if m:
@@ -1089,6 +1098,8 @@ def assinatura(linha_idx, col_bytes):
     return assinatura_texto(texto, linha_idx, col, _caminho_texto(text))
 
 
+import threading
+
 # -- diagnosticos -----------------------------------------------------------------
 
 ERROS_PYFLAKES = {
@@ -1215,7 +1226,29 @@ def diagnosticos():
     if text is None:
         return "SKIP"
     _jedi_aquecer()  # um script python aberto: o Jedi carrega enquanto a pessoa le
-    return diagnosticos_texto(text.as_string(), text.name)
+    texto, nome = text.as_string(), text.name
+    chave = (nome, texto)
+    pronto = _diag.get("pronto")
+    if pronto and pronto[0] == chave:
+        return pronto[1]
+    if _diag.get("rodando"):
+        return "WAIT"  # o C volta a perguntar no proximo timer
+    # 70-200 ms de pyflakes: numa thread, a digitacao nao espera (o GIL e solto entre as
+    # chamadas do C; o desenho do editor so pega o resultado quando fica pronto)
+    _diag["rodando"] = True
+
+    def corpo():
+        try:
+            r = diagnosticos_texto(texto, nome)
+        except Exception:
+            r = "OK"
+        _diag["pronto"] = (chave, r)
+        _diag["rodando"] = False
+    threading.Thread(target=corpo, name="text_diagnosticos", daemon=True).start()
+    return "WAIT"
+
+
+_diag = {"pronto": None, "rodando": False}
 
 
 # -- Jedi (inferencia de verdade) ---------------------------------------------------

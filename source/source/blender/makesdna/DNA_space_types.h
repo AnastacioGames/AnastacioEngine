@@ -1140,6 +1140,10 @@ typedef enum eSpaceText_Flags {
 	ST_NO_AUTO_CLOSE		= (1 << 12),
 	/* Range: do NOT highlight the other occurrences of the word under the cursor (text_hints.c) */
 	ST_NO_HIGHLIGHT_OCCURRENCES	= (1 << 13),
+	/* Range: do NOT draw the indentation guides (bit off = on) */
+	ST_NO_INDENT_GUIDES		= (1 << 14),
+	/* Range: show spaces as dots and tabs as arrows */
+	ST_SHOW_WHITESPACE		= (1 << 15),
 } eSpaceText_Flags;
 
 /* SpaceText.findstr/replacestr */

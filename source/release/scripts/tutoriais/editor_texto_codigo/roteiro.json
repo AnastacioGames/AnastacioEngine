@@ -1,0 +1,234 @@
+{
+  "titulo": {
+    "pt": "36. Escrever scripts no Text Editor (autocompletar, erros, VS Code)",
+    "en": "36. Write scripts in the Text Editor (autocomplete, errors, VS Code)",
+    "es": "36. Escribir scripts en el Text Editor (autocompletar, errores, VS Code)"
+  },
+  "categoria": "Text Editor",
+  "resumo": {
+    "pt": "Snippets, autocompletar da API do jogo, erros ao vivo, Format Code, Outline e o VS Code.",
+    "en": "Snippets, game API autocomplete, live errors, Format Code, Outline and VS Code.",
+    "es": "Snippets, autocompletar de la API del juego, errores en vivo, Format Code, Outline y VS Code."
+  },
+  "abertura": {
+    "pt": "Vamos escrever um script do jogo com a ajuda do Text Editor: ele completa, avisa erros e arruma o código.",
+    "en": "Let's write a game script with help from the Text Editor: it completes, warns about errors and tidies the code.",
+    "es": "Vamos a escribir un script del juego con ayuda del Text Editor: completa, avisa de errores y ordena el código."
+  },
+  "passos": [
+    {
+      "texto": {
+        "pt": "Salve o projeto numa pasta sua: File › Save As (Shift+Ctrl+S). Os scripts e as dicas do VS Code ficam ao lado do .range.",
+        "en": "Save the project in a folder of yours: File › Save As (Shift+Ctrl+S). Scripts and VS Code hints go next to the .range.",
+        "es": "Guarda el proyecto en una carpeta tuya: File › Save As (Shift+Ctrl+S). Los scripts y las ayudas de VS Code quedan junto al .range."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "bool(D.filepath) and not D.is_dirty and not __import__('os').path.normcase(D.filepath).startswith(__import__('os').path.normcase(bpy.app.tempdir))"
+      },
+      "destaque": "VIEW_3D",
+      "alvo": null
+    },
+    {
+      "texto": {
+        "pt": "Troque a área de baixo para Text Editor.",
+        "en": "Change the bottom area to Text Editor.",
+        "es": "Cambia el área de abajo a Text Editor."
+      },
+      "narracao": "",
+      "checagem": {
+        "area": "TEXT_EDITOR"
+      },
+      "destaque": "BAIXO",
+      "alvo": {
+        "area": "BAIXO",
+        "regiao": "HEADER",
+        "botao": "tip:Change editor type",
+        "menu": "Text Editor"
+      },
+      "dica": {
+        "pt": "Área pequena? Passe o mouse nela e aperte Ctrl+Espaço para ocupar a tela toda.",
+        "en": "Area too small? Hover it and press Ctrl+Space to make it fill the screen.",
+        "es": "¿Área pequeña? Pasa el ratón sobre ella y pulsa Ctrl+Espacio para ocupar toda la pantalla."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique em New no cabeçalho do Text Editor: nasce um texto vazio.",
+        "en": "Click New in the Text Editor header: an empty text is created.",
+        "es": "Haz clic en New en la cabecera del Text Editor: nace un texto vacío."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'TEXT_EDITOR' and a.spaces.active.text is not None for a in C.screen.areas)"
+      },
+      "destaque": "TEXT_EDITOR",
+      "alvo": {
+        "area": "TEXT_EDITOR",
+        "regiao": "HEADER",
+        "botao": "op:TEXT_OT_new"
+      }
+    },
+    {
+      "texto": {
+        "pt": "Com o mouse no texto, abra Edit › Insert Snippet › Controller Script: o começo de um script de controller aparece pronto.",
+        "en": "With the mouse over the text, open Edit › Insert Snippet › Controller Script: the start of a controller script appears ready.",
+        "es": "Con el ratón sobre el texto, abre Edit › Insert Snippet › Controller Script: el comienzo de un script de controller aparece listo."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'TEXT_EDITOR' and a.spaces.active.text is not None and 'getCurrentController' in a.spaces.active.text.as_string() for a in C.screen.areas)"
+      },
+      "destaque": "TEXT_EDITOR",
+      "alvo": {
+        "area": "TEXT_EDITOR",
+        "regiao": "HEADER",
+        "botao": "Edit",
+        "menu": "Insert Snippet"
+      },
+      "dica": {
+        "pt": "O clique direito no texto também tem Insert Snippet. Ctrl+Z tira o snippet inteiro de uma vez.",
+        "en": "Right-clicking the text also has Insert Snippet. Ctrl+Z removes the whole snippet at once.",
+        "es": "El clic derecho en el texto también tiene Insert Snippet. Ctrl+Z quita todo el snippet de una vez."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Na linha vazia do fim, digite own.worl e espere a lista: escolha worldPosition com as setas e Enter. Complete a linha: own.worldPosition.z += 0.01",
+        "en": "On the empty last line, type own.worl and wait for the list: pick worldPosition with the arrows and Enter. Finish the line: own.worldPosition.z += 0.01",
+        "es": "En la línea vacía del final, escribe own.worl y espera la lista: elige worldPosition con las flechas y Enter. Termina la línea: own.worldPosition.z += 0.01"
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'TEXT_EDITOR' and a.spaces.active.text is not None and 'own.worldPosition' in a.spaces.active.text.as_string() for a in C.screen.areas)"
+      },
+      "destaque": "TEXT_EDITOR",
+      "dica": {
+        "pt": "A lista conhece a API do jogo (bge, mathutils): o que own tem, o que logic tem. Ctrl+Espaço abre a lista na hora; Esc fecha.",
+        "en": "The list knows the game API (bge, mathutils): what own has, what logic has. Ctrl+Space opens the list right away; Esc closes it.",
+        "es": "La lista conoce la API del juego (bge, mathutils): lo que tiene own, lo que tiene logic. Ctrl+Espacio abre la lista al momento; Esc la cierra."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Numa linha nova, digite print( : o ) aparece sozinho e uma caixa mostra o que a função recebe. Escreva print(own.name) e siga.",
+        "en": "On a new line, type print( : the ) appears by itself and a box shows what the function takes. Write print(own.name) and go on.",
+        "es": "En una línea nueva, escribe print( : el ) aparece solo y una caja muestra lo que recibe la función. Escribe print(own.name) y sigue."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'TEXT_EDITOR' and a.spaces.active.text is not None and 'print(own.name)' in a.spaces.active.text.as_string() for a in C.screen.areas)"
+      },
+      "destaque": "TEXT_EDITOR",
+      "dica": {
+        "pt": "Aspas e colchetes também fecham sozinhos. Digitar o ) por cima só pula o que já está lá.",
+        "en": "Quotes and brackets close by themselves too. Typing ) over it just skips the one already there.",
+        "es": "Las comillas y los corchetes también se cierran solos. Escribir ) encima solo salta el que ya está."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Erro ao vivo: numa linha nova digite print(onw) (com erro). Uma linha ondulada marca onw e o rodapé diz que o nome não existe. Corrija para own e clique em Next.",
+        "en": "Live errors: on a new line type print(onw) (misspelled). A wavy line marks onw and the bottom bar says the name does not exist. Fix it to own and click Next.",
+        "es": "Errores en vivo: en una línea nueva escribe print(onw) (con error). Una línea ondulada marca onw y la barra de abajo dice que el nombre no existe. Corrígelo a own y haz clic en Next."
+      },
+      "narracao": "",
+      "checagem": null,
+      "destaque": "TEXT_EDITOR",
+      "dica": {
+        "pt": "import Range sem uso não gera aviso: a engine sabe que ele é usado pelo jogo.",
+        "en": "An unused import Range gives no warning: the engine knows the game uses it.",
+        "es": "Un import Range sin uso no da aviso: el motor sabe que el juego lo usa."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Digite numa linha nova speed=5 (sem espaços) e abra Format › Format Code (PEP 8): o código fica no padrão, speed = 5.",
+        "en": "Type speed=5 (no spaces) on a new line and open Format › Format Code (PEP 8): the code gets the standard style, speed = 5.",
+        "es": "Escribe speed=5 (sin espacios) en una línea nueva y abre Format › Format Code (PEP 8): el código queda en el estándar, speed = 5."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'TEXT_EDITOR' and a.spaces.active.text is not None and 'speed = 5' in a.spaces.active.text.as_string() for a in C.screen.areas)"
+      },
+      "destaque": "TEXT_EDITOR",
+      "alvo": {
+        "area": "TEXT_EDITOR",
+        "regiao": "HEADER",
+        "botao": "Format",
+        "menu": "Format Code (PEP 8)"
+      },
+      "dica": {
+        "pt": "Ctrl+Z desfaz a formatação inteira de uma vez.",
+        "en": "Ctrl+Z undoes the whole formatting at once.",
+        "es": "Ctrl+Z deshace todo el formateo de una vez."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Aperte Ctrl+T com o mouse no texto: abre a barra do lado. O painel Outline lista os def e class do script (clique para pular até eles); este script ainda não tem nenhum.",
+        "en": "Press Ctrl+T with the mouse over the text: the side bar opens. The Outline panel lists the script def and class lines (click to jump to them); this script has none yet.",
+        "es": "Pulsa Ctrl+T con el ratón sobre el texto: se abre la barra lateral. El panel Outline lista los def y class del script (clic para saltar a ellos); este script todavía no tiene ninguno."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'TEXT_EDITOR' and any(r.type == 'UI' and r.width > 1 for r in a.regions) for a in C.screen.areas)"
+      },
+      "destaque": "TEXT_EDITOR",
+      "dica": {
+        "pt": "No painel Editor dá para ligar e desligar o autocompletar, os erros ao vivo, o auto-close e o realce de ocorrências (clique numa palavra, como own, e as outras iguais acendem).",
+        "en": "In the Editor panel you can turn autocomplete, live errors, auto-close and occurrence highlight on and off (click a word like own and the same ones light up).",
+        "es": "En el panel Editor puedes activar y desactivar el autocompletar, los errores en vivo, el auto-close y el realce de ocurrencias (haz clic en una palabra como own y las iguales se iluminan)."
+      }
+    },
+    {
+      "texto": {
+        "pt": "No painel Editor, clique em Set Up VS Code Hints: a pasta typings com as dicas da API do jogo vai para junto do .range.",
+        "en": "In the Editor panel, click Set Up VS Code Hints: a typings folder with the game API hints goes next to the .range.",
+        "es": "En el panel Editor, haz clic en Set Up VS Code Hints: la carpeta typings con las ayudas de la API del juego va junto al .range."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "bool(D.filepath) and __import__('os').path.isdir(__import__('os').path.join(__import__('os').path.dirname(__import__('os').path.abspath(D.filepath)), 'typings'))"
+      },
+      "destaque": "TEXT_EDITOR",
+      "alvo": {
+        "area": "TEXT_EDITOR",
+        "regiao": "UI",
+        "botao": "op:TEXT_OT_install_vscode_stubs"
+      },
+      "dica": {
+        "pt": "Com elas o VS Code completa e confere bge e mathutils como aqui dentro.",
+        "en": "With them VS Code completes and checks bge and mathutils just like in here.",
+        "es": "Con ellas VS Code completa y revisa bge y mathutils igual que aquí dentro."
+      }
+    },
+    {
+      "texto": {
+        "pt": "Clique no botão Open in External Editor, ao lado do Play no cabeçalho: o texto é salvo como .py ao lado do .range e abre no VS Code (ou no editor do sistema).",
+        "en": "Click the Open in External Editor button, next to Play in the header: the text is saved as a .py next to the .range and opens in VS Code (or the system editor).",
+        "es": "Haz clic en el botón Open in External Editor, junto a Play en la cabecera: el texto se guarda como .py junto al .range y se abre en VS Code (o en el editor del sistema)."
+      },
+      "narracao": "",
+      "checagem": {
+        "expr": "any(a.type == 'TEXT_EDITOR' and a.spaces.active.text is not None and bool(a.spaces.active.text.filepath) and not a.spaces.active.text.is_in_memory for a in C.screen.areas)"
+      },
+      "destaque": "TEXT_EDITOR",
+      "alvo": {
+        "area": "TEXT_EDITOR",
+        "regiao": "HEADER",
+        "botao": "op:TEXT_OT_open_external"
+      },
+      "dica": {
+        "pt": "Se já existir um .py com esse nome, abre uma janela para escolher onde salvar. O que você salvar no VS Code volta sozinho para cá. Outro editor? Escolha o programa no campo External Editor do painel Editor.",
+        "en": "If a .py with that name already exists, a window asks where to save it. What you save in VS Code comes back here by itself. Another editor? Pick the program in the External Editor field of the Editor panel.",
+        "es": "Si ya existe un .py con ese nombre, se abre una ventana para elegir dónde guardarlo. Lo que guardes en VS Code vuelve aquí solo. ¿Otro editor? Elige el programa en el campo External Editor del panel Editor."
+      }
+    }
+  ],
+  "encerramento": {
+    "pt": "Pronto! Agora é ligar o script num controller Python do Logic Editor e jogar.",
+    "en": "Done! Now hook the script to a Python controller in the Logic Editor and play.",
+    "es": "¡Listo! Ahora conecta el script a un controller Python del Logic Editor y juega."
+  }
+}

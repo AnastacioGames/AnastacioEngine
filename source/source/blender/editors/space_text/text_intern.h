@@ -84,6 +84,7 @@ void text_hints_update(const struct bContext *C, struct SpaceText *st, struct AR
 void text_hints_draw_diagnostics(const struct SpaceText *st, struct ARegion *ar);
 void text_hints_draw_popups(const struct SpaceText *st, struct ARegion *ar);
 void text_hints_draw_occurrences(struct SpaceText *st, struct ARegion *ar);
+void text_hints_draw_indent(struct SpaceText *st, struct ARegion *ar);
 void TEXT_OT_signature_help(struct wmOperatorType *ot);
 void TEXT_OT_hints_hide(struct wmOperatorType *ot);
 void TEXT_OT_format_code(struct wmOperatorType *ot);

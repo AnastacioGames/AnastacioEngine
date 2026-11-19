@@ -71,7 +71,7 @@
 #include "text_intern.h"  /* own include */
 
 /* pause in the typing before checking the text again (seconds) */
-#define HINTS_DELAY 0.8
+#define HINTS_DELAY 0.5
 #define HINTS_TIMER_STEP 0.2
 
 #define DIAG_MAX 100
@@ -95,6 +95,7 @@ typedef struct DiagCache {
 	unsigned int cur_hash;
 	unsigned int seen_hash;  /* content at the previous draw: a change there is an edit */
 	bool seen;
+	bool waiting;         /* the python thread is still checking */
 	double last_edit;
 	double delay;         /* pause before checking (longer when the check is slow) */
 	double used_time;
@@ -161,13 +162,17 @@ static DiagCache *diag_cache_get(const Text *text, bool create)
 	diag_cache[oldest].tot = 0;
 	diag_cache[oldest].last_edit = 0.0;
 	diag_cache[oldest].seen = false;
+	diag_cache[oldest].waiting = false;
 	diag_cache[oldest].delay = HINTS_DELAY;
 	return &diag_cache[oldest];
 }
 
-/* "OK\n..." from text_autocomplete.<expr>, or NULL (SKIP/failure). MEM_freeN the result. */
+static bool hints_python_wait = false;  /* the last answer was "WAIT" (computing in a thread) */
+
+/* "OK\n..." from text_autocomplete.<expr>, or NULL (SKIP/failure/WAIT). MEM_freeN the result. */
 static char *hints_python(bContext *C, const char *expr)
 {
+	hints_python_wait = false;
 #ifdef WITH_PYTHON
 	static bool reported = false;
 	const char *imports[] = {"text_autocomplete", NULL};
@@ -181,6 +186,7 @@ static char *hints_python(bContext *C, const char *expr)
 		return NULL;
 	}
 	if (result && !STRPREFIX(result, "OK")) {
+		hints_python_wait = STREQ(result, "WAIT");
 		MEM_freeN(result);
 		return NULL;
 	}
@@ -249,11 +255,16 @@ static void diag_compute(bContext *C, DiagCache *dc)
 	char *result, *lines[DIAG_MAX + 1];
 	int tot, i;
 
+	result = hints_python(C, "text_autocomplete.diagnosticos()");
+	dc->waiting = hints_python_wait;
+	if (dc->waiting) {
+		/* checked in a thread: the old marks stay until the answer, asked again by the timer */
+		hints_timer_ensure(C);
+		return;
+	}
 	dc->tot = 0;
 	dc->hash = dc->cur_hash;
 	dc->computed = true;  /* also on failure: no retry on every redraw */
-
-	result = hints_python(C, "text_autocomplete.diagnosticos()");
 	if (!result) return;
 
 	tot = hints_split_lines(result, lines, DIAG_MAX);
@@ -299,12 +310,7 @@ static void hints_diagnostics_update(bContext *C, SpaceText *st, Text *text, dou
 		hints_timer_ensure(C);  /* still typing: check after the pause */
 		return;
 	}
-	{
-		const double t0 = PIL_check_seconds_timer();
-		diag_compute(C, dc);
-		/* a slow check (big text) waits longer for the next pause */
-		dc->delay = MIN2(HINTS_DELAY + 3.0 * (PIL_check_seconds_timer() - t0), 3.0);
-	}
+	diag_compute(C, dc);
 }
 
 /* some text still waiting for its pause (expires: a hidden editor never checks) */
@@ -313,7 +319,9 @@ static bool hints_diag_pending(double now)
 	int i;
 	for (i = 0; i < DIAG_CACHE_SIZE; i++) {
 		const DiagCache *dc = &diag_cache[i];
-		if (dc->text && (!dc->computed || dc->hash != dc->cur_hash) && now - dc->last_edit < dc->delay + 2.0) {
+		if (dc->text && (dc->waiting ||
+		                 ((!dc->computed || dc->hash != dc->cur_hash) && now - dc->last_edit < dc->delay + 2.0)))
+		{
 			return true;
 		}
 	}
@@ -874,6 +882,125 @@ void text_hints_draw_occurrences(SpaceText *st, ARegion *ar)
 		glDisable(GL_BLEND);
 	}
 	MEM_freeN(hits);
+}
+
+/* -------------------------------------------------------------------- */
+/* indentation guides and visible whitespace */
+
+/* columns of the leading whitespace (tabs to the next stop), -1 for a blank line */
+static int indent_columns(const SpaceText *st, const TextLine *line)
+{
+	const int tw = max_ii(st->tabnumber, 1);
+	int i, col = 0;
+	for (i = 0; i < line->len; i++) {
+		if (line->line[i] == ' ') col++;
+		else if (line->line[i] == '\t') col += tw - col % tw;
+		else return col;
+	}
+	return -1;
+}
+
+/* a blank line keeps the guides of the code around it (the smaller of the two sides) */
+static int indent_columns_blank(const SpaceText *st, const TextLine *line, int prev)
+{
+	const TextLine *l;
+	int k, next = 0;
+	for (l = line->next, k = 0; l && k < 200; l = l->next, k++) {
+		next = indent_columns(st, l);
+		if (next >= 0) break;
+	}
+	if (next < 0) next = 0;
+	return min_ii(max_ii(prev, 0), next);
+}
+
+void text_hints_draw_indent(SpaceText *st, ARegion *ar)
+{
+	Text *text = st->text;
+	TextLine *linep;
+	const bool guides = !(st->flags & ST_NO_INDENT_GUIDES);
+	const bool spaces = (st->flags & ST_SHOW_WHITESPACE) != 0;
+	const int lheight = st->lheight_dpi + TXT_LINE_SPACING;
+	const int xbase = st->showlinenrs ? TXT_OFFSET + TEXTXLOC : TXT_OFFSET;
+	const int xmax = ar->winx - TXT_SCROLL_WIDTH;
+	const int tw = max_ii(st->tabnumber, 1);
+	int row, wrap_skip, prev = 0;
+	unsigned char col[4];
+
+	if (!text || (!guides && !spaces)) return;
+
+	/* indentation of the code above the first visible line (blank lines at the top) */
+	linep = text_draw_first_visible_line(st, &wrap_skip);
+	if (linep) {
+		const TextLine *l = linep->prev;
+		int k;
+		for (k = 0; l && k < 200; l = l->prev, k++) {
+			const int c = indent_columns(st, l);
+			if (c >= 0) { prev = c; break; }
+		}
+	}
+
+	UI_GetThemeColor3ubv(TH_TEXT, col);
+	glEnable(GL_BLEND);
+	glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+
+	row = -wrap_skip;
+	for (; linep && row < st->viewlines; linep = linep->next) {
+		const int nrows = st->wordwrap ? text_get_visible_lines(st, ar, linep->line) : 1;
+		const int ytop = ar->winy - row * lheight;
+		int ind = indent_columns(st, linep);
+
+		if (ind >= 0) prev = ind;
+		else ind = indent_columns_blank(st, linep, prev);
+
+		if (guides && ind > 0) {
+			int c;
+			glColor4ub(col[0], col[1], col[2], 45);
+			glBegin(GL_LINES);
+			for (c = 0; c < ind; c += tw) {
+				const int x = xbase + (c - st->left) * st->cwidth + 1;
+				if (x < xbase || x >= xmax) continue;
+				glVertex2i(x, ytop);
+				glVertex2i(x, ytop - nrows * lheight);
+			}
+			glEnd();
+		}
+
+		if (spaces) {
+			int b;
+			for (b = 0; b < linep->len; b++) {
+				const char ch = linep->line[b];
+				int offl, offc, vrow, x, yc, w;
+				if (ch != ' ' && ch != '\t') continue;
+				wrap_offset_in_line(st, ar, linep, b, &offl, &offc);
+				vrow = row + offl;
+				if (vrow < 0 || vrow >= st->viewlines) continue;
+				x = xbase + (text_get_char_pos(st, linep->line, b) - st->left + offc) * st->cwidth;
+				if (x < xbase || x >= xmax) continue;
+				yc = ar->winy - vrow * lheight - lheight / 2;
+				glColor4ub(col[0], col[1], col[2], 90);
+				if (ch == ' ') {
+					const int r = max_ii(1, st->cwidth / 8);
+					const int xc = x + st->cwidth / 2;
+					glRecti(xc - r, yc - r, xc + r, yc + r);
+				}
+				else {
+					/* arrow over the whole tab */
+					w = (text_get_char_pos(st, linep->line, b + 1) - text_get_char_pos(st, linep->line, b)) * st->cwidth;
+					w = min_ii(w, xmax - x);
+					glBegin(GL_LINES);
+					glVertex2i(x + 2, yc);
+					glVertex2i(x + w - 2, yc);
+					glVertex2i(x + w - 2, yc);
+					glVertex2i(x + w - 2 - st->cwidth / 3, yc + st->cwidth / 3);
+					glVertex2i(x + w - 2, yc);
+					glVertex2i(x + w - 2 - st->cwidth / 3, yc - st->cwidth / 3);
+					glEnd();
+				}
+			}
+		}
+		row += nrows;
+	}
+	glDisable(GL_BLEND);
 }
 
 /* -------------------------------------------------------------------- */

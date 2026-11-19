@@ -1487,6 +1487,8 @@ void draw_text_main(SpaceText *st, ARegion *ar)
 	winx = ar->winx - TXT_SCROLL_WIDTH;
 
 	/* other places of the name under the cursor (under the selection and the cursor) */
+	/* indentation guides and visible spaces/tabs (under the text) */
+	text_hints_draw_indent(st, ar);
 	text_hints_draw_occurrences(st, ar);
 
 	/* draw cursor */

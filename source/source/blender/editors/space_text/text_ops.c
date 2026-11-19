@@ -3241,6 +3241,13 @@ static int text_find_and_replace(bContext *C, wmOperator *op, short mode)
 		text_update_cursor_moved(C);
 		WM_event_add_notifier(C, NC_TEXT | ND_CURSOR, text);
 	}
+	else if (!(flags & ST_FIND_WRAP) && txt_find_string(text, st->findstr, true, flags & ST_MATCH_CASE)) {
+		/* Range: nothing after the cursor (it was at the end): the search goes on from the top,
+		 * so Find Next does not "fail" just because of where the cursor is */
+		text_update_cursor_moved(C);
+		WM_event_add_notifier(C, NC_TEXT | ND_CURSOR, text);
+		BKE_report(op->reports, RPT_INFO, "Search continued from the top");
+	}
 	else {
 		if (!found) BKE_reportf(op->reports, RPT_ERROR, "Text not found: %s", st->findstr);
 	}

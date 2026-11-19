@@ -8,6 +8,15 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — Text Editor: digitação mais leve, guias de recuo, espaços visíveis, busca do fim e tutorial
+
+- **Erros ao vivo numa thread:** `text_autocomplete.diagnosticos()` responde `WAIT` e roda ast+pyflakes (70-200 ms) em `threading.Thread`; o C (`text_hints.c`, `DiagCache.waiting`) mantém os sublinhados antigos e pergunta de novo no timer. A pausa antes de checar caiu de 0,8 para 0,5 s.
+- **Cache dos imports:** `_Contexto` só relê os imports quando as linhas com `import` mudam (antes cortava comentário de todas as linhas a cada tecla; lista e assinatura).
+- **Indentation Guides** (`use_indent_guides`, bit `ST_NO_INDENT_GUIDES`, ligado por padrão) e **Show Whitespace** (`show_whitespace`, `ST_SHOW_WHITESPACE`: pontos nos espaços, seta no tab), em `text_hints_draw_indent`; linhas vazias seguem o menor recuo em volta. Opções na barra lateral.
+- **Find Next do fim:** sem Wrap, se nada é achado depois do cursor a busca continua do começo ("Search continued from the top"); pedido do Discord (Kitsuy).
+- **Tutorial 36** `editor_texto_codigo` (categoria Text Editor, 11 passos, revisor OK) + capa.
+- Testes: `editor_guias_recuo`, `editor_busca_do_fim`; `editor_autocompletar`, `editor_dicas_codigo`, `editor_complementos_codigo`, `editor_externo_sem_arquivo` seguem OK.
+
 ## 2026-11-18 — Text Editor: Jedi, stubs, outline, snippets, auto-close, ocorrências e PEP 8
 
 - **Jedi 0.19.2 + parso 0.8.4** (MIT, em `scripts/modules`, com LICENSE; sem django-stubs e sem typeshed de terceiros). Quando o provedor próprio não sabe o tipo, ou é chamada de função, o Jedi responde membros, detalhe e assinatura.

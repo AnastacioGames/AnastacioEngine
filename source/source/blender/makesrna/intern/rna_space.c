@@ -3622,6 +3622,16 @@ static void rna_def_space_text(BlenderRNA *brna)
 	                         "Highlight the other places of the name under the cursor (or the selected name)");
 	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
 
+	prop = RNA_def_property(srna, "use_indent_guides", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_negative_sdna(prop, NULL, "flags", ST_NO_INDENT_GUIDES);
+	RNA_def_property_ui_text(prop, "Indentation Guides", "Draw a thin vertical line at each indentation level");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
+	prop = RNA_def_property(srna, "show_whitespace", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flags", ST_SHOW_WHITESPACE);
+	RNA_def_property_ui_text(prop, "Show Whitespace", "Show spaces as dots and tabs as arrows (to see a mix of both)");
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_TEXT, NULL);
+
 	prop = RNA_def_property(srna, "margin_column", PROP_INT, PROP_NONE);
 	RNA_def_property_int_sdna(prop, NULL, "margin_column");
 	RNA_def_property_range(prop, 0, 1024);
