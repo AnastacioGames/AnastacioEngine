@@ -1071,3 +1071,39 @@ GPUTexture *GPU_offscreen_depth_texture(const GPUOffScreen *ofs)
 	return ofs->depth;
 }
 
+/* Copies the off-screen color into a 2D texture (level 0), stretched to its size, mirrored
+ * horizontally when flip_x. Used by the 3D View realtime reflections, which draw the mirrored
+ * view flipped so the faces keep their winding. Keeps the current framebuffer bindings. */
+bool GPU_offscreen_blit_to_texture(GPUOffScreen *ofs, GPUTexture *tex, bool flip_x)
+{
+	GLint read_fb = 0, draw_fb = 0;
+	GLuint fbo = 0;
+	bool ok = false;
+	const int w = GPU_texture_width(ofs->color), h = GPU_texture_height(ofs->color);
+
+	if (!tex || GPU_texture_opengl_bindcode(tex) == 0) {
+		return false;
+	}
+
+	glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read_fb);
+	glGetIntegerv(GL_DRAW_FRAMEBUFFER_BINDING, &draw_fb);
+
+	glGenFramebuffersEXT(1, &fbo);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, fbo);
+	glFramebufferTexture2DEXT(GL_DRAW_FRAMEBUFFER_EXT, GL_COLOR_ATTACHMENT0_EXT, GL_TEXTURE_2D,
+	                          GPU_texture_opengl_bindcode(tex), 0);
+	if (glCheckFramebufferStatusEXT(GL_DRAW_FRAMEBUFFER_EXT) == GL_FRAMEBUFFER_COMPLETE_EXT) {
+		glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, ofs->fb->object);
+		glReadBuffer(GL_COLOR_ATTACHMENT0_EXT);
+		glBlitFramebufferEXT(flip_x ? w : 0, 0, flip_x ? 0 : w, h,
+		                     0, 0, GPU_texture_width(tex), GPU_texture_height(tex),
+		                     GL_COLOR_BUFFER_BIT, GL_LINEAR);
+		ok = true;
+	}
+
+	glBindFramebufferEXT(GL_READ_FRAMEBUFFER_EXT, read_fb);
+	glBindFramebufferEXT(GL_DRAW_FRAMEBUFFER_EXT, draw_fb);
+	glDeleteFramebuffersEXT(1, &fbo);
+	return ok;
+}
+

@@ -97,6 +97,7 @@ void GPU_offscreen_read_pixels(GPUOffScreen *ofs, int type, void *pixels);
 int GPU_offscreen_width(const GPUOffScreen *ofs);
 int GPU_offscreen_height(const GPUOffScreen *ofs);
 int GPU_offscreen_color_texture(const GPUOffScreen *ofs);
+bool GPU_offscreen_blit_to_texture(GPUOffScreen *ofs, struct GPUTexture *tex, bool flip_x);
 
 #ifdef __cplusplus
 }

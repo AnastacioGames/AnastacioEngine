@@ -8,6 +8,20 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-18 — Reflexo realtime (Plane) ao vivo na 3D View
+
+- Environment Map Realtime + Plane agora aparece na 3D View sem Play, no modo Material/Texture GLSL
+  (`editors/space_view3d/view3d_draw_reflections.c`). Antes do desenho principal, a cena é desenhada
+  espelhada pelo plano Z do Viewpoint Object (ou do próprio objeto) numa GPUOffScreen do tamanho da
+  imagem, com near oblíquo (igual ao `KX_PlanarMap`), Clipping e Ignore Layers do mapa, viewpoint
+  escondido; o X vai espelhado no winmat para manter o winding e volta no blit
+  (`GPU_offscreen_blit_to_texture`) para a textura da imagem. O shader do material não muda.
+- No modo câmera usa o quadro da câmera (o material mapeia pela borda da câmera), senão a região.
+- Até 4 espelhos por redesenho; pula durante pincelada de pintura. Testado por captura contra o jogo
+  na cena do Kitsuy (câmera alta) e aceito com janela. Revisão do Codex: textura readquirida após o
+  desenho (imagens animadas são liberadas) e limite contando só os desenhados.
+- Próximos da prévia na 3D View: nó Planar Reflection, Environment Map Cube, probes, Probe Volume GI.
+
 ## 2026-11-18 — Reflexo realtime: sem borda clara em Alpha Clip
 
 - **Bug (Discord, Kitsuy, `alpha_effect_bug.range`):** folhagem com Alpha Clip refletida por Environment Map realtime ganhava contorno cinza-claro só no reflexo. A folha grava o alpha da textura (0,5-1) no alvo RGBA e o plano usava esse alpha como fator do blend com a cor do material (branca). Vinha da Range original (a 1.6 mostra pior).

@@ -568,6 +568,7 @@ void ED_view3d_shaders_free(void)
 	}
 	floor_shader_failed = false;
 	view3d_rain_shaders_free();
+	view3d_reflections_free();
 }
 
 /* Returns false when the shader is unavailable, so the caller falls back to the line grid. */
@@ -4161,6 +4162,14 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 
 	/* Setup the view matrix. */
 	ED_view3d_draw_setup_view(CTX_wm_window(C), scene, ar, v3d, NULL, NULL, NULL);
+
+	/* Realtime Environment Maps (preview of KX_PlanarMap): needs this view's matrices and runs
+	 * before the compositor binds its buffers; the offscreen pass leaves its own GL matrices. */
+	if (draw_glsl_material(scene, NULL, v3d, v3d->drawtype) && !paint_stroke) {
+		if (view3d_reflections_update(bmain, scene, v3d, ar)) {
+			ED_view3d_draw_setup_view(CTX_wm_window(C), scene, ar, v3d, NULL, NULL, NULL);
+		}
+	}
 
 	rv3d->rflag &= ~RV3D_IS_GAME_ENGINE;
 #ifdef WITH_GAMEENGINE

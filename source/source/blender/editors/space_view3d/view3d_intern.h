@@ -194,6 +194,10 @@ double view3d_layer_profile_draw_begin(void);
 void view3d_layer_profile_draw_end(double t_draw_begin);
 void view3d_warmup_step(const struct bContext *C, struct Main *bmain, Scene *scene, struct ARegion *ar, View3D *v3d);
 
+/* view3d_draw_reflections.c */
+bool view3d_reflections_update(struct Main *bmain, Scene *scene, View3D *v3d, struct ARegion *ar);
+void view3d_reflections_free(void);
+
 /* view3d_draw_shadows.c */
 void gpu_update_lamps_shadows_world(struct Main *bmain, Scene *scene, View3D *v3d, struct RegionView3D *viewer_rv3d);
 
