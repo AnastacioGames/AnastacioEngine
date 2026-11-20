@@ -71,8 +71,14 @@ MIX = NL.join((
     "mx.size = 0.5", "mx.lifetime = 2.0", "mx.color = (0.1, 0.4, 1.0, 1.0)", "mx.particle_look = 'FIRE'"))
 FLIP = NL.join(("gp.size = 1.6", 
     "gp.texture = r'ATLAS'", "gp.flipbook_columns = 2", "gp.flipbook_rows = 2", "gp.flipbook_cycles = 1.0"))
+CHAO = NL.join((
+    "gp.particle_look = 'SMOKE'", "gp.size = 1.2",
+    "bpy.ops.mesh.primitive_plane_add(radius=6, location=(0, 0, 0.4))",
+    "pl = bpy.context.scene.objects.active",
+    "mt = bpy.data.materials.new('chao'); mt.use_shadeless = True; mt.diffuse_color = (0.03, 0.03, 0.03)",
+    "pl.data.materials.append(mt)"))
 CASOS = (('fumaca', "gp.particle_look = 'SMOKE'"), ('fogo', "gp.particle_look = 'FIRE'"),
-         ('flipbook', FLIP), ('mix', "gp.particle_look = 'SMOKE'" + NL + MIX))
+         ('flipbook', FLIP), ('mix', "gp.particle_look = 'SMOKE'" + NL + MIX), ('chao', CHAO))
 
 
 def testar(t):
@@ -98,6 +104,10 @@ def testar(t):
         pc, px_, py_, pcor = medir(im)
         t.nota('%s: jogo cob %.3f c(%.2f,%.2f) cor %s; prévia cob %.3f c(%.2f,%.2f) cor %s; desligada %.4f' % (nome, jc, jx, jy, tuple(int(v) for v in jcor), pc, px_, py_, tuple(int(v) for v in pcor), off))
         assert jc > 0.003, nome + ': o jogo não mostrou partículas'
+        if nome == 'chao':  # o plano cobre boa parte da tela: a prévia ligada tem de ter mais que desligada
+            assert pc > off + 0.03, nome + ': o toggle não acrescentou partículas'
+            assert abs(pc - jc) < 0.15, nome + ': a cobertura difere do jogo'
+            continue
         assert off < max(jc * 0.2, 0.004), nome + ': a prévia mostrou partículas com o toggle desligado'
         assert pc > jc * 0.25, nome + ': a prévia quase não mostrou partículas'
         assert abs(px_ - jx) < 0.15 and abs(py_ - jy) < 0.15, nome + ': a coluna está em outro lugar'

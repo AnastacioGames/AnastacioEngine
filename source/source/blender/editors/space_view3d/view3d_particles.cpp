@@ -66,6 +66,37 @@ struct Emitter {
 
 std::vector<Emitter> g_emitters;
 
+/* Snapshot of the scene depth under the particles (soft particles): copied from the bound framebuffer
+ * right before drawing, as the game's depth blit does. */
+GLuint g_depth_tex = 0;
+int g_depth_w = 0, g_depth_h = 0;
+
+bool depth_snapshot(const GLint vp[4])
+{
+	if (vp[2] <= 0 || vp[3] <= 0) {
+		return false;
+	}
+	while (glGetError() != GL_NO_ERROR) {}
+	if (!g_depth_tex) {
+		glGenTextures(1, &g_depth_tex);
+		g_depth_w = g_depth_h = 0;
+	}
+	GLint prev_tex = 0;
+	glGetIntegerv(GL_TEXTURE_BINDING_2D, &prev_tex);
+	glBindTexture(GL_TEXTURE_2D, g_depth_tex);
+	if (g_depth_w != vp[2] || g_depth_h != vp[3]) {
+		glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, vp[2], vp[3], 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+		g_depth_w = vp[2];
+		g_depth_h = vp[3];
+	}
+	glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, vp[0], vp[1], vp[2], vp[3]);
+	glBindTexture(GL_TEXTURE_2D, prev_tex);
+	return glGetError() == GL_NO_ERROR; /* e.g. a multisampled source fails: no soft fade, still drawn */
+}
+
 bool emitter_wanted(const Object *ob, bool mix)
 {
 	return (ob->gameflag2 & (mix ? OB_GPU_PARTICLES_MIX : OB_GPU_PARTICLES)) != 0;
@@ -132,6 +163,10 @@ bool view3d_gpu_particles_active(const Scene *scene, const View3D *v3d)
 void view3d_gpu_particles_free(void)
 {
 	g_emitters.clear();
+	if (g_depth_tex) {
+		glDeleteTextures(1, &g_depth_tex);
+		g_depth_tex = 0;
+	}
 }
 
 void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
@@ -156,10 +191,26 @@ void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 	const double now = PIL_check_seconds_timer();
 	bool any = false;
 
+	GLint vp[4] = {0, 0, 0, 0};
+	glGetIntegerv(GL_VIEWPORT, vp);
 	GLint prev_prog = 0, prev_vao = 0, prev_vbo = 0;
 	glGetIntegerv(GL_CURRENT_PROGRAM, &prev_prog);
 	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prev_vao);
 	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prev_vbo);
+	unsigned int soft_tex = 0;
+	{
+		bool wanted = false;
+		for (const Emitter &e : g_emitters) {
+			wanted = wanted || (e.rv3d == rv3d);
+		}
+		/* Emitters created in this very pass are not in the list yet: any wanted emitter qualifies. */
+		for (const Base *base = (const Base *)scene->base.first; base && !wanted; base = base->next) {
+			wanted = (base->lay & v3d->lay) && (emitter_wanted(base->object, false) || emitter_wanted(base->object, true));
+		}
+		if (wanted && depth_snapshot(vp)) {
+			soft_tex = g_depth_tex;
+		}
+	}
 	glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT);
 	for (const Base *base = (const Base *)scene->base.first; base; base = base->next) {
 		const Object *ob = base->object;
@@ -199,7 +250,8 @@ void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 			}
 			const mt::vec3 pos(ob->obmat[3][0], ob->obmat[3][1], ob->obmat[3][2]);
 			e->buffer->Update(dt, pos, object_rotation(ob));
-			e->buffer->Draw(view, proj, 0);
+			e->buffer->SetSoftDepthOrigin((float)vp[0], (float)vp[1]);
+			e->buffer->Draw(view, proj, soft_tex);
 			any = true;
 		}
 	}

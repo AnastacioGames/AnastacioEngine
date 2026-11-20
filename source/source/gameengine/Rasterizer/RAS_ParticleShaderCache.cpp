@@ -353,13 +353,14 @@ const char *drawFragmentSoftMain =
 	"uniform bool u_softValid;\n"
 	"uniform vec2 u_projZ;\n"
 	"uniform float u_softDistance;\n"
+	"uniform vec2 u_softOrigin;\n"
 	"float particle_view_distance(float depth) {\n"
 	"	return u_projZ.y / ((depth * 2.0 - 1.0) + u_projZ.x);\n"
 	"}\n"
 	"void main() {\n"
 	"	particle_look_main();\n"
 	"	if (u_softValid) {\n"
-	"		vec2 uv = gl_FragCoord.xy / vec2(textureSize(u_softDepthTex, 0));\n"
+	"		vec2 uv = (gl_FragCoord.xy - u_softOrigin) / vec2(textureSize(u_softDepthTex, 0));\n"
 	"		float scene = particle_view_distance(texture(u_softDepthTex, uv).r);\n"
 	"		float frag = particle_view_distance(gl_FragCoord.z);\n"
 	"		fragColor.a *= clamp((scene - frag) / u_softDistance, 0.0, 1.0);\n"
@@ -883,6 +884,7 @@ RAS_ParticleShaderCache::RAS_ParticleShaderCache(const std::string &customFragSh
 	m_drawSoftValidLoc = glGetUniformLocation(m_drawProgram, "u_softValid");
 	m_drawProjZLoc = glGetUniformLocation(m_drawProgram, "u_projZ");
 	m_drawSoftDistanceLoc = glGetUniformLocation(m_drawProgram, "u_softDistance");
+	m_drawSoftOriginLoc = glGetUniformLocation(m_drawProgram, "u_softOrigin");
 
 	const GLuint updateProgram = m_updateShader->GetProgram();
 	m_deltaTimeLoc = glGetUniformLocation(updateProgram, "u_deltaTime");

@@ -66,7 +66,7 @@ private:
 	/// Fase K: optional curve-driven size/color over lifetime.
 	int m_drawUseSizeCurveLoc, m_drawSizeCurveTexLoc, m_drawUseColorCurveLoc, m_drawColorCurveTexLoc;
 	/// Soft particles: scene depth snapshot + projection terms to linearize it.
-	int m_drawSoftDepthTexLoc = -1, m_drawSoftValidLoc = -1, m_drawProjZLoc = -1, m_drawSoftDistanceLoc = -1;
+	int m_drawSoftDepthTexLoc = -1, m_drawSoftValidLoc = -1, m_drawProjZLoc = -1, m_drawSoftDistanceLoc = -1, m_drawSoftOriginLoc = -1;
 
 	int m_deltaTimeLoc, m_lifetimeLoc, m_emitterRadiusLoc, m_velocityRandomnessLoc;
 	int m_timeLoc, m_gravityLoc, m_emitterPosLoc, m_velocityBaseLoc;
@@ -119,6 +119,7 @@ public:
 	int GetDrawSoftValidLoc() const { return m_drawSoftValidLoc; }
 	int GetDrawProjZLoc() const { return m_drawProjZLoc; }
 	int GetDrawSoftDistanceLoc() const { return m_drawSoftDistanceLoc; }
+	int GetDrawSoftOriginLoc() const { return m_drawSoftOriginLoc; }
 
 	int GetDeltaTimeLoc() const { return m_deltaTimeLoc; }
 	int GetLifetimeLoc() const { return m_lifetimeLoc; }

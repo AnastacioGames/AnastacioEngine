@@ -93,6 +93,7 @@ private:
 	float m_velocityBase[3];
 	float m_velocityRandomness;
 	float m_billboardSize;
+	float m_softOriginX = 0.0f, m_softOriginY = 0.0f;
 	float m_color[4];
 	/// Fase G: end-of-life color/size, lerped against m_color/m_billboardSize by particle age.
 	/// Defaulted equal to the start values in the constructor, so no gradient is visible until
@@ -215,6 +216,8 @@ public:
 	/// offset so the quad always faces the camera without needing separate right/up uniforms).
 	/// softDepthTex: GL bindcode of the scene depth snapshot for soft particles, 0 = none.
 	void Draw(const mt::mat4 &view, const mt::mat4 &projection, unsigned int softDepthTex = 0);
+	/// Window origin of the soft depth snapshot (the 3D View region corner); the game keeps 0,0.
+	void SetSoftDepthOrigin(float x, float y) { m_softOriginX = x; m_softOriginY = y; }
 
 	bool Ok() const
 	{

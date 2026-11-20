@@ -593,6 +593,7 @@ void RAS_ParticleBuffer::Draw(const mt::mat4 &view, const mt::mat4 &projection, 
 		glBindTexture(GL_TEXTURE_2D, softDepthTex);
 		glUniform1i(m_shaderCache->GetDrawSoftDepthTexLoc(), 4);
 		glUniform2f(m_shaderCache->GetDrawProjZLoc(), proj[10], proj[14]);
+		glUniform2f(m_shaderCache->GetDrawSoftOriginLoc(), m_softOriginX, m_softOriginY);
 		glUniform1f(m_shaderCache->GetDrawSoftDistanceLoc(), std::max(0.05f, 0.35f * std::max(m_billboardSize, m_endSize)));
 	}
 	glActiveTexture(GL_TEXTURE0);
