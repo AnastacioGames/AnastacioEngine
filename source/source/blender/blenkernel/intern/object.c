@@ -906,7 +906,16 @@ static LodLevel *lod_level_select(Object *ob, const float camera_position[3])
 
 	if (!current) return NULL;
 
-	dist_sq = len_squared_v3v3(ob->obmat[3], camera_position);
+	/* Build HLOD: an invisible level whose object is the cell proxy makes the distance be measured
+	 * from the proxy, as KX_LodManager does, so the group and its proxy switch on the same frame. */
+	const float *origin = ob->obmat[3];
+	for (LodLevel *lod = ob->lodlevels.first; lod; lod = lod->next) {
+		if ((lod->flags & OB_LOD_USE_INVISIBLE) && lod->source && lod->source != ob) {
+			origin = lod->source->obmat[3];
+		}
+	}
+
+	dist_sq = len_squared_v3v3(origin, camera_position);
 
 	if (dist_sq < SQUARE(current->distance)) {
 		/* check for higher LoD */
