@@ -100,6 +100,9 @@ public:
 	/// caster in range. Invalid means "redraw next frame" (new lamp, replica, hidden last frame).
 	bool m_autoShadowValid = false;
 	mt::mat3x4 m_autoShadowLightTrans;
+	/// Static Shadow without cascades: lamp transform of the last redraw; a change asks for a new one.
+	mt::mat3x4 m_staticShadowLightTrans;
+	bool m_staticShadowLightTransValid = false;
 	float m_autoShadowParams[8];
 	std::unordered_map<const void *, mt::mat3x4> m_autoShadowCasters;
 

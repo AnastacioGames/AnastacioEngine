@@ -607,6 +607,16 @@ void KX_ShadowRenderer::Render(KX_Scene *scene)
 			// otherwise, since nothing sets m_requestShadowUpdate automatically as the camera moves,
 			// the whole cascade block (both sub-passes) would simply stop running.
 			const bool lightActive = light->GetVisible() && !light->GetDistanceCulled() && raslight->HasShadowBuffer();
+			if (raslight->m_staticShadow && !hasCascade) {
+				// A Static Shadow lamp without cascades only redraws on request: moving or rotating
+				// the lamp must ask for one, otherwise the old map is sampled with the new matrix.
+				const mt::mat3x4 lightTrans = light->NodeGetWorldTransform();
+				if (!raslight->m_staticShadowLightTransValid || !Mat3x4NearlyEqual(lightTrans, raslight->m_staticShadowLightTrans)) {
+					raslight->m_requestShadowUpdate = true;
+					raslight->m_staticShadowLightTrans = lightTrans;
+					raslight->m_staticShadowLightTransValid = true;
+				}
+			}
 			bool needUpdate = useStaticSplit || raslight->NeedShadowUpdate();
 			if (raslight->m_autoShadow && !useCascade && lightActive) {
 				// A manual request or a change in the caster list still forces the redraw.
