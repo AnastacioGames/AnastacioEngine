@@ -899,25 +899,85 @@ bool BKE_object_vehicle_gear_remove(Object *ob, int index)
 	return true;
 }
 
-static LodLevel *lod_level_select(Object *ob, const float camera_position[3])
+/* Level selection mirrors the game (KX_LodManager / KX_GameObject::UpdateLod) so the 3D View previews
+ * the same level: levels the game drops (no mesh source and not invisible) are skipped, the distance is
+ * measured from the HLOD origin (source of an invisible level, see anastacio_hlod.py) and scaled by the
+ * camera and object LoD factors, and the scene/level hysteresis widens the switch distances. */
+static bool lod_level_valid(const LodLevel *lod)
+{
+	return (lod->flags & OB_LOD_USE_INVISIBLE) || (lod->source && lod->source->type == OB_MESH);
+}
+
+static LodLevel *lod_next_valid(LodLevel *lod)
+{
+	for (lod = lod->next; lod; lod = lod->next) {
+		if (lod_level_valid(lod)) {
+			return lod;
+		}
+	}
+	return NULL;
+}
+
+static LodLevel *lod_prev_valid(LodLevel *lod)
+{
+	for (lod = lod->prev; lod; lod = lod->prev) {
+		if (lod_level_valid(lod)) {
+			return lod;
+		}
+	}
+	return NULL;
+}
+
+static float lod_hysteresis(const Scene *scene, LodLevel *lod)
+{
+	LodLevel *prelod = lod_prev_valid(lod);
+	if (!prelod || !scene || !(scene->gm.lodflag & SCE_LOD_USE_HYST)) {
+		return 0.0f;
+	}
+	const float percent = (lod->flags & OB_LOD_USE_HYST) ? (float)lod->obhysteresis : (float)scene->gm.scehysteresis;
+	return fabsf(prelod->distance - lod->distance) * (percent / 100.0f);
+}
+
+static void lod_distance_origin(const Object *ob, float r_origin[3])
+{
+	copy_v3_v3(r_origin, ob->obmat[3]);
+	for (const LodLevel *lod = ob->lodlevels.first; lod; lod = lod->next) {
+		if ((lod->flags & OB_LOD_USE_INVISIBLE) && lod->source && lod->source != ob) {
+			copy_v3_v3(r_origin, lod->source->obmat[3]);
+		}
+	}
+}
+
+static LodLevel *lod_level_select(Object *ob, const Scene *scene, const float camera_position[3], float camera_lodfactor)
 {
 	LodLevel *current = ob->currentlod;
-	float dist_sq;
+	float origin[3];
 
 	if (!current) return NULL;
 
-	dist_sq = len_squared_v3v3(ob->obmat[3], camera_position);
-
-	if (dist_sq < SQUARE(current->distance)) {
-		/* check for higher LoD */
-		while (current->prev && dist_sq < SQUARE(current->distance)) {
-			current = current->prev;
-		}
-	}
-	else {
-		/* check for lower LoD */
-		while (current->next && dist_sq > SQUARE(current->next->distance)) {
+	if (!lod_level_valid(current)) {
+		current = ob->lodlevels.first;
+		while (current && !lod_level_valid(current)) {
 			current = current->next;
+		}
+		if (!current) return NULL;
+	}
+
+	lod_distance_origin(ob, origin);
+	const float factor = camera_lodfactor * ob->lodfactor;
+	const float dist_sq = len_squared_v3v3(origin, camera_position) * factor * factor;
+
+	for (int guard = 0; guard < 1024; guard++) {
+		LodLevel *next = lod_next_valid(current);
+		LodLevel *prev = lod_prev_valid(current);
+		if (next && SQUARE(next->distance + lod_hysteresis(scene, next)) <= dist_sq) {
+			current = next;
+		}
+		else if (prev && SQUARE(current->distance - lod_hysteresis(scene, current)) > dist_sq) {
+			current = prev;
+		}
+		else {
+			break;
 		}
 	}
 
@@ -930,14 +990,72 @@ bool BKE_object_lod_is_usable(Object *ob, Scene *scene)
 	return (ob->mode == OB_MODE_OBJECT || !active);
 }
 
-void BKE_object_lod_update(Object *ob, const float camera_position[3])
+void BKE_object_lod_update_ex(Object *ob, const Scene *scene, const float camera_position[3], float camera_lodfactor)
 {
 	LodLevel *cur_level = ob->currentlod;
-	LodLevel *new_level = lod_level_select(ob, camera_position);
+	LodLevel *new_level = lod_level_select(ob, scene, camera_position, camera_lodfactor);
 
-	if (new_level != cur_level) {
+	if (new_level && new_level != cur_level) {
 		ob->currentlod = new_level;
 	}
+}
+
+void BKE_object_lod_update(Object *ob, const float camera_position[3])
+{
+	BKE_object_lod_update_ex(ob, NULL, camera_position, 1.0f);
+}
+
+/* Impostor (billboard LoD level): the game turns the object around Z so its local +Y faces the camera
+ * (KX_GameObject::UpdateLod) and, with an atlas, picks the cell baked nearest to that heading. */
+bool BKE_object_lod_impostor(Object *ob, const float camera_position[3], float r_obmat[4][4], float r_uv[4])
+{
+	const LodLevel *lod = ob->currentlod;
+	float to_cam[3], size[3];
+
+	if (!lod || (lod->flags & OB_LOD_USE_INVISIBLE) || !(lod->flags & OB_LOD_USE_BILLBOARD)) {
+		return false;
+	}
+
+	sub_v3_v3v3(to_cam, camera_position, ob->obmat[3]);
+	to_cam[2] = 0.0f;
+	const float len_sq = len_squared_v3(to_cam);
+	if (len_sq <= 1e-8f) {
+		return false;
+	}
+	mul_v3_fl(to_cam, 1.0f / sqrtf(len_sq));
+
+	/* heading = atan2(-x, y): sin = -x, cos = y, so the local +Y axis (-sin, cos) is the camera direction. */
+	const float heading = atan2f(-to_cam[0], to_cam[1]);
+	const float ch = cosf(heading);
+	const float sh = sinf(heading);
+
+	mat4_to_size(size, ob->obmat);
+	unit_m4(r_obmat);
+	r_obmat[0][0] = ch * size[0];  r_obmat[0][1] = sh * size[0];
+	r_obmat[1][0] = -sh * size[1]; r_obmat[1][1] = ch * size[1];
+	r_obmat[2][2] = size[2];
+	copy_v3_v3(r_obmat[3], ob->obmat[3]);
+
+	r_uv[0] = r_uv[1] = 1.0f;
+	r_uv[2] = r_uv[3] = 0.0f;
+	if (lod->flags & OB_LOD_USE_ATLAS) {
+		const int cols = lod->atlas_cols;
+		const int rows = lod->atlas_rows;
+		const int cell_count = cols * rows;
+		if (cell_count > 0) {
+			float normalized = heading / (2.0f * (float)M_PI);
+			if (normalized < 0.0f) {
+				normalized += 1.0f;
+			}
+			/* cell i was baked at heading i / cell_count: the nearest view, not the floor */
+			const int cell = (int)(normalized * cell_count + 0.5f) % cell_count;
+			r_uv[0] = 1.0f / cols;
+			r_uv[1] = 1.0f / rows;
+			r_uv[2] = (float)(cell % cols) / cols;
+			r_uv[3] = (float)(cell / cols) / rows;
+		}
+	}
+	return true;
 }
 
 static Object *lod_ob_get(Object *ob, Scene *scene, int flag)

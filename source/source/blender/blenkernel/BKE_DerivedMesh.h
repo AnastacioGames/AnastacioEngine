@@ -776,6 +776,12 @@ typedef struct DMVertexAttribs {
 	int tottface, totmcol, tottang, totorco;
 } DMVertexAttribs;
 
+/* Impostor atlas cell (3D View preview of KX_ImpostorAtlasDeformer): while set, the UV layers sent to the
+ * GLSL draw become uv * xf[0..1] + xf[2..3]. NULL / clear = untouched. */
+void DM_draw_uv_transform_set(const float xf[4]);
+void DM_draw_uv_transform_clear(void);
+const float *DM_draw_uv_transform_get(void);
+
 void DM_vertex_attributes_from_gpu(
         DerivedMesh *dm,
         struct GPUVertexAttribs *gattribs, DMVertexAttribs *attribs);

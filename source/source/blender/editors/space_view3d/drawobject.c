@@ -9806,7 +9806,7 @@ void draw_object_instance(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object 
 }
 
 /* Shader log on: a line per object whose draw took long (first draw after showing a layer). */
-void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
+static void draw_object_profiled(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
 {
 	if (!GPU_profile_log_enabled()) {
 		draw_object_impl(bmain, scene, ar, v3d, base, dflag);
@@ -9828,4 +9828,32 @@ void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base
 		             dm ? dm->getNumLoops(dm) : -1, dm ? dm->getNumPolys(dm) : -1, ob->totcol, ob->dt);
 		GPU_profile_log_line(text);
 	}
+}
+
+/* Impostor LoD level (Billboard / Atlas) in the 3D View, as the game draws it (KX_GameObject::UpdateLod): the
+ * object turns around Z to face the view and, with an atlas, shows the cell baked nearest to that heading.
+ * The object matrix and the UV transform only live during this draw. */
+void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
+{
+#ifdef WITH_GAMEENGINE
+	RegionView3D *rv3d = ar->regiondata;
+	Object *ob = base->object;
+	float billboard_obmat[4][4], saved_obmat[4][4], uv_xf[4];
+
+	if ((rv3d->rflag & RV3D_IS_GAME_ENGINE) && ob != scene->obedit && ob->currentlod &&
+	    (ob->currentlod->flags & OB_LOD_USE_BILLBOARD) && BKE_object_lod_is_usable(ob, scene) &&
+	    BKE_object_lod_impostor(ob, rv3d->viewinv[3], billboard_obmat, uv_xf))
+	{
+		copy_m4_m4(saved_obmat, ob->obmat);
+		copy_m4_m4(ob->obmat, billboard_obmat);
+		if (uv_xf[0] != 1.0f || uv_xf[1] != 1.0f || uv_xf[2] != 0.0f || uv_xf[3] != 0.0f) {
+			DM_draw_uv_transform_set(uv_xf);
+		}
+		draw_object_profiled(bmain, scene, ar, v3d, base, dflag);
+		DM_draw_uv_transform_clear();
+		copy_m4_m4(ob->obmat, saved_obmat);
+		return;
+	}
+#endif
+	draw_object_profiled(bmain, scene, ar, v3d, base, dflag);
 }

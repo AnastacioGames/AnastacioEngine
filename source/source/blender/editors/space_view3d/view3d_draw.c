@@ -2450,6 +2450,19 @@ static DupliObject *dupli_step(DupliObject *dob)
 	return dob;
 }
 
+#ifdef WITH_GAMEENGINE
+/* LoD distance factor of the camera the game would render with: the camera of a camera view, else the
+ * scene camera (Camera.lod_factor, see KX_Camera::GetLodDistanceFactor). */
+static float view3d_lod_camera_factor(Scene *scene, View3D *v3d, RegionView3D *rv3d)
+{
+	Object *camob = (rv3d->persp == RV3D_CAMOB && v3d->camera) ? v3d->camera : scene->camera;
+	if (camob && camob->type == OB_CAMERA && camob->data) {
+		return ((Camera *)camob->data)->lodfactor;
+	}
+	return 1.0f;
+}
+#endif
+
 static void draw_dupli_objects_color(
         Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base,
         const short dflag, const int color)
@@ -2498,7 +2511,7 @@ static void draw_dupli_objects_color(
 
 #ifdef WITH_GAMEENGINE
 		if (rv3d->rflag & RV3D_IS_GAME_ENGINE) {
-			BKE_object_lod_update(dob->ob, rv3d->viewinv[3]);
+			BKE_object_lod_update_ex(dob->ob, scene, rv3d->viewinv[3], view3d_lod_camera_factor(scene, v3d, rv3d));
 		}
 #endif
 
@@ -4931,7 +4944,7 @@ static void view3d_stereo3d_setup_offscreen(Scene *scene, View3D *v3d, ARegion *
 }
 
 #ifdef WITH_GAMEENGINE
-static void update_lods(Scene *scene, float camera_pos[3])
+static void update_lods(Scene *scene, float camera_pos[3], float camera_lodfactor)
 {
 	Scene *sce_iter;
 	Base *base;
@@ -4939,7 +4952,7 @@ static void update_lods(Scene *scene, float camera_pos[3])
 
 	for (SETLOOPER(scene, sce_iter, base)) {
 		ob = base->object;
-		BKE_object_lod_update(ob, camera_pos);
+		BKE_object_lod_update_ex(ob, scene, camera_pos, camera_lodfactor);
 	}
 }
 #endif
@@ -4998,7 +5011,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 		rv3d->rflag |= RV3D_IS_GAME_ENGINE;
 
 		/* Make sure LoDs are up to date */
-		update_lods(scene, rv3d->viewinv[3]);
+		update_lods(scene, rv3d->viewinv[3], view3d_lod_camera_factor(scene, v3d, rv3d));
 	}
 #endif
 

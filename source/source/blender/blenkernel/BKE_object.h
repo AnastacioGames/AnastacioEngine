@@ -97,6 +97,9 @@ void BKE_object_lod_add(struct Object *ob);
 void BKE_object_lod_sort(struct Object *ob);
 bool BKE_object_lod_remove(struct Object *ob, int level);
 void BKE_object_lod_update(struct Object *ob, const float camera_position[3]);
+void BKE_object_lod_update_ex(struct Object *ob, const struct Scene *scene, const float camera_position[3],
+                             float camera_lodfactor);
+bool BKE_object_lod_impostor(struct Object *ob, const float camera_position[3], float r_obmat[4][4], float r_uv[4]);
 bool BKE_object_lod_is_usable(struct Object *ob, struct Scene *scene);
 struct Object *BKE_object_lod_meshob_get(struct Object *ob, struct Scene *scene);
 struct Object *BKE_object_lod_matob_get(struct Object *ob, struct Scene *scene);
