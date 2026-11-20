@@ -101,6 +101,7 @@
 #include "DNA_group_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_property_types.h"
+#include "DNA_object_force_types.h"
 #include "DNA_python_component_types.h"
 #include "BLI_listbase.h"
 #include "DNA_world_types.h"
@@ -1009,6 +1010,50 @@ void KX_Scene::UpdateAutoWorldSun()
 	// Blender lamps illuminate along local -Z, so align local +Z away from the
 	// ground reference. This leaves local -Z pointing directly at it.
 	m_worldSun->AlignAxisToVect(sunPosition - groundReference, 2);
+}
+
+void KX_Scene::UpdateGameFields()
+{
+	if (!m_physicsEnvironment) {
+		return;
+	}
+	std::vector<PHY_GameField> fields;
+	EXP_ListValue<KX_GameObject> *objects = GetObjectList();
+	for (KX_GameObject *gameobj : *objects) {
+		if (!gameobj->IsGameField()) {
+			continue;
+		}
+		const PartDeflect *pd = gameobj->GetBlenderObject()->pd;
+		if ((pd->forcefield != PFIELD_FORCE && pd->forcefield != PFIELD_WIND) || !(pd->flag & PFIELD_DO_LOCATION)) {
+			continue;
+		}
+		PHY_GameField f;
+		f.type = pd->forcefield;
+		const mt::vec3 pos = gameobj->NodeGetWorldPosition();
+		const mt::vec3 z = gameobj->NodeGetWorldOrientation().GetColumn(2).Normalized();
+		for (int i = 0; i < 3; i++) {
+			f.position[i] = pos[i];
+			f.zAxis[i] = z[i];
+		}
+		f.strength = pd->f_strength;
+		f.flow = pd->f_flow;
+		f.planar = (pd->shape == PFIELD_SHAPE_PLANE);
+		f.gravitation = (pd->flag & PFIELD_GRAVITATION) != 0;
+		f.falloff = pd->falloff;
+		f.zdir = pd->zdir;
+		f.useMin = (pd->flag & PFIELD_USEMIN) != 0;
+		f.useMax = (pd->flag & PFIELD_USEMAX) != 0;
+		f.useMinRad = (pd->flag & PFIELD_USEMINR) != 0;
+		f.useMaxRad = (pd->flag & PFIELD_USEMAXR) != 0;
+		f.minDist = pd->mindist;
+		f.maxDist = pd->maxdist;
+		f.power = pd->f_power;
+		f.minRad = pd->minrad;
+		f.maxRad = pd->maxrad;
+		f.powerRad = pd->f_power_r;
+		fields.push_back(f);
+	}
+	m_physicsEnvironment->SetGameFields(fields);
 }
 
 void KX_Scene::UpdateEarthquake(double curtime)

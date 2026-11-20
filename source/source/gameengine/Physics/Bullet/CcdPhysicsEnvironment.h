@@ -93,6 +93,13 @@ protected:
 
 	/// timestep subdivisions
 	int m_numTimeSubSteps;
+
+	/// Game force fields. Their force is added right before each sub step and taken back right
+	/// after it, so the field never leaves residue in the body forces the game or Bullet own.
+	std::vector<PHY_GameField> m_gameFields;
+	std::vector<std::pair<btRigidBody *, btVector3> > m_appliedFieldForces;
+	void ApplyGameFields();
+	void RemoveGameFields();
 	/// value passed to SetFixedTimeStep, returned as-is by GetFixedTimeStep (0.f if not using a fixed timestep)
 	float m_fixedTimeStep;
 
@@ -185,6 +192,7 @@ public:
 	/// Perform an integration step of duration 'timeStep'.
 	virtual void ProceedDeltaTimeCar(double timeStep, double interval);
 	virtual void ProceedDeltaTime(double timeStep, double interval);
+	virtual void SetGameFields(const std::vector<PHY_GameField>& fields);
 
 	/**
 	 * Called by Bullet for every physical simulation (sub)tick.

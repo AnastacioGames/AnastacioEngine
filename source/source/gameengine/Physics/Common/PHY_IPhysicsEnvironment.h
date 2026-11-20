@@ -95,6 +95,24 @@ public:
 	}
 };
 
+/// Force field (Blender PartDeflect, opt-in with PFIELD_GAME) as seen by the physics step.
+/// World space; rebuilt by the scene every frame, so it always follows the runtime transform.
+struct PHY_GameField {
+	enum Type { FORCE = 1, WIND = 4 };
+	int type;
+	float position[3];
+	float zAxis[3];        ///< normalised world +Z of the field object
+	float strength;
+	float flow;            ///< wind: drag against the body velocity (air resistance)
+	bool planar;           ///< PFIELD_SHAPE_PLANE
+	bool gravitation;      ///< force scaled by 1/distance^2
+	int falloff;           ///< PFIELD_FALL_SPHERE/TUBE/CONE
+	int zdir;              ///< PFIELD_Z_BOTH/POS/NEG
+	bool useMin, useMax, useMinRad, useMaxRad;
+	float minDist, maxDist, power;
+	float minRad, maxRad, powerRad;
+};
+
 /**
  * Physics Environment takes care of stepping the simulation and is a container for physics entities
  * (rigidbodies,constraints, materials etc.)
@@ -109,6 +127,10 @@ public:
 	/// Perform an integration step of duration 'timeStep'.
 	virtual void ProceedDeltaTimeCar(double timeStep, double interval) = 0;
 	virtual void ProceedDeltaTime(double timeStep, double interval) = 0;
+	/// Force fields acting on dynamic bodies during the next step (replaces the previous list).
+	virtual void SetGameFields(const std::vector<PHY_GameField>& fields)
+	{
+	}
 	/// draw debug lines (make sure to call this during the render phase, otherwise lines are not drawn properly)
 	virtual void DebugDrawWorld()
 	{

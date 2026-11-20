@@ -650,6 +650,9 @@ public:
 	/// Shake scene gravity from World > Weather > Earthquake (curtime in seconds).
 	void UpdateEarthquake(double curtime);
 
+	/// Collects the objects with a Game Engine force field (PFIELD_GAME) and hands them to physics.
+	void UpdateGameFields();
+
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, RAS_Rasterizer::StereoEye eye, int layer, bool is_shadowbuf);
 	std::vector<KX_GameObject *> CalculateVisibleMeshes(KX_Camera *cam, const SG_Frustum& frustum, int layer, bool is_shadowbuf);
 	/** Until EndShadowCulling(), shadow-buffer CalculateVisibleMeshes() calls test a snapshot

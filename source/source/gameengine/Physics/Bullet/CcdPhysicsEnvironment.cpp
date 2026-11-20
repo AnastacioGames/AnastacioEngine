@@ -1073,6 +1073,121 @@ void CcdPhysicsEnvironment::StaticSimulationSubtickCallback(btDynamicsWorld *wor
 	this_->SimulationSubtickCallback(timeStep);
 }
 
+/* Same falloff as blenkernel effect.c (falloff_func): 1 up to mindist, 1/(1+d-min)^power after it,
+ * zero past maxdist. */
+static float GameFieldFalloff(float fac, bool useMin, float minDist, bool useMax, float maxDist, float power)
+{
+	if (useMax && fac > maxDist) {
+		return 0.0f;
+	}
+	if (useMin && fac < minDist) {
+		return 1.0f;
+	}
+	if (!useMin) {
+		minDist = 0.0f;
+	}
+	return (float)pow((double)(1.0f + fac - minDist), (double)(-power));
+}
+
+void CcdPhysicsEnvironment::SetGameFields(const std::vector<PHY_GameField>& fields)
+{
+	m_gameFields = fields;
+}
+
+void CcdPhysicsEnvironment::ApplyGameFields()
+{
+	m_appliedFieldForces.clear();
+	if (m_gameFields.empty()) {
+		return;
+	}
+	for (CcdPhysicsController *ctrl : m_controllers) {
+		btRigidBody *body = ctrl->GetRigidBody();
+		if (!body || !body->isInWorld() || body->isStaticOrKinematicObject()) {
+			continue;
+		}
+		const btVector3 p = body->getCenterOfMassPosition();
+		const btVector3 vel = body->getLinearVelocity();
+		btVector3 total(0.0f, 0.0f, 0.0f);
+
+		for (const PHY_GameField& f : m_gameFields) {
+			const btVector3 fpos(f.position[0], f.position[1], f.position[2]);
+			const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
+			const btVector3 toCenter = p - fpos;
+			btVector3 loc = fpos;
+			if (f.planar) {
+				loc = p - nor * toCenter.dot(nor); // closest point on the field's XY plane
+			}
+			btVector3 toPoint = p - loc;
+			const float dist = toPoint.length();
+			const float fac = nor.dot(toCenter);
+
+			float falloff = 1.0f;
+			if ((f.zdir == 1 && fac < 0.0f) || (f.zdir == 2 && fac > 0.0f)) {
+				falloff = 0.0f;
+			}
+			else if (f.falloff == 1 || f.falloff == 2) { // tube, cone
+				falloff = GameFieldFalloff(fabsf(fac), f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
+				if (falloff != 0.0f) {
+					float rFac;
+					if (f.falloff == 1) {
+						rFac = (toCenter - nor * fac).length();
+					}
+					else {
+						const float len = toPoint.length();
+						rFac = (len > SIMD_EPSILON) ? btDegrees(acosf(btClamped(fac / len, -1.0f, 1.0f))) : 0.0f;
+					}
+					falloff *= GameFieldFalloff(rFac, f.useMinRad, f.minRad, f.useMaxRad, f.maxRad, f.powerRad);
+				}
+			}
+			else {
+				falloff = GameFieldFalloff(dist, f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
+			}
+			if (falloff <= 0.0f) {
+				continue;
+			}
+
+			btVector3 force(0.0f, 0.0f, 0.0f);
+			if (f.type == PHY_GameField::WIND) {
+				force = nor * (f.strength * falloff);
+			}
+			else if (f.type == PHY_GameField::FORCE) {
+				float strength = f.strength;
+				if (f.gravitation) {
+					strength = (dist < SIMD_EPSILON) ? 0.0f : strength / (dist * dist);
+				}
+				if (dist > SIMD_EPSILON) {
+					force = (toPoint / dist) * (strength * falloff);
+				}
+			}
+			if (f.flow != 0.0f) {
+				force -= vel * (f.flow * falloff); // air resistance against the moving medium
+			}
+			total += force;
+		}
+
+		if (total.fuzzyZero()) {
+			continue;
+		}
+		if (!body->isActive()) {
+			// A sleeping body only wakes up when the field would really move it.
+			if (total.length() * body->getInvMass() < 0.5f) {
+				continue;
+			}
+			body->activate();
+		}
+		body->applyCentralForce(total);
+		m_appliedFieldForces.push_back(std::make_pair(body, total));
+	}
+}
+
+void CcdPhysicsEnvironment::RemoveGameFields()
+{
+	for (const std::pair<btRigidBody *, btVector3>& applied : m_appliedFieldForces) {
+		applied.first->applyCentralForce(-applied.second);
+	}
+	m_appliedFieldForces.clear();
+}
+
 void CcdPhysicsEnvironment::SimulationSubtickCallback(btScalar timeStep)
 {
 	std::set<CcdPhysicsController *>::iterator it;
@@ -1120,7 +1235,9 @@ void CcdPhysicsEnvironment::ProceedDeltaTime(double timeStep, double interval)
 		return;
 	}
 	for (unsigned short r=0;r<i;r++) {
+		ApplyGameFields();
 		m_dynamicsWorld->stepSimulationRun();
+		RemoveGameFields();
 		CallbackTriggers();
 	}
 	SynchronizeActiveMotionStates();
@@ -1198,7 +1315,9 @@ void CcdPhysicsEnvironment::ProceedDeltaTimeCar(double timeStep, double interval
 	}
 
 	for (int r=0;r<i;r++) {
+		ApplyGameFields();
 		m_dynamicsWorld->stepSimulationRun();
+		RemoveGameFields();
 		CallbackTriggers();
 	}
 	m_dynamicsWorld->synchronizeMotionStates();
