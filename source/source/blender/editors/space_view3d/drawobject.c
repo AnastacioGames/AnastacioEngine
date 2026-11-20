@@ -9806,8 +9806,72 @@ void draw_object_instance(Scene *scene, View3D *v3d, RegionView3D *rv3d, Object 
 }
 
 /* Shader log on: a line per object whose draw took long (first draw after showing a layer). */
+#ifdef WITH_GAMEENGINE
+/* LOD impostor preview (KX_GameObject::UpdateLod): a Billboard level turns around Z to face the view and
+ * an Atlas level shows the cell baked for that heading. The object matrix is replaced for the draw only. */
+static bool impostor_preview_begin(Scene *scene, RegionView3D *rv3d, Object *ob, float r_obmat_backup[4][4])
+{
+	const LodLevel *lod = ob->currentlod;
+	if (!(rv3d->rflag & RV3D_IS_GAME_ENGINE) || !lod || !(lod->flags & OB_LOD_USE_BILLBOARD) ||
+	    !BKE_object_lod_is_usable(ob, scene) || (lod->flags & OB_LOD_USE_INVISIBLE))
+	{
+		return false;
+	}
+	float to_cam[3];
+	sub_v3_v3v3(to_cam, rv3d->viewinv[3], ob->obmat[3]);
+	to_cam[2] = 0.0f;
+	const float len_sq = len_squared_v3(to_cam);
+	if (len_sq < 1e-8f) {
+		return false;
+	}
+	mul_v3_fl(to_cam, 1.0f / sqrtf(len_sq));
+	const float heading = atan2f(-to_cam[0], to_cam[1]);
+	const float ch = cosf(heading), sh = sinf(heading);
+
+	copy_m4_m4(r_obmat_backup, ob->obmat);
+	/* same scale, orientation replaced by the heading (cylindrical billboard) */
+	const float sx = len_v3(ob->obmat[0]), sy = len_v3(ob->obmat[1]), sz = len_v3(ob->obmat[2]);
+	ob->obmat[0][0] = ch * sx;  ob->obmat[0][1] = sh * sx;  ob->obmat[0][2] = 0.0f;
+	ob->obmat[1][0] = -sh * sy; ob->obmat[1][1] = ch * sy;  ob->obmat[1][2] = 0.0f;
+	ob->obmat[2][0] = 0.0f;     ob->obmat[2][1] = 0.0f;     ob->obmat[2][2] = sz;
+
+	if ((lod->flags & OB_LOD_USE_ATLAS) && lod->atlas_cols > 0 && lod->atlas_rows > 0) {
+		const int cols = lod->atlas_cols, rows = lod->atlas_rows, cells = cols * rows;
+		float cell_heading = heading;
+		/* a parented impostor shows the side that faces the camera relative to where the parent points */
+		if (ob->parent && ob->partype != PARBONE) {
+			const float *fwd = ob->parent->obmat[1];
+			if (fwd[0] * fwd[0] + fwd[1] * fwd[1] > 1e-8f) {
+				cell_heading -= atan2f(-fwd[0], fwd[1]);
+			}
+		}
+		float normalized = cell_heading / (2.0f * (float)M_PI);
+		normalized -= floorf(normalized);
+		const int index = (int)(normalized * cells + 0.5f) % cells;
+		const float cell[4] = {(float)(index % cols) / cols, (float)(index / cols) / rows, 1.0f / cols, 1.0f / rows};
+		GPU_material_set_impostor_cell(cell);
+	}
+	return true;
+}
+
+static void impostor_preview_end(Object *ob, const float obmat_backup[4][4])
+{
+	copy_m4_m4(ob->obmat, obmat_backup);
+	GPU_material_set_impostor_cell(NULL);
+}
+#endif
+
 void draw_object(Main *bmain, Scene *scene, ARegion *ar, View3D *v3d, Base *base, const short dflag)
 {
+#ifdef WITH_GAMEENGINE
+	float impostor_obmat[4][4];
+	const bool impostor = impostor_preview_begin(scene, ar->regiondata, base->object, impostor_obmat);
+	if (impostor) {
+		draw_object_impl(bmain, scene, ar, v3d, base, dflag);
+		impostor_preview_end(base->object, impostor_obmat);
+		return;
+	}
+#endif
 	if (!GPU_profile_log_enabled()) {
 		draw_object_impl(bmain, scene, ar, v3d, base, dflag);
 		return;

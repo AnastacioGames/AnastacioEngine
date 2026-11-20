@@ -357,6 +357,8 @@ void GPU_material_bind(
         GPUMaterial *material, int viewlay, double time, int mipmap,
         float viewmat[4][4], float viewinv[4][4], float cameraborder[4], bool scenelock,
         float projmat[4][4]);
+/* Atlas cell (xy offset, zw scale) of the LOD impostor being drawn; NULL turns it off. */
+void GPU_material_set_impostor_cell(const float cell[4]);
 void GPU_material_bind_uniforms(
         GPUMaterial *material, float obmat[4][4], float viewmat[4][4], const float obcol[4],
 		int oblay, float autobumpscale, GPUParticleInfo *pi, float object_info[3]);

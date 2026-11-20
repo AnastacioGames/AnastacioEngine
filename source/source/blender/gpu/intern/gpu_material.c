@@ -534,6 +534,8 @@ static int gpu_material_construct_end(GPUMaterial *material, const char *passnam
 			material->objectlayloc = GPU_shader_get_uniform(shader, GPU_builtin_name(GPU_OBJECT_LAY));
 		}
 
+		material->impostorcellloc = GPU_shader_get_uniform(shader, "unfimpostorcell");
+
 		if (material->use_foliage) {
 			material->infoliageparamsloc = GPU_shader_get_uniform(shader, "unfoliageparams");
 			material->infoliagecameraloc = material->use_instancing ?
@@ -1067,6 +1069,18 @@ GPUBuiltin GPU_get_material_builtins(GPUMaterial *material)
 	return material->builtins;
 }
 
+/* Atlas cell of the LOD impostor being drawn (3D View preview): xy = UV offset, zw = UV scale. */
+static float g_impostor_cell[4];
+static bool g_impostor_cell_on = false;
+
+void GPU_material_set_impostor_cell(const float cell[4])
+{
+	g_impostor_cell_on = (cell != NULL);
+	if (cell) {
+		copy_v4_v4(g_impostor_cell, cell);
+	}
+}
+
 void GPU_material_bind_uniforms(
         GPUMaterial *material, float obmat[4][4], float viewmat[4][4], const float obcol[4], int oblay,
         float autobumpscale, GPUParticleInfo *pi, float object_info[3])
@@ -1076,6 +1090,13 @@ void GPU_material_bind_uniforms(
 		float invmat[4][4], col[4];
 		float localtoviewmat[4][4];
 		float invlocaltoviewmat[4][4];
+
+		/* zero z = off; the uniform keeps its value in the program, so reset it once after use */
+		if (material->impostorcellloc != -1 && (g_impostor_cell_on || material->impostorcell_on)) {
+			static const float off[4] = {0.0f, 0.0f, 0.0f, 0.0f};
+			GPU_shader_uniform_vector(shader, material->impostorcellloc, 4, 1, g_impostor_cell_on ? g_impostor_cell : off);
+			material->impostorcell_on = g_impostor_cell_on;
+		}
 
 		if (material->use_foliage && material->ma) {
 			Material *ma = material->ma;

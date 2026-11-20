@@ -1880,6 +1880,11 @@ static char *code_generate_vertex(ListBase *nodes, const char *usercode, const G
 #endif
 					BLI_dynstr_appendf(ds, "\tset_var_from_attr(att%d, att%d_info, var%d);\n",
 					                   input->attribid, input->attribid, input->attribid);
+					if (input->attribtype == CD_MTFACE && strcmp(input->attribname, "Lightmap") != 0) {
+						/* LOD impostor atlas cell of the 3D View preview (GPU_material_set_impostor_cell) */
+						BLI_dynstr_appendf(ds, "\tif (unfimpostorcell.z > 0.0) var%d.xy = var%d.xy * unfimpostorcell.zw + unfimpostorcell.xy;\n",
+						                   input->attribid, input->attribid);
+					}
 #ifdef WITH_OPENSUBDIV
 					if (is_mtface) {
 						BLI_dynstr_appendf(ds, "#endif\n");

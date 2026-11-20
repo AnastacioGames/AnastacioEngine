@@ -123,6 +123,8 @@ struct GPUMaterial {
 	bool use_skinning;
 
 	int infoliageparamsloc;
+	int impostorcellloc;
+	bool impostorcell_on;
 	int infoliagecameraloc;
 	float foliagecamera[3];
 	bool foliagecamera_set;

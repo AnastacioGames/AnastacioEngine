@@ -169,6 +169,10 @@ void set_var_from_attr(float attr, int info, out float var)
 	var = attr;
 }
 
+/* LOD impostor atlas cell (3D View preview; applied to UV layers by gpu_codegen.c): xy offset, zw scale,
+ * zw = 0 when off. */
+uniform vec4 unfimpostorcell;
+
 void set_var_from_attr(vec2 attr, int info, out vec2 var)
 {
 	var = attr;
