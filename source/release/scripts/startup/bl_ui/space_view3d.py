@@ -3813,6 +3813,7 @@ class VIEW3D_PT_shading(Panel):
             col.prop(fx_settings, "use_game_ssgi")
             col.prop(fx_settings, "use_game_particles")
             col.prop(context.scene, "range_ui_preview")
+            col.prop(context.scene, "range_video_preview")
         col.prop(view, "show_invisible_lods")
 
         layout.separator()
