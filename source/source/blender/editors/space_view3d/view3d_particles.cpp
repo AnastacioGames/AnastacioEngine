@@ -137,8 +137,10 @@ void view3d_gpu_particles_free(void)
 void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 {
 	if (!(v3d->fx_settings.fx_flag2 & GPU_FX2_PARTICLES)) {
-		if (!g_emitters.empty()) {
-			g_emitters.clear();
+		for (size_t i = g_emitters.size(); i-- > 0;) {
+			if (g_emitters[i].rv3d == rv3d) {
+				g_emitters.erase(g_emitters.begin() + i);
+			}
 		}
 		return;
 	}
@@ -154,6 +156,10 @@ void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 	const double now = PIL_check_seconds_timer();
 	bool any = false;
 
+	GLint prev_prog = 0, prev_vao = 0, prev_vbo = 0;
+	glGetIntegerv(GL_CURRENT_PROGRAM, &prev_prog);
+	glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &prev_vao);
+	glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &prev_vbo);
 	glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT);
 	for (const Base *base = (const Base *)scene->base.first; base; base = base->next) {
 		const Object *ob = base->object;
@@ -198,6 +204,9 @@ void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 		}
 	}
 	glPopAttrib();
+	glUseProgram(prev_prog);
+	glBindVertexArray(prev_vao);
+	glBindBuffer(GL_ARRAY_BUFFER, prev_vbo);
 	(void)any;
 
 	/* Emitters that left the view, the scene or the layers free their buffers. */

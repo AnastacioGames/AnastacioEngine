@@ -2337,6 +2337,15 @@ static void rna_GPUFXSettings_fx_update(Main *UNUSED(bmain), Scene *UNUSED(scene
 	BKE_screen_gpu_fx_validate(fx_settings);
 }
 
+static void rna_GPUFXSettings_particles_update(Main *bmain, Scene *scene, PointerRNA *ptr)
+{
+	rna_GPUFXSettings_fx_update(bmain, scene, ptr);
+	/* starts or stops the viewport realtime timer the particles need */
+	if (bmain->wm.first) {
+		ED_view3d_realtime_viewport_update((wmWindowManager *)bmain->wm.first);
+	}
+}
+
 static void rna_SCENEFXSettings_fx_update(Main *UNUSED(bmain), Scene *scene, PointerRNA *UNUSED(ptr))
 {
 	BKE_scene_fx_validate(scene);
@@ -5741,7 +5750,7 @@ static void rna_def_gpu_fx(BlenderRNA *brna)
 	RNA_def_property_ui_text(prop, "Particles",
 	                         "Show the GPU particle emitters (Object > Particles) simulated with the game's own "
 	                         "buffer, on the real clock");
-	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, NULL);
+	RNA_def_property_update(prop, NC_SPACE | ND_SPACE_VIEW3D, "rna_GPUFXSettings_particles_update");
 }
 
 static void rna_def_scene_gpu_bloom_fx(BlenderRNA *brna)
