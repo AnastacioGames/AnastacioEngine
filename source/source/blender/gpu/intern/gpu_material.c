@@ -1352,6 +1352,17 @@ bool GPU_shadow_depth_pass_get(void)
 	return GPU_shadow_depth_pass > 0.5f;
 }
 
+bool GPU_shadow_color_pass_get(void)
+{
+	return GPU_shadow_color_pass > 0.5f;
+}
+
+bool GPU_material_casts_colored_shadow(const Material *ma)
+{
+	return ma && (ma->mode2 & MA_COLORED_SHADOW) && (ma->mode2 & MA_CASTSHADOW) &&
+	       (ma->game.alpha_blend & (GEMAT_ALPHA | GEMAT_ALPHA_SORT));
+}
+
 void GPU_material_shadow_color_link(GPUMaterial *material, GPUNodeLink *base, GPUNodeLink *alpha)
 {
 	const Material *ma = material->ma;
@@ -1371,10 +1382,7 @@ static void gpu_material_link_shadow_color(GPUMaterial *mat, Material *ma)
 	GPUNodeLink *base = mat->shadowcol_base;
 	GPUNodeLink *alpha = mat->shadowcol_alpha;
 
-	if (!mat->outlinks[0] || mat->type != GPU_MATERIAL_TYPE_MESH ||
-	    !(ma->mode2 & MA_COLORED_SHADOW) || !(ma->mode2 & MA_CASTSHADOW) ||
-	    !(ma->game.alpha_blend & (GEMAT_ALPHA | GEMAT_ALPHA_SORT)))
-	{
+	if (!mat->outlinks[0] || mat->type != GPU_MATERIAL_TYPE_MESH || !GPU_material_casts_colored_shadow(ma)) {
 		return;
 	}
 
@@ -6101,6 +6109,14 @@ static GLint shadow_color_prev_fb;
 static int shadow_color_viewport[4];
 static GLboolean shadow_color_depth_test;
 
+void GPU_shadow_color_pass_blend(void)
+{
+	/* rgb: multiply by the caster's transmittance; alpha: keep the nearest caster depth */
+	glEnable(GL_BLEND);
+	glBlendFuncSeparate(GL_DST_COLOR, GL_ZERO, GL_ONE, GL_ONE);
+	glBlendEquationSeparate(GL_FUNC_ADD, GL_MIN);
+}
+
 bool GPU_lamp_shadow_color_begin(GPULamp *lamp)
 {
 	if (!lamp->fb || !lamp->colortex || !lamp->colorfb) {
@@ -6113,11 +6129,7 @@ bool GPU_lamp_shadow_color_begin(GPULamp *lamp)
 	GPU_framebuffer_bind_no_save(lamp->colorfb, 0);
 	glDisable(GL_DEPTH_TEST);
 	gpu_lamp_shadow_color_clear();
-
-	/* rgb: multiply by the caster's transmittance; alpha: keep the nearest caster depth */
-	glEnable(GL_BLEND);
-	glBlendFuncSeparate(GL_DST_COLOR, GL_ZERO, GL_ONE, GL_ONE);
-	glBlendEquationSeparate(GL_FUNC_ADD, GL_MIN);
+	GPU_shadow_color_pass_blend();
 #if defined(WITH_GL_PROFILE_COMPAT) && !defined(WITH_GL_PROFILE_CORE) && !defined(__EMSCRIPTEN__)
 	glDisable(GL_ALPHA_TEST);
 #endif
@@ -6142,6 +6154,27 @@ void GPU_lamp_shadow_color_end(GPULamp *lamp, bool drew_casters)
 	/* The blend state was changed behind the material blend cache: make it apply Solid again. */
 	GPU_set_material_alpha_blend(GPU_BLEND_ALPHA);
 	GPU_set_material_alpha_blend(GPU_BLEND_SOLID);
+}
+
+bool GPU_lamp_shadow_color_ensure(GPULamp *lamp)
+{
+	if (!lamp || lamp->colortex || !lamp->fb || lamp->la->shadowmap_type == LA_SHADMAP_VARIANCE ||
+	    GPU_lamp_has_point_shadow(lamp))
+	{
+		return false;
+	}
+	GLint fb, viewport[4];
+	glGetIntegerv(GL_FRAMEBUFFER_BINDING_EXT, &fb);
+	glGetIntegerv(GL_VIEWPORT, viewport);
+	gpu_lamp_shadow_color_create(lamp);
+	glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, (GLuint)fb);
+	glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+	return lamp->colortex != NULL;
+}
+
+int GPU_lamp_shadow_color_size(GPULamp *lamp)
+{
+	return (lamp && lamp->colortex) ? GPU_texture_width(lamp->colortex) : 0;
 }
 
 bool GPU_lamp_shadow_color_dirty(GPULamp *lamp)

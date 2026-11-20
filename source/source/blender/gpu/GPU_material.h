@@ -490,6 +490,18 @@ bool GPU_lamp_shadow_color_begin(GPULamp *lamp);
 /* Shadow Casting Alpha: 1 while the casters draw into a depth shadow map with their own shader. */
 void GPU_shadow_depth_pass_set(bool enable);
 bool GPU_shadow_depth_pass_get(void);
+/* A lamp's shadow color pass is being drawn (GPU_lamp_shadow_color_begin/end). */
+bool GPU_shadow_color_pass_get(void);
+/* The pass's blend (transmittance multiplied, nearest depth kept): again before each caster, the
+ * 3D View's object drawing resets the blend state. */
+void GPU_shadow_color_pass_blend(void);
+/* The material writes the colored shadow transmittance (Colored Shadows, casts, alpha blend). */
+bool GPU_material_casts_colored_shadow(const struct Material *ma);
+/* Side of the lamp's shadow color target, 0 without one. */
+int GPU_lamp_shadow_color_size(GPULamp *lamp);
+/* Creates the color target of a lamp made before any Colored Shadows material existed (the
+ * framebuffer binding is kept). True when created: the materials must be rebuilt to read it. */
+bool GPU_lamp_shadow_color_ensure(GPULamp *lamp);
 /* drew_casters false: the target was only cleared, white (see GPU_lamp_shadow_color_dirty). */
 void GPU_lamp_shadow_color_end(GPULamp *lamp, bool drew_casters);
 bool GPU_lamp_shadow_color_dirty(GPULamp *lamp);

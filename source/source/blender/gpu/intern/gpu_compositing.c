@@ -356,6 +356,17 @@ struct GPUFX {
 	GPUShader *ssgi_trace_sh, *ssgi_image_sh;
 	int ssgi_shader_slot;
 	bool ssgi_failed;
+	/* temporal resolve (KX_2DFilterManager::AttachTemporalResolve): ping-pong history at the trace
+	 * size, the depth it was drawn with and its view-projection */
+	GPUShader *ssgi_resolve_sh;
+	GPUTexture *ssgi_hist[2];
+	unsigned int ssgi_hist_depth;
+	int ssgi_hist_cur;
+	bool ssgi_hist_valid;
+	bool ssgi_temporal;
+	bool ssgi_no_temporal;  /* the history failed: the static trace until the slot changes */
+	float ssgi_hist_persmat[4][4];
+	int ssgi_frame;
 
 	unsigned int cloud_history;
 	unsigned int cloud_history_depth;
@@ -491,6 +502,18 @@ static void gpu_fx_ssgi_free_buffers(GPUFX *fx)
 		GPU_texture_free(fx->ssgi_trace);
 		fx->ssgi_trace = NULL;
 	}
+	for (int i = 0; i < 2; i++) {
+		if (fx->ssgi_hist[i]) {
+			GPU_framebuffer_texture_detach(fx->ssgi_hist[i]);
+			GPU_texture_free(fx->ssgi_hist[i]);
+			fx->ssgi_hist[i] = NULL;
+		}
+	}
+	if (fx->ssgi_hist_depth) {
+		glDeleteTextures(1, &fx->ssgi_hist_depth);
+		fx->ssgi_hist_depth = 0;
+	}
+	fx->ssgi_hist_valid = false;
 }
 
 static void gpu_fx_ssgi_free_shaders(GPUFX *fx)
@@ -503,6 +526,12 @@ static void gpu_fx_ssgi_free_shaders(GPUFX *fx)
 		GPU_shader_free(fx->ssgi_image_sh);
 		fx->ssgi_image_sh = NULL;
 	}
+	if (fx->ssgi_resolve_sh) {
+		GPU_shader_free(fx->ssgi_resolve_sh);
+		fx->ssgi_resolve_sh = NULL;
+	}
+	fx->ssgi_temporal = false;
+	fx->ssgi_hist_valid = false;
 	fx->ssgi_shader_slot = 0;
 }
 
@@ -898,6 +927,14 @@ void GPU_fx_compositor_set_ssgi(GPUFX *fx, const GPUFXSSGISettings *settings)
 	if (settings->slot != fx->ssgi_shader_slot) {
 		gpu_fx_ssgi_free_shaders(fx);
 		fx->ssgi_failed = false;
+		fx->ssgi_no_temporal = false;
+	}
+	/* other rays, radius... : the history no longer matches (the game rebuilds its filters) */
+	if (fx->ssgi.divisor != settings->divisor ||
+	    memcmp(fx->ssgi.params, settings->params, sizeof(fx->ssgi.params)) != 0 ||
+	    memcmp(fx->ssgi.display, settings->display, sizeof(fx->ssgi.display)) != 0)
+	{
+		fx->ssgi_hist_valid = false;
 	}
 	fx->ssgi = *settings;
 	CLAMP(fx->ssgi.divisor, 1, 4);
@@ -913,8 +950,20 @@ static bool gpu_fx_ssgi_prepare(GPUFX *fx)
 	if (!fx->ssgi_trace_sh) {
 		char defines[64];
 		/* bgl_DataTextures[0] is the first attachment after the color (KX_2DFilterManager) */
-		BLI_snprintf(defines, sizeof(defines), "#define SSGI_SLOT %d\n", fx->ssgi.slot - 1);
+		/* the game: per frame ray rotation only with the temporal resolve (float targets), which
+		 * needs a copy of the depth here; without it the trace is the static one */
+		fx->ssgi_temporal = false;
+#ifdef GL_VERSION_4_3
+		if (fx->ssgi.resolve_shader && !fx->ssgi_no_temporal && (GLEW_VERSION_4_3 || GLEW_ARB_copy_image)) {
+			fx->ssgi_resolve_sh = GPU_shader_create(gpu_fx_node_vert, fx->ssgi.resolve_shader, NULL, NULL,
+			                                        "#define TEMPORAL_ALPHA 0.1\n", 0, 0, 0);
+			fx->ssgi_temporal = fx->ssgi_resolve_sh != NULL;
+		}
+#endif
+		BLI_snprintf(defines, sizeof(defines), "#define SSGI_SLOT %d\n%s", fx->ssgi.slot - 1,
+		             fx->ssgi_temporal ? "#define SSGI_TEMPORAL\n" : "");
 		fx->ssgi_trace_sh = GPU_shader_create(gpu_fx_node_vert, fx->ssgi.trace_shader, NULL, NULL, defines, 0, 0, 0);
+		BLI_snprintf(defines, sizeof(defines), "#define SSGI_SLOT %d\n", fx->ssgi.slot - 1);
 		fx->ssgi_image_sh = GPU_shader_create(gpu_fx_node_vert, fx->ssgi.image_shader, NULL, NULL, defines, 0, 0, 0);
 		fx->ssgi_shader_slot = fx->ssgi.slot;
 		if (!fx->ssgi_trace_sh || !fx->ssgi_image_sh) {
@@ -948,6 +997,13 @@ static bool gpu_fx_ssgi_buffers(GPUFX *fx, int w, int h, char err_out[256])
 		if (!(fx->ssgi_trace = GPU_texture_create_2D(tw, th, NULL, GPU_HDR_HALF_FLOAT, err_out))) {
 			gpu_fx_ssgi_free_buffers(fx);
 			return false;
+		}
+	}
+	/* without history the trace is shown as it is (no temporal: a failure is not fatal) */
+	for (int i = 0; i < 2 && fx->ssgi_temporal; i++) {
+		if (!fx->ssgi_hist[i]) {
+			fx->ssgi_hist[i] = GPU_texture_create_2D(tw, th, NULL, GPU_HDR_HALF_FLOAT, NULL);
+			fx->ssgi_hist_valid = false;
 		}
 	}
 	return true;
@@ -1879,7 +1935,7 @@ static void gpu_fx_ssgi_bind(GPUFX *fx, GPUShader *sh, float projmat[4][4], floa
 	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTextureHeight"), 1, 1, &h);
 	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "ge_SSGIParams"), 4, 2, fx->ssgi.params);
 	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "ge_SSGIDisplay"), 4, 1, fx->ssgi.display);
-	GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "bgl_Frame"), 0);
+	GPU_shader_uniform_int(sh, GPU_shader_get_uniform(sh, "bgl_Frame"), fx->ssgi_temporal ? fx->ssgi_frame : 0);
 }
 
 static void gpu_fx_ssgi_unbind(GPUFX *fx)
@@ -1893,8 +1949,86 @@ static void gpu_fx_ssgi_unbind(GPUFX *fx)
 
 /* Trace at 1/divisor into its own texture, then the composition as one ping-pong pass. Without
  * the buffers (allocation failed) the pass only copies, so the chain keeps its count. */
+/* The depth texture the history depth copies with glCopyImageSubData (same internal format). */
+static bool gpu_fx_ssgi_hist_depth(GPUFX *fx)
+{
+	const int w = GPU_texture_width(fx->depth_buffer), h = GPU_texture_height(fx->depth_buffer);
+	if (fx->ssgi_hist_depth) {
+		return true;
+	}
+	if (!fx->depth_buffer) {
+		return false;
+	}
+	GLint format = GL_DEPTH_COMPONENT24;
+	glBindTexture(GL_TEXTURE_2D, GPU_texture_opengl_bindcode(fx->depth_buffer));
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_INTERNAL_FORMAT, &format);
+	glGenTextures(1, &fx->ssgi_hist_depth);
+	glBindTexture(GL_TEXTURE_2D, fx->ssgi_hist_depth);
+	glTexImage2D(GL_TEXTURE_2D, 0, format, w, h, 0, GL_DEPTH_COMPONENT, GL_FLOAT, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_COMPARE_MODE, GL_NONE);
+	GLint got_w = 0;
+	glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &got_w);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	if (got_w != w) {
+		glDeleteTextures(1, &fx->ssgi_hist_depth);
+		fx->ssgi_hist_depth = 0;
+		return false;
+	}
+	return true;
+}
+
+/* RAS_2DFilterManager::RenderTemporalResolve: the trace blended with the reprojected history into
+ * the other history texture, which the composition then reads. Returns what it reads. */
+static GPUTexture *gpu_fx_ssgi_resolve(GPUFX *fx, float viewmat[4][4], float projmat[4][4], float invproj[4][4])
+{
+	GPUTexture *out = fx->ssgi_hist[fx->ssgi_hist_cur], *prev = fx->ssgi_hist[!fx->ssgi_hist_cur];
+	GPUShader *sh = fx->ssgi_resolve_sh;
+	float persmat[4][4], viewinv[4][4];
+	mul_m4_m4m4(persmat, projmat, viewmat);
+	invert_m4_m4(viewinv, viewmat);
+	const float valid = fx->ssgi_hist_valid ? 1.0f : 0.0f;
+
+	if (!GPU_framebuffer_texture_attach(fx->gbuffer, out, 0, NULL)) {
+		return NULL;
+	}
+	GPU_texture_bind_as_framebuffer(out);
+	GPU_shader_bind(sh);
+	GPU_texture_bind(fx->depth_buffer, 0);
+	GPU_texture_filter_mode(fx->depth_buffer, false, false, false);
+	GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "bgl_DepthTexture"), fx->depth_buffer);
+	GPU_texture_bind(fx->ssgi_trace, 1);
+	GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "ge_TemporalCurrent"), fx->ssgi_trace);
+	GPU_texture_bind(prev, 2);
+	GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "ge_TemporalHistory"), prev);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, fx->ssgi_hist_depth);
+	glActiveTexture(GL_TEXTURE0);
+	glUniform1i(GPU_shader_get_uniform(sh, "ge_TemporalHistoryDepth"), 3);
+	GPU_shader_uniform_vector(sh, GPU_shader_get_uniform(sh, "ge_TemporalHistoryValid"), 1, 1, &valid);
+	glUniformMatrix4fv(GPU_shader_get_uniform(sh, "ge_TemporalHistoryViewProj"), 1, GL_FALSE,
+	                   fx->ssgi_hist_valid ? (float *)fx->ssgi_hist_persmat : (float *)persmat);
+	glUniformMatrix4fv(GPU_shader_get_uniform(sh, "unfinvviewmat"), 1, GL_FALSE, (float *)viewinv);
+	glUniformMatrix4fv(GPU_shader_get_uniform(sh, "unfinvprojmat"), 1, GL_FALSE, (float *)invproj);
+	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+	glActiveTexture(GL_TEXTURE3);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glActiveTexture(GL_TEXTURE0);
+	GPU_texture_unbind(prev);
+	GPU_texture_unbind(fx->ssgi_trace);
+	GPU_texture_filter_mode(fx->depth_buffer, true, false, false);
+	GPU_texture_unbind(fx->depth_buffer);
+	GPU_framebuffer_texture_unbind(fx->gbuffer, out);
+	GPU_framebuffer_texture_detach(out);
+	copy_m4_m4(fx->ssgi_hist_persmat, persmat);
+	return out;
+}
+
 static void gpu_fx_ssgi_draw(GPUFX *fx, int *passes_left, struct GPUOffScreen *ofs, GPUTexture **src,
-                             GPUTexture **target, float projmat[4][4])
+                             GPUTexture **target, float viewmat[4][4], float projmat[4][4])
 {
 	float invproj[4][4];
 	const float w = (float)fx->gbuffer_dim[0], h = (float)fx->gbuffer_dim[1];
@@ -1913,6 +2047,13 @@ static void gpu_fx_ssgi_draw(GPUFX *fx, int *passes_left, struct GPUOffScreen *o
 		GPU_framebuffer_texture_unbind(fx->gbuffer, trace);
 		GPU_framebuffer_texture_detach(trace);
 	}
+	GPUTexture *gi = ready ? fx->ssgi_trace : NULL;
+	const bool temporal = ready && fx->ssgi_temporal && fx->ssgi_hist[0] && fx->ssgi_hist[1] &&
+	                      gpu_fx_ssgi_hist_depth(fx);
+	GPUTexture *resolved = temporal ? gpu_fx_ssgi_resolve(fx, viewmat, projmat, invproj) : NULL;
+	if (resolved) {
+		gi = resolved;
+	}
 
 	GPUShader *sh = fx->ssgi_image_sh;
 	unit = 0;
@@ -1920,8 +2061,8 @@ static void gpu_fx_ssgi_draw(GPUFX *fx, int *passes_left, struct GPUOffScreen *o
 	GPU_texture_bind(*src, unit++);
 	GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "bgl_RenderedTexture"), *src);
 	if (ready) {
-		GPU_texture_bind(fx->ssgi_trace, unit++);
-		GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "ge_SSGIBuffer"), fx->ssgi_trace);
+		GPU_texture_bind(gi, unit++);
+		GPU_shader_uniform_texture(sh, GPU_shader_get_uniform(sh, "ge_SSGIBuffer"), gi);
 		gpu_fx_ssgi_bind(fx, sh, projmat, invproj, w, h, &unit);
 	}
 	else {
@@ -1933,8 +2074,26 @@ static void gpu_fx_ssgi_draw(GPUFX *fx, int *passes_left, struct GPUOffScreen *o
 	glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
 	if (ready) {
 		gpu_fx_ssgi_unbind(fx);
-		GPU_texture_unbind(fx->ssgi_trace);
+		GPU_texture_unbind(gi);
 	}
+#ifdef GL_VERSION_4_3
+	if (resolved) {
+		/* the next draw reprojects this one: its depth and (kept above) view-projection */
+		glCopyImageSubData(GPU_texture_opengl_bindcode(fx->depth_buffer), GL_TEXTURE_2D, 0, 0, 0, 0,
+		                   fx->ssgi_hist_depth, GL_TEXTURE_2D, 0, 0, 0, 0, GPU_texture_width(fx->depth_buffer),
+		                   GPU_texture_height(fx->depth_buffer), 1);
+		fx->ssgi_hist_valid = true;
+		fx->ssgi_hist_cur = !fx->ssgi_hist_cur;
+	}
+#endif
+	if (ready && fx->ssgi_temporal && !resolved) {
+		/* rotated rays without the average would flicker: rebuild the trace static (next draw) */
+		fprintf(stderr, "SSGI preview: no temporal history, static trace\n");
+		gpu_fx_ssgi_free_shaders(fx);
+		fx->ssgi_shader_slot = fx->ssgi.slot;
+		fx->ssgi_no_temporal = true;
+	}
+	fx->ssgi_frame++;
 	GPU_texture_unbind(*src);
 	if (*target) {
 		GPU_framebuffer_texture_detach(*target);
@@ -2031,7 +2190,7 @@ bool GPU_fx_do_composite_pass(
 
 	/* Native SSGI first, as in the game (FILTERPASS_SSGI) */
 	if (fx->sce_effects & GPU_SCENEFX_SSGI) {
-		gpu_fx_ssgi_draw(fx, &passes_left, ofs, &src, &target, projmat);
+		gpu_fx_ssgi_draw(fx, &passes_left, ofs, &src, &target, viewmat, projmat);
 	}
 
 	/* ssao pass */

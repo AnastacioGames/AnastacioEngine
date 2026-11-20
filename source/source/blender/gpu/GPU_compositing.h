@@ -140,6 +140,8 @@ bool GPU_fx_compositor_history_kept(const GPUFX *fx);
  * is on; the passes run first in the chain, as in the game. */
 typedef struct GPUFXSSGISettings {
 	const char *trace_shader, *image_shader;  /* not owned, must outlive the compositor */
+	/* RAS_Temporal2DFilter.glsl, the game's temporal resolve of the trace (NULL: none) */
+	const char *resolve_shader;
 	int slot;  /* GPU_material_ssgi_slot, 0 = off */
 	int divisor;  /* 1, 2 or 4 */
 	float params[8];  /* ge_SSGIParams */

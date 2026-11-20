@@ -2,7 +2,7 @@
 na viewport com Game Preview > SSGI, em shading Material. Os materiais escrevem os 4 buffers do SSGI
 durante o desenho dos objetos e os passes do jogo (trace + composição) somam a luz rebatida: com o
 toggle a imagem fica mais clara perto das paredes, sem pixels inválidos (NaN vira preto/rosa)."""
-from PIL import Image, ImageChops, ImageStat
+from PIL import Image, ImageChops, ImageFilter, ImageStat
 from rodar import py
 
 CENA = '''
@@ -86,15 +86,23 @@ def testar(t):
     caixa = py(e, PREPARAR % 'True')
     on = recorte(e, str(t.pasta / 'on.png'), caixa)
     on2 = recorte(e, str(t.pasta / 'on2.png'), caixa)
+    # acúmulo temporal (o resolve do jogo): com a vista parada o grão some em ~30 redesenhos
+    py(e, "import bpy\nbpy.ops.wm.redraw_timer(type='DRAW_WIN_SWAP', iterations=40)\nresultado = 0")
+    on3 = recorte(e, str(t.pasta / 'on3.png'), caixa)
 
     m_off, m_on = ImageStat.Stat(off).mean, ImageStat.Stat(on).mean
     ganho = sum(m_on) / 3 - sum(m_off) / 3
     tremor = sum(ImageStat.Stat(ImageChops.difference(on, on2)).mean) / 3
     # rosa de shader quebrado / NaN: pixels quase (255, 0, 255)
+    def grao(im):
+        return sum(ImageStat.Stat(ImageChops.difference(im, im.filter(ImageFilter.BoxBlur(2)))).mean) / 3
+    g_off, g_on, g_conv = grao(off), grao(on), grao(on3)
     rosa = sum(1 for p in on.getdata() if p[0] > 200 and p[1] < 40 and p[2] > 200)
-    t.nota('média RGB sem SSGI %s, com SSGI %s; ganho %.2f; diferença entre redesenhos %.3f; rosa %d'
-           % ([round(v, 1) for v in m_off], [round(v, 1) for v in m_on], ganho, tremor, rosa))
+    t.nota('média RGB sem SSGI %s, com SSGI %s; ganho %.2f; diferença entre redesenhos %.3f; rosa %d; '
+           'grão sem SSGI %.3f, ao ligar %.3f, após 40 redesenhos %.3f'
+           % ([round(v, 1) for v in m_off], [round(v, 1) for v in m_on], ganho, tremor, rosa, g_off, g_on, g_conv))
     assert ganho > 1.0, 'o SSGI não somou luz rebatida'
     assert ganho < 60.0, 'o SSGI estourou a imagem'
     assert rosa == 0, 'pixels de shader quebrado'
-    assert tremor < 0.5, 'o SSGI muda entre redesenhos com a vista parada'
+    assert tremor < 2.0, 'o SSGI muda demais entre redesenhos com a vista parada'
+    assert g_conv < g_on, 'o acúmulo temporal não reduziu o grão'

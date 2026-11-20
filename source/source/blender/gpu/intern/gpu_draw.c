@@ -2227,6 +2227,11 @@ static int gpu_object_material_bind_impl(int nr, void *attribs)
 	else
 		GMS.lastretval = !GMS.is_alpha_pass;
 
+	/* shadow color pass: only the Colored Shadows materials (the game's color shadow buckets) */
+	if (GMS.lastretval && GPU_shadow_color_pass_get() && !GPU_material_casts_colored_shadow(GMS.gmatbuf[nr])) {
+		GMS.lastretval = 0;
+	}
+
 	if (GMS.lastretval) {
 		/* for alpha pass, use alpha blend */
 		GPUBlendMode alphablend = GMS.alphablend[nr];
@@ -2264,6 +2269,9 @@ static int gpu_object_material_bind_impl(int nr, void *attribs)
 				GPU_material_bind_scene_lights(gpumat, GMS.lights);
 			}
 			GMS.gboundmat = mat;
+			if (GPU_shadow_color_pass_get()) {
+				GPU_shadow_color_pass_blend();
+			}
 
 			/* for glsl use alpha blend mode, unless it's set to solid and
 			 * we are already drawing in an alpha pass */
@@ -2338,6 +2346,10 @@ int GPU_object_material_visible(int nr, void *attribs)
 
 void GPU_set_material_alpha_blend(int alphablend)
 {
+	/* the shadow color pass blends by transmittance (GPU_lamp_shadow_color_begin) */
+	if (GPU_shadow_color_pass_get()) {
+		return;
+	}
 	if (GMS.lastalphablend == alphablend)
 		return;
 

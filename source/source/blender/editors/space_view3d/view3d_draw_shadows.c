@@ -248,6 +248,54 @@ static void view3d_compute_cascade_shadow_matrix(
 	normalize_v3(r_viewmat[2]);
 }
 
+/* KX_ShadowRenderer: after a lamp's depth map, its Colored Shadows casters multiply their
+ * transmittance into the lamp's color target (left white otherwise), with the same matrices.
+ * Called while the lamp's shadow framebuffer is still bound. */
+static bool view3d_shadow_color_pass(Main *bmain, Scene *scene, View3D *v3d, GPULamp *lamp,
+                                     float viewmat[4][4], float winmat[4][4])
+{
+	/* as the game: with no caster the pass only runs to leave a tinted target white again */
+	bool casters = false;
+	Scene *sce_iter;
+	Base *base;
+	for (SETLOOPER(scene, sce_iter, base)) {
+		Object *ob = base->object;
+		if (ob->type == OB_MESH && (base->lay & v3d->lay)) {
+			for (int i = 1; i <= ob->totcol && !casters; i++) {
+				casters = GPU_material_casts_colored_shadow(give_current_material(ob, i));
+			}
+		}
+		if (casters) {
+			break;
+		}
+	}
+	/* the lamp was made before the first Colored Shadows material: no target yet */
+	const bool created = casters && GPU_lamp_shadow_color_ensure(lamp);
+	const int size = GPU_lamp_shadow_color_size(lamp);
+	if (!size || (!casters && !GPU_lamp_shadow_color_dirty(lamp)) || !GPU_lamp_shadow_color_begin(lamp)) {
+		return created;
+	}
+	if (!casters) {
+		GPU_lamp_shadow_color_end(lamp, false);
+		return created;
+	}
+	ARegion ar = {NULL};
+	RegionView3D rv3d = {{{0}}};
+	ar.regiondata = &rv3d;
+	ar.regiontype = RGN_TYPE_WINDOW;
+	rv3d.persp = RV3D_CAMOB;
+	copy_m4_m4(rv3d.winmat, winmat);
+	copy_m4_m4(rv3d.viewmat, viewmat);
+	invert_m4_m4(rv3d.viewinv, rv3d.viewmat);
+	mul_m4_m4m4(rv3d.persmat, rv3d.winmat, rv3d.viewmat);
+	invert_m4_m4(rv3d.persinv, rv3d.viewinv);
+	glViewport(0, 0, size, size);
+	ED_view3d_draw_offscreen(bmain, scene, v3d, &ar, size, size, viewmat, winmat, false, false, true,
+	                         NULL, NULL, NULL, NULL);
+	GPU_lamp_shadow_color_end(lamp, true);
+	return created;
+}
+
 void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3d, RegionView3D *viewer_rv3d)
 {
 	ListBase shadows;
@@ -257,6 +305,7 @@ void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3d, Regi
 	Object *ob;
 	World *world = scene->world;
 	SceneRenderLayer *srl = v3d->scenelock ? BLI_findlink(&scene->r.layers, scene->r.actlay) : NULL;
+	bool rebuild_materials = false;
 
 	BLI_listbase_clear(&shadows);
 
@@ -353,6 +402,9 @@ void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3d, Regi
 		if (vsm) {
 			GPU_shader_unbind();
 		}
+		else {
+			rebuild_materials |= view3d_shadow_color_pass(bmain, scene, v3d, shadow->lamp, viewmat, winmat);
+		}
 		GPU_lamp_shadow_buffer_unbind(shadow->lamp);
 
 		if (viewer_rv3d != NULL && GPU_lamp_has_cascaded_shadow(shadow->lamp)) {
@@ -424,6 +476,9 @@ void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3d, Regi
 				if (cvsm) {
 					GPU_shader_unbind();
 				}
+				else {
+					rebuild_materials |= view3d_shadow_color_pass(bmain, scene, v3d, cascadeLamp, cViewOut, cWinOut);
+				}
 				GPU_lamp_shadow_buffer_unbind(cascadeLamp);
 			}
 		}
@@ -434,6 +489,22 @@ void gpu_update_lamps_shadows_world(Main *bmain, Scene *scene, View3D *v3d, Regi
 	}
 
 	BLI_freelistN(&shadows);
+	/* a lamp got its shadow color target: the materials are linked to it when built */
+	if (rebuild_materials) {
+		/* not GPU_materials_free: it frees the lamps (and the maps just drawn) too */
+		for (Material *ma = bmain->mat.first; ma; ma = ma->id.next) {
+			GPU_material_free(&ma->gpumaterial);
+			GPU_material_free(&ma->gpumaterialinstancing);
+			GPU_material_free(&ma->gpumaterialskinning);
+		}
+		for (World *wo = bmain->world.first; wo; wo = wo->id.next) {
+			GPU_material_free(&wo->gpumaterial);
+		}
+		extern Material defmaterial;
+		GPU_material_free(&defmaterial.gpumaterial);
+		GPU_material_free(&defmaterial.gpumaterialinstancing);
+		GPU_material_free(&defmaterial.gpumaterialskinning);
+	}
 
 	/* update world values */
 	if (world) {

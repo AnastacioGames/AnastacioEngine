@@ -3740,6 +3740,53 @@ static int view3d_fx_taa_next;
 #define VIEW3D_FX_TAA_PHASES 8
 #define VIEW3D_FX_TAA_SETTLE 24
 
+/* Game Preview > SSGI: the temporal resolve averages the rotated rays of the redraws (the game's
+ * frames, weight 0.1); with the view still a few more redraws let it converge. */
+typedef struct View3DFxSSGI {
+	const RegionView3D *rv3d;
+	float persmat[4][4];
+	int settle;
+	double time;
+	bool active;
+} View3DFxSSGI;
+
+static View3DFxSSGI view3d_fx_ssgi_state[8];
+static int view3d_fx_ssgi_next;
+#define VIEW3D_FX_SSGI_SETTLE 32
+
+static void view3d_fx_ssgi_settle(RegionView3D *rv3d, bool active)
+{
+	View3DFxSSGI *s = NULL;
+	if (!rv3d) {
+		return;
+	}
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_ssgi_state) && !s; i++) {
+		if (view3d_fx_ssgi_state[i].rv3d == rv3d) {
+			s = &view3d_fx_ssgi_state[i];
+		}
+	}
+	if (!s) {
+		if (!active) {
+			return;
+		}
+		s = &view3d_fx_ssgi_state[view3d_fx_ssgi_next];
+		view3d_fx_ssgi_next = (view3d_fx_ssgi_next + 1) % ARRAY_SIZE(view3d_fx_ssgi_state);
+		memset(s, 0, sizeof(*s));
+		s->rv3d = rv3d;
+	}
+	const double now = PIL_check_seconds_timer();
+	/* as the TAA: again after the view moved or an edit after it rested, never endless */
+	if (!s->active || !equals_m4m4(s->persmat, rv3d->persmat) || (s->settle == 0 && now - s->time > 0.25)) {
+		s->settle = VIEW3D_FX_SSGI_SETTLE;
+	}
+	else if (s->settle > 0) {
+		s->settle--;
+	}
+	copy_m4_m4(s->persmat, rv3d->persmat);
+	s->time = now;
+	s->active = active;
+}
+
 /* The view stopped but its last draw still shows the trail (or the TAA still converges): a few
  * redraws let it settle like the game's next frames. The window manager is replaced on file load
  * (its timers with it). */
@@ -3755,6 +3802,10 @@ static void view3d_fx_motion_redraw(void)
 	for (int i = 0; i < ARRAY_SIZE(view3d_fx_taa); i++) {
 		const View3DFxTaa *a = &view3d_fx_taa[i];
 		settling |= a->rv3d && a->active && a->settle > 0 && now - a->time < 1.0;
+	}
+	for (int i = 0; i < ARRAY_SIZE(view3d_fx_ssgi_state); i++) {
+		const View3DFxSSGI *s = &view3d_fx_ssgi_state[i];
+		settling |= s->rv3d && s->active && s->settle > 0 && now - s->time < 1.0;
 	}
 	wmWindowManager *wm = G_MAIN ? G_MAIN->wm.first : NULL;
 	wmTimer *wt = view3d_fx_motion_timer;
@@ -4060,7 +4111,7 @@ static void view3d_fx_taa_end(wmWindow *win, Scene *scene, ARegion *ar, View3D *
 
 #ifdef WITH_GAMEENGINE
 /* KX_2DFilterManager.cpp: the game's Native SSGI passes (RAS_SSGI2DFilter / RAS_SSGIImage2DFilter). */
-extern void KX_SSGIPreviewShaders(const char **r_trace, const char **r_image);
+extern void KX_SSGIPreviewShaders(const char **r_trace, const char **r_image, const char **r_resolve);
 #endif
 
 /* KX_Scene: an "ae_ssgi_*" scene setting, any number type. */
@@ -4077,17 +4128,19 @@ static float view3d_fx_ssgi_setting(Scene *scene, const char *name, float fallba
 
 /* Game Preview > SSGI: the scene's Native SSGI with the values KX_Scene gives the game's filter.
  * Only Material shading: the materials write the SSGI buffers there (Solid writes none). */
-static void view3d_fx_ssgi(GPUFX *fx, Scene *scene, View3D *v3d, const GPUFXSettings *fx_settings)
+static void view3d_fx_ssgi(GPUFX *fx, Scene *scene, View3D *v3d, RegionView3D *rv3d,
+                           const GPUFXSettings *fx_settings)
 {
 #ifdef WITH_GAMEENGINE
 	const int slot = (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_SSGI) && v3d->drawtype == OB_MATERIAL) ?
 	                 GPU_material_ssgi_slot(scene) : 0;
+	view3d_fx_ssgi_settle(rv3d, slot != 0);
 	if (!slot) {
 		GPU_fx_compositor_set_ssgi(fx, NULL);
 		return;
 	}
 	GPUFXSSGISettings s;
-	KX_SSGIPreviewShaders(&s.trace_shader, &s.image_shader);
+	KX_SSGIPreviewShaders(&s.trace_shader, &s.image_shader, &s.resolve_shader);
 	s.slot = slot;
 	s.divisor = (int)CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_divisor", 2), 1, 4);
 	s.params[0] = CLAMPIS(view3d_fx_ssgi_setting(scene, "ae_ssgi_radius", 3), 0.01f, 100.0f);
@@ -4124,7 +4177,7 @@ static void view3d_fx_camera_lens(GPUFX *fx, Scene *scene, ARegion *ar, View3D *
 	}
 	view3d_fx_node_compositor(fx, scene, fx_settings);
 	GPUFXNodeStage fixed[3];
-	view3d_fx_ssgi(fx, scene, v3d, fx_settings);
+	view3d_fx_ssgi(fx, scene, v3d, offscreen ? NULL : rv3d, fx_settings);
 	int num_fixed = 0;
 	if (fx_settings && (fx_settings->fx_flag & GPU_FX_FLAG_CAMERA_DOF) &&
 	    view3d_fx_camera_dof(scene, ar, v3d, rv3d, offscreen, &fixed[num_fixed]))
@@ -4262,7 +4315,8 @@ void ED_view3d_draw_offscreen(
 	if (do_sky) {
 		view3d_main_region_clear(scene, v3d, ar);
 	}
-	else {
+	else if (!GPU_shadow_color_pass_get()) {
+		/* (the shadow color target starts white, GPU_lamp_shadow_color_begin) */
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 	}
@@ -4985,6 +5039,7 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	 * with every filter off. */
 	if (!do_compositing && rv3d->compositor) {
 		view3d_fx_motion_forget(rv3d);
+		view3d_fx_ssgi_settle(rv3d, false);
 		view3d_fx_motion_redraw();
 		GPU_fx_compositor_destroy(rv3d->compositor);
 		rv3d->compositor = NULL;

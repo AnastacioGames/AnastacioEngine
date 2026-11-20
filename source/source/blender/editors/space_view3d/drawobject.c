@@ -4821,10 +4821,32 @@ static bool draw_mesh_object(Scene *scene, ARegion *ar, View3D *v3d, RegionView3
 			if (ma && !(ma->mode2 & MA_CASTSHADOW)) {
 				return true;
 			}
+			/* RAS_BucketManager: a Colored Shadows material is only in the color shadow bucket,
+			 * never in the depth map (it tints the light instead of blocking it) */
+			if (!GPU_shadow_color_pass_get() && GPU_material_casts_colored_shadow(ma)) {
+				return true;
+			}
 			if (ma && ma->shad_alpha > 0.0f) {
 				shad_alpha = min_ff(shad_alpha, ma->shad_alpha);
 			}
 		}
+	}
+
+	/* Colored shadows (KX_ShadowRenderer): the color pass draws only the casters with a Colored
+	 * Shadows material, with their GLSL shader (it outputs the transmittance). */
+	if ((v3d->flag2 & V3D_RENDER_SHADOW) && GPU_shadow_color_pass_get()) {
+		bool colored = false;
+		for (int i = 1; i <= ob->totcol && !colored; ++i) {
+			colored = GPU_material_casts_colored_shadow(give_current_material(ob, i));
+		}
+		if (!colored) {
+			return true;
+		}
+		const char drawtype = v3d->drawtype;
+		v3d->drawtype = OB_MATERIAL;
+		retval = draw_mesh_object_body(scene, ar, v3d, rv3d, base, OB_MATERIAL, ob_wire_col, dflag);
+		v3d->drawtype = drawtype;
+		return retval;
 	}
 
 	/* Shadow Casting Alpha preview: the viewport draws shadow maps solid, so a stipple stands in
@@ -4924,7 +4946,9 @@ static bool draw_mesh_object_body(Scene *scene, ARegion *ar, View3D *v3d, Region
 				const bool glsl = draw_glsl_material(scene, ob, v3d, dt);
 
 				if (dt == OB_SOLID || glsl) {
-					const bool check_alpha = check_alpha_pass(base);
+					/* the shadow color pass draws its (alpha) casters right away: nothing is
+					 * deferred while drawing shadows */
+					const bool check_alpha = check_alpha_pass(base) && !GPU_shadow_color_pass_get();
 					GPU_begin_object_materials(v3d, rv3d, scene, ob, glsl,
 					                           (check_alpha) ? &do_alpha_after : NULL);
 				}
