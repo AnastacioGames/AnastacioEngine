@@ -12,11 +12,11 @@ bpy.ops.mesh.primitive_cube_add(radius=0.1, location=(0, 0, 0))
 em = sc.objects.active
 em.use_gpu_particles = True
 gp = em.gpu_particles
-LOOK_LINHAS
 gp.particle_count = 300
 gp.size = 0.6
 gp.color = (1.0, 0.3, 0.1, 1.0)
 gp.lifetime = 2.0
+LOOK_LINHAS
 cam = bpy.data.objects.new('Cam', bpy.data.cameras.new('Cam'))
 sc.objects.link(cam)
 cam.location = (0, -7, 2)
