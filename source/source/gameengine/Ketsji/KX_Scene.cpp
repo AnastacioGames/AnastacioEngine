@@ -1024,7 +1024,8 @@ void KX_Scene::UpdateGameFields()
 			continue;
 		}
 		const PartDeflect *pd = gameobj->GetBlenderObject()->pd;
-		if ((pd->forcefield != PFIELD_FORCE && pd->forcefield != PFIELD_WIND) || !(pd->flag & PFIELD_DO_LOCATION)) {
+		if ((pd->forcefield != PFIELD_FORCE && pd->forcefield != PFIELD_WIND &&
+		     pd->forcefield != PFIELD_VORTEX && pd->forcefield != PFIELD_TURBULENCE) || !(pd->flag & PFIELD_DO_LOCATION)) {
 			continue;
 		}
 		PHY_GameField f;
@@ -1051,6 +1052,8 @@ void KX_Scene::UpdateGameFields()
 		f.minRad = pd->minrad;
 		f.maxRad = pd->maxrad;
 		f.powerRad = pd->f_power_r;
+		f.size = pd->f_size;
+		f.seed = pd->seed;
 		fields.push_back(f);
 	}
 	m_physicsEnvironment->SetGameFields(fields);

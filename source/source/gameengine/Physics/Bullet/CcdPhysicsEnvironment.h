@@ -99,7 +99,8 @@ protected:
 	std::vector<PHY_GameField> m_gameFields;
 	std::vector<std::pair<btRigidBody *, btVector3> > m_appliedFieldForces;
 	std::vector<btSoftBody *> m_windedSoftBodies; ///< soft bodies with wind set this step, cleared after it
-	void ApplyGameFields();
+	float m_fieldTime; ///< simulated seconds, drives turbulence
+	void ApplyGameFields(float dt);
 	void RemoveGameFields();
 	/// value passed to SetFixedTimeStep, returned as-is by GetFixedTimeStep (0.f if not using a fixed timestep)
 	float m_fixedTimeStep;

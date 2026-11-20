@@ -75,6 +75,13 @@ def make_scene(output):
     # Point force, positive strength pushes away from the field.
     _field(scene, "Repel", (0.0, -30.0, 0.0), "FORCE", 10.0, True, (0.0, 0.0, 0.0), 8.0)
     _cube(scene, "Pushed", (3.0, -30.0, 0.0))
+    # Vortex around Z: a cube on the +X side is pushed along +Y, then curves toward -X (right-hand rule, no centripetal force).
+    _field(scene, "Swirl", (0.0, 60.0, 0.0), "VORTEX", 10.0, True, (0.0, 0.0, 0.0), 8.0)
+    _cube(scene, "Swirled", (3.0, 60.0, 0.0))
+    # Turbulence moves the cube in some direction; the same field with a far cube does nothing.
+    _field(scene, "Shake", (0.0, 90.0, 0.0), "TURBULENCE", 10.0, True, (0.0, 0.0, 0.0), 8.0).field.size = 1.0
+    _cube(scene, "Shaken", (2.0, 90.0, 0.0))
+    _cube(scene, "ShakeFar", (30.0, 90.0, 0.0))
 
     tester = bpy.data.objects.new("Tester", None)
     scene.objects.link(tester)
@@ -108,7 +115,7 @@ def run_runtime():
         results = tester["results"] = []
 
     if frame == 1:
-        tester["start"] = {n: list(objects[n].worldPosition) for n in ("InRange", "OutOfRange", "OptOut", "Pushed")}
+        tester["start"] = {n: list(objects[n].worldPosition) for n in ("InRange", "OutOfRange", "OptOut", "Pushed", "Swirled", "Shaken", "ShakeFar")}
 
     if frame == END_FRAME:
         def moved(name):
@@ -124,6 +131,13 @@ def run_runtime():
         _check(results, "field without opt-in does nothing", max(abs(v) for v in d) < 0.05, "moved %.3f" % max(abs(v) for v in d))
         d = moved("Pushed")
         _check(results, "force repels from the field", d[0] > 1.0 and abs(d[1]) < 0.1, "moved %.2f %.2f %.2f" % tuple(d))
+        d = moved("Swirled")
+        _check(results, "vortex swirls counter-clockwise around Z", d[1] > 1.0 and d[0] < 0.0 and abs(d[2]) < 0.1,
+               "moved %.2f %.2f %.2f" % tuple(d))
+        d = moved("Shaken")
+        _check(results, "turbulence moves the body", math.sqrt(sum(v * v for v in d)) > 0.3, "moved %.2f %.2f %.2f" % tuple(d))
+        d = moved("ShakeFar")
+        _check(results, "turbulence respects max distance", max(abs(v) for v in d) < 0.05, "moved %.3f" % max(abs(v) for v in d))
         failed = [line for line in results if " FAIL " in line]
         results.append("FORCE_FIELD: %d checks, %d failed" % (len(results), len(failed)))
         for line in results:

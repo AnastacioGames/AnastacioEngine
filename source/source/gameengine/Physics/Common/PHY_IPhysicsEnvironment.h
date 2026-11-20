@@ -98,7 +98,7 @@ public:
 /// Force field (Blender PartDeflect, opt-in with PFIELD_GAME) as seen by the physics step.
 /// World space; rebuilt by the scene every frame, so it always follows the runtime transform.
 struct PHY_GameField {
-	enum Type { FORCE = 1, WIND = 4 };
+	enum Type { FORCE = 1, VORTEX = 2, WIND = 4, TURBULENCE = 11 };
 	int type;
 	float position[3];
 	float zAxis[3];        ///< normalised world +Z of the field object
@@ -111,6 +111,8 @@ struct PHY_GameField {
 	bool useMin, useMax, useMinRad, useMaxRad;
 	float minDist, maxDist, power;
 	float minRad, maxRad, powerRad;
+	float size;            ///< turbulence: noise cell size
+	int seed;              ///< turbulence: noise seed
 };
 
 /**

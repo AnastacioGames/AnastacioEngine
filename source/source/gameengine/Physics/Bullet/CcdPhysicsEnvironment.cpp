@@ -715,6 +715,7 @@ CcdPhysicsEnvironment::CcdPhysicsEnvironment(PHY_SolverType solverType, bool use
 	m_numIterations(10),
 	m_numTimeSubSteps(1),
 	m_fixedTimeStep(0.f),
+	m_fieldTime(0.f),
 	m_ccdMode(0),
 	m_solverType(PHY_SOLVER_NONE),
 	m_deactivationTime(2.0f),
@@ -1099,6 +1100,29 @@ void CcdPhysicsEnvironment::SetGameFields(const std::vector<PHY_GameField>& fiel
 	m_gameFields = fields;
 }
 
+/// Smooth, reproducible 3D value noise in [-1, 1] (hash lattice + smoothstep), same result for the same seed.
+static float GameFieldHash(int x, int y, int z, int seed)
+{
+	unsigned int h = (unsigned int)x * 374761393u + (unsigned int)y * 668265263u + (unsigned int)z * 2147483647u + (unsigned int)seed * 69069u;
+	h = (h ^ (h >> 13)) * 1274126177u;
+	h ^= h >> 16;
+	return (float)(h & 0xFFFFu) / 32767.5f - 1.0f;
+}
+
+static float GameFieldNoise(const btVector3& p, int seed)
+{
+	const int ix = (int)floorf(p.x()), iy = (int)floorf(p.y()), iz = (int)floorf(p.z());
+	const float fx = p.x() - ix, fy = p.y() - iy, fz = p.z() - iz;
+	const float ux = fx * fx * (3.0f - 2.0f * fx), uy = fy * fy * (3.0f - 2.0f * fy), uz = fz * fz * (3.0f - 2.0f * fz);
+	float r = 0.0f;
+	for (int k = 0; k < 8; k++) {
+		const int dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
+		const float w = (dx ? ux : 1.0f - ux) * (dy ? uy : 1.0f - uy) * (dz ? uz : 1.0f - uz);
+		r += w * GameFieldHash(ix + dx, iy + dy, iz + dz, seed);
+	}
+	return r;
+}
+
 /// Distance/shape/direction falloff of a field at world point p (0 = out of reach).
 static float GameFieldFalloffAt(const PHY_GameField& f, const btVector3& p)
 {
@@ -1133,8 +1157,9 @@ static float GameFieldFalloffAt(const PHY_GameField& f, const btVector3& p)
 	return GameFieldFalloff(dist, f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
 }
 
-void CcdPhysicsEnvironment::ApplyGameFields()
+void CcdPhysicsEnvironment::ApplyGameFields(float dt)
 {
+	m_fieldTime += dt;
 	m_appliedFieldForces.clear();
 	m_windedSoftBodies.clear();
 	if (m_gameFields.empty()) {
@@ -1150,12 +1175,29 @@ void CcdPhysicsEnvironment::ApplyGameFields()
 			soft->getAabb(bmin, bmax);
 			const btVector3 c = (bmin + bmax) * 0.5f;
 			for (const PHY_GameField& f : m_gameFields) {
-				if (f.type != PHY_GameField::WIND) {
+				if (f.type == PHY_GameField::FORCE) {
 					continue;
 				}
 				const float fall = GameFieldFalloffAt(f, c);
-				if (fall > 0.0f) {
-					wind += btVector3(f.zAxis[0], f.zAxis[1], f.zAxis[2]) * (f.strength * fall);
+				if (fall <= 0.0f) {
+					continue;
+				}
+				const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
+				if (f.type == PHY_GameField::WIND) {
+					wind += nor * (f.strength * fall);
+				}
+				else if (f.type == PHY_GameField::VORTEX) {
+					const btVector3 radial = c - btVector3(f.position[0], f.position[1], f.position[2]);
+					const btVector3 tangent = nor.cross(radial - nor * nor.dot(radial));
+					if (tangent.length2() > SIMD_EPSILON) {
+						wind += tangent.normalized() * (f.strength * fall);
+					}
+				}
+				else if (f.type == PHY_GameField::TURBULENCE) {
+					const float inv = 1.0f / btMax(f.size, 0.01f);
+					const btVector3 q = c * inv + btVector3(m_fieldTime * 0.7f, m_fieldTime * 0.5f, m_fieldTime * 0.3f);
+					wind += btVector3(GameFieldNoise(q, f.seed), GameFieldNoise(q + btVector3(31.4f, 17.2f, 5.7f), f.seed),
+					                  GameFieldNoise(q + btVector3(-12.3f, 44.1f, 23.9f), f.seed)) * (f.strength * fall);
 				}
 			}
 			if (!wind.fuzzyZero()) {
@@ -1200,6 +1242,20 @@ void CcdPhysicsEnvironment::ApplyGameFields()
 				if (dist > SIMD_EPSILON) {
 					force = (toPoint / dist) * (strength * falloff);
 				}
+			}
+			if (f.type == PHY_GameField::VORTEX) {
+				// Pushes around the field's Z axis (right-hand rule), like Blender's Vortex.
+				const btVector3 radial = toCenter - nor * nor.dot(toCenter);
+				const btVector3 tangent = nor.cross(radial);
+				if (tangent.length2() > SIMD_EPSILON) {
+					force = tangent.normalized() * (f.strength * falloff);
+				}
+			}
+			else if (f.type == PHY_GameField::TURBULENCE) {
+				const float inv = 1.0f / btMax(f.size, 0.01f);
+				const btVector3 q = p * inv + btVector3(m_fieldTime * 0.7f, m_fieldTime * 0.5f, m_fieldTime * 0.3f);
+				force = btVector3(GameFieldNoise(q, f.seed), GameFieldNoise(q + btVector3(31.4f, 17.2f, 5.7f), f.seed),
+				                  GameFieldNoise(q + btVector3(-12.3f, 44.1f, 23.9f), f.seed)) * (f.strength * falloff);
 			}
 			if (f.flow != 0.0f) {
 				force -= vel * (f.flow * falloff); // air resistance against the moving medium
@@ -1281,7 +1337,7 @@ void CcdPhysicsEnvironment::ProceedDeltaTime(double timeStep, double interval)
 		return;
 	}
 	for (unsigned short r=0;r<i;r++) {
-		ApplyGameFields();
+		ApplyGameFields((float)subStep);
 		m_dynamicsWorld->stepSimulationRun();
 		RemoveGameFields();
 		CallbackTriggers();
@@ -1361,7 +1417,7 @@ void CcdPhysicsEnvironment::ProceedDeltaTimeCar(double timeStep, double interval
 	}
 
 	for (int r=0;r<i;r++) {
-		ApplyGameFields();
+		ApplyGameFields((float)subStep);
 		m_dynamicsWorld->stepSimulationRun();
 		RemoveGameFields();
 		CallbackTriggers();
