@@ -3,36 +3,36 @@
 Índice de `view3d_draw.c` e dos arquivos separados dele (`view3d_draw_shadows.c`, `view3d_draw_warmup.c`): grade, cursor, bordas de câmera, profundidade e seleção, sombras na viewport,
 offscreen, overlays e o aquecimento de shaders. Não descreve arquitetura.
 
-**Linhas conferidas em 2026-11-09 (`HEAD` `55870764`).** Os números envelhecem a cada edição: confirme com
+**Linhas conferidas em 2026-11-20 (`HEAD` `d09c51a4`).** Os números envelhecem a cada edição: confirme com
 `grep -n "nome" arquivo`. `python tools/check_docs.py --fix` corrige os números deste mapa.
 
 Regra da casa: não mudar o shading dos meshes na viewport; ajustes visuais vão nos overlays.
 
-## `source/source/blender/editors/space_view3d/view3d_draw.c` (4.850 linhas)
+## `source/source/blender/editors/space_view3d/view3d_draw.c` (5.879 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
-| Clipping | `view3d_draw_clipping` 164, `ED_view3d_clipping_set` 192, `ED_view3d_clipping_test` 236 |
-| Grade, chão e cursor | `drawgrid` 282, `ED_view3d_grid_scale` 478, `drawfloor_shader` 574, `drawfloor` 651, `drawcursor` 763 |
-| Eixos e textos | `draw_view_axis` 865, `draw_rotation_guide` 967, `draw_viewport_name` 1163, `draw_selected_name` 1219 |
-| Borda da câmera | `ED_view3d_calc_camera_border` 1376, `drawviewborder` 1454 |
-| Backbuffer (seleção por cor) | `backdrawview3d` 1678, `ED_view3d_backbuf_sample` 1838, `ED_view3d_backbuf_read` 1859 |
-| Imagens de fundo | `view3d_draw_bgpic` 2005 |
-| Transparência e X-ray | `view3d_draw_transp` 2328, `view3d_draw_xray` 2346 |
-| Dupli | `draw_dupli_objects_color` 2445, `draw_dupli_objects` 2606 |
-| Profundidade e seleção | `ED_view3d_depth_update` 2677, `view3d_draw_depth_loop` 2750, `ED_view3d_draw_depth` 2832, `ED_view3d_draw_select_loop` 2882 |
-| Matrizes e objetos | `ED_view3d_update_viewmat` 2981, **`view3d_draw_objects`** 3064, `view3d_main_region_setup_view` 3267, `view3d_main_region_clear` 3331 |
-| Offscreen (render OpenGL, thumbnails) | `ED_view3d_draw_offscreen` 3412, `ED_view3d_draw_offscreen_imbuf` 3564 |
-| FPS e engine de render | `ED_scene_draw_fps` 3807, `view3d_main_region_draw_engine` 3909 |
-| Estéreo e LOD | `view3d_stereo3d_setup` 4046, `update_lods` 4114 |
-| Região principal | `view3d_main_region_draw_objects` 4140, `draw_paint_hints` 4386 (dicas de pintura), `view3d_main_region_draw_info` 4453, `view3d_draw_floating_controls` 4544, **`view3d_main_region_draw`** 4707 (entrada) |
-| Debug draw | `bl_debug_draw_quad_add` 4773, `bl_debug_draw` 4801 |
+| Clipping | `view3d_draw_clipping` 174, `ED_view3d_clipping_set` 202, `ED_view3d_clipping_test` 246 |
+| Grade, chão e cursor | `drawgrid` 292, `ED_view3d_grid_scale` 488, `drawfloor_shader` 589, `drawfloor` 666, `drawcursor` 778 |
+| Eixos e textos | `draw_view_axis` 880, `draw_rotation_guide` 982, `draw_viewport_name` 1178, `draw_selected_name` 1234 |
+| Borda da câmera | `ED_view3d_calc_camera_border` 1391, `drawviewborder` 1469 |
+| Backbuffer (seleção por cor) | `backdrawview3d` 1693, `ED_view3d_backbuf_sample` 1853, `ED_view3d_backbuf_read` 1874 |
+| Imagens de fundo | `view3d_draw_bgpic` 2020 |
+| Transparência e X-ray | `view3d_draw_transp` 2343, `view3d_draw_xray` 2361 |
+| Dupli | `draw_dupli_objects_color` 2493, `draw_dupli_objects` 2654 |
+| Profundidade e seleção | `ED_view3d_depth_update` 2725, `view3d_draw_depth_loop` 2798, `ED_view3d_draw_depth` 2880, `ED_view3d_draw_select_loop` 2930 |
+| Matrizes e objetos | `ED_view3d_update_viewmat` 3029, **`view3d_draw_objects`** 3112, `view3d_main_region_setup_view` 3327, `view3d_main_region_clear` 3391 |
+| Offscreen (render OpenGL, thumbnails) | `ED_view3d_draw_offscreen` 4273, `ED_view3d_draw_offscreen_imbuf` 4427 |
+| FPS e engine de render | `ED_scene_draw_fps` 4670, `view3d_main_region_draw_engine` 4772 |
+| Estéreo e LOD | `view3d_stereo3d_setup` 4909, `update_lods` 4977 |
+| Região principal | `view3d_main_region_draw_objects` 5003, `draw_paint_hints` 5270 (dicas de pintura), `view3d_main_region_draw_info` 5337, `view3d_draw_floating_controls` 5428, **`view3d_main_region_draw`** 5734 (entrada) |
+| Debug draw | `bl_debug_draw_quad_add` 5802, `bl_debug_draw` 5830 |
 
-## `source/source/blender/editors/space_view3d/view3d_draw_shadows.c` (446 linhas)
+## `source/source/blender/editors/space_view3d/view3d_draw_shadows.c` (520 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
-| Lâmpadas e sombras (CSM) | `gpu_render_lamp_update` 123, `view3d_compute_cascade_shadow_matrix` 170, `gpu_update_lamps_shadows_world` 251 |
+| Lâmpadas e sombras (CSM) | `gpu_render_lamp_update` 123, `view3d_compute_cascade_shadow_matrix` 170, `gpu_update_lamps_shadows_world` 299 |
 
 ## `source/source/blender/editors/space_view3d/view3d_draw_warmup.c` (369 linhas)
 

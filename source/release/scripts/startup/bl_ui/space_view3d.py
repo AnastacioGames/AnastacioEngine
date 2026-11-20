@@ -4261,6 +4261,8 @@ class VIEW3D_PT_overlay(Panel):
         row.prop(view, "realtime_viewport_shading", text="Realtime", icon='RESTRICT_RENDER_OFF', toggle=True)
         row.prop(view, "show_only_render", text="Only Render",
                  icon='RESTRICT_VIEW_ON' if view.show_only_render else 'RESTRICT_VIEW_OFF', toggle=True)
+        if hasattr(scene, "range_ui_hud_preview"):
+            layout.prop(scene, "range_ui_hud_preview", text="Game HUD (UI Tree)", icon='MENU_PANEL')
 
         layout.separator()
 
