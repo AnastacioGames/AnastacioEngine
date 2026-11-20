@@ -1790,6 +1790,34 @@ def _hud_frame_rect(context, region, rv3d):
     return 0.0, 0.0, float(region.width), float(region.height)
 
 
+def _hud_markers(node, scene):
+    """Marcadores reais do Minimap, como o jogo os monta: objetos com a propriedade
+    ou o prefixo, na cor `minimap_color` (#rrggbb) se houver; o jogador por último.
+    Sem nenhum objeto na cena, o exemplo da prévia do Node Editor."""
+    import math
+    player = scene.objects.get(node.object_name) if node.object_name else None
+    markers = []
+    for obj in scene.objects:
+        if obj is player or not _is_marker(obj, node):
+            continue
+        color = None
+        prop = obj.game.properties.get("minimap_color")
+        text = prop.value if prop is not None and prop.type == "STRING" else ""
+        value = text.lstrip("#")
+        if len(value) == 6:
+            try:
+                color = tuple(int(value[i:i + 2], 16) / 255.0 for i in (0, 2, 4)) + (1.0,)
+            except ValueError:
+                color = None
+        p = obj.matrix_world.translation
+        markers.append((p.x, p.y, 0.0, False, color))
+    if player is not None:
+        p = player.matrix_world.translation
+        fx, fy = player.matrix_world.to_3x3().col[1][:2]
+        markers.append((p.x, p.y, math.atan2(fy, fx) - math.pi * 0.5, True, None))
+    return markers or node.preview_markers()
+
+
 def _hud_values(node, scene):
     """Valores do widget: propriedades de jogo do Object (ou da câmera, que leva
     o script) quando existem; senão o exemplo da prévia do Node Editor."""
@@ -1859,7 +1887,7 @@ def _draw_viewport_hud():
                     data = node.widget()
                     if data.get("key"):
                         data["format"] = data["key"]
-                    markers = node.preview_markers() if isinstance(node, UIMinimapNode) else None
+                    markers = _hud_markers(node, scene) if isinstance(node, UIMinimapNode) else None
                     range_ui_draw.draw_widget(bgl, blf, data, _hud_values(node, scene),
                                               x, y, w, h, bindcode=bindcode, markers=markers)
                 else:
