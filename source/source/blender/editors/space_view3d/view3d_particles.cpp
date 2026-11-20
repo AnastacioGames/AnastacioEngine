@@ -48,6 +48,8 @@
 #include "DNA_property_types.h"
 extern "C" {
 #include "BKE_property.h"
+#include "BKE_object.h"
+bool ED_view3d_boundbox_clip_ex(const RegionView3D *rv3d, const BoundBox *bb, float obmat[4][4]);
 }
 
 #include "GPU_glew.h"
@@ -245,6 +247,18 @@ void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 			e->seen = true;
 			if (!e->buffer) {
 				continue;
+			}
+			/* As the game (KX_Scene::UpdateGpuParticleEmitters, KX_RenderPipeline): a mesh emitter outside
+			 * the view is neither simulated nor drawn, unless its particles are static. Its buffer stays,
+			 * so the column is there again when it comes back into view. */
+			if (ob->type == OB_MESH && !e->buffer->IsStatic()) {
+				const BoundBox *bb = BKE_object_boundbox_get((Object *)ob);
+				float obmat[4][4];
+				memcpy(obmat, ob->obmat, sizeof(obmat));
+				if (!ED_view3d_boundbox_clip_ex(rv3d, bb, obmat)) {
+					e->last_time = now;
+					continue;
+				}
 			}
 			/* The real clock between redraws, capped so a long pause does not jump the simulation. */
 			const float dt = (float)std::min(0.1, std::max(0.0, now - e->last_time));
