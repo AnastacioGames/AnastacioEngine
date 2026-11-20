@@ -51,8 +51,12 @@ Directional Blur (matriz anterior + profundidade) valida a infraestrutura; depoi
 | Baked Lighting | Já tem caminho; testar paridade e limites (UV Lightmap, atlas, modos). |
 | Impostor e HLOD | A mesh LOD já aparece; faltam orientação do impostor, célula do atlas (`KX_GameObject.cpp:1597`) e HLOD. Testar por variante. |
 
-### Fase 5: partículas do jogo
+### Fase 5: partículas do jogo (IMPLEMENTADA 2026-11-20; paridade visual aguarda aceite lado a lado)
 `RangeGPUParticleSettings`, flipbook, fumaça/fogo/light_flicker. Estado e buffers nascem em `KX_GameObject.cpp:888` e são desenhados em `KX_RenderPipeline.cpp:1149`. A prévia precisa de simulação, relógio, emissão, profundidade, transparência e descarte; instanciar só o `RAS_ParticleBuffer` não basta.
+
+Feito (toggle Game Preview > Particles, `view3d_particles.cpp`): `RAS_ParticleBuffer` compartilhado com o jogo; looks fumaça/fogo, flipbook, mix; partículas suaves (snapshot de profundidade da região); curvas de tamanho e cor; light_flicker das lâmpadas (`view3d_draw_shadows.c`); culling de emissor de malha fora da vista; buffer refeito ao editar curvas ou vértices estáticos; emissores de região fechada liberados no desenho seguinte. Testes: `editor_previa_particulas*`, `editor_previa_flicker`. Cobertura em regime estacionário igual à do jogo (~0,12).
+
+Limites conhecidos: sem colisão com a tela e sem burst manual (gatilho do usuário, fora de "sem lógica"); suaves sem MSAA nem ortográfica; offset do flicker em espaço do mundo (no jogo é local, difere com pais girados/escalados); a curva de cor não alterou a imagem nem no jogo no teste `curva_cor` (paridade não provada); liberação por região fechada só compilada, não testada; hash de vértices estáticos a cada desenho, custo não medido.
 
 ### Fase 6: UI e mídia
 UI Tree (HUD), Text Boxes com o atlas do jogo, Video Player, Minimap.
