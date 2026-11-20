@@ -1297,10 +1297,6 @@ bool CcdPhysicsController::CreateSoftbody()
 	psb->randomizeConstraints();
 	psb->setTotalMass(m_cci.m_mass);
 
-	if (m_cci.m_soft_collisionflags & (CCD_BSB_COL_CL_RS + CCD_BSB_COL_CL_SS)) {
-		psb->generateClusters(m_cci.m_soft_numclusteriterations);
-	}
-
 
 	psb->setCollisionFlags(0);
 
@@ -1336,6 +1332,11 @@ bool CcdPhysicsController::CreateSoftbody()
 				psb->setMass(m_softBodyIndices[v], 0.0f);
 			}
 		}
+	}
+
+	// Clusters read the node masses when they are built, so they come after the pins.
+	if (m_cci.m_soft_collisionflags & (CCD_BSB_COL_CL_RS + CCD_BSB_COL_CL_SS)) {
+		psb->generateClusters(m_cci.m_soft_numclusteriterations);
 	}
 
 	// Nodes are in object space: move them to the object transform, which becomes the soft body frame.
