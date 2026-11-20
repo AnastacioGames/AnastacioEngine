@@ -115,7 +115,11 @@
 #include "GPU_select.h"
 #include "GPU_init_exit.h"
 
-#include "view3d_intern.h"  /* own include */
+#include "view3d_intern.h"
+
+#ifdef WITH_GAMEENGINE
+#  include "BL_PreviewParticles.h"
+#endif  /* own include */
 
 /* prototypes */
 static bool view3d_stereo3d_active(wmWindow *win, Scene *scene, View3D *v3d, RegionView3D *rv3d);
@@ -574,6 +578,9 @@ void ED_view3d_shaders_free(void)
 	}
 	floor_shader_failed = false;
 	view3d_rain_shaders_free();
+#ifdef WITH_GAMEENGINE
+	BL_preview_particles_free();
+#endif
 	view3d_reflections_free();
 	view3d_probe_volumes_free();
 }
@@ -2451,6 +2458,26 @@ static DupliObject *dupli_step(DupliObject *dob)
 }
 
 #ifdef WITH_GAMEENGINE
+/* GPU particle emitters (Object.use_gpu_particles / use_gpu_particles_mix) seen without playing: the game's own
+ * RAS_ParticleBuffer, stepped by real time and drawn after the solid and transparent objects. Only with the
+ * viewport's Realtime toggle on (it also owns the redraw timer, see ED_view3d_realtime_viewport_update) and in
+ * Solid or better shading. Soft particles (depth fade against the geometry) are not previewed. */
+static void view3d_draw_game_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
+{
+	if (!(rv3d->rflag & RV3D_IS_GAME_ENGINE) || !(v3d->flag2 & V3D_REATIME_VIEWPORT) ||
+	    v3d->drawtype <= OB_WIRE || (G.f & G_PICKSEL))
+	{
+		return;
+	}
+
+	glPushAttrib(GL_ENABLE_BIT | GL_DEPTH_BUFFER_BIT | GL_COLOR_BUFFER_BIT | GL_CURRENT_BIT | GL_POLYGON_BIT);
+	glEnable(GL_DEPTH_TEST);
+	BL_preview_particles_draw(scene, v3d->lay, rv3d->viewmat, rv3d->winmat);
+	glPopAttrib();
+}
+#endif
+
+#ifdef WITH_GAMEENGINE
 /* LoD distance factor of the camera the game would render with: the camera of a camera view, else the
  * scene camera (Camera.lod_factor, see KX_Camera::GetLodDistanceFactor). */
 static float view3d_lod_camera_factor(Scene *scene, View3D *v3d, RegionView3D *rv3d)
@@ -3253,6 +3280,9 @@ static void view3d_draw_objects(
 
 	/* World > Rain aura and lightning bolt, before X-ray clears the depth */
 	view3d_draw_rain_effects(scene, v3d, rv3d);
+#ifdef WITH_GAMEENGINE
+	view3d_draw_game_particles(scene, v3d, rv3d);
+#endif
 
 	/* always do that here to cleanup depth buffers if none needed */
 	if (fx) {

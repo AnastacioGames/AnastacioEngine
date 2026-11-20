@@ -40,8 +40,10 @@ set(INC_SYS
 
 set(SRC
 	BL_KetsjiEmbedStart.cpp
+	BL_PreviewParticles.cpp
 	KX_BlenderCanvas.cpp
 
+	BL_PreviewParticles.h
 	KX_BlenderCanvas.h
 )
 

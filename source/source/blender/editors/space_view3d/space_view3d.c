@@ -1430,10 +1430,22 @@ const char *view3d_context_dir[] = {
  * has realtime shading enabled. */
 static wmTimer *g_realtime_viewport_timer = NULL;
 
+/* GPU particle emitters in the scene: the preview (view3d_draw_game_particles) wants ~30 redraws a second. */
+static bool view3d_scene_has_gpu_particles(const Scene *scene)
+{
+	for (const Base *base = scene->base.first; base; base = base->next) {
+		if (base->object->gameflag2 & (OB_GPU_PARTICLES | OB_GPU_PARTICLES_MIX)) {
+			return true;
+		}
+	}
+	return false;
+}
+
 void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 {
 	wmWindow *win;
 	bool want_timer = false;
+	bool want_fast = false;
 
 	/* The timer is freed with the window manager it belongs to. */
 	if (g_realtime_viewport_timer && BLI_findindex(&wm->timers, g_realtime_viewport_timer) == -1) {
@@ -1482,14 +1494,26 @@ void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 				View3D *v3d = sa->spacedata.first;
 				if (v3d->flag2 & V3D_REATIME_VIEWPORT) {
 					want_timer = true;
+					if (win->screen->scene && view3d_scene_has_gpu_particles(win->screen->scene)) {
+						want_fast = true;
+					}
 					break;
 				}
 			}
 		}
 	}
 
+	/* the step the timer needs changed (particles appeared or went away): make it again */
+	if (want_timer && g_realtime_viewport_timer &&
+	    g_realtime_viewport_timer->timestep != (want_fast ? 1.0 / 30.0 : 0.1))
+	{
+		WM_event_remove_timer(wm, NULL, g_realtime_viewport_timer);
+		g_realtime_viewport_timer = NULL;
+	}
+
 	if (want_timer && !g_realtime_viewport_timer) {
-		g_realtime_viewport_timer = WM_event_add_timer_notifier(wm, NULL, NC_OBJECT | ND_DRAW, 0.1);
+		g_realtime_viewport_timer = WM_event_add_timer_notifier(wm, NULL, NC_OBJECT | ND_DRAW,
+		                                                        want_fast ? 1.0 / 30.0 : 0.1);
 	}
 	else if (!want_timer && g_realtime_viewport_timer) {
 		WM_event_remove_timer(wm, NULL, g_realtime_viewport_timer);
