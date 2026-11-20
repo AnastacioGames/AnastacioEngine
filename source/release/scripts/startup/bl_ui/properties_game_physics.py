@@ -427,6 +427,32 @@ class PHYSICS_PT_game_collision_bounds(PhysicsButtonsPanel, Panel):
         col.prop(game, "collision_mask")
 
 
+class PHYSICS_PT_game_force_field(PhysicsButtonsPanel, Panel):
+    bl_label = "Force Field"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+                and physics_category_is(context, 'PHYSICS'))
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
+        field = ob.field
+        if field is None or field.type == 'NONE':
+            if ob == context.active_object:
+                layout.operator("object.forcefield_toggle", text="Add Force Field", icon='FORCE_FORCE')
+            return
+        layout.prop(field, "use_game_field", text="Enabled in Game")
+        col = layout.column()
+        col.active = field.use_game_field
+        col.prop(field, "type", text="")
+        col.label(text="Edit the field values in the render Physics tab", icon='INFO')
+
+
 class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
     # New id so files that saved the old panel position also show it last; add-ons that
     # add physics panels re-register it after theirs.

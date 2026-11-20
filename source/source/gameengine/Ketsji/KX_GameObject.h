@@ -731,6 +731,9 @@ public:
 
 	Object *GetBlenderObject() const;
 
+	/// True when the Blender object has a force field with the Game Engine opt-in (PFIELD_GAME).
+	bool IsGameField() const;
+
 	/// Multiplayer id assigned by KX_NetworkManager; 0 when the object is not replicated.
 	unsigned int GetNetId() const;
 	void SetNetId(unsigned int netId);

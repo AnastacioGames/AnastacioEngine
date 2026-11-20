@@ -386,6 +386,7 @@ typedef struct SoftBody {
 #define PFIELD_GUIDE_PATH_WEIGHT (1 << 16)      /* apply curve weights */
 #define PFIELD_SMOKE_DENSITY    (1 << 17)       /* multiply smoke force by density */
 #define PFIELD_GRAVITATION      (1 << 18)       /* used for (simple) force */
+#define PFIELD_GAME             (1 << 19)       /* Game Engine opt-in: the field acts in the game (default off) */
 
 /* pd->falloff */
 #define PFIELD_FALL_SPHERE		0

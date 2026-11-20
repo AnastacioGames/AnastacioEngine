@@ -1421,6 +1421,10 @@ static void rna_def_field(BlenderRNA *brna)
 	RNA_def_property_update(prop, 0, "rna_FieldSettings_update");
 
 
+	prop = RNA_def_property(srna, "use_game_field", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", PFIELD_GAME);
+	RNA_def_property_ui_text(prop, "Game Engine", "Apply this field to game objects at runtime (off by default)");
+
 	/* Pointer */
 
 	prop = RNA_def_property(srna, "texture", PROP_POINTER, PROP_NONE);
