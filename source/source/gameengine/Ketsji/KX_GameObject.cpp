@@ -826,38 +826,7 @@ void KX_GameObject::SetActionLayerWeight(short layer, float layer_weight)
 
 void KX_GameObject::ApplyGPUParticleParams(RAS_ParticleBuffer *buffer, const RangeGPUParticleSettings &settings)
 {
-	buffer->SetGravity(settings.gravity);
-	buffer->SetLifetime(settings.lifetime);
-	buffer->SetEmitterPos(settings.emitter_position);
-	buffer->SetEmitterRadius(settings.emitter_radius);
-	buffer->SetVelocityBase(settings.velocity);
-	buffer->SetVelocityRandomness(settings.velocity_randomness);
-	buffer->SetBillboardSize(settings.size);
-	buffer->SetColor(settings.color);
-	buffer->SetEndColor(settings.end_color);
-	buffer->SetEndSize(settings.end_size);
-	buffer->SetEmissionDirection(settings.emission_direction);
-	buffer->SetEmissionAngle(settings.emission_angle);
-	buffer->SetDebugUI(settings.use_debug_ui != 0);
-	buffer->SetBlendMode(settings.blend_mode);
-	buffer->SetBillboardMode(settings.billboard_mode);
-	buffer->SetBackfaceCulling(settings.use_backface_culling != 0);
-	buffer->SetEnabled(settings.disable_emission == 0);
-	buffer->SetCollisionMode(settings.collision_mode);
-	buffer->SetCollisionHeight(settings.collision_height);
-	buffer->SetCollisionBounce(settings.collision_bounce);
-	buffer->SetCollisionFriction(settings.collision_friction);
-	buffer->SetUseVortex(settings.use_vortex != 0);
-	buffer->SetVortexRotationSpeed(settings.vortex_rotation_speed);
-	buffer->SetVortexRadiusTop(settings.vortex_radius_top);
-	buffer->SetVortexHeight(settings.vortex_height);
-	buffer->SetUseObjectRotation(settings.use_object_rotation != 0);
-	buffer->SetBurstMode(settings.emission_mode == GPU_PARTICLE_EMISSION_BURST);
-	buffer->SetBurstInterval(settings.burst_interval);
-	buffer->SetDrag(settings.drag);
-	/* 0 cycles only makes sense with a random start (still variant per sprite): otherwise play once. */
-	const float cycles = (settings.flipbook_cycles > 0.0f || settings.flipbook_random) ? settings.flipbook_cycles : 1.0f;
-	buffer->SetFlipbook(settings.flipbook_cols, settings.flipbook_rows, cycles, settings.flipbook_random != 0);
+	buffer->ApplySettings(settings);
 }
 
 void KX_GameObject::ApplyGPUParticlesLive(const RangeGPUParticleSettings &oldSettings, const RangeGPUParticleSettings &settings, bool mix)
@@ -892,60 +861,16 @@ void KX_GameObject::SetupGPUParticlesBuffer(std::unique_ptr<RAS_ParticleBuffer> 
 		return;
 	}
 
-	ApplyGPUParticleParams(bufferSlot.get(), settings);
-
-	// One static particle per vertex of the object's own mesh (base mesh, modifiers not applied),
-	// in local space -- UpdateParticles feeds the world transform every frame.
-	if (settings.emit_from == GPU_PARTICLE_EMIT_VERTICES) {
-		Object *blenderobj = GetBlenderObject();
-		Mesh *me = (blenderobj && blenderobj->type == OB_MESH) ? (Mesh *)blenderobj->data : nullptr;
-		if (me && me->mvert && me->totvert > 0) {
-			std::vector<float> positions(me->totvert * 3);
-			for (int i = 0; i < me->totvert; ++i) {
-				positions[i * 3 + 0] = me->mvert[i].co[0];
-				positions[i * 3 + 1] = me->mvert[i].co[1];
-				positions[i * 3 + 2] = me->mvert[i].co[2];
-			}
-			bufferSlot->SetStaticPositions(positions);
-			const mt::mat4 model = mt::mat4::FromAffineTransform(NodeGetWorldTransform());
-			bufferSlot->SetModelMatrix((const float *)model.Data());
-		}
-		else {
-			CM_Warning("GPU particles on object \"" << m_name << "\": Emit From Mesh Vertices needs a mesh object with vertices, using Emitter Volume");
-		}
+	// The configuration is shared with the editor's 3D View preview (RAS_ParticleBuffer::Configure).
+	Object *blenderobj = GetBlenderObject();
+	Mesh *me = (blenderobj && blenderobj->type == OB_MESH) ? (Mesh *)blenderobj->data : nullptr;
+	const mt::mat4 model = mt::mat4::FromAffineTransform(NodeGetWorldTransform());
+	const RAS_ParticleBuffer::ConfigureResult result = bufferSlot->Configure(settings, me, (const float *)model.Data());
+	if (result.noMeshVertices) {
+		CM_Warning("GPU particles on object \"" << m_name << "\": Emit From Mesh Vertices needs a mesh object with vertices, using Emitter Volume");
 	}
-
-	if (settings.use_custom_frag_shader && settings.frag_shader_path[0] != '\0') {
-		if (!bufferSlot->LoadFragShaderFromPath(settings.frag_shader_path)) {
-			CM_Error("KX_GameObject::SetupGPUParticles: custom fragment shader failed to load/compile for object \"" << m_name << "\", using default look (see log above)");
-		}
-	}
-
-	// Fase Q: built-in look, baked into the engine -- takes priority over the file-based custom
-	// shader above if both are somehow set, since it's the one exposed by the Mix panel.
-	if (settings.particle_look != GPU_PARTICLE_LOOK_DEFAULT) {
-		bufferSlot->SetCustomFragShader(RAS_GetBuiltinParticleLookSource(settings.particle_look));
-	}
-	// Smoke and fire should already be burning when the scene starts.
-	bufferSlot->SetPrewarm(settings.particle_look == GPU_PARTICLE_LOOK_SMOKE ||
-	                       settings.particle_look == GPU_PARTICLE_LOOK_FIRE);
-	if (settings.emission_mode == GPU_PARTICLE_EMISSION_BURST && (settings.burst_flags & GPU_PARTICLE_BURST_ON_START)) {
-		bufferSlot->Burst();
-	}
-
-	if (settings.texture_path[0] != '\0') {
-		bufferSlot->LoadTextureFromPath(settings.texture_path);
-	}
-
-	if (settings.use_size_curve && settings.size_curve) {
-		bufferSlot->BakeSizeCurve(settings.size_curve);
-	} else {
-		bufferSlot->ClearSizeCurve();
-	}
-	if (settings.use_color_curve && settings.color_curve) {
-		bufferSlot->BakeColorCurve(settings.color_curve);
-	} else {
-		bufferSlot->ClearColorCurve();
+	if (result.fragShaderFailed) {
+		CM_Error("KX_GameObject::SetupGPUParticles: custom fragment shader failed to load/compile for object \"" << m_name << "\", using default look (see log above)");
 	}
 }
 

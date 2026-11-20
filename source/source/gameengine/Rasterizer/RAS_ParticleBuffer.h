@@ -45,8 +45,25 @@
 #include <string>
 #include <vector>
 
+struct RangeGPUParticleSettings;
+struct Mesh;
+
 class RAS_ParticleBuffer
 {
+public:
+	struct ConfigureResult
+	{
+		bool noMeshVertices = false;
+		bool fragShaderFailed = false;
+	};
+
+	/// Copies the simulation/draw parameters of the DNA settings into the buffer. Shared by the
+	/// game (KX_GameObject) and the editor's 3D View preview, so both run the same configuration.
+	void ApplySettings(const RangeGPUParticleSettings &settings);
+	/// Full setup after Create(): ApplySettings, mesh-vertex emission (me and model may be null),
+	/// look/shader, prewarm, burst on start, texture and curves.
+	ConfigureResult Configure(const RangeGPUParticleSettings &settings, const Mesh *me, const float *model16);
+
 private:
 	unsigned int m_vbo[2];
 	unsigned int m_vao[2];

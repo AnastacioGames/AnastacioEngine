@@ -42,6 +42,9 @@
 #include "RAS_Texture.h"
 #include "DNA_color_types.h"
 #include "DNA_image_types.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+#include "DNA_object_types.h"
 #include "MEM_guardedalloc.h"
 
 #include "BLI_fileops.h"
@@ -245,6 +248,104 @@ RAS_ParticleBuffer::~RAS_ParticleBuffer()
 	if (m_colorCurveTexture) {
 		glDeleteTextures(1, &m_colorCurveTexture);
 	}
+}
+
+void RAS_ParticleBuffer::ApplySettings(const RangeGPUParticleSettings &settings)
+{
+	SetGravity(settings.gravity);
+	SetLifetime(settings.lifetime);
+	SetEmitterPos(settings.emitter_position);
+	SetEmitterRadius(settings.emitter_radius);
+	SetVelocityBase(settings.velocity);
+	SetVelocityRandomness(settings.velocity_randomness);
+	SetBillboardSize(settings.size);
+	SetColor(settings.color);
+	SetEndColor(settings.end_color);
+	SetEndSize(settings.end_size);
+	SetEmissionDirection(settings.emission_direction);
+	SetEmissionAngle(settings.emission_angle);
+	SetDebugUI(settings.use_debug_ui != 0);
+	SetBlendMode(settings.blend_mode);
+	SetBillboardMode(settings.billboard_mode);
+	SetBackfaceCulling(settings.use_backface_culling != 0);
+	SetEnabled(settings.disable_emission == 0);
+	SetCollisionMode(settings.collision_mode);
+	SetCollisionHeight(settings.collision_height);
+	SetCollisionBounce(settings.collision_bounce);
+	SetCollisionFriction(settings.collision_friction);
+	SetUseVortex(settings.use_vortex != 0);
+	SetVortexRotationSpeed(settings.vortex_rotation_speed);
+	SetVortexRadiusTop(settings.vortex_radius_top);
+	SetVortexHeight(settings.vortex_height);
+	SetUseObjectRotation(settings.use_object_rotation != 0);
+	SetBurstMode(settings.emission_mode == GPU_PARTICLE_EMISSION_BURST);
+	SetBurstInterval(settings.burst_interval);
+	SetDrag(settings.drag);
+	/* 0 cycles only makes sense with a random start (still variant per sprite): otherwise play once. */
+	const float cycles = (settings.flipbook_cycles > 0.0f || settings.flipbook_random) ? settings.flipbook_cycles : 1.0f;
+	SetFlipbook(settings.flipbook_cols, settings.flipbook_rows, cycles, settings.flipbook_random != 0);
+}
+
+RAS_ParticleBuffer::ConfigureResult RAS_ParticleBuffer::Configure(const RangeGPUParticleSettings &settings, const Mesh *me, const float *model16)
+{
+	ConfigureResult result;
+	ApplySettings(settings);
+
+	// One static particle per vertex of the object's own mesh (base mesh, modifiers not applied),
+	// in local space -- the caller feeds the world transform every frame (SetModelMatrix).
+	if (settings.emit_from == GPU_PARTICLE_EMIT_VERTICES) {
+		if (me && me->mvert && me->totvert > 0) {
+			std::vector<float> positions(me->totvert * 3);
+			for (int i = 0; i < me->totvert; ++i) {
+				positions[i * 3 + 0] = me->mvert[i].co[0];
+				positions[i * 3 + 1] = me->mvert[i].co[1];
+				positions[i * 3 + 2] = me->mvert[i].co[2];
+			}
+			SetStaticPositions(positions);
+			if (model16) {
+				SetModelMatrix(model16);
+			}
+		}
+		else {
+			result.noMeshVertices = true;
+		}
+	}
+
+	if (settings.use_custom_frag_shader && settings.frag_shader_path[0] != '\0') {
+		if (!LoadFragShaderFromPath(settings.frag_shader_path)) {
+			result.fragShaderFailed = true;
+		}
+	}
+
+	// Fase Q: built-in look, baked into the engine -- takes priority over the file-based custom
+	// shader above if both are somehow set, since it's the one exposed by the Mix panel.
+	if (settings.particle_look != GPU_PARTICLE_LOOK_DEFAULT) {
+		SetCustomFragShader(RAS_GetBuiltinParticleLookSource(settings.particle_look));
+	}
+	// Smoke and fire should already be burning when the scene starts.
+	SetPrewarm(settings.particle_look == GPU_PARTICLE_LOOK_SMOKE ||
+	           settings.particle_look == GPU_PARTICLE_LOOK_FIRE);
+	if (settings.emission_mode == GPU_PARTICLE_EMISSION_BURST && (settings.burst_flags & GPU_PARTICLE_BURST_ON_START)) {
+		Burst();
+	}
+
+	if (settings.texture_path[0] != '\0') {
+		LoadTextureFromPath(settings.texture_path);
+	}
+
+	if (settings.use_size_curve && settings.size_curve) {
+		BakeSizeCurve(settings.size_curve);
+	}
+	else {
+		ClearSizeCurve();
+	}
+	if (settings.use_color_curve && settings.color_curve) {
+		BakeColorCurve(settings.color_curve);
+	}
+	else {
+		ClearColorCurve();
+	}
+	return result;
 }
 
 bool RAS_ParticleBuffer::Create()
