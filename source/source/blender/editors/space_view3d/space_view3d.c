@@ -838,6 +838,9 @@ static void view3d_main_region_free(ARegion *ar)
 		if (rv3d->localvd) MEM_freeN(rv3d->localvd);
 		if (rv3d->clipbb) MEM_freeN(rv3d->clipbb);
 
+		/* Game particles of this region are released at the next draw, when a GL context is current. */
+		view3d_gpu_particles_region_freed(rv3d);
+
 		if (rv3d->render_engine)
 			RE_engine_free(rv3d->render_engine);
 

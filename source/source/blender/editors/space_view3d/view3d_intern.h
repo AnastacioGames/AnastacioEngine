@@ -238,6 +238,7 @@ void view3d_rain_shaders_free(void);
 void view3d_draw_gpu_particles(struct Scene *scene, struct View3D *v3d, struct RegionView3D *rv3d);
 bool view3d_gpu_particles_active(const struct Scene *scene, const struct View3D *v3d);
 void view3d_gpu_particles_free(void);
+void view3d_gpu_particles_region_freed(const struct RegionView3D *rv3d);
 
 /* view3d_draw.c */
 void view3d_main_region_draw(const struct bContext *C, struct ARegion *ar);

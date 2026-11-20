@@ -43,6 +43,8 @@
 #include "DNA_view3d_types.h"
 #include "DNA_gpu_types.h"
 #include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+#include "DNA_color_types.h"
 
 #include "PIL_time.h"
 #include "DNA_property_types.h"
@@ -68,7 +70,53 @@ struct Emitter {
 	std::unique_ptr<RAS_ParticleBuffer> buffer;
 	double last_time;
 	bool seen;
+	bool orphan;       /* its region was freed: erased at the next draw, when a GL context is current */
+	uint64_t sig;      /* curves (and the vertices of a static emitter) as the buffer was built */
 };
+
+struct Hasher {
+	uint64_t h = 1469598103934665603ull;
+	void add(const void *p, size_t n)
+	{
+		const unsigned char *b = (const unsigned char *)p;
+		for (size_t i = 0; i < n; i++) {
+			h = (h ^ b[i]) * 1099511628211ull;
+		}
+	}
+};
+
+/* What the settings struct does not hold by value: the curve points behind its pointers and, for a static
+ * emitter (one particle per vertex), the vertices. Editing them rebuilds the buffer. */
+uint64_t emitter_signature(const Object *ob, const RangeGPUParticleSettings &s, bool is_static)
+{
+	Hasher hs;
+	for (int k = 0; k < 2; k++) {
+		const CurveMapping *cu = (k == 0) ? (s.use_size_curve ? s.size_curve : nullptr) : (s.use_color_curve ? s.color_curve : nullptr);
+		if (!cu) {
+			continue;
+		}
+		for (int c = 0; c < (k == 0 ? 1 : 4); c++) {
+			const CurveMap &cm = cu->cm[c];
+			hs.add(&cm.totpoint, sizeof(cm.totpoint));
+			hs.add(&cm.flag, sizeof(cm.flag));
+			for (int p = 0; p < cm.totpoint && cm.curve; p++) {
+				hs.add(&cm.curve[p].x, sizeof(float) * 2);
+				hs.add(&cm.curve[p].flag, sizeof(cm.curve[p].flag));
+			}
+		}
+		hs.add(&cu->preset, sizeof(cu->preset));
+	}
+	if (is_static && ob->type == OB_MESH) {
+		const Mesh *me = (const Mesh *)ob->data;
+		if (me && me->mvert) {
+			hs.add(&me->totvert, sizeof(me->totvert));
+			for (int i = 0; i < me->totvert; i++) {
+				hs.add(me->mvert[i].co, sizeof(float) * 3);
+			}
+		}
+	}
+	return hs.h;
+}
 
 std::vector<Emitter> g_emitters;
 
@@ -143,6 +191,7 @@ void emitter_build(Emitter &e, const Object *ob, const RangeGPUParticleSettings 
 	}
 	const Mesh *me = (ob->type == OB_MESH) ? (const Mesh *)ob->data : nullptr;
 	e.buffer->Configure(settings, me, &ob->obmat[0][0]);
+	e.sig = emitter_signature(ob, settings, e.buffer->IsStatic());
 	e.last_time = PIL_check_seconds_timer();
 }
 
@@ -176,8 +225,24 @@ void view3d_gpu_particles_free(void)
 	}
 }
 
+void view3d_gpu_particles_region_freed(const RegionView3D *rv3d)
+{
+	for (Emitter &e : g_emitters) {
+		if (e.rv3d == rv3d) {
+			e.orphan = true;
+		}
+	}
+}
+
 void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 {
+	/* Buffers of regions that were freed since the last draw (a GL context is current here). */
+	for (size_t i = g_emitters.size(); i-- > 0;) {
+		if (g_emitters[i].orphan) {
+			g_emitters.erase(g_emitters.begin() + i);
+		}
+	}
+
 	if (!(v3d->fx_settings.fx_flag2 & GPU_FX2_PARTICLES)) {
 		for (size_t i = g_emitters.size(); i-- > 0;) {
 			if (g_emitters[i].rv3d == rv3d) {
@@ -238,10 +303,14 @@ void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 				e->rv3d = rv3d;
 				e->mix = mix;
 				memset(&e->settings, 0, sizeof(e->settings));
+				e->orphan = false;
+				e->sig = 0;
 				e->last_time = now;
 				emitter_build(*e, ob, settings);
 			}
-			else if (memcmp(&e->settings, &settings, sizeof(settings)) != 0) {
+			else if (memcmp(&e->settings, &settings, sizeof(settings)) != 0 ||
+			         (e->buffer && e->sig != emitter_signature(ob, settings, e->buffer->IsStatic())))
+			{
 				emitter_build(*e, ob, settings);
 			}
 			e->seen = true;
@@ -295,6 +364,7 @@ void view3d_draw_gpu_particles(Scene *scene, View3D *v3d, RegionView3D *rv3d)
 extern "C" {
 bool view3d_gpu_particles_active(const Scene *, const View3D *) { return false; }
 void view3d_gpu_particles_free(void) {}
+void view3d_gpu_particles_region_freed(const RegionView3D *) {}
 void view3d_draw_gpu_particles(Scene *, View3D *, RegionView3D *) {}
 }
 
