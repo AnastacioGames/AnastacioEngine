@@ -75,10 +75,21 @@ class VIEW3D_PT_tools_transform(View3DPanel, Panel):
     def draw(self, context):
         layout = self.layout
 
-        col = layout.column(align=True)
-        col.operator("transform.translate")
-        col.operator("transform.rotate")
-        col.operator("transform.resize", text="Scale")
+        # Cada transformação tem uma linha X/Y/Z que trava o eixo na orientação
+        # escolhida em Transform Orientations (Local, Global...), como o gizmo.
+        orient = context.scene.transform_orientation
+        layout.prop(context.scene, "transform_orientation", text="")
+
+        for op_id, label in (("transform.translate", "Translate"),
+                             ("transform.rotate", "Rotate"),
+                             ("transform.resize", "Scale")):
+            col = layout.column(align=True)
+            col.operator(op_id, text=label)
+            row = col.row(align=True)
+            for i, axis in enumerate("XYZ"):
+                op = row.operator(op_id, text=axis)
+                op.constraint_axis = tuple(j == i for j in range(3))
+                op.constraint_orientation = orient
 
         col = layout.column(align=True)
         col.operator("transform.mirror", text="Mirror")
