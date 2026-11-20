@@ -36,6 +36,8 @@ set(INC
 	../../../../intern/guardedalloc
 	../../../../intern/glew-mx
 	../../../../intern/smoke/extern
+	../../../gameengine/Rasterizer
+	../../../../intern/mathfu
 )
 
 set(INC_SYS
@@ -63,6 +65,7 @@ set(SRC
 	view3d_iterators.c
 	view3d_ops.c
 	view3d_project.c
+	view3d_particles.cpp
 	view3d_rain.c
 	view3d_ruler.c
 	view3d_select.c
@@ -90,6 +93,7 @@ if(WITH_GAMEENGINE)
 	list(APPEND LIB
 		ge_launcher
 		ge_blender_routines
+		ge_rasterizer
 	)
 	list(APPEND INC
 		../../../gameengine/Launcher

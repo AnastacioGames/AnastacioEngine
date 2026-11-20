@@ -1480,7 +1480,9 @@ void ED_view3d_realtime_viewport_update(wmWindowManager *wm)
 		for (sa = win->screen->areabase.first; sa; sa = sa->next) {
 			if (sa->spacetype == SPACE_VIEW3D) {
 				View3D *v3d = sa->spacedata.first;
-				if (v3d->flag2 & V3D_REATIME_VIEWPORT) {
+				if (v3d->flag2 & V3D_REATIME_VIEWPORT ||
+				    (win->screen->scene && view3d_gpu_particles_active(win->screen->scene, v3d)))
+				{
 					want_timer = true;
 					break;
 				}

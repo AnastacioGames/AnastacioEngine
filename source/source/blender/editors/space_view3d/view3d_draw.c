@@ -574,6 +574,7 @@ void ED_view3d_shaders_free(void)
 	}
 	floor_shader_failed = false;
 	view3d_rain_shaders_free();
+	view3d_gpu_particles_free();
 	view3d_reflections_free();
 	view3d_probe_volumes_free();
 }
@@ -3240,6 +3241,7 @@ static void view3d_draw_objects(
 
 	/* World > Rain aura and lightning bolt, before X-ray clears the depth */
 	view3d_draw_rain_effects(scene, v3d, rv3d);
+	view3d_draw_gpu_particles(scene, v3d, rv3d);
 
 	/* always do that here to cleanup depth buffers if none needed */
 	if (fx) {

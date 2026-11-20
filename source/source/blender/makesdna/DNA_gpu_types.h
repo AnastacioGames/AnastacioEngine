@@ -37,7 +37,8 @@ typedef struct GPUDOFSettings {
 typedef struct GPUFXSettings {
 	GPUDOFSettings *dof;
 	char fx_flag;  /* eGPUFXFlags */
-	char pad[7];
+	char fx_flag2; /* eGPUFXFlags2 */
+	char pad[6];
 } GPUFXSettings;
 
 /* shaderfx enables */
@@ -58,5 +59,11 @@ typedef enum eGPUFXFlags {
 	/* preview of the scene's Native SSGI (game material buffers + the game's passes) */
 	GPU_FX_FLAG_SSGI        = (1 << 7),
 } eGPUFXFlags;
+
+/* second byte of shaderfx enables (fx_flag has no free bit left) */
+typedef enum eGPUFXFlags2 {
+	/* preview of the GPU particle emitters (Object > Particles) with the game's own buffer */
+	GPU_FX2_PARTICLES = (1 << 0),
+} eGPUFXFlags2;
 
 #endif  /* __DNA_GPU_TYPES_H__ */
