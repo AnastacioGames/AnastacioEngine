@@ -43,7 +43,7 @@ Bokeh do jogo (`FILTERPASS_CAMERA_DOF`, `_REDUCE`), com Cat Eye (parâmetro do D
 ### Fase 3: temporal
 Directional Blur (matriz anterior + profundidade) valida a infraestrutura; depois Speed Blur (precisa da velocidade da câmera), TAA/TAAU (define resolução interna e escala) e SSGI (`KX_2DFilterManager.cpp:410`). Cada um tem entradas e alvos próprios.
 
-### Fase 4: iluminação e geometria
+### Fase 4: iluminação e geometria (CONCLUÍDA 2026-11-20: Probe GI, sombra colorida, Baked, impostor, HLOD; paridade visual aguarda aceite)
 | Recurso | Observação |
 |---|---|
 | Light Probe Volume | Provavelmente ausente (pendente de teste visual). Distinguir a grade de sondas do jogo (`KX_ProbeVolume.cpp`) do baked light volume, que já tem caminho no material. |
