@@ -65,6 +65,16 @@ bool GPU_object_materials_check(void);
 
 int GPU_object_material_bind(int nr, void *attribs);
 void GPU_object_material_unbind(void);
+
+/* Probe Volume GI preview (view3d_draw_probes.c): the saved grids of the scene, bound per object by
+ * the material draw like BL_BlenderShader does in the game. NULL/0 = none. */
+typedef struct GPUViewportProbeVolume {
+	struct GPUTexture *atlas;
+	float min[3], max[3];
+	int dims[3];
+	float spacing;
+} GPUViewportProbeVolume;
+void GPU_viewport_probe_volumes_set(const GPUViewportProbeVolume *volumes, int count);
 int GPU_object_material_visible(int nr, void *attribs);
 
 void GPU_begin_dupli_object(struct DupliObject *dob);

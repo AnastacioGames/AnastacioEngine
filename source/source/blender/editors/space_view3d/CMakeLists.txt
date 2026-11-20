@@ -53,6 +53,7 @@ set(SRC
 	view3d_buttons.c
 	view3d_camera_control.c
 	view3d_draw.c
+	view3d_draw_probes.c
 	view3d_draw_reflections.c
 	view3d_draw_shadows.c
 	view3d_draw_warmup.c

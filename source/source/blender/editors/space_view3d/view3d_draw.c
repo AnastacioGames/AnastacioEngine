@@ -575,6 +575,7 @@ void ED_view3d_shaders_free(void)
 	floor_shader_failed = false;
 	view3d_rain_shaders_free();
 	view3d_reflections_free();
+	view3d_probe_volumes_free();
 }
 
 /* Returns false when the shader is unavailable, so the caller falls back to the line grid. */
@@ -4984,6 +4985,8 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 	/* Realtime Environment Maps (preview of KX_PlanarMap): needs this view's matrices and runs
 	 * before the compositor binds its buffers; the offscreen pass leaves its own GL matrices. */
 	if (draw_glsl_material(scene, NULL, v3d, v3d->drawtype) && !paint_stroke) {
+		/* Probe Volume GI: the saved light of the grids, before the reflections draw the scene too. */
+		view3d_probe_volumes_update(bmain, scene);
 		if (view3d_reflections_update(bmain, scene, v3d, ar)) {
 			ED_view3d_draw_setup_view(CTX_wm_window(C), scene, ar, v3d, NULL, NULL, NULL);
 		}
@@ -5068,6 +5071,8 @@ static void view3d_main_region_draw_objects(const bContext *C, Scene *scene, Vie
 
 	/* main drawing call */
 	view3d_draw_objects(C, bmain, scene, v3d, ar, grid_unit, true, false, do_compositing ? rv3d->compositor : NULL);
+	/* the grids belong to this view: other draws (offscreen, other scenes) bind none */
+	GPU_viewport_probe_volumes_set(NULL, 0);
 
 	/* Hidden layers of a new file or scene, a few objects per frame (after the visible ones). */
 	view3d_warmup_step(C, bmain, scene, ar, v3d);

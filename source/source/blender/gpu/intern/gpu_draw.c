@@ -64,9 +64,7 @@
 #include "BKE_node.h"
 #include "BKE_scene.h"
 #include "BKE_DerivedMesh.h"
-#ifdef WITH_GAMEENGINE
-#  include "BKE_object.h"
-#endif
+#include "BKE_object.h"
 
 #include "GPU_basic_shader.h"
 #include "GPU_buffers.h"
@@ -1816,6 +1814,80 @@ void GPU_free_images_old(Main *bmain)
 
 /* OpenGL state caching for materials */
 
+/* Probe Volume GI preview: KX_TextureRendererManager::FindProbeVolume + BL_BlenderShader's bind. */
+static const GPUViewportProbeVolume *viewport_probe_volumes = NULL;
+static int viewport_probe_volume_count = 0;
+
+void GPU_viewport_probe_volumes_set(const GPUViewportProbeVolume *volumes, int count)
+{
+	viewport_probe_volumes = volumes;
+	viewport_probe_volume_count = volumes ? count : 0;
+}
+
+static void gpu_bind_viewport_probe_volume(GPUMaterial *gpumat, Object *ob)
+{
+	if (!GPU_material_use_probe_grid_atlas(gpumat)) {
+		return;
+	}
+	const GPUViewportProbeVolume *best = NULL;
+	if (viewport_probe_volume_count && ob) {
+		/* World box of the object (the game uses the mesh's bounding box). */
+		float bmin[3], bmax[3];
+		copy_v3_v3(bmin, ob->obmat[3]);
+		copy_v3_v3(bmax, ob->obmat[3]);
+		BoundBox *bb = BKE_object_boundbox_get(ob);
+		if (bb) {
+			INIT_MINMAX(bmin, bmax);
+			for (int c = 0; c < 8; c++) {
+				float co[3];
+				mul_v3_m4v3(co, ob->obmat, bb->vec[c]);
+				minmax_v3v3_v3(bmin, bmax, co);
+			}
+		}
+		float center[3];
+		mid_v3_v3v3(center, bmin, bmax);
+		float best_weight = 0.0f;
+		for (int v = 0; v < viewport_probe_volume_count; v++) {
+			const GPUViewportProbeVolume *vol = &viewport_probe_volumes[v];
+			/* KX_ProbeVolume::BoxOverlap */
+			float inter = 1.0f;
+			for (int i = 0; i < 3; i++) {
+				const float ext = bmax[i] - bmin[i];
+				if (ext < 1e-3f) {
+					const float mid = 0.5f * (bmin[i] + bmax[i]);
+					inter *= (mid >= vol->min[i] && mid <= vol->max[i]) ? 1.0f : 0.0f;
+					continue;
+				}
+				inter *= min_ff(max_ff(min_ff(bmax[i], vol->max[i]) - max_ff(bmin[i], vol->min[i]), 0.0f) / ext, 1.0f);
+			}
+			float weight;
+			if (inter > 0.0f) {
+				weight = 1.0f + inter;
+			}
+			else {
+				/* KX_ProbeVolume::BoxWeight */
+				float outside = 0.0f;
+				for (int i = 0; i < 3; i++) {
+					outside = max_ff(outside, max_ff(vol->min[i] - center[i], center[i] - vol->max[i]));
+				}
+				weight = min_ff(max_ff(1.0f - outside / (0.5f * vol->spacing), 0.0f), 1.0f);
+			}
+			if (weight > best_weight) {
+				best = vol;
+				best_weight = weight;
+			}
+		}
+	}
+	if (best) {
+		GPU_material_bind_probe_grid_atlas(gpumat, best->atlas, best->min, best->max, best->dims,
+		                                   1.0f / (0.5f * best->spacing), 1.0f);
+	}
+	else {
+		GPU_material_bind_probe_grid_atlas(gpumat, NULL, NULL, NULL, NULL, 0.0f, 1.0f);
+	}
+	GPU_material_bind_probe_grid(gpumat, NULL, 0.0f);
+}
+
 typedef struct GPUMaterialFixed {
 	float diff[3];
 	float spec[3];
@@ -2268,6 +2340,8 @@ static int gpu_object_material_bind_impl(int nr, void *attribs)
 				GPU_material_bind_shadow_lamps(gpumat, GMS.shadowlamps);
 				GPU_material_bind_scene_lights(gpumat, GMS.lights);
 			}
+			/* after the lamps: the unit cache reset above would forget the atlas unit */
+			gpu_bind_viewport_probe_volume(gpumat, GMS.gob);
 			GMS.gboundmat = mat;
 			if (GPU_shadow_color_pass_get()) {
 				GPU_shadow_color_pass_blend();
