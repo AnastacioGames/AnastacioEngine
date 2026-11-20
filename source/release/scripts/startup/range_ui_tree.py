@@ -1774,6 +1774,112 @@ def _draw_editor():
     _draw_previews()
 
 
+def _hud_frame_rect(context, region, rv3d):
+    """Retângulo (x, y, largura, altura) em pixels onde o HUD aparece: o quadro
+    da câmera na visão de câmera, senão a região inteira."""
+    cam = context.scene.camera
+    if rv3d.view_perspective == "CAMERA" and cam is not None and cam.type == "CAMERA":
+        from bpy_extras.view3d_utils import location_3d_to_region_2d
+        corners = [location_3d_to_region_2d(region, rv3d, cam.matrix_world * c)
+                   for c in cam.data.view_frame(context.scene)]
+        if all(c is not None for c in corners):
+            xs, ys = [c.x for c in corners], [c.y for c in corners]
+            w, h = max(xs) - min(xs), max(ys) - min(ys)
+            if w > 8 and h > 8:
+                return min(xs), min(ys), w, h
+    return 0.0, 0.0, float(region.width), float(region.height)
+
+
+def _hud_values(node, scene):
+    """Valores do widget: propriedades de jogo do Object (ou da câmera, que leva
+    o script) quando existem; senão o exemplo da prévia do Node Editor."""
+    values = node.preview_values()
+    owner = bpy.data.objects.get(node.object_name) if node.object_name else scene.camera
+    if owner is not None:
+        values.update({p.name: p.value for p in owner.game.properties})
+    return values
+
+
+def _draw_viewport_hud():
+    """Mostra na 3D View o HUD da UI Tree (telas marcadas como HUD), como o jogo
+    o desenha.  Só visual: sem eventos, sem animação."""
+    context = bpy.context
+    scene = context.scene
+    if not getattr(scene, "range_ui_preview", False):
+        return
+    region, rv3d = context.region, context.region_data
+    if region is None or rv3d is None:
+        return
+    # Uma UI Tree só: sem ler o texto do bake a cada redesenho.
+    trees = [t for t in bpy.data.node_groups if t.bl_idname == UITree.bl_idname]
+    tree = trees[0] if len(trees) == 1 else _baked_tree()
+    if tree is None:
+        return
+    import bgl
+    import blf
+    import range_ui_draw
+    left, bottom, width, height = _hud_frame_rect(context, region, rv3d)
+    bgl.glPushAttrib(bgl.GL_ALL_ATTRIB_BITS)
+    pushed = False
+    try:
+        bgl.glUseProgram(0)
+        bgl.glDisable(bgl.GL_LIGHTING)
+        bgl.glDisable(bgl.GL_TEXTURE_2D)
+        bgl.glDisable(bgl.GL_DEPTH_TEST)
+        bgl.glEnable(bgl.GL_SCISSOR_TEST)
+        # O scissor é em coordenadas da janela e entra no que já recortava a região.
+        sx, sy = int(region.x + max(left, 0.0)), int(region.y + max(bottom, 0.0))
+        sw = int(min(left + width, region.width) - max(left, 0.0)) + 1
+        sh = int(min(bottom + height, region.height) - max(bottom, 0.0)) + 1
+        bgl.glScissor(sx, sy, max(sw, 1), max(sh, 1))
+        bgl.glPushMatrix()
+        pushed = True
+        bgl.glTranslatef(left, bottom, 0.0)
+        range_ui_draw.set_alpha(1.0)
+        for frame in tree.nodes:
+            if not _is_screen(frame) or not frame.ui_hud:
+                continue
+            # HUD de uma câmera específica (split screen) só aparece com ela ativa.
+            if frame.ui_camera and (scene.camera is None or scene.camera.name != frame.ui_camera):
+                continue
+            fx, fy, fw, fh = _canvas(frame, scene)
+            children = [n for n in tree.nodes if n.parent == frame and
+                        (isinstance(n, UIHudNode) or n.bl_idname == UIButtonNode.bl_idname)]
+            # Fundo primeiro (Panel, Image, Minimap), como no jogo.
+            children.sort(key=lambda n: 0 if isinstance(n, UIPanelNode) else
+                          1 if isinstance(n, (UIImageNode, UIMinimapNode)) else 2)
+            for node in children:
+                nx, ny = _abs_location(node)
+                rect = ((nx - fx) / fw, (fy - ny) / fh, node.width / fw, node.button_height / fh)
+                x, y, w, h = range_ui_draw.place(rect, frame.ui_scale_mode, (fw, fh),
+                                                 node.anchor, width, height)
+                image = node.image() if hasattr(node, "image") else None
+                bindcode = image.bindcode[0] if image is not None and not image.gl_load() else 0
+                if isinstance(node, UIHudNode):
+                    data = node.widget()
+                    if data.get("key"):
+                        data["format"] = data["key"]
+                    markers = node.preview_markers() if isinstance(node, UIMinimapNode) else None
+                    range_ui_draw.draw_widget(bgl, blf, data, _hud_values(node, scene),
+                                              x, y, w, h, bindcode=bindcode, markers=markers)
+                else:
+                    range_ui_draw.draw_button(bgl, blf, node.style(), node.translation_key or node.text,
+                                              x, y, w, h, "NORMAL", bindcode=bindcode)
+    except Exception as exc:  # a prévia nunca pode derrubar o desenho da viewport
+        print("[UI Tree] HUD preview failed: %s" % exc)
+    finally:
+        if pushed:
+            bgl.glPopMatrix()
+        bgl.glPopAttrib()
+
+
+def _tag_view3d(self, context):
+    for window in context.window_manager.windows:
+        for area in window.screen.areas:
+            if area.type == "VIEW_3D":
+                area.tag_redraw()
+
+
 class UITreePanel:
     bl_space_type = "NODE_EDITOR"
     bl_label = "UI Tree"
@@ -1880,6 +1986,7 @@ CLASSES = (UITree, UIEventSocket, UIButtonNode) + HUD_NODES + ACTION_NODES + (
     NODE_PT_range_ui_tree_tools)
 
 _draw_handles = []
+_view3d_handles = []
 
 
 def register():
@@ -1922,6 +2029,11 @@ def register():
     bpy.types.INFO_MT_add.append(_draw_add_minimap)
     space = bpy.types.SpaceNodeEditor
     _draw_handles.append(space.draw_handler_add(_draw_editor, (), "WINDOW", "PRE_VIEW"))
+    bpy.types.Scene.range_ui_preview = BoolProperty(
+        name="UI Tree HUD", default=False, update=_tag_view3d,
+        description="Show the UI Tree HUD screens in the 3D View, as the game draws them")
+    _view3d_handles.append(bpy.types.SpaceView3D.draw_handler_add(
+        _draw_viewport_hud, (), "WINDOW", "POST_PIXEL"))
     for handlers in (bpy.app.handlers.game_pre, bpy.app.handlers.save_pre):
         if _auto_bake not in handlers:
             handlers.append(_auto_bake)
@@ -1933,6 +2045,9 @@ def unregister():
             handlers.remove(_auto_bake)
     while _draw_handles:
         bpy.types.SpaceNodeEditor.draw_handler_remove(_draw_handles.pop(), "WINDOW")
+    while _view3d_handles:
+        bpy.types.SpaceView3D.draw_handler_remove(_view3d_handles.pop(), "WINDOW")
+    del bpy.types.Scene.range_ui_preview
     del bpy.types.Object.range_minimap_show
     del bpy.types.Object.range_minimap_use_color
     del bpy.types.Object.range_minimap_color
