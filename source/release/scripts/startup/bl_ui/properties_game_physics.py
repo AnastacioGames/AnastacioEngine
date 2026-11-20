@@ -25,6 +25,7 @@ from bpy.types import Panel, Menu, UIList, Operator, AnimationEventTrigger
 from bpy.props import IntProperty, StringProperty, EnumProperty
 from mathutils import Vector
 from bpy.app.translations import pgettext_iface as iface_
+from .properties_constraint import ConstraintButtonsPanel
 
 # Game: Physics tab (physics, collision, obstacles, destruction, explosive, deformation).
 # Split out of properties_game.py, which still registers every class in order.
@@ -456,6 +457,33 @@ class PHYSICS_PT_game_force_field(PhysicsButtonsPanel, Panel):
         col.active = field.use_game_field
         col.prop(field, "type", text="")
         col.label(text="Edit the field values in the render Physics tab", icon='INFO')
+
+
+class PHYSICS_PT_game_joints(PhysicsButtonsPanel, ConstraintButtonsPanel, Panel):
+    # Edits the same RIGID_BODY_JOINT constraints as the Constraints tab, so a joint is never duplicated.
+    bl_label = "Rigid Body Joints"
+    bl_options = {'DEFAULT_CLOSED'}
+    COMPAT_ENGINES = {'BLENDER_GAME'}
+
+    @classmethod
+    def poll(cls, context):
+        ob = context.object
+        return (ob is not None and context.scene.render.engine in cls.COMPAT_ENGINES
+                and physics_category_is(context, 'PHYSICS')
+                and ob.game.physics_type in {'STATIC', 'DYNAMIC', 'RIGID_BODY'})
+
+    def draw(self, context):
+        layout = self.layout
+        ob = context.object
+        joints = [con for con in ob.constraints if con.type == 'RIGID_BODY_JOINT']
+        if not joints:
+            layout.label(text="Select the other body, then add a joint here", icon='INFO')
+        row = layout.row(align=True)
+        for ident, label in (('BALL', "Ball"), ('HINGE', "Hinge"),
+                             ('CONE_TWIST', "Cone"), ('GENERIC_6_DOF', "6DoF")):
+            row.operator("object.game_joint_add", text=label).pivot_type = ident
+        for con in joints:
+            self.draw_constraint(context, con)
 
 
 class PHYSICS_PT_game_obstacles(PhysicsButtonsPanel, Panel):
