@@ -4263,6 +4263,8 @@ class VIEW3D_PT_overlay(Panel):
                  icon='RESTRICT_VIEW_ON' if view.show_only_render else 'RESTRICT_VIEW_OFF', toggle=True)
         if hasattr(scene, "range_ui_hud_preview"):
             layout.prop(scene, "range_ui_hud_preview", text="Game HUD (UI Tree)", icon='MENU_PANEL')
+        if hasattr(scene, "range_video_poster_preview"):
+            layout.prop(scene, "range_video_poster_preview", text="Video Poster", icon='FILE_MOVIE')
 
         layout.separator()
 
