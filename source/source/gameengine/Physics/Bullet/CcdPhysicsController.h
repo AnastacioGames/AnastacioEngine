@@ -52,6 +52,7 @@ class RAS_Deformer;
 class btCollisionShape;
 
 #define CCD_BSB_SHAPE_MATCHING  2
+#define CCD_BSB_CLOTH 4 /* same bit as OB_BSB_CLOTH */
 #define CCD_BSB_BENDING_CONSTRAINTS 8
 #define CCD_BSB_AERO_VPOINT 16 /* aero model, Vertex normals are oriented toward velocity*/
 #define CCD_BSB_AERO_VTWOSIDE 32 /* aero model, Vertex normals are flipped to match velocity */

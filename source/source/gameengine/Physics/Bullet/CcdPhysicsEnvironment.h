@@ -98,6 +98,7 @@ protected:
 	/// after it, so the field never leaves residue in the body forces the game or Bullet own.
 	std::vector<PHY_GameField> m_gameFields;
 	std::vector<std::pair<btRigidBody *, btVector3> > m_appliedFieldForces;
+	std::vector<btSoftBody *> m_windedSoftBodies; ///< soft bodies with wind set this step, cleared after it
 	void ApplyGameFields();
 	void RemoveGameFields();
 	/// value passed to SetFixedTimeStep, returned as-is by GetFixedTimeStep (0.f if not using a fixed timestep)

@@ -1268,6 +1268,11 @@ bool CcdPhysicsController::CreateSoftbody()
 		psb->generateBendingConstraints(m_cci.m_softBendingDistance, pm);
 	}
 
+	if (m_cci.m_gamesoftFlag & CCD_BSB_CLOTH) {
+		// A sheet is hit by the wind from both faces.
+		psb->m_cfg.aeromodel = btSoftBody::eAeroModel::V_TwoSided;
+	}
+
 	psb->m_cfg.piterations = m_cci.m_soft_piterations;
 	psb->m_cfg.viterations = m_cci.m_soft_viterations;
 	psb->m_cfg.diterations = m_cci.m_soft_diterations;

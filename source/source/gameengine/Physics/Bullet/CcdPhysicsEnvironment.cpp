@@ -1099,13 +1099,72 @@ void CcdPhysicsEnvironment::SetGameFields(const std::vector<PHY_GameField>& fiel
 	m_gameFields = fields;
 }
 
+/// Distance/shape/direction falloff of a field at world point p (0 = out of reach).
+static float GameFieldFalloffAt(const PHY_GameField& f, const btVector3& p)
+{
+	const btVector3 fpos(f.position[0], f.position[1], f.position[2]);
+	const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
+	const btVector3 toCenter = p - fpos;
+	btVector3 loc = fpos;
+	if (f.planar) {
+		loc = p - nor * toCenter.dot(nor);
+	}
+	const btVector3 toPoint = p - loc;
+	const float dist = toPoint.length();
+	const float fac = nor.dot(toCenter);
+
+	if ((f.zdir == 1 && fac < 0.0f) || (f.zdir == 2 && fac > 0.0f)) {
+		return 0.0f;
+	}
+	if (f.falloff == 1 || f.falloff == 2) { // tube, cone
+		float falloff = GameFieldFalloff(fabsf(fac), f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
+		if (falloff != 0.0f) {
+			float rFac;
+			if (f.falloff == 1) {
+				rFac = (toCenter - nor * fac).length();
+			}
+			else {
+				rFac = (dist > SIMD_EPSILON) ? btDegrees(acosf(btClamped(fac / dist, -1.0f, 1.0f))) : 0.0f;
+			}
+			falloff *= GameFieldFalloff(rFac, f.useMinRad, f.minRad, f.useMaxRad, f.maxRad, f.powerRad);
+		}
+		return falloff;
+	}
+	return GameFieldFalloff(dist, f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
+}
+
 void CcdPhysicsEnvironment::ApplyGameFields()
 {
 	m_appliedFieldForces.clear();
+	m_windedSoftBodies.clear();
 	if (m_gameFields.empty()) {
 		return;
 	}
 	for (CcdPhysicsController *ctrl : m_controllers) {
+		// Soft bodies take wind as an air velocity (Bullet's aero model does the force, a single path).
+		// Strength is the wind speed in m/s; the cloth's kDG/kLF set how strongly it reacts.
+		btSoftBody *soft = ctrl->GetSoftBody();
+		if (soft) {
+			btVector3 wind(0.0f, 0.0f, 0.0f);
+			btVector3 bmin, bmax;
+			soft->getAabb(bmin, bmax);
+			const btVector3 c = (bmin + bmax) * 0.5f;
+			for (const PHY_GameField& f : m_gameFields) {
+				if (f.type != PHY_GameField::WIND) {
+					continue;
+				}
+				const float fall = GameFieldFalloffAt(f, c);
+				if (fall > 0.0f) {
+					wind += btVector3(f.zAxis[0], f.zAxis[1], f.zAxis[2]) * (f.strength * fall);
+				}
+			}
+			if (!wind.fuzzyZero()) {
+				soft->setWindVelocity(wind);
+				soft->activate();
+				m_windedSoftBodies.push_back(soft);
+			}
+			continue;
+		}
 		btRigidBody *body = ctrl->GetRigidBody();
 		if (!body || !body->isInWorld() || body->isStaticOrKinematicObject()) {
 			continue;
@@ -1124,29 +1183,7 @@ void CcdPhysicsEnvironment::ApplyGameFields()
 			}
 			btVector3 toPoint = p - loc;
 			const float dist = toPoint.length();
-			const float fac = nor.dot(toCenter);
-
-			float falloff = 1.0f;
-			if ((f.zdir == 1 && fac < 0.0f) || (f.zdir == 2 && fac > 0.0f)) {
-				falloff = 0.0f;
-			}
-			else if (f.falloff == 1 || f.falloff == 2) { // tube, cone
-				falloff = GameFieldFalloff(fabsf(fac), f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
-				if (falloff != 0.0f) {
-					float rFac;
-					if (f.falloff == 1) {
-						rFac = (toCenter - nor * fac).length();
-					}
-					else {
-						const float len = toPoint.length();
-						rFac = (len > SIMD_EPSILON) ? btDegrees(acosf(btClamped(fac / len, -1.0f, 1.0f))) : 0.0f;
-					}
-					falloff *= GameFieldFalloff(rFac, f.useMinRad, f.minRad, f.useMaxRad, f.maxRad, f.powerRad);
-				}
-			}
-			else {
-				falloff = GameFieldFalloff(dist, f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
-			}
+			const float falloff = GameFieldFalloffAt(f, p);
 			if (falloff <= 0.0f) {
 				continue;
 			}
@@ -1191,6 +1228,10 @@ void CcdPhysicsEnvironment::RemoveGameFields()
 		applied.first->applyCentralForce(-applied.second);
 	}
 	m_appliedFieldForces.clear();
+	for (btSoftBody *soft : m_windedSoftBodies) {
+		soft->setWindVelocity(btVector3(0.0f, 0.0f, 0.0f));
+	}
+	m_windedSoftBodies.clear();
 }
 
 void CcdPhysicsEnvironment::SimulationSubtickCallback(btScalar timeStep)
