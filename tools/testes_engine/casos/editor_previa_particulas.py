@@ -78,7 +78,15 @@ CHAO = NL.join((
     "mt = bpy.data.materials.new('chao'); mt.use_shadeless = True; mt.diffuse_color = (0.03, 0.03, 0.03)",
     "pl.data.materials.append(mt)"))
 CASOS = (('fumaca', "gp.particle_look = 'SMOKE'"), ('fogo', "gp.particle_look = 'FIRE'"),
-         ('flipbook', FLIP), ('mix', "gp.particle_look = 'SMOKE'" + NL + MIX), ('chao', CHAO))
+         ('flipbook', FLIP), ('mix', "gp.particle_look = 'SMOKE'" + NL + MIX), ('chao', CHAO),
+         ('curva_tam', NL.join(("gp.particle_look = 'SMOKE'", "gp.use_size_curve = True",
+                                "gp.size_curve.curves[0].points[0].location = (0.0, 1.0)",
+                                "gp.size_curve.curves[0].points[1].location = (1.0, 0.2)",
+                                "gp.size_curve.update()"))),
+         ('curva_cor', NL.join(("gp.particle_look = 'SMOKE'", "gp.use_color_curve = True",
+                                "for c in gp.color_curve.curves:",
+                                "    c.points[1].location = (1.0, 0.0)",
+                                "gp.color_curve.update()"))))
 
 
 def testar(t):
