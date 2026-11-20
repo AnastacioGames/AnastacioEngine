@@ -351,6 +351,8 @@ struct CcdConstructionInfo {
 
 	int m_gamesoftFlag;
 	unsigned short m_softBendingDistance;
+	/// Original mesh vertices pinned by the soft body pin vertex group (cloth).
+	std::vector<unsigned int> m_softPinnedVertices;
 	/// linear stiffness 0..1
 	float m_soft_linStiff;
 	/// angular stiffness 0..1

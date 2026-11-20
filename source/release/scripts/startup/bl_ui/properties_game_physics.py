@@ -257,6 +257,11 @@ class PHYSICS_PT_game_physics(PhysicsButtonsPanel, Panel):
             col.prop(soft, "kdp", text="Damping", slider=True)
             col.prop(soft, "collision_margin", slider=True)
             col.prop(soft, "kvcf", text="Velocity Correction", slider=True)
+            col.prop(soft, "use_cloth")
+            if soft.use_cloth and ob.type == 'MESH':
+                sub = col.column(align=True)
+                sub.prop_search(soft, "pin_group", ob, "vertex_groups", text="Pin Group")
+                sub.prop(soft, "pin_threshold", slider=True)
             col.prop(soft, "use_bending_constraints", text="Bending Constraints")
 
             sub = col.column()

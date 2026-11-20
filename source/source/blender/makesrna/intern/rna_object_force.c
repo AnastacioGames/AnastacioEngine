@@ -47,6 +47,32 @@ static const EnumPropertyItem effector_shape_items[] = {
 
 #include "BLI_math_base.h"
 
+/* Cloth preset: written once when the toggle goes on, so later tweaks are preserved. */
+static void rna_BulletSoftBody_use_cloth_set(PointerRNA *ptr, bool value)
+{
+	BulletSoftBody *bsb = (BulletSoftBody *)ptr->data;
+	const bool was_on = (bsb->flag & OB_BSB_CLOTH) != 0;
+	if (value) {
+		bsb->flag |= OB_BSB_CLOTH;
+		if (!was_on) {
+			bsb->flag |= OB_BSB_BENDING_CONSTRAINTS;
+			bsb->flag &= ~OB_BSB_SHAPE_MATCHING;
+			bsb->linStiff = 0.6f;
+			bsb->bending_dist = 2;
+			bsb->piterations = 4;
+			bsb->kDP = 0.02f;
+			bsb->kDG = 0.05f; /* drag/lift are what make wind act on the cloth (phase 4) */
+			bsb->kLF = 0.02f;
+			bsb->kPR = 0.0f;  /* a flat sheet has no volume: no pressure or volume conservation */
+			bsb->kVC = 0.0f;
+			bsb->volume = 0.0f;
+		}
+	}
+	else {
+		bsb->flag &= ~OB_BSB_CLOTH;
+	}
+}
+
 
 /* type specific return values only used from functions */
 static const EnumPropertyItem curve_shape_items[] = {
@@ -1670,6 +1696,20 @@ static void rna_def_game_softbody(BlenderRNA *brna)
 	prop = RNA_def_property(srna, "use_shape_match", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", OB_BSB_SHAPE_MATCHING);
 	RNA_def_property_ui_text(prop, "Shape Match", "Enable soft body shape matching goal");
+
+	prop = RNA_def_property(srna, "use_cloth", PROP_BOOLEAN, PROP_NONE);
+	RNA_def_property_boolean_sdna(prop, NULL, "flag", OB_BSB_CLOTH);
+	RNA_def_property_boolean_funcs(prop, NULL, "rna_BulletSoftBody_use_cloth_set");
+	RNA_def_property_ui_text(prop, "Cloth", "Cloth preset: applies cloth-like values once when enabled (stiffness, bending, drag and lift for wind, no shape matching or pressure)");
+
+	prop = RNA_def_property(srna, "pin_group", PROP_STRING, PROP_NONE);
+	RNA_def_property_string_sdna(prop, NULL, "pin_group");
+	RNA_def_property_ui_text(prop, "Pin Group", "Vertex group whose vertices are fixed in world space (triangle mesh soft bodies only)");
+
+	prop = RNA_def_property(srna, "pin_threshold", PROP_FLOAT, PROP_FACTOR);
+	RNA_def_property_float_sdna(prop, NULL, "pin_threshold");
+	RNA_def_property_range(prop, 0.0f, 1.0f);
+	RNA_def_property_ui_text(prop, "Pin Threshold", "Vertices with at least this weight in the pin group are fixed");
 
 	prop = RNA_def_property(srna, "use_bending_constraints", PROP_BOOLEAN, PROP_NONE);
 	RNA_def_property_boolean_sdna(prop, NULL, "flag", OB_BSB_BENDING_CONSTRAINTS);

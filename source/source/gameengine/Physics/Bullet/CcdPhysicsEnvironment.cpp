@@ -58,6 +58,11 @@
 #include "DNA_world_types.h"
 #include "DNA_object_types.h" // for OB_MAX_COL_MASKS
 #include "DNA_object_force_types.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+extern "C" {
+#include "BKE_deform.h"
+}
 
 extern "C" {
 	#include "BLI_utildefines.h"
@@ -3584,6 +3589,23 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 			ci.m_soft_kAHR = blenderobject->bsoft->kAHR; // Anchors hardness [0,1]
 			ci.m_soft_collisionflags = blenderobject->bsoft->collisionflags; // Vertex/Face or Signed Distance Field(SDF) or Clusters, Soft versus Soft or Rigid
 			ci.m_soft_numclusteriterations = blenderobject->bsoft->numclusteriterations; // number of iterations to refine collision clusters
+
+			// Pin group: collect the original mesh vertices whose weight reaches the threshold.
+			if (blenderobject->bsoft->pin_group[0] && blenderobject->type == OB_MESH && blenderobject->data) {
+				const Mesh *pinMesh = (const Mesh *)blenderobject->data;
+				const int pinGroup = defgroup_name_index(blenderobject, blenderobject->bsoft->pin_group);
+				if (pinGroup >= 0 && pinMesh->dvert) {
+					for (int v = 0; v < pinMesh->totvert; ++v) {
+						const MDeformVert& dv = pinMesh->dvert[v];
+						for (int w = 0; w < dv.totweight; ++w) {
+							if (dv.dw[w].def_nr == pinGroup && dv.dw[w].weight >= blenderobject->bsoft->pin_threshold) {
+								ci.m_softPinnedVertices.push_back((unsigned int)v);
+								break;
+							}
+						}
+					}
+				}
+			}
 
 		}
 		else {

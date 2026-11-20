@@ -1323,6 +1323,16 @@ bool CcdPhysicsController::CreateSoftbody()
 		m_softBodyIndices[i] = (node >= 0) ? (unsigned int)node : -1;
 	}
 
+	// Pins: mass 0 on the node of each pinned original vertex. Triangle mesh only, a hull has several
+	// vertices per node. Done after setTotalMass so the fixed mass is kept.
+	if (shapeType != CONVEX_HULL_SHAPE_PROXYTYPE) {
+		for (const unsigned int v : m_cci.m_softPinnedVertices) {
+			if (v < m_softBodyIndices.size() && m_softBodyIndices[v] != (unsigned int)-1) {
+				psb->setMass(m_softBodyIndices[v], 0.0f);
+			}
+		}
+	}
+
 	// Nodes are in object space: move them to the object transform, which becomes the soft body frame.
 	btTransform startTrans;
 	m_bulletMotionState->getWorldTransform(startTrans);
