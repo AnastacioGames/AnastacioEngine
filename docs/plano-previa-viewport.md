@@ -81,3 +81,12 @@ Inventário e matriz de suporte → Fase 0 → Fase 1 → Fase 2 → Fase 3 → 
 ## Para incluir outros recursos depois
 
 Acrescentar na fase certa: nome, fonte no jogo, o que a viewport não mostra, custo, se é temporal e que dados de runtime precisa.
+
+## Notas de execução
+
+### Item 1: Baked Lighting (Fase 4)
+**O que se achou (leitura de código, sem build):** o material é o mesmo nos dois lados. `node_shader_gpu_lightmap` (`node_shader_util.c:376`) e `lightmap_sample` (`gpu_shader_material.glsl:5501`) servem viewport e jogo; as props `ae_lightmap`/`ae_lightmap_use`/`ae_lightmap_mode` e o `update_tag` dos materiais (`anastacio_lightmap.py`) recompilam os dois. A divergência real estava na UV: o jogo pula o atributo "Lightmap" quando o mesh não tem a camada (`BL_BlenderShader.cpp:140`, o shader lê 0,0 = texel vazio e o objeto fica com a luz ambiente), enquanto a viewport (`cdDM_drawMappedFacesGLSL`) deixava o atributo sem array e com o valor genérico que o desenho anterior deixou, isto é, indefinido.
+**Feito:** o atributo sem camada recebe `glVertexAttrib2f(idx, 0, 0)` antes de desenhar (`cdderivedmesh.c`, laço final de `cdDM_drawMappedFacesGLSL`). Teste novo `casos/editor_previa_baked_lighting.py` (atlas RGBM por script, plano com e sem UV Lightmap, liga/desliga `ae_lightmap_use`).
+**Diferenças conhecidas e não mexidas:** (1) mipmap/anisotropia do atlas: o jogo aplica o da cena (`RAS_Rasterizer::SetMipmapping`), a viewport o das preferências (estado global de `gpu_draw.c`); (2) em Edit Mode o mesh não manda a UV (`is_editmesh`), sem lightmap; (3) objeto sem material (`totcol == 0`) usa `defmaterial` na viewport.
+**Conferir no build/teste:** compilar `blenkernel`; rodar `rodar.py editor_previa_baked_lighting`; ver no editor um objeto sem UV Lightmap ao lado de um com; checar se o `glVertexAttrib2f` no índice 0 não gera vértice (fora de glBegin só define o valor corrente).
+**Dúvidas:** o teste assume que `uv_textures.new('Lightmap')` produz UV 0..1 por face no plano; se a cor sair invertida, é o atlas, não o código.

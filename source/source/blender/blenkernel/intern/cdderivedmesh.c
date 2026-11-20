@@ -1203,6 +1203,16 @@ static void cdDM_drawMappedFacesGLSL(
 			do_draw = setMaterial(new_matnr + 1, &gattribs);
 
 			if (do_draw) {
+				/* A UV layer the mesh lacks (e.g. "Lightmap" on an object outside the baked atlas) has no
+				 * array: give the attribute the constant 0,0 the game reads (BL_BlenderShader::GetAttribs
+				 * skips it), instead of whatever generic value the previous draw left behind. */
+				for (b = 0; b < matconv[a].attribs.tottface; b++) {
+					if (!matconv[a].attribs.tface[b].array && !matconv[a].attribs.tface[b].gl_texco &&
+					    matconv[a].attribs.tface[b].gl_index >= 0)
+					{
+						glVertexAttrib2f(matconv[a].attribs.tface[b].gl_index, 0.0f, 0.0f);
+					}
+				}
 				if (matconv[a].numdata) {
 					GPU_interleaved_attrib_setup(buffer, matconv[a].datatypes, matconv[a].numdata, max_element_size);
 				}
