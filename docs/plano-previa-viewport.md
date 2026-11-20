@@ -58,10 +58,12 @@ Feito (toggle Game Preview > Particles, `view3d_particles.cpp`): `RAS_ParticleBu
 
 Limites conhecidos: sem colisão com a tela e sem burst manual (gatilho do usuário, fora de "sem lógica"); suaves sem MSAA nem ortográfica; offset do flicker em espaço do mundo (no jogo é local, difere com pais girados/escalados); a curva de cor não alterou a imagem nem no jogo no teste `curva_cor` (paridade não provada); liberação por região fechada só compilada, não testada; hash de vértices estáticos a cada desenho, custo não medido.
 
-### Fase 6: UI e mídia (em andamento)
+### Fase 6: UI e mídia (em andamento; falta o Video Player)
 UI Tree (HUD), Text Boxes com o atlas do jogo, Video Player, Minimap.
 
 Feito 2026-11-20: **UI Tree HUD** (toggle Game Preview > UI Tree HUD, propriedade `Scene.range_ui_preview`, `_draw_viewport_hud` em `range_ui_tree.py`). Desenha as telas marcadas como HUD num draw handler POST_PIXEL da 3D View, com o mesmo `range_ui_draw` do jogo, dentro do quadro da câmera (ou da região fora da visão de câmera). Valores vêm das propriedades de jogo do Object (ou da câmera); sem a propriedade vale o exemplo da prévia do Node Editor. Inclui Minimap com marcadores reais (objetos com a propriedade/prefixo, cor `minimap_color`, jogador com a orientação do objeto; sem nenhum objeto, o exemplo) e Dialogue (1ª página). Teste: `editor_previa_ui_minimap`. Teste: `editor_previa_ui_hud`. Limites: sem eventos, hover ou animação; HUD com Camera preenchida só aparece quando é a câmera ativa; Tuner/Microfone com valor de exemplo; paridade com o jogo aguarda aceite lado a lado.
+
+Feito 2026-11-20: **Text Boxes**. A prévia de texto do jogo (por texto, "Preview Game Text", já com o atlas de bitmap) agora também quebra as linhas pela largura da caixa e mostra só a 1ª página, como `KX_FontObject::LayoutLines` (`draw_game_text_preview` em `drawobject.c`). Teste: `editor_previa_texto_caixa`. Limites: 256 linhas no máximo; página sempre a 0 (o jogo troca por script); sem máquina de escrever nem locale; paridade aguarda aceite lado a lado.
 
 ### Dependem de decisão de produto
 - **Light Flash:** é o pulso da destruição (`KX_DestructionManager.cpp:1333`); precisa de um gatilho de prévia e de simulação temporal, o que toca o limite "sem lógica".

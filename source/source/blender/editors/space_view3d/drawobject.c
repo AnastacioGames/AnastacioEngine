@@ -5433,6 +5433,36 @@ static int draw_game_text_font_id(Main *bmain, VFont *vfont)
 	return (fontid != -1) ? fontid : BLF_find("default");
 }
 
+/** Width of a line for the box wrap, as KX_FontObject::LineWidth (atlas advances or BLF width). */
+static float game_text_line_width(Curve *cu, int fontid, int isize, float aspect,
+                                  const char *line, size_t len)
+{
+	if ((cu->flag & CU_BITMAP_ATLAS) && cu->atlas_image && cu->atlas_glyphs &&
+	    cu->atlas_count > 0 && cu->atlas_size > 0.0f && cu->atlas_cell > 0.0f)
+	{
+		const float s = cu->fsize / cu->atlas_size;
+		float pen = 0.0f;
+		size_t index = 0;
+		while (index < len) {
+			const unsigned int code = BLI_str_utf8_as_unicode_step(line, &index);
+			int found = -1;
+			for (int k = 0; k < cu->atlas_count; k++) {
+				if ((unsigned int)cu->atlas_glyphs[k].code == code) {
+					found = k;
+					break;
+				}
+			}
+			pen += (found >= 0) ? cu->atlas_glyphs[found].advance * s : cu->atlas_cell * s * 0.5f;
+		}
+		return pen;
+	}
+	if (len == 0) {
+		return 0.0f;
+	}
+	BLF_size(fontid, isize, 72);
+	return BLF_width(fontid, line, len) * aspect;
+}
+
 /**
  * "Preview Game Text" with a Bitmap Atlas: same layout as KX_FontObject::BuildAtlasQuads,
  * ApplyTextAlignment and RAS_OpenGLRasterizer::RenderTextAtlas3D.
@@ -5616,19 +5646,79 @@ static bool draw_game_text_preview(Main *bmain, Scene *scene, Base *base,
 	const int isize = (int)size;
 	float offset[2] = {cu->xof, cu->yof};
 
-	/* split on line breaks, like split_string() in KX_FontObject.cpp */
+	/* split on line breaks, like split_string() in KX_FontObject.cpp, then the box wrap and page 0
+	 * of KX_FontObject::LayoutLines (lines stay contiguous slices of the text) */
 	const char *lines[256];
 	size_t lens[256];
 	int totline = 0;
+	const float box_w = (cu->tb && cu->totbox > 0) ? max_ff(cu->tb[0].w, 0.0f) : 0.0f;
+	const float box_h = (cu->tb && cu->totbox > 0) ? max_ff(cu->tb[0].h, 0.0f) : 0.0f;
 	for (const char *p = str; totline < 256; ) {
 		const char *end = strchr(p, '\n');
-		lines[totline] = p;
-		lens[totline] = end ? (size_t)(end - p) : strlen(p);
-		totline++;
-		if (end == NULL) {
+		const size_t plen = end ? (size_t)(end - p) : strlen(p);
+		if (box_w <= 0.0f) {
+			lines[totline] = p;
+			lens[totline] = plen;
+			totline++;
+		}
+		else {
+			const char *line = NULL;
+			size_t llen = 0;
+			size_t pos = 0;
+			while (pos <= plen && totline < 255) {
+				const char *sp = memchr(p + pos, ' ', plen - pos);
+				const size_t wend = sp ? (size_t)(sp - p) : plen;
+				const char *word = p + pos;
+				const size_t wlen = wend - pos;
+				/* the game tests line.empty(): a line of zero length restarts at this word */
+				const char *cand = (llen > 0) ? line : word;
+				const size_t clen = (llen > 0) ? (size_t)((word + wlen) - line) : wlen;
+				if (llen == 0 ||
+				    game_text_line_width(cu, fontid, isize, aspect, cand, clen) <= box_w)
+				{
+					line = cand;
+					llen = clen;
+				}
+				else {
+					lines[totline] = line;
+					lens[totline++] = llen;
+					line = word;
+					llen = wlen;
+				}
+				/* a word wider than the box is cut at the last letter that fits */
+				while (totline < 255 &&
+				       game_text_line_width(cu, fontid, isize, aspect, line, llen) > box_w)
+				{
+					size_t index = 0, cut = 0;
+					while (index < llen) {
+						size_t next = index;
+						BLI_str_utf8_as_unicode_step(line, &next);
+						if (cut > 0 && game_text_line_width(cu, fontid, isize, aspect, line, next) > box_w) {
+							break;
+						}
+						cut = index = next;
+					}
+					if (cut == 0 || cut >= llen) {
+						break;
+					}
+					lines[totline] = line;
+					lens[totline++] = cut;
+					line += cut;
+					llen -= cut;
+				}
+				pos = wend + 1;
+			}
+			lines[totline] = line ? line : p;
+			lens[totline++] = line ? llen : 0;
+		}
+		if (end == NULL || totline >= 256) {
 			break;
 		}
 		p = end + 1;
+	}
+	if (box_h > 0.0f && cu->fsize * cu->linedist > 0.0f) {
+		const int per_page = max_ii(1, (int)(box_h / (cu->fsize * cu->linedist) + 1e-4f));
+		totline = min_ii(totline, per_page);
 	}
 
 	/* KX_FontObject::GetTextAabb + ApplyTextAlignment */
