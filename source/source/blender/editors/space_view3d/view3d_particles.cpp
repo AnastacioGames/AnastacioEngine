@@ -45,6 +45,10 @@
 #include "DNA_mesh_types.h"
 
 #include "PIL_time.h"
+#include "DNA_property_types.h"
+extern "C" {
+#include "BKE_property.h"
+}
 
 #include "GPU_glew.h"
 
@@ -152,7 +156,8 @@ bool view3d_gpu_particles_active(const Scene *scene, const View3D *v3d)
 	for (const Base *base = (const Base *)scene->base.first; base; base = base->next) {
 		const Object *ob = base->object;
 		if ((base->lay & v3d->lay) &&
-		    (emitter_wanted(ob, false) || emitter_wanted(ob, true)))
+		    (emitter_wanted(ob, false) || emitter_wanted(ob, true) ||
+		     (ob->type == OB_LAMP && BKE_bproperty_object_get((Object *)ob, "light_flicker"))))
 		{
 			return true;
 		}

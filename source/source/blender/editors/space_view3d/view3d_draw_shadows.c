@@ -35,6 +35,10 @@
 #include "DNA_mesh_types.h"
 #include "DNA_key_types.h"
 #include "DNA_lamp_types.h"
+#include "DNA_property_types.h"
+#include "DNA_gpu_types.h"
+#include "DNA_view3d_types.h"
+#include "BKE_property.h"
 #include "DNA_material_types.h"
 #include "DNA_scene_types.h"
 #include "DNA_world_types.h"
@@ -120,23 +124,87 @@ typedef struct View3DShadow {
 	float obmat[4][4];
 } View3DShadow;
 
+/* Same smooth noise as KX_FlickerNoise (KX_LightObject.cpp). */
+static float flicker_noise(double x)
+{
+	const double i = floor(x);
+	const float f = (float)(x - i);
+	const double h0 = fmod(sin(i * 127.1) * 43758.5453, 1.0) * 0.5 + 0.5;
+	const double h1 = fmod(sin((i + 1.0) * 127.1) * 43758.5453, 1.0) * 0.5 + 0.5;
+	const float u = f * f * (3.0f - 2.0f * f);
+	return (float)h0 + (float)(h1 - h0) * u;
+}
+
+/* Game Preview > Particles: a lamp with the "light_flicker" game property (0..2) wanders in energy,
+ * color and position as in the game (KX_LightObject::UpdateFlicker), around the values it has in the
+ * scene. Nothing is written back: only the GPU lamp and the matrix used for this draw change. */
+static bool lamp_flicker(View3D *v3d, Object *ob, float r_col[3], float *r_energy, float offset[3])
+{
+	bProperty *prop;
+	double time, seed;
+	float amount, n, t, reach;
+	const Lamp *la = (const Lamp *)ob->data;
+
+	if (!(v3d->fx_settings.fx_flag2 & GPU_FX2_PARTICLES) || !(prop = BKE_bproperty_object_get(ob, "light_flicker"))) {
+		return false;
+	}
+	switch (prop->type) {
+		case GPROP_FLOAT:
+		case GPROP_TIME:
+			amount = *((float *)&prop->data);
+			break;
+		case GPROP_BOOL:
+		case GPROP_INT:
+			amount = (float)prop->data;
+			break;
+		default:
+			return false;
+	}
+	CLAMP(amount, 0.0f, 2.0f);
+	time = PIL_check_seconds_timer();
+	seed = (double)(((uintptr_t)ob >> 4) % 1000) * 3.17;
+	n = flicker_noise(time * 2.3 + seed) * 0.5f + flicker_noise(time * 7.9 + seed * 1.7) * 0.32f +
+	    flicker_noise(time * 19.0 + seed * 2.3) * 0.18f;
+	t = (n - 0.5f) * 2.0f;
+	*r_energy = la->energy * MAX2(0.0f, 1.0f + 0.35f * amount * t);
+	r_col[0] = la->r;
+	r_col[1] = la->g * MAX2(0.0f, 1.0f + 0.06f * amount * t);
+	r_col[2] = la->b * MAX2(0.0f, 1.0f + 0.12f * amount * t);
+	reach = 0.06f * amount;
+	offset[0] = (flicker_noise(time * 5.1 + seed + 11.0) - 0.5f) * 2.0f * reach;
+	offset[1] = (flicker_noise(time * 4.7 + seed + 23.0) - 0.5f) * 2.0f * reach;
+	offset[2] = (flicker_noise(time * 6.3 + seed + 37.0) - 0.5f) * 1.2f * reach;
+	return true;
+}
+
 static void gpu_render_lamp_update(Scene *scene, View3D *v3d,
                                    Object *ob, Object *par,
-                                   float obmat[4][4], unsigned int lay,
+                                   float obmat_in[4][4], unsigned int lay,
                                    ListBase *shadows, SceneRenderLayer *srl)
 {
 	GPULamp *lamp;
 	Lamp *la = (Lamp *)ob->data;
 	View3DShadow *shadow;
 	unsigned int layers;
+	float obmat[4][4], fcol[3], fenergy, foffset[3];
+	const bool flicker = lamp_flicker(v3d, ob, fcol, &fenergy, foffset);
 
+	copy_m4_m4(obmat, obmat_in);
+	if (flicker) {
+		add_v3_v3(obmat[3], foffset);
+	}
 	lamp = GPU_lamp_from_blender(scene, ob, par);
 
 	if (lamp) {
 		/* Before GPU_lamp_update: the shadow projection reads the spot size. */
 		GPU_lamp_update_spot(lamp, la->spotsize, la->spotblend);
 		GPU_lamp_update(lamp, lay, (ob->restrictflag & OB_RESTRICT_RENDER), obmat);
-		GPU_lamp_update_colors(lamp, la->r, la->g, la->b, la->energy);
+		if (flicker) {
+			GPU_lamp_update_colors(lamp, fcol[0], fcol[1], fcol[2], fenergy);
+		}
+		else {
+			GPU_lamp_update_colors(lamp, la->r, la->g, la->b, la->energy);
+		}
 		/* Live values: editing them only redraws (rna_Lamp_value_update), no GLSL rebuild. */
 		GPU_lamp_update_distance(lamp, la->dist, la->att1, la->att2,
 		                         la->coeff_const, la->coeff_lin, la->coeff_quad);
