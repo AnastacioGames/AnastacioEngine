@@ -510,7 +510,8 @@ class MATERIAL_OT_anastacio_palette_atlas(Operator):
         for name, reason in skipped:
             self.report({'WARNING'}, "%s skipped: %s" % (name, reason))
         if not converted:
-            self.report({'ERROR'}, "No object converted")
+            why = "; ".join("%s: %s" % s for s in skipped)
+            self.report({'ERROR'}, "No object converted" + (" (%s). Use Bake or Auto for mixed/textured materials" % why if why else ""))
             return {'CANCELLED'}
         self.report({'INFO'}, "Palette Atlas: %d object(s), %d color(s) in the scene palette"
                     % (len(converted), colors))
@@ -547,7 +548,11 @@ class MATERIAL_OT_anastacio_atlas_auto(Operator):
             summary = classify(context.object)
             mode = 'PALETTE' if summary and all(flat for _i, _n, flat, _r in summary) else 'BAKE'
         if mode == 'PALETTE':
-            return bpy.ops.material.anastacio_palette_atlas()
+            try:
+                return bpy.ops.material.anastacio_palette_atlas()
+            except RuntimeError as error:
+                self.report({'ERROR'}, str(error).replace("Error: ", "", 1).strip())
+                return {'CANCELLED'}
         try:
             skips = transparent_skips(context, context.object)
         except RuntimeError as error:
