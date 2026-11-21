@@ -1571,9 +1571,10 @@ static void curvetomesh(Main *bmain, Scene *scene, Object *ob)
 	if (ob->type == OB_MESH) {
 		BKE_object_free_modifiers(ob, 0);
 
-		/* Game engine defaults for mesh objects */
+		/* Game engine defaults for mesh objects; keep the load mode (With Scene / On Demand /
+		 * Editor Only), otherwise the converted text or curve silently leaves the game. */
 		ob->body_type = OB_BODY_TYPE_STATIC;
-		ob->gameflag = OB_PROP | OB_COLLISION;
+		ob->gameflag = OB_PROP | OB_COLLISION | (ob->gameflag & (OB_TASK_CONVERT | OB_TASK_EDITOR_ONLY));
 	}
 }
 

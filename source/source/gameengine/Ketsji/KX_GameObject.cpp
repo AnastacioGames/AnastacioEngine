@@ -95,6 +95,7 @@
 #include "BLI_listbase.h"
 #include "DNA_group_types.h"
 #include "DNA_object_types.h"
+#include "DNA_object_force_types.h"
 
 #include "BL_BlenderDataConversion.h" // For BL_ConvertDeformer.
 #include "BL_ConvertObjectInfo.h"
@@ -2312,6 +2313,12 @@ Object *KX_GameObject::GetBlenderObject() const
 {
 	// Non converted objects has default camera doesn't have convert info.
 	return (m_convertInfo) ? m_convertInfo->m_blenderObject : nullptr;
+}
+
+bool KX_GameObject::IsGameField() const
+{
+	Object *ob = GetBlenderObject();
+	return ob && ob->pd && ob->pd->forcefield != PFIELD_NULL && (ob->pd->flag & PFIELD_GAME);
 }
 
 unsigned int KX_GameObject::GetNetId() const

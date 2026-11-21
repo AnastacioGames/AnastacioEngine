@@ -58,6 +58,11 @@
 #include "DNA_world_types.h"
 #include "DNA_object_types.h" // for OB_MAX_COL_MASKS
 #include "DNA_object_force_types.h"
+#include "DNA_mesh_types.h"
+#include "DNA_meshdata_types.h"
+extern "C" {
+#include "BKE_deform.h"
+}
 
 extern "C" {
 	#include "BLI_utildefines.h"
@@ -710,6 +715,7 @@ CcdPhysicsEnvironment::CcdPhysicsEnvironment(PHY_SolverType solverType, bool use
 	m_numIterations(10),
 	m_numTimeSubSteps(1),
 	m_fixedTimeStep(0.f),
+	m_fieldTime(0.f),
 	m_ccdMode(0),
 	m_solverType(PHY_SOLVER_NONE),
 	m_deactivationTime(2.0f),
@@ -1073,6 +1079,217 @@ void CcdPhysicsEnvironment::StaticSimulationSubtickCallback(btDynamicsWorld *wor
 	this_->SimulationSubtickCallback(timeStep);
 }
 
+/* Same falloff as blenkernel effect.c (falloff_func): 1 up to mindist, 1/(1+d-min)^power after it,
+ * zero past maxdist. */
+static float GameFieldFalloff(float fac, bool useMin, float minDist, bool useMax, float maxDist, float power)
+{
+	if (useMax && fac > maxDist) {
+		return 0.0f;
+	}
+	if (useMin && fac < minDist) {
+		return 1.0f;
+	}
+	if (!useMin) {
+		minDist = 0.0f;
+	}
+	return (float)pow((double)(1.0f + fac - minDist), (double)(-power));
+}
+
+void CcdPhysicsEnvironment::SetGameFields(const std::vector<PHY_GameField>& fields)
+{
+	m_gameFields = fields;
+}
+
+/// Smooth, reproducible 3D value noise in [-1, 1] (hash lattice + smoothstep), same result for the same seed.
+static float GameFieldHash(int x, int y, int z, int seed)
+{
+	unsigned int h = (unsigned int)x * 374761393u + (unsigned int)y * 668265263u + (unsigned int)z * 2147483647u + (unsigned int)seed * 69069u;
+	h = (h ^ (h >> 13)) * 1274126177u;
+	h ^= h >> 16;
+	return (float)(h & 0xFFFFu) / 32767.5f - 1.0f;
+}
+
+static float GameFieldNoise(const btVector3& p, int seed)
+{
+	const int ix = (int)floorf(p.x()), iy = (int)floorf(p.y()), iz = (int)floorf(p.z());
+	const float fx = p.x() - ix, fy = p.y() - iy, fz = p.z() - iz;
+	const float ux = fx * fx * (3.0f - 2.0f * fx), uy = fy * fy * (3.0f - 2.0f * fy), uz = fz * fz * (3.0f - 2.0f * fz);
+	float r = 0.0f;
+	for (int k = 0; k < 8; k++) {
+		const int dx = k & 1, dy = (k >> 1) & 1, dz = (k >> 2) & 1;
+		const float w = (dx ? ux : 1.0f - ux) * (dy ? uy : 1.0f - uy) * (dz ? uz : 1.0f - uz);
+		r += w * GameFieldHash(ix + dx, iy + dy, iz + dz, seed);
+	}
+	return r;
+}
+
+/// Distance/shape/direction falloff of a field at world point p (0 = out of reach).
+static float GameFieldFalloffAt(const PHY_GameField& f, const btVector3& p)
+{
+	const btVector3 fpos(f.position[0], f.position[1], f.position[2]);
+	const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
+	const btVector3 toCenter = p - fpos;
+	btVector3 loc = fpos;
+	if (f.planar) {
+		loc = p - nor * toCenter.dot(nor);
+	}
+	const btVector3 toPoint = p - loc;
+	const float dist = toPoint.length();
+	const float fac = nor.dot(toCenter);
+
+	if ((f.zdir == 1 && fac < 0.0f) || (f.zdir == 2 && fac > 0.0f)) {
+		return 0.0f;
+	}
+	if (f.falloff == 1 || f.falloff == 2) { // tube, cone
+		float falloff = GameFieldFalloff(fabsf(fac), f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
+		if (falloff != 0.0f) {
+			float rFac;
+			if (f.falloff == 1) {
+				rFac = (toCenter - nor * fac).length();
+			}
+			else {
+				rFac = (dist > SIMD_EPSILON) ? btDegrees(acosf(btClamped(fac / dist, -1.0f, 1.0f))) : 0.0f;
+			}
+			falloff *= GameFieldFalloff(rFac, f.useMinRad, f.minRad, f.useMaxRad, f.maxRad, f.powerRad);
+		}
+		return falloff;
+	}
+	return GameFieldFalloff(dist, f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
+}
+
+void CcdPhysicsEnvironment::ApplyGameFields(float dt)
+{
+	m_fieldTime += dt;
+	m_appliedFieldForces.clear();
+	m_windedSoftBodies.clear();
+	if (m_gameFields.empty()) {
+		return;
+	}
+	for (CcdPhysicsController *ctrl : m_controllers) {
+		// Soft bodies take wind as an air velocity (Bullet's aero model does the force, a single path).
+		// Strength is the wind speed in m/s; the cloth's kDG/kLF set how strongly it reacts.
+		btSoftBody *soft = ctrl->GetSoftBody();
+		if (soft) {
+			btVector3 wind(0.0f, 0.0f, 0.0f);
+			btVector3 bmin, bmax;
+			soft->getAabb(bmin, bmax);
+			const btVector3 c = (bmin + bmax) * 0.5f;
+			for (const PHY_GameField& f : m_gameFields) {
+				if (f.type == PHY_GameField::FORCE) {
+					continue;
+				}
+				const float fall = GameFieldFalloffAt(f, c);
+				if (fall <= 0.0f) {
+					continue;
+				}
+				const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
+				if (f.type == PHY_GameField::WIND) {
+					wind += nor * (f.strength * fall);
+				}
+				else if (f.type == PHY_GameField::VORTEX) {
+					const btVector3 radial = c - btVector3(f.position[0], f.position[1], f.position[2]);
+					const btVector3 tangent = nor.cross(radial - nor * nor.dot(radial));
+					if (tangent.length2() > SIMD_EPSILON) {
+						wind += tangent.normalized() * (f.strength * fall);
+					}
+				}
+				else if (f.type == PHY_GameField::TURBULENCE) {
+					const float inv = 1.0f / btMax(f.size, 0.01f);
+					const btVector3 q = c * inv + btVector3(m_fieldTime * 0.7f, m_fieldTime * 0.5f, m_fieldTime * 0.3f);
+					wind += btVector3(GameFieldNoise(q, f.seed), GameFieldNoise(q + btVector3(31.4f, 17.2f, 5.7f), f.seed),
+					                  GameFieldNoise(q + btVector3(-12.3f, 44.1f, 23.9f), f.seed)) * (f.strength * fall);
+				}
+			}
+			if (!wind.fuzzyZero()) {
+				soft->setWindVelocity(wind);
+				soft->activate();
+				m_windedSoftBodies.push_back(soft);
+			}
+			continue;
+		}
+		btRigidBody *body = ctrl->GetRigidBody();
+		if (!body || !body->isInWorld() || body->isStaticOrKinematicObject()) {
+			continue;
+		}
+		const btVector3 p = body->getCenterOfMassPosition();
+		const btVector3 vel = body->getLinearVelocity();
+		btVector3 total(0.0f, 0.0f, 0.0f);
+
+		for (const PHY_GameField& f : m_gameFields) {
+			const btVector3 fpos(f.position[0], f.position[1], f.position[2]);
+			const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
+			const btVector3 toCenter = p - fpos;
+			btVector3 loc = fpos;
+			if (f.planar) {
+				loc = p - nor * toCenter.dot(nor); // closest point on the field's XY plane
+			}
+			btVector3 toPoint = p - loc;
+			const float dist = toPoint.length();
+			const float falloff = GameFieldFalloffAt(f, p);
+			if (falloff <= 0.0f) {
+				continue;
+			}
+
+			btVector3 force(0.0f, 0.0f, 0.0f);
+			if (f.type == PHY_GameField::WIND) {
+				force = nor * (f.strength * falloff);
+			}
+			else if (f.type == PHY_GameField::FORCE) {
+				float strength = f.strength;
+				if (f.gravitation) {
+					strength = (dist < SIMD_EPSILON) ? 0.0f : strength / (dist * dist);
+				}
+				if (dist > SIMD_EPSILON) {
+					force = (toPoint / dist) * (strength * falloff);
+				}
+			}
+			if (f.type == PHY_GameField::VORTEX) {
+				// Pushes around the field's Z axis (right-hand rule), like Blender's Vortex.
+				const btVector3 radial = toCenter - nor * nor.dot(toCenter);
+				const btVector3 tangent = nor.cross(radial);
+				if (tangent.length2() > SIMD_EPSILON) {
+					force = tangent.normalized() * (f.strength * falloff);
+				}
+			}
+			else if (f.type == PHY_GameField::TURBULENCE) {
+				const float inv = 1.0f / btMax(f.size, 0.01f);
+				const btVector3 q = p * inv + btVector3(m_fieldTime * 0.7f, m_fieldTime * 0.5f, m_fieldTime * 0.3f);
+				force = btVector3(GameFieldNoise(q, f.seed), GameFieldNoise(q + btVector3(31.4f, 17.2f, 5.7f), f.seed),
+				                  GameFieldNoise(q + btVector3(-12.3f, 44.1f, 23.9f), f.seed)) * (f.strength * falloff);
+			}
+			if (f.flow != 0.0f) {
+				force -= vel * (f.flow * falloff); // air resistance against the moving medium
+			}
+			total += force;
+		}
+
+		if (total.fuzzyZero()) {
+			continue;
+		}
+		if (!body->isActive()) {
+			// A sleeping body only wakes up when the field would really move it.
+			if (total.length() * body->getInvMass() < 0.5f) {
+				continue;
+			}
+			body->activate();
+		}
+		body->applyCentralForce(total);
+		m_appliedFieldForces.push_back(std::make_pair(body, total));
+	}
+}
+
+void CcdPhysicsEnvironment::RemoveGameFields()
+{
+	for (const std::pair<btRigidBody *, btVector3>& applied : m_appliedFieldForces) {
+		applied.first->applyCentralForce(-applied.second);
+	}
+	m_appliedFieldForces.clear();
+	for (btSoftBody *soft : m_windedSoftBodies) {
+		soft->setWindVelocity(btVector3(0.0f, 0.0f, 0.0f));
+	}
+	m_windedSoftBodies.clear();
+}
+
 void CcdPhysicsEnvironment::SimulationSubtickCallback(btScalar timeStep)
 {
 	std::set<CcdPhysicsController *>::iterator it;
@@ -1120,7 +1337,9 @@ void CcdPhysicsEnvironment::ProceedDeltaTime(double timeStep, double interval)
 		return;
 	}
 	for (unsigned short r=0;r<i;r++) {
+		ApplyGameFields((float)subStep);
 		m_dynamicsWorld->stepSimulationRun();
+		RemoveGameFields();
 		CallbackTriggers();
 	}
 	SynchronizeActiveMotionStates();
@@ -1198,7 +1417,9 @@ void CcdPhysicsEnvironment::ProceedDeltaTimeCar(double timeStep, double interval
 	}
 
 	for (int r=0;r<i;r++) {
+		ApplyGameFields((float)subStep);
 		m_dynamicsWorld->stepSimulationRun();
+		RemoveGameFields();
 		CallbackTriggers();
 	}
 	m_dynamicsWorld->synchronizeMotionStates();
@@ -3465,6 +3686,23 @@ void CcdPhysicsEnvironment::ConvertObject(BL_SceneConverter& converter, KX_GameO
 			ci.m_soft_kAHR = blenderobject->bsoft->kAHR; // Anchors hardness [0,1]
 			ci.m_soft_collisionflags = blenderobject->bsoft->collisionflags; // Vertex/Face or Signed Distance Field(SDF) or Clusters, Soft versus Soft or Rigid
 			ci.m_soft_numclusteriterations = blenderobject->bsoft->numclusteriterations; // number of iterations to refine collision clusters
+
+			// Pin group: collect the original mesh vertices whose weight reaches the threshold.
+			if (blenderobject->bsoft->pin_group[0] && blenderobject->type == OB_MESH && blenderobject->data) {
+				const Mesh *pinMesh = (const Mesh *)blenderobject->data;
+				const int pinGroup = defgroup_name_index(blenderobject, blenderobject->bsoft->pin_group);
+				if (pinGroup >= 0 && pinMesh->dvert) {
+					for (int v = 0; v < pinMesh->totvert; ++v) {
+						const MDeformVert& dv = pinMesh->dvert[v];
+						for (int w = 0; w < dv.totweight; ++w) {
+							if (dv.dw[w].def_nr == pinGroup && dv.dw[w].weight >= blenderobject->bsoft->pin_threshold) {
+								ci.m_softPinnedVertices.push_back((unsigned int)v);
+								break;
+							}
+						}
+					}
+				}
+			}
 
 		}
 		else {

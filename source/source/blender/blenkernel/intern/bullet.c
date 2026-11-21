@@ -78,6 +78,7 @@ BulletSoftBody *bsbNew(void)
 	bsb->numclusteriterations = 64;
 	bsb->bending_dist = 2;
 	bsb->welding = 0.f;
+	bsb->pin_threshold = 0.5f;
 
 	return bsb;
 }

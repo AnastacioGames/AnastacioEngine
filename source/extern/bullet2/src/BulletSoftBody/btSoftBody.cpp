@@ -534,7 +534,13 @@ void			btSoftBody::addAeroForceToNode(const btVector3& windVelocity,int nodeInde
 						const btScalar	c1	=	c0 * medium.m_density;
 						force	+=	nrm*(-c1*kLF);
 						force	+=	rel_v.normalized() * (-c1 * kDG);
-						ApplyClampedForce(n, force, dt);
+						// Clamp against the velocity relative to the air (not the node velocity), so a wind
+						// can set a still node moving instead of being cancelled; with no wind it is unchanged.
+						const btScalar	dtim = dt * n.m_im;
+						if ((force * dtim).length2() > rel_v2)
+							n.m_f -= ProjectOnAxis(rel_v, force.normalized()) / dtim;
+						else
+							n.m_f += force;
 					}
 				}	
 			}

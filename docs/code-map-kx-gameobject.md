@@ -7,13 +7,13 @@ Python em [`KX_GameObject_Python.cpp`](../source/source/gameengine/Ketsji/KX_Gam
 (tabelas, tipo e atributos) e
 [`KX_GameObject_PyMethods.cpp`](../source/source/gameengine/Ketsji/KX_GameObject_PyMethods.cpp) (métodos).
 
-**Linhas conferidas em 2026-11-08 (`HEAD` `8c48a7d5`).** Números de linha são aproximados e envelhecem a cada
+**Linhas conferidas em 2026-11-20 (`HEAD` `d09c51a4`).** Números de linha são aproximados e envelhecem a cada
 edição: use-os como ponto de partida e confirme com `grep -n "KX_GameObject::NomeDoMetodo"`.
 
 Para a declaração das classes e membros, o header é
-[`KX_GameObject.h`](../source/source/gameengine/Ketsji/KX_GameObject.h) (1.450 linhas).
+[`KX_GameObject.h`](../source/source/gameengine/Ketsji/KX_GameObject.h) (1.453 linhas).
 
-## `Ketsji/KX_GameObject.cpp` (2.807 linhas)
+## `Ketsji/KX_GameObject.cpp` (2.814 linhas)
 
 Núcleo C++.
 
@@ -22,34 +22,34 @@ Os métodos de um mesmo domínio **não são contíguos**: por exemplo, animaç�
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
-| Ciclo de vida | construtor 120, construtor de cópia 165, destrutor 233, `GetReplica` 1077, `RemoveRessources` 1087 |
-| Identidade e propriedades | `GetName`/`SetName` 357–363, `GetClientObject` 343, `GetRuntimeProperty`/`SetRuntimeProperty` 452–472, `GetBlenderObject` 2379, `GetConvertObjectInfo`/`SetConvertObjectInfo` 2400–2405 |
+| Ciclo de vida | construtor 120, construtor de cópia 165, destrutor 233, `GetReplica` 1079, `RemoveRessources` 1089 |
+| Identidade e propriedades | `GetName`/`SetName` 359–365, `GetClientObject` 345, `GetRuntimeProperty`/`SetRuntimeProperty` 454–474, `GetBlenderObject` 2386, `GetConvertObjectInfo`/`SetConvertObjectInfo` 2407–2412 |
 | Veículo (parâmetros armazenados) | `Set/GetVehicle*` 303–358 (constraint id, roda de direção, torque, RPM, marchas, tipo de câmbio) |
-| Controllers (física/gráfico) | `GetPhysicsController` 367, `SetPhysicsController` 495, `Get/SetGraphicController` 436–441, `ActivateGraphicController` 1043, `GetDeformer` 362 |
-| Grupos/instâncias e constraints | `Get/SetDupliGroupObject` 446/481, `Get/Add/RemoveInstanceObject(s)` 451–473, `GetConstraints`/`ReplicateConstraints` 561–566 |
-| Hierarquia | `GetParent` 579, `SetParent` 595, `RemoveParent` 667 |
-| Animação | `GetActionManager` 713, `PlayAction` 722, `StopAction` 745, `IsActionDone` 750, `IsActionsSuspended` 795, `UpdateActionManager` 800, frames/nomes/camadas 688–698 e 803–818, `SetPlayMode` 1021, `SuspendAnimations`/`ResumeAnimations` 2538–2548, `Get/SetAnimationEventManager` 1389–1402, `GetDoAnimations`/`SetHalfAnimations` 1874–1886 |
-| Partículas GPU | `SetupGPUParticlesBuffer` 884, `SetupGPUParticles` 950, `SetupGPUParticlesMix` 955, `UpdateParticles` 960, `GetParticleBuffer(Mix)` 793–798 |
-| Colisão | `Set/GetCollisionGroup` 850/865, `Set/GetCollisionMask` 857/869, `Register/UnregisterCollisionCallbacks` 2157–2178, `RunCollisionCallbacks` 2586 |
-| Física: parâmetros | `IsDynamic` 1111, damping 925–956, CCD 964–970, **soft body** (`SetSoft*`, coeficientes, solver iterations) 981–1154 |
-| Física: forças e velocidades | `ApplyForce/Torque/Movement/Rotation` 1166–1189, `Add/SetLinearVelocity`, `SetAngularVelocity` 2038–2053, `GetMass`…`GetVelocity` 2229–2296, `SuspendPhysics`/`RestorePhysics` 2521–2528 |
-| Malhas e renderização | `UpdateBlenderObjectMatrix` 1403, `AddMeshUser` 1414, `UpdateBuckets` 1466, `ReplaceMesh` 1489, `RemoveMeshes` 1519, `GetMeshList` 1536, `Renderable` 1546, cor 1686–1691, `Get/SetPassIndex` 1654–1659, `Get/SetLayer` 1644–1649 |
-| LOD | `Set/GetLodManager` 1291–1313, `UpdateLod` 1598, `GetVisibleLOD`/`UpdateVisibleLOD` 1885–1890 |
-| Visibilidade e depuração | `GetVisible`/`SetVisible` 1922/1563, `SetOccluder` 1950, `SetUseDebugProperties` 1985, helpers `static` `setVisible_recursive` 1905, `setOccluder_recursive` 1934, `setDebug_recursive` 1962 |
-| Atividade e culling | `UpdateActivity` 1768, `Get/SetActivityCullingInfo` 2092–2097, `SetActivityCulling` 2472, `UpdateBounds` 2410, `Get/SetBoundsAabb` 2070–2081, `GetCullingNode` 2457 |
-| SceneGraph e transformação | `UpdateTransform`/`SynchronizeTransform` 1840–1869, `AlignAxisToVect` 2055, `NodeSet*`/`NodeGet*` 1878–2015, `SetNode` 2405 |
-| Componentes Python | `SetComponents` 2728, `UpdateComponents` 2733 (runtime; ficam no núcleo apesar do `#ifdef WITH_PYTHON`) |
-| Helpers `static` do núcleo | `setGraphicController_recursive` 1026, `walk_children`/`walk_parent` 2687–2709 (servem a `GetChildren*`) |
+| Controllers (física/gráfico) | `GetPhysicsController` 369, `SetPhysicsController` 497, `Get/SetGraphicController` 436–441, `ActivateGraphicController` 1045, `GetDeformer` 364 |
+| Grupos/instâncias e constraints | `Get/SetDupliGroupObject` 446/481, `Get/Add/RemoveInstanceObject(s)` 451–473, `GetConstraints`/`ReplicateConstraints` 563–568 |
+| Hierarquia | `GetParent` 581, `SetParent` 597, `RemoveParent` 669 |
+| Animação | `GetActionManager` 715, `PlayAction` 724, `StopAction` 747, `IsActionDone` 752, `IsActionsSuspended` 797, `UpdateActionManager` 802, frames/nomes/camadas 688–698 e 803–818, `SetPlayMode` 1023, `SuspendAnimations`/`ResumeAnimations` 2545–2555, `Get/SetAnimationEventManager` 1389–1402, `GetDoAnimations`/`SetHalfAnimations` 1881–1893 |
+| Partículas GPU | `SetupGPUParticlesBuffer` 886, `SetupGPUParticles` 952, `SetupGPUParticlesMix` 957, `UpdateParticles` 962, `GetParticleBuffer(Mix)` 793–798 |
+| Colisão | `Set/GetCollisionGroup` 850/865, `Set/GetCollisionMask` 857/869, `Register/UnregisterCollisionCallbacks` 2157–2178, `RunCollisionCallbacks` 2593 |
+| Física: parâmetros | `IsDynamic` 1113, damping 925–956, CCD 964–970, **soft body** (`SetSoft*`, coeficientes, solver iterations) 981–1154 |
+| Física: forças e velocidades | `ApplyForce/Torque/Movement/Rotation` 1166–1189, `Add/SetLinearVelocity`, `SetAngularVelocity` 2045–2060, `GetMass`…`GetVelocity` 2236–2303, `SuspendPhysics`/`RestorePhysics` 2528–2535 |
+| Malhas e renderização | `UpdateBlenderObjectMatrix` 1405, `AddMeshUser` 1416, `UpdateBuckets` 1468, `ReplaceMesh` 1491, `RemoveMeshes` 1521, `GetMeshList` 1538, `Renderable` 1548, cor 1686–1691, `Get/SetPassIndex` 1654–1659, `Get/SetLayer` 1644–1649 |
+| LOD | `Set/GetLodManager` 1291–1313, `UpdateLod` 1600, `GetVisibleLOD`/`UpdateVisibleLOD` 1892–1897 |
+| Visibilidade e depuração | `GetVisible`/`SetVisible` 1929/1563, `SetOccluder` 1957, `SetUseDebugProperties` 1992, helpers `static` `setVisible_recursive` 1912, `setOccluder_recursive` 1941, `setDebug_recursive` 1969 |
+| Atividade e culling | `UpdateActivity` 1775, `Get/SetActivityCullingInfo` 2092–2097, `SetActivityCulling` 2479, `UpdateBounds` 2417, `Get/SetBoundsAabb` 2070–2081, `GetCullingNode` 2464 |
+| SceneGraph e transformação | `UpdateTransform`/`SynchronizeTransform` 1847–1876, `AlignAxisToVect` 2062, `NodeSet*`/`NodeGet*` 1878–2015, `SetNode` 2412 |
+| Componentes Python | `SetComponents` 2735, `UpdateComponents` 2740 (runtime; ficam no núcleo apesar do `#ifdef WITH_PYTHON`) |
+| Helpers `static` do núcleo | `setGraphicController_recursive` 1028, `walk_children`/`walk_parent` 2694–2716 (servem a `GetChildren*`) |
 
-## `Ketsji/KX_GameObject_Python.cpp` (2.895 linhas)
+## `Ketsji/KX_GameObject_Python.cpp` (2.896 linhas)
 
 Bindings Python, parte 1. Tudo dentro de `#ifdef WITH_PYTHON`. Ordem do arquivo:
 
 | Linhas | Conteúdo |
 |---|---|
 | 127–417 | macro `PYTHON_CHECK_PHYSICS_CONTROLLER`, callbacks mathutils (`static`), `KX_GameObject_Mathutils_Callback_Init` 413 (público, chamada por `KX_PythonInitTypes.cpp`) |
-| 419–1386 | `Methods[]`, helpers de destruição (`static`), `Attributes[]`, `Map_GetItem` 1193, `Map_SetItem`, `Seq_Contains` (`static`), `Mapping`, `Sequence`, `KX_GameObject::Type` |
-| 1387–fim | getters/setters de atributos Python (`pyattr_get_*`, `pyattr_set_*`, a partir de `pyattr_get_name` 1458) e `py_get_*_item` |
+| 419–1386 | `Methods[]`, helpers de destruição (`static`), `Attributes[]`, `Map_GetItem` 1194, `Map_SetItem`, `Seq_Contains` (`static`), `Mapping`, `Sequence`, `KX_GameObject::Type` |
+| 1387–fim | getters/setters de atributos Python (`pyattr_get_*`, `pyattr_set_*`, a partir de `pyattr_get_name` 1459) e `py_get_*_item` |
 
 ## `Ketsji/KX_GameObject_PyMethods.cpp` (2.024 linhas)
 

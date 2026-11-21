@@ -1131,6 +1131,7 @@ static void cdDM_drawMappedFacesGLSL(
 		}
 
 		/* part two, generate and fill the arrays with the data */
+		const float *uv_xf = DM_draw_uv_transform_get();  /* impostor atlas cell, NULL when not drawing one */
 		if (max_element_size > 0) {
 			buffer = GPU_buffer_alloc(max_element_size * dm->drawObject->tot_loop_verts);
 
@@ -1161,8 +1162,14 @@ static void cdDM_drawMappedFacesGLSL(
 					for (b = 0; b < matconv[i].attribs.tottface; b++) {
 						if (matconv[i].attribs.tface[b].array) {
 							const MLoopUV *mloopuv = matconv[i].attribs.tface[b].array;
-							for (j = 0; j < mpoly->totloop; j++)
-								copy_v2_v2((float *)&varray[offset + j * max_element_size], mloopuv[mpoly->loopstart + j].uv);
+							for (j = 0; j < mpoly->totloop; j++) {
+								float *uv_out = (float *)&varray[offset + j * max_element_size];
+								copy_v2_v2(uv_out, mloopuv[mpoly->loopstart + j].uv);
+								if (uv_xf) {
+									uv_out[0] = uv_out[0] * uv_xf[0] + uv_xf[2];
+									uv_out[1] = uv_out[1] * uv_xf[1] + uv_xf[3];
+								}
+							}
 							offset += sizeof(float) * 2;
 						}
 					}
@@ -1203,6 +1210,16 @@ static void cdDM_drawMappedFacesGLSL(
 			do_draw = setMaterial(new_matnr + 1, &gattribs);
 
 			if (do_draw) {
+				/* A UV layer the mesh lacks (e.g. "Lightmap" on an object outside the baked atlas) has no
+				 * array: give the attribute the constant 0,0 the game reads (BL_BlenderShader::GetAttribs
+				 * skips it), instead of whatever generic value the previous draw left behind. */
+				for (b = 0; b < matconv[a].attribs.tottface; b++) {
+					if (!matconv[a].attribs.tface[b].array && !matconv[a].attribs.tface[b].gl_texco &&
+					    matconv[a].attribs.tface[b].gl_index >= 0)
+					{
+						glVertexAttrib2f(matconv[a].attribs.tface[b].gl_index, 0.0f, 0.0f);
+					}
+				}
 				if (matconv[a].numdata) {
 					GPU_interleaved_attrib_setup(buffer, matconv[a].datatypes, matconv[a].numdata, max_element_size);
 				}

@@ -256,11 +256,13 @@ typedef struct BulletSoftBody {
 	int bending_dist; /* Bending constraint distance */
 	float	welding;		/* welding limit to remove duplicate/nearby vertices, 0.0..0.01 */
 	float   margin;			/* margin specific to softbody */
+	float   pin_threshold;	/* vertex group weight at or above which a vertex is pinned */
+	char    pin_group[64];	/* vertex group name of pinned vertices (empty = no pins) */
 } BulletSoftBody;
 
 /* BulletSoftBody.flag */
 #define OB_BSB_SHAPE_MATCHING	2
-// #define OB_BSB_UNUSED 4
+#define OB_BSB_CLOTH 4 /* game engine: cloth preset (never reuse bit 32, see CCD_BSB_AERO_VTWOSIDE) */
 #define OB_BSB_BENDING_CONSTRAINTS 8
 #define OB_BSB_AERO_VPOINT 16 /* aero model, Vertex normals are oriented toward velocity*/
 // #define OB_BSB_AERO_VTWOSIDE 32 /* aero model, Vertex normals are flipped to match velocity */
@@ -386,6 +388,7 @@ typedef struct SoftBody {
 #define PFIELD_GUIDE_PATH_WEIGHT (1 << 16)      /* apply curve weights */
 #define PFIELD_SMOKE_DENSITY    (1 << 17)       /* multiply smoke force by density */
 #define PFIELD_GRAVITATION      (1 << 18)       /* used for (simple) force */
+#define PFIELD_GAME             (1 << 19)       /* Game Engine opt-in: the field acts in the game (default off) */
 
 /* pd->falloff */
 #define PFIELD_FALL_SPHERE		0

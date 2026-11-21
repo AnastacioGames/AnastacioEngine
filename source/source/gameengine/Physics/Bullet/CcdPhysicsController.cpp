@@ -1268,6 +1268,11 @@ bool CcdPhysicsController::CreateSoftbody()
 		psb->generateBendingConstraints(m_cci.m_softBendingDistance, pm);
 	}
 
+	if (m_cci.m_gamesoftFlag & CCD_BSB_CLOTH) {
+		// A sheet is hit by the wind from both faces.
+		psb->m_cfg.aeromodel = btSoftBody::eAeroModel::V_TwoSided;
+	}
+
 	psb->m_cfg.piterations = m_cci.m_soft_piterations;
 	psb->m_cfg.viterations = m_cci.m_soft_viterations;
 	psb->m_cfg.diterations = m_cci.m_soft_diterations;
@@ -1291,10 +1296,6 @@ bool CcdPhysicsController::CreateSoftbody()
 
 	psb->randomizeConstraints();
 	psb->setTotalMass(m_cci.m_mass);
-
-	if (m_cci.m_soft_collisionflags & (CCD_BSB_COL_CL_RS + CCD_BSB_COL_CL_SS)) {
-		psb->generateClusters(m_cci.m_soft_numclusteriterations);
-	}
 
 
 	psb->setCollisionFlags(0);
@@ -1321,6 +1322,21 @@ bool CcdPhysicsController::CreateSoftbody()
 		}
 		const int node = Ccd_FindClosestNode(psb, pos);
 		m_softBodyIndices[i] = (node >= 0) ? (unsigned int)node : -1;
+	}
+
+	// Pins: mass 0 on the node of each pinned original vertex. Triangle mesh only, a hull has several
+	// vertices per node. Done after setTotalMass so the fixed mass is kept.
+	if (shapeType != CONVEX_HULL_SHAPE_PROXYTYPE) {
+		for (const unsigned int v : m_cci.m_softPinnedVertices) {
+			if (v < m_softBodyIndices.size() && m_softBodyIndices[v] != (unsigned int)-1) {
+				psb->setMass(m_softBodyIndices[v], 0.0f);
+			}
+		}
+	}
+
+	// Clusters read the node masses when they are built, so they come after the pins.
+	if (m_cci.m_soft_collisionflags & (CCD_BSB_COL_CL_RS + CCD_BSB_COL_CL_SS)) {
+		psb->generateClusters(m_cci.m_soft_numclusteriterations);
 	}
 
 	// Nodes are in object space: move them to the object transform, which becomes the soft body frame.

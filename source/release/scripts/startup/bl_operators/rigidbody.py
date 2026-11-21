@@ -216,6 +216,41 @@ class OBJECT_OT_rigid_body_joint_component_refresh(Operator):
         return {'FINISHED'}
 
 
+class OBJECT_OT_game_joint_add(Operator):
+    """Add a Bullet rigid body joint to the active object, targeting the other selected object"""
+    bl_idname = "object.game_joint_add"
+    bl_label = "Add Game Joint"
+    bl_options = {'REGISTER', 'UNDO'}
+
+    pivot_type: EnumProperty(
+        name="Type",
+        items=(
+            ('BALL', "Ball", "Point to point: free rotation around the pivot"),
+            ('HINGE', "Hinge", "Rotation around one axis"),
+            ('CONE_TWIST', "Cone Twist", "Rotation limited by a cone and a twist angle"),
+            ('GENERIC_6_DOF', "Generic 6 DoF", "Every axis free or limited by hand"),
+        ),
+        default='BALL',
+    )
+
+    @classmethod
+    def poll(cls, context):
+        return context.object is not None
+
+    def execute(self, context):
+        owner = context.object
+        others = [obj for obj in context.selected_objects if obj != owner]
+        joint = owner.constraints.new('RIGID_BODY_JOINT')
+        joint.pivot_type = self.pivot_type
+        joint.use_linked_collision = True
+        joint.show_pivot = True
+        if others:
+            joint.target = others[0]
+        else:
+            self.report({'INFO'}, "Joint added without a target: pick the other body in the Target field")
+        return {'FINISHED'}
+
+
 class AddGameConstraintPreset(Operator):
     '''Append an original, ready-to-play Bullet constraint example'''
     bl_idname = "object.game_constraint_preset_add"
@@ -609,6 +644,7 @@ class ConnectRigidBodies(Operator):
 
 
 classes = (
+    OBJECT_OT_game_joint_add,
     AddGameConstraintPreset,
     OBJECT_OT_rigid_body_joint_component_add,
     OBJECT_OT_rigid_body_joint_component_refresh,

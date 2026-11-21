@@ -8,6 +8,21 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-20 — Convert to Mesh não tira mais o objeto do jogo
+
+- **Bug:** texto (FONT) ou curva/Bézier convertidos com Object > Convert to Mesh apareciam na 3D View
+  mas não no Play. `curvetomesh()` (`editors/object/object_add.c`) sobrescrevia o `gameflag` com
+  `OB_PROP | OB_COLLISION` e apagava `OB_TASK_CONVERT` (Load Mode "With Scene"); o objeto virava
+  "On Demand" e o `KX_Scene` não o criava. Achado no logo 3D da Anastacio Games (letras convertidas).
+- **Correção:** os bits de modo de carga (`OB_TASK_CONVERT | OB_TASK_EDITOR_ONLY`) são preservados; o
+  resto dos padrões de jogo da malha continua igual. Revisão do Codex: mball→mesh e mesh→curve não
+  zeram o flag; Keep Original duplica e passa pela mesma função.
+- **Testes:** pelo controle (`tools/testes_engine`), jogo rodando: texto convertido, Bézier com bevel,
+  círculo Bézier com extrude e Bézier com Keep Original ficam "With Scene" e são criados no jogo;
+  curva marcada On Demand continua On Demand.
+- **Arquivos já salvos** com o objeto afetado não são migrados (indistinguível de On Demand de
+  propósito): trocar Load Mode para With Scene no painel Game do objeto ou no Outliner.
+
 ## 2026-11-18 — Reflexo realtime (Plane) ao vivo na 3D View
 
 - Environment Map Realtime + Plane agora aparece na 3D View sem Play, no modo Material/Texture GLSL

@@ -3712,6 +3712,25 @@ void DM_calc_auto_bump_scale(DerivedMesh *dm)
 	}
 }
 
+static float g_draw_uv_transform[4];
+static bool g_draw_uv_transform_on = false;
+
+void DM_draw_uv_transform_set(const float xf[4])
+{
+	copy_v4_v4(g_draw_uv_transform, xf);
+	g_draw_uv_transform_on = true;
+}
+
+void DM_draw_uv_transform_clear(void)
+{
+	g_draw_uv_transform_on = false;
+}
+
+const float *DM_draw_uv_transform_get(void)
+{
+	return g_draw_uv_transform_on ? g_draw_uv_transform : NULL;
+}
+
 void DM_vertex_attributes_from_gpu(DerivedMesh *dm, GPUVertexAttribs *gattribs, DMVertexAttribs *attribs)
 {
 	CustomData *vdata, *ldata;

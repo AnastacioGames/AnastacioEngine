@@ -4,7 +4,7 @@ Guia de navegação para achar rápido onde fica cada responsabilidade nos maior
 sem lê-los inteiros. Não descreve arquitetura nem decisões; é só um índice. Para `KX_GameObject.cpp`, veja
 [code-map-kx-gameobject.md](code-map-kx-gameobject.md).
 
-**Linhas conferidas em 2026-11-14 (`HEAD` `ef47fda9`).** As linhas são aproximadas e envelhecem a cada edição: use-as
+**Linhas conferidas em 2026-11-20 (`HEAD` `d09c51a4`).** As linhas são aproximadas e envelhecem a cada edição: use-as
 como ponto de partida e confirme com `grep -n "Classe::Metodo"`. O agrupamento por domínio foi feito pelo nome
 dos métodos e por fronteiras confirmadas no código (marcadas onde houve conferência); leia o trecho antes de
 mudar algo com base neste mapa.
@@ -17,7 +17,7 @@ Caminhos abaixo relativos a `source/source/gameengine/`.
 
 Cena em execução: dona dos objetos, listas de render, câmera ativa e bindings Python. Cutscene e Trace Rail ficam em
 `Ketsji/KX_SceneCutscene.cpp` (mesma classe `KX_Scene`). O header é
-`Ketsji/KX_Scene.h` (947 linhas).
+`Ketsji/KX_Scene.h` (951 linhas).
 
 | Domínio | Métodos (linha inicial) |
 |---|---|
@@ -50,7 +50,7 @@ cinco caminhos (`RemoveObject`, `DelayedRemoveObject`, `RemoveEuthanasyObjects`,
 
 ---
 
-## `Ketsji/KX_PythonInit.cpp` (3.944 linhas)
+## `Ketsji/KX_PythonInit.cpp` (3.947 linhas)
 
 Bootstrap do Python embutido e módulos `Range`/`bge`. O registro dos **tipos** (`KX_GameObject`, `KX_Scene`…)
 não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específico de Web (`__EMSCRIPTEN__`) em 69,
@@ -61,22 +61,22 @@ não está aqui: fica em `Ketsji/KX_PythonInitTypes.cpp`. Há código específic
 | Utilitários do módulo `Range` (funções globais `gPy*`) | aleatório/gravidade/caminho 214–243, `gPyStartGame`/`EndGame`/`RestartGame` 261–289, `SaveGlobalDict`/`LoadGlobalDict` 300–318, `GetProfileInfo` 336, `SendMessage` 349, `GetSpectrum` 372 |
 | Taxas e relógio | tic rate, render rate, animation rate, exit key, max frames, clock/time scale 384–602 |
 | Lista de arquivos e cenas | `.blend`/`.range`/`.rasec` 607–660, `AddScene`/`GetCurrentScene`/`GetSceneList` 671–707 |
-| Informação de sistema | `pyPrintStats` 892, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 974 |
-| Bibliotecas externas | `gLibLoad` 993, `gLibNew` 1218, `gLibFree` 1272, `gLibList` 1288, `gPyNextFrame` 1314 |
+| Informação de sistema | `pyPrintStats` 895, GPU vendor/renderer 722–735, CPU 749–759, `pyPrintExt` 977 |
+| Bibliotecas externas | `gLibLoad` 996, `gLibNew` 1221, `gLibFree` 1275, `gLibList` 1291, `gPyNextFrame` 1317 |
 | Tabela `game_methods[]` | 997 |
-| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1452–1646 |
-| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1957, janela/fullscreen 1507–1524 |
+| Janela, mouse, estéreo, screenshot | `gPyGetWindowHeight`… 1455–1649 |
+| Render (GLSL, AA, filtro, vsync, `drawLine`) | motion blur 1273–1290, GLSL 1302–1398, anisotropia/AA/mipmap/vsync 1413–1577, `gPyDrawLine` 1960, janela/fullscreen 1507–1524 |
 | Áudio e debug na tela | `MasterVolume` 1585–1597, `ShowFramerate`/`ShowProfile`/`ShowProperties`/`AutoDebugList` 1606–1650, `GetDisplayDimensions` 1660 |
 | Tabela `rasterizer_methods[]` | 1679 |
-| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2326 (~430 linhas, constantes de tipos/estados) |
-| Ambiente `sys` e caminhos | `backupPySysObjects` 2769 … `restorePySysObjects` 2844, `appendPythonPath` 2872, `addImportMain`/`removeImportMain` 2883–2888 |
-| Módulo `Range` e compatibilidade | `addSubModule` 2905, `initRANGE` 2913, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2952, `installLegacyAudFactoryAlias` 3006 (alias `bge`/`aud`) |
-| Init/saída do Python | `initPlayerPython` 3054, `exitPlayerPython` 3094, console 2528–2595, `initGamePython` 3185, `exitGamePython` 3282 |
-| Console e joystick | `createPythonConsole` 3305, `getPythonJoystick` 3317, `updatePythonJoysticks` 3322 |
-| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3363 |
-| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3497 (~190 linhas de constantes) |
-| Módulo `Application` | `initApplicationPythonBinding` 3692 |
-| Config persistente do jogo | `saveGamePythonConfig` 3754, `loadGamePythonConfig` 3833, `pathGamePythonConfig` 3910 (contém código Web/IDBFS) |
+| Módulo lógica (`GameLogic`) | `GameLogic_module_def` 1748, `initGameLogicPythonBinding` 2329 (~430 linhas, constantes de tipos/estados) |
+| Ambiente `sys` e caminhos | `backupPySysObjects` 2772 … `restorePySysObjects` 2847, `appendPythonPath` 2875, `addImportMain`/`removeImportMain` 2886–2891 |
+| Módulo `Range` e compatibilidade | `addSubModule` 2908, `initRANGE` 2916, `RANGE_module_def` 2310, `installLegacyCollectionsAliases` 2955, `installLegacyAudFactoryAlias` 3009 (alias `bge`/`aud`) |
+| Init/saída do Python | `initPlayerPython` 3057, `exitPlayerPython` 3097, console 2528–2595, `initGamePython` 3188, `exitGamePython` 3285 |
+| Console e joystick | `createPythonConsole` 3308, `getPythonJoystick` 3320, `updatePythonJoysticks` 3325 |
+| Módulo `Rasterizer` | `initRasterizerPythonBinding` 3366 |
+| Teclas | `gPyEventToString`/`ToCharacter` 2775–2812, `initGameKeysPythonBinding` 3500 (~190 linhas de constantes) |
+| Módulo `Application` | `initApplicationPythonBinding` 3695 |
+| Config persistente do jogo | `saveGamePythonConfig` 3757, `loadGamePythonConfig` 3836, `pathGamePythonConfig` 3913 (contém código Web/IDBFS) |
 
 Observação: `initPlayerPython` (editor não usa) é o caminho do standalone; o editor entra por `BPY_python_start`.
 
@@ -134,7 +134,7 @@ Um corpo físico (rigid/soft/personagem) e seus motion states. O header é `CcdP
 
 ---
 
-## `Converter/BL_BlenderDataConversion.cpp` (4.284 linhas)
+## `Converter/BL_BlenderDataConversion.cpp` (4.285 linhas)
 
 Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConversion.h` (101 linhas).
 
@@ -151,7 +151,7 @@ Conversão do `.blend` para objetos do runtime. O header é `BL_BlenderDataConve
 | Componentes e cutscene | `BL_ConvertComponentsObject` 2635, `BL_ConvertCutscene` 2858 |
 | Conversão de objeto único | `bl_ConvertBlenderObject_Single` 2720 |
 | **Passagem principal** | `BL_ConvertBlenderObjects` 2935–3634 (**uma função de ~700 linhas** que converte os objetos da cena) |
-| Pós-conversão e cursor | `BL_PostConvertBlenderObjects` 4002, `BL_ConvertCustomMouseCursor` 4263 |
+| Pós-conversão e cursor | `BL_PostConvertBlenderObjects` 4003, `BL_ConvertCustomMouseCursor` 4264 |
 
 Observação: `BL_ConvertBlenderObjects` concentra a conversão numa só função; mudanças aqui exigem ler o
 trecho inteiro, não só um método.
@@ -171,16 +171,16 @@ Laço do jogo: tempo, frames lógicos/físicos, cenas. O desenho em si fica em `
 | Cenas | `AddScene` 1353, `ConvertAndAddScene` 1455, `PreloadScene` 1460, `RemoveScene` 1465, `ReplaceScene` 1480, `SuspendScene` 1485, `ResumeScene` 1490 |
 | Taxas e flags | `SetTicRate` 1516, `SetUseFixedTimestep` 1609, `SetShadowCulling` 1636, `SetDynamicResolution` 1641 |
 
-## `Ketsji/KX_RenderPipeline.cpp` (1.403 linhas)
+## `Ketsji/KX_RenderPipeline.cpp` (1.459 linhas)
 
 | Domínio | Funções (linha inicial) |
 |---|---|
-| Névoa volumétrica | `KX_FillVolumetricFog` 137 |
-| Frame | **`Render`** 387 (sombras, câmeras, filtros), `RenderCollisionDepthBuffer` 660 |
-| Câmeras e visibilidade | `GetCameraRenderData` 703, `GetRenderData` 749, `GetVisibleMeshes` 847, `RenderCamera` 892 |
-| Pós-render | `PostRenderScene` 1083 (2D filters, offscreen final) |
+| Névoa volumétrica | `KX_FillVolumetricFog` 225 |
+| Frame | **`Render`** 475 (sombras, câmeras, filtros), `RenderCollisionDepthBuffer` 752 |
+| Câmeras e visibilidade | `GetCameraRenderData` 795, `GetRenderData` 841, `GetVisibleMeshes` 939, `RenderCamera` 984 |
+| Pós-render | `PostRenderScene` 1186 (2D filters, offscreen final) |
 
-## `Converter/BL_Converter.cpp` (2.145 linhas)
+## `Converter/BL_Converter.cpp` (2.150 linhas)
 
 Conversão de cenas e LibLoad (síncrono e assíncrono). A conversão objeto a objeto fica em
 `BL_BlenderDataConversion.cpp` (acima).
@@ -190,5 +190,5 @@ Conversão de cenas e LibLoad (síncrono e assíncrono). A conversão objeto a o
 | Cena | `ConvertScene` 690, `CompileSceneShaders` 729, `ConvertScene` 940, `PostConvertScene` 1047, `RemoveScene` 1052 |
 | Objetos sob demanda | `FindOrConvertMainObject` 255, `FindSceneObject` 300, `ConvertSceneObject` 312, `FreeUnconvertedData` 472 |
 | LibLoad | `LinkBlendFileMemory` 1450, `LinkBlendFilePath` 1458, **`LinkBlendFile`** 1487, `FreeBlendFileData` 1654, `FreeBlendFile` 1777 |
-| Merge e assíncrono | `StepMerge` 1170, `StepReloads` 1297, `ProcessScheduledLibraries` 1338, `FinalizeAsyncLoads` 1379, `AsyncConvertTask` 1410, `MergeSceneData` 1951, `MergeScene` 1965 |
-| Shaders e malhas | `ReloadShaders` 1999, `ConvertMeshSpecial` 2037 |
+| Merge e assíncrono | `StepMerge` 1170, `StepReloads` 1297, `ProcessScheduledLibraries` 1338, `FinalizeAsyncLoads` 1379, `AsyncConvertTask` 1410, `MergeSceneData` 1956, `MergeScene` 1970 |
+| Shaders e malhas | `ReloadShaders` 2004, `ConvertMeshSpecial` 2042 |
