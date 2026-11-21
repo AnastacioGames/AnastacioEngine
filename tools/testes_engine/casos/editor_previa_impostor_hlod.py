@@ -48,7 +48,7 @@ def cubo(nome, loc, esc, m, layers=None):
         ob.layers = layers
     return ob
 
-OCULTA = [False, True] + [False] * 18
+OCULTA = [k == 5 for k in range(20)]
 
 def camera(loc, alvo):
     cam = bpy.data.objects.new('Cam', bpy.data.cameras.new('Cam'))
@@ -65,31 +65,39 @@ def finalizar():
 
 IMPOSTOR = BASE + '''
 # atlas 2x1: esquerda vermelha, direita azul
-img = bpy.data.images.new('Atlas', 2, 1, alpha=True)
-img.pixels = [1, 0, 0, 1, 0, 0, 1, 1]
+img = bpy.data.images.new('Atlas', 32, 16)
+img.pixels = [v for y in range(16) for x in range(32) for v in ((1, 0, 0, 1) if x < 16 else (0, 0, 1, 1))]
 img.pack(as_png=True)
 img.use_fake_user = True
 mat = emissao('Impostor', None, img)
 
-verde = emissao('Verde', (0, 1, 0, 1))
-arvore = cubo('Arvore', (0, 0, 1), (0.5, 0.5, 1), verde)
-
 # o quad do impostor fica no plano XZ (normal em Y), numa layer oculta
-bpy.ops.mesh.primitive_plane_add(radius=1, location=(0, 0, 0), rotation=(math.pi / 2, 0, 0))
+bpy.ops.mesh.primitive_plane_add(radius=1.5, location=(0, 0, 0))
 quad = sc.objects.active
+quad.rotation_euler = (-math.pi / 2, 0, 0)
 quad.name = 'Quad'
 bpy.ops.object.transform_apply(rotation=True, location=True, scale=True)
 quad.location = (0, 0, 1)
-quad.scale = (1.5, 1.5, 1.5)
 quad.data.materials.append(mat)
+me = quad.data
+if not me.uv_layers:
+    me.uv_textures.new('UVMap')
+for poly in me.polygons:
+    for li in poly.loop_indices:
+        co = me.vertices[me.loops[li].vertex_index].co
+        me.uv_layers[0].data[li].uv = ((co.x + 1.5) / 3.0, (co.z + 1.5) / 3.0)
 quad.layers = OCULTA
+
+verde = emissao('Verde', (0, 1, 0, 1))
+arvore = cubo('Arvore', (0, 0, 1), (0.5, 0.5, 1), verde)
+bpy.ops.object.transform_apply(scale=True)
+
 sc.objects.active = arvore
 bpy.ops.object.lod_add()
 nivel = arvore.lod_levels[1]
-nivel.distance = 5
+nivel.distance = 3
 nivel.object = quad
 nivel.use_mesh = True
-nivel.use_material = True
 nivel.use_billboard = True
 nivel.use_atlas = @ATLAS@
 nivel.atlas_columns = 2
@@ -109,7 +117,7 @@ malha = cubo('ProxyMalha', (0, 0, 0.5), (1.2, 1.2, 1.2), verde, OCULTA)
 sc.objects.active = proxy
 bpy.ops.object.lod_add()
 proxy.lod_levels[0].use_invisible_mesh = True
-proxy.lod_levels[1].distance = 7.8
+proxy.lod_levels[1].distance = 6.0
 proxy.lod_levels[1].object = malha
 proxy.lod_levels[1].use_mesh = True
 proxy.lod_levels[1].use_material = True
@@ -118,7 +126,7 @@ proxy.lod_levels[1].use_material = True
 orig = cubo('Original', (0, -4, 0.5), (0.8, 0.8, 0.8), vermelho)
 sc.objects.active = orig
 bpy.ops.object.lod_add()
-orig.lod_levels[1].distance = 7.8
+orig.lod_levels[1].distance = 6.0
 orig.lod_levels[1].use_invisible_mesh = True
 orig.lod_levels[1].object = proxy
 camera(cam_loc, (0, 0, 0.5))
@@ -178,8 +186,8 @@ def gerar(t, codigo, nome, **troca):
 
 def testar(t):
     # atlas: câmera em +Y -> célula 0 (vermelho); em -Y -> célula 1 (azul)
-    for nome, cam, cor, outra in (('atlas_mais_y', '(0, 8, 2)', 'vermelho', 'azul'),
-                                  ('atlas_menos_y', '(0, -8, 2)', 'azul', 'vermelho')):
+    for nome, cam, cor, outra in (('atlas_mais_y', '(1, 8, 2)', 'vermelho', 'azul'),
+                                  ('atlas_menos_y', '(-1, -8, 2)', 'azul', 'vermelho')):
         jogo, previa = captura(t, gerar(t, IMPOSTOR, nome, ATLAS='True', CAM=cam), nome)
         t.nota('%s: jogo %s, prévia %s' % (nome, jogo, previa))
         assert jogo[cor] > 300 and jogo[cor] > 4 * jogo[outra], 'o jogo não mostrou a célula esperada (%s)' % nome
