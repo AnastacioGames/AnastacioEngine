@@ -26,7 +26,6 @@ from bpy.props import IntProperty, StringProperty, EnumProperty
 from mathutils import Vector
 from bpy.app.translations import pgettext_iface as iface_
 from .properties_constraint import ConstraintButtonsPanel
-from .properties_physics_common import basic_force_field_falloff_ui
 
 # Game: Physics tab (physics, collision, obstacles, destruction, explosive, deformation).
 # Split out of properties_game.py, which still registers every class in order.
@@ -455,8 +454,9 @@ class PHYSICS_PT_game_force_field(PhysicsButtonsPanel, Panel):
             if ob == context.active_object:
                 layout.operator("object.forcefield_toggle", text="Add Force Field", icon='FORCE_FORCE')
             return
-        layout.prop(field, "use_game_field", text="Enabled in Game")
-        col = layout.column()
+        box = layout.box()
+        box.prop(field, "use_game_field", text="Enabled in Game")
+        col = box.column()
         col.active = field.use_game_field
         col.prop(field, "type", text="")
         if field.type not in self.GAME_FIELD_TYPES:
@@ -478,10 +478,25 @@ class PHYSICS_PT_game_force_field(PhysicsButtonsPanel, Panel):
         sub.label(text="Effect point:")
         sub.prop(field, "apply_to_location", text="Location")
 
-        col.separator()
+        box = layout.box()
+        col = box.column()
+        col.active = field.use_game_field
         col.label(text="Falloff:")
         col.row().prop(field, "falloff_type", expand=True)
-        basic_force_field_falloff_ui(self, context, field)
+        split = col.split(factor=0.35)
+        split.column().prop(field, "z_direction", text="")
+        split.column().prop(field, "falloff_power", text="Power")
+        split = col.split()
+        row = split.column().row(align=True)
+        row.prop(field, "use_min_distance", text="")
+        sub = row.row(align=True)
+        sub.active = field.use_min_distance
+        sub.prop(field, "distance_min", text="Minimum")
+        row = split.column().row(align=True)
+        row.prop(field, "use_max_distance", text="")
+        sub = row.row(align=True)
+        sub.active = field.use_max_distance
+        sub.prop(field, "distance_max", text="Maximum")
         if field.falloff_type in {'CONE', 'TUBE'}:
             tube = field.falloff_type == 'TUBE'
             split = col.split(factor=0.35)
@@ -516,9 +531,10 @@ class PHYSICS_PT_game_joints(PhysicsButtonsPanel, ConstraintButtonsPanel, Panel)
         layout = self.layout
         ob = context.object
         joints = [con for con in ob.constraints if con.type == 'RIGID_BODY_JOINT']
+        box = layout.box()
         if not joints:
-            layout.label(text="Select the other body, then add a joint here", icon='INFO')
-        row = layout.row(align=True)
+            box.label(text="Select the other body, then add a joint here", icon='INFO')
+        row = box.row(align=True)
         for ident, label in (('BALL', "Ball"), ('HINGE', "Hinge"),
                              ('CONE_TWIST', "Cone"), ('GENERIC_6_DOF', "6DoF")):
             row.operator("object.game_joint_add", text=label).pivot_type = ident
