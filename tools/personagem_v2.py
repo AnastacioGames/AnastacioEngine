@@ -94,12 +94,26 @@ def etapa_maos(args):
     return info
 
 
+def etapa_saia(args):
+    """-- saia <pasta_de_trabalho> [--peca Tops]: opcional (vestido longo), abre 05_maos.range e grava 05_saia.range com os
+    ossos da barra (Skirt<i>_<k>); o atlas abre este arquivo se ele existir."""
+    import bpy
+    out_dir = args[0]
+    _abrir(out_dir, "05_maos")
+    scene = bpy.context.scene
+    arm = next(o for o in scene.objects if o.type == 'ARMATURE')
+    nome = args[args.index("--peca") + 1] if "--peca" in args else "Tops"
+    info = v2.add_skirt_bones(arm, bpy.data.objects[nome], report=lambda *a: None)
+    info["arquivo"] = v2.save_checkpoint(out_dir, "05_saia")
+    return info
+
+
 def etapa_atlas(args):
     """-- atlas <pasta_de_trabalho> [Nome]: abre 05_maos.range, grava 06_atlas.range + textures/ + render."""
     import bpy
     out_dir = args[0]
     name = args[1] if len(args) > 1 else os.path.basename(os.path.normpath(out_dir))
-    bpy.ops.wm.open_mainfile(filepath=os.path.join(out_dir, "05_maos.range"))
+    _abrir(out_dir, "05_saia", "05_maos")
     scene = bpy.context.scene
     pieces = [o for o in scene.objects if o.type == 'MESH']
     body, info = v2.atlas_body(pieces, os.path.join(out_dir, "textures"), "Group" + name)
@@ -212,7 +226,7 @@ def etapa_corpo(args):
 
 
 ETAPAS = {"importar": etapa_importar, "esqueleto": etapa_esqueleto, "pesos": etapa_pesos,
-          "cabeca": etapa_cabeca, "maos": etapa_maos, "atlas": etapa_atlas, "lod": etapa_lod,
+          "cabeca": etapa_cabeca, "maos": etapa_maos, "saia": etapa_saia, "atlas": etapa_atlas, "lod": etapa_lod,
           "impostor": etapa_impostor, "fechar": etapa_fechar, "corpo": etapa_corpo}
 
 

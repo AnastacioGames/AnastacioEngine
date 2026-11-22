@@ -2530,3 +2530,110 @@ def add_body_impostor(body, fp_body, head, card, name, distance=BODY_IMPOSTOR_DI
             "cabeca": [(round(l.distance, 2), l.use_invisible_mesh) for l in head.lod_levels],
             "lod_max_ragdoll": {o.name: o.game.properties["lod_max_ragdoll"].value for o in (body, fp_body, head)
                                 if o and "lod_max_ragdoll" in o.game.properties}}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Saia solta (vestido longo): ossos extras na barra, movidos por script (mola) no jogo
+# ---------------------------------------------------------------------------------------------------------------------
+SKIRT_SECTORS = 6          # correntes em volta da saia (6x2 = 12 grupos: o corpo fica em 51+12 = 63 <= 64, GPU skinning)
+SKIRT_LINKS = 2            # ossos por corrente (joelho -> meio -> barra)
+SKIRT_FREE_TOP = 0.05      # m acima do joelho: a roupa começa a se soltar das pernas
+SKIRT_FREE_BOTTOM = 0.07   # m abaixo do joelho: solta por inteiro
+SKIRT_PREFIX = "Skirt"
+
+
+def _smoothstep(a, b, x):
+    t = max(0.0, min(1.0, (x - a) / (b - a)))
+    return t * t * (3.0 - 2.0 * t)
+
+
+def skirt_bone_names():
+    return ["%s%d_%d" % (SKIRT_PREFIX, i, k + 1) for i in range(SKIRT_SECTORS) for k in range(SKIRT_LINKS)]
+
+
+def add_skirt_bones(arm, dress, sectors=SKIRT_SECTORS, links=SKIRT_LINKS, report=print):
+    """Cria correntes de ossos na barra do vestido (filhas do osso da perna do mesmo lado) e passa os pesos da barra
+    para elas. Acima do joelho a roupa segue as pernas como antes (sentada, o vestido apoia nas coxas); abaixo, os
+    ossos da barra podem balançar. Os ossos ficam com o eixo local Z apontando para fora da saia (X = tangente):
+    girar em X abre/fecha a barra, em Z balança para o lado."""
+    from mathutils import Vector
+    dress_z = [v.co.z for v in dress.data.vertices]
+    knee = arm.data.bones["mixamorig:LeftLeg"].head_local.z
+    hem = min(dress_z)
+    cx, cy = 0.0, arm.data.bones["mixamorig:Hips"].head_local.y
+    step = (knee - hem) / links
+    # raio da saia por altura e ângulo (para pôr cada osso dentro do tecido)
+    sector_angle = [(2 * math.pi) * (i + 0.5) / sectors for i in range(sectors)]   # 0 = frente (+Y), cresce para -X? ver abaixo
+
+    def ang(x, y):
+        return math.atan2(-(x - cx), y - cy) % (2 * math.pi)   # 0 = +Y (frente), π/2 = -X (esquerda do piloto: x<0)
+
+    def radius_at(z, a):
+        best = []
+        for v in dress.data.vertices:
+            if abs(v.co.z - z) < step * 0.6:
+                d = abs((ang(v.co.x, v.co.y) - a + math.pi) % (2 * math.pi) - math.pi)
+                if d < math.pi / sectors:
+                    best.append(math.hypot(v.co.x - cx, v.co.y - cy))
+        return (sum(best) / len(best)) if best else 0.2
+
+    bpy.context.scene.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    eb = arm.data.edit_bones
+    names = []
+    for i, a in enumerate(sector_angle):
+        out = Vector((-math.sin(a), math.cos(a), 0.0))        # direção radial no plano
+        left = out.x < 0.0
+        parent = eb["mixamorig:%sLeg" % ("Left" if left else "Right")]
+        prev = None
+        for k in range(links):
+            z0 = knee - k * step
+            z1 = z0 - step
+            r0, r1 = radius_at(z0, a) * 0.85, radius_at(z1, a) * 0.85
+            b = eb.new("%s%d_%d" % (SKIRT_PREFIX, i, k + 1))
+            b.head = Vector((cx + out.x * r0, cy + out.y * r0, z0))
+            b.tail = Vector((cx + out.x * r1, cy + out.y * r1, z1))
+            b.align_roll(out)
+            b.parent = prev if prev is not None else parent
+            b.use_connect = False
+            b.use_deform = True
+            names.append(b.name)
+            prev = b
+    bpy.ops.object.mode_set(mode='OBJECT')
+    for n in names:
+        if n not in dress.vertex_groups:
+            dress.vertex_groups.new(n)
+    gidx = {n: dress.vertex_groups[n].index for n in names}
+    count = 0
+    for v in dress.data.vertices:
+        z = v.co.z
+        s = _smoothstep(knee + SKIRT_FREE_TOP, knee - SKIRT_FREE_BOTTOM, z)   # 0 acima, 1 abaixo
+        if s <= 0.0:
+            continue
+        a = ang(v.co.x, v.co.y)
+        w_sec = []
+        for i, sa in enumerate(sector_angle):
+            d = abs((a - sa + math.pi) % (2 * math.pi) - math.pi)
+            w_sec.append(max(0.0, 1.0 - d / (2 * math.pi / sectors)))
+        tot = sum(w_sec) or 1.0
+        # distribuição entre os elos (1 = perto do joelho, links = barra)
+        u = max(0.0, min(1.0, (knee - z) / (knee - hem)))
+        link_w = []
+        for k in range(links):
+            c = (k + 0.5) / links
+            link_w.append(max(0.0, 1.0 - abs(u - c) * links))
+        lt = sum(link_w) or 1.0
+        # pesos originais encolhem para (1 - s)
+        old = [(g.group, g.weight) for g in v.groups]
+        for gi, w in old:
+            dress.vertex_groups[gi].add([v.index], w * (1.0 - s), 'REPLACE')
+        for i in range(sectors):
+            if w_sec[i] <= 0.0:
+                continue
+            for k in range(links):
+                w = s * (w_sec[i] / tot) * (link_w[k] / lt)
+                if w > 0.001:
+                    dress.vertex_groups[gidx["%s%d_%d" % (SKIRT_PREFIX, i, k + 1)]].add([v.index], w, 'REPLACE')
+        count += 1
+    report("saia: %d ossos, %d vértices da roupa movidos para a barra" % (len(names), count))
+    return {"ossos": names, "vertices": count}
