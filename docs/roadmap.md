@@ -12,9 +12,9 @@ MCP `anastacio-api` (referência da API fatiada, já publicada), MCP `anastacio-
 o MCP abre o editor com janela visível) e o skill `criar-jogo-anastacio`. O skill `api-anastacio` deste repo
 usa o primeiro.
 
-- **Testado com a engine instalada (2026-11-22):** lista em `anastacio-docs/docs/testes-pendentes.md`. Faltam
-  recarregar outro `.range` pela interface (`wm.open_mainfile` via `op_executar` derruba o editor, bug de contexto
-  em `armature_undosys_poll`) e os dois skills em sessão nova.
+- **Testado com a engine instalada (2026-11-22):** lista em `anastacio-docs/docs/testes-pendentes.md`. Faltam só
+  os dois skills em sessão nova. O crash de `wm.open_mainfile` não era da engine: o MCP passava um contexto
+  montado antes do carregamento (ponteiros liberados); corrigido no `servidor_editor.py`.
 - **Adiado, exige mudar a engine:** modo B (a IA conecta no editor que o usuário já abriu, por um complemento
   "Ativar controle por IA", desligado por padrão). Não fazer sem decisão. Assistente de IA dentro do editor:
   descartado por ora.
