@@ -43,7 +43,8 @@ CRIADOS = set()  # scripts que a IA criou nesta sessão: ela pode regravá-los s
 # `definir` só mexe em dados do projeto, nunca em preferências do usuário nem em caminhos de scripts.
 PREFIXOS_DEFINIR = ('bpy.data', 'bpy.context.scene', 'bpy.context.object', 'bpy.context.active_object',
                     'bpy.context.window_manager.addon_search')
-ESTADO = {'escuta': None, 'conexao': None, 'buffer': b''}
+MAX_CONEXOES = 4  # clientes ao mesmo tempo (ex.: Claude Code e outro); passando disso a mais velha é largada
+ESTADO = {'escuta': None, 'conexoes': []}
 
 class TrocouEditor(Exception):
     """O pedido volta para a fila e roda de novo no próximo tique."""
@@ -367,7 +368,7 @@ def porta():
 
 
 def conectado():
-    return ESTADO['conexao'] is not None
+    return bool(ESTADO['conexoes'])
 
 
 def ligar(arquivo_sessao, observar=False, dono='mcp'):
@@ -388,69 +389,71 @@ def ligar(arquivo_sessao, observar=False, dono='mcp'):
 
 def desligar():
     """Fecha a conexão e o socket e apaga o arquivo de sessão (só se for nosso)."""
-    for chave in ('conexao', 'escuta'):
-        if ESTADO[chave] is not None:
-            try:
-                ESTADO[chave].close()
-            except OSError:
-                pass
-            ESTADO[chave] = None
-    ESTADO['buffer'] = b''
+    _largar()
+    if ESTADO['escuta'] is not None:
+        try:
+            ESTADO['escuta'].close()
+        except OSError:
+            pass
+        ESTADO['escuta'] = None
     if CONFIG['arquivo_sessao']:
         sessao.apagar(CONFIG['arquivo_sessao'], so_se_pid=os.getpid())
     CONFIG['ligado'] = False
 
 
-def _largar():
-    if ESTADO['conexao'] is not None:
+def _largar(c=None):
+    """Fecha uma conexão (ou todas, sem argumento)."""
+    for x in ([c] if c is not None else list(ESTADO['conexoes'])):
         try:
-            ESTADO['conexao'].close()
+            x['s'].close()
         except OSError:
             pass
-    ESTADO['conexao'] = None
-    ESTADO['buffer'] = b''
+        if x in ESTADO['conexoes']:
+            ESTADO['conexoes'].remove(x)
+
+
+def _atender_conexao(c):
+    try:
+        dados = c['s'].recv(1 << 20)
+        if not dados:
+            _largar(c)
+            return
+        c['buf'] += dados
+    except BlockingIOError:
+        pass
+    except OSError:
+        _largar(c)
+        return
+    if len(c['buf']) > LIMITE_LINHA and b'\n' not in c['buf']:
+        _largar(c)
+        return
+    if b'\n' in c['buf']:
+        linha, resto = c['buf'].split(b'\n', 1)
+        resposta = atender(linha.decode('utf-8', 'replace'))
+        if resposta is not None and c in ESTADO['conexoes']:
+            c['buf'] = resto
+            try:
+                c['s'].settimeout(TEMPO_ENVIO)
+                c['s'].sendall((json.dumps(resposta) + '\n').encode('utf-8'))
+                c['s'].setblocking(False)
+            except OSError:  # cliente sumiu ou parou de ler: solta só ele, o laço continua
+                _largar(c)
 
 
 def tique():
     e = ESTADO
     if not CONFIG['ligado']:
         return
-    try:  # quem conecta por último assume; a conexão velha (talvez travada) é largada
-        nova, _ = escuta().accept()
-        _largar()
-        nova.setblocking(False)
-        e['conexao'], e['buffer'] = nova, b''
-    except (BlockingIOError, InterruptedError):
-        pass
-    except OSError:
-        pass
-    if e['conexao'] is None:
-        return
     try:
-        dados = e['conexao'].recv(1 << 20)
-        if not dados:
-            _largar()
-            return
-        e['buffer'] += dados
-    except BlockingIOError:
+        nova, _ = escuta().accept()
+        nova.setblocking(False)
+        e['conexoes'].append({'s': nova, 'buf': b''})
+        while len(e['conexoes']) > MAX_CONEXOES:  # conexão parada não prende a vaga: a mais velha sai
+            _largar(e['conexoes'][0])
+    except (BlockingIOError, InterruptedError, OSError):
         pass
-    except OSError:
-        _largar()
-        return
-    if len(e['buffer']) > LIMITE_LINHA and b'\n' not in e['buffer']:
-        _largar()
-        return
-    if b'\n' in e['buffer']:
-        linha, resto = e['buffer'].split(b'\n', 1)
-        resposta = atender(linha.decode('utf-8', 'replace'))
-        if resposta is not None and e['conexao'] is not None:
-            e['buffer'] = resto
-            try:
-                e['conexao'].settimeout(TEMPO_ENVIO)
-                e['conexao'].sendall((json.dumps(resposta) + '\n').encode('utf-8'))
-                e['conexao'].setblocking(False)
-            except OSError:  # cliente sumiu ou parou de ler: solta a conexão, o laço continua
-                _largar()
+    for c in list(e['conexoes']):
+        _atender_conexao(c)
 
 
 class ANASTACIO_OT_servidor_criador(bpy.types.Operator):
