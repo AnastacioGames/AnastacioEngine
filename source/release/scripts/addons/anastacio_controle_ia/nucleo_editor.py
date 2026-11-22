@@ -20,7 +20,7 @@ VERSAO = 2
 PY_LIBERADO = os.environ.get('ANASTACIO_CRIADOR_PY') == '1'
 LIMITE_OBJETOS = 500
 # Comandos que só leem (ou gravam cópia de segurança). O resto exige o modo "controle".
-SO_LEITURA = {'ping', 'cena', 'objeto', 'listar', 'descrever', 'ler', 'tela', 'backup'}
+SO_LEITURA = {'ping', 'cena', 'objeto', 'listar', 'descrever', 'ler', 'tela', 'backup', 'copia_para_jogo'}
 
 CONFIG = {'arquivo_sessao': None, 'observar': False, 'token': None, 'ligado': False, 'dono': 'mcp'}
 LIMITE_LINHA = 8 << 20  # bytes de um pedido sem quebra de linha
@@ -38,6 +38,7 @@ OPS_TEXTO_ATIVO = {'text.insert', 'text.paste', 'text.cut', 'text.delete', 'text
                    'text.uncomment', 'text.indent', 'text.unindent', 'text.convert_whitespace', 'text.replace',
                    'text.move_lines', 'text.duplicate_line', 'text.overwrite_toggle'}
 LIMITE_SCRIPT = 200_000  # caracteres
+CRIADOS = set()  # scripts que a IA criou nesta sessão: ela pode regravá-los sem pedir autorização
 # `definir` só mexe em dados do projeto, nunca em preferências do usuário nem em caminhos de scripts.
 PREFIXOS_DEFINIR = ('bpy.data', 'bpy.context.scene', 'bpy.context.object', 'bpy.context.active_object',
                     'bpy.context.window_manager.addon_search')
@@ -179,12 +180,13 @@ def cmd_script_gravar(p):
     if not isinstance(conteudo, str) or len(conteudo) > LIMITE_SCRIPT:
         raise ValueError('conteúdo deve ser texto de até %d caracteres' % LIMITE_SCRIPT)
     existente = bpy.data.texts.get(nome)
-    if existente is not None and not p.get('sobrescrever'):
-        raise ValueError('já existe um script "%s" no projeto; use outro nome ou peça ao usuário para autorizar '
-                         'sobrescrever' % nome)
+    if existente is not None and not p.get('sobrescrever') and nome not in CRIADOS:
+        raise ValueError('já existe um script "%s" que não foi criado por você nesta sessão; use outro nome ou peça ao '
+                         'usuário para autorizar sobrescrever' % nome)
     texto = existente or bpy.data.texts.new(nome)
     texto.clear()
     texto.write(conteudo)
+    CRIADOS.add(texto.name)
     return {'script': texto.name, 'linhas': conteudo.count('\n') + 1, 'criado': existente is None}
 
 
@@ -240,6 +242,12 @@ def cmd_backup(_p):
     destino = os.path.join(pasta, time.strftime('%Y%m%d-%H%M%S') + os.path.splitext(atual)[1])
     bpy.ops.wm.save_as_mainfile(filepath=destino, copy=True)
     return {'backup': destino}
+
+
+def cmd_copia_para_jogo(p):
+    """Grava uma cópia da cena atual (com o que ainda não foi salvo) em `arquivo`, sem trocar o arquivo aberto."""
+    bpy.ops.wm.save_as_mainfile(filepath=p['arquivo'], copy=True)
+    return p['arquivo']
 
 
 def cmd_salvar(_p):

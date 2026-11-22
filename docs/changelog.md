@@ -34,6 +34,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - **Scripts pelo MCP:** novos comandos `script_gravar` (cria/atualiza um texto pelo nome, sem executar; não sobrescreve sem
   autorização) e `script_ligar` (sensor Always + controlador Python). Os operadores `text.*` ficam bloqueados: o primeiro uso
   real mostrou que `text.insert` escrevia no texto ativo do editor, que era um script do usuário.
+  `copia_para_jogo`: o MCP roda no jogo uma cópia da cena aberta (com o que não foi salvo); a IA pode regravar sem
+  pedir os scripts que ela mesma criou na sessão.
 
 ## 2026-11-22 — Skill `api-anastacio` e API Python fatiada para IA
 
