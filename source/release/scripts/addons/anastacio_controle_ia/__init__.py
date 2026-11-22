@@ -105,13 +105,14 @@ def _cabecalho(self, context):
     if pedido:
         caixa = self.layout.row(align=True)
         caixa.alert = True
-        caixa.label('A IA pede para editar: ' + pedido['motivo'], icon='ERROR')
+        caixa.label((pedido.get('cliente') or 'A IA') + ' pede para editar: ' + pedido['motivo'], icon='ERROR')
         caixa.operator('wm.anastacio_ia_responder', text='Permitir').permitir = True
         caixa.operator('wm.anastacio_ia_responder', text='Negar').permitir = False
         _quadro_novo()
     row = self.layout.row(align=True)
     row.alert = not nucleo.CONFIG['observar']
-    row.label('IA: ' + ('observando' if nucleo.CONFIG['observar'] else 'pode editar'), icon='RADIOBUT_ON')
+    quem = nucleo.clientes_conectados()
+    row.label('IA' + (' (' + ', '.join(quem) + ')' if quem else '') + ': ' + ('observando' if nucleo.CONFIG['observar'] else 'pode editar'), icon='RADIOBUT_ON')
     row.operator('wm.anastacio_ia_liberar', text='Liberar' if nucleo.CONFIG['observar'] else 'Travar')
     row.operator('wm.anastacio_ia_ligar', text='Desligar')
 

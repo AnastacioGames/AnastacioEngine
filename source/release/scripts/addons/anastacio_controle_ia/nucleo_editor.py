@@ -123,7 +123,24 @@ def resumo_objeto(o, completo=False):
 
 TEMPO_PEDIDO = 60.0     # s que o aviso fica na tela esperando o usuário
 ESPERA_NEGADO = float(os.environ.get('ANASTACIO_CRIADOR_ESPERA_NEGADO', 30))   # s sem novo pedido depois de uma negação
-PEDIDO = {'motivo': None, 'fim': 0.0, 'resultado': None, 'bloqueado_ate': 0.0}
+PEDIDO = {'motivo': None, 'fim': 0.0, 'resultado': None, 'bloqueado_ate': 0.0, 'cliente': ''}
+QUEM = {'atual': ''}  # cliente do pedido que está sendo atendido agora
+
+
+def nome_cliente(bruto):
+    """Nome para mostrar de quem se conectou (ex.: 'claude-code' -> 'Claude Code'); vazio se não disse."""
+    nome = ''.join(ch for ch in str(bruto or '') if ch.isprintable()).strip()[:24]
+    baixo = nome.lower()
+    if 'claude' in baixo:
+        return 'Claude Code' if 'code' in baixo or baixo == 'claude' else 'Claude'
+    if 'codex' in baixo:
+        return 'Codex'
+    return nome
+
+
+def clientes_conectados():
+    """Nomes de quem está conectado agora (sem repetir; 'IA' para quem não se identificou)."""
+    return sorted({c.get('nome') or 'IA' for c in ESTADO['conexoes']})
 
 
 def pedido_atual():
@@ -132,7 +149,8 @@ def pedido_atual():
         PEDIDO.update(motivo=None, resultado='expirou')
     if PEDIDO['motivo'] is None:
         return None
-    return {'motivo': PEDIDO['motivo'], 'resta': round(PEDIDO['fim'] - time.time(), 1)}
+    return {'motivo': PEDIDO['motivo'], 'cliente': PEDIDO['cliente'],
+            'resta': round(PEDIDO['fim'] - time.time(), 1)}
 
 
 def responder_pedido(permitir):
@@ -158,7 +176,7 @@ def cmd_pedir_liberacao(p):
     motivo = str(p.get('motivo', '')).strip()[:200]
     if not motivo:
         raise ValueError('informe o motivo em uma frase')
-    PEDIDO.update(motivo=motivo, fim=time.time() + TEMPO_PEDIDO, resultado=None)
+    PEDIDO.update(motivo=motivo, fim=time.time() + TEMPO_PEDIDO, resultado=None, cliente=QUEM['atual'])
     for janela in bpy.context.window_manager.windows:
         for area in janela.screen.areas:
             area.tag_redraw()
@@ -174,7 +192,8 @@ def cmd_resposta_pedido(_p):
 
 def cmd_ping(_p):
     return {'versao': VERSAO, 'arquivo': bpy.data.filepath, 'py_liberado': PY_LIBERADO,
-            'modo': 'observar' if CONFIG['observar'] else 'controle', 'pedido': pedido_atual()}
+            'modo': 'observar' if CONFIG['observar'] else 'controle', 'pedido': pedido_atual(),
+            'clientes': clientes_conectados()}
 
 
 def cmd_cena(_p):
@@ -340,6 +359,7 @@ def atender(linha):
         pedido = json.loads(linha)
         if pedido.get('token') != CONFIG['token']:
             return {'ok': False, 'erro': 'token inválido'}
+        QUEM['atual'] = nome_cliente(pedido.get('cliente'))
         if CONFIG['observar'] and pedido['cmd'] not in SO_LEITURA:
             return {'ok': False, 'erro': 'o editor está no modo "só observar": peça ao usuário para clicar em '
                     '"Liberar edição" em Controle por IA (barra superior ou Preferências > Add-ons)'}
@@ -429,7 +449,15 @@ def _atender_conexao(c):
         return
     if b'\n' in c['buf']:
         linha, resto = c['buf'].split(b'\n', 1)
-        resposta = atender(linha.decode('utf-8', 'replace'))
+        QUEM['atual'] = ''
+        texto = linha.decode('utf-8', 'replace')
+        try:  # o nome vale já para este pedido (o ping mostra quem pediu)
+            nome = nome_cliente(json.loads(texto).get('cliente'))
+            if nome:
+                c['nome'] = nome
+        except (ValueError, AttributeError):
+            pass
+        resposta = atender(texto)
         if resposta is not None and c in ESTADO['conexoes']:
             c['buf'] = resto
             try:
