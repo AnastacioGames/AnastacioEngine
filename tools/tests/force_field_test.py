@@ -78,6 +78,10 @@ def make_scene(output):
     # Vortex around Z: a cube on the +X side is pushed along +Y, then curves toward -X (right-hand rule, no centripetal force).
     _field(scene, "Swirl", (0.0, 60.0, 0.0), "VORTEX", 10.0, True, (0.0, 0.0, 0.0), 8.0)
     _cube(scene, "Swirled", (3.0, 60.0, 0.0))
+    # Plane vortex (the Blender default): swirl plus a pull toward the Z axis, minus the body's velocity.
+    plane = _field(scene, "SwirlPlane", (0.0, 120.0, 0.0), "VORTEX", 3.0, True, (0.0, 0.0, 0.0), 8.0)
+    plane.field.shape = "PLANE"
+    _cube(scene, "SwirledPlane", (3.0, 120.0, 0.0))
     # Turbulence moves the cube in some direction; the same field with a far cube does nothing.
     _field(scene, "Shake", (0.0, 90.0, 0.0), "TURBULENCE", 10.0, True, (0.0, 0.0, 0.0), 8.0).field.size = 1.0
     _cube(scene, "Shaken", (2.0, 90.0, 0.0))
@@ -115,7 +119,7 @@ def run_runtime():
         results = tester["results"] = []
 
     if frame == 1:
-        tester["start"] = {n: list(objects[n].worldPosition) for n in ("InRange", "OutOfRange", "OptOut", "Pushed", "Swirled", "Shaken", "ShakeFar")}
+        tester["start"] = {n: list(objects[n].worldPosition) for n in ("InRange", "OutOfRange", "OptOut", "Pushed", "Swirled", "SwirledPlane", "Shaken", "ShakeFar")}
 
     if frame == END_FRAME:
         def moved(name):
@@ -133,6 +137,9 @@ def run_runtime():
         _check(results, "force repels from the field", d[0] > 1.0 and abs(d[1]) < 0.1, "moved %.2f %.2f %.2f" % tuple(d))
         d = moved("Swirled")
         _check(results, "vortex swirls counter-clockwise around Z", d[1] > 1.0 and d[0] < 0.0 and abs(d[2]) < 0.1,
+               "moved %.2f %.2f %.2f" % tuple(d))
+        d = moved("SwirledPlane")
+        _check(results, "plane vortex pulls toward its axis and swirls", d[0] < -0.5 and d[1] > 0.15 and abs(d[2]) < 0.1,
                "moved %.2f %.2f %.2f" % tuple(d))
         d = moved("Shaken")
         _check(results, "turbulence moves the body", math.sqrt(sum(v * v for v in d)) > 0.3, "moved %.2f %.2f %.2f" % tuple(d))

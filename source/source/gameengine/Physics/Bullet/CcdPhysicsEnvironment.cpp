@@ -1081,6 +1081,8 @@ void CcdPhysicsEnvironment::StaticSimulationSubtickCallback(btDynamicsWorld *wor
 
 /* Same falloff as blenkernel effect.c (falloff_func): 1 up to mindist, 1/(1+d-min)^power after it,
  * zero past maxdist. */
+static const float kGameFieldFps = 24.0f; // Blender's default scene fps: scale of the Vortex terms
+
 static float GameFieldFalloff(float fac, bool useMin, float minDist, bool useMax, float maxDist, float power)
 {
 	if (useMax && fac > maxDist) {
@@ -1131,7 +1133,8 @@ static float GameFieldFalloffAt(const PHY_GameField& f, const btVector3& p)
 	const btVector3 toCenter = p - fpos;
 	btVector3 loc = fpos;
 	if (f.planar) {
-		loc = p - nor * toCenter.dot(nor);
+		// effect.c: the vortex measures from its axis, every other planar field from its XY plane.
+		loc = (f.type == PHY_GameField::VORTEX) ? fpos + nor * toCenter.dot(nor) : p - nor * toCenter.dot(nor);
 	}
 	const btVector3 toPoint = p - loc;
 	const float dist = toPoint.length();
@@ -1265,11 +1268,21 @@ void CcdPhysicsEnvironment::ApplyGameFields(float dt)
 				}
 			}
 			if (f.type == PHY_GameField::VORTEX) {
-				// Pushes around the field's Z axis (right-hand rule), like Blender's Vortex.
-				const btVector3 radial = toCenter - nor * nor.dot(toCenter);
-				const btVector3 tangent = nor.cross(radial);
-				if (tangent.length2() > SIMD_EPSILON) {
-					force = tangent.normalized() * (f.strength * falloff);
+				// Same two laws as blenkernel effect.c (its terms are divided by the scene fps, 24 by default).
+				if (f.planar) {
+					// Plane (default): swirl around the Z axis plus a pull toward it, minus the body's own velocity.
+					const btVector3 radial = toCenter - nor * nor.dot(toCenter);
+					const float sf = f.strength * falloff;
+					const btVector3 swirl = nor.cross(radial) * sf;
+					const btVector3 pull = nor.cross(swirl) * sf;
+					force = (swirl + pull) * (1.0f / kGameFieldFps) - vel;
+				}
+				else {
+					// Point (old vortex): tangent around the axis, grows with the distance to the origin.
+					const btVector3 tangent = nor.cross(toCenter);
+					if (tangent.length2() > SIMD_EPSILON) {
+						force = tangent.normalized() * (f.strength * toCenter.length() * falloff / kGameFieldFps);
+					}
 				}
 			}
 			else if (f.type == PHY_GameField::TURBULENCE) {
