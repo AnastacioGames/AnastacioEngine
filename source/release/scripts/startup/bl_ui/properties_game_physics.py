@@ -26,6 +26,7 @@ from bpy.props import IntProperty, StringProperty, EnumProperty
 from mathutils import Vector
 from bpy.app.translations import pgettext_iface as iface_
 from .properties_constraint import ConstraintButtonsPanel
+from .properties_physics_common import basic_force_field_falloff_ui
 
 # Game: Physics tab (physics, collision, obstacles, destruction, explosive, deformation).
 # Split out of properties_game.py, which still registers every class in order.
@@ -437,6 +438,8 @@ class PHYSICS_PT_game_force_field(PhysicsButtonsPanel, Panel):
     bl_label = "Force Field"
     bl_options = {'DEFAULT_CLOSED'}
     COMPAT_ENGINES = {'BLENDER_GAME'}
+    # Same list as KX_Scene::UpdateGameFields.
+    GAME_FIELD_TYPES = {'FORCE', 'WIND', 'VORTEX', 'TURBULENCE'}
 
     @classmethod
     def poll(cls, context):
@@ -456,7 +459,44 @@ class PHYSICS_PT_game_force_field(PhysicsButtonsPanel, Panel):
         col = layout.column()
         col.active = field.use_game_field
         col.prop(field, "type", text="")
-        col.label(text="Edit the field values in the render Physics tab", icon='INFO')
+        if field.type not in self.GAME_FIELD_TYPES:
+            col.label(text="Only Force, Wind, Vortex and Turbulence act in the game", icon='ERROR')
+            return
+
+        col.prop(field, "shape", text="Shape")
+        col.separator()
+        row = col.row()
+        sub = row.column()
+        sub.prop(field, "strength")
+        sub.prop(field, "flow")
+        if field.type == 'TURBULENCE':
+            sub.prop(field, "size")
+            sub.prop(field, "seed")
+        elif field.type == 'FORCE':
+            sub.prop(field, "use_gravity_falloff", text="Gravitation")
+        sub = row.column()
+        sub.label(text="Effect point:")
+        sub.prop(field, "apply_to_location", text="Location")
+
+        col.separator()
+        col.label(text="Falloff:")
+        col.row().prop(field, "falloff_type", expand=True)
+        basic_force_field_falloff_ui(self, context, field)
+        if field.falloff_type in {'CONE', 'TUBE'}:
+            tube = field.falloff_type == 'TUBE'
+            split = col.split(factor=0.35)
+            sub = split.column()
+            sub.label(text="Radial:" if tube else "Angular:")
+            sub.prop(field, "use_radial_min", text="Use Minimum")
+            sub.prop(field, "use_radial_max", text="Use Maximum")
+            sub = split.column()
+            sub.prop(field, "radial_falloff", text="Power")
+            row = sub.column()
+            row.active = field.use_radial_min
+            row.prop(field, "radial_min", text="Distance" if tube else "Angle")
+            row = sub.column()
+            row.active = field.use_radial_max
+            row.prop(field, "radial_max", text="Distance" if tube else "Angle")
 
 
 class PHYSICS_PT_game_joints(PhysicsButtonsPanel, ConstraintButtonsPanel, Panel):
