@@ -96,7 +96,10 @@ class ANASTACIO_AP_controle_ia(bpy.types.AddonPreferences):
 
 
 def _cabecalho(self, context):
-    if not nucleo.CONFIG['ligado']:
+    if not nucleo.CONFIG['ligado']:  # fica no cabeçalho, desligado, até o addon ser desativado
+        row = self.layout.row(align=True)
+        row.label('IA: desligada', icon='RADIOBUT_OFF')
+        row.operator('wm.anastacio_ia_ligar', text='Ligar')
         return
     pedido = nucleo.pedido_atual()
     if pedido:
