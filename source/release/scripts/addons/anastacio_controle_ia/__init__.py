@@ -53,6 +53,20 @@ class ANASTACIO_OT_ia_liberar(bpy.types.Operator):
 
     def execute(self, context):
         nucleo.CONFIG['observar'] = not nucleo.CONFIG['observar']
+        if not nucleo.CONFIG['observar']:
+            nucleo.responder_pedido(True)
+        _quadro_novo()
+        return {'FINISHED'}
+
+
+class ANASTACIO_OT_ia_responder(bpy.types.Operator):
+    bl_idname = 'wm.anastacio_ia_responder'
+    bl_label = 'Responder pedido da IA'
+    bl_description = 'Permite ou nega o pedido da IA para editar'
+    permitir = bpy.props.BoolProperty(default=False)
+
+    def execute(self, context):
+        nucleo.responder_pedido(self.permitir)
         _quadro_novo()
         return {'FINISHED'}
 
@@ -84,6 +98,14 @@ class ANASTACIO_AP_controle_ia(bpy.types.AddonPreferences):
 def _cabecalho(self, context):
     if not nucleo.CONFIG['ligado']:
         return
+    pedido = nucleo.pedido_atual()
+    if pedido:
+        caixa = self.layout.row(align=True)
+        caixa.alert = True
+        caixa.label('A IA pede para editar: ' + pedido['motivo'], icon='ERROR')
+        caixa.operator('wm.anastacio_ia_responder', text='Permitir').permitir = True
+        caixa.operator('wm.anastacio_ia_responder', text='Negar').permitir = False
+        _quadro_novo()
     row = self.layout.row(align=True)
     row.alert = not nucleo.CONFIG['observar']
     row.label('IA: ' + ('observando' if nucleo.CONFIG['observar'] else 'pode editar'), icon='RADIOBUT_ON')
@@ -115,6 +137,7 @@ def register():
     nucleo.registrar()
     bpy.utils.register_class(ANASTACIO_OT_ia_ligar)
     bpy.utils.register_class(ANASTACIO_OT_ia_liberar)
+    bpy.utils.register_class(ANASTACIO_OT_ia_responder)
     bpy.utils.register_class(ANASTACIO_AP_controle_ia)
     bpy.types.INFO_HT_header.append(_cabecalho)
     bpy.app.handlers.load_post.append(_religar)
@@ -127,6 +150,7 @@ def unregister():
         bpy.app.handlers.load_post.remove(_religar)
     bpy.types.INFO_HT_header.remove(_cabecalho)
     bpy.utils.unregister_class(ANASTACIO_AP_controle_ia)
+    bpy.utils.unregister_class(ANASTACIO_OT_ia_responder)
     bpy.utils.unregister_class(ANASTACIO_OT_ia_liberar)
     bpy.utils.unregister_class(ANASTACIO_OT_ia_ligar)
     nucleo.desregistrar()

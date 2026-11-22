@@ -8,6 +8,10 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-22 — Controle por IA: pedido de liberação
+
+- A IA pode pedir para editar (`pedir_liberacao`): aparece um aviso com Permitir/Negar no cabeçalho do editor. Só o clique do usuário libera; negar segura novos pedidos por 30 s; expira em 60 s.
+
 ## 2026-11-22 — Complemento "Controle por IA" (parte B do MCP do criador)
 
 - **Novo addon** `source/release/scripts/addons/anastacio_controle_ia/` (desligado por padrão; o usuário ativa em

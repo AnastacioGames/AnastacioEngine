@@ -20,7 +20,8 @@ VERSAO = 2
 PY_LIBERADO = os.environ.get('ANASTACIO_CRIADOR_PY') == '1'
 LIMITE_OBJETOS = 500
 # Comandos que só leem (ou gravam cópia de segurança). O resto exige o modo "controle".
-SO_LEITURA = {'ping', 'cena', 'objeto', 'listar', 'descrever', 'ler', 'tela', 'backup', 'copia_para_jogo'}
+SO_LEITURA = {'ping', 'cena', 'objeto', 'listar', 'descrever', 'ler', 'tela', 'backup', 'copia_para_jogo',
+              'pedir_liberacao', 'resposta_pedido'}
 
 CONFIG = {'arquivo_sessao': None, 'observar': False, 'token': None, 'ligado': False, 'dono': 'mcp'}
 LIMITE_LINHA = 8 << 20  # bytes de um pedido sem quebra de linha
@@ -119,9 +120,60 @@ def resumo_objeto(o, completo=False):
     return d
 
 
+TEMPO_PEDIDO = 60.0     # s que o aviso fica na tela esperando o usuário
+ESPERA_NEGADO = float(os.environ.get('ANASTACIO_CRIADOR_ESPERA_NEGADO', 30))   # s sem novo pedido depois de uma negação
+PEDIDO = {'motivo': None, 'fim': 0.0, 'resultado': None, 'bloqueado_ate': 0.0}
+
+
+def pedido_atual():
+    """Pedido de liberação pendente ({'motivo','resta'}) ou None; expira sozinho."""
+    if PEDIDO['motivo'] is not None and time.time() > PEDIDO['fim']:
+        PEDIDO.update(motivo=None, resultado='expirou')
+    if PEDIDO['motivo'] is None:
+        return None
+    return {'motivo': PEDIDO['motivo'], 'resta': round(PEDIDO['fim'] - time.time(), 1)}
+
+
+def responder_pedido(permitir):
+    """Chamado só pelo usuário (botão do editor). Permitir libera a edição; negar segura novos pedidos."""
+    if PEDIDO['motivo'] is None:
+        return
+    PEDIDO['motivo'] = None
+    PEDIDO['resultado'] = 'permitido' if permitir else 'negado'
+    if permitir:
+        CONFIG['observar'] = False
+    else:
+        PEDIDO['bloqueado_ate'] = time.time() + ESPERA_NEGADO
+
+
+def cmd_pedir_liberacao(p):
+    """Mostra no editor um aviso pedindo ao usuário para liberar a edição. Não libera nada por si."""
+    if not CONFIG['observar']:
+        return {'estado': 'permitido', 'aviso': 'a edição já está liberada'}
+    if CONFIG['dono'] == 'mcp':
+        raise ValueError('o editor foi aberto pelo MCP; não há aviso para clicar')
+    if time.time() < PEDIDO['bloqueado_ate']:
+        return {'estado': 'negado', 'aviso': 'o usuário negou há pouco; aguarde antes de pedir de novo'}
+    motivo = str(p.get('motivo', '')).strip()[:200]
+    if not motivo:
+        raise ValueError('informe o motivo em uma frase')
+    PEDIDO.update(motivo=motivo, fim=time.time() + TEMPO_PEDIDO, resultado=None)
+    for janela in bpy.context.window_manager.windows:
+        for area in janela.screen.areas:
+            area.tag_redraw()
+    return {'estado': 'pendente', 'resta': TEMPO_PEDIDO}
+
+
+def cmd_resposta_pedido(_p):
+    """Estado do pedido: pendente, permitido, negado, expirou (ou None se nunca houve)."""
+    if pedido_atual() is not None:
+        return {'estado': 'pendente', 'resta': pedido_atual()['resta']}
+    return {'estado': PEDIDO['resultado']}
+
+
 def cmd_ping(_p):
     return {'versao': VERSAO, 'arquivo': bpy.data.filepath, 'py_liberado': PY_LIBERADO,
-            'modo': 'observar' if CONFIG['observar'] else 'controle'}
+            'modo': 'observar' if CONFIG['observar'] else 'controle', 'pedido': pedido_atual()}
 
 
 def cmd_cena(_p):
