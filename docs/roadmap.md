@@ -5,6 +5,20 @@ concluídos estão resumidos em [`../relatorio-melhorias-anastacioengine.md`](..
 e detalhados no [`changelog.md`](changelog.md) (histórico antigo em [`changelog-arquivo.md`](changelog-arquivo.md)).
 Ao concluir um item, apague-o daqui e registre no changelog.
 
+## IA para criadores de jogos (MCP)
+
+Fora da engine, no repo `anastacio-docs` (PR do MCP e do skill ainda não no `main`; branch `ccr-7536d00d-qdc44d`):
+MCP `anastacio-api` (referência da API fatiada, já publicada), MCP `anastacio-criador` (editor e jogo, modo A:
+o MCP abre o editor com janela visível) e o skill `criar-jogo-anastacio`. O skill `api-anastacio` deste repo
+usa o primeiro.
+
+- **Pendente de teste com a engine instalada:** lista em `anastacio-docs/docs/testes-pendentes.md`. O MCP foi
+  testado só contra um editor falso; `servidor_editor.py` nunca rodou dentro do editor.
+- **Adiado, exige mudar a engine:** modo B (a IA conecta no editor que o usuário já abriu, por um complemento
+  "Ativar controle por IA", desligado por padrão). Não fazer sem decisão. Assistente de IA dentro do editor:
+  descartado por ora.
+- `tools/testes_engine/controle.py` continua ferramenta interna dos agentes da engine; não é o MCP do criador.
+
 ## Nodes GLSL por arquivo
 
 - Plano do formato concluído e aprovado com janela em 2026-11-11 ([shader-nodes.md](shader-nodes.md)): cabeçalho
