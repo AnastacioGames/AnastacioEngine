@@ -17,8 +17,8 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   classe, `busca.json`, guia), `tools/anastacio_api_mcp.py` (servidor MCP) e `inventario/sem_descricao.md`
   (130 de 2196 itens sem frase de descrição).
 - Não mexe em código C++; nada a compilar. O MCP foi verificado num Claude Code real em 2026-11-22 (as cinco
-  ferramentas respondem, também com `--fonte` apontando para a doc publicada). **Ainda não verificado:** a queda do
-  skill para a versão publicada quando o MCP não está instalado, numa sessão nova.
+  ferramentas respondem, também com `--fonte` apontando para a doc publicada). Os dois skills foram verificados em sessão nova
+  (`claude -p`, sem MCP): `criar-jogo-anastacio` dispara no pedido do cubo e `api-anastacio` cai para a doc publicada.
   O site publicado (`api-ia/`) depende do deploy do `anastacio-docs` (PR #2 já no `main`).
 
 ## 2026-11-20 — Convert to Mesh não tira mais o objeto do jogo
