@@ -292,7 +292,7 @@ def _slice_loops(bm, sgn, x):
     return loops
 
 
-def _long_finger_centers(arm, side, body, step=0.003):
+def _long_finger_centers(arm, side, body, step=0.003, max_err=0.012):
     """Indicador a mínimo: a malha do corpo é cortada em fatias ao longo da mão (pose T: dedos em ±X). Cada
     dedo vira um anel fechado separado no corte; o centro do anel é o centro do dedo, ligado ao dedo da base
     mais próximo. Não depende de a linha da base estar dentro do dedo (no lado direito do Enzo ela passava
@@ -315,9 +315,11 @@ def _long_finger_centers(arm, side, body, step=0.003):
     x0 = max(sgn * r.x for r, _t in lines.values()) + 0.006
     x1 = max(sgn * v.co.x for v in bm.verts)
     centers = {f: [] for f in lines}
+    last = {}
     x = x0
     while x < x1 - 0.002:
         taken = {}
+        small = []
         for loop in _slice_loops(bm, sgn, x):
             if len(loop) < 4:
                 continue
@@ -325,15 +327,35 @@ def _long_finger_centers(arm, side, body, step=0.003):
             zs = [c.z for c in loop]
             if max(ys) - min(ys) > 0.03 or max(zs) - min(zs) > 0.03:   # palma/braço, não um dedo
                 continue
-            c = Vector((sgn * x, (min(ys) + max(ys)) / 2.0, (min(zs) + max(zs)) / 2.0))
-            best_f, best_e = None, 0.012
-            for f, (r, t) in lines.items():
-                u = (sgn * x - r.x) / (t.x - r.x if abs(t.x - r.x) > 1e-6 else 1e-6)
-                e = abs(c.y - (r.y + u * (t.y - r.y)))
-                if e < best_e:
-                    best_f, best_e = f, e
-            if best_f and (best_f not in taken or best_e < taken[best_f][0]):
-                taken[best_f] = (best_e, c)
+            small.append(Vector((sgn * x, (min(ys) + max(ys)) / 2.0, (min(zs) + max(zs)) / 2.0)))
+        order = sorted(lines, key=lambda f: -lines[f][0].y)   # indicador, médio, anelar, mínimo (de +Y a -Y)
+        if len(small) == len(order):
+            # um anel por dedo: a ordem em Y vale mais que a distância à linha da base (mão maior/mais larga
+            # que a da base deixava os dedos a ~2 cm das linhas e o médio virava anelar)
+            for f, c in zip(order, sorted(small, key=lambda c: -c.y)):
+                taken[f] = (0.0, c)
+            last.update({f: c for f, (_e, c) in taken.items()})
+        elif last:
+            # ponta do dedo (anel some ou se junta): segue o dedo da fatia anterior, não a linha da base
+            for c in small:
+                best_f, best_e = None, 0.008
+                for f, lc in last.items():
+                    e = abs(c.y - lc.y)
+                    if e < best_e:
+                        best_f, best_e = f, e
+                if best_f and (best_f not in taken or best_e < taken[best_f][0]):
+                    taken[best_f] = (best_e, c)
+            last.update({f: c for f, (_e, c) in taken.items()})
+        else:
+            for c in small:
+                best_f, best_e = None, max_err
+                for f, (r, t) in lines.items():
+                    u = (sgn * x - r.x) / (t.x - r.x if abs(t.x - r.x) > 1e-6 else 1e-6)
+                    e = abs(c.y - (r.y + u * (t.y - r.y)))
+                    if e < best_e:
+                        best_f, best_e = f, e
+                if best_f and (best_f not in taken or best_e < taken[best_f][0]):
+                    taken[best_f] = (best_e, c)
         for f, (_e, c) in taken.items():
             centers[f].append(c)
         x += step
@@ -373,6 +395,7 @@ def fit_fingers(arm, meshes, reach=0.010, thumb_reach=0.016):
         hverts = [c for c in verts if abs(c.x) >= abs(hx) - 0.01 and (c.x > 0) == (hx > 0)]
         body = next((o for o in meshes if autorig._piece(o) == "body"), None)
         long_fingers = _long_finger_centers(arm, side, body)
+        wide = None
         for finger in FINGERS:
             names = _finger_chain(arm, side, finger)
             if not names:
@@ -383,13 +406,19 @@ def fit_fingers(arm, meshes, reach=0.010, thumb_reach=0.016):
             fracs = [(mw * bones[n].head_local - root).dot(axis) / (tip0 - root).length for n in names] + [1.0]
             if finger == "Thumb":
                 line = _thumb_line(hverts, root, axis, thumb_reach)
+                if line is None:      # mão maior que a da base (Fabio): procura mais longe da linha
+                    line = _thumb_line(hverts, root, axis, thumb_reach * 1.7)
             else:
                 line = long_fingers.get(finger)
+                if line is None:
+                    if wide is None:
+                        wide = _long_finger_centers(arm, side, body, max_err=0.022)
+                    line = wide.get(finger)
             if line is None:
                 warn.append("%s %s: dedo não achado na malha, mantido o da base" % (side, finger))
                 continue
             p0, d, tip = line
-            if d.dot(axis) < 0.906:       # mais de 25 graus do dedo da base: medida errada
+            if d.dot(axis) < 0.766:       # mais de 40 graus (era 25: a medida por ordem dos anéis é mais confiável) do dedo da base: medida errada
                 warn.append("%s %s: eixo medido torto (%.0f graus), mantido o da base"
                             % (side, finger, math.degrees(math.acos(max(-1.0, min(1.0, d.dot(axis)))))))
                 continue
@@ -413,6 +442,53 @@ def fit_fingers(arm, meshes, reach=0.010, thumb_reach=0.016):
     return report, warn
 
 
+WRIST_TO_TIP = 0.142      # m: do pulso à ponta do dedo médio nos pilotos de 1,672 m (Enzo 14,2; Aldebaran 13,7; Azeite 15,3)
+WRIST_TOL = 0.015
+
+
+def fit_wrist(arm, meshes):
+    """Pulso: o autorig estica o braço pela envergadura e em alguns corpos (Fabio, Biel) o osso Hand fica 2-5 cm
+    perto demais da ponta dos dedos (a palma vira antebraço e dobra com os dedos). Recua a cabeça do Hand (e a
+    ponta do ForeArm) ao longo do antebraço até WRIST_TO_TIP da ponta da malha. Retorna {lado: cm recuados}."""
+    core = [o for o in meshes if autorig._piece(o) not in autorig.ACCESSORIES]
+    verts = autorig.world_verts(core)
+    mw = arm.matrix_world
+    inv = mw.inverted()
+    plan = {}
+    for side in ("Left", "Right"):
+        hand = arm.data.bones.get("mixamorig:%sHand" % side)
+        fore = arm.data.bones.get("mixamorig:%sForeArm" % side)
+        if hand is None or fore is None:
+            continue
+        h = mw * hand.head_local
+        f0 = mw * fore.head_local
+        sgn = 1.0 if h.x > 0 else -1.0
+        tip = max(sgn * c.x for c in verts)
+        gap = tip - sgn * h.x
+        if gap >= WRIST_TO_TIP - WRIST_TOL:
+            continue
+        d = (h - f0).normalized()
+        if sgn * d.x < 0.5:
+            continue
+        back = (WRIST_TO_TIP - gap) / (sgn * d.x)     # a mudança em X vira distância ao longo do antebraço
+        plan[side] = (h - d * back, back)
+    if not plan:
+        return {}
+    for o in bpy.context.scene.objects:
+        o.select = o is arm
+    bpy.context.scene.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    eb = arm.data.edit_bones
+    out = {}
+    for side, (pos, back) in plan.items():
+        local = inv * pos
+        eb["mixamorig:%sForeArm" % side].tail = local
+        eb["mixamorig:%sHand" % side].head = local
+        out[side] = round(back * 100, 1)
+    bpy.ops.object.mode_set(mode='OBJECT')
+    return out
+
+
 def fit_skeleton_v2(pieces, skeleton=DEFAULT_SKELETON, report=print):
     """Etapa 2: traz o esqueleto da biblioteca, estica braços pela envergadura (autorig.fit_skeleton) e
     encaixa os 5 dedos. A malha ainda não é ligada (etapa 3). Retorna (armature, info)."""
@@ -424,7 +500,10 @@ def fit_skeleton_v2(pieces, skeleton=DEFAULT_SKELETON, report=print):
     arm["v2_skeleton"] = skeleton
     arm.data.draw_type = 'STICK'
     arm.show_x_ray = True
+    wrist = fit_wrist(arm, pieces)
     moved, warn = fit_fingers(arm, pieces)
+    if wrist:
+        warn.append("pulso recuado (cm): %s" % wrist)
     for w in warn:
         report("aviso: " + w)
     return arm, {"ossos": len(arm.data.bones), "dedos_mm": moved, "avisos": warn}
@@ -511,9 +590,8 @@ def finger_weights(arm, meshes):
         own = {hand} | {n for names, _p in chains.values() for n in names}
         hx = (arm.matrix_world * arm.data.bones[hand].head_local).x
         count = 0
-        for o in meshes:
-            if o.type != 'MESH':
-                continue
+        skin = [o for o in meshes if o.type == 'MESH' and autorig._piece(o) == "body"]
+        for o in skin:
             groups = {g.name: g for g in o.vertex_groups}
             for v in o.data.vertices:
                 c = o.matrix_world * v.co
@@ -526,11 +604,20 @@ def finger_weights(arm, meshes):
                     lo = THUMB_BASE_BLEND[0] if f == "Thumb" else KNUCKLE_BLEND[0]
                     if d < radius and t > lo:
                         hits.append((d, f, t))
-                if not hits:
-                    continue
                 # Só vértices que já eram da mão/dedos (pulso e antebraço ficam com a transferência).
                 old = {o.vertex_groups[e.group].name: e.weight for e in v.groups}
                 if sum(x for n, x in old.items() if n in own) < 0.5:
+                    continue
+                if not hits:
+                    # palma/costas da mão longe de qualquer dedo: só Hand. A transferência da base dava
+                    # pesos de falange a vértices da palma quando a mão é maior que a da base (Fabio, Biel).
+                    if any(x > 0.05 for n, x in old.items() if n in own and n != hand):
+                        for e in list(v.groups):
+                            o.vertex_groups[e.group].remove([v.index])
+                        g = groups.get(hand) or o.vertex_groups.new(hand)
+                        groups[hand] = g
+                        g.add([v.index], 1.0, 'REPLACE')
+                        count += 1
                     continue
                 d, f, t = min(hits)
                 names, pts = chains[f]
@@ -560,8 +647,51 @@ def finger_weights(arm, meshes):
                         g = groups[n] = o.vertex_groups.new(n)
                     g.add([v.index], x, 'REPLACE')
                 count += 1
+        count += _cloth_follow_hand(arm, side, skin, [o for o in meshes if o.type == 'MESH' and o not in skin], own, hx)
         out[side] = count
     return out
+
+
+def _cloth_follow_hand(arm, side, skin, cloth, own, hx, dist=0.03, k=4):
+    """Luva e manga da mão copiam os pesos (já refeitos) dos vértices de pele mais próximos, até 3 cm: com
+    a malha da roupa a ~1 cm da pele o raio dos dedos não pegava e a luva ficava rígida ou rasgava."""
+    from mathutils import kdtree
+    pts = [(o.matrix_world * v.co, o, v) for o in skin for v in o.data.vertices
+           if (o.matrix_world * v.co).x * hx > 0 and abs((o.matrix_world * v.co).x) >= abs(hx) - 0.03]
+    if not pts:
+        return 0
+    tree = kdtree.KDTree(len(pts))
+    for i, (co, _o, _v) in enumerate(pts):
+        tree.insert(co, i)
+    tree.balance()
+    count = 0
+    for o in cloth:
+        for v in o.data.vertices:
+            c = o.matrix_world * v.co
+            if (c.x > 0) != (hx > 0) or abs(c.x) < abs(hx) - 0.005:
+                continue
+            old = {o.vertex_groups[e.group].name: e.weight for e in v.groups}
+            if sum(x for n, x in old.items() if n in own) < 0.5:
+                continue
+            hits = [h for h in tree.find_n(c, k) if h[2] <= dist]
+            if not hits:
+                continue
+            acc, tot = {}, 0.0
+            for _co, i, d in hits:
+                sk, sv = pts[i][1], pts[i][2]
+                w = 1.0 / max(d, 0.002)
+                tot += w
+                for e in sv.groups:
+                    nm = sk.vertex_groups[e.group].name
+                    acc[nm] = acc.get(nm, 0.0) + w * e.weight
+            for e in list(v.groups):
+                o.vertex_groups[e.group].remove([v.index])
+            for nm, w in acc.items():
+                if w / tot > 0.001:
+                    g = o.vertex_groups.get(nm) or o.vertex_groups.new(nm)
+                    g.add([v.index], w / tot, 'REPLACE')
+            count += 1
+    return count
 
 
 def weights_v2(arm, pieces, skeleton=None):
@@ -1533,12 +1663,12 @@ def join_keep_materials(body, parts):
 # -- Etapa 7: redução e LOD do corpo ---------------------------------------------------------------------
 
 BODY_REST_TRIS = 3000        # corpo sem as mãos (o gerador antigo dava 3000 ao corpo sem a parte de cima)
-HANDS_TRIS = 1500            # as duas mãos (o Fuse dá ~2600); as juntas ficam travadas
+HANDS_TRIS = None            # None = mãos inteiras no nível 0 (reduzir entortava os dedos, 2026-11-21); número = alvo das duas mãos com as juntas travadas
 JOINT_GROUP = "proteger_juntas"
 JOINT_KEEP = 0.004           # até 4 mm de uma junta: trava total
 JOINT_FADE = 0.010           # trava some aos poucos até 10 mm da junta (meio da falange, palma: reduz)
-BODY_LODS = ((2500, 10.0), (900, 25.0))
-BODY_LODS_WITH_HEAD = ((4000, 10.0), (1500, 25.0))   # sem corte: a cabeça vai junto nos LODs   # (triângulos, distância) como o gerador antigo; mãos sem trava
+BODY_LODS = ((2500, 15.0), (900, 35.0))
+BODY_LODS_WITH_HEAD = ((4000, 15.0), (1500, 35.0))   # sem corte: a cabeça vai junto nos LODs   # (triângulos, distância) como o gerador antigo; mãos sem trava
 
 
 def _hand_tris(ob):
@@ -1658,6 +1788,19 @@ def _hemisphere(n):
     return out
 
 
+OUTSIDE_RAYS = 160
+
+
+def _sphere_dirs(n):
+    out = []
+    golden = math.pi * (3.0 - math.sqrt(5.0))
+    for i in range(n):
+        z = 1.0 - 2.0 * (i + 0.5) / n
+        r = math.sqrt(max(0.0, 1.0 - z * z))
+        out.append(Vector((math.cos(golden * i) * r, math.sin(golden * i) * r, z)))
+    return out
+
+
 def _see_through(m):
     return m is not None and (m.use_transparency or any(k in m.name.lower() for k in ("hair", "lash", "brow")))
 
@@ -1695,6 +1838,25 @@ def _hidden_in_current_pose(ob, occluders, dirs):
                 break
         if not escaped:
             hidden.add(p.index)
+    # Conferência por fora: raios vindos de longe, de todos os lados, em direção ao centro de cada candidata. Se o
+    # 1º ponto atingido é a própria face, ela aparece e fica (faces do lado do tronco do Fabio sumiam: buraco).
+    outside = _sphere_dirs(OUTSIDE_RAYS)
+    for p in list(hidden):
+        poly = me.polygons[p]
+        c0 = mw * poly.center
+        # centro e pontos perto de cada canto: uma face que só aparece pela borda (fresta do bolso) também fica
+        samples = [c0] + [c0 + (mw * me.vertices[i].co - c0) * 0.6 for i in poly.vertices]
+        seen = False
+        for c in samples:
+            for d in outside:
+                hit = tree.ray_cast(c + d * 2.0, -d, 2.1)[0]
+                if hit is not None and (hit - c).length < 0.004:
+                    seen = True
+                    break
+            if seen:
+                break
+        if seen:
+            hidden.discard(p)
     bpy.data.meshes.remove(me)
     return hidden
 
@@ -1753,6 +1915,21 @@ def reduce_body(arm, body, rest_tris=BODY_REST_TRIS, hands_tris=HANDS_TRIS, lods
     scene = bpy.context.scene
     if bpy.data.objects.get("Cabeca") is None and lods is BODY_LODS:
         lods = BODY_LODS_WITH_HEAD
+    head = bpy.data.objects.get("Cabeca")
+
+    def rest():
+        clear_pose(arm)
+
+    def seated():
+        clear_pose(arm)
+        if not autorig.bake_seat_pose(arm, game_root):
+            raise RuntimeError("pose sentada do jogo não encontrada em %s" % game_root)
+
+    # Faces fechadas por dentro (forro da roupa, pele sob a roupa) saem da malha CHEIA antes de qualquer redução,
+    # no nível 0 e nos LODs (2026-11-21): depois da redução a roupa tem frestas finas que os raios não acham, e
+    # sem a pele de baixo elas viravam buraco no ombro (LOD sentado no jogo).
+    hidden = remove_hidden_faces(body, [body] + ([head] if head else []), poses=(rest, seated))
+    clear_pose(arm)
     hands0 = _hand_tris(body)
     full = body.data.copy()
     tris0 = autorig._tris(body)
@@ -1774,29 +1951,15 @@ def reduce_body(arm, body, rest_tris=BODY_REST_TRIS, hands_tris=HANDS_TRIS, lods
         if bpy.data.objects.get("Cabeca") is None:
             again |= head_region(arm, body)   # índices mudam depois da redução: recalcula
         body.vertex_groups[PROTECT_GROUP].remove(sorted(again))
-    joint_weights(arm, body)
-    rest_now = autorig._tris(body) - _hand_tris(body)
-    got = reduce_protected(body, rest_now + hands_tris, group=JOINT_GROUP)
+    if hands_tris is None:
+        got = autorig._tris(body)       # mãos inteiras (sem a 2ª passada)
+    else:
+        joint_weights(arm, body)
+        rest_now = autorig._tris(body) - _hand_tris(body)
+        got = reduce_protected(body, rest_now + hands_tris, group=JOINT_GROUP)
     hands1 = _hand_tris(body)
     head = bpy.data.objects.get("Cabeca")
 
-    def rest():
-        clear_pose(arm)
-
-    def seated():
-        clear_pose(arm)
-        if not autorig.bake_seat_pose(arm, game_root):
-            raise RuntimeError("pose sentada do jogo não encontrada em %s" % game_root)
-
-    # Faces escondidas saem da malha CHEIA, antes de reduzir: depois da redução a roupa tem frestas finas que
-    # os raios não acham, e sem a pele de baixo elas viravam buraco no ombro (LOD sentado no jogo).
-    src = body.copy()
-    src.data = full
-    scene.objects.link(src)
-    hidden = remove_hidden_faces(src, [src] + ([head] if head else []), poses=(rest, seated))
-    clear_pose(arm)
-    scene.objects.unlink(src)
-    bpy.data.objects.remove(src)
     lod_objs = []
     for i, (tris, dist) in enumerate(lods, 1):
         ob = body.copy()
