@@ -31,6 +31,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   Depois: a conexão mais nova assume a vaga (uma conexão travada não prende mais o servidor) e a sessão guarda o nome do
   executável, então um PID reaproveitado por outro programa é ignorado. Teste com a engine real em
   `anastacio-docs/tools/criador/teste_editor.py`.
+- **Scripts pelo MCP:** novos comandos `script_gravar` (cria/atualiza um texto pelo nome, sem executar; não sobrescreve sem
+  autorização) e `script_ligar` (sensor Always + controlador Python). Os operadores `text.*` ficam bloqueados: o primeiro uso
+  real mostrou que `text.insert` escrevia no texto ativo do editor, que era um script do usuário.
 
 ## 2026-11-22 — Skill `api-anastacio` e API Python fatiada para IA
 

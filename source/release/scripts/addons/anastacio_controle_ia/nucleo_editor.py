@@ -33,6 +33,11 @@ OPS_DE_CODIGO = {'script.python_file_run', 'script.execute_preset', 'script.relo
                  'wm.context_set_enum', 'wm.context_toggle', 'wm.context_toggle_enum', 'wm.properties_edit',
                  'wm.properties_add', 'wm.keyconfig_import', 'wm.keyconfig_activate', 'wm.appconfig_activate',
                  'wm.url_open', 'wm.path_open', 'file.execute', 'wm.app_template_install'}
+# Operadores do editor de texto agem no texto ATIVO (que pode ser um script do usuário): nunca por `op`.
+OPS_TEXTO_ATIVO = {'text.insert', 'text.paste', 'text.cut', 'text.delete', 'text.line_break', 'text.comment',
+                   'text.uncomment', 'text.indent', 'text.unindent', 'text.convert_whitespace', 'text.replace',
+                   'text.move_lines', 'text.duplicate_line', 'text.overwrite_toggle'}
+LIMITE_SCRIPT = 200_000  # caracteres
 # `definir` só mexe em dados do projeto, nunca em preferências do usuário nem em caminhos de scripts.
 PREFIXOS_DEFINIR = ('bpy.data', 'bpy.context.scene', 'bpy.context.object', 'bpy.context.active_object',
                     'bpy.context.window_manager.addon_search')
@@ -150,6 +155,9 @@ CARREGAM_ARQUIVO = {'wm.open_mainfile', 'wm.revert_mainfile', 'wm.read_homefile'
 
 
 def cmd_op(p):
+    if p['nome'] in OPS_TEXTO_ATIVO:
+        raise PermissionError('%s edita o texto ativo do editor (pode ser um script do usuário). '
+                              'Use script_gravar para criar ou trocar o conteúdo de um script pelo nome' % p['nome'])
     if p['nome'] in OPS_DE_CODIGO and not PY_LIBERADO:
         raise PermissionError('%s executa código ou mexe em preferências: só com ANASTACIO_CRIADOR_PY=1' % p['nome'])
     op = operador(p['nome'])
@@ -161,6 +169,46 @@ def cmd_op(p):
     if not op.poll(ctx):
         return {'estado': 'sem_contexto'}
     return {'estado': sorted(op(ctx, 'EXEC_DEFAULT', **p.get('args', {})))}
+
+
+def cmd_script_gravar(p):
+    """Cria um texto (script) pelo nome e grava o conteúdo. Só dados: não roda nada. Não sobrescreve sem pedir."""
+    nome, conteudo = p['nome'], p['conteudo']
+    if not re.fullmatch(r'[A-Za-z0-9_][A-Za-z0-9_.\- ]{0,62}', nome):
+        raise ValueError('nome de script inválido: use letras, números, _ . - e espaço (até 63)')
+    if not isinstance(conteudo, str) or len(conteudo) > LIMITE_SCRIPT:
+        raise ValueError('conteúdo deve ser texto de até %d caracteres' % LIMITE_SCRIPT)
+    existente = bpy.data.texts.get(nome)
+    if existente is not None and not p.get('sobrescrever'):
+        raise ValueError('já existe um script "%s" no projeto; use outro nome ou peça ao usuário para autorizar '
+                         'sobrescrever' % nome)
+    texto = existente or bpy.data.texts.new(nome)
+    texto.clear()
+    texto.write(conteudo)
+    return {'script': texto.name, 'linhas': conteudo.count('\n') + 1, 'criado': existente is None}
+
+
+def cmd_script_ligar(p):
+    """Liga um script ao objeto: sensor Always (pulso contínuo) -> controlador Python em modo Script."""
+    objeto = bpy.data.objects[p['objeto']]
+    texto = bpy.data.texts[p['script']]
+    if any(c.type == 'PYTHON' and c.text == texto for c in objeto.game.controllers):
+        return {'objeto': objeto.name, 'script': texto.name, 'aviso': 'já estava ligado'}
+    ctx = contexto()
+    cena = bpy.context.scene
+    antes = cena.objects.active
+    cena.objects.active = objeto
+    try:
+        bpy.ops.logic.sensor_add(ctx, type='ALWAYS', object=objeto.name)
+        bpy.ops.logic.controller_add(ctx, type='PYTHON', object=objeto.name)
+    finally:
+        cena.objects.active = antes
+    ctrl, sensor = objeto.game.controllers[-1], objeto.game.sensors[-1]
+    ctrl.mode = 'SCRIPT'
+    ctrl.text = texto
+    sensor.use_pulse_true_level = True
+    sensor.link(ctrl)
+    return {'objeto': objeto.name, 'script': texto.name, 'sensor': sensor.name, 'controlador': ctrl.name}
 
 
 def cmd_ler(p):
