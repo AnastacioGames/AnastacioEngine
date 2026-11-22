@@ -249,7 +249,8 @@ def escuta():
         s.setblocking(False)
         ESTADO['escuta'] = s
         sessao.escrever(CONFIG['arquivo_sessao'], {'porta': s.getsockname()[1], 'token': CONFIG['token'],
-                                                    'pid': os.getpid(), 'versao': VERSAO})
+                                                    'pid': os.getpid(), 'versao': VERSAO,
+                                                    'programa': sessao.nome_processo(os.getpid())})
     return ESTADO['escuta']
 
 
@@ -306,15 +307,17 @@ def tique():
     e = ESTADO
     if not CONFIG['ligado']:
         return
+    try:  # quem conecta por último assume; a conexão velha (talvez travada) é largada
+        nova, _ = escuta().accept()
+        _largar()
+        nova.setblocking(False)
+        e['conexao'], e['buffer'] = nova, b''
+    except (BlockingIOError, InterruptedError):
+        pass
+    except OSError:
+        pass
     if e['conexao'] is None:
-        try:
-            e['conexao'], _ = escuta().accept()
-            e['conexao'].setblocking(False)
-            e['buffer'] = b''
-        except (BlockingIOError, InterruptedError):
-            return
-        except OSError:
-            return
+        return
     try:
         dados = e['conexao'].recv(1 << 20)
         if not dados:

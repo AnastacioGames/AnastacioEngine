@@ -28,7 +28,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - **Revisão (/code-review) aplicada:** cliente que some ou para de ler não derruba o laço (timeout de envio, limite de linha);
   `ligar()` não deixa estado ligado se falhar; `tela` em modo observar não troca o layout; `fechar` num editor do usuário só
   desliga o controle; operadores que executam código e caminhos fora dos dados do projeto exigem `ANASTACIO_CRIADOR_PY=1`.
-  Limitação conhecida: um PID reaproveitado após queda do editor pode fazer `ligar` recusar até apagar a sessão.
+  Depois: a conexão mais nova assume a vaga (uma conexão travada não prende mais o servidor) e a sessão guarda o nome do
+  executável, então um PID reaproveitado por outro programa é ignorado. Teste com a engine real em
+  `anastacio-docs/tools/criador/teste_editor.py`.
 
 ## 2026-11-22 — Skill `api-anastacio` e API Python fatiada para IA
 
