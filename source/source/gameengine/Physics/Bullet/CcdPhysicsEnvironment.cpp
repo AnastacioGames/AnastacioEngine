@@ -1148,7 +1148,10 @@ static float GameFieldFalloffAt(const PHY_GameField& f, const btVector3& p)
 				rFac = (toCenter - nor * fac).length();
 			}
 			else {
-				rFac = (dist > SIMD_EPSILON) ? btDegrees(acosf(btClamped(fac / dist, -1.0f, 1.0f))) : 0.0f;
+				// Angle against the field's Z axis seen from its origin (blenkernel effect.c uses the full
+				// vector to the origin; with a planar shape "dist" is only the distance to the plane).
+				const float toCenterLen = toCenter.length();
+				rFac = (toCenterLen > SIMD_EPSILON) ? btDegrees(acosf(btClamped(fac / toCenterLen, -1.0f, 1.0f))) : 0.0f;
 			}
 			falloff *= GameFieldFalloff(rFac, f.useMinRad, f.minRad, f.useMaxRad, f.maxRad, f.powerRad);
 		}
@@ -1171,19 +1174,26 @@ void CcdPhysicsEnvironment::ApplyGameFields(float dt)
 		btSoftBody *soft = ctrl->GetSoftBody();
 		if (soft) {
 			btVector3 wind(0.0f, 0.0f, 0.0f);
+			btVector3 pushed(0.0f, 0.0f, 0.0f); // Force fields: a push on the whole body, spread by node mass
 			btVector3 bmin, bmax;
 			soft->getAabb(bmin, bmax);
 			const btVector3 c = (bmin + bmax) * 0.5f;
 			for (const PHY_GameField& f : m_gameFields) {
-				if (f.type == PHY_GameField::FORCE) {
-					continue;
-				}
 				const float fall = GameFieldFalloffAt(f, c);
 				if (fall <= 0.0f) {
 					continue;
 				}
 				const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
-				if (f.type == PHY_GameField::WIND) {
+				if (f.type == PHY_GameField::FORCE) {
+					const btVector3 toCenter = c - btVector3(f.position[0], f.position[1], f.position[2]);
+					const btVector3 toPoint = f.planar ? nor * nor.dot(toCenter) : toCenter;
+					const float dist = toPoint.length();
+					const float strength = f.gravitation ? ((dist < SIMD_EPSILON) ? 0.0f : f.strength / (dist * dist)) : f.strength;
+					if (dist > SIMD_EPSILON) {
+						pushed += (toPoint / dist) * (strength * fall);
+					}
+				}
+				else if (f.type == PHY_GameField::WIND) {
 					wind += nor * (f.strength * fall);
 				}
 				else if (f.type == PHY_GameField::VORTEX) {
@@ -1199,6 +1209,17 @@ void CcdPhysicsEnvironment::ApplyGameFields(float dt)
 					wind += btVector3(GameFieldNoise(q, f.seed), GameFieldNoise(q + btVector3(31.4f, 17.2f, 5.7f), f.seed),
 					                  GameFieldNoise(q + btVector3(-12.3f, 44.1f, 23.9f), f.seed)) * (f.strength * fall);
 				}
+			}
+			const btScalar totalMass = soft->getTotalMass();
+			if (!pushed.fuzzyZero() && totalMass > SIMD_EPSILON) {
+				// Same law as a rigid body: the force accelerates the whole body (a = F / total mass).
+				for (int n = 0; n < soft->m_nodes.size(); n++) {
+					btSoftBody::Node &node = soft->m_nodes[n];
+					if (node.m_im > 0.0f) {
+						node.m_f += pushed * ((1.0f / node.m_im) / totalMass);
+					}
+				}
+				soft->activate();
 			}
 			if (!wind.fuzzyZero()) {
 				soft->setWindVelocity(wind);

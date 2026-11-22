@@ -76,6 +76,10 @@ def make_scene(output):
     _cloth(scene, "Calm", (60.0, 0.0, 10.0))
     _wind(scene, "WindUp", (0.0, 0.0, 6.0), (0.0, 0.0, 0.0), 8.0)
     _wind(scene, "WindDown", (30.0, 0.0, 14.0), (math.radians(180.0), 0.0, 0.0), 8.0)
+    # A point Force below a sheet repels it (the Force field acts on soft bodies too).
+    _cloth(scene, "Repelled", (90.0, 0.0, 10.0))
+    _wind(scene, "Repel", (90.0, 0.0, 6.0), (0.0, 0.0, 0.0), 8.0)
+    scene.objects["Repel"].field.type = "FORCE"
 
     tester = bpy.data.objects.new("Tester", None)
     scene.objects.link(tester)
@@ -114,6 +118,8 @@ def run_runtime():
         _check(results, "wind pushes the sheet along its direction", up > 0.3, "dz %.2f" % up)
         _check(results, "wind hits the other face of the sheet too", down < -0.3, "dz %.2f" % down)
         _check(results, "sheet outside the field stays put", abs(calm) < 0.1, "dz %.2f" % calm)
+        repelled = scene.objects["Repelled"].worldPosition.z - 10.0
+        _check(results, "force field pushes the sheet away from it", repelled > 0.3, "dz %.2f" % repelled)
         failed = [line for line in results if " FAIL " in line]
         results.append("CLOTHWIND: %d checks, %d failed" % (len(results), len(failed)))
         for line in results:
