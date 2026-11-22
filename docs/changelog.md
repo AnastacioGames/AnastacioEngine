@@ -8,6 +8,24 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-22 — Complemento "Controle por IA" (parte B do MCP do criador)
+
+- **Novo addon** `source/release/scripts/addons/anastacio_controle_ia/` (desligado por padrão; o usuário ativa em
+  Preferências > Add-ons). Liga um servidor TCP local (127.0.0.1) neste editor, e o MCP `anastacio-criador`
+  conecta nele sem abrir outro editor.
+- **Começa em "só observar":** a IA lê cena, objeto, operadores, propriedades e tela; operar, definir, clicar,
+  salvar, `py` e fechar são recusados até o usuário clicar em "Liberar edição". Barra superior mostra
+  "IA: observando / pode editar" com botões Liberar/Travar e Desligar. Código Python livre continua só por
+  `ANASTACIO_CRIADOR_PY=1` no ambiente do editor (não há botão).
+- **Sessão** (porta, token, pid) em `%LOCALAPPDATA%\AnastacioEngine\criador\sessao_editor.json` (Linux:
+  `~/.local/state/anastacio-engine/criador/`). Dois editores: o segundo recusa ligar; arquivo de um editor morto é
+  ignorado pelo pid. Recarregar outro arquivo religa o laço com o mesmo token.
+- Fonte única em `anastacio-docs/tools/criador/` (`nucleo_editor.py`, `caminhos.py`, `sessao.py`); este diretório leva
+  uma cópia: `python tools/criador/sincronizar_addon.py <raiz da engine> [--verificar]`.
+- Não mexe em C++. Testado com `AnastacioEngine.exe` real: sessão criada, observar bloqueia `op` e `evento`, liberar
+  permite, `wm.open_mainfile` mantém a conexão, desligar fecha o socket sem derrubar o editor, modo antigo
+  (`--python`) segue igual. **Falta:** aceite visual com janela (botões da barra superior e das Preferências).
+
 ## 2026-11-22 — Skill `api-anastacio` e API Python fatiada para IA
 
 - **Skill** `.claude/skills/api-anastacio/SKILL.md`: manda a IA consultar a referência da API Python por
