@@ -22,14 +22,27 @@ LIMITE_OBJETOS = 500
 # Comandos que só leem (ou gravam cópia de segurança). O resto exige o modo "controle".
 SO_LEITURA = {'ping', 'cena', 'objeto', 'listar', 'descrever', 'ler', 'tela', 'backup'}
 
-CONFIG = {'arquivo_sessao': None, 'observar': False, 'token': None, 'ligado': False}
+CONFIG = {'arquivo_sessao': None, 'observar': False, 'token': None, 'ligado': False, 'dono': 'mcp'}
+LIMITE_LINHA = 8 << 20  # bytes de um pedido sem quebra de linha
+TEMPO_ENVIO = 5.0       # s para entregar uma resposta antes de largar a conexão
+# Operadores que executam código: só com ANASTACIO_CRIADOR_PY=1, igual ao `py`.
+OPS_DE_CODIGO = {'script.python_file_run', 'script.execute_preset', 'script.reload', 'text.run_script',
+                 'text.open', 'wm.addon_install', 'wm.addon_enable', 'wm.addon_refresh', 'wm.addon_remove',
+                 'wm.addon_userpref_show', 'wm.save_userpref', 'wm.read_factory_settings',
+                 'console.execute', 'wm.context_set_value', 'wm.context_set_string',
+                 'wm.context_set_enum', 'wm.context_toggle', 'wm.context_toggle_enum', 'wm.properties_edit',
+                 'wm.properties_add', 'wm.keyconfig_import', 'wm.keyconfig_activate', 'wm.appconfig_activate',
+                 'wm.url_open', 'wm.path_open', 'file.execute', 'wm.app_template_install'}
+# `definir` só mexe em dados do projeto, nunca em preferências do usuário nem em caminhos de scripts.
+PREFIXOS_DEFINIR = ('bpy.data', 'bpy.context.scene', 'bpy.context.object', 'bpy.context.active_object',
+                    'bpy.context.window_manager.addon_search')
 ESTADO = {'escuta': None, 'conexao': None, 'buffer': b''}
 
 class TrocouEditor(Exception):
     """O pedido volta para a fila e roda de novo no próximo tique."""
 
 
-def contexto(editor=None):
+def contexto(editor=None, mudar=True):
     janela = bpy.context.window_manager.windows[0]
     tela = janela.screen
     area = None
@@ -38,6 +51,9 @@ def contexto(editor=None):
     if area is None:
         area = max(tela.areas, key=lambda a: a.width * a.height)
         if editor:
+            if not mudar:
+                raise PermissionError('modo "só observar": não troco o layout do editor; peça a tela de um editor '
+                                      'que já está aberto ou peça ao usuário para liberar a edição')
             area.type = editor
             raise TrocouEditor()
     regiao = next(r for r in area.regions if r.type == 'WINDOW')
@@ -134,6 +150,8 @@ CARREGAM_ARQUIVO = {'wm.open_mainfile', 'wm.revert_mainfile', 'wm.read_homefile'
 
 
 def cmd_op(p):
+    if p['nome'] in OPS_DE_CODIGO and not PY_LIBERADO:
+        raise PermissionError('%s executa código ou mexe em preferências: só com ANASTACIO_CRIADOR_PY=1' % p['nome'])
     op = operador(p['nome'])
     if p['nome'] in CARREGAM_ARQUIVO:
         return {'estado': sorted(op('EXEC_DEFAULT', **p.get('args', {})))}
@@ -150,6 +168,9 @@ def cmd_ler(p):
 
 
 def cmd_definir(p):
+    if not PY_LIBERADO and not p['caminho'].startswith(PREFIXOS_DEFINIR):
+        raise PermissionError('definir só aceita dados do projeto (bpy.data..., bpy.context.scene...); '
+                              'outros caminhos exigem ANASTACIO_CRIADOR_PY=1')
     return texto(caminhos.definir(p['caminho'], p['valor'], bpy))
 
 
@@ -181,7 +202,7 @@ def cmd_salvar(_p):
 
 
 def cmd_tela(p):
-    ctx = so_janela(contexto(p.get('editor')))
+    ctx = so_janela(contexto(p.get('editor'), mudar=not CONFIG['observar']))
     bpy.ops.wm.redraw_timer(ctx, type='DRAW_WIN_SWAP', iterations=1)
     bpy.ops.screen.screenshot(ctx, filepath=p['arquivo'], full=True)
     return p['arquivo']
@@ -196,6 +217,9 @@ def cmd_evento(p):
 
 
 def cmd_fechar(_p):
+    if CONFIG['dono'] != 'mcp':  # editor aberto pelo usuário: só solta a conexão, nunca mata o processo
+        desligar()
+        return 'controle desligado; o editor continua aberto'
     os._exit(0)  # sem wm.quit: não grava quit.blend nem mexe no projeto
 
 
@@ -237,15 +261,20 @@ def conectado():
     return ESTADO['conexao'] is not None
 
 
-def ligar(arquivo_sessao, observar=False):
+def ligar(arquivo_sessao, observar=False, dono='mcp'):
     """Começa a escutar. Recusa se outro editor vivo já usa o arquivo de sessão."""
     if CONFIG['ligado']:
         return
     outro = sessao.ler(arquivo_sessao)
     if outro and outro.get('pid') != os.getpid():
         raise RuntimeError('já há outro editor com o controle por IA ligado (pid %s); desligue lá primeiro' % outro['pid'])
-    CONFIG.update(arquivo_sessao=str(arquivo_sessao), observar=observar, token=secrets.token_hex(16), ligado=True)
-    escuta()
+    CONFIG.update(arquivo_sessao=str(arquivo_sessao), observar=observar, token=secrets.token_hex(16), dono=dono)
+    try:
+        escuta()
+    except Exception:
+        desligar()
+        raise
+    CONFIG['ligado'] = True
 
 
 def desligar():
@@ -263,6 +292,16 @@ def desligar():
     CONFIG['ligado'] = False
 
 
+def _largar():
+    if ESTADO['conexao'] is not None:
+        try:
+            ESTADO['conexao'].close()
+        except OSError:
+            pass
+    ESTADO['conexao'] = None
+    ESTADO['buffer'] = b''
+
+
 def tique():
     e = ESTADO
     if not CONFIG['ligado']:
@@ -272,28 +311,35 @@ def tique():
             e['conexao'], _ = escuta().accept()
             e['conexao'].setblocking(False)
             e['buffer'] = b''
-        except BlockingIOError:
+        except (BlockingIOError, InterruptedError):
+            return
+        except OSError:
             return
     try:
         dados = e['conexao'].recv(1 << 20)
         if not dados:
-            e['conexao'].close()
-            e['conexao'] = None
+            _largar()
             return
         e['buffer'] += dados
     except BlockingIOError:
         pass
     except OSError:
-        e['conexao'] = None
+        _largar()
+        return
+    if len(e['buffer']) > LIMITE_LINHA and b'\n' not in e['buffer']:
+        _largar()
         return
     if b'\n' in e['buffer']:
         linha, resto = e['buffer'].split(b'\n', 1)
-        resposta = atender(linha.decode('utf-8'))
+        resposta = atender(linha.decode('utf-8', 'replace'))
         if resposta is not None and e['conexao'] is not None:
             e['buffer'] = resto
-            e['conexao'].setblocking(True)
-            e['conexao'].sendall((json.dumps(resposta) + '\n').encode('utf-8'))
-            e['conexao'].setblocking(False)
+            try:
+                e['conexao'].settimeout(TEMPO_ENVIO)
+                e['conexao'].sendall((json.dumps(resposta) + '\n').encode('utf-8'))
+                e['conexao'].setblocking(False)
+            except OSError:  # cliente sumiu ou parou de ler: solta a conexão, o laço continua
+                _largar()
 
 
 class ANASTACIO_OT_servidor_criador(bpy.types.Operator):
@@ -312,7 +358,11 @@ class ANASTACIO_OT_servidor_criador(bpy.types.Operator):
             context.window_manager.event_timer_remove(self._timer)
             return {'FINISHED'}
         if evento.type == 'TIMER':
-            tique()
+            try:
+                tique()
+            except Exception:
+                traceback.print_exc()
+                _largar()
         return {'PASS_THROUGH'}
 
 

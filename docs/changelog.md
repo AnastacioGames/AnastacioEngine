@@ -24,7 +24,11 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
   uma cópia: `python tools/criador/sincronizar_addon.py <raiz da engine> [--verificar]`.
 - Não mexe em C++. Testado com `AnastacioEngine.exe` real: sessão criada, observar bloqueia `op` e `evento`, liberar
   permite, `wm.open_mainfile` mantém a conexão, desligar fecha o socket sem derrubar o editor, modo antigo
-  (`--python`) segue igual. **Falta:** aceite visual com janela (botões da barra superior e das Preferências).
+  (`--python`) segue igual. Aceite visual feito em 2026-11-22.
+- **Revisão (/code-review) aplicada:** cliente que some ou para de ler não derruba o laço (timeout de envio, limite de linha);
+  `ligar()` não deixa estado ligado se falhar; `tela` em modo observar não troca o layout; `fechar` num editor do usuário só
+  desliga o controle; operadores que executam código e caminhos fora dos dados do projeto exigem `ANASTACIO_CRIADOR_PY=1`.
+  Limitação conhecida: um PID reaproveitado após queda do editor pode fazer `ligar` recusar até apagar a sessão.
 
 ## 2026-11-22 — Skill `api-anastacio` e API Python fatiada para IA
 

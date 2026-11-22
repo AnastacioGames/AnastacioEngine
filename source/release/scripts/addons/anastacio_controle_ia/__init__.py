@@ -17,8 +17,6 @@ bl_info = {
 
 from . import nucleo_editor as nucleo, sessao  # noqa: E402
 
-_tip = bpy.app.translations.pgettext_tip
-
 
 def _quadro_novo():
     for janela in bpy.context.window_manager.windows:
@@ -37,11 +35,12 @@ class ANASTACIO_OT_ia_ligar(bpy.types.Operator):
             self.report({'INFO'}, 'Controle por IA desligado')
         else:
             try:
-                nucleo.ligar(sessao.sessao_usuario(), observar=True)
+                nucleo.ligar(sessao.sessao_usuario(), observar=True, dono='usuario')
+                nucleo.iniciar_modal()
             except Exception as erro:
+                nucleo.desligar()
                 self.report({'ERROR'}, str(erro))
                 return {'CANCELLED'}
-            nucleo.iniciar_modal()
             self.report({'INFO'}, 'Controle por IA ligado (só observar). Porta %s' % nucleo.porta())
         _quadro_novo()
         return {'FINISHED'}
@@ -122,6 +121,8 @@ def register():
 
 
 def unregister():
+    if _retomar in bpy.app.handlers.scene_update_post:
+        bpy.app.handlers.scene_update_post.remove(_retomar)
     if _religar in bpy.app.handlers.load_post:
         bpy.app.handlers.load_post.remove(_religar)
     bpy.types.INFO_HT_header.remove(_cabecalho)
