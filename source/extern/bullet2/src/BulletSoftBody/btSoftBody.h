@@ -675,6 +675,8 @@ public:
 	btTransform			m_initialWorldTransform;
 
 	btVector3			m_windVelocity;
+	// Optional air velocity per node (same size as m_nodes). Empty = use m_windVelocity for every node.
+	btAlignedObjectArray<btVector3>	m_nodeWindVelocities;
 	
 	btScalar        m_restLengthScale;
 	

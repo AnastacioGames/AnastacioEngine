@@ -80,6 +80,11 @@ def make_scene(output):
     _cloth(scene, "Repelled", (90.0, 0.0, 10.0))
     _wind(scene, "Repel", (90.0, 0.0, 6.0), (0.0, 0.0, 0.0), 8.0)
     scene.objects["Repel"].field.type = "FORCE"
+    # A sheet whose centre is out of reach but whose edge is inside the field: the wind is sampled per node.
+    edge = _cloth(scene, "Edge", (120.0, 0.0, 10.0))
+    reach = max(v.co.x for v in edge.data.vertices)
+    _wind(scene, "WindEdge", (120.0 + reach + 2.0, 0.0, 10.0), (0.0, 0.0, 0.0), 8.0)
+    scene.objects["WindEdge"].field.distance_max = 3.0
 
     tester = bpy.data.objects.new("Tester", None)
     scene.objects.link(tester)
@@ -118,6 +123,8 @@ def run_runtime():
         _check(results, "wind pushes the sheet along its direction", up > 0.3, "dz %.2f" % up)
         _check(results, "wind hits the other face of the sheet too", down < -0.3, "dz %.2f" % down)
         _check(results, "sheet outside the field stays put", abs(calm) < 0.1, "dz %.2f" % calm)
+        edge = scene.objects["Edge"].worldPosition.z - 10.0
+        _check(results, "wind reaching only the edge of a sheet still moves it", edge > 0.15, "dz %.2f" % edge)
         repelled = scene.objects["Repelled"].worldPosition.z - 10.0
         _check(results, "force field pushes the sheet away from it", repelled > 0.3, "dz %.2f" % repelled)
         failed = [line for line in results if " FAIL " in line]

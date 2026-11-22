@@ -1163,6 +1163,40 @@ static float GameFieldFalloffAt(const PHY_GameField& f, const btVector3& p)
 	return GameFieldFalloff(dist, f.useMin, f.minDist, f.useMax, f.maxDist, f.power);
 }
 
+/// Air velocity a soft body node feels at world point p: Wind, Vortex and Turbulence add up (Force fields
+/// push the whole body instead, see ApplyGameFields).
+static btVector3 GameFieldWindAt(const std::vector<PHY_GameField>& fields, const btVector3& p, float time)
+{
+	btVector3 wind(0.0f, 0.0f, 0.0f);
+	for (const PHY_GameField& f : fields) {
+		if (f.type == PHY_GameField::FORCE) {
+			continue;
+		}
+		const float fall = GameFieldFalloffAt(f, p);
+		if (fall <= 0.0f) {
+			continue;
+		}
+		const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
+		if (f.type == PHY_GameField::WIND) {
+			wind += nor * (f.strength * fall);
+		}
+		else if (f.type == PHY_GameField::VORTEX) {
+			const btVector3 radial = p - btVector3(f.position[0], f.position[1], f.position[2]);
+			const btVector3 tangent = nor.cross(radial - nor * nor.dot(radial));
+			if (tangent.length2() > SIMD_EPSILON) {
+				wind += tangent.normalized() * (f.strength * fall);
+			}
+		}
+		else if (f.type == PHY_GameField::TURBULENCE) {
+			const float inv = 1.0f / btMax(f.size, 0.01f);
+			const btVector3 q = p * inv + btVector3(time * 0.7f, time * 0.5f, time * 0.3f);
+			wind += btVector3(GameFieldNoise(q, f.seed), GameFieldNoise(q + btVector3(31.4f, 17.2f, 5.7f), f.seed),
+			                  GameFieldNoise(q + btVector3(-12.3f, 44.1f, 23.9f), f.seed)) * (f.strength * fall);
+		}
+	}
+	return wind;
+}
+
 void CcdPhysicsEnvironment::ApplyGameFields(float dt)
 {
 	m_fieldTime += dt;
@@ -1176,41 +1210,25 @@ void CcdPhysicsEnvironment::ApplyGameFields(float dt)
 		// Strength is the wind speed in m/s; the cloth's kDG/kLF set how strongly it reacts.
 		btSoftBody *soft = ctrl->GetSoftBody();
 		if (soft) {
-			btVector3 wind(0.0f, 0.0f, 0.0f);
 			btVector3 pushed(0.0f, 0.0f, 0.0f); // Force fields: a push on the whole body, spread by node mass
 			btVector3 bmin, bmax;
 			soft->getAabb(bmin, bmax);
 			const btVector3 c = (bmin + bmax) * 0.5f;
 			for (const PHY_GameField& f : m_gameFields) {
+				if (f.type != PHY_GameField::FORCE) {
+					continue;
+				}
 				const float fall = GameFieldFalloffAt(f, c);
 				if (fall <= 0.0f) {
 					continue;
 				}
 				const btVector3 nor(f.zAxis[0], f.zAxis[1], f.zAxis[2]);
-				if (f.type == PHY_GameField::FORCE) {
-					const btVector3 toCenter = c - btVector3(f.position[0], f.position[1], f.position[2]);
-					const btVector3 toPoint = f.planar ? nor * nor.dot(toCenter) : toCenter;
-					const float dist = toPoint.length();
-					const float strength = f.gravitation ? ((dist < SIMD_EPSILON) ? 0.0f : f.strength / (dist * dist)) : f.strength;
-					if (dist > SIMD_EPSILON) {
-						pushed += (toPoint / dist) * (strength * fall);
-					}
-				}
-				else if (f.type == PHY_GameField::WIND) {
-					wind += nor * (f.strength * fall);
-				}
-				else if (f.type == PHY_GameField::VORTEX) {
-					const btVector3 radial = c - btVector3(f.position[0], f.position[1], f.position[2]);
-					const btVector3 tangent = nor.cross(radial - nor * nor.dot(radial));
-					if (tangent.length2() > SIMD_EPSILON) {
-						wind += tangent.normalized() * (f.strength * fall);
-					}
-				}
-				else if (f.type == PHY_GameField::TURBULENCE) {
-					const float inv = 1.0f / btMax(f.size, 0.01f);
-					const btVector3 q = c * inv + btVector3(m_fieldTime * 0.7f, m_fieldTime * 0.5f, m_fieldTime * 0.3f);
-					wind += btVector3(GameFieldNoise(q, f.seed), GameFieldNoise(q + btVector3(31.4f, 17.2f, 5.7f), f.seed),
-					                  GameFieldNoise(q + btVector3(-12.3f, 44.1f, 23.9f), f.seed)) * (f.strength * fall);
+				const btVector3 toCenter = c - btVector3(f.position[0], f.position[1], f.position[2]);
+				const btVector3 toPoint = f.planar ? nor * nor.dot(toCenter) : toCenter;
+				const float dist = toPoint.length();
+				const float strength = f.gravitation ? ((dist < SIMD_EPSILON) ? 0.0f : f.strength / (dist * dist)) : f.strength;
+				if (dist > SIMD_EPSILON) {
+					pushed += (toPoint / dist) * (strength * fall);
 				}
 			}
 			const btScalar totalMass = soft->getTotalMass();
@@ -1224,10 +1242,20 @@ void CcdPhysicsEnvironment::ApplyGameFields(float dt)
 				}
 				soft->activate();
 			}
-			if (!wind.fuzzyZero()) {
-				soft->setWindVelocity(wind);
+			// The wind is sampled at every node, so a cloth half inside a field only feels it where it reaches.
+			soft->m_nodeWindVelocities.resize(soft->m_nodes.size());
+			bool windy = false;
+			for (int n = 0; n < soft->m_nodes.size(); n++) {
+				const btVector3 w = GameFieldWindAt(m_gameFields, soft->m_nodes[n].m_x, m_fieldTime);
+				soft->m_nodeWindVelocities[n] = w;
+				windy = windy || !w.fuzzyZero();
+			}
+			if (windy) {
 				soft->activate();
 				m_windedSoftBodies.push_back(soft);
+			}
+			else {
+				soft->m_nodeWindVelocities.clear();
 			}
 			continue;
 		}
@@ -1320,6 +1348,7 @@ void CcdPhysicsEnvironment::RemoveGameFields()
 	m_appliedFieldForces.clear();
 	for (btSoftBody *soft : m_windedSoftBodies) {
 		soft->setWindVelocity(btVector3(0.0f, 0.0f, 0.0f));
+		soft->m_nodeWindVelocities.clear();
 	}
 	m_windedSoftBodies.clear();
 }

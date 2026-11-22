@@ -18,6 +18,8 @@ subject to the following restrictions:
 #include "BulletSoftBody/btSoftBodySolvers.h"
 #include "btSoftBodyData.h"
 #include "LinearMath/btSerializer.h"
+#include <algorithm>
+#include <vector>
 
 
 //
@@ -1045,6 +1047,50 @@ int				btSoftBody::generateBendingConstraints(int distance,Material* mat)
 {
 	int i,j;
 
+	if(distance==2)
+	{
+		/* Sparse version of the distance 2 case: it only needs the node neighbours, so it avoids the
+		   n*n adjacency matrix below (4 bytes * n*n: 100 MB at 5000 nodes, 1.6 GB at 20000).
+		   Same links, in the same order (by lowest node, then highest). */
+		const int	n=m_nodes.size();
+		btAlignedObjectArray<NodeLinks> nodeLinks;
+		nodeLinks.resize(n);
+		for(int l=0;l<m_links.size();++l)
+		{
+			const int	ia=(int)(m_links[l].m_n[0]-&m_nodes[0]);
+			const int	ib=(int)(m_links[l].m_n[1]-&m_nodes[0]);
+			if(nodeLinks[ia].m_links.findLinearSearch(ib)==nodeLinks[ia].m_links.size())
+				nodeLinks[ia].m_links.push_back(ib);
+			if(nodeLinks[ib].m_links.findLinearSearch(ia)==nodeLinks[ib].m_links.size())
+				nodeLinks[ib].m_links.push_back(ia);
+		}
+		std::vector<unsigned long long>	pairs;
+		for(int a=0;a<n;++a)
+		{
+			for(int jk=0;jk<nodeLinks[a].m_links.size();++jk)
+			{
+				const int	k=nodeLinks[a].m_links[jk];
+				for(int kb=0;kb<nodeLinks[k].m_links.size();++kb)
+				{
+					const int	b=nodeLinks[k].m_links[kb];
+					if(b!=a && nodeLinks[a].m_links.findLinearSearch(b)==nodeLinks[a].m_links.size())
+					{
+						const unsigned long long	lo=(unsigned long long)btMin(a,b);
+						const unsigned long long	hi=(unsigned long long)btMax(a,b);
+						pairs.push_back((lo<<32)|hi);
+					}
+				}
+			}
+		}
+		std::sort(pairs.begin(),pairs.end());
+		pairs.erase(std::unique(pairs.begin(),pairs.end()),pairs.end());
+		for(size_t q=0;q<pairs.size();++q)
+		{
+			appendLink((int)(pairs[q]&0xffffffffu),(int)(pairs[q]>>32),mat);
+			m_links[m_links.size()-1].m_bbending=1;
+		}
+		return((int)pairs.size());
+	}
 	if(distance>1)
 	{
 		/* Build graph	*/ 
@@ -2970,6 +3016,8 @@ void				btSoftBody::applyForces()
 	}
 	/* Per vertex forces			*/ 
 	int i,ni;
+	// Optional air velocity per node (game force fields); when set it replaces the single m_windVelocity.
+	const bool per_node_wind = m_nodeWindVelocities.size()==m_nodes.size();
 
 	for(i=0,ni=m_nodes.size();i<ni;++i)
 	{
@@ -2979,7 +3027,7 @@ void				btSoftBody::applyForces()
 			if(use_medium)
 			{
 				/* Aerodynamics			*/ 
-				addAeroForceToNode(m_windVelocity, i);
+				addAeroForceToNode(per_node_wind ? m_nodeWindVelocities[i] : m_windVelocity, i);
 			}
 			/* Pressure				*/ 
 			if(as_pressure)
@@ -3000,7 +3048,15 @@ void				btSoftBody::applyForces()
 	//	btSoftBody::Face&	f=m_faces[i];
 
 		/* Aerodynamics			*/ 
-		addAeroForceToFace(m_windVelocity, i);	
+		btVector3 face_wind = m_windVelocity;
+		if(per_node_wind)
+		{
+			const btSoftBody::Face&	pf=m_faces[i];
+			face_wind = (m_nodeWindVelocities[(int)(pf.m_n[0]-&m_nodes[0])]+
+			             m_nodeWindVelocities[(int)(pf.m_n[1]-&m_nodes[0])]+
+			             m_nodeWindVelocities[(int)(pf.m_n[2]-&m_nodes[0])])/3;
+		}
+		addAeroForceToFace(face_wind, i);	
 	}
 }
 
