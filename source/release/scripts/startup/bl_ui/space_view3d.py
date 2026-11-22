@@ -1389,6 +1389,23 @@ class INFO_MT_camera_add(Menu):
         layout.operator("object.camera_add", text="Camera", icon='OUTLINER_OB_CAMERA')
 
 
+class INFO_MT_game_force_field_add(Menu):
+    # Only the field types the game engine simulates (KX_Scene::UpdateGameFields).
+    bl_idname = "INFO_MT_game_force_field_add"
+    bl_label = "Force Field"
+
+    def draw(self, context):
+        layout = self.layout
+        layout.operator_context = 'EXEC_REGION_WIN'
+        for ident, label, icon in (
+                ('FORCE', "Force", 'FORCE_FORCE'),
+                ('WIND', "Wind", 'FORCE_WIND'),
+                ('VORTEX', "Vortex", 'FORCE_VORTEX'),
+                ('TURBULENCE', "Turbulence", 'FORCE_TURBULENCE'),
+        ):
+            layout.operator("object.effector_add", text=label, icon=icon).type = ident
+
+
 class INFO_MT_game_constraints_add(Menu):
     bl_idname = "INFO_MT_game_constraints_add"
     bl_label = "Constraints"
@@ -1456,7 +1473,9 @@ class INFO_MT_add(Menu):
 
         if rd != "BLENDER_GAME":
             layout.operator_menu_enum("object.effector_add", "type", text="Force Field", icon='OUTLINER_OB_FORCE_FIELD')
-            layout.separator(factor=1)
+        else:
+            layout.menu("INFO_MT_game_force_field_add", icon='OUTLINER_OB_FORCE_FIELD')
+        layout.separator(factor=1)
 
         if len(bpy.data.groups) > 10:
             layout.operator_context = 'INVOKE_REGION_WIN'
@@ -4969,6 +4988,7 @@ classes = (
     INFO_MT_game_constraints_add,
     INFO_MT_lamp_add,
     INFO_MT_camera_add,
+    INFO_MT_game_force_field_add,
     INFO_MT_add,
     VIEW3D_MT_undo_redo,
     VIEW3D_MT_object_relations,

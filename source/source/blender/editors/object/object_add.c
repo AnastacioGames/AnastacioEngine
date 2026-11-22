@@ -529,6 +529,10 @@ static int effector_add_exec(bContext *C, wmOperator *op)
 	}
 
 	ob->pd = BKE_partdeflect_new(type);
+	/* Game engine: a field added while the Game engine is active acts in the game right away. */
+	if (STREQ(CTX_data_scene(C)->r.engine, RE_engine_id_BLENDER_GAME)) {
+		ob->pd->flag |= PFIELD_GAME;
+	}
 
 	DAG_relations_tag_update(CTX_data_main(C));
 
