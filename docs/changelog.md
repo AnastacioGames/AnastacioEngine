@@ -16,7 +16,9 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 - **No repo `anastacio-docs`** (branch `ccr-7536d00d-qdc44d`): `tools/gerar_api_ia.py` (índice, páginas por
   classe, `busca.json`, guia), `tools/anastacio_api_mcp.py` (servidor MCP) e `inventario/sem_descricao.md`
   (130 de 2196 itens sem frase de descrição).
-- Não mexe em código C++; nada a compilar. O MCP foi testado com cliente de teste, não num Claude Code real.
+- Não mexe em código C++; nada a compilar. **Não verificado:** o MCP foi testado só com um cliente de teste em
+  stdio, não num Claude Code real; o skill trata o MCP como primeira opção com queda para a versão publicada.
+  O site publicado (`api-ia/`) depende do deploy do `anastacio-docs` (PR #2 já no `main`).
 
 ## 2026-11-20 — Convert to Mesh não tira mais o objeto do jogo
 

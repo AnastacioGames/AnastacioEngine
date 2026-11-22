@@ -11,7 +11,7 @@ A referência completa tem ~450 KB. **Não carregue o arquivo inteiro.** Use a v
 
 ## Onde consultar (nesta ordem)
 
-1. **Ferramentas MCP `anastacio-api`**, se estiverem disponíveis (`api_guia`, `api_indice`, `api_buscar`, `api_pagina`, `api_item`).
+1. **Ferramentas MCP `anastacio-api`**, se estiverem disponíveis (`api_guia`, `api_indice`, `api_buscar`, `api_pagina`, `api_item`). *Ainda não verificado num Claude Code real* (só testado com um cliente de teste): se uma chamada falhar ou os nomes das ferramentas forem outros, passe para o próximo item.
 2. **Versão fatiada publicada**: `https://anastaciogames.github.io/anastacio-docs/api-ia/pt/` com `INDEX.md`, `GUIA.md`, `busca.json` e `paginas/<Classe>.md`. Busque com WebFetch (ou curl).
 3. **Repositório `anastacio-docs`**, se estiver clonado: `site/public/api-ia/pt/`.
 4. **Sem doc acessível**: leia os bindings no C++ (`source/source/gameengine/**/*.cpp`, tabelas `PyMethodDef X::Methods[]` e `PyAttributeDef X::Attributes[]`) e diga ao usuário que não conferiu na referência.
@@ -22,7 +22,7 @@ A referência completa tem ~450 KB. **Não carregue o arquivo inteiro.** Use a v
 2. Procure cada nome que vai usar (`api_buscar` ou `busca.json`). Só use o que aparecer.
 3. Abra a página da classe só para o que precisa. Páginas grandes (`KX_GameObject`, `Range.logic`, `Range.texture`) têm partes `--props`, `--funcs`, `--consts`.
 4. Itens marcados *(novo na Anastacio)* ou *(alterado na Anastacio)* não existiam no UPBGE: leia a descrição, não suponha o comportamento.
-5. Se o nome não existe, diga isso e proponha a alternativa que existe. Não crie um nome parecido.
+5. Só diga que um nome "não existe" depois de conferir na referência **ou**, se ela estiver inacessível, nos bindings do C++ (item 4 acima). Sem nenhuma das duas conferências, diga que não conseguiu verificar e não rejeite o nome. Se confirmado que não existe, proponha a alternativa que existe e não crie um nome parecido.
 
 ## Instalar o MCP (uma vez por máquina)
 
@@ -36,7 +36,7 @@ Para ler a doc publicada em vez da pasta local, acrescente `--fonte https://anas
 
 ## Se você está adicionando ou mudando a API Python da engine
 
-A regra "cascata de propriedade nova" do `AGENTS.md` inclui o inventário da API. No repo `anastacio-docs`:
+A regra "cascata de propriedade nova" do `AGENTS.md` continua valendo: **neste repo, rode `python tools/check_cascata.py` antes do commit** (ele não regenera a doc externa). A regeneração abaixo é um passo separado, no repo `anastacio-docs`, para a IA não ficar com a referência desatualizada:
 
 ```
 python tools/api_inventario.py --engine <caminho da engine>
