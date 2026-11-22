@@ -125,6 +125,14 @@ def validate_export_desktop(package_dir: Path) -> None:
         print(f"Launcher do jogo copiado de {modelo}")
 
 
+def validate_controle_ia(package_dir: Path) -> None:
+    """The opt-in "Controle por IA" addon (MCP do criador) must travel with the package."""
+    pasta = package_dir / "2.79" / "scripts" / "addons" / "anastacio_controle_ia"
+    faltam = [n for n in ("__init__.py", "nucleo_editor.py", "caminhos.py", "sessao.py") if not (pasta / n).is_file()]
+    if faltam:
+        raise RuntimeError("Pacote incompleto: addon anastacio_controle_ia sem " + ", ".join(faltam))
+
+
 def validate_ragdoll_scripts(package_dir: Path) -> None:
     """Ensure the bundled Anastacio Ragdoll addon and runtime travel together."""
     scripts = package_dir / "2.79" / "scripts"
@@ -203,6 +211,7 @@ def main() -> None:
         validate_startup_scripts(staging_dir)
         validate_export_desktop(staging_dir)
         validate_ragdoll_scripts(staging_dir)
+        validate_controle_ia(staging_dir)
     except (OSError, SyntaxError, ValueError, RuntimeError) as ex:
         raise SystemExit(f"ERRO: {ex}")
     if zip_path.exists():
