@@ -8,6 +8,16 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-22 — Skill `api-anastacio` e API Python fatiada para IA
+
+- **Skill** `.claude/skills/api-anastacio/SKILL.md`: manda a IA consultar a referência da API Python por
+  páginas pequenas (MCP `anastacio-api`, versão publicada ou `anastacio-docs`) em vez de escrever nomes de
+  memória ou carregar o arquivo único de ~450 KB.
+- **No repo `anastacio-docs`** (branch `ccr-7536d00d-qdc44d`): `tools/gerar_api_ia.py` (índice, páginas por
+  classe, `busca.json`, guia), `tools/anastacio_api_mcp.py` (servidor MCP) e `inventario/sem_descricao.md`
+  (130 de 2196 itens sem frase de descrição).
+- Não mexe em código C++; nada a compilar. O MCP foi testado com cliente de teste, não num Claude Code real.
+
 ## 2026-11-20 — Convert to Mesh não tira mais o objeto do jogo
 
 - **Bug:** texto (FONT) ou curva/Bézier convertidos com Object > Convert to Mesh apareciam na 3D View
