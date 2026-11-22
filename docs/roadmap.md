@@ -7,13 +7,14 @@ Ao concluir um item, apague-o daqui e registre no changelog.
 
 ## IA para criadores de jogos (MCP)
 
-Fora da engine, no repo `anastacio-docs` (PR do MCP e do skill ainda não no `main`; branch `ccr-7536d00d-qdc44d`):
+Fora da engine, no repo `anastacio-docs` (já no `main`):
 MCP `anastacio-api` (referência da API fatiada, já publicada), MCP `anastacio-criador` (editor e jogo, modo A:
 o MCP abre o editor com janela visível) e o skill `criar-jogo-anastacio`. O skill `api-anastacio` deste repo
 usa o primeiro.
 
-- **Pendente de teste com a engine instalada:** lista em `anastacio-docs/docs/testes-pendentes.md`. O MCP foi
-  testado só contra um editor falso; `servidor_editor.py` nunca rodou dentro do editor.
+- **Testado com a engine instalada (2026-11-22):** lista em `anastacio-docs/docs/testes-pendentes.md`. Faltam
+  recarregar outro `.range` pela interface (`wm.open_mainfile` via `op_executar` derruba o editor, bug de contexto
+  em `armature_undosys_poll`) e os dois skills em sessão nova.
 - **Adiado, exige mudar a engine:** modo B (a IA conecta no editor que o usuário já abriu, por um complemento
   "Ativar controle por IA", desligado por padrão). Não fazer sem decisão. Assistente de IA dentro do editor:
   descartado por ora.

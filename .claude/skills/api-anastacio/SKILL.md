@@ -11,7 +11,7 @@ A referência completa tem ~450 KB. **Não carregue o arquivo inteiro.** Use a v
 
 ## Onde consultar (nesta ordem)
 
-1. **Ferramentas MCP `anastacio-api`**, se estiverem disponíveis (`api_guia`, `api_indice`, `api_buscar`, `api_pagina`, `api_item`). *Ainda não verificado num Claude Code real* (só testado com um cliente de teste): se uma chamada falhar ou os nomes das ferramentas forem outros, passe para o próximo item.
+1. **Ferramentas MCP `anastacio-api`**, se estiverem disponíveis (`api_guia`, `api_indice`, `api_buscar`, `api_pagina`, `api_item`). Verificado num Claude Code real em 2026-11-22 (as cinco ferramentas respondem, inclusive lendo a doc publicada com `--fonte`). Se uma chamada falhar ou os nomes das ferramentas forem outros, passe para o próximo item.
 2. **Versão fatiada publicada**: `https://anastaciogames.github.io/anastacio-docs/api-ia/pt/` com `INDEX.md`, `GUIA.md`, `busca.json` e `paginas/<Classe>.md`. Busque com WebFetch (ou curl).
 3. **Repositório `anastacio-docs`**, se estiver clonado: `site/public/api-ia/pt/`.
 4. **Sem doc acessível**: leia os bindings no C++ (`source/source/gameengine/**/*.cpp`, tabelas `PyMethodDef X::Methods[]` e `PyAttributeDef X::Attributes[]`) e diga ao usuário que não conferiu na referência.
