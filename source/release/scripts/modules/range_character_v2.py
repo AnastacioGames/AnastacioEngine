@@ -2637,3 +2637,101 @@ def add_skirt_bones(arm, dress, sectors=SKIRT_SECTORS, links=SKIRT_LINKS, report
         count += 1
     report("saia: %d ossos, %d vértices da roupa movidos para a barra" % (len(names), count))
     return {"ossos": names, "vertices": count}
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# Rabo de cavalo / trança: corrente de ossos filha do Head, movida por script (mola) no jogo
+# ---------------------------------------------------------------------------------------------------------------------
+TAIL_LINKS = 3
+TAIL_BEHIND = 0.035        # m atrás do fundo do crânio: o que passa disso no cabelo é o rabo (a calota do cabelo fica antes)
+TAIL_ROOT_BLEND = 0.04     # m abaixo do alto do rabo: o cabelo se solta da cabeça aos poucos
+TAIL_PREFIX = "Tail"
+TAIL_Y_BLEND = 0.03        # m: o cabelo só se solta por inteiro 3 cm além do corte (fios da nuca ficam quase na cabeça)
+
+
+def tail_bone_names(links=TAIL_LINKS):
+    return ["%s%d" % (TAIL_PREFIX, k + 1) for k in range(links)]
+
+
+def add_ponytail_bones(arm, hair, skin, links=TAIL_LINKS, report=print, braid=False):
+    """Acha o rabo no cabelo (vértices bem atrás do crânio), põe `links` ossos Tail1..N em cadeia (filhos do Head, de
+    cima para baixo pelo centro do rabo em cada altura) e passa os pesos do rabo para eles. O resto do cabelo continua
+    100 % Head. Eixos do osso: Y ao longo do rabo, Z para a frente, X para o lado (girar X = balançar para frente/trás,
+    girar Z = para o lado)."""
+    head_b = arm.data.bones[HEAD_BONE]
+    back = min(v.co.y for v in skin.data.vertices if v.co.z > head_b.head_local.z + 0.06 and abs(v.co.x) < 0.08)
+    cut = back - TAIL_BEHIND
+    if braid:   # trança colada na nuca: tudo abaixo da calota do cabelo e atrás do eixo da cabeça
+        z_cap = head_b.head_local.z + 0.13
+        tail = [v for v in hair.data.vertices if v.co.z < z_cap and v.co.y < head_b.head_local.y - 0.015]
+    else:
+        tail = [v for v in hair.data.vertices if v.co.y < cut and v.co.z < head_b.tail_local.z - 0.02]
+    if len(tail) < 12:
+        report("rabo: nenhum rabo achado (%d vértices atrás de y=%.3f)" % (len(tail), cut))
+        return {"ossos": [], "vertices": 0}
+    top = max(v.co.z for v in tail)
+    bot = min(v.co.z for v in tail)
+    span = top - bot
+    knots = []
+    for j in range(links + 1):
+        z = top - span * j / links
+        near = [v.co for v in tail if abs(v.co.z - z) <= span / links * 0.6] or [min(tail, key=lambda v: abs(v.co.z - z)).co]
+        knots.append(Vector((sum(p.x for p in near) / len(near), sum(p.y for p in near) / len(near), z)))
+    bpy.context.scene.objects.active = arm
+    bpy.ops.object.mode_set(mode='EDIT')
+    eb = arm.data.edit_bones
+    prev = eb[HEAD_BONE]
+    names = tail_bone_names(links)
+    for j, n in enumerate(names):
+        b = eb.new(n)
+        b.head, b.tail = knots[j].copy(), knots[j + 1].copy()
+        b.align_roll(Vector((0.0, 1.0, 0.0)))
+        b.parent = prev
+        b.use_connect = False
+        b.use_deform = True
+        prev = b
+    bpy.ops.object.mode_set(mode='OBJECT')
+    for n in names:
+        if n not in hair.vertex_groups:
+            hair.vertex_groups.new(n)
+    gidx = {n: hair.vertex_groups[n].index for n in names}
+    count = 0
+    for v in tail:
+        u = (top - v.co.z) / span                       # 0 no alto do rabo, 1 na ponta
+        s = _smoothstep(0.0, TAIL_ROOT_BLEND / span, top - v.co.z) * (1.0 if braid else _smoothstep(cut, cut - TAIL_Y_BLEND, v.co.y))   # 0 = Head, 1 = solto
+        old = [(g.group, g.weight) for g in v.groups]
+        for gi, w in old:
+            hair.vertex_groups[gi].add([v.index], w * (1.0 - s), 'REPLACE')
+        lw = [max(0.0, 1.0 - abs(u * links - (j + 0.5))) for j in range(links)]
+        lt = sum(lw) or 1.0
+        for j in range(links):
+            w = s * lw[j] / lt
+            if w > 0.001:
+                hair.vertex_groups[gidx[names[j]]].add([v.index], w, 'REPLACE')
+        count += 1
+    report("rabo: %d ossos, %d vértices (do alto z=%.3f à ponta z=%.3f)" % (len(names), count, top, bot))
+    return {"ossos": names, "vertices": count, "alto": top, "ponta": bot}
+
+
+def merge_toes_into_feet(arm, report=print):
+    """Junta os pesos de LeftToeBase/RightToeBase no pé (Foot) e apaga esses grupos de todas as malhas: libera 2 dos
+    64 grupos do GPU skinning para os ossos da saia/rabo (os dedos do pé ficam dentro da bota)."""
+    n = 0
+    for o in bpy.data.objects:
+        if o.type != 'MESH' or not any(m.type == 'ARMATURE' for m in o.modifiers):
+            continue
+        for lado in ("Left", "Right"):
+            toe = o.vertex_groups.get("mixamorig:%sToeBase" % lado)
+            foot = o.vertex_groups.get("mixamorig:%sFoot" % lado)
+            if toe is None:
+                continue
+            if foot is None:
+                foot = o.vertex_groups.new("mixamorig:%sFoot" % lado)
+            for v in o.data.vertices:
+                w = _weight(o, v, toe.name)
+                if w > 0.0:
+                    foot.add([v.index], w + _weight(o, v, foot.name), 'REPLACE')
+                    n += 1
+            o.vertex_groups.remove(toe)
+    report("dedos do pé fundidos nos pés (%d vértices)" % n)
+    return n

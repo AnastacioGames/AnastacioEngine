@@ -108,12 +108,29 @@ def etapa_saia(args):
     return info
 
 
+def etapa_rabo(args):
+    """-- rabo <pasta_de_trabalho> [--elos 3] [--fundir-dedos]: opcional (rabo de cavalo/trança), abre 05_saia.range (ou 05_maos.range) e grava
+    05_rabo.range com os ossos Tail1..3; o atlas abre este arquivo se ele existir."""
+    import bpy
+    out_dir = args[0]
+    _abrir(out_dir, "05_saia", "05_maos")
+    scene = bpy.context.scene
+    arm = next(o for o in scene.objects if o.type == 'ARMATURE')
+    elos = int(args[args.index("--elos") + 1]) if "--elos" in args else v2.TAIL_LINKS
+    info = v2.add_ponytail_bones(arm, bpy.data.objects["Hair"], bpy.data.objects["Body"], links=elos,
+                                 report=lambda *a: None, braid="--tranca" in args)
+    if "--fundir-dedos" in args:   # corpo com saia + rabo passa de 64 grupos sem isto
+        info["dedos_pe"] = v2.merge_toes_into_feet(arm, report=lambda *a: None)
+    info["arquivo"] = v2.save_checkpoint(out_dir, "05_rabo")
+    return info
+
+
 def etapa_atlas(args):
     """-- atlas <pasta_de_trabalho> [Nome]: abre 05_maos.range, grava 06_atlas.range + textures/ + render."""
     import bpy
     out_dir = args[0]
     name = args[1] if len(args) > 1 else os.path.basename(os.path.normpath(out_dir))
-    _abrir(out_dir, "05_saia", "05_maos")
+    _abrir(out_dir, "05_rabo", "05_saia", "05_maos")
     scene = bpy.context.scene
     pieces = [o for o in scene.objects if o.type == 'MESH']
     body, info = v2.atlas_body(pieces, os.path.join(out_dir, "textures"), "Group" + name)
@@ -226,7 +243,7 @@ def etapa_corpo(args):
 
 
 ETAPAS = {"importar": etapa_importar, "esqueleto": etapa_esqueleto, "pesos": etapa_pesos,
-          "cabeca": etapa_cabeca, "maos": etapa_maos, "saia": etapa_saia, "atlas": etapa_atlas, "lod": etapa_lod,
+          "cabeca": etapa_cabeca, "maos": etapa_maos, "saia": etapa_saia, "rabo": etapa_rabo, "atlas": etapa_atlas, "lod": etapa_lod,
           "impostor": etapa_impostor, "fechar": etapa_fechar, "corpo": etapa_corpo}
 
 
