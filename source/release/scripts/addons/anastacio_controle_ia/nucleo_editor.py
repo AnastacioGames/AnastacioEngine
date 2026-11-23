@@ -34,6 +34,20 @@ OPS_DE_CODIGO = {'script.python_file_run', 'script.execute_preset', 'script.relo
                  'wm.context_set_enum', 'wm.context_toggle', 'wm.context_toggle_enum', 'wm.properties_edit',
                  'wm.properties_add', 'wm.keyconfig_import', 'wm.keyconfig_activate', 'wm.appconfig_activate',
                  'wm.url_open', 'wm.path_open', 'file.execute', 'wm.app_template_install'}
+# Operadores que gravam arquivos em caminhos escolhidos por quem chama (o projeto, exportações, imagens):
+# só com ANASTACIO_CRIADOR_PY=1. Salvar o projeto é do `projeto_salvar`, que grava no arquivo dele.
+OPS_GRAVAM_ARQUIVO = {'wm.save_as_mainfile', 'wm.save_mainfile', 'wm.save_homefile', 'wm.collada_export',
+                      'image.save', 'image.save_as', 'image.save_dirty', 'image.save_sequence', 'render.render',
+                      'render.opengl', 'wm.link', 'wm.append', 'wm.link_append', 'wm.copy_prev_settings',
+                      'sound.mixdown', 'screen.screenshot', 'screen.screencast', 'object.bake_image',
+                      'wm.alembic_export', 'wm.usd_export', 'text.save', 'text.save_as'}
+PREFIXOS_GRAVAM = ('export_', 'wm.save', 'image.save', 'wm.alembic', 'wm.usd')
+
+
+def grava_arquivo(nome):
+    return nome in OPS_GRAVAM_ARQUIVO or nome.startswith(PREFIXOS_GRAVAM)
+
+
 # Operadores do editor de texto agem no texto ATIVO (que pode ser um script do usuário): nunca por `op`.
 OPS_TEXTO_ATIVO = {'text.insert', 'text.paste', 'text.cut', 'text.delete', 'text.line_break', 'text.comment',
                    'text.uncomment', 'text.indent', 'text.unindent', 'text.convert_whitespace', 'text.replace',
@@ -231,6 +245,9 @@ def cmd_op(p):
     if p['nome'] in OPS_TEXTO_ATIVO:
         raise PermissionError('%s edita o texto ativo do editor (pode ser um script do usuário). '
                               'Use script_gravar para criar ou trocar o conteúdo de um script pelo nome' % p['nome'])
+    if grava_arquivo(p['nome']) and not PY_LIBERADO:
+        raise PermissionError('%s grava arquivos em caminhos livres: só com ANASTACIO_CRIADOR_PY=1 '
+                              '(para salvar o projeto use projeto_salvar)' % p['nome'])
     if p['nome'] in OPS_DE_CODIGO and not PY_LIBERADO:
         raise PermissionError('%s executa código ou mexe em preferências: só com ANASTACIO_CRIADOR_PY=1' % p['nome'])
     op = operador(p['nome'])
