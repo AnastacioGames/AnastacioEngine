@@ -672,6 +672,8 @@ def _slot_image(obj, kind):
 
 def _atlas_layout(keys, size):
     """keys = [(image, peça)] na ordem de prioridade. Retorna {image: (x, y, lado)} em pixels."""
+    if len(keys) == 1:   # personagem de peça única (Mixamo direto): ocupa o atlas inteiro
+        return {keys[0][0]: (0, 0, size)}
     q = size // 2
     cell = size // 4
     big = [k for k in keys if k[1] in BIG_PIECES][:1]

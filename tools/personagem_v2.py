@@ -33,6 +33,49 @@ def etapa_importar(args):
     return info
 
 
+def etapa_importar_mixamo(args):
+    """-- importar_mixamo <piloto.fbx> <pasta_de_trabalho> [esqueleto]: personagem direto do Mixamo (sem Fuse).
+    Extrai as texturas embutidas do FBX para <pasta>/00_original/textures (se ainda não estiverem lá), guarda o
+    FBX em 00_original e grava 01_importado.range como se fosse a saída da etapa importar. Daí em diante é igual."""
+    import re
+    import struct
+    fbx, out_dir = args[0], args[1]
+    skeleton = args[2] if len(args) > 2 else v2.DEFAULT_SKELETON
+    orig = os.path.join(out_dir, "00_original")
+    tex_dir = os.path.join(orig, "textures")
+    os.makedirs(tex_dir, exist_ok=True)
+    dst = os.path.join(orig, os.path.basename(fbx))
+    if not os.path.isfile(dst):
+        import shutil
+        shutil.copy2(fbx, dst)
+    data = open(dst, "rb").read()
+    names = ["Diffuse", "Specular", "Glossiness", "Normal"]   # ordem em que o Mixamo embute
+    prefix = None
+    for m in re.finditer(rb"(\w+)_1001_Diffuse\.png", data):
+        prefix = m.group(1).decode()
+        break
+    if prefix is None:
+        raise ValueError("FBX sem textura embutida reconhecível (<nome>_1001_Diffuse.png)")
+    # nomes na ordem real dos PNGs embutidos: o último "<prefix>_1001_<Tipo>.png" antes de cada assinatura PNG
+    for i, m in enumerate(re.finditer(b"\x89PNG\r\n\x1a\n", data)):
+        s, p = m.start(), m.start() + 8
+        while True:
+            ln, = struct.unpack(">I", data[p:p + 4])
+            typ = data[p + 4:p + 8]
+            p += 12 + ln
+            if typ == b"IEND":
+                break
+        kind = re.findall(rb"_1001_(\w+)\.png", data[max(0, s - 400):s])
+        kind = kind[-1].decode() if kind else names[i]
+        f = os.path.join(tex_dir, "%s_%s.png" % (prefix, kind))
+        if not os.path.isfile(f):
+            open(f, "wb").write(data[s:p])
+    pieces, info = v2.import_mixamo(dst, tex_dir, prefix + "_1001", skeleton)
+    info["arquivo"] = v2.save_checkpoint(out_dir, "01_importado")
+    info["render"] = v2.render_check(os.path.join(out_dir, "01_importado.png"), pieces)
+    return info
+
+
 def etapa_esqueleto(args):
     """-- esqueleto <pasta_de_trabalho> [esqueleto]: abre 01_importado.range, grava 02_esqueleto.range."""
     import bpy
@@ -242,7 +285,7 @@ def etapa_corpo(args):
     return info
 
 
-ETAPAS = {"importar": etapa_importar, "esqueleto": etapa_esqueleto, "pesos": etapa_pesos,
+ETAPAS = {"importar": etapa_importar, "importar_mixamo": etapa_importar_mixamo, "esqueleto": etapa_esqueleto, "pesos": etapa_pesos,
           "cabeca": etapa_cabeca, "maos": etapa_maos, "saia": etapa_saia, "rabo": etapa_rabo, "atlas": etapa_atlas, "lod": etapa_lod,
           "impostor": etapa_impostor, "fechar": etapa_fechar, "corpo": etapa_corpo}
 

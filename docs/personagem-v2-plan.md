@@ -63,6 +63,20 @@ Ordem nova: `importar`, `esqueleto`, `pesos`, `cabeca`, `maos`, `atlas`, `lod`, 
   (`Enzo/16_pescoco_virado_*.png`). A versão cortada antiga está em `Enzo_cabeca_cortada/`, e o instalado anterior em
   `_backup/GroupEnzo_cabeca_cortada_manual`.
 
+### Início alternativo: personagem direto do Mixamo, sem Fuse (2026-11-23, Piloto)
+
+Troca só a etapa 1; as etapas 2 a 9 são as mesmas (sem `cabeca --cortar`, sem impostor).
+`E importar_mixamo "<...>\piloto.fbx" P` (P = `6 - Personagem v2\<Nome>`):
+- guarda o FBX em `P\00_original\` e extrai os PNGs embutidos (Diffuse/Normal/Specular/Glossiness, 4096²) em
+  `00_original\textures\`: essa pasta é a versão pesada, nada nas etapas seguintes a sobrescreve (os `01_` a `06_` também ficam);
+- joga fora o rig e os pesos do Mixamo (o v2 refaz esqueleto e pesos pela biblioteca, igual aos do Fuse), junta as malhas
+  numa peça só `Body` e põe de pé, em metros, frente +Y, altura da base (o topo do capacete/cabeça = fim do osso Head,
+  então a altura bate; cabelo/chapéu na mesma malha entram na medida);
+- material novo com as texturas extraídas. Como a peça é única, `_atlas_layout` dá a ela o atlas 2048 inteiro (com várias
+  peças o corpo ganha só 1/4). Gloss/specular não entram no atlas (igual aos pilotos do Fuse).
+Piloto (macacão + capacete, 49 867 tris, 4 PNGs 4K = 145 MB na pasta): nível 0 21 472, LOD 4000/1500, corpo + 1ª pessoa
+9047 + 12 425, pacote final 25 MB (DDS). Conferir como no Enzo: `02_maos.png`, `03_maos_*`, `05_maos_*`, `07_*`, `09_card_foto`.
+
 ### Receita rápida (Enzo finalizado em 2026-11-17; ver a mudança acima)
 
 Tudo em background, uma etapa por vez, conferindo a imagem `NN_*.png` de cada uma (detalhes nas seções abaixo).

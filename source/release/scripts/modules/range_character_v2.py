@@ -196,6 +196,95 @@ def import_fuse(obj_path, skeleton=DEFAULT_SKELETON, report=print):
     return pieces, info
 
 
+def mixamo_material(name, tex_dir, prefix):
+    """Material no formato do jogo a partir dos PNGs extraídos do FBX do Mixamo (<prefix>_Diffuse/Normal/
+    Specular/Glossiness.png): opaco, normal map de verdade, especular pelo mapa e dureza pelo gloss."""
+    def load(kind):
+        f = os.path.join(tex_dir, "%s_%s.png" % (prefix, kind))
+        return bpy.data.images.load(f, check_existing=True) if os.path.isfile(f) else None
+    diffuse, normal, specular, gloss = load("Diffuse"), load("Normal"), load("Specular"), load("Glossiness")
+    new = bpy.data.materials.new(name)
+    if diffuse:
+        _add_slot(new, name + "_diffuse", diffuse, use_map_color_diffuse=True)
+    if normal:
+        normal.colorspace_settings.name = 'Non-Color'
+        _add_slot(new, name + "_normal", normal, use_map_normal=True, normal_factor=1.0,
+                  normal_map_space='TANGENT', tex_use_normal_map=True)
+    if specular:
+        specular.colorspace_settings.name = 'Non-Color'
+        _add_slot(new, name + "_specular", specular, use_map_specular=True, specular_factor=0.2)
+    if gloss:
+        gloss.colorspace_settings.name = 'Non-Color'
+        _add_slot(new, name + "_gloss", gloss, use_map_hardness=True, hardness_factor=0.5)
+    new.diffuse_color = (1.0, 1.0, 1.0)
+    new.diffuse_intensity = 1.0
+    new.specular_color = (1.0, 1.0, 1.0)
+    new.specular_intensity = 0.2
+    new.specular_hardness = 40
+    new.diffuse_metallic_bsdf = new.specular_metallic_bsdf = 0.0
+    new.use_transparency = False
+    new.alpha = 1.0
+    new.game_settings.alpha_blend = 'OPAQUE'
+    return new
+
+
+def import_mixamo(fbx_path, tex_dir, tex_prefix, skeleton=DEFAULT_SKELETON, report=print):
+    """Etapa 1 para personagem que vem direto do Mixamo (sem Fuse): FBX com malha única + esqueleto + pesos.
+    Joga fora o rig e os grupos de vértice do Mixamo (o v2 refaz esqueleto e pesos, igual aos do Fuse; o FBX
+    original fica guardado em 00_original), põe a malha de pé, em metros, frente +Y, altura da base, material
+    novo com as texturas extraídas do FBX. A malha vira a peça "Body". Retorna (peças, info)."""
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    scene = bpy.context.scene
+    scene.world = autorig.default_world()
+    arm0, proxy = autorig.load_library_base(_skeleton_folder(skeleton))
+    before = set(scene.objects)
+    bpy.ops.import_scene.fbx(filepath=fbx_path)
+    new = [o for o in scene.objects if o not in before]
+    meshes = [o for o in new if o.type == 'MESH']
+    if not meshes:
+        raise ValueError("FBX sem malha: %s" % fbx_path)
+    info = {"ossos_mixamo": sum(len(o.data.bones) for o in new if o.type == 'ARMATURE'),
+            "malhas_fbx": {o.name: autorig._tris(o) for o in meshes}}
+    scene.update()
+    for o in meshes:
+        for m in [m for m in o.modifiers if m.type == 'ARMATURE']:
+            o.modifiers.remove(m)
+        mw = o.matrix_world.copy()
+        o.parent = None
+        o.matrix_world = mw
+        o.vertex_groups.clear()
+    for o in new:
+        if o.type != 'MESH':
+            bpy.data.objects.remove(o, do_unlink=True)
+    for a in list(bpy.data.actions):
+        bpy.data.actions.remove(a)
+    # uma peça só (várias malhas são juntas), com o nome que o pipeline espera
+    if len(meshes) > 1:
+        bpy.ops.object.select_all(action='DESELECT')
+        for o in meshes:
+            o.select = True
+        scene.objects.active = meshes[0]
+        bpy.ops.object.join()
+        meshes = [scene.objects.active]
+    body = meshes[0]
+    body.name = body.data.name = "Body"
+    mat = mixamo_material("Body", tex_dir, tex_prefix)
+    body.data.materials.clear()
+    body.data.materials.append(mat)
+    for p in body.data.polygons:
+        p.material_index = 0
+    for mat0 in [m for m in bpy.data.materials if m.users == 0]:
+        bpy.data.materials.remove(mat0)
+    scene.update()
+    info.update(autorig.align_to_base([body], arm0, report=report))
+    info["frente_depois"] = autorig.mesh_front([body])[0]
+    bpy.data.objects.remove(proxy, do_unlink=True)
+    bpy.data.objects.remove(arm0, do_unlink=True)
+    info["pecas"] = {body.name: autorig._tris(body)}
+    info["esqueleto"] = skeleton
+    return [body], info
+
+
 def _skeleton_folder(skeleton):
     if os.path.isdir(skeleton):
         return skeleton
