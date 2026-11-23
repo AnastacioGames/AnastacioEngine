@@ -37,11 +37,11 @@ OPS_DE_CODIGO = {'script.python_file_run', 'script.execute_preset', 'script.relo
 # Operadores que gravam arquivos em caminhos escolhidos por quem chama (o projeto, exportações, imagens):
 # só com ANASTACIO_CRIADOR_PY=1. Salvar o projeto é do `projeto_salvar`, que grava no arquivo dele.
 OPS_GRAVAM_ARQUIVO = {'wm.save_as_mainfile', 'wm.save_mainfile', 'wm.save_homefile', 'wm.collada_export',
-                      'image.save', 'image.save_as', 'image.save_dirty', 'image.save_sequence', 'render.render',
-                      'render.opengl', 'wm.link', 'wm.append', 'wm.link_append', 'wm.copy_prev_settings',
+                      'image.save', 'image.save_as', 'image.save_dirty', 'image.save_sequence',
+                      'file.unpack_all', 'file.unpack_item', 'file.unpack_libraries', 'wm.copy_prev_settings',
                       'sound.mixdown', 'screen.screenshot', 'screen.screencast', 'object.bake_image',
                       'wm.alembic_export', 'wm.usd_export', 'text.save', 'text.save_as'}
-PREFIXOS_GRAVAM = ('export_', 'wm.save', 'image.save', 'wm.alembic', 'wm.usd')
+PREFIXOS_GRAVAM = ('export_', 'wm.save', 'image.save', 'wm.alembic', 'wm.usd', 'file.unpack')
 
 
 def grava_arquivo(nome):
