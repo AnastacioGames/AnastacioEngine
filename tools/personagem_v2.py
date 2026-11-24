@@ -33,31 +33,13 @@ def etapa_importar(args):
     return info
 
 
-def etapa_importar_mixamo(args):
-    """-- importar_mixamo <piloto.fbx> <pasta_de_trabalho> [esqueleto]: personagem direto do Mixamo (sem Fuse).
-    Extrai as texturas embutidas do FBX para <pasta>/00_original/textures (se ainda não estiverem lá), guarda o
-    FBX em 00_original e grava 01_importado.range como se fosse a saída da etapa importar. Daí em diante é igual."""
+def _extrair_texturas(data, tex_dir):
+    """Grava os PNG embutidos no FBX (binário) em tex_dir, com o nome de arquivo que o FBX guarda perto de cada um
+    (<Personagem>_1001_Diffuse.png). Retorna os nomes."""
     import re
     import struct
-    fbx, out_dir = args[0], args[1]
-    skeleton = args[2] if len(args) > 2 else v2.DEFAULT_SKELETON
-    orig = os.path.join(out_dir, "00_original")
-    tex_dir = os.path.join(orig, "textures")
-    os.makedirs(tex_dir, exist_ok=True)
-    dst = os.path.join(orig, os.path.basename(fbx))
-    if not os.path.isfile(dst):
-        import shutil
-        shutil.copy2(fbx, dst)
-    data = open(dst, "rb").read()
-    names = ["Diffuse", "Specular", "Glossiness", "Normal"]   # ordem em que o Mixamo embute
-    prefix = None
-    for m in re.finditer(rb"(\w+)_1001_Diffuse\.png", data):
-        prefix = m.group(1).decode()
-        break
-    if prefix is None:
-        raise ValueError("FBX sem textura embutida reconhecível (<nome>_1001_Diffuse.png)")
-    # nomes na ordem real dos PNGs embutidos: o último "<prefix>_1001_<Tipo>.png" antes de cada assinatura PNG
-    for i, m in enumerate(re.finditer(b"\x89PNG\r\n\x1a\n", data)):
+    saidas = []
+    for m in re.finditer(b"\x89PNG\r\n\x1a\n", data):
         s, p = m.start(), m.start() + 8
         while True:
             ln, = struct.unpack(">I", data[p:p + 4])
@@ -65,12 +47,41 @@ def etapa_importar_mixamo(args):
             p += 12 + ln
             if typ == b"IEND":
                 break
-        kind = re.findall(rb"_1001_(\w+)\.png", data[max(0, s - 400):s])
-        kind = kind[-1].decode() if kind else names[i]
-        f = os.path.join(tex_dir, "%s_%s.png" % (prefix, kind))
+        nomes = re.findall(rb"([^\x00-\x1f/\\]+\.png)", data[max(0, s - 600):s], re.I)
+        if not nomes:
+            continue
+        base = nomes[-1].decode("latin-1")
+        f = os.path.join(tex_dir, base)
         if not os.path.isfile(f):
             open(f, "wb").write(data[s:p])
-    pieces, info = v2.import_mixamo(dst, tex_dir, prefix + "_1001", skeleton)
+        saidas.append(base)
+    return saidas
+
+
+def etapa_importar_mixamo(args):
+    """-- importar_mixamo <arquivo.fbx> <pasta_de_trabalho> [esqueleto]: personagem direto do Mixamo (sem Fuse).
+    Guarda o FBX em <pasta>/00_original, extrai as texturas embutidas (ou copia as da pasta <nome>.fbm ao lado)
+    para 00_original/textures e grava 01_importado.range como se fosse a saída da etapa importar. Daí em diante
+    é igual (esqueleto, pesos, cabeca, maos, atlas, lod, fechar)."""
+    import shutil
+    fbx, out_dir = args[0], args[1]
+    skeleton = args[2] if len(args) > 2 else v2.DEFAULT_SKELETON
+    orig = os.path.join(out_dir, "00_original")
+    tex_dir = os.path.join(orig, "textures")
+    os.makedirs(tex_dir, exist_ok=True)
+    dst = os.path.join(orig, os.path.basename(fbx))
+    if not os.path.isfile(dst):
+        shutil.copy2(fbx, dst)
+    stem = os.path.splitext(os.path.basename(fbx))[0] + ".fbm"
+    fbm = next((d for d in (os.path.join(os.path.dirname(fbx), stem), os.path.join(os.path.dirname(os.path.dirname(fbx)), stem))
+                if os.path.isdir(d)), None)
+    if fbm:   # texturas fora do arquivo (Mixamo antigo); a pasta pode estar um nível acima (FBX 2013/)
+        for f in os.listdir(fbm):
+            if not os.path.isfile(os.path.join(tex_dir, f)):
+                shutil.copy2(os.path.join(fbm, f), tex_dir)
+    _extrair_texturas(open(dst, "rb").read(), tex_dir)
+    pieces, info = v2.import_mixamo(dst, tex_dir, skeleton)
+    info["texturas"] = sorted(os.listdir(tex_dir))
     info["arquivo"] = v2.save_checkpoint(out_dir, "01_importado")
     info["render"] = v2.render_check(os.path.join(out_dir, "01_importado.png"), pieces)
     return info

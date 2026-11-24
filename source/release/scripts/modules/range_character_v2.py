@@ -196,43 +196,123 @@ def import_fuse(obj_path, skeleton=DEFAULT_SKELETON, report=print):
     return pieces, info
 
 
-def mixamo_material(name, tex_dir, prefix):
-    """Material no formato do jogo a partir dos PNGs extraídos do FBX do Mixamo (<prefix>_Diffuse/Normal/
-    Specular/Glossiness.png): opaco, normal map de verdade, especular pelo mapa e dureza pelo gloss."""
+_MIXAMO_KEYS = (("hair", "Hair"), ("lash", "Eyelashes"), ("eye", "Eyes"), ("bottom", "Bottoms"), ("beard", "Beard"), ("helmet", "Hat"), ("hat", "Hat"),
+                ("sneaker", "Shoes"), ("shoe", "Shoes"), ("boot", "Shoes"), ("sock", "Shoes"), ("shirt", "Tops"),
+                ("hoodie", "Tops"), ("suit", "Tops"), ("vest", "Tops"), ("jacket", "Tops"), ("coat", "Tops"),
+                ("top", "Tops"), ("tie", "Tops"), ("pant", "Bottoms"), ("short", "Bottoms"), ("belt", "Bottoms"),
+                ("skirt", "Bottoms"), ("body", "Body"))
+
+
+def mixamo_piece_name(name):
+    """Nome de peça do pipeline (Body, Hair, Eyelashes, Tops, Bottoms, Shoes, Hat, Beard) pelo nome da malha ou do
+    material do Mixamo (Ch08_Hoodie -> Tops). Sem pista: Tops (roupa)."""
+    import re
+    n = re.sub(r"^ch\d+_*", "", name.lower())
+    for key, piece in _MIXAMO_KEYS:
+        if key in n:
+            return piece
+    return "Tops"
+
+
+def _mixamo_files(mat, tex_dir):
+    """{diffuse, normal, specular, gloss}: arquivos de tex_dir pelo nome das imagens do material do FBX."""
+    out = {}
+    for ts in mat.texture_slots:
+        if not (ts and ts.texture and getattr(ts.texture, "image", None)):
+            continue
+        base = os.path.basename(ts.texture.image.filepath.replace("\\", "/"))
+        low = base.lower()
+        if "opac" in low:
+            kind = "opacity"
+        elif "diffuse" in low or "albedo" in low or "color" in low:
+            kind = "diffuse"
+        elif "normal" in low:
+            kind = "normal"
+        elif "spec" in low:
+            kind = "specular"
+        elif "gloss" in low:
+            kind = "gloss"
+        elif ts.use_map_color_diffuse:
+            kind = "diffuse"
+        else:
+            continue
+        f = os.path.join(tex_dir, base)
+        if os.path.isfile(f):
+            out.setdefault(kind, f)
+    return out
+
+
+def _diffuse_with_opacity(diffuse_path, opacity_path):
+    """Mixamo antigo guarda a opacidade num PNG à parte (Remy_Hair_Opacity.png): grava <diffuse>_alpha.png com ela
+    no canal alfa (o recorte do jogo lê o alfa do diffuse). Retorna o caminho."""
+    out = os.path.splitext(diffuse_path)[0] + "_alpha.png"
+    if os.path.isfile(out):
+        return out
+    d = bpy.data.images.load(diffuse_path, check_existing=True)
+    o = bpy.data.images.load(opacity_path, check_existing=True)
+    w, h = d.size
+    if tuple(o.size) != (w, h):
+        o = o.copy()
+        o.scale(w, h)
+    px = list(d.pixels)
+    px[3::4] = list(o.pixels)[0::4]
+    im = bpy.data.images.new("alpha_tmp", w, h, alpha=True)
+    im.pixels = px
+    im.filepath_raw = out
+    im.file_format = 'PNG'
+    im.save()
+    bpy.data.images.remove(im)
+    return out
+
+
+def mixamo_material(name, files, alpha_clip):
+    """Material no formato do jogo a partir dos PNGs do FBX do Mixamo: opaco (ou recorte por alfa no cabelo e
+    nos cílios), normal map de verdade, especular pelo mapa (não no cabelo) e dureza pelo gloss."""
+    if alpha_clip and "opacity" in files and "diffuse" in files:
+        files = dict(files, diffuse=_diffuse_with_opacity(files["diffuse"], files["opacity"]))
+
     def load(kind):
-        f = os.path.join(tex_dir, "%s_%s.png" % (prefix, kind))
-        return bpy.data.images.load(f, check_existing=True) if os.path.isfile(f) else None
-    diffuse, normal, specular, gloss = load("Diffuse"), load("Normal"), load("Specular"), load("Glossiness")
+        return bpy.data.images.load(files[kind], check_existing=True) if kind in files else None
+    diffuse, normal, specular, gloss = load("diffuse"), load("normal"), load("specular"), load("gloss")
     new = bpy.data.materials.new(name)
     if diffuse:
-        _add_slot(new, name + "_diffuse", diffuse, use_map_color_diffuse=True)
+        _add_slot(new, name + "_diffuse", diffuse, use_map_color_diffuse=True,
+                  use_map_alpha=alpha_clip, alpha_factor=1.0)
     if normal:
         normal.colorspace_settings.name = 'Non-Color'
         _add_slot(new, name + "_normal", normal, use_map_normal=True, normal_factor=1.0,
                   normal_map_space='TANGENT', tex_use_normal_map=True)
-    if specular:
+    if specular and not alpha_clip:
         specular.colorspace_settings.name = 'Non-Color'
         _add_slot(new, name + "_specular", specular, use_map_specular=True, specular_factor=0.2)
-    if gloss:
+    if gloss and not alpha_clip:
         gloss.colorspace_settings.name = 'Non-Color'
         _add_slot(new, name + "_gloss", gloss, use_map_hardness=True, hardness_factor=0.5)
     new.diffuse_color = (1.0, 1.0, 1.0)
     new.diffuse_intensity = 1.0
     new.specular_color = (1.0, 1.0, 1.0)
-    new.specular_intensity = 0.2
+    new.specular_intensity = 0.0 if alpha_clip else 0.2
     new.specular_hardness = 40
     new.diffuse_metallic_bsdf = new.specular_metallic_bsdf = 0.0
-    new.use_transparency = False
-    new.alpha = 1.0
-    new.game_settings.alpha_blend = 'OPAQUE'
+    if alpha_clip:
+        new.use_transparency = True
+        new.transparency_method = 'Z_TRANSPARENCY'
+        new.alpha = 0.0
+        new.game_settings.alpha_blend = 'CLIP'
+        new.use_cast_shadows = True
+    else:
+        new.use_transparency = False
+        new.alpha = 1.0
+        new.game_settings.alpha_blend = 'OPAQUE'
     return new
 
 
-def import_mixamo(fbx_path, tex_dir, tex_prefix, skeleton=DEFAULT_SKELETON, report=print):
-    """Etapa 1 para personagem que vem direto do Mixamo (sem Fuse): FBX com malha única + esqueleto + pesos.
+def import_mixamo(fbx_path, tex_dir, skeleton=DEFAULT_SKELETON, report=print):
+    """Etapa 1 para personagem que vem direto do Mixamo (sem Fuse): FBX com malhas + esqueleto + pesos.
     Joga fora o rig e os grupos de vértice do Mixamo (o v2 refaz esqueleto e pesos, igual aos do Fuse; o FBX
-    original fica guardado em 00_original), põe a malha de pé, em metros, frente +Y, altura da base, material
-    novo com as texturas extraídas do FBX. A malha vira a peça "Body". Retorna (peças, info)."""
+    original fica guardado em 00_original), divide malha com vários materiais, dá às peças os nomes do pipeline
+    (Body, Hair, Tops, ...), põe tudo de pé, em metros, frente +Y, altura da base, e monta um material novo por
+    peça com as texturas extraídas do FBX (tex_dir). Retorna (peças, info)."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     scene = bpy.context.scene
     scene.world = autorig.default_world()
@@ -256,33 +336,81 @@ def import_mixamo(fbx_path, tex_dir, tex_prefix, skeleton=DEFAULT_SKELETON, repo
     for o in new:
         if o.type != 'MESH':
             bpy.data.objects.remove(o, do_unlink=True)
+    # camadas auxiliares de n-gon do importador FBX (só em algumas peças) impedem juntar as malhas depois
+    import bmesh
+    for o in meshes:
+        bm = bmesh.new()
+        bm.from_mesh(o.data)
+        for coll in (bm.verts.layers.int, bm.edges.layers.int, bm.faces.layers.int, bm.loops.layers.int):
+            for name in [n for n in coll.keys() if n.startswith("NGon")]:
+                coll.remove(coll[name])
+        bm.to_mesh(o.data)
+        bm.free()
+        for uv in [u for u in o.data.uv_textures if u.name.startswith("NGon")]:
+            o.data.uv_textures.remove(uv)
+        for uv in o.data.uv_textures:   # mesmo nome de UV em todas as peças (senão o join do atlas falha)
+            uv.name = "UVMap"
     for a in list(bpy.data.actions):
         bpy.data.actions.remove(a)
-    # uma peça só (várias malhas são juntas), com o nome que o pipeline espera
-    if len(meshes) > 1:
-        bpy.ops.object.select_all(action='DESELECT')
-        for o in meshes:
+    # malha com vários materiais (nego, gas mack, Kachujin): uma peça por material
+    divididas = set()
+    for o in list(meshes):
+        used = {p.material_index for p in o.data.polygons}
+        if len(used) > 1:
+            before_sep = set(scene.objects)
+            for ob in scene.objects:
+                ob.select = False
             o.select = True
-        scene.objects.active = meshes[0]
-        bpy.ops.object.join()
-        meshes = [scene.objects.active]
-    body = meshes[0]
-    body.name = body.data.name = "Body"
-    mat = mixamo_material("Body", tex_dir, tex_prefix)
-    body.data.materials.clear()
-    body.data.materials.append(mat)
-    for p in body.data.polygons:
-        p.material_index = 0
+            scene.objects.active = o
+            bpy.ops.object.mode_set(mode='EDIT')
+            bpy.ops.mesh.select_all(action='SELECT')
+            bpy.ops.mesh.separate(type='MATERIAL')
+            bpy.ops.object.mode_set(mode='OBJECT')
+            novas = [x for x in scene.objects if x not in before_sep and x.type == 'MESH']
+            divididas.update([o] + novas)
+            meshes += novas
+    # nomes das peças: pelo material nas malhas divididas (o nome da malha é o mesmo), senão pelo nome da malha
+    names = {}
+    for o in meshes:
+        mat0 = o.data.materials[o.data.polygons[0].material_index] if o.data.polygons and o.data.materials else None
+        names[o] = mixamo_piece_name(mat0.name if (mat0 and o in divididas) else o.name)
+    bodies = [o for o in meshes if names[o] == "Body"]
+    if not bodies:   # sem pista no nome (ex.: Kachujin): a maior peça é o corpo
+        bodies = [max(meshes, key=autorig._tris)]
+        names[bodies[0]] = "Body"
+    for o in sorted(bodies, key=autorig._tris, reverse=True)[1:]:
+        names[o] = "Tops"
+    # materiais novos: um por material de origem; cabelo/cílios (recorte por alfa) um por peça
+    made = {}
+    for o in sorted(meshes, key=lambda x: (names[x] != "Body", names[x], x.name)):
+        piece = names[o]
+        clip = piece.lower() in ALPHA_PIECES
+        mats = list(o.data.materials)
+        for i, m in enumerate(mats):
+            if m is None:
+                continue
+            key = (o.name, i) if clip else m.as_pointer()
+            if key not in made:
+                made[key] = mixamo_material(piece, _mixamo_files(m, tex_dir), clip)
+            mats[i] = made[key]
+        o.data.materials.clear()
+        for m in mats:
+            o.data.materials.append(m)
+    for o in meshes:
+        o.name = o.data.name = names[o]
+    for o in meshes:
+        if o.name.split(".")[0].lower() in ALPHA_PIECES:
+            clip_base_color(o)
     for mat0 in [m for m in bpy.data.materials if m.users == 0]:
         bpy.data.materials.remove(mat0)
     scene.update()
-    info.update(autorig.align_to_base([body], arm0, report=report))
-    info["frente_depois"] = autorig.mesh_front([body])[0]
+    info.update(autorig.align_to_base(meshes, arm0, report=report))
+    info["frente_depois"] = autorig.mesh_front(meshes)[0]
     bpy.data.objects.remove(proxy, do_unlink=True)
     bpy.data.objects.remove(arm0, do_unlink=True)
-    info["pecas"] = {body.name: autorig._tris(body)}
+    info["pecas"] = {o.name: autorig._tris(o) for o in meshes}
     info["esqueleto"] = skeleton
-    return [body], info
+    return meshes, info
 
 
 def _skeleton_folder(skeleton):
