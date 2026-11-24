@@ -900,7 +900,14 @@ bool KX_KetsjiEngine::NextFrame()
 		// backlog never converts an out-of-range quotient to int (CLK-01).
 		steps = 0;
 		if (m_framestep > 0.0) {
-			steps = (int)std::min(std::floor(m_simAccumulator / m_framestep), (double)m_maxLogicFrame);
+#ifdef __EMSCRIPTEN__
+			/* Web: no in-frame wait, so rAF arrives 1-2 ms early/late; a frame at 0.96 step would give 0 steps. */
+			const double stepTolerance = (m_framestep > 0.006) ? 0.002 : 0.0;
+#else
+			const double stepTolerance = 0.0;
+#endif
+			steps = (int)std::min(std::floor((m_simAccumulator + stepTolerance) / m_framestep),
+			                      (double)m_maxLogicFrame);
 		}
 		for (int i = 0; i < steps; ++i) {
 			if (i > 0) {

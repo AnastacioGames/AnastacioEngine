@@ -852,14 +852,32 @@ KX_ExitInfo LA_Launcher::EngineMainLoop()
 			 * browser frames that come before the game's next frame are skipped, so a 120 Hz
 			 * screen still runs a 60 FPS game at 60. A margin of 2 ms absorbs rAF jitter. */
 			static double next = 0.0;
+			static double lastRaf = 0.0;
+			static double rafAvg = 0.0;
 			const double now = emscripten_get_now();
 			const double rate = self->m_ketsjiEngine->GetTicRate();
+			/* Measured rAF interval (smoothed; long stalls are ignored). */
+			if (lastRaf > 0.0) {
+				const double dt = now - lastRaf;
+				if (dt < 100.0) {
+					rafAvg = (rafAvg > 0.0) ? rafAvg * 0.9 + dt * 0.1 : dt;
+				}
+			}
+			lastRaf = now;
 			if (rate > 0.0) {
 				const double step = 1000.0 / rate;
-				if (now < next - 2.0) {
+				/* Only skip when the monitor is clearly faster than the game (120/144 Hz with a 60 FPS
+				 * game). When rAF is near the game rate every frame runs: skipping on jitter gave
+				 * 0/1/2 logic steps per frame. */
+				const bool monitorFaster = rafAvg > 0.0 && rafAvg < step * 0.75;
+				if (monitorFaster && now < next - 2.0) {
 					return;
 				}
-				next = (now - next > step) ? now + step : next + step;
+				/* Keep the phase; only drop the lag beyond one step (no full re-anchor). */
+				next += step;
+				if (now - next > step) {
+					next = now;
+				}
 			}
 			self->m_emscriptenExitInfo = self->EngineNextFrame();
 			if (self->m_emscriptenExitInfo.m_code != KX_ExitInfo::NO_REQUEST) {

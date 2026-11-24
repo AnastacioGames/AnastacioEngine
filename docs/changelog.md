@@ -8,6 +8,12 @@ da época e podem conter hipóteses corrigidas em entradas posteriores. Para o e
 
 
 
+## 2026-11-24 — Web: ritmo da lógica estável (relato do musikai, 0.7.x)
+
+- `LA_Launcher.cpp`: o limitador de quadros do rAF só pula quadros quando o monitor é claramente mais rápido que o jogo (rAF médio < 75% do passo); perto da taxa do jogo, todo quadro roda. O `next` mantém a fase em vez de reancorar a cada atraso.
+- `KX_KetsjiEngine.cpp`: no Emscripten o acumulador do Fixed Timestep tolera 2 ms (`floor((acc+ε)/passo)`), evitando 0/1/2 passos por quadro com jitter do rAF.
+- Testado: `build-web-release` compila e o pacote roda no Edge headless (SwiftShader, sem ritmo representativo). Falta validar com janela real e `steps=` no log. Hipótese ainda não confirmada no navegador do musikai.
+
 ## 2026-11-22 — Controle por IA: pedido de liberação
 
 - A IA pode pedir para editar (`pedir_liberacao`): aparece um aviso com Permitir/Negar no cabeçalho do editor. Só o clique do usuário libera; negar segura novos pedidos por 30 s; expira em 60 s.
