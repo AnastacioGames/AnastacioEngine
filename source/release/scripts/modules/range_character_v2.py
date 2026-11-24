@@ -307,6 +307,27 @@ def mixamo_material(name, files, alpha_clip):
     return new
 
 
+MIXAMO_CARD_TRIS = {"Hair": 4500, "Beard": 1500, "Hat": 3000}   # cabelo/barba do Mixamo são cartões de 4-14 mil tris
+
+
+def reduce_cards(ob, target):
+    """Collapse nos cartões de cabelo/barba/capacete até `target` triângulos (UV e alfa seguem junto). Retorna (antes, depois)."""
+    before = autorig._tris(ob)
+    if before <= target * 1.05:
+        return before, before
+    scene = bpy.context.scene
+    for x in scene.objects:
+        x.select = False
+    ob.select = True
+    scene.objects.active = ob
+    mod = ob.modifiers.new("reduzir", 'DECIMATE')
+    mod.decimate_type = 'COLLAPSE'
+    mod.ratio = max(0.05, target / float(before))
+    mod.use_collapse_triangulate = True
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    return before, autorig._tris(ob)
+
+
 def import_mixamo(fbx_path, tex_dir, skeleton=DEFAULT_SKELETON, report=print):
     """Etapa 1 para personagem que vem direto do Mixamo (sem Fuse): FBX com malhas + esqueleto + pesos.
     Joga fora o rig e os grupos de vértice do Mixamo (o v2 refaz esqueleto e pesos, igual aos do Fuse; o FBX
@@ -398,6 +419,11 @@ def import_mixamo(fbx_path, tex_dir, skeleton=DEFAULT_SKELETON, report=print):
             o.data.materials.append(m)
     for o in meshes:
         o.name = o.data.name = names[o]
+    info["cartoes"] = {}
+    for o in meshes:
+        alvo = MIXAMO_CARD_TRIS.get(o.name.split(".")[0])
+        if alvo:
+            info["cartoes"][o.name] = reduce_cards(o, alvo)
     for o in meshes:
         if o.name.split(".")[0].lower() in ALPHA_PIECES:
             clip_base_color(o)
